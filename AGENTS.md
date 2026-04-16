@@ -1,85 +1,67 @@
 # AGENTS.md
 
-## Quick Start
+## Build Commands
 
 ```bash
-# Prerequisites check
-java -version      # Must be Java 21+
-gradle --version   # Must be Gradle 8.x
-ollama list        # Ollama must be installed
-
-# Start Ollama (required for local provider)
-ollama serve
-
-# Build and run
-gradle build
-gradle run
+gradle build              # Build project
+gradle run                # Run application
+gradle copyAllDependencies # Copy deps to lib/ folder
 ```
 
-## Project Status
+## Prerequisites
 
-**Early stage** - Documentation only, no source code implemented yet. See [Roadmap](README.md#roadmap) for phases.
+- Java 21+
+- Gradle (installed via Homebrew on macOS)
+- Ollama running (`ollama serve`) for local LLM
+
+## Project Structure
+
+```
+src/main/kotlin/com/visualagent/
+├── Main.kt                    # Application entry point
+├── agent/                     # LLM client, provider interface
+├── config/                    # AppConfig singleton
+├── knowledge/                 # SQLite KnowledgeDb
+├── todo/                      # Todo model
+└── ui/                        # JavaFX UI panels
+    └── panels/                # SubAgents, Chat, Todo, Canvas panels
+```
 
 ## Tech Stack
 
-| Component | Technology |
-|-----------|------------|
-| Language | Kotlin |
-| Build | Gradle (Kotlin DSL) |
-| UI | JavaFX 21 |
-| Database | SQLite (embedded) |
-| HTTP | Ktor |
-| LLM | Ollama API |
+Kotlin, Gradle (Kotlin DSL), JavaFX 21, SQLite, Ktor HTTP client
 
-## Architecture
+## Key Patterns
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     MAIN WINDOW (JavaFX)                    │
-├──────────────┬──────────────────┬───────────────────────────┤
-│  SUBAGENTS   │     CHAT         │        TODOS              │
-│   Panel      │     Panel        │        Panel              │
-├──────────────┴──────────────────┴───────────────────────────┤
-│                    CANVAS (visual output)                   │
-└─────────────────────────────────────────────────────────────┘
-                              │
-         ┌────────────────────┼────────────────────┐
-         │                    │                    │
-   ┌─────▼─────┐      ┌──────▼──────┐     ┌──────▼──────┐
-   │  OLLAMA   │      │  KNOWLEDGE  │     │   BROWSER   │
-   │  CLIENT   │      │    DB       │     │ CONTROLLER  │
-   └───────────┘      └─────────────┘     └─────────────┘
-```
-
-## Key Directories
-
-- `docs/` - All documentation (English)
-- `src/main/kotlin/` - Application source (to be created)
-- `src/main/resources/` - Config, styles, FXML, images
+- **AppConfig**: Singleton loaded from `src/main/resources/config/app.properties`
+- **LLMProvider**: Interface for Ollama/Cloud providers in `agent/LLMProvider.kt`
+- **Region inheritance**: UI panels extend `javafx.scene.layout.Region`
+- **VBox orientation**: VBox is always vertical in JavaFX - no `.orientation` property
 
 ## Gotchas
 
-1. **JavaFX modules** - May need JVM args in `build.gradle.kts`:
+1. JavaFX modules require JVM args for modular JDK:
    ```kotlin
-   applicationDefaultJvmArgs = listOf(
-       "--add-modules", "javafx.controls,javafx.fxml,javafx.web"
-   )
+   "--add-modules", "javafx.controls,javafx.fxml,javafx.web,javafx.graphics,javafx.media,javafx.swing,javafx.base"
    ```
 
-2. **Ollama must be running** - `ollama serve` before using local provider
+2. `ollama serve` must be running before `gradle run`
 
-3. **SQLite database path** - Default: `./data/visual-agent.db` - ensure directory exists
+3. Dependencies copied to `lib/` via `gradle copyAllDependencies`
 
-4. **Screen access on macOS** - Requires "Screen Recording" permission for window capture features
+4. Kotlinx Serialization requires explicit `@Serializable` annotation on data classes used with `Json.encodeToString/decodeFromString`
+
+5. `json.parseToJsonElement()` returns `JsonElement` - use `.jsonObject`, `.jsonArray`, `.jsonPrimitive` extensions
 
 ## Documentation Language
 
 All documentation and code comments are in **English**.
 
-## Next Implementation Steps
+## Development Philosophy
 
-1. Create `build.gradle.kts` and `settings.gradle.kts`
-2. Implement `Main.kt` with JavaFX application
-3. Build Ollama client (`agent/OllamaClient.kt`)
-4. Create UI panels (Chat, SubAgents, Todos, Canvas)
-5. Set up SQLite database schema
+**Write software you would be happy to use yourself.** Prioritize:
+- Intuitive UI/UX that feels natural
+- Clear, readable code that explains its intent
+- Thoughtful error handling with helpful messages
+- Performance that doesn't frustrate users
+- Features that provide real value in daily work
