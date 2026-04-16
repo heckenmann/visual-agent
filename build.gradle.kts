@@ -1,5 +1,6 @@
 plugins {
     kotlin("jvm") version "1.9.21"
+    kotlin("plugin.serialization") version "1.9.21"
     application
 }
 
@@ -20,15 +21,19 @@ val platform = when {
     else -> "linux"
 }
 
-val javafxVersion = "21"
+val javafxVersion = "21.0.2"
 
 dependencies {
     implementation(kotlin("stdlib"))
     
-    // JavaFX 21 with platform classifier
+    // JavaFX 21 - all modules needed
+    implementation("org.openjfx:javafx-base:$javafxVersion:$platform")
     implementation("org.openjfx:javafx-controls:$javafxVersion:$platform")
     implementation("org.openjfx:javafx-fxml:$javafxVersion:$platform")
+    implementation("org.openjfx:javafx-graphics:$javafxVersion:$platform")
+    implementation("org.openjfx:javafx-media:$javafxVersion:$platform")
     implementation("org.openjfx:javafx-web:$javafxVersion:$platform")
+    implementation("org.openjfx:javafx-swing:$javafxVersion:$platform")
     
     // SQLite JDBC
     implementation("org.xerial:sqlite-jdbc:3.45.0.0")
@@ -51,11 +56,10 @@ dependencies {
 }
 
 application {
-    mainClass.set("MainKt")
+    mainClass.set("com.visualagent.MainKt")
     
-    // JVM Args für JavaFX Module
     applicationDefaultJvmArgs = listOf(
-        "--add-modules", "javafx.controls,javafx.fxml,javafx.web",
+        "--add-modules", "javafx.controls,javafx.fxml,javafx.web,javafx.graphics,javafx.media,javafx.swing,javafx.base",
         "--add-opens", "javafx.graphics/com.sun.javafx.application=ALL-UNNAMED"
     )
 }
@@ -70,7 +74,6 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
     }
 }
 
-// Alle Dependencies in den Projektordner kopieren
 tasks.register<Copy>("copyDependencies") {
     from(configurations.runtimeClasspath)
     into("lib")
