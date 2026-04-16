@@ -102,3 +102,8 @@ tasks.register<JavaExec>("format") {
     mainClass.set("com.pinterest.ktlint.Main")
     args = listOf("-F", "src/**/*.kt")
 }
+
+// Auto-format before compilation
+tasks.named("compileKotlin") {
+    dependsOn("format")
+}
