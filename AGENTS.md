@@ -6,6 +6,24 @@
 gradle build              # Build project
 gradle run                # Run application
 gradle copyAllDependencies # Copy deps to lib/ folder
+gradle test               # Run tests
+```
+
+## Pre-Commit Quality Checks
+
+Run before every commit:
+```bash
+gradle build
+gradle test
+```
+
+If available, also run:
+```bash
+# Linting
+./gradlew ktlintCheck
+
+# Type checking
+./gradlew check
 ```
 
 ## Prerequisites
