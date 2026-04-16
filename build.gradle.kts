@@ -90,3 +90,15 @@ ktlint {
     android.set(false)
     outputColorName.set("RED")
 }
+
+/**
+ * Format all Kotlin source files according to ktlint rules.
+ * Run with: ./gradlew format
+ */
+tasks.register<JavaExec>("format") {
+    group = "formatting"
+    description = "Format Kotlin source files using ktlint"
+    classpath = configurations.getByName("ktlint")
+    mainClass.set("com.pinterest.ktlint.Main")
+    args = listOf("-F", "src/**/*.kt")
+}
