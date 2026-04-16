@@ -75,6 +75,34 @@ Kotlin, Gradle (Kotlin DSL), JavaFX 21, SQLite, Ktor HTTP client
 
 All documentation and code comments are in **English**.
 
+## Code Documentation
+
+All public APIs must have meaningful Javadoc comments:
+- Classes: purpose, usage context, important constraints
+- Methods: parameters, return values, exceptions, side effects
+- Properties: purpose and valid value ranges
+
+Example:
+```kotlin
+/**
+ * LLM provider interface for chat, streaming, vision, and embedding capabilities.
+ *
+ * @property baseUrl The Ollama API endpoint (default: http://localhost:11434)
+ * @see OllamaClient for local implementation
+ * @see OllamaCloudProvider for cloud implementation
+ */
+interface LLMProvider {
+    /**
+     * Send a chat message and receive a response.
+     *
+     * @param messages List of conversation messages
+     * @return Complete chat response from the LLM
+     * @throws LLMError if the request fails or model is unavailable
+     */
+    suspend fun chat(messages: List<Message>): ChatResponse
+}
+```
+
 ## Development Philosophy
 
 **Write software you would be happy to use yourself.** Prioritize:

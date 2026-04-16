@@ -3,14 +3,65 @@ package com.visualagent.agent
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.Serializable
 
+/**
+ * LLM provider interface for chat, streaming, vision, and embedding capabilities.
+ *
+ * This interface abstracts the underlying LLM provider (Ollama Local, Ollama Cloud, etc.)
+ * and provides a unified API for interacting with language models.
+ *
+ * @see OllamaClient for local Ollama implementation
+ * @see OllamaCloudProvider for cloud implementation
+ */
 interface LLMProvider {
+    /**
+     * Send a chat message and receive a complete response.
+     *
+     * @param messages List of conversation messages with roles (system, user, assistant)
+     * @return Complete chat response from the LLM
+     * @throws Exception if the request fails or model is unavailable
+     */
     suspend fun chat(messages: List<Message>): ChatResponse
+
+    /**
+     * Stream a chat response in real-time chunks.
+     *
+     * @param messages List of conversation messages
+     * @return Flow of response chunks for real-time display
+     */
     suspend fun stream(messages: List<Message>): Flow<ChatResponse>
+
+    /**
+     * Process an image with a vision-capable model.
+     *
+     * @param image Raw image bytes to analyze
+     * @param prompt Text prompt for image analysis
+     * @return Response describing the image content
+     */
     suspend fun vision(image: ByteArray, prompt: String): ChatResponse
+
+    /**
+     * Generate embeddings for text.
+     *
+     * @param text Text to generate embeddings for
+     * @return List of embedding values
+     */
     suspend fun embeddings(text: String): List<Double>
+
+    /**
+     * Check if the provider is currently connected and available.
+     *
+     * @return true if connected, false otherwise
+     */
     fun isConnected(): Boolean
 }
 
+/**
+ * Represents a single message in a conversation.
+ *
+ * @property role Message role (system, user, or assistant)
+ * @property content Text content of the message
+ * @property images Optional list of base64-encoded images (for vision)
+ */
 @Serializable
 data class Message(
     val role: String,
@@ -18,6 +69,14 @@ data class Message(
     val images: List<String>? = null,
 )
 
+/**
+ * Request payload for chat API.
+ *
+ * @property model Model name to use
+ * @property messages List of conversation messages
+ * @property stream Enable streaming responses
+ * @property options Optional model-specific options
+ */
 @Serializable
 data class ChatRequest(
     val model: String,
@@ -26,6 +85,16 @@ data class ChatRequest(
     val options: Map<String, String>? = null,
 )
 
+/**
+ * Response from chat API.
+ *
+ * @property model Model that generated the response
+ * @property message The assistant's response message
+ * @property done Whether this is the final chunk
+ * @property totalDuration Total processing time in nanoseconds
+ * @property promptEvalCount Number of tokens in the prompt
+ * @property evalCount Number of tokens in the response
+ */
 @Serializable
 data class ChatResponse(
     val model: String,

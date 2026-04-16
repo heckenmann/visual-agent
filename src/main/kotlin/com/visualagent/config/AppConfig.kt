@@ -4,6 +4,19 @@ import java.io.File
 import java.io.FileInputStream
 import java.util.Properties
 
+/**
+ * Application configuration singleton.
+ *
+ * Loads configuration from `src/main/resources/config/app.properties`.
+ * Provides access to Ollama settings, database path, UI preferences, and browser configuration.
+ *
+ * @property ollamaLocalUrl Ollama API endpoint (default: http://localhost:11434)
+ * @property ollamaModel Default model name (default: llama3.2)
+ * @property databasePath Path to SQLite database file
+ * @property theme UI theme (default: dark)
+ * @property fontSize UI font size (default: 14)
+ * @property browserDefault Default browser for web integration (default: firefox)
+ */
 class AppConfig private constructor() {
 
     var ollamaLocalUrl: String = "http://localhost:11434"
@@ -14,6 +27,7 @@ class AppConfig private constructor() {
     var browserDefault: String = "firefox"
 
     companion object {
+        /** Singleton instance of AppConfig */
         val instance: AppConfig by lazy { AppConfig().load() }
     }
 
