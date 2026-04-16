@@ -26,6 +26,17 @@ If available, also run:
 ./gradlew check
 ```
 
+### Security
+
+**Never commit sensitive data:**
+- API keys, passwords, secrets
+- Authentication tokens
+- Private keys
+- Database credentials
+- User personal information
+
+Store sensitive data in environment variables or secure configuration files that are excluded from version control (see `.gitignore`).
+
 ## Prerequisites
 
 - Java 21+
