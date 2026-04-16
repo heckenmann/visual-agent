@@ -6,14 +6,14 @@ enum class TodoStatus {
     PENDING,
     IN_PROGRESS,
     COMPLETED,
-    CANCELLED
+    CANCELLED,
 }
 
 enum class TodoPriority {
     LOW,
     MEDIUM,
     HIGH,
-    URGENT
+    URGENT,
 }
 
 data class Todo(
@@ -24,5 +24,5 @@ data class Todo(
     val assignedAgentId: String? = null,
     val createdAt: Instant = Instant.now(),
     var completedAt: Instant? = null,
-    val dueDate: Instant? = null
+    val dueDate: Instant? = null,
 )

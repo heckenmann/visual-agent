@@ -1,0 +1,17 @@
+root = true
+
+[*.kt]
+indent_style = space
+indent_size = 4
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# Ktlint rules
+ktlint_code_style = kotlin
+ktlint_experimental_ruleset = standard
+
+# Javadoc rules (if supported by ktlint version)
+ktlint_javadoc_visibility = INTERNAL
+ktlint_disabled_rules = no-wildcard-imports

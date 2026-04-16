@@ -15,7 +15,7 @@ interface LLMProvider {
 data class Message(
     val role: String,
     val content: String,
-    val images: List<String>? = null
+    val images: List<String>? = null,
 )
 
 @Serializable
@@ -23,7 +23,7 @@ data class ChatRequest(
     val model: String,
     val messages: List<Message>,
     val stream: Boolean = false,
-    val options: Map<String, String>? = null
+    val options: Map<String, String>? = null,
 )
 
 @Serializable
@@ -33,5 +33,5 @@ data class ChatResponse(
     val done: Boolean,
     val totalDuration: Long? = null,
     val promptEvalCount: Int? = null,
-    val evalCount: Int? = null
+    val evalCount: Int? = null,
 )

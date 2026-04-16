@@ -3,7 +3,7 @@ package com.visualagent.agent
 enum class AgentStatus {
     IDLE,
     BUSY,
-    OFFLINE
+    OFFLINE,
 }
 
 data class SubAgent(
@@ -12,5 +12,5 @@ data class SubAgent(
     val role: String,
     var status: AgentStatus = AgentStatus.IDLE,
     var currentTask: String? = null,
-    val parentAgentId: String? = null
+    val parentAgentId: String? = null,
 )
