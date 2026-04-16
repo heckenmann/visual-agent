@@ -99,6 +99,7 @@ tasks.register<JavaExec>("format") {
     args = listOf("-F", "src/**/*.kt")
 }
 
-tasks.named("compileKotlin") {
-    dependsOn("format")
-}
+// Disabled - ktlint format requires classpath setup
+// tasks.named("compileKotlin") {
+//     dependsOn("format")
+// }
