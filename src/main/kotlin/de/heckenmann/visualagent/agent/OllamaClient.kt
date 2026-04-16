@@ -1,6 +1,6 @@
-package com.visualagent.agent
+package de.heckenmann.visualagent.agent
 
-import com.visualagent.config.AppConfig
+import de.heckenmann.visualagent.config.AppConfig
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.request.get

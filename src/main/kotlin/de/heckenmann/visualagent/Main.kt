@@ -1,6 +1,6 @@
-package com.visualagent
+package de.heckenmann.visualagent
 
-import com.visualagent.ui.MainWindow
+import de.heckenmann.visualagent.ui.MainWindow
 import javafx.application.Application
 import javafx.stage.Stage
 

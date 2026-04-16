@@ -1,7 +1,7 @@
-package com.visualagent.ui.panels
+package de.heckenmann.visualagent.ui.panels
 
-import com.visualagent.agent.AgentStatus
-import com.visualagent.agent.SubAgent
+import de.heckenmann.visualagent.agent.AgentStatus
+import de.heckenmann.visualagent.agent.SubAgent
 import javafx.scene.control.Label
 import javafx.scene.layout.Priority
 import javafx.scene.layout.Region
@@ -33,6 +33,11 @@ class SubAgentsPanel : Region() {
 
         children.add(rootVBox)
         VBox.setVgrow(this, Priority.ALWAYS)
+
+        minWidth = 200.0
+        maxWidth = 300.0
+        minHeight = 300.0
+        maxHeight = 600.0
     }
 
     private fun createDefaultAgents() {

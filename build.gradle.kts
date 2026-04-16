@@ -5,7 +5,7 @@ plugins {
     application
 }
 
-group = "com.visualagent"
+group = "de.heckenmann.visualagent"
 version = "0.1.0"
 
 repositories {
@@ -57,11 +57,11 @@ dependencies {
 }
 
 application {
-    mainClass.set("com.visualagent.MainKt")
+    mainClass.set("de.heckenmann.visualagent.Main")
 
     applicationDefaultJvmArgs = listOf(
-        "--add-modules", "javafx.controls,javafx.fxml,javafx.web,javafx.graphics,javafx.media,javafx.swing,javafx.base",
-        "--add-opens", "javafx.graphics/com.sun.javafx.application=ALL-UNNAMED",
+        "--module-path", "${rootDir}/lib",
+        "--add-modules", "javafx.controls,javafx.fxml,javafx.web,javafx.graphics,javafx.media,javafx.swing,javafx.base"
     )
 }
 
@@ -91,10 +91,6 @@ ktlint {
     outputColorName.set("RED")
 }
 
-/**
- * Format all Kotlin source files according to ktlint rules.
- * Run with: ./gradlew format
- */
 tasks.register<JavaExec>("format") {
     group = "formatting"
     description = "Format Kotlin source files using ktlint"
@@ -103,7 +99,6 @@ tasks.register<JavaExec>("format") {
     args = listOf("-F", "src/**/*.kt")
 }
 
-// Auto-format before compilation
 tasks.named("compileKotlin") {
     dependsOn("format")
 }

@@ -1,4 +1,4 @@
-package com.visualagent.config
+package de.heckenmann.visualagent.config
 
 import java.io.File
 import java.io.FileInputStream

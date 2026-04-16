@@ -1,4 +1,4 @@
-package com.visualagent.knowledge
+package de.heckenmann.visualagent.knowledge
 
 import java.sql.Connection
 import java.sql.DriverManager

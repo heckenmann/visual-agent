@@ -1,8 +1,8 @@
-package com.visualagent.ui.panels
+package de.heckenmann.visualagent.ui.panels
 
-import com.visualagent.todo.Todo
-import com.visualagent.todo.TodoPriority
-import com.visualagent.todo.TodoStatus
+import de.heckenmann.visualagent.todo.Todo
+import de.heckenmann.visualagent.todo.TodoPriority
+import de.heckenmann.visualagent.todo.TodoStatus
 import javafx.scene.control.CheckBox
 import javafx.scene.control.Label
 import javafx.scene.control.ListView
@@ -39,6 +39,11 @@ class TodoPanel : Region() {
 
         children.add(rootBorderPane)
         VBox.setVgrow(todoListView, Priority.ALWAYS)
+
+        minWidth = 200.0
+        maxWidth = 300.0
+        minHeight = 300.0
+        maxHeight = 600.0
     }
 
     private fun createSampleTodos() {

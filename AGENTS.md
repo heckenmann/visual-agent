@@ -46,7 +46,7 @@ Store sensitive data in environment variables or secure configuration files that
 ## Project Structure
 
 ```
-src/main/kotlin/com/visualagent/
+src/main/kotlin/de/heckenmann/visualagent/
 ├── Main.kt                    # Application entry point
 ├── agent/                     # LLM client, provider interface
 ├── config/                    # AppConfig singleton

@@ -1,4 +1,4 @@
-package com.visualagent.ui
+package de.heckenmann.visualagent.ui
 
 import javafx.scene.control.Label
 import javafx.scene.layout.BorderPane

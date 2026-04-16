@@ -1,6 +1,6 @@
-package com.visualagent.agent
+package de.heckenmann.visualagent.agent
 
-import com.visualagent.knowledge.KnowledgeDb
+import de.heckenmann.visualagent.knowledge.KnowledgeDb
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

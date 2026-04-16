@@ -1,5 +1,6 @@
-package com.visualagent.ui.panels
+package de.heckenmann.visualagent.ui.panels
 
+import javafx.geometry.Insets
 import javafx.scene.canvas.Canvas
 import javafx.scene.canvas.GraphicsContext
 import javafx.scene.control.Label
@@ -14,8 +15,9 @@ import javafx.scene.text.FontWeight
 class CanvasPanel : Region() {
 
     private val rootBorderPane = BorderPane()
-    private val canvas = Canvas(800.0, 300.0)
+    private val canvas = Canvas()
     private val gc: GraphicsContext = canvas.graphicsContext2D
+    private val titleLabel = Label("Canvas")
 
     init {
         setupUI()
@@ -26,7 +28,6 @@ class CanvasPanel : Region() {
         styleClass.add("canvas-panel")
         style = "-fx-background-color: #1e1e1e;"
 
-        val titleLabel = Label("Canvas")
         titleLabel.font = Font.font("System", FontWeight.BOLD, 14.0)
         titleLabel.style = "-fx-text-fill: #e0e0e0; -fx-padding: 4px;"
 
@@ -37,8 +38,11 @@ class CanvasPanel : Region() {
         canvas.heightProperty().bind(heightProperty().subtract(40.0))
 
         children.add(rootBorderPane)
-        BorderPane.setMargin(canvas, javafx.geometry.Insets(8.0))
-        VBox.setVgrow(this, Priority.ALWAYS)
+        BorderPane.setMargin(canvas, Insets(8.0))
+
+        minHeight = 100.0
+        prefHeight = 200.0
+        maxHeight = 400.0
     }
 
     fun clearCanvas() {

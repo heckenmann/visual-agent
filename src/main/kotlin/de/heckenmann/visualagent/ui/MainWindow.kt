@@ -1,9 +1,9 @@
-package com.visualagent.ui
+package de.heckenmann.visualagent.ui
 
-import com.visualagent.ui.panels.CanvasPanel
-import com.visualagent.ui.panels.ChatPanel
-import com.visualagent.ui.panels.SubAgentsPanel
-import com.visualagent.ui.panels.TodoPanel
+import de.heckenmann.visualagent.ui.panels.CanvasPanel
+import de.heckenmann.visualagent.ui.panels.ChatPanel
+import de.heckenmann.visualagent.ui.panels.SubAgentsPanel
+import de.heckenmann.visualagent.ui.panels.TodoPanel
 import javafx.geometry.Insets
 import javafx.scene.layout.BorderPane
 import javafx.stage.Stage

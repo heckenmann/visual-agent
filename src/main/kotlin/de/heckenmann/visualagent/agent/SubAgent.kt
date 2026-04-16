@@ -1,4 +1,4 @@
-package com.visualagent.agent
+package de.heckenmann.visualagent.agent
 
 enum class AgentStatus {
     IDLE,

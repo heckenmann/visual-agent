@@ -1,4 +1,4 @@
-package com.visualagent.todo
+package de.heckenmann.visualagent.todo
 
 import java.time.Instant
 

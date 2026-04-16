@@ -1,4 +1,4 @@
-package com.visualagent.agent
+package de.heckenmann.visualagent.agent
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.Serializable
