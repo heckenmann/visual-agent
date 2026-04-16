@@ -60,8 +60,8 @@ application {
     mainClass.set("de.heckenmann.visualagent.Main")
 
     applicationDefaultJvmArgs = listOf(
-        "--module-path", "${rootDir}/lib",
-        "--add-modules", "javafx.controls,javafx.fxml,javafx.web,javafx.graphics,javafx.media,javafx.swing,javafx.base"
+        "--module-path", rootDir.resolve("lib").toString(),
+        "--add-modules", "javafx.controls,javafx.fxml,javafx.web,javafx.graphics,javafx.media,javafx.swing,javafx.base",
     )
 }
 

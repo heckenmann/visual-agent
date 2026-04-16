@@ -42,8 +42,9 @@ class MainWindow : Stage() {
     }
 
     private fun setupStyles() {
-        scene.stylesheets.add(
-            java.net.URL("file://${System.getProperty("user.dir")}/src/main/resources/styles/dark.css").toExternalForm(),
-        )
+        val cssFile = java.io.File(System.getProperty("user.dir"), "src/main/resources/styles/dark.css")
+        if (cssFile.exists()) {
+            scene.stylesheets.add(cssFile.toURI().toURL().toExternalForm())
+        }
     }
 }
