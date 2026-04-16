@@ -2,16 +2,19 @@
 
 A modern Kotlin-based coding agent with JavaFX UI, utilizing local and cloud LLMs via Ollama.
 
-## Features
+## Current Status
 
-- 🤖 **Multi-Provider Support** - Ollama Local, Ollama Cloud, and more providers
-- 🧠 **SubAgents** - Parallel agents with specialized tasks
-- ✅ **Todo System** - Integrated task management with live view
-- 💾 **Knowledge Database** - SQLite-based long-term knowledge storage
-- 🎨 **Canvas** - Visual output and diagrams
-- 🌐 **Browser Integration** - Firefox integration for web analysis
-- 🖥️ **Window Access** - Screen access for visual analysis
-- 👤 **Personalization** - Agent name, image, and settings
+**Phase 1 — Early Implementation.** UI shells are built, backend wiring is in progress.
+
+| Feature | UI | Backend | Wired |
+|---------|----|---------|-------|
+| Chat | Done | `AgentManager.sendMessage()` exists | No — send button has no handler |
+| SubAgents | Done | Hardcoded in `AgentManager` | No — panel creates its own data |
+| Todos | Done | DB table exists | No — panel uses sample data |
+| Canvas | Done | Draw methods work | Yes |
+| Status Bar | Done | Update methods exist | No — always shows "Disconnected" |
+| Ollama Client | N/A | Implemented, never called | No |
+| Knowledge DB | N/A | Tables + partial CRUD | Partially |
 
 ## Tech Stack
 
@@ -23,6 +26,8 @@ A modern Kotlin-based coding agent with JavaFX UI, utilizing local and cloud LLM
 | Database | SQLite (embedded) |
 | HTTP Client | Ktor |
 | LLM Provider | Ollama API |
+| Linter | ktlint |
+| Namespace | `de.heckenmann.visualagent` |
 
 ## Architecture
 
@@ -32,116 +37,70 @@ A modern Kotlin-based coding agent with JavaFX UI, utilizing local and cloud LLM
 ├──────────────┬──────────────────┬───────────────────────────┤
 │  SUBAGENTS   │     CHAT         │        TODOS              │
 │   Panel      │     Panel        │        Panel              │
-│  (live view) │  (conversation)  │     (live view)           │
 ├──────────────┴──────────────────┴───────────────────────────┤
 │                    CANVAS (visual output)                   │
 ├─────────────────────────────────────────────────────────────┤
-│              STATUS BAR (agent status, connections)         │
+│              STATUS BAR (connection, model, agents)          │
 └─────────────────────────────────────────────────────────────┘
-                              │
-         ┌────────────────────┼────────────────────┐
-         │                    │                    │
-   ┌─────▼─────┐      ┌──────▼──────┐     ┌──────▼──────┐
-   │  OLLAMA   │      │  KNOWLEDGE  │     │   BROWSER   │
-   │  CLIENT   │      │    DB       │     │ CONTROLLER  │
-   │ (REST API)│      │  (SQLite)   │     │  (Firefox)  │
-   └───────────┘      └─────────────┘     └─────────────┘
 ```
 
 ## Project Structure
 
 ```
-visual-agent/
-├── build.gradle.kts
-├── settings.gradle.kts
-├── app/
-│   └── src/main/kotlin/
-│       ├── Main.kt
-│       ├── ui/                    # JavaFX UI components
-│       ├── agent/                 # Agent logic
-│       ├── todo/                  # Todo management
-│       ├── knowledge/             # Knowledge database
-│       ├── browser/               # Browser integration
-│       └── config/                # Configuration
-└── src/main/resources/
-    ├── styles.css
-    ├── fxml/
-    └── images/
+src/main/kotlin/de/heckenmann/visualagent/
+├── Main.kt                    # Application entry point
+├── agent/                     # LLM client, provider interface, SubAgent model
+├── config/                    # AppConfig singleton
+├── knowledge/                 # SQLite KnowledgeDb
+├── todo/                      # Todo model
+└── ui/                        # JavaFX UI panels
+    ├── MainWindow.kt
+    ├── StatusBar.kt
+    └── panels/                 # SubAgents, Chat, Todo, Canvas panels
 ```
 
 ## Prerequisites
 
-- Java 21 or higher
-- Gradle 8.x
-- Ollama (locally installed for Local provider)
+- Java 21+
+- Gradle 8.x+
+- Ollama running (`ollama serve`)
 
-## Installation
+## Quick Start
 
 ```bash
-# Clone repository
-git clone <repository-url>
-cd visual-agent
-
-# Install dependencies
+# Build
 gradle build
 
-# Run application
-gradle run
-```
-
-## Configuration
-
-### Ollama Local
-
-Ensure Ollama is running locally:
-
-```bash
-ollama serve
-```
-
-### Ollama Cloud
-
-Store API key in configuration (implemented in Phase 2).
-
-## Development
-
-### Build Commands
-
-```bash
-# Create build
-gradle build
-
-# Run tests
-gradle test
-
-# Run application
+# Run
 gradle run
 
-# Create JAR
-gradle jar
+# Copy dependencies to lib/
+gradle copyAllDependencies
 ```
 
 ## Roadmap
 
-### Phase 1: Foundation (Week 1-2)
-- [ ] Gradle Project Setup
-- [ ] JavaFX MainWindow with CSS styling
-- [ ] Ollama Local Client (REST API)
-- [ ] Basic Chat (Request/Response)
+### Phase 1: Foundation (Current)
+- [x] Gradle Project Setup
+- [x] JavaFX MainWindow with CSS styling
+- [x] Ollama Local Client (REST API)
+- [x] UI Panels (Chat, SubAgents, Todos, Canvas, StatusBar)
+- [ ] Wire UI to backend (send button, connection check, agent status)
+- [ ] Remove hardcoded sample data
 
-### Phase 2: Core Features (Week 3-4)
-- [ ] SubAgent System (UI + Backend)
-- [ ] Todo Manager with SQLite
-- [ ] Knowledge DB Schema + CRUD
+### Phase 2: Core Features
+- [ ] SubAgent System loaded from DB
+- [ ] Todo Manager with SQLite persistence
+- [ ] Knowledge DB full CRUD
+- [ ] Chat with streaming responses
 - [ ] Personalization (Name, Image storage)
 
-### Phase 3: Advanced Features (Week 5-6)
-- [ ] Canvas for visual output
+### Phase 3: Advanced Features
+- [ ] Canvas with LLM-driven visual output
 - [ ] Ollama Cloud Provider
-- [ ] Streaming Responses
 - [ ] Tool-Calling Interface
 
-### Phase 4: Integration (Week 7-8)
+### Phase 4: Integration
 - [ ] Firefox Browser Controller
 - [ ] Screen Capture + Analysis
 - [ ] Input Simulation (Robot)
@@ -150,7 +109,3 @@ gradle jar
 ## License
 
 MIT License
-
-## Contributing
-
-Contributions are welcome! Please create an issue or pull request.

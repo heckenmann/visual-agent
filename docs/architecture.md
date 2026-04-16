@@ -2,7 +2,7 @@
 
 ## Overview
 
-Visual Agent follows a modular architecture with clear separation of concerns.
+Visual Agent follows a modular architecture with clear separation of concerns. The project is in early implementation stage — UI shells exist but backend wiring is incomplete.
 
 ## Layer Model
 
@@ -22,124 +22,81 @@ Visual Agent follows a modular architecture with clear separation of concerns.
 └─────────────────────────────────────────────────────────────┘
 ```
 
+## Current Implementation Status
+
+| Component | UI | Backend | Wired |
+|-----------|----|---------|-------|
+| MainWindow | Done | N/A | N/A |
+| ChatPanel | Done (no send handler) | `AgentManager.sendMessage()` exists | **Not wired** |
+| SubAgentsPanel | Done | `AgentManager` has hardcoded agents | **Not wired** — panel creates its own duplicate list |
+| TodoPanel | Done | `KnowledgeDb` has `todos` table | **Not wired** — panel uses hardcoded sample data |
+| CanvasPanel | Done | Draw methods exist | Partially functional |
+| StatusBar | Done | `updateConnectionStatus()`, `updateModel()` exist | **Not wired** — always shows "Disconnected" |
+| OllamaClient | N/A | `chat()`, `stream()`, `vision()`, `embeddings()` | **Exists but never called** |
+| KnowledgeDb | N/A | `saveMemory()`, `searchMemories()`, preferences CRUD | **Exists but never initialized** |
+
 ## Main Components
 
 ### 1. UI Layer (JavaFX)
 
-| Component | Description |
-|-----------|-------------|
-| `MainWindow` | Main window with all panels |
-| `ChatPanel` | Chat interface for conversations |
-| `SubAgentsPanel` | Live view of all SubAgents |
-| `TodoPanel` | Todo list with status display |
-| `CanvasPanel` | Drawing area for visual output |
-| `StatusBar` | Status bar for connections |
+| Component | Description | Status |
+|-----------|-------------|--------|
+| `MainWindow` | Main window with BorderPane layout | Working |
+| `ChatPanel` | Chat interface with ListView + TextField + Button | Missing: send button event handler |
+| `SubAgentsPanel` | Live view of SubAgents with status indicators | Missing: populated from AgentManager |
+| `TodoPanel` | Todo list with CheckBox + priority colors | Missing: loaded from DB, add button |
+| `CanvasPanel` | Drawing canvas with text, rect, line, circle | Working |
+| `StatusBar` | Connection status, model name, agent count | Missing: never updated from backend |
 
 ### 2. Agent Layer
 
+**`AgentManager`** — exists but uses hardcoded agents instead of DB.
+
 ```kotlin
-interface Agent {
-    val id: String
-    val name: String
-    val status: AgentStatus
-    suspend fun execute(task: String): Result
+// Current (hardcoded):
+private fun loadAgentsFromDb() {
+    subAgents["1"] = SubAgent("1", "Researcher", "Web research", AgentStatus.IDLE)
+    subAgents["2"] = SubAgent("2", "Coder", "Code implementation", AgentStatus.IDLE)
+    subAgents["3"] = SubAgent("3", "Documenter", "Documentation", AgentStatus.IDLE)
 }
 
-data class SubAgent(
-    override val id: String,
-    override val name: String,
-    val role: String,
-    val capabilities: List<Capability>
-)
+// Needed: query KnowledgeDb.sub_agents table
 ```
 
 ### 3. Provider Layer
 
-```kotlin
-interface LLMProvider {
-    suspend fun chat(messages: List<Message>): Response
-    suspend fun stream(messages: List<Message>): Flow<ResponseChunk>
-    suspend fun vision(image: ByteArray, prompt: String): Response
-}
+**`OllamaClient`** — implements `LLMProvider`, fully coded but never instantiated by the UI.
 
-// Implementations:
-// - OllamaLocalProvider (localhost:11434)
-// - OllamaCloudProvider (api.ollama.com)
-// - OpenAIProvider (future)
-// - AnthropicProvider (future)
-```
+| Method | Status | Notes |
+|--------|--------|-------|
+| `chat()` | Implemented | Uses `ChatRequest.serializer()` |
+| `stream()` | Implemented | Parses NDJSON response line by line |
+| `vision()` | Implemented | **Bug**: hardcodes model `"llava"` instead of config |
+| `embeddings()` | Implemented | **Bug**: uses raw string interpolation, no escaping of `$text` |
+| `checkConnection()` | Implemented | Never called — `isConnected()` always returns `false` |
 
 ### 4. Data Layer
 
-#### Knowledge Database (SQLite)
+**`KnowledgeDb`** — creates all tables on `init()`, has partial CRUD.
 
-```sql
--- Long-term memory
-CREATE TABLE long_term_memory (
-    id TEXT PRIMARY KEY,
-    content TEXT NOT NULL,
-    embedding BLOB,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    tags TEXT
-);
+| Table | Read | Write | Status |
+|-------|------|-------|--------|
+| `long_term_memory` | `searchMemories()` | `saveMemory()` | Working but never called |
+| `user_preferences` | `getPreference()` | `setPreference()` | Working but never called |
+| `conversation_history` | **Missing** | **Missing** | Table created, no CRUD methods |
+| `todos` | **Missing** | **Missing** | Table created, no CRUD methods |
+| `sub_agents` | **Missing** | **Missing** | Table created, no CRUD methods |
+| `project_knowledge` | **Missing** | **Missing** | Table created, no CRUD methods |
+| `tool_executions` | **Missing** | **Missing** | Table created, no CRUD methods |
 
--- Project knowledge
-CREATE TABLE project_knowledge (
-    id TEXT PRIMARY KEY,
-    project_path TEXT NOT NULL,
-    content_hash TEXT,
-    summary TEXT,
-    last_accessed TIMESTAMP
-);
+## Known Issues
 
--- User preferences
-CREATE TABLE user_preferences (
-    key TEXT PRIMARY KEY,
-    value TEXT NOT NULL
-);
-
--- Conversation history
-CREATE TABLE conversation_history (
-    id TEXT PRIMARY KEY,
-    session_id TEXT NOT NULL,
-    messages_json TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-```
-
-### 5. Browser Integration
-
-```kotlin
-interface BrowserController {
-    suspend fun navigate(url: String)
-    suspend fun screenshot(): ByteArray
-    suspend fun getDomContent(): String
-    suspend fun click(selector: String)
-    suspend fun type(selector: String, text: String)
-}
-```
-
-## Data Flow
-
-### Process Chat Message
-
-```
-User Input → ChatPanel → Agent → LLMProvider → Ollama API
-                ↓                              ↓
-           TodoPanel ← Response ← LLMProvider
-                ↓
-         KnowledgeDb (save)
-```
-
-### Create SubAgent
-
-```
-User Request → MainWindow → AgentManager → SubAgent
-                                      ↓
-                              TodoManager (new task)
-                                      ↓
-                              KnowledgeDb (save context)
-```
+1. **No wiring between UI and backend** — MainWindow creates panels independently without passing AgentManager, OllamaClient, or KnowledgeDb
+2. **ChatPanel send button has no event handler** — clicking "Send" does nothing
+3. **StatusBar never updated** — methods exist but are never called
+4. **OllamaClient.checkConnection() never called** — app always shows "Disconnected"
+5. **Vision model hardcoded to `"llava"`** — should be configurable
+6. **Embeddings uses raw string interpolation** — no JSON escaping, injection risk
 
 ## Thread Model
 
@@ -152,16 +109,7 @@ User Request → MainWindow → AgentManager → SubAgent
 
 | File | Purpose |
 |------|---------|
-| `config/app.properties` | General settings |
-| `config/ollama.properties` | Ollama configuration |
-| `config/personalization.json` | User personalization |
-
-## Security Considerations
-
-1. **API Keys**: Store in encrypted keystore
-2. **Database**: Optionally protect with password
-3. **Screen Access**: User permission required (macOS: Screen Recording)
-4. **Browser**: Sandbox mode for unknown sites
+| `src/main/resources/config/app.properties` | General settings (only file that exists) |
 
 ## Extensibility
 
@@ -169,4 +117,4 @@ The system is designed following the Open-Closed Principle:
 
 - New providers by implementing `LLMProvider`
 - New tools by registering in `ToolRegistry`
-- New UI components by extending JavaFX `Pane`
+- New UI components by extending JavaFX `Region`

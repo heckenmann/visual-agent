@@ -48,11 +48,13 @@ Store sensitive data in environment variables or secure configuration files that
 ```
 src/main/kotlin/de/heckenmann/visualagent/
 ├── Main.kt                    # Application entry point
-├── agent/                     # LLM client, provider interface
+├── agent/                     # LLM client, provider interface, SubAgent model
 ├── config/                    # AppConfig singleton
 ├── knowledge/                 # SQLite KnowledgeDb
 ├── todo/                      # Todo model
 └── ui/                        # JavaFX UI panels
+    ├── MainWindow.kt
+    ├── StatusBar.kt
     └── panels/                # SubAgents, Chat, Todo, Canvas panels
 ```
 
@@ -66,6 +68,11 @@ Kotlin, Gradle (Kotlin DSL), JavaFX 21, SQLite, Ktor HTTP client
 - **LLMProvider**: Interface for Ollama/Cloud providers in `agent/LLMProvider.kt`
 - **Region inheritance**: UI panels extend `javafx.scene.layout.Region`
 - **VBox orientation**: VBox is always vertical in JavaFX - no `.orientation` property
+
+## Known Bugs
+
+1. **OllamaClient.embeddings()** uses raw string interpolation — no JSON escaping of prompt text
+2. **OllamaClient.vision()** hardcodes model `"llava"` instead of using AppConfig
 
 ## Gotchas
 
@@ -81,6 +88,10 @@ Kotlin, Gradle (Kotlin DSL), JavaFX 21, SQLite, Ktor HTTP client
 4. Kotlinx Serialization requires explicit `@Serializable` annotation on data classes used with `Json.encodeToString/decodeFromString`
 
 5. `json.parseToJsonElement()` returns `JsonElement` - use `.jsonObject`, `.jsonArray`, `.jsonPrimitive` extensions
+
+6. **JavaFX `--module-path`** must point to `lib/` — without it you get "JavaFX Runtime components missing"
+
+7. **Main class is `de.heckenmann.visualagent.Main`** (not `MainKt`) — because `Main` extends `Application`
 
 ## Documentation Language
 

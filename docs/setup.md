@@ -2,174 +2,56 @@
 
 ## Prerequisites
 
-### Required Software
-
-| Software | Version | Download |
-|----------|---------|----------|
+| Software | Version | Install |
+|----------|---------|---------|
 | Java JDK | 21+ | [Amazon Corretto](https://aws.amazon.com/corretto/) |
-| Gradle | 8.x | [Gradle](https://gradle.org/install/) |
-| Ollama | Latest | [Ollama](https://ollama.com/download) |
-
-### Optional Software
-
-| Software | Purpose |
-|----------|---------|
-| Firefox | Browser integration |
-| Git | Version control |
+| Gradle | 8.x+ | `brew install gradle` (macOS) |
+| Ollama | Latest | [ollama.com/download](https://ollama.com/download) |
 
 ## Installation
-
-### 1. Clone Repository
 
 ```bash
 git clone <repository-url>
 cd visual-agent
-```
-
-### 2. Gradle Setup
-
-If Gradle is not installed:
-
-**macOS:**
-```bash
-brew install gradle
-```
-
-**Windows (Chocolatey):**
-```powershell
-choco install gradle
-```
-
-**Linux:**
-```bash
-sudo apt install gradle  # Debian/Ubuntu
-sudo dnf install gradle  # Fedora
-```
-
-### 3. Install Dependencies
-
-```bash
 gradle build
 ```
 
-### 4. Configure Ollama
+## Configure Ollama
 
-**Start local server:**
 ```bash
+# Start Ollama server
 ollama serve
-```
 
-**Download model:**
-```bash
+# Download a model
 ollama pull llama3.2
-```
 
-**Check availability:**
-```bash
+# Verify it's running
 curl http://localhost:11434/api/tags
 ```
 
-## Initialize Project Structure
+## Run Application
 
-### Create build.gradle.kts
+**Important:** JavaFX requires the module path to be set because Java 21 does not bundle JavaFX.
 
-```kotlin
-plugins {
-    kotlin("jvm") version "1.9.21"
-    application
-}
-
-group = "com.visualagent"
-version = "0.1.0"
-
-repositories {
-    mavenCentral()
-}
-
-dependencies {
-    // Kotlin
-    implementation(kotlin("stdlib"))
-    
-    // JavaFX
-    implementation("org.openjfx:javafx-controls:21")
-    implementation("org.openjfx:javafx-fxml:21")
-    implementation("org.openjfx:javafx-webview:21")
-    
-    // SQLite
-    implementation("org.xerial:sqlite-jdbc:3.45.0.0")
-    
-    // HTTP Client
-    implementation("io.ktor:ktor-client-core:2.3.7")
-    implementation("io.ktor:ktor-client-cio:2.3.7")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.7")
-    
-    // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-javafx:1.7.3")
-    
-    // JSON
-    implementation("com.squareup.moshi:moshi-kotlin:1.15.0")
-    
-    // Logging
-    implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
-    implementation("ch.qos.logback:logback-classic:1.4.14")
-}
-
-application {
-    mainClass.set("MainKt")
-}
-
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
-    kotlinOptions {
-        jvmTarget = "21"
-    }
-}
+```bash
+# Option 1: Gradle (sets module path automatically via build.gradle.kts)
+gradle run
 ```
 
-### Create settings.gradle.kts
-
-```kotlin
-rootProject.name = "visual-agent"
+```bash
+# Option 2: Direct Java command (after `gradle copyAllDependencies`)
+java \
+  --module-path lib \
+  --add-modules javafx.controls,javafx.fxml,javafx.web,javafx.graphics,javafx.media,javafx.swing,javafx.base \
+  -cp "build/classes/kotlin/main:lib/*" \
+  de.heckenmann.visualagent.Main
 ```
 
-### Create Main Class
-
-`src/main/kotlin/Main.kt`:
-
-```kotlin
-import javafx.application.Application
-import javafx.stage.Stage
-
-class Main : Application() {
-    override fun start(primaryStage: Stage) {
-        // TODO: Initialize UI
-        primaryStage.title = "Visual Agent"
-        primaryStage.show()
-    }
-    
-    companion object {
-        @JvmStatic
-        fun main(args: Array<String>) {
-            Application.launch(Main::class.java, *args)
-        }
-    }
-}
-```
+**Note:** `gradle copyAllDependencies` must be run once to populate the `lib/` directory with JavaFX platform JARs before using Option 2.
 
 ## Configuration
 
-### Create Directory Structure
-
-```bash
-mkdir -p src/main/resources/config
-mkdir -p src/main/resources/styles
-mkdir -p src/main/resources/fxml
-mkdir -p src/main/resources/images
-```
-
-### Create app.properties
-
-`src/main/resources/config/app.properties`:
+Configuration is loaded from `src/main/resources/config/app.properties`:
 
 ```properties
 # Ollama Configuration
@@ -187,63 +69,33 @@ ui.font.size=14
 browser.default=firefox
 ```
 
-## Build & Run
-
-### Build Application
-
-```bash
-gradle clean build
-```
-
-### Run Application
-
-```bash
-gradle run
-```
-
-### Create JAR
-
-```bash
-gradle jar
-```
-
 ## Troubleshooting
+
+### "JavaFX Runtime components missing"
+
+This means the JavaFX module path is not set. Use `gradle run` which configures this automatically, or use the direct Java command with `--module-path lib` shown above.
+
+### "Module javafx.base not found"
+
+The `lib/` directory is missing JavaFX platform JARs. Run:
+
+```bash
+gradle copyAllDependencies
+```
+
+### "Two versions of module X found in lib"
+
+Duplicate JARs in `lib/`. Only the platform-specific JARs (e.g., `*-mac-aarch64.jar`) should remain for the module path. Remove the empty "meta" JARs (e.g., `javafx-base-21.0.2.jar` without platform suffix).
 
 ### Ollama Connection Fails
 
 ```bash
-# Check Ollama status
-ollama list
-
-# Restart server
-ollama serve
-```
-
-### JavaFX Modules Not Found
-
-Add JVM args:
-
-```kotlin
-application {
-    applicationDefaultJvmArgs = listOf(
-        "--add-modules", "javafx.controls,javafx.fxml,javafx.web",
-        "--add-opens", "javafx.graphics/com.sun.javafx.application=ALL-UNNAMED"
-    )
-}
+ollama list    # Check if Ollama is running
+ollama serve   # Start Ollama server
 ```
 
 ### SQLite Errors
 
 ```bash
-# Create data directory
-mkdir -p data
-
-# Check permissions
-chmod 755 data
+mkdir -p data  # Create data directory
 ```
-
-## Next Steps
-
-1. [Read Architecture](architecture.md)
-2. [Create First UI Component](development.md)
-3. [Implement Ollama Client](api.md)

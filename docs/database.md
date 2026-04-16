@@ -2,276 +2,173 @@
 
 ## Overview
 
-Visual Agent uses SQLite as an embedded database for:
-- Long-term knowledge storage
-- Project context
-- User preferences
-- Conversation history
+Visual Agent uses SQLite as an embedded database via `KnowledgeDb` at `de.heckenmann.visualagent.knowledge.KnowledgeDb`.
+
+The database is initialized with WAL mode for better concurrent read/write performance.
 
 ## Schema
 
+All tables are created in `KnowledgeDb.init()`. The actual SQL matches what's below.
+
 ### long_term_memory
 
-Stores long-term knowledge for RAG (Retrieval Augmented Generation).
-
 ```sql
-CREATE TABLE long_term_memory (
+CREATE TABLE IF NOT EXISTS long_term_memory (
     id TEXT PRIMARY KEY,
     content TEXT NOT NULL,
     embedding BLOB,
-    source TEXT,
     tags TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     access_count INTEGER DEFAULT 0,
     last_accessed TIMESTAMP
 );
-
-CREATE INDEX idx_memory_tags ON long_term_memory(tags);
-CREATE INDEX idx_memory_created ON long_term_memory(created_at);
 ```
 
-### project_knowledge
+**CRUD Status:**
+| Operation | Method | Status |
+|-----------|--------|--------|
+| Create | `saveMemory(content, tags)` | Implemented |
+| Read | `searchMemories(query, limit)` | Implemented (text search only, no embedding) |
+| Update | — | Missing |
+| Delete | — | Missing |
 
-Project-specific knowledge and context.
+### conversation_history
 
 ```sql
-CREATE TABLE project_knowledge (
+CREATE TABLE IF NOT EXISTS conversation_history (
     id TEXT PRIMARY KEY,
-    project_path TEXT NOT NULL UNIQUE,
-    name TEXT,
-    description TEXT,
-    content_hash TEXT,
-    summary TEXT,
-    file_count INTEGER DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_indexed TIMESTAMP,
-    last_accessed TIMESTAMP
+    session_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    metadata TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
-CREATE INDEX idx_project_path ON project_knowledge(project_path);
 ```
+
+**CRUD Status:**
+| Operation | Method | Status |
+|-----------|--------|--------|
+| Create | — | **Missing** |
+| Read | — | **Missing** |
+| Update | — | Missing |
+| Delete | — | Missing |
+
+### todos
+
+```sql
+CREATE TABLE IF NOT EXISTS todos (
+    id TEXT PRIMARY KEY,
+    description TEXT NOT NULL,
+    status TEXT DEFAULT 'PENDING',
+    priority TEXT DEFAULT 'MEDIUM',
+    assigned_agent_id TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP,
+    due_date TIMESTAMP
+);
+```
+
+**CRUD Status:**
+| Operation | Method | Status |
+|-----------|--------|--------|
+| Create | — | **Missing** |
+| Read | — | **Missing** |
+| Update | — | **Missing** |
+| Delete | — | **Missing** |
+
+### sub_agents
+
+```sql
+CREATE TABLE IF NOT EXISTS sub_agents (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    role TEXT NOT NULL,
+    status TEXT DEFAULT 'IDLE',
+    current_task TEXT,
+    parent_agent_id TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**CRUD Status:**
+| Operation | Method | Status |
+|-----------|--------|--------|
+| Create | — | **Missing** |
+| Read | — | **Missing** |
+| Update | — | **Missing** |
+| Delete | — | **Missing** |
 
 ### user_preferences
 
-User settings and personalization.
-
 ```sql
-CREATE TABLE user_preferences (
+CREATE TABLE IF NOT EXISTS user_preferences (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL,
     type TEXT DEFAULT 'string',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
--- Default values
-INSERT INTO user_preferences (key, value, type) VALUES
-    ('agent_name', 'Visual Agent', 'string'),
-    ('agent_image', '', 'string'),
-    ('theme', 'dark', 'string'),
-    ('default_model', 'llama3.2', 'string'),
-    ('default_provider', 'ollama_local', 'string');
 ```
 
-### conversation_history
+**CRUD Status:**
+| Operation | Method | Status |
+|-----------|--------|--------|
+| Create/Update | `setPreference(key, value)` | Implemented |
+| Read | `getPreference(key)` | Implemented |
+| Delete | — | Missing |
 
-Complete conversation history.
+### project_knowledge
 
 ```sql
-CREATE TABLE conversation_history (
+CREATE TABLE IF NOT EXISTS project_knowledge (
     id TEXT PRIMARY KEY,
-    session_id TEXT NOT NULL,
-    parent_id TEXT,
-    role TEXT NOT NULL, -- 'system', 'user', 'assistant'
-    content TEXT NOT NULL,
-    metadata TEXT, -- JSON for additional data
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (parent_id) REFERENCES conversation_history(id)
+    project_path TEXT NOT NULL UNIQUE,
+    name TEXT,
+    description TEXT,
+    summary TEXT,
+    last_accessed TIMESTAMP
 );
-
-CREATE INDEX idx_conversation_session ON conversation_history(session_id);
-CREATE INDEX idx_conversation_created ON conversation_history(created_at);
 ```
 
-### todos
-
-Task management.
-
-```sql
-CREATE TABLE todos (
-    id TEXT PRIMARY KEY,
-    description TEXT NOT NULL,
-    status TEXT DEFAULT 'pending', -- 'pending', 'in_progress', 'completed', 'cancelled'
-    priority TEXT DEFAULT 'medium', -- 'low', 'medium', 'high', 'urgent'
-    assigned_agent_id TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    completed_at TIMESTAMP,
-    due_date TIMESTAMP,
-    metadata TEXT -- JSON for additional data
-);
-
-CREATE INDEX idx_todos_status ON todos(status);
-CREATE INDEX idx_todos_priority ON todos(priority);
-```
-
-### sub_agents
-
-SubAgent information.
-
-```sql
-CREATE TABLE sub_agents (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    role TEXT NOT NULL,
-    status TEXT DEFAULT 'idle', -- 'idle', 'busy', 'offline'
-    current_task TEXT,
-    parent_agent_id TEXT,
-    capabilities TEXT, -- JSON array
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX idx_agents_status ON sub_agents(status);
-```
+**CRUD Status:**
+| Operation | Method | Status |
+|-----------|--------|--------|
+| All | — | **Missing** (table created, no methods) |
 
 ### tool_executions
 
-Log for tool executions.
-
 ```sql
-CREATE TABLE tool_executions (
+CREATE TABLE IF NOT EXISTS tool_executions (
     id TEXT PRIMARY KEY,
     tool_name TEXT NOT NULL,
-    arguments TEXT, -- JSON
-    result TEXT, -- JSON
+    arguments TEXT,
+    result TEXT,
     success BOOLEAN DEFAULT TRUE,
     error_message TEXT,
     execution_time_ms INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
-CREATE INDEX idx_tool_name ON tool_executions(tool_name);
-CREATE INDEX idx_tool_created ON tool_executions(created_at);
 ```
 
-## Kotlin DAO Implementation
+**CRUD Status:**
+| Operation | Method | Status |
+|-----------|--------|--------|
+| All | — | **Missing** (table created, no methods) |
 
-### Database Helper
+## Database Configuration
 
-```kotlin
-class DatabaseHelper(private val dbPath: String = "./data/visual-agent.db") {
-    private val connection: Connection by lazy {
-        DriverManager.getConnection("jdbc:sqlite:$dbPath")
-    }
-    
-    fun init() {
-        connection.createStatement().use { stmt ->
-            // Create all tables
-            stmt.execute(longTermMemoryTable)
-            stmt.execute(projectKnowledgeTable)
-            stmt.execute(userPreferencesTable)
-            stmt.execute(conversationHistoryTable)
-            stmt.execute(todosTable)
-            stmt.execute(subAgentsTable)
-            stmt.execute(toolExecutionsTable)
-        }
-    }
-}
-```
+- Default path: `./data/visual-agent.db` (from `app.properties`)
+- Directory is auto-created on init via `ensureDataDirectory()`
+- WAL mode is enabled: `PRAGMA journal_mode=WAL`
 
-### Knowledge Repository
+## Priority: Missing CRUD Methods
 
-```kotlin
-class KnowledgeRepository(private val db: DatabaseHelper) {
-    
-    suspend fun saveMemory(content: String, tags: List<String>): String {
-        val id = UUID.randomUUID().toString()
-        db.connection.prepareStatement("""
-            INSERT INTO long_term_memory (id, content, tags)
-            VALUES (?, ?, ?)
-        """).use { stmt ->
-            stmt.setString(1, id)
-            stmt.setString(2, content)
-            stmt.setString(3, tags.joinToString(","))
-            stmt.executeUpdate()
-        }
-        return id
-    }
-    
-    suspend fun searchMemories(query: String, limit: Int = 10): List<Memory> {
-        // TODO: Implement embedding-based search
-        return db.connection.prepareStatement("""
-            SELECT * FROM long_term_memory 
-            WHERE content LIKE ? OR tags LIKE ?
-            ORDER BY created_at DESC
-            LIMIT ?
-        """).use { stmt ->
-            stmt.setString(1, "%$query%")
-            stmt.setString(2, "%$query%")
-            stmt.setInt(3, limit)
-            stmt.executeQuery().map { rs ->
-                Memory(
-                    id = rs.getString("id"),
-                    content = rs.getString("content"),
-                    tags = rs.getString("tags").split(","),
-                    createdAt = rs.getTimestamp("created_at").toInstant()
-                )
-            }
-        }
-    }
-    
-    suspend fun getPreference(key: String): String? {
-        return db.connection.prepareStatement("""
-            SELECT value FROM user_preferences WHERE key = ?
-        """).use { stmt ->
-            stmt.setString(1, key)
-            stmt.executeQuery().takeIf { it.next() }?.getString("value")
-        }
-    }
-    
-    suspend fun setPreference(key: String, value: String) {
-        db.connection.prepareStatement("""
-            INSERT OR REPLACE INTO user_preferences (key, value, updated_at)
-            VALUES (?, ?, CURRENT_TIMESTAMP)
-        """).use { stmt ->
-            stmt.setString(1, key)
-            stmt.setString(2, value)
-            stmt.executeUpdate()
-        }
-    }
-}
-```
+The following methods need to be added to `KnowledgeDb` to support the UI:
 
-## Migrations
-
-For future schema changes:
-
-```sql
--- migrations/002_add_embedding_index.sql
-CREATE INDEX idx_memory_embedding ON long_term_memory(embedding);
-
--- migrations/003_add_agent_metadata.sql
-ALTER TABLE sub_agents ADD COLUMN metadata TEXT;
-```
-
-## Backup
-
-```bash
-# Backup database
-cp data/visual-agent.db data/visual-agent.db.backup
-
-# Restore backup
-cp data/visual-agent.db.backup data/visual-agent.db
-```
-
-## Performance Optimization
-
-```sql
--- WAL mode for better performance
-PRAGMA journal_mode=WAL;
-
--- Increase cache size
-PRAGMA cache_size=-64000; -- 64MB
-
--- Enable foreign keys
-PRAGMA foreign_keys=ON;
-```
+1. **`saveConversation(sessionId, role, content)`** — for chat persistence
+2. **`getConversations(sessionId)`** — for loading chat history
+3. **`saveTodo(todo: Todo)`** — for todo persistence
+4. **`getTodos()`** — for loading todos
+5. **`updateTodoStatus(id, status)`** — for todo status changes
+6. **`saveSubAgent(agent: SubAgent)`** — for agent persistence
+7. **`getSubAgents()`** — for loading agents from DB
+8. **`updateSubAgentStatus(id, status, task)`** — for agent status changes
