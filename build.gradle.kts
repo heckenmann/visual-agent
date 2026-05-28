@@ -1,7 +1,10 @@
 plugins {
-    kotlin("jvm") version "1.9.21"
-    kotlin("plugin.serialization") version "1.9.21"
-    id("org.jlleitschuh.gradle.ktlint") version "11.5.0"
+    kotlin("jvm") version "2.1.21"
+    kotlin("plugin.serialization") version "2.1.21"
+    kotlin("plugin.spring") version "2.1.21"
+    // id("org.jlleitschuh.gradle.ktlint") version "12.1.2" // Deactivated: conflicts with Kotlin 2.1.21
+    id("org.springframework.boot") version "3.4.2"
+    id("io.spring.dependency-management") version "1.1.7"
     application
 }
 
@@ -10,9 +13,9 @@ version = "0.1.0"
 
 repositories {
     mavenCentral()
+    maven { url = uri("https://repo.spring.io/milestone") }
+    maven { url = uri("https://jitpack.io") }
 }
-
-buildDir = file(rootDir.resolve("build"))
 
 val platform = when {
     System.getProperty("os.name").contains("Mac") && System.getProperty("os.arch").contains("aarch64") -> "mac-aarch64"
@@ -27,7 +30,11 @@ val javafxVersion = "21.0.2"
 dependencies {
     implementation(kotlin("stdlib"))
 
-    // JavaFX 21 - all modules needed
+    // Spring Boot & AI
+    implementation("org.springframework.boot:spring-boot-starter")
+    implementation("org.springframework.ai:spring-ai-ollama-spring-boot-starter:1.0.0-M5")
+
+    // JavaFX 21
     implementation("org.openjfx:javafx-base:$javafxVersion:$platform")
     implementation("org.openjfx:javafx-controls:$javafxVersion:$platform")
     implementation("org.openjfx:javafx-fxml:$javafxVersion:$platform")
@@ -39,21 +46,37 @@ dependencies {
     // SQLite JDBC
     implementation("org.xerial:sqlite-jdbc:3.45.0.0")
 
-    // Ktor HTTP Client
-    implementation("io.ktor:ktor-client-core:2.3.7")
-    implementation("io.ktor:ktor-client-cio:2.3.7")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.7")
-
     // Kotlinx Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-javafx:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.7.3") // Needed for Spring AI Flux to Flow
 
     // JSON Serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
 
-    // Logging
+    // AtlantaFX themes
+    implementation("io.github.mkpaz:atlantafx-base:2.0.1")
+
+    // Ikonli icons
+    implementation("org.kordamp.ikonli:ikonli-javafx:12.4.0")
+    implementation("org.kordamp.ikonli:ikonli-fontawesome5-pack:12.4.0")
+
+    // Kotlin logging (wrapper for SLF4J)
     implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
-    implementation("ch.qos.logback:logback-classic:1.4.14")
+
+    // Ensure compatible Logback is available at runtime (Spring Boot logging expects it)
+    implementation("ch.qos.logback:logback-classic:1.5.18")
+    implementation("ch.qos.logback:logback-core:1.5.18")
+
+    // Test
+    testImplementation(kotlin("test"))
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("io.mockk:mockk:1.13.10")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 application {
@@ -67,17 +90,10 @@ application {
 
 kotlin {
     jvmToolchain(21)
-}
-
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
-    kotlinOptions {
-        jvmTarget = "21"
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+        freeCompilerArgs.addAll("-Xjsr305=strict")
     }
-}
-
-tasks.register<Copy>("copyDependencies") {
-    from(configurations.runtimeClasspath)
-    into("lib")
 }
 
 tasks.register<Copy>("copyAllDependencies") {
@@ -85,21 +101,9 @@ tasks.register<Copy>("copyAllDependencies") {
     into("lib")
 }
 
+/*
 ktlint {
-    version.set("0.50.0")
+    version.set("1.0.1")
     android.set(false)
-    outputColorName.set("RED")
 }
-
-tasks.register<JavaExec>("format") {
-    group = "formatting"
-    description = "Format Kotlin source files using ktlint"
-    classpath = configurations.getByName("ktlint")
-    mainClass.set("com.pinterest.ktlint.Main")
-    args = listOf("-F", "src/**/*.kt")
-}
-
-// Disabled - ktlint format requires classpath setup
-// tasks.named("compileKotlin") {
-//     dependsOn("format")
-// }
+*/
