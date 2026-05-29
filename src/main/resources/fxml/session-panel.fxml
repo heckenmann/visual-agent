@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Slider?>
+<?import javafx.scene.control.Spinner?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Priority?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
+
+<VBox fx:id="root" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1">
+    <ScrollPane fitToWidth="true" fitToHeight="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED"
+                styleClass="scroll-transparent" fx:id="scrollPane">
+        <VBox spacing="16.0">
+            <padding>
+                <Insets top="20.0" right="20.0" bottom="20.0" left="20.0"/>
+            </padding>
+
+            <!-- Section Header: Session Control -->
+            <HBox alignment="CENTER_LEFT" spacing="8.0">
+                <padding>
+                    <Insets bottom="8.0"/>
+                </padding>
+                <FontIcon iconLiteral="fas-bars" iconSize="14"/>
+                <Label text="Session Control" styleClass="title-3"/>
+            </HBox>
+
+            <!-- MODEL GROUP -->
+            <VBox spacing="4.0" styleClass="setting-group">
+                <HBox alignment="CENTER_LEFT" spacing="8.0">
+                    <padding>
+                        <Insets top="4.0" bottom="4.0"/>
+                    </padding>
+                    <FontIcon iconLiteral="fas-laptop" iconSize="11"/>
+                    <Label text="MODEL" styleClass="text-muted, bold"/>
+                </HBox>
+                <VBox spacing="10.0">
+                    <padding>
+                        <Insets left="24.0"/>
+                    </padding>
+                    <VBox spacing="4.0">
+                        <Label text="Active Model"/>
+                        <ComboBox fx:id="modelSelector" maxWidth="Infinity"/>
+                    </VBox>
+                    
+                    <!-- Model Details Section -->
+                    <VBox spacing="4.0">
+                        <Label text="Model Details" styleClass="text-muted, bold"/>
+                        <VBox spacing="2.0">
+                            <padding>
+                                <Insets left="20.0"/>
+                            </padding>
+                            <ScrollPane fitToWidth="true" styleClass="scroll-transparent">
+                                <Label fx:id="modelInfoLabel" text="No model selected" styleClass="text-caption"/>
+                            </ScrollPane>
+                        </VBox>
+                    </VBox>
+                </VBox>
+            </VBox>
+
+            <!-- MODEL CONTEXT GROUP -->
+            <VBox spacing="4.0" styleClass="setting-group">
+                <HBox alignment="CENTER_LEFT" spacing="8.0">
+                    <padding>
+                        <Insets top="4.0" bottom="4.0"/>
+                    </padding>
+                    <FontIcon iconLiteral="fas-brain" iconSize="11"/>
+                    <Label text="MODEL CONTEXT" styleClass="text-muted, bold"/>
+                </HBox>
+                <VBox spacing="10.0">
+                    <padding>
+                        <Insets left="24.0"/>
+                    </padding>
+                    <VBox spacing="4.0">
+                        <Label text="Context Length"/>
+                        <HBox spacing="8.0" alignment="CENTER_LEFT">
+                            <Slider fx:id="contextSlider" HBox.hgrow="ALWAYS"
+                                    min="1024.0" max="32768.0" blockIncrement="1024.0"
+                                    majorTickUnit="8192.0" snapToTicks="true"/>
+                            <HBox spacing="4.0" alignment="CENTER_LEFT">
+                                <Label fx:id="contextValueLabel" text="4096" styleClass="bold, status-connected"/>
+                                <Label text="tokens" styleClass="text-caption"/>
+                            </HBox>
+                        </HBox>
+                    </VBox>
+                </VBox>
+            </VBox>
+
+            <!-- BEHAVIOR GROUP -->
+            <VBox spacing="4.0" styleClass="setting-group">
+                <HBox alignment="CENTER_LEFT" spacing="8.0">
+                    <padding>
+                        <Insets top="4.0" bottom="4.0"/>
+                    </padding>
+                    <FontIcon iconLiteral="fas-cog" iconSize="11"/>
+                    <Label text="BEHAVIOR" styleClass="text-muted, bold"/>
+                </HBox>
+                <VBox spacing="10.0">
+                    <padding>
+                        <Insets left="24.0"/>
+                    </padding>
+                    <!-- Streaming Toggle -->
+                    <VBox spacing="2.0">
+                        <padding>
+                            <Insets top="2.0" bottom="2.0"/>
+                        </padding>
+                        <CheckBox fx:id="streamingToggle" text="Streaming"/>
+                        <Label text="Real-time token streaming" styleClass="text-caption"/>
+                    </VBox>
+                    <!-- Thinking Toggle -->
+                    <VBox spacing="2.0">
+                        <padding>
+                            <Insets top="2.0" bottom="2.0"/>
+                        </padding>
+                        <CheckBox fx:id="thinkingToggle" text="Thought Display"/>
+                        <Label text="Show model reasoning" styleClass="text-caption"/>
+                    </VBox>
+                    <!-- Auto Compaction Toggle -->
+                    <VBox spacing="2.0">
+                        <padding>
+                            <Insets top="2.0" bottom="2.0"/>
+                        </padding>
+                        <CheckBox fx:id="autoCompactionToggle" text="Auto Compaction"/>
+                        <Label text="Compact history on overflow" styleClass="text-caption"/>
+                    </VBox>
+                    <!-- Load Limit Spinner -->
+                    <VBox spacing="2.0">
+                        <padding>
+                            <Insets top="2.0" bottom="2.0"/>
+                        </padding>
+                        <HBox spacing="6.0" alignment="CENTER_LEFT">
+                            <Spinner fx:id="loadLimitSpinner" prefWidth="100.0" maxWidth="100.0" editable="true"/>
+                            <Label text="messages loaded on startup" styleClass="text-caption"/>
+                        </HBox>
+                    </VBox>
+                    <!-- Parallel Sub-Agents -->
+                    <VBox spacing="2.0">
+                        <padding>
+                            <Insets top="2.0" bottom="2.0"/>
+                        </padding>
+                        <HBox spacing="6.0" alignment="CENTER_LEFT">
+                            <Spinner fx:id="maxParallelSubAgentsSpinner" prefWidth="100.0" maxWidth="100.0" editable="true"/>
+                            <Label text="max parallel sub-agents per turn" styleClass="text-caption"/>
+                        </HBox>
+                    </VBox>
+                </VBox>
+            </VBox>
+
+            <!-- TIMEOUT GROUP -->
+            <VBox spacing="4.0" styleClass="setting-group">
+                <HBox alignment="CENTER_LEFT" spacing="8.0">
+                    <padding>
+                        <Insets top="4.0" bottom="4.0"/>
+                    </padding>
+                    <FontIcon iconLiteral="fas-clock" iconSize="11"/>
+                    <Label text="TIMEOUT" styleClass="text-muted, bold"/>
+                </HBox>
+                <VBox spacing="10.0">
+                    <padding>
+                        <Insets left="24.0"/>
+                    </padding>
+                    <VBox spacing="4.0">
+                        <Label text="Request Timeout"/>
+                        <HBox spacing="6.0" alignment="CENTER_LEFT">
+                            <Spinner fx:id="timeoutSpinner" prefWidth="100.0" maxWidth="100.0" editable="true"/>
+                            <Label text="seconds" styleClass="text-caption"/>
+                        </HBox>
+                    </VBox>
+                </VBox>
+            </VBox>
+        </VBox>
+    </ScrollPane>
+</VBox>

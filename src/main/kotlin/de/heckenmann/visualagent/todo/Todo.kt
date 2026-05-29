@@ -21,7 +21,7 @@ data class Todo(
     val description: String,
     var status: TodoStatus = TodoStatus.PENDING,
     val priority: TodoPriority = TodoPriority.MEDIUM,
-    val assignedAgentId: String? = null,
+    var assignedAgentId: String? = null,
     val createdAt: Instant = Instant.now(),
     var completedAt: Instant? = null,
     val dueDate: Instant? = null,

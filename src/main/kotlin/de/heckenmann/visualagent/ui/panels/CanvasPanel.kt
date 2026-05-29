@@ -8,7 +8,6 @@ import javafx.scene.layout.BorderPane
 import javafx.scene.layout.Region
 import javafx.scene.paint.Color
 import javafx.scene.text.Font
-import javafx.scene.text.FontWeight
 
 class CanvasPanel : Region() {
 
@@ -24,10 +23,8 @@ class CanvasPanel : Region() {
 
     private fun setupUI() {
         styleClass.add("canvas-panel")
-        style = "-fx-background-color: #1e1e1e;"
 
-        titleLabel.font = Font.font("System", FontWeight.BOLD, 14.0)
-        titleLabel.style = "-fx-text-fill: #e0e0e0; -fx-padding: 4px;"
+        titleLabel.styleClass.add("panel-title-label")
 
         rootBorderPane.top = titleLabel
         rootBorderPane.center = canvas

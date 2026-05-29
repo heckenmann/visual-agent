@@ -1,0 +1,143 @@
+/* Application Theme for Visual Agent */
+/* Minimal overrides, maximizing AtlantaFX usage */
+
+.root {
+    -fx-background-color: -color-bg-default;
+    -fx-text-fill: -color-fg-default;
+}
+
+/* Layout Helpers */
+.bold { -fx-font-weight: bold; }
+.italic { -fx-font-style: italic; }
+
+/* Base Panel Layouts */
+.subagents-panel,
+.chat-panel,
+.todo-panel,
+.canvas-panel {
+    -fx-background-color: -color-bg-subtle;
+}
+
+.chat-root {
+    -fx-background-color: -color-bg-inset;
+}
+
+/* Chat Message List */
+.chat-message-list {
+    -fx-background: -color-bg-inset;
+    -fx-background-color: -color-bg-inset;
+}
+
+.chat-message-list .list-cell {
+    -fx-background: -color-bg-inset;
+    -fx-background-color: -color-bg-inset;
+    -fx-padding: 0px;
+    -fx-border-width: 0px;
+}
+
+.chat-message-list .list-cell:hover {
+    -fx-background-color: -color-bg-subtle;
+}
+
+/* Chat Input Area */
+.chat-input-box {
+    -fx-background-color: -color-bg-inset;
+    -fx-padding: 16px 16px 24px 16px;
+    -fx-spacing: 10px;
+}
+
+/* Chat Message Rows */
+.chat-row-inner {
+    -fx-spacing: 14px;
+    -fx-padding: 4px 16px;
+    -fx-alignment: top-left;
+}
+
+.chat-row-grouped .chat-row-inner {
+    -fx-padding: 0px 16px 0px 16px;
+}
+
+.chat-avatar {
+    -fx-min-width: 36px;
+    -fx-min-height: 36px;
+    -fx-alignment: center;
+    -fx-background-radius: 50px;
+    -fx-text-fill: -color-fg-default;
+}
+
+.chat-avatar-user { -fx-background-color: #2563eb; -fx-text-fill: white; }
+.chat-avatar-assistant { -fx-background-color: #10b981; -fx-text-fill: white; }
+
+.chat-avatar-spacer { -fx-min-width: 36px; }
+
+.chat-role-label-assistant { -fx-text-fill: -color-accent-emphasis; }
+
+/* Custom UI Elements */
+.button-icon {
+    -fx-background-color: transparent;
+    -fx-text-fill: -color-fg-muted;
+}
+
+.button-icon:hover {
+    -fx-background-color: -color-bg-subtle;
+    -fx-text-fill: -color-fg-default;
+}
+
+.icon-rail {
+    -fx-background-color: -color-bg-default;
+    -fx-padding: 8px 0px;
+    -fx-spacing: 4px;
+    -fx-border-color: -color-border-default;
+    -fx-border-width: 0px 1px 0px 0px;
+}
+
+.icon-rail-button {
+    -fx-background-color: transparent;
+    -fx-min-width: 48px;
+    -fx-min-height: 48px;
+}
+
+.icon-rail-button.active {
+    -fx-background-color: -color-bg-subtle;
+    -fx-border-color: -color-accent-emphasis;
+    -fx-border-width: 0px 0px 0px 3px;
+}
+
+.title-bar {
+    -fx-background-color: -color-bg-default;
+    -fx-padding: 0px 8px;
+    -fx-border-color: -color-border-default;
+    -fx-border-width: 0px 0px 1px 0px;
+}
+
+.window-button {
+    -fx-background-color: transparent;
+    -fx-min-width: 40px;
+    -fx-min-height: 40px;
+}
+
+.window-close-button:hover { -fx-background-color: -color-danger-emphasis; }
+
+/* Status Indicators */
+.status-connected { -fx-text-fill: -color-success-emphasis; }
+.status-disconnected { -fx-text-fill: -color-danger-emphasis; }
+.status-warning { -fx-text-fill: -color-warning-emphasis; }
+
+.agent-status-indicator { -fx-min-width: 10px; -fx-min-height: 10px; -fx-background-radius: 5px; }
+.agent-status-idle { -fx-background-color: -color-success-emphasis; }
+.agent-status-busy { -fx-background-color: -color-warning-emphasis; }
+.agent-status-offline { -fx-background-color: -color-fg-muted; }
+
+/* Badges */
+.badge { -fx-font-size: 0.8em; -fx-padding: 2px 8px; -fx-background-radius: 10px; }
+.badge-low { -fx-background-color: -color-info-muted; }
+.badge-medium { -fx-background-color: -color-success-muted; }
+.badge-high { -fx-background-color: -color-warning-muted; }
+.badge-urgent { -fx-background-color: -color-danger-muted; }
+
+/* Setting Group Card */
+.setting-group {
+    -fx-background-color: -color-bg-default;
+    -fx-padding: 12px 16px;
+    -fx-background-radius: 6px;
+}

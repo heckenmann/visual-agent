@@ -4,11 +4,19 @@
 
 Visual Agent uses SQLite as an embedded database via `KnowledgeDb` at `de.heckenmann.visualagent.knowledge.KnowledgeDb`.
 
-The database is initialized with WAL mode for better concurrent read/write performance.
+The database is initialized with WAL mode and a busy timeout for better concurrent read/write performance and resilience against lock contention.
+
+## Connection Configuration
+
+- Default path: `./data/visual-agent.db` (from `app.properties`)
+- Directory is auto-created on init via `ensureDataDirectory()`
+- WAL mode is enabled: `PRAGMA journal_mode=WAL`
+- Busy timeout is set: `PRAGMA busy_timeout=5000` — SQLite will wait up to 5 seconds for a locked database before returning `SQLITE_BUSY`
+- If stale WAL/SHM files from a crashed process cause `SQLITE_BUSY`, delete `data/visual-agent.db-wal` and `data/visual-agent.db-shm` before restarting
 
 ## Schema
 
-All tables are created in `KnowledgeDb.init()`. The actual SQL matches what's below.
+All tables are created in `KnowledgeDb.initDatabase()`. The actual SQL matches what's below.
 
 ### long_term_memory
 
@@ -74,7 +82,7 @@ CREATE TABLE IF NOT EXISTS todos (
 | Create | — | **Missing** |
 | Read | — | **Missing** |
 | Update | — | **Missing** |
-| Delete | — | **Missing** |
+| Delete | — | Missing |
 
 ### sub_agents
 
@@ -96,7 +104,7 @@ CREATE TABLE IF NOT EXISTS sub_agents (
 | Create | — | **Missing** |
 | Read | — | **Missing** |
 | Update | — | **Missing** |
-| Delete | — | **Missing** |
+| Delete | — | Missing |
 
 ### user_preferences
 
@@ -134,31 +142,12 @@ CREATE TABLE IF NOT EXISTS project_knowledge (
 |-----------|--------|--------|
 | All | — | **Missing** (table created, no methods) |
 
-### tool_executions
-
-```sql
-CREATE TABLE IF NOT EXISTS tool_executions (
-    id TEXT PRIMARY KEY,
-    tool_name TEXT NOT NULL,
-    arguments TEXT,
-    result TEXT,
-    success BOOLEAN DEFAULT TRUE,
-    error_message TEXT,
-    execution_time_ms INTEGER,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-```
-
-**CRUD Status:**
-| Operation | Method | Status |
-|-----------|--------|--------|
-| All | — | **Missing** (table created, no methods) |
-
 ## Database Configuration
 
 - Default path: `./data/visual-agent.db` (from `app.properties`)
 - Directory is auto-created on init via `ensureDataDirectory()`
 - WAL mode is enabled: `PRAGMA journal_mode=WAL`
+- Busy timeout: `PRAGMA busy_timeout=5000`
 
 ## Priority: Missing CRUD Methods
 
@@ -169,6 +158,7 @@ The following methods need to be added to `KnowledgeDb` to support the UI:
 3. **`saveTodo(todo: Todo)`** — for todo persistence
 4. **`getTodos()`** — for loading todos
 5. **`updateTodoStatus(id, status)`** — for todo status changes
-6. **`saveSubAgent(agent: SubAgent)`** — for agent persistence
-7. **`getSubAgents()`** — for loading agents from DB
-8. **`updateSubAgentStatus(id, status, task)`** — for agent status changes
+6. **`deleteTodo(id)`** — for todo deletion
+7. **`saveSubAgent(agent: SubAgent)`** — for agent persistence
+8. **`getSubAgents()`** — for loading agents from DB
+9. **`updateSubAgentStatus(id, status, task)`** — for agent status changes

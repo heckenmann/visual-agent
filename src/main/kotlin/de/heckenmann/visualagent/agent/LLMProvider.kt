@@ -53,6 +53,21 @@ interface LLMProvider {
      * @return true if connected, false otherwise
      */
     fun isConnected(): Boolean
+
+    /**
+     * Get the list of available model names.
+     *
+     * @return List of model names
+     */
+    suspend fun getModels(): List<String>
+
+    /**
+     * Get detailed information about a specific model.
+     *
+     * @param modelName Name of the model to get details for
+     * @return ShowResponse containing model details
+     */
+    suspend fun getModelDetails(modelName: String): ShowResponse
 }
 
 /**

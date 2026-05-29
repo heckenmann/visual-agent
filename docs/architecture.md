@@ -2,7 +2,7 @@
 
 ## Overview
 
-Visual Agent follows a modular architecture with clear separation of concerns. The project is in early implementation stage — UI shells exist but backend wiring is incomplete.
+Visual Agent follows a modular architecture with clear separation of concerns. UI shells are built and key backend wiring is in place — ChatPanel sends messages via AgentManager, SessionPanel fetches models from OllamaClient, and StatusBar reflects connection status.
 
 ## Layer Model
 
@@ -26,14 +26,16 @@ Visual Agent follows a modular architecture with clear separation of concerns. T
 
 | Component | UI | Backend | Wired |
 |-----------|----|---------|-------|
-| MainWindow | Done | N/A | N/A |
-| ChatPanel | Done (no send handler) | `AgentManager.sendMessage()` exists | **Not wired** |
-| SubAgentsPanel | Done | `AgentManager` has hardcoded agents | **Not wired** — panel creates its own duplicate list |
-| TodoPanel | Done | `KnowledgeDb` has `todos` table | **Not wired** — panel uses hardcoded sample data |
-| CanvasPanel | Done | Draw methods exist | Partially functional |
-| StatusBar | Done | `updateConnectionStatus()`, `updateModel()` exist | **Not wired** — always shows "Disconnected" |
-| OllamaClient | N/A | `chat()`, `stream()`, `vision()`, `embeddings()` | **Exists but never called** |
-| KnowledgeDb | N/A | `saveMemory()`, `searchMemories()`, preferences CRUD | **Exists but never initialized** |
+| MainWindow | Done (FXML, window controls) | N/A | N/A |
+| ChatPanel | Done (send handler, Enter key, custom cells) | `AgentManager.sendMessage()` | **Wired** — callback in MainWindow |
+| SubAgentsPanel | Done (CSS classes) | `AgentManager` has hardcoded agents | **Partially** — panel creates its own list |
+| TodoPanel | Done (Add dialog, Delete, checkbox, badges) | `KnowledgeDb` has `todos` table | **Not wired** — panel uses in-memory list |
+| CanvasPanel | Done (CSS classes) | Draw methods exist | Functional |
+| SessionPanel | Done (FXML, model selector, details) | `OllamaClient.getModels()`, `getModelDetails()` | **Wired** — model list + details functional |
+| StatusBar | Done (CSS classes) | `checkConnection()` called on startup | **Wired** — shows connected/disconnected |
+| ApplicationSettingsPanel | Done (FXML, theme, font size) | AppConfig mutable properties | **Wired** — theme reload + font size |
+| OllamaClient | N/A | `chat()`, `stream()`, `vision()`, `embeddings()`, `getModels()`, `getModelDetails()` | **Wired** — called by SessionPanel and ChatPanel |
+| KnowledgeDb | N/A | `saveMemory()`, `searchMemories()`, preferences CRUD, WAL mode, busy_timeout | Initialized but not called by UI |
 
 ## Main Components
 
@@ -41,16 +43,19 @@ Visual Agent follows a modular architecture with clear separation of concerns. T
 
 | Component | Description | Status |
 |-----------|-------------|--------|
-| `MainWindow` | Main window with BorderPane layout | Working |
-| `ChatPanel` | Chat interface with ListView + TextField + Button | Missing: send button event handler |
-| `SubAgentsPanel` | Live view of SubAgents with status indicators | Missing: populated from AgentManager |
-| `TodoPanel` | Todo list with CheckBox + priority colors | Missing: loaded from DB, add button |
+| `MainWindow` | FXML-based with BorderPane layout, panel switching, window controls | Working |
+| `ChatPanel` | Chat with ListView + custom cells + send handler + Enter key | Working — wired to AgentManager |
+| `SubAgentsPanel` | Live view of SubAgents with status indicators | Working — creates own default agents |
+| `TodoPanel` | Todo list with Add dialog, Delete, checkbox toggle, priority badges | Working — in-memory only |
 | `CanvasPanel` | Drawing canvas with text, rect, line, circle | Working |
-| `StatusBar` | Connection status, model name, agent count | Missing: never updated from backend |
+| `SessionPanel` | Model selector, context slider, streaming toggle, model details | Working — wired to OllamaClient |
+| `StatusBar` | Connection status, model name, agent count | Working — updated on startup |
+| `ApplicationSettingsPanel` | Theme selector, font size spinner | Working — applies changes live |
+| `FxmlLoader` | Type-safe FXML loading utility | Working |
 
 ### 2. Agent Layer
 
-**`AgentManager`** — exists but uses hardcoded agents instead of DB.
+**`AgentManager`** — wired to ChatPanel via `setOnSendMessage` callback. Still uses hardcoded agents.
 
 ```kotlin
 // Current (hardcoded):
@@ -65,7 +70,7 @@ private fun loadAgentsFromDb() {
 
 ### 3. Provider Layer
 
-**`OllamaClient`** — implements `LLMProvider`, fully coded but never instantiated by the UI.
+**`OllamaClient`** — implements `LLMProvider`, called by SessionPanel and ChatPanel.
 
 | Method | Status | Notes |
 |--------|--------|-------|
@@ -73,43 +78,45 @@ private fun loadAgentsFromDb() {
 | `stream()` | Implemented | Parses NDJSON response line by line |
 | `vision()` | Implemented | **Bug**: hardcodes model `"llava"` instead of config |
 | `embeddings()` | Implemented | **Bug**: uses raw string interpolation, no escaping of `$text` |
-| `checkConnection()` | Implemented | Never called — `isConnected()` always returns `false` |
+| `checkConnection()` | Implemented | Called on startup by MainWindow |
+| `getModels()` | Implemented | Called by SessionPanel via `setOllamaClient()` |
+| `getModelDetails()` | Implemented | Called by SessionPanel on model selection |
 
 ### 4. Data Layer
 
-**`KnowledgeDb`** — creates all tables on `init()`, has partial CRUD.
+**`KnowledgeDb`** — creates all tables on `init()`, has partial CRUD. WAL mode and `busy_timeout=5000` enabled.
 
 | Table | Read | Write | Status |
 |-------|------|-------|--------|
-| `long_term_memory` | `searchMemories()` | `saveMemory()` | Working but never called |
-| `user_preferences` | `getPreference()` | `setPreference()` | Working but never called |
+| `long_term_memory` | `searchMemories()` | `saveMemory()` | Working but never called by UI |
+| `user_preferences` | `getPreference()` | `setPreference()` | Working but never called by UI |
 | `conversation_history` | **Missing** | **Missing** | Table created, no CRUD methods |
 | `todos` | **Missing** | **Missing** | Table created, no CRUD methods |
 | `sub_agents` | **Missing** | **Missing** | Table created, no CRUD methods |
-| `project_knowledge` | **Missing** | **Missing** | Table created, no CRUD methods |
-| `tool_executions` | **Missing** | **Missing** | Table created, no CRUD methods |
+| `project_knowledge` | **Missing** | **Missing** | Table created, no methods |
 
 ## Known Issues
 
-1. **No wiring between UI and backend** — MainWindow creates panels independently without passing AgentManager, OllamaClient, or KnowledgeDb
-2. **ChatPanel send button has no event handler** — clicking "Send" does nothing
-3. **StatusBar never updated** — methods exist but are never called
-4. **OllamaClient.checkConnection() never called** — app always shows "Disconnected"
-5. **Vision model hardcoded to `"llava"`** — should be configurable
-6. **Embeddings uses raw string interpolation** — no JSON escaping, injection risk
+1. **SubAgentsPanel creates its own agent list** — not populated from AgentManager, leads to duplicate data
+2. **TodoPanel uses in-memory list** — not persisted to KnowledgeDb
+3. **Vision model hardcoded to `"llava"`** — should be configurable
+4. **Embeddings uses raw string interpolation** — no JSON escaping, injection risk
+5. **AgentManager.loadAgentsFromDb() hardcoded** — should query KnowledgeDb.sub_agents table
 
 ## Thread Model
 
 - **JavaFX Application Thread**: UI updates
-- **Coroutines Dispatcher**: Async operations
-- **IO Dispatcher**: Database and network
+- **Coroutines Dispatcher**: Async operations (AgentManager, SessionPanel)
+- **IO Dispatcher**: Database and network (implicit via Ktor CIO)
 - **Default Dispatcher**: CPU-intensive tasks
 
 ## Configuration Files
 
 | File | Purpose |
 |------|---------|
-| `src/main/resources/config/app.properties` | General settings (only file that exists) |
+| `src/main/resources/config/app.properties` | General settings |
+| `src/main/resources/fxml/*.fxml` | FXML layouts for panels |
+| `src/main/resources/styles/dark.css` | Dark theme stylesheet (30+ selectors) |
 
 ## Extensibility
 

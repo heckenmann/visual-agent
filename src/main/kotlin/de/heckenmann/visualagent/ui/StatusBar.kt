@@ -5,8 +5,6 @@ import javafx.scene.layout.BorderPane
 import javafx.scene.layout.HBox
 import javafx.scene.layout.Priority
 import javafx.scene.layout.Region
-import javafx.scene.text.Font
-import javafx.scene.text.FontWeight
 
 class StatusBar : Region() {
 
@@ -20,22 +18,18 @@ class StatusBar : Region() {
     }
 
     private fun setupUI() {
-        style = "-fx-background-color: #1a1a1a; -fx-padding: 4px;"
+        styleClass.add("status-bar")
 
-        connectionLabel.font = Font.font("System", FontWeight.NORMAL, 12.0)
-        connectionLabel.style = "-fx-text-fill: #ff9800;"
+        connectionLabel.styleClass.addAll("status-bar-muted", "status-bar-warning")
 
-        modelLabel.font = Font.font("System", FontWeight.NORMAL, 12.0)
-        modelLabel.style = "-fx-text-fill: #a0a0a0;"
+        modelLabel.styleClass.add("status-bar-muted")
 
-        agentsLabel.font = Font.font("System", FontWeight.NORMAL, 12.0)
-        agentsLabel.style = "-fx-text-fill: #a0a0a0;"
+        agentsLabel.styleClass.add("status-bar-muted")
 
         val spacer = Region()
         HBox.setHgrow(spacer, Priority.ALWAYS)
 
         val statusBox = HBox(connectionLabel, modelLabel, spacer, agentsLabel)
-        statusBox.style = "-fx-padding: 4px;"
         statusBox.spacing = 20.0
 
         rootBorderPane.center = statusBox
@@ -46,10 +40,11 @@ class StatusBar : Region() {
 
     fun updateConnectionStatus(connected: Boolean) {
         connectionLabel.text = if (connected) "Ollama: Connected" else "Ollama: Disconnected"
-        connectionLabel.style = if (connected) {
-            "-fx-text-fill: #4caf50;"
+        connectionLabel.styleClass.removeAll("status-bar-connected", "status-bar-disconnected", "status-bar-warning")
+        if (connected) {
+            connectionLabel.styleClass.add("status-bar-connected")
         } else {
-            "-fx-text-fill: #f44336;"
+            connectionLabel.styleClass.add("status-bar-disconnected")
         }
     }
 

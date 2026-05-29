@@ -5,7 +5,7 @@
 | Software | Version | Install |
 |----------|---------|---------|
 | Java JDK | 21+ | [Amazon Corretto](https://aws.amazon.com/corretto/) |
-| Gradle | 8.x+ | `brew install gradle` (macOS) |
+| Gradle | 9.4.1 | `brew install gradle` (macOS) |
 | Ollama | Latest | [ollama.com/download](https://ollama.com/download) |
 
 ## Installation
@@ -99,3 +99,14 @@ ollama serve   # Start Ollama server
 ```bash
 mkdir -p data  # Create data directory
 ```
+
+### SQLITE_BUSY / Database Locked
+
+If the application crashed or was force-killed, stale WAL and SHM files may cause `SQLITE_BUSY` errors. The database has `PRAGMA busy_timeout=5000` set, which makes SQLite wait up to 5 seconds for locks. If the problem persists:
+
+```bash
+# Delete stale WAL/SHM files
+rm data/visual-agent.db-wal data/visual-agent.db-shm
+```
+
+Then restart the application.

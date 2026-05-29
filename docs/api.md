@@ -8,7 +8,8 @@
 |----------|--------|-------------|-----------------------|
 | `/api/chat` | POST | Chat conversation | Implemented |
 | `/api/embeddings` | POST | Generate embeddings | Implemented (has bug) |
-| `/api/tags` | GET | Available models | Implemented (used by `checkConnection()`) |
+| `/api/tags` | GET | Available models | Implemented — used by `checkConnection()` and `getModels()` |
+| `/api/show` | POST | Model details | Implemented — used by `getModelDetails()` |
 
 ### Implemented Client: OllamaClient
 
@@ -58,7 +59,23 @@ override suspend fun embeddings(text: String): List<Double>
 suspend fun checkConnection(): Boolean
 ```
 
-Calls `GET /api/tags` to verify Ollama is reachable. Sets the `connected` flag. Currently never called by the UI.
+Calls `GET /api/tags` to verify Ollama is reachable. Sets the `connected` flag. Called on startup by `MainWindow.checkConnection()`.
+
+#### getModels()
+
+```kotlin
+override suspend fun getModels(): List<String>
+```
+
+Calls `GET /api/tags` and extracts model names from the JSON response. Called by `SessionPanel.refreshModels()` via `setOllamaClient()`.
+
+#### getModelDetails()
+
+```kotlin
+override suspend fun getModelDetails(modelName: String): ShowResponse
+```
+
+Calls `POST /api/show` with a `ShowRequest` body and returns detailed model information. Called by `SessionPanel.refreshModelDetails()` when a model is selected.
 
 ### Data Models
 
@@ -87,6 +104,32 @@ data class ChatResponse(
     val promptEvalCount: Int? = null,
     val evalCount: Int? = null
 )
+
+@Serializable
+data class ShowRequest(
+    val model: String
+)
+
+@Serializable
+data class ShowResponse(
+    val model: String,
+    val modifiedAt: String,
+    val parameters: String?,
+    val templates: Map<String, String>?,
+    val system: String?,
+    val license: String?,
+    val details: ModelDetails?
+)
+
+@Serializable
+data class ModelDetails(
+    val parentModel: String?,
+    val format: String?,
+    val family: String?,
+    val families: List<String>?,
+    val parameterSize: String?,
+    val quantizationLevel: String?
+)
 ```
 
 ## Provider Interface
@@ -98,6 +141,8 @@ interface LLMProvider {
     suspend fun vision(image: ByteArray, prompt: String): ChatResponse
     suspend fun embeddings(text: String): List<Double>
     fun isConnected(): Boolean
+    suspend fun getModels(): List<String>
+    suspend fun getModelDetails(modelName: String): ShowResponse
 }
 ```
 

@@ -2,42 +2,36 @@ package de.heckenmann.visualagent.ui.panels
 
 import de.heckenmann.visualagent.agent.AgentStatus
 import de.heckenmann.visualagent.agent.SubAgent
+import de.heckenmann.visualagent.ui.FxmlLoader
+import javafx.fxml.FXML
+import javafx.scene.Node
 import javafx.scene.control.Label
-import javafx.scene.layout.Priority
 import javafx.scene.layout.Region
 import javafx.scene.layout.VBox
-import javafx.scene.text.Font
-import javafx.scene.text.FontWeight
 
 class SubAgentsPanel : Region() {
 
-    private val rootVBox = VBox()
-    private val titleLabel = Label("SubAgents")
+    @FXML
+    private lateinit var rootVBox: VBox
+
+    @FXML
+    private lateinit var titleLabel: Label
+
+    @FXML
+    private lateinit var agentsContainer: VBox
+
     private val agentsList = mutableListOf<SubAgentView>()
 
     init {
+        val root = FxmlLoader.load(this, "sub-agents-panel.fxml")
+        children.add(root as Region)
         setupUI()
         createDefaultAgents()
     }
 
     private fun setupUI() {
         styleClass.add("subagents-panel")
-
-        titleLabel.font = Font.font("System", FontWeight.BOLD, 16.0)
-        titleLabel.style = "-fx-text-fill: #e0e0e0; -fx-padding: 8px;"
-
-        rootVBox.spacing = 8.0
-        rootVBox.style = "-fx-background-color: #2d2d2d; -fx-padding: 8px;"
-
-        rootVBox.children.add(titleLabel)
-
-        children.add(rootVBox)
-        VBox.setVgrow(this, Priority.ALWAYS)
-
-        minWidth = 200.0
-        maxWidth = 300.0
-        minHeight = 300.0
-        maxHeight = 600.0
+        titleLabel.text = "SubAgents"
     }
 
     private fun createDefaultAgents() {
@@ -49,7 +43,7 @@ class SubAgentsPanel : Region() {
     fun addAgent(agent: SubAgent) {
         val agentView = SubAgentView(agent)
         agentsList.add(agentView)
-        rootVBox.children.add(agentView)
+        agentsContainer.children.add(agentView as Node)
     }
 
     fun updateAgentStatus(agentId: String, status: AgentStatus, task: String? = null) {
@@ -59,48 +53,50 @@ class SubAgentsPanel : Region() {
 
 class SubAgentView(val agent: SubAgent) : Region() {
 
-    private val nameLabel = Label()
-    private val roleLabel = Label()
-    private val statusIndicator = Region()
-    private val taskLabel = Label()
+    @FXML
+    private lateinit var root: VBox
+
+    @FXML
+    private lateinit var nameLabel: Label
+
+    @FXML
+    private lateinit var roleLabel: Label
+
+    @FXML
+    private lateinit var statusIndicator: Label
+
+    @FXML
+    private lateinit var taskLabel: Label
 
     init {
+        val root = FxmlLoader.load(this, "sub-agent-item.fxml")
+        children.add(root as Region)
         setupUI()
     }
 
     private fun setupUI() {
         styleClass.add("agent-view")
-        style = "-fx-background-color: #3d3d3d; -fx-padding: 10px; -fx-background-radius: 4px;"
 
         nameLabel.text = agent.name
-        nameLabel.font = Font.font("System", FontWeight.BOLD, 14.0)
-        nameLabel.style = "-fx-text-fill: #ffffff;"
-
         roleLabel.text = agent.role
-        roleLabel.font = Font.font("System", 12.0)
-        roleLabel.style = "-fx-text-fill: #a0a0a0;"
 
-        statusIndicator.style = "-fx-min-width: 10px; -fx-min-height: 10px; -fx-background-radius: 5px;"
+        statusIndicator.styleClass.addAll("agent-status-indicator", "agent-status-idle")
         updateStatusIndicator(agent.status)
 
-        taskLabel.font = Font.font("System", 10.0)
-        taskLabel.style = "-fx-text-fill: #808080;"
         taskLabel.isWrapText = true
 
-        val content = VBox(statusIndicator, nameLabel, roleLabel, taskLabel)
-        content.spacing = 4.0
-        content.style = "-fx-padding: 4px;"
-
-        children.add(content)
+        val content = root.children.first()
+        content.styleClass.add("agent-content")
     }
 
     private fun updateStatusIndicator(status: AgentStatus) {
-        val color = when (status) {
-            AgentStatus.IDLE -> "#4caf50"
-            AgentStatus.BUSY -> "#ff9800"
-            AgentStatus.OFFLINE -> "#757575"
+        statusIndicator.styleClass.removeAll("agent-status-idle", "agent-status-busy", "agent-status-offline")
+        val statusClass = when (status) {
+            AgentStatus.IDLE -> "agent-status-idle"
+            AgentStatus.BUSY -> "agent-status-busy"
+            AgentStatus.OFFLINE -> "agent-status-offline"
         }
-        statusIndicator.style = "-fx-min-width: 10px; -fx-min-height: 10px; -fx-background-radius: 5px; -fx-background-color: $color;"
+        statusIndicator.styleClass.add(statusClass)
     }
 
     fun updateStatus(status: AgentStatus, task: String? = null) {

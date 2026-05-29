@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox fx:id="rootVBox" styleClass="subagents-panel" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1">
+    <children>
+        <Label fx:id="titleLabel" styleClass="title-4, bold">
+            <padding>
+                <javafx.geometry.Insets top="8.0" right="8.0" bottom="8.0" left="8.0"/>
+            </padding>
+        </Label>
+        <VBox fx:id="agentsContainer" spacing="8.0">
+            <padding>
+                <javafx.geometry.Insets top="8.0" right="8.0" bottom="8.0" left="8.0"/>
+            </padding>
+        </VBox>
+    </children>
+</VBox>
