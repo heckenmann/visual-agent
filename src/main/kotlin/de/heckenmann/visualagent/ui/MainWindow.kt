@@ -213,15 +213,13 @@ class MainWindow(
     private fun switchPanel(panel: javafx.scene.Node, button: Button?) {
         chatArea.center = panel
 
-        // Manage global back button visibility and action when panel supports BackNavigable
-        if (panel is BackNavigable && panel.showsBackButton) {
-            globalBackButton.isVisible = true
-            globalBackButton.setOnAction {
-                // Prefer panel-provided handler, fallback to chatPanel
-                panel.onBack?.invoke() ?: switchPanel(chatPanel, null)
-            }
+        // Global policy: show back button for any panel except the chat (conversation) panel.
+        // The back action always returns to the chat panel (fixed behavior requested).
+        val showBack = panel !== chatPanel
+        globalBackButton.isVisible = showBack
+        if (showBack) {
+            globalBackButton.setOnAction { switchPanel(chatPanel, null) }
         } else {
-            globalBackButton.isVisible = false
             globalBackButton.onAction = null
         }
 
