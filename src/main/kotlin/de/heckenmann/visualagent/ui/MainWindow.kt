@@ -36,6 +36,13 @@ class MainWindow(
     private val agentManager: AgentManager,
     private val ollamaClient: OllamaClient,
 ) : Stage() {
+    companion object {
+        /**
+         * Testable predicate: whether the global back button should be shown.
+         * Uses identity comparison so callers can pass any object representing panels.
+         */
+        fun shouldShowBack(activePanel: Any, chatPanel: Any): Boolean = activePanel !== chatPanel
+    }
 
     @FXML
     private lateinit var rootPane: BorderPane
