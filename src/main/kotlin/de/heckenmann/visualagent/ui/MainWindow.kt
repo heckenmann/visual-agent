@@ -130,6 +130,51 @@ class MainWindow(
         canvasBtn.setOnAction { switchPanel(canvasPanel, canvasBtn) }
         settingsBtn.setOnAction { switchPanel(applicationSettingsPanel, settingsBtn) }
 
+        // Wire SubAgentsPanel UI actions to AgentManager backend
+        subAgentsPanel.agentActionCallback = { action, agentId ->
+            when (action) {
+                "update" -> {
+                    // UI already mutated the agent model. Persist changes to AgentManager
+                    val uiAgent = agentManager.getSubAgent(agentId)
+                    if (uiAgent != null) {
+                        // attempt to update based on UI changes (name/role/config may have been changed on UI instance)
+                        // To keep consistency, refresh UI card from AgentManager after update
+                        agentManager.updateAgent(agentId, name = uiAgent.name, role = uiAgent.role, config = uiAgent.config)
+                        Platform.runLater { agentsLabel.text = " ${agentManager.getSubAgents().size}" }
+                    } else {
+                        println("[MainWindow] update: agent not found in manager: $agentId")
+                    }
+                }
+                "delete" -> {
+                    if (agentManager.deleteAgent(agentId)) {
+                        Platform.runLater { agentsLabel.text = " ${agentManager.getSubAgents().size}" }
+                    }
+                }
+                "run" -> {
+                    // assign first pending todo to this agent if available
+                    val pending = agentManager.todoManager.getPending().firstOrNull()
+                    if (pending != null) {
+                        val ok = agentManager.assignTodoToAgent(pending.id, agentId)
+                        if (!ok) println("[MainWindow] Failed to assign todo ${pending.id} to agent $agentId")
+                    } else {
+                        println("[MainWindow] No pending todos to run")
+                    }
+                }
+            }
+        }
+
+        // Create agent flow: create via AgentManager and add to panel
+        subAgentsPanel.onCreateAgent = { name, role, template ->
+            val created = agentManager.createAgent(name, role, template)
+            Platform.runLater {
+                subAgentsPanel.addAgent(created)
+                agentsLabel.text = " ${agentManager.getSubAgents().size}"
+            }
+        }
+
+        // Initialize the SubAgentsPanel with agents from AgentManager (override panel defaults)
+        subAgentsPanel.setAgents(agentManager.getSubAgents())
+
         chatPanel.setOnSendMessage { text ->
             scope.launch {
                 try {
@@ -143,7 +188,13 @@ class MainWindow(
 
         AgentManager.setAgentCallback { agentId, message ->
             Platform.runLater {
+                // Mirror messages into chat panel
                 chatPanel.addAssistantMessage("[$agentId]: $message")
+                // Also update agent card status from AgentManager authoritative state
+                val a = agentManager.getSubAgent(agentId)
+                if (a != null) {
+                    subAgentsPanel.updateAgentStatus(agentId, a.status, a.currentTask)
+                }
             }
         }
 

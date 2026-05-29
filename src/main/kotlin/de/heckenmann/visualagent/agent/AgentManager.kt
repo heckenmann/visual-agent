@@ -138,6 +138,8 @@ class AgentManager(
         val agent = SubAgent.fromTemplate(id, name, role, templateName)
         saveAgentToDb(agent)
         subAgents[agent.id] = agent
+        // Notify listeners about new agent
+        notifyAgent(agent.id, "CREATED")
         println("[AgentManager] Created agent: $id ($name)")
         return agent
     }
@@ -211,6 +213,8 @@ class AgentManager(
         idleAgent.currentTodoId = pendingTodo.id
         idleAgent.currentTask = pendingTodo.description
         saveAgentToDb(idleAgent)
+        // Notify UI/consumers about status change
+        notifyAgent(idleAgent.id, "STATUS:${idleAgent.status.name}")
 
         println("[AgentManager] assignNextTodo assigned todo=${pendingTodo.id} to agent=${idleAgent.id}")
 
@@ -234,6 +238,8 @@ class AgentManager(
         agent.currentTodoId = todoId
         agent.currentTask = todo.description
         saveAgentToDb(agent)
+        // Notify UI/consumers about status change
+        notifyAgent(agent.id, "STATUS:${agent.status.name}")
 
         scope.launch {
             processTodoWithLLM(agent, todoId, todo.description)
@@ -274,6 +280,8 @@ class AgentManager(
             agent.currentTask = null
             agent.currentTodoId = null
             saveAgentToDb(agent)
+            // Notify UI/consumers that agent is idle again
+            notifyAgent(agent.id, "STATUS:${agent.status.name}")
         }
     }
 

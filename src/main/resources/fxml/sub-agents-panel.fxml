@@ -10,6 +10,11 @@
                 <javafx.geometry.Insets top="8.0" right="8.0" bottom="8.0" left="8.0"/>
             </padding>
         </Label>
+        <HBox spacing="8.0" alignment="CENTER_RIGHT">
+            <children>
+                <Button fx:id="btnAddAgent" text="Add Agent" />
+            </children>
+        </HBox>
         <VBox fx:id="agentsContainer" spacing="8.0">
             <padding>
                 <javafx.geometry.Insets top="8.0" right="8.0" bottom="8.0" left="8.0"/>

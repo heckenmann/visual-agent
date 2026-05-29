@@ -2,12 +2,15 @@ package de.heckenmann.visualagent.ui.panels
 
 import de.heckenmann.visualagent.agent.AgentStatus
 import de.heckenmann.visualagent.agent.SubAgent
+import de.heckenmann.visualagent.agent.AgentConfig
 import de.heckenmann.visualagent.ui.FxmlLoader
 import javafx.fxml.FXML
 import javafx.scene.Node
+import javafx.scene.control.Button
 import javafx.scene.control.Label
 import javafx.scene.layout.Region
 import javafx.scene.layout.VBox
+import java.util.UUID
 
 class SubAgentsPanel : Region() {
 
@@ -18,9 +21,15 @@ class SubAgentsPanel : Region() {
     private lateinit var titleLabel: Label
 
     @FXML
+    private lateinit var btnAddAgent: Button
+
+    @FXML
     private lateinit var agentsContainer: VBox
 
-    private val agentsList = mutableListOf<SubAgentView>()
+    private val agentsList = mutableListOf<SubAgentCardView>()
+
+    // Callback for creating new agents (UI -> backend)
+    var onCreateAgent: ((name: String, role: String, template: String) -> Unit)? = null
 
     init {
         val root = FxmlLoader.load(this, "sub-agents-panel.fxml")
@@ -29,9 +38,29 @@ class SubAgentsPanel : Region() {
         createDefaultAgents()
     }
 
+    fun setAgents(agents: List<SubAgent>) {
+        agentsContainer.children.clear()
+        agentsList.clear()
+        agents.forEach { addAgent(it) }
+    }
+
     private fun setupUI() {
         styleClass.add("subagents-panel")
         titleLabel.text = "SubAgents"
+
+        // Add button behavior: open dialog and delegate creation to callback or create locally
+        btnAddAgent.text = "Add Agent"
+        btnAddAgent.setOnAction {
+            AgentDetailsDialog.showFor(null) { name, role, template ->
+                if (onCreateAgent != null) {
+                    onCreateAgent!!.invoke(name, role, template)
+                } else {
+                    val id = UUID.randomUUID().toString().take(8)
+                    val newAgent = SubAgent.fromTemplate(id, name, role, template)
+                    addAgent(newAgent)
+                }
+            }
+        }
     }
 
     private fun createDefaultAgents() {
@@ -40,8 +69,48 @@ class SubAgentsPanel : Region() {
         addAgent(SubAgent("3", "Documenter", "Documentation writing", AgentStatus.IDLE))
     }
 
+    // Optional external callback for agent actions (UI -> backend wiring)
+    var agentActionCallback: ((action: String, agentId: String) -> Unit)? = null
+
     fun addAgent(agent: SubAgent) {
-        val agentView = SubAgentView(agent)
+        val agentView = SubAgentCardView(agent)
+
+        // Configure callbacks: delegate to agentActionCallback if present, otherwise perform local UI-only behavior
+        agentView.onConfigure = { a ->
+            AgentDetailsDialog.showFor(a) { name, role, template ->
+                a.name = name
+                a.role = role
+                a.config = AgentConfig.fromTemplate(template)
+                agentView.refreshDisplay()
+                // propagate to backend if available
+                agentActionCallback?.invoke("update", a.id)
+            }
+        }
+
+        agentView.onRun = { a ->
+            agentActionCallback?.invoke("run", a.id) ?: println("[UI] Run agent ${a.id}")
+        }
+
+        agentView.onLogs = { a ->
+            // show logs dialog
+            AgentLogsDialog.showFor(a)
+        }
+
+        agentView.onDelete = { a ->
+            // confirmation before deleting
+            val alert = javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.CONFIRMATION)
+            alert.title = "Delete Agent"
+            alert.headerText = "Delete agent ${a.name}?"
+            alert.contentText = "This will remove the agent from the UI and delete persisted data if connected to backend."
+            val res = alert.showAndWait()
+            if (res.isPresent && res.get() == javafx.scene.control.ButtonType.OK) {
+                // remove from UI
+                agentsContainer.children.remove(agentView)
+                agentsList.remove(agentView)
+                agentActionCallback?.invoke("delete", a.id)
+            }
+        }
+
         agentsList.add(agentView)
         agentsContainer.children.add(agentView as Node)
     }
