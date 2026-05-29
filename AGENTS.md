@@ -106,6 +106,7 @@ src/main/kotlin/de/heckenmann/visualagent/
 2. **SessionPanel persistence** — model selection is now persisted to AppConfig, surviving application restarts
 3. **OllamaClient error handling** — proper HTTP status checking (200 OK) with detailed error messages for network failures, timeout handling, and JSON parsing errors
 4. **ChatPanel copy icons** — message context menu now displays proper copy icons: 📋 for code blocks, 📄 for plain text
+5. **SubAgents (Phase 2)** — Persistence and UI: added `sub_agents` table and CRUD helpers, AgentConfig templates, SubAgentsPanel card UI with Add/Edit/Delete/Logs, live status updates via AgentManager notifications, and MainWindow wiring to AgentManager (create/update/delete/run). See `docs/subagents.md` for details.
 
 ## Known Bugs
 
