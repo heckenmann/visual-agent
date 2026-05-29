@@ -44,6 +44,9 @@ class MainWindow(
     private lateinit var titleBar: HBox
 
     @FXML
+    private lateinit var globalBackButton: Button
+
+    @FXML
     private lateinit var iconRail: VBox
 
     @FXML
@@ -209,6 +212,19 @@ class MainWindow(
 
     private fun switchPanel(panel: javafx.scene.Node, button: Button?) {
         chatArea.center = panel
+
+        // Manage global back button visibility and action when panel supports BackNavigable
+        if (panel is BackNavigable && panel.showsBackButton) {
+            globalBackButton.isVisible = true
+            globalBackButton.setOnAction {
+                // Prefer panel-provided handler, fallback to chatPanel
+                panel.onBack?.invoke() ?: switchPanel(chatPanel, null)
+            }
+        } else {
+            globalBackButton.isVisible = false
+            globalBackButton.onAction = null
+        }
+
         activeButton?.styleClass?.remove("active")
         if (button != null) {
             button.styleClass.add("active")
