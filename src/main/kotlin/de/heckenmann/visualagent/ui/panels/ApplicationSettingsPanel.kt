@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.ui.FxmlLoader
 import javafx.application.Application
 import javafx.application.Platform
 import javafx.fxml.FXML
+import javafx.scene.control.Button
 import javafx.scene.control.ComboBox
 import javafx.scene.control.Spinner
 import javafx.scene.control.SpinnerValueFactory.IntegerSpinnerValueFactory
@@ -17,10 +18,16 @@ class ApplicationSettingsPanel : Region() {
     private lateinit var root: VBox
 
     @FXML
+    private lateinit var btnBack: Button
+
+    @FXML
     private lateinit var themeSelector: ComboBox<String>
 
     @FXML
     private lateinit var fontSizeSpinner: Spinner<Int>
+
+    // Back handler provided by MainWindow
+    var onBack: (() -> Unit)? = null
 
     private val themes = listOf(
         "Dracula",
@@ -39,6 +46,7 @@ class ApplicationSettingsPanel : Region() {
 
     @FXML
     fun initialize() {
+        btnBack.setOnAction { onBack?.invoke() }
         themeSelector.items.setAll(themes)
         themeSelector.selectionModel.select(AppConfig.instance.theme)
         themeSelector.selectionModel.selectedItemProperty().addListener { _, _, selected ->

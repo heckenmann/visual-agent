@@ -17,6 +17,7 @@
     </padding>
 
     <HBox alignment="CENTER_LEFT" spacing="8.0">
+        <Button fx:id="btnBack" text="Zurück" />
         <FontIcon iconLiteral="fas-cog" iconSize="14"/>
         <Label text="Settings" styleClass="title-4"/>
     </HBox>

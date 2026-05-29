@@ -130,6 +130,11 @@ class MainWindow(
         canvasBtn.setOnAction { switchPanel(canvasPanel, canvasBtn) }
         settingsBtn.setOnAction { switchPanel(applicationSettingsPanel, settingsBtn) }
 
+        // Provide a back handler from settings to switch back to the chat panel
+        applicationSettingsPanel.onBack = {
+            switchPanel(chatPanel, null)
+        }
+
         // Wire SubAgentsPanel UI actions to AgentManager backend
         subAgentsPanel.agentActionCallback = { action, agentId ->
             when (action) {
