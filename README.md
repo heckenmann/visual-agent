@@ -114,11 +114,14 @@ gradle copyAllDependencies
 - [ ] Wire TodoPanel to KnowledgeDb for persistence
 
 ### Phase 2: Core Features
-- [ ] SubAgent System loaded from DB
+- [x] SubAgent System loaded from DB (persistence + AgentConfig templates)
+- [x] SubAgents UI: card view, Add/Edit/Delete, Logs, live status updates
 - [ ] Todo Manager with SQLite persistence
-- [ ] Knowledge DB full CRUD
+- [ ] Knowledge DB full CRUD (partial: sub_agents table + helpers implemented)
 - [ ] Chat with streaming responses
 - [ ] Personalization (Name, Image storage)
+
+See `docs/subagents.md` for details on the SubAgents implementation and how to use the new UI features.
 
 ### Phase 3: Advanced Features
 - [ ] Canvas with LLM-driven visual output
