@@ -8,12 +8,12 @@ A modern Kotlin-based coding agent with JavaFX UI, utilizing local and cloud LLM
 
 | Feature | UI | Backend | Wired |
 |---------|----|---------|-------|
-| Chat | Done (send handler + Enter key + custom cells) | `AgentManager.sendMessage()` | Yes — callback wired in MainWindow |
+| Chat | Done (send handler + Enter key + Cmd/Ctrl+Enter, loading state, custom cells) | `AgentManager.sendMessage()` | Yes — callback wired in MainWindow |
 | SubAgents | Done (CSS classes, no inline styles) | Hardcoded in `AgentManager` | Partially — panel creates its own list |
 | Todos | Done (Add dialog, Delete, checkbox toggle, badges) | DB table exists | No — panel uses in-memory list |
 | Canvas | Done (CSS classes) | Draw methods work | Yes |
 | Session | Done (FXML, model selector, details) | OllamaClient connected | Yes — model list + details functional |
-| StatusBar | Done (CSS classes) | `checkConnection()` called on startup | Yes — shows connected/disconnected |
+| StatusBar | Done (CSS classes + Retry/Reconnect actions) | `checkConnection()` called on startup | Yes — shows connected/disconnected and allows reconnect |
 | Settings | Done (FXML, theme selector, font spinner) | AppConfig mutable | Yes — theme reload + font size |
 | Ollama Client | N/A | `chat()`, `stream()`, `vision()`, `embeddings()`, `getModels()`, `getModelDetails()` | Yes — called by SessionPanel and ChatPanel |
 | Knowledge DB | N/A | Tables + partial CRUD, WAL mode, busy_timeout | Partially — initialized but not called by UI |
@@ -67,12 +67,12 @@ src/main/kotlin/de/heckenmann/visualagent/
 ├── todo/
 │   └── Todo.kt                # Todo, Priority, Status models
 └── ui/
-    ├── MainWindow.kt          # FXML-based, panel switching, window controls, wires backend to UI
+    ├── MainWindow.kt          # FXML-based, panel switching, shortcuts, command palette, window controls
     ├── FxmlLoader.kt          # Type-safe FXML loading utility
-    ├── StatusBar.kt           # Connection status with CSS classes
+    ├── StatusBar.kt           # Connection status + Retry/Reconnect actions
     └── panels/
         ├── SessionPanel.kt         # FXML-based, OllamaClient connected, model list + details
-        ├── ChatPanel.kt            # Send handler, Enter key, setOnSendMessage callback, ChatMessage
+        ├── ChatPanel.kt            # Send handler, Enter/Cmd+Ctrl+Enter, loading placeholder, ChatMessage
         ├── TodoPanel.kt            # FXML-based, Add dialog, Delete, checkbox toggle, priority badges
         ├── SubAgentsPanel.kt       # Agent list built in code, CSS classes (no inline styles)
         ├── CanvasPanel.kt          # Drawing canvas built in code, CSS classes
@@ -101,6 +101,10 @@ gradle copyAllDependencies
 ## Roadmap
 
 ### Phase 1: Foundation (Current)
+
+> NOTE: Releases are drafted automatically using GitHub Release Drafter when merging to `main`. Maintain conventional PR labels (enhancement, bug, documentation, test) so drafts are grouped appropriately. A human should review the drafted release and publish when ready.
+
+
 - [x] Gradle Project Setup
 - [x] JavaFX MainWindow with CSS styling
 - [x] Ollama Local Client (REST API)

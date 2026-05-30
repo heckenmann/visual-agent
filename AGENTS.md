@@ -61,12 +61,12 @@ src/main/kotlin/de/heckenmann/visualagent/
 ├── todo/
 │   └── Todo.kt                # Todo, Priority, Status models
 └── ui/
-    ├── MainWindow.kt          # FXML-based, panel switching, window controls, wires backend to UI
+    ├── MainWindow.kt          # FXML-based, panel switching, shortcuts/command palette, window controls, wires backend to UI
     ├── FxmlLoader.kt          # Type-safe FXML loading utility
-    ├── StatusBar.kt           # Connection status with CSS classes
+    ├── StatusBar.kt           # Connection status with CSS classes + Retry/Reconnect actions
     └── panels/
         ├── SessionPanel.kt         # FXML-based, OllamaClient connected, model list + details
-        ├── ChatPanel.kt            # Send handler, Enter key, setOnSendMessage callback, ChatMessage
+        ├── ChatPanel.kt            # Send handler, Enter/Cmd+Ctrl+Enter, loading placeholder, setOnSendMessage callback, ChatMessage
         ├── TodoPanel.kt            # FXML-based, Add dialog, Delete, checkbox toggle, priority badges
         ├── SubAgentsPanel.kt       # Agent list built in code, CSS classes (no inline styles)
         ├── CanvasPanel.kt          # Drawing canvas built in code, CSS classes
@@ -96,6 +96,7 @@ src/main/kotlin/de/heckenmann/visualagent/
 - **FXML loading**: Panels use `FxmlLoader.load(controller, "file.fxml")` — sets controller before loading, no `fx:controller` attribute in FXML (MainWindow, SessionPanel, TodoPanel, ApplicationSettingsPanel)
 - **Code-built panels**: ChatPanel and SubAgentsPanel build UI in code (no FXML)
 - **Panel switching**: Navigation buttons in MainWindow swap `chatArea.center` between panels
+- **Keyboard navigation**: MainWindow supports `Cmd/Ctrl+1..6` for panel switching and `Cmd/Ctrl+K` command palette
 - **CSS classes**: All styling via CSS classes (dark.css), no inline `setStyle()` calls
 - **Callback wiring**: ChatPanel sends messages via `setOnSendMessage` callback wired to `AgentManager.sendMessage()` in MainWindow
 - **OllamaClient integration**: SessionPanel calls `getModels()` and `getModelDetails()` via `setOllamaClient()`

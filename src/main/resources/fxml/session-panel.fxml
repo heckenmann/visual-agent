@@ -14,8 +14,8 @@
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <VBox fx:id="root" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1">
-    <ScrollPane fitToWidth="true" fitToHeight="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED"
-                styleClass="scroll-transparent" fx:id="scrollPane">
+    <ScrollPane fitToWidth="true" fitToHeight="false" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED"
+                styleClass="scroll-transparent" fx:id="scrollPane" VBox.vgrow="ALWAYS">
         <VBox spacing="16.0">
             <padding>
                 <Insets top="20.0" right="20.0" bottom="20.0" left="20.0"/>

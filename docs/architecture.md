@@ -2,7 +2,7 @@
 
 ## Overview
 
-Visual Agent follows a modular architecture with clear separation of concerns. UI shells are built and key backend wiring is in place — ChatPanel sends messages via AgentManager, SessionPanel fetches models from OllamaClient, and StatusBar reflects connection status.
+Visual Agent follows a modular architecture with clear separation of concerns. UI shells are built and key backend wiring is in place — ChatPanel sends messages via AgentManager, SessionPanel fetches models from OllamaClient, and StatusBar reflects connection status with quick reconnect actions.
 
 ## Layer Model
 
@@ -27,14 +27,14 @@ Visual Agent follows a modular architecture with clear separation of concerns. U
 | Component | UI | Backend | Wired |
 |-----------|----|---------|-------|
 | MainWindow | Done (FXML, window controls) | N/A | N/A |
-| ChatPanel | Done (send handler, Enter key, custom cells) | `AgentManager.sendMessage()` | **Wired** — callback in MainWindow |
+| ChatPanel | Done (send handler, Enter/Cmd+Ctrl+Enter, loading state, custom cells) | `AgentManager.sendMessage()` | **Wired** — callback in MainWindow |
 | SubAgentsPanel | Done (CSS classes) | `AgentManager` has hardcoded agents | **Partially** — panel creates its own list |
 | TodoPanel | Done (Add dialog, Delete, checkbox, badges) | `KnowledgeDb` has `todos` table | **Not wired** — panel uses in-memory list |
 | CanvasPanel | Done (CSS classes) | Draw methods exist | Functional |
 | SessionPanel | Done (FXML, model selector, details) | `OllamaClient.getModels()`, `getModelDetails()` | **Wired** — model list + details functional |
-| StatusBar | Done (CSS classes) | `checkConnection()` called on startup | **Wired** — shows connected/disconnected |
+| StatusBar | Done (CSS classes + Retry/Reconnect actions) | `checkConnection()` called on startup | **Wired** — shows connected/disconnected, actions trigger reconnect |
 | ApplicationSettingsPanel | Done (FXML, theme, font size) | AppConfig mutable properties | **Wired** — theme reload + font size |
-| OllamaClient | N/A | `chat()`, `stream()`, `vision()`, `embeddings()`, `getModels()`, `getModelDetails()` | **Wired** — called by SessionPanel and ChatPanel |
+| OllamaClient | N/A | `chat()`, `stream()`, `vision()`, `embeddings()`, `getModels()`, `getModelDetails()` | **Wired** — called by SessionPanel and ChatPanel; chat/stream use Spring AI tools |
 | KnowledgeDb | N/A | `saveMemory()`, `searchMemories()`, preferences CRUD, WAL mode, busy_timeout | Initialized but not called by UI |
 
 ## Main Components
@@ -43,13 +43,13 @@ Visual Agent follows a modular architecture with clear separation of concerns. U
 
 | Component | Description | Status |
 |-----------|-------------|--------|
-| `MainWindow` | FXML-based with BorderPane layout, panel switching, window controls | Working |
-| `ChatPanel` | Chat with ListView + custom cells + send handler + Enter key | Working — wired to AgentManager |
+| `MainWindow` | FXML-based with BorderPane layout, panel switching, keyboard shortcuts (`Cmd/Ctrl+1..6`) and command palette (`Cmd/Ctrl+K`) | Working |
+| `ChatPanel` | Chat with ListView + custom cells + send handler + Enter/Cmd+Ctrl+Enter + assistant loading state | Working — wired to AgentManager |
 | `SubAgentsPanel` | Live view of SubAgents with status indicators | Working — creates own default agents |
 | `TodoPanel` | Todo list with Add dialog, Delete, checkbox toggle, priority badges | Working — in-memory only |
 | `CanvasPanel` | Drawing canvas with text, rect, line, circle | Working |
 | `SessionPanel` | Model selector, context slider, streaming toggle, model details | Working — wired to OllamaClient |
-| `StatusBar` | Connection status, model name, agent count | Working — updated on startup |
+| `StatusBar` | Connection status, model name, agent count, Retry/Reconnect | Working — updated on startup |
 | `ApplicationSettingsPanel` | Theme selector, font size spinner | Working — applies changes live |
 | `FxmlLoader` | Type-safe FXML loading utility | Working |
 
@@ -74,15 +74,21 @@ private fun loadAgentsFromDb() {
 
 | Method | Status | Notes |
 |--------|--------|-------|
-| `chat()` | Implemented | Uses `ChatRequest.serializer()` |
-| `stream()` | Implemented | Parses NDJSON response line by line |
+| `chat()` | Implemented | Uses Spring AI `ChatModel` with request-scoped function callbacks |
+| `stream()` | Implemented | Uses Spring AI streaming with request-scoped function callbacks |
 | `vision()` | Implemented | **Bug**: hardcodes model `"llava"` instead of config |
 | `embeddings()` | Implemented | **Bug**: uses raw string interpolation, no escaping of `$text` |
 | `checkConnection()` | Implemented | Called on startup by MainWindow |
 | `getModels()` | Implemented | Called by SessionPanel via `setOllamaClient()` |
 | `getModelDetails()` | Implemented | Called by SessionPanel on model selection |
 
-### 4. Data Layer
+### 4. Tool Layer
+
+`ToolRegistry` exposes application tools to Spring AI as `FunctionCallback` instances. Agent code only passes provider-neutral `ToolId` values through `ChatRequestContext`; provider-specific callback creation stays inside the LLM provider boundary.
+
+Implemented tool IDs: `ui`, `file:read`, `file:list`, `file:glob`, `file:grep`, `file:write`, `file:edit`, `terminal`, `browser`, `search`, `context`, `pwd`.
+
+### 5. Data Layer
 
 **`KnowledgeDb`** — creates all tables on `init()`, has partial CRUD. WAL mode and `busy_timeout=5000` enabled.
 

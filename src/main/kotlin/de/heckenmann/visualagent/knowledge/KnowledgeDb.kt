@@ -1,5 +1,11 @@
 package de.heckenmann.visualagent.knowledge
 
+import de.heckenmann.visualagent.agent.SubAgentToolConfig
+import de.heckenmann.visualagent.todo.Todo
+import de.heckenmann.visualagent.todo.TodoPriority
+import de.heckenmann.visualagent.todo.TodoStatus
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
 import org.springframework.stereotype.Repository
 import java.sql.Connection
 import java.sql.DriverManager
@@ -51,7 +57,7 @@ class KnowledgeDb(private val dbPath: String = "./data/visual-agent.db") {
 
     private fun getConnection(): Connection {
         if (connection == null || connection!!.isClosed) {
-            connection = DriverManager.getConnection("jdbc:sqlite:$dbPath")
+            connection = DriverManager.getConnection(resolveJdbcUrl(dbPath))
             connection!!.createStatement().use { stmt ->
                 stmt.execute("PRAGMA journal_mode=WAL")
                 stmt.execute("PRAGMA busy_timeout=5000")
@@ -59,6 +65,9 @@ class KnowledgeDb(private val dbPath: String = "./data/visual-agent.db") {
         }
         return connection!!
     }
+
+    private fun resolveJdbcUrl(pathOrUrl: String): String =
+        if (pathOrUrl.startsWith("jdbc:sqlite:")) pathOrUrl else "jdbc:sqlite:$pathOrUrl"
 
     private fun initDatabase() {
         val conn = getConnection()
@@ -141,6 +150,22 @@ class KnowledgeDb(private val dbPath: String = "./data/visual-agent.db") {
                     config TEXT NOT NULL DEFAULT '{"timeout":60,"maxRetries":3,"memoryLimitMb":512}',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """.trimIndent(),
+            )
+
+            stmt.execute(
+                """
+                CREATE TABLE IF NOT EXISTS sub_agent_configs (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    description TEXT NOT NULL,
+                    model TEXT NOT NULL,
+                    system_prompt TEXT NOT NULL DEFAULT '',
+                    tools TEXT NOT NULL DEFAULT '[]',
+                    max_turns INTEGER NOT NULL DEFAULT 5,
+                    enabled INTEGER NOT NULL DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
                 """.trimIndent(),
             )
@@ -227,6 +252,178 @@ class KnowledgeDb(private val dbPath: String = "./data/visual-agent.db") {
             stmt.setString(1, key)
             stmt.setString(2, value)
             stmt.setString(3, Instant.now().toString())
+            stmt.executeUpdate()
+        }
+    }
+
+    /**
+     * Persist one chat message in the conversation history table.
+     *
+     * @param sessionId Logical conversation/session identifier
+     * @param role Message role (user, assistant, system)
+     * @param content Message body
+     * @param metadata Optional serialized metadata payload
+     * @return Created message ID
+     */
+    fun saveConversationMessage(sessionId: String, role: String, content: String, metadata: String? = null): String {
+        val id = UUID.randomUUID().toString()
+        val conn = getConnection()
+        conn.prepareStatement(
+            """
+            INSERT INTO conversation_history (id, session_id, role, content, metadata, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        ).use { stmt ->
+            stmt.setString(1, id)
+            stmt.setString(2, sessionId)
+            stmt.setString(3, role)
+            stmt.setString(4, content)
+            stmt.setString(5, metadata)
+            stmt.setString(6, Instant.now().toString())
+            stmt.executeUpdate()
+        }
+        return id
+    }
+
+    /**
+     * Load conversation history for a session in chronological order.
+     *
+     * @param sessionId Logical conversation/session identifier
+     * @param limit Maximum number of rows to load (newest rows are selected first and returned chronologically)
+     */
+    fun getConversationMessages(sessionId: String, limit: Int = 500): List<Map<String, String>> {
+        val conn = getConnection()
+        val rows = mutableListOf<Map<String, String>>()
+        conn.prepareStatement(
+            """
+            SELECT id, role, content, metadata, created_at
+            FROM conversation_history
+            WHERE session_id = ?
+            ORDER BY created_at DESC
+            LIMIT ?
+        """,
+        ).use { stmt ->
+            stmt.setString(1, sessionId)
+            stmt.setInt(2, limit)
+            stmt.executeQuery().use { rs ->
+                while (rs.next()) {
+                    rows.add(
+                        mapOf(
+                            "id" to rs.getString("id"),
+                            "role" to rs.getString("role"),
+                            "content" to rs.getString("content"),
+                            "metadata" to (rs.getString("metadata") ?: ""),
+                            "createdAt" to rs.getString("created_at"),
+                        ),
+                    )
+                }
+            }
+        }
+        return rows.reversed()
+    }
+
+    /**
+     * Delete all conversation messages for a session.
+     *
+     * @param sessionId Logical conversation/session identifier
+     * @return Number of deleted rows
+     */
+    fun deleteConversationMessages(sessionId: String): Int {
+        val conn = getConnection()
+        conn.prepareStatement("DELETE FROM conversation_history WHERE session_id = ?").use { stmt ->
+            stmt.setString(1, sessionId)
+            return stmt.executeUpdate()
+        }
+    }
+
+    /**
+     * Save or update one todo row.
+     *
+     * @param todo Todo to persist
+     */
+    fun saveTodo(todo: Todo) {
+        val conn = getConnection()
+        conn.prepareStatement(
+            """
+            INSERT INTO todos (id, description, status, priority, assigned_agent_id, created_at, completed_at, due_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                description = excluded.description,
+                status = excluded.status,
+                priority = excluded.priority,
+                assigned_agent_id = excluded.assigned_agent_id,
+                created_at = excluded.created_at,
+                completed_at = excluded.completed_at,
+                due_date = excluded.due_date
+            """.trimIndent(),
+        ).use { stmt ->
+            stmt.setString(1, todo.id)
+            stmt.setString(2, todo.description)
+            stmt.setString(3, todo.status.name)
+            stmt.setString(4, todo.priority.name)
+            stmt.setString(5, todo.assignedAgentId)
+            stmt.setString(6, todo.createdAt.toString())
+            stmt.setString(7, todo.completedAt?.toString())
+            stmt.setString(8, todo.dueDate?.toString())
+            stmt.executeUpdate()
+        }
+    }
+
+    /**
+     * Load all todos ordered by creation timestamp.
+     *
+     * @return Persisted todos
+     */
+    fun listTodos(): List<Todo> {
+        val conn = getConnection()
+        val todos = mutableListOf<Todo>()
+        conn.prepareStatement(
+            """
+            SELECT id, description, status, priority, assigned_agent_id, created_at, completed_at, due_date
+            FROM todos
+            ORDER BY created_at ASC
+            """.trimIndent(),
+        ).use { stmt ->
+            stmt.executeQuery().use { rs ->
+                while (rs.next()) {
+                    val createdAt = runCatching { Instant.parse(rs.getString("created_at")) }.getOrElse { Instant.now() }
+                    val completedAt = rs.getString("completed_at")?.let { runCatching { Instant.parse(it) }.getOrNull() }
+                    val dueDate = rs.getString("due_date")?.let { runCatching { Instant.parse(it) }.getOrNull() }
+                    todos += Todo(
+                        id = rs.getString("id"),
+                        description = rs.getString("description"),
+                        status = runCatching { TodoStatus.valueOf(rs.getString("status")) }.getOrDefault(TodoStatus.PENDING),
+                        priority = runCatching { TodoPriority.valueOf(rs.getString("priority")) }.getOrDefault(TodoPriority.MEDIUM),
+                        assignedAgentId = rs.getString("assigned_agent_id"),
+                        createdAt = createdAt,
+                        completedAt = completedAt,
+                        dueDate = dueDate,
+                    )
+                }
+            }
+        }
+        return todos
+    }
+
+    /**
+     * Delete one todo row.
+     *
+     * @param todoId Todo ID to remove
+     */
+    fun deleteTodo(todoId: String) {
+        val conn = getConnection()
+        conn.prepareStatement("DELETE FROM todos WHERE id = ?").use { stmt ->
+            stmt.setString(1, todoId)
+            stmt.executeUpdate()
+        }
+    }
+
+    /**
+     * Remove all todos from storage.
+     */
+    fun clearTodos() {
+        val conn = getConnection()
+        conn.prepareStatement("DELETE FROM todos").use { stmt ->
             stmt.executeUpdate()
         }
     }
@@ -391,6 +588,96 @@ class KnowledgeDb(private val dbPath: String = "./data/visual-agent.db") {
             stmt.setString(4, id)
             return stmt.executeUpdate() > 0
         }
+    }
+
+    /**
+     * Save or update an agent tool configuration.
+     *
+     * @param id Stable configuration ID
+     * @param name Display name
+     * @param description Description of the agent capability
+     * @param model Preferred model name
+     * @param systemPrompt System prompt used by this config
+     * @param toolsJson JSON encoded list of tool IDs
+     * @param maxTurns Maximum loop turns
+     * @param enabled Whether the config is enabled
+     */
+    fun saveSubAgentConfig(
+        id: String,
+        name: String,
+        description: String,
+        model: String,
+        systemPrompt: String,
+        toolsJson: String,
+        maxTurns: Int,
+        enabled: Boolean,
+    ) {
+        val conn = getConnection()
+        conn.prepareStatement(
+            """
+            INSERT OR REPLACE INTO sub_agent_configs
+                (id, name, description, model, system_prompt, tools, max_turns, enabled, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM sub_agent_configs WHERE id = ?), ?))
+            """.trimIndent(),
+        ).use { stmt ->
+            stmt.setString(1, id)
+            stmt.setString(2, name)
+            stmt.setString(3, description)
+            stmt.setString(4, model)
+            stmt.setString(5, systemPrompt)
+            stmt.setString(6, toolsJson)
+            stmt.setInt(7, maxTurns)
+            stmt.setInt(8, if (enabled) 1 else 0)
+            stmt.setString(9, id)
+            stmt.setString(10, Instant.now().toString())
+            stmt.executeUpdate()
+        }
+    }
+
+    /**
+     * Load one agent tool configuration.
+     *
+     * @param id Stable configuration ID
+     * @return Configuration if present
+     */
+    fun getSubAgentConfig(id: String): SubAgentToolConfig? {
+        val conn = getConnection()
+        conn.prepareStatement("SELECT * FROM sub_agent_configs WHERE id = ?").use { stmt ->
+            stmt.setString(1, id)
+            stmt.executeQuery().use { rs ->
+                if (!rs.next()) return null
+                return SubAgentToolConfig(
+                    id = rs.getString("id"),
+                    name = rs.getString("name"),
+                    description = rs.getString("description"),
+                    model = rs.getString("model"),
+                    systemPrompt = rs.getString("system_prompt"),
+                    tools = runCatching {
+                        Json.decodeFromString<List<String>>(rs.getString("tools"))
+                    }.getOrElse { emptyList() },
+                    maxTurns = rs.getInt("max_turns"),
+                    enabled = rs.getInt("enabled") == 1,
+                )
+            }
+        }
+    }
+
+    /**
+     * List all persisted agent tool configurations.
+     *
+     * @return Configurations ordered by ID
+     */
+    fun listSubAgentConfigs(): List<SubAgentToolConfig> {
+        val conn = getConnection()
+        val configs = mutableListOf<SubAgentToolConfig>()
+        conn.prepareStatement("SELECT id FROM sub_agent_configs ORDER BY id").use { stmt ->
+            stmt.executeQuery().use { rs ->
+                while (rs.next()) {
+                    getSubAgentConfig(rs.getString("id"))?.let(configs::add)
+                }
+            }
+        }
+        return configs
     }
 
     fun close() {

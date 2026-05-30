@@ -1,6 +1,9 @@
 package de.heckenmann.visualagent.agent
 
+import de.heckenmann.visualagent.config.AppConfig
 import de.heckenmann.visualagent.knowledge.KnowledgeDb
+import de.heckenmann.visualagent.todo.TodoChange
+import de.heckenmann.visualagent.todo.TodoChangeType
 import de.heckenmann.visualagent.todo.TodoStatus
 import de.heckenmann.visualagent.todo.TodoManager
 import de.heckenmann.visualagent.todo.Todo
@@ -22,17 +25,25 @@ import java.util.UUID
 class AgentManager(
     private val knowledgeDb: KnowledgeDb,
     private val llmProvider: LLMProvider,
+    private val agentToolConfigService: AgentToolConfigService,
 ) {
-    val todoManager: TodoManager = TodoManager()
+    val todoManager: TodoManager = TodoManager(
+        initialTodos = knowledgeDb.listTodos(),
+        onChange = { change -> persistTodoChange(change) },
+    )
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val subAgents = mutableMapOf<String, SubAgent>()
     private val conversationHistory = mutableListOf<Message>()
+    private var pendingResumeMessage: String? = null
 
     init {
         loadAgentsFromDb()
+        loadConversationFromDb()
+        resumeInterruptedConversationIfNeeded()
     }
 
     companion object {
+        private const val MAIN_SESSION_ID = "main"
         private var globalAgentCallback: ((String, String) -> Unit)? = null
 
         fun setAgentCallback(callback: (String, String) -> Unit) {
@@ -176,34 +187,52 @@ class AgentManager(
     suspend fun sendMessageToAgent(agentId: String, content: String): String {
         val agent = subAgents[agentId] ?: return "Error: Agent not found"
         val messages = listOf(Message("user", content))
-        val response = agent.chat(messages, llmProvider)
+        val response = agent.chat(messages, llmProvider, agentToolConfigService.toolsFor(agent))
         return response.message.content
     }
 
     suspend fun sendMessage(content: String): String {
-        conversationHistory.add(Message("user", content))
-        val response = llmProvider.chat(conversationHistory)
+        val userMessage = Message("user", content)
+        conversationHistory.add(userMessage)
+        knowledgeDb.saveConversationMessage(MAIN_SESSION_ID, userMessage.role, userMessage.content)
+        val response = llmProvider.chat(buildMainRequest(conversationHistory))
         conversationHistory.add(response.message)
+        knowledgeDb.saveConversationMessage(MAIN_SESSION_ID, response.message.role, response.message.content)
         return response.message.content
     }
 
     suspend fun streamMessage(content: String, onChunk: (String) -> Unit) {
         conversationHistory.add(Message("user", content))
-        llmProvider.stream(conversationHistory).collect { chunk ->
+        llmProvider.stream(buildMainRequest(conversationHistory)).collect { chunk ->
             onChunk(chunk.message.content)
         }
     }
 
     fun clearHistory() {
         conversationHistory.clear()
+        knowledgeDb.deleteConversationMessages(MAIN_SESSION_ID)
     }
 
     fun getHistory(): List<Message> = conversationHistory.toList()
 
+    private fun loadConversationFromDb() {
+        conversationHistory.clear()
+        val rows = knowledgeDb.getConversationMessages(MAIN_SESSION_ID)
+        rows.forEach { row ->
+            val role = row["role"].orEmpty()
+            val content = row["content"].orEmpty()
+            if (role.isNotBlank() && content.isNotBlank()) {
+                conversationHistory.add(Message(role = role, content = content))
+            }
+        }
+        val last = conversationHistory.lastOrNull()
+        pendingResumeMessage = if (last?.role == "user") last.content else null
+    }
+
     // ============ Task Management & Execution ============
 
     fun assignNextTodo(): Boolean {
-        val idleAgent = subAgents.values.firstOrNull { it.status == AgentStatus.IDLE } ?: return false
+        val idleAgent = selectWorkerAgentForNextTodo() ?: return false
         val pendingTodo = todoManager.getPending().firstOrNull() ?: return false
 
         val assigned = todoManager.assignToAgent(pendingTodo.id, idleAgent.id)
@@ -219,7 +248,7 @@ class AgentManager(
         println("[AgentManager] assignNextTodo assigned todo=${pendingTodo.id} to agent=${idleAgent.id}")
 
         scope.launch {
-            processTodoWithLLM(idleAgent, pendingTodo.id, pendingTodo.description)
+            processTodoWithLLM(idleAgent, pendingTodo.id, buildWorkerInstruction(pendingTodo))
         }
 
         return true
@@ -242,7 +271,7 @@ class AgentManager(
         notifyAgent(agent.id, "STATUS:${agent.status.name}")
 
         scope.launch {
-            processTodoWithLLM(agent, todoId, todo.description)
+            processTodoWithLLM(agent, todoId, buildWorkerInstruction(todo))
         }
 
         return true
@@ -258,10 +287,20 @@ class AgentManager(
 
             while (attempt < maxRetries) {
                 try {
-                    agent.performTodo(todoId, taskDescription, llmProvider, knowledgeDb)
-                    notifyAgent(agent.id, "Completed todo: $todoId")
-                    todoManager.completeTodo(todoId)
-                    break
+                    val workerResult = agent.performTodo(todoId, taskDescription, llmProvider, knowledgeDb, agentToolConfigService.toolsFor(agent))
+                    val reviewApproved = reviewWorkerResult(todoId, taskDescription, workerResult)
+                    if (reviewApproved) {
+                        notifyAgent(agent.id, "Completed todo: $todoId")
+                        todoManager.completeTodo(todoId)
+                        break
+                    }
+                    attempt++
+                    if (attempt >= maxRetries) {
+                        notifyAgent(agent.id, "Main review rejected final result for todo: $todoId")
+                        todoManager.cancelTodo(todoId)
+                        break
+                    }
+                    notifyAgent(agent.id, "Main review requested retry for todo: $todoId")
                 } catch (e: Exception) {
                     attempt++
                     val backoff = 500L * attempt
@@ -286,13 +325,15 @@ class AgentManager(
     }
 
     fun assignAllPendingTodos(): Int {
-        // Assign at most the number of currently idle agents to avoid rapid re-assignment
+        // Assign up to the configured parallelism and currently available idle agents.
         val idleCount = subAgents.values.count { it.status == AgentStatus.IDLE }
+        val parallelLimit = AppConfig.instance.maxParallelSubAgents.coerceAtLeast(1)
+        val assignmentBudget = minOf(idleCount, parallelLimit)
         var count = 0
-        repeat(idleCount) {
+        repeat(assignmentBudget) {
             if (assignNextTodo()) count++ else return@repeat
         }
-        println("[AgentManager] assignAllPendingTodos idleCount=$idleCount assigned=$count")
+        println("[AgentManager] assignAllPendingTodos idleCount=$idleCount limit=$parallelLimit assigned=$count")
         return count
     }
 
@@ -335,6 +376,10 @@ class AgentManager(
         scope.launch {
             println("[AgentManager] Autonomous processing started")
             while (true) {
+                val expanded = expandComplexTodoIfNeeded()
+                if (expanded) {
+                    println("[AgentManager] Expanded complex todo into smaller work items")
+                }
                 val assigned = assignAllPendingTodos()
                 if (assigned > 0) {
                     println("[AgentManager] Assigned $assigned todos to idle agents")
@@ -350,6 +395,184 @@ class AgentManager(
                     break
                 }
             }
+        }
+    }
+
+    /**
+     * Enqueues a goal for autonomous execution and starts the autonomous loop if needed.
+     *
+     * @param goal Main objective to solve end-to-end
+     */
+    fun startAutonomousMode(goal: String) {
+        if (goal.isNotBlank()) {
+            todoManager.add(goal.trim())
+        }
+        startAutonomousProcessing(seed = false)
+    }
+
+    private fun buildMainRequest(history: List<Message>): ChatRequestContext {
+        val contextPrompt = buildMainSystemContextPrompt()
+        val preparedMessages = mutableListOf<Message>()
+        preparedMessages += Message("system", contextPrompt)
+        preparedMessages += history
+        return ChatRequestContext(
+            messages = preparedMessages,
+            enabledTools = agentToolConfigService.mainAgentTools(),
+            metadata = mapOf("sessionId" to MAIN_SESSION_ID, "agent" to "main"),
+        )
+    }
+
+    private fun buildMainSystemContextPrompt(): String {
+        val todos = todoManager.getAll()
+        val todoLines = if (todos.isEmpty()) {
+            "- no active todos"
+        } else {
+            todos.joinToString("\n") { todo ->
+                "- [${todo.status}] ${todo.description} (id=${todo.id}, priority=${todo.priority}, assigned=${todo.assignedAgentId ?: "none"})"
+            }
+        }
+        val resumeHint = pendingResumeMessage?.let {
+            "Resume Hint: The previous app run ended while processing this user request:\n\"$it\""
+        } ?: "Resume Hint: no interrupted user request detected."
+        return """
+            You are the main orchestrator agent.
+            Always use the todo context below for planning and execution.
+            $resumeHint
+            
+            Current TODO list:
+            $todoLines
+            
+            Execution policy:
+            - Break down complex tasks.
+            - Delegate implementation/research subtasks to worker agents when useful.
+            - Validate worker outputs before declaring completion.
+        """.trimIndent()
+    }
+
+    private fun resumeInterruptedConversationIfNeeded() {
+        val resumeText = pendingResumeMessage ?: return
+        scope.launch {
+            runCatching {
+                val resumeInstruction = Message(
+                    "system",
+                    "The previous request was interrupted by an app shutdown or failure. Continue the unfinished work from the last user request now.",
+                )
+                val request = buildMainRequest(listOf(resumeInstruction) + conversationHistory)
+                val response = llmProvider.chat(request)
+                val assistantMessage = Message("assistant", response.message.content)
+                conversationHistory.add(assistantMessage)
+                knowledgeDb.saveConversationMessage(MAIN_SESSION_ID, assistantMessage.role, assistantMessage.content)
+                pendingResumeMessage = null
+            }.onFailure { error ->
+                val note = Message("assistant", "Recovery note: Could not auto-resume interrupted request (${error.message}).")
+                conversationHistory.add(note)
+                knowledgeDb.saveConversationMessage(MAIN_SESSION_ID, note.role, note.content)
+            }
+        }
+    }
+
+    private suspend fun expandComplexTodoIfNeeded(): Boolean {
+        val candidate = todoManager.getPending().firstOrNull { isComplex(it.description) } ?: return false
+        val analyst = ensureAnalysisAgent()
+        val prompt = listOf(
+            Message("system", "Break down the task into up to 5 executable subtasks. Return one subtask per line without numbering decorations."),
+            Message("user", candidate.description),
+        )
+        return runCatching {
+            val response = analyst.chat(prompt, llmProvider, agentToolConfigService.toolsFor(analyst))
+            val subtasks = response.message.content.lines().map { it.trim().trimStart('-', '*', '•', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.', ')', ' ') }
+                .filter { it.length > 5 }
+                .distinct()
+                .take(5)
+            if (subtasks.isEmpty()) return false
+            subtasks.forEach { todoManager.add("${candidate.description}: $it", candidate.priority) }
+            todoManager.cancelTodo(candidate.id)
+            true
+        }.getOrDefault(false)
+    }
+
+    private fun isComplex(description: String): Boolean {
+        val markers = listOf(" and ", " then ", "anschließend", "mehrere", "complex", "komplex")
+        return description.length > 120 || markers.any { description.contains(it, ignoreCase = true) }
+    }
+
+    private fun ensureAnalysisAgent(): SubAgent =
+        subAgents.values.firstOrNull { it.name.contains("analyst", true) || it.role.contains("analysis", true) }
+            ?: createAgent("Analyst", "Task decomposition and structured planning", "researcher")
+
+    private fun selectWorkerAgentForNextTodo(): SubAgent? {
+        val pending = todoManager.getPending().firstOrNull() ?: return null
+        val idleAgents = subAgents.values.filter { it.status == AgentStatus.IDLE }
+        if (idleAgents.isEmpty()) return null
+        val preferred = idleAgents.firstOrNull {
+            val d = pending.description.lowercase()
+            (d.contains("code") || d.contains("implement") || d.contains("fix")) && it.name.contains("coder", true) ||
+                (d.contains("research") || d.contains("docs") || d.contains("issue")) && it.name.contains("research", true)
+        }
+        return preferred ?: idleAgents.firstOrNull() ?: createDynamicWorkerFor(pending.description)
+    }
+
+    private fun createDynamicWorkerFor(description: String): SubAgent {
+        val lower = description.lowercase()
+        return when {
+            lower.contains("test") -> createAgent("Tester", "Focused test implementation and validation", "tester")
+            lower.contains("review") -> createAgent("Reviewer", "Code and architecture review", "reviewer")
+            lower.contains("doc") -> createAgent("Documenter", "Documentation and developer guides", "documenter")
+            else -> createAgent("Worker-${UUID.randomUUID().toString().take(4)}", "General execution worker", "coder")
+        }
+    }
+
+    private fun buildWorkerInstruction(todo: Todo): String {
+        val localHints = """
+            Prioritize local project context first:
+            - read project markdown docs
+            - inspect code comments and relevant source files
+            If blocked after multiple attempts:
+            - gather external references
+            - prioritize GitHub issues, StackOverflow, and search engines
+        """.trimIndent()
+        return """
+            Task ID: ${todo.id}
+            Priority: ${todo.priority}
+            Objective: ${todo.description}
+            
+            Deliverable requirements:
+            1. Provide concrete implementation steps and results.
+            2. Explain which files or components were analyzed.
+            3. If blocked, include attempted steps and next actions.
+            
+            $localHints
+        """.trimIndent()
+    }
+
+    private suspend fun reviewWorkerResult(todoId: String, taskDescription: String, workerResult: String): Boolean {
+        val reviewPrompt = listOf(
+            Message("system", "You are the main reviewer. Respond with exactly APPROVED or RETRY in first line, then a short rationale."),
+            Message(
+                "user",
+                """
+                    TODO ID: $todoId
+                    Task: $taskDescription
+                    Worker Result:
+                    $workerResult
+                """.trimIndent(),
+            ),
+        )
+        val response = llmProvider.chat(buildMainRequest(reviewPrompt))
+        return response.message.content.trim().uppercase().startsWith("APPROVED")
+    }
+
+    private fun persistTodoChange(change: TodoChange) {
+        when (change.type) {
+            TodoChangeType.ADDED, TodoChangeType.UPDATED -> {
+                val todo = change.todo ?: return
+                knowledgeDb.saveTodo(todo)
+            }
+            TodoChangeType.REMOVED -> {
+                val todoId = change.todoId ?: return
+                knowledgeDb.deleteTodo(todoId)
+            }
+            TodoChangeType.CLEARED -> knowledgeDb.clearTodos()
         }
     }
 }

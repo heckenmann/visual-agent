@@ -2,32 +2,29 @@ package de.heckenmann.visualagent.ui.panels
 
 import de.heckenmann.visualagent.config.AppConfig
 import de.heckenmann.visualagent.ui.FxmlLoader
-import javafx.application.Application
-import javafx.application.Platform
 import javafx.fxml.FXML
-import javafx.scene.control.Button
 import javafx.scene.control.ComboBox
 import javafx.scene.control.Spinner
 import javafx.scene.control.SpinnerValueFactory.IntegerSpinnerValueFactory
 import javafx.scene.layout.Region
 import javafx.scene.layout.VBox
 
+/**
+ * Application-wide settings panel for theme and font preferences.
+ *
+ * Changes are persisted through [AppConfig]. Global UI updates are handled by
+ * AppConfig observers such as MainWindow, not by this panel directly.
+ */
 class ApplicationSettingsPanel : Region() {
 
     @FXML
     private lateinit var root: VBox
 
     @FXML
-    private lateinit var btnBack: Button
-
-    @FXML
     private lateinit var themeSelector: ComboBox<String>
 
     @FXML
     private lateinit var fontSizeSpinner: Spinner<Int>
-
-    // Back handler provided by MainWindow
-    var onBack: (() -> Unit)? = null
 
     private val themes = listOf(
         "Dracula",
@@ -44,16 +41,17 @@ class ApplicationSettingsPanel : Region() {
         children.add(loaded)
     }
 
+    /**
+     * Initializes settings controls and persists user changes through AppConfig.
+     */
     @FXML
     fun initialize() {
-        btnBack.setOnAction { onBack?.invoke() }
         themeSelector.items.setAll(themes)
         themeSelector.selectionModel.select(AppConfig.instance.theme)
         themeSelector.selectionModel.selectedItemProperty().addListener { _, _, selected ->
             if (selected != null) {
                 AppConfig.instance.theme = selected
                 AppConfig.instance.save()
-                reloadTheme()
             }
         }
 
@@ -62,21 +60,7 @@ class ApplicationSettingsPanel : Region() {
             if (newVal != null) {
                 AppConfig.instance.fontSize = newVal
                 AppConfig.instance.save()
-                applyFontSize(newVal)
             }
-        }
-    }
-
-    private fun reloadTheme() {
-        Platform.runLater {
-            Application.setUserAgentStylesheet(AppConfig.instance.getThemeStylesheet())
-        }
-    }
-
-    private fun applyFontSize(size: Int) {
-        val currentScene = scene ?: return
-        Platform.runLater {
-            currentScene.root.style = "-fx-font-size: ${size}px;"
         }
     }
 }

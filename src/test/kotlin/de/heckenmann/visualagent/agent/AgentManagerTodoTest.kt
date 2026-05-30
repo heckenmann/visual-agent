@@ -18,12 +18,12 @@ class AgentManagerTodoTest {
         val db = KnowledgeDb("jdbc:sqlite::memory:")
         val provider = mockk<LLMProvider>(relaxed = true)
         coEvery { provider.isConnected() } returns true
-        coEvery { provider.chat(any()) } returns ChatResponse(
+        coEvery { provider.chat(any<ChatRequestContext>()) } returns ChatResponse(
             model = "test",
             message = Message("assistant", "Task completed"),
             done = true,
         )
-        val manager = AgentManager(db, provider)
+        val manager = AgentManager(db, provider, AgentToolConfigService(db))
         return Triple(manager, provider, db)
     }
 

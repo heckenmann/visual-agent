@@ -16,7 +16,7 @@
             <padding>
                 <Insets top="8.0" right="16.0" bottom="8.0" left="16.0"/>
             </padding>
-            <Label text="Agent Plan" styleClass="title-3"/>
+            <Label text="Todos" styleClass="title-3"/>
             <Region HBox.hgrow="ALWAYS"/>
             <Button fx:id="addButton" styleClass="button-icon">
                 <graphic>

@@ -10,8 +10,8 @@ Tasks (seeded)
 4. ChatPanel: virtualize message list for large histories
 5. ChatPanel: accessibility pass (focus, labels, contrast)
 6. MainWindow: persistent left navigation with active state and tooltips
-7. MainWindow: command palette (Cmd/Ctrl+K) to switch panels/search
-8. StatusBar: actionable controls (Retry, Reconnect)
+7. [Done] MainWindow: command palette (Cmd/Ctrl+K) to switch panels/search
+8. [Done] StatusBar: actionable controls (Retry, Reconnect)
 9. SessionPanel: model search, filter, favorites and quick actions
 10. SessionPanel: improve loading/error states for model info
 11. TodoPanel: inline create/edit without modal

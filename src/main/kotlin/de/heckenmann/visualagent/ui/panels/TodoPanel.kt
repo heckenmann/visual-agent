@@ -21,6 +21,8 @@ import javafx.scene.control.Label
 import javafx.scene.control.ListCell
 import javafx.scene.control.ListView
 import javafx.scene.control.TextField
+import javafx.scene.control.TextInputControl
+import javafx.scene.input.KeyEvent
 import javafx.scene.layout.BorderPane
 import javafx.scene.layout.HBox
 import javafx.scene.layout.Priority
@@ -35,6 +37,18 @@ import java.util.UUID
  * each [Todo] with a checkbox, description, priority badge, and delete button.
  */
 class TodoPanel(private val todoManager: TodoManager) : Region() {
+    companion object {
+        /**
+         * Determines whether the add-todo shortcut should fire for a key event.
+         *
+         * @param code Pressed key code
+         * @param shortcutDown Whether Cmd/Ctrl is pressed
+         * @param focusOwnerIsTextInput Whether the current focus owner is a text input control
+         * @return true when the Add Todo dialog should open
+         */
+        fun shouldOpenAddDialog(code: KeyCode, shortcutDown: Boolean, focusOwnerIsTextInput: Boolean): Boolean =
+            code == KeyCode.N && shortcutDown && !focusOwnerIsTextInput
+    }
 
     @FXML
     private lateinit var rootBorderPane: BorderPane
@@ -46,6 +60,21 @@ class TodoPanel(private val todoManager: TodoManager) : Region() {
     private lateinit var todoListView: ListView<Todo>
 
     private val todos = FXCollections.observableArrayList<Todo>()
+    private var registeredScene: javafx.scene.Scene? = null
+    private val todoShortcutHandler = javafx.event.EventHandler<KeyEvent> { ev ->
+        val focusOwner = registeredScene?.focusOwner
+        val focusOwnerIsTextInput = focusOwner is TextInputControl
+        if (shouldOpenAddDialog(ev.code, ev.isShortcutDown, focusOwnerIsTextInput)) {
+            showAddDialog()
+            ev.consume()
+        } else if (ev.code == KeyCode.DELETE && !focusOwnerIsTextInput) {
+            val selected = todoListView.selectionModel.selectedItem
+            if (selected != null) {
+                todos.remove(selected)
+                ev.consume()
+            }
+        }
+    }
 
     init {
         val root = FxmlLoader.load(this, "todo-panel.fxml")
@@ -63,19 +92,12 @@ class TodoPanel(private val todoManager: TodoManager) : Region() {
         todoListView.items = todos
         todoListView.setCellFactory { TodoCell() }
         addButton.setOnAction { showAddDialog() }
-        // Keyboard shortcuts: N for new todo, Delete for removing selected todo
+        // Keyboard shortcuts: Cmd/Ctrl+N for new todo, Delete for removing selected todo.
         rootBorderPane.sceneProperty().addListener { _, _, newScene ->
-            newScene?.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED) { ev ->
-                if (ev.code == KeyCode.N) {
-                    showAddDialog()
-                    ev.consume()
-                } else if (ev.code == KeyCode.DELETE) {
-                    val selected = todoListView.selectionModel.selectedItem
-                    if (selected != null) {
-                        todos.remove(selected)
-                        ev.consume()
-                    }
-                }
+            registeredScene?.removeEventFilter(KeyEvent.KEY_PRESSED, todoShortcutHandler)
+            registeredScene = newScene
+            if (newScene != null) {
+                newScene.addEventFilter(KeyEvent.KEY_PRESSED, todoShortcutHandler)
             }
         }
     }

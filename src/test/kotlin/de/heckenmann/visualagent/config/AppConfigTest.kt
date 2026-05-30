@@ -1,37 +1,141 @@
 package de.heckenmann.visualagent.config
 
+import de.heckenmann.visualagent.knowledge.KnowledgeDb
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.io.File
-import java.util.Properties
+import kotlin.io.path.createTempDirectory
 
 class AppConfigTest {
 
     @Test
-    fun testSaveAndLoad() {
+    fun `save persists settings to user_preferences table`() {
         val config = AppConfig.instance
-        val originalTheme = config.theme
-        val originalFontSize = config.fontSize
+        val original = snapshot(config)
+        val tempDb = createTempDirectory("visual-agent-config-test").resolve("settings.db").toString()
 
         try {
-            // Change values
+            config.databasePath = tempDb
             config.theme = "Nord Dark"
             config.fontSize = 18
+            config.ollamaModel = "llama3.2:3b"
+            config.contextLength = 8192
+            config.streamingEnabled = false
+            config.autoCompactionEnabled = false
             config.save()
 
-            // Verify file content directly
-            val props = Properties()
-            File("src/main/resources/config/app.properties").inputStream().use {
-                props.load(it)
-            }
-
-            assertEquals("Nord Dark", props.getProperty("ui.theme"))
-            assertEquals("18", props.getProperty("ui.font.size"))
+            val db = KnowledgeDb(tempDb)
+            assertEquals("Nord Dark", db.getPreference("ui.theme"))
+            assertEquals("18", db.getPreference("ui.font.size"))
+            assertEquals("llama3.2:3b", db.getPreference("ollama.model"))
+            assertEquals("8192", db.getPreference("session.context.length"))
+            assertEquals("false", db.getPreference("session.streaming.enabled"))
+            assertEquals("false", db.getPreference("session.auto.compaction.enabled"))
+            assertTrue(File(tempDb).exists())
         } finally {
-            // Restore original values
-            config.theme = originalTheme
-            config.fontSize = originalFontSize
-            config.save()
+            restore(config, original)
         }
+    }
+
+    @Test
+    fun `reload restores settings from database`() {
+        val config = AppConfig.instance
+        val original = snapshot(config)
+        val tempDb = createTempDirectory("visual-agent-config-reload-test").resolve("settings.db").toString()
+
+        try {
+            config.databasePath = tempDb
+            config.theme = "Cupertino Light"
+            config.fontSize = 20
+            config.timeoutSeconds = 240
+            config.maxParallelSubAgents = 7
+            config.save()
+
+            // Simulate in-memory drift before "next startup"/reload
+            config.theme = "Dracula"
+            config.fontSize = 12
+            config.timeoutSeconds = 60
+            config.maxParallelSubAgents = 2
+
+            config.reload()
+
+            assertEquals("Cupertino Light", config.theme)
+            assertEquals(20, config.fontSize)
+            assertEquals(240, config.timeoutSeconds)
+            assertEquals(7, config.maxParallelSubAgents)
+        } finally {
+            restore(config, original)
+        }
+    }
+
+    @Test
+    fun `save notifies observers for changed model`() {
+        val config = AppConfig.instance
+        val original = snapshot(config)
+        val tempDb = createTempDirectory("visual-agent-config-observer-test").resolve("settings.db").toString()
+        val changes = mutableListOf<AppConfigChange>()
+        val registration = config.addChangeListener { changes.add(it) }
+
+        try {
+            config.databasePath = tempDb
+            config.ollamaModel = "observer-model"
+            config.save()
+
+            assertTrue(changes.any { it.key == "ollama.model" && it.newValue == "observer-model" })
+        } finally {
+            registration.close()
+            restore(config, original)
+        }
+    }
+
+    private data class ConfigSnapshot(
+        val databasePath: String,
+        val ollamaLocalUrl: String,
+        val ollamaModel: String,
+        val theme: String,
+        val fontSize: Int,
+        val browserDefault: String,
+        val contextLength: Int,
+        val streamingEnabled: Boolean,
+        val thinkingEnabled: Boolean,
+        val autoCompactionEnabled: Boolean,
+        val loadLimit: Int,
+        val maxParallelSubAgents: Int,
+        val timeoutSeconds: Int,
+    )
+
+    private fun snapshot(config: AppConfig): ConfigSnapshot =
+        ConfigSnapshot(
+            databasePath = config.databasePath,
+            ollamaLocalUrl = config.ollamaLocalUrl,
+            ollamaModel = config.ollamaModel,
+            theme = config.theme,
+            fontSize = config.fontSize,
+            browserDefault = config.browserDefault,
+            contextLength = config.contextLength,
+            streamingEnabled = config.streamingEnabled,
+            thinkingEnabled = config.thinkingEnabled,
+            autoCompactionEnabled = config.autoCompactionEnabled,
+            loadLimit = config.loadLimit,
+            maxParallelSubAgents = config.maxParallelSubAgents,
+            timeoutSeconds = config.timeoutSeconds,
+        )
+
+    private fun restore(config: AppConfig, snapshot: ConfigSnapshot) {
+        config.databasePath = snapshot.databasePath
+        config.ollamaLocalUrl = snapshot.ollamaLocalUrl
+        config.ollamaModel = snapshot.ollamaModel
+        config.theme = snapshot.theme
+        config.fontSize = snapshot.fontSize
+        config.browserDefault = snapshot.browserDefault
+        config.contextLength = snapshot.contextLength
+        config.streamingEnabled = snapshot.streamingEnabled
+        config.thinkingEnabled = snapshot.thinkingEnabled
+        config.autoCompactionEnabled = snapshot.autoCompactionEnabled
+        config.loadLimit = snapshot.loadLimit
+        config.maxParallelSubAgents = snapshot.maxParallelSubAgents
+        config.timeoutSeconds = snapshot.timeoutSeconds
+        config.save()
     }
 }

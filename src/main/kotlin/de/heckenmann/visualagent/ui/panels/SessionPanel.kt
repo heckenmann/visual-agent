@@ -13,11 +13,13 @@ import javafx.scene.control.ScrollPane
 import javafx.scene.control.Slider
 import javafx.scene.control.Spinner
 import javafx.scene.control.SpinnerValueFactory.IntegerSpinnerValueFactory
+import javafx.scene.Parent
 import javafx.scene.layout.Region
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import mu.KotlinLogging
 
 /**
@@ -66,10 +68,11 @@ class SessionPanel : Region() {
 
     private var ollamaClient: LLMProvider? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val rootNode: Parent
 
     init {
-        val root = FxmlLoader.load(this, "session-panel.fxml")
-        children.add(root)
+        rootNode = FxmlLoader.load(this, "session-panel.fxml")
+        children.add(rootNode)
     }
 
     /**
@@ -80,24 +83,33 @@ class SessionPanel : Region() {
     fun initialize() {
         contextSlider.valueProperty().addListener { _, _, newVal ->
             contextValueLabel.text = newVal.toInt().toString()
+            AppConfig.instance.contextLength = newVal.toInt()
+            AppConfig.instance.save()
         }
 
         modelSelector.selectionModel.selectedItemProperty().addListener { _, _, selected ->
             if (selected != null) {
                 AppConfig.instance.ollamaModel = selected
+                AppConfig.instance.save()
                 refreshModelDetails(selected)
             }
         }
 
         streamingToggle.selectedProperty().addListener { _, _, newVal ->
+            AppConfig.instance.streamingEnabled = newVal
+            AppConfig.instance.save()
             logger.debug { "Streaming toggled: $newVal" }
         }
 
         thinkingToggle.selectedProperty().addListener { _, _, newVal ->
+            AppConfig.instance.thinkingEnabled = newVal
+            AppConfig.instance.save()
             logger.debug { "Thinking toggled: $newVal" }
         }
 
         autoCompactionToggle.selectedProperty().addListener { _, _, newVal ->
+            AppConfig.instance.autoCompactionEnabled = newVal
+            AppConfig.instance.save()
             logger.debug { "Auto compaction toggled: $newVal" }
         }
 
@@ -106,20 +118,70 @@ class SessionPanel : Region() {
         timeoutSpinner.valueFactory = IntegerSpinnerValueFactory(5, 600, 120)
 
         loadLimitSpinner.valueProperty().addListener { _, _, newVal ->
+            AppConfig.instance.loadLimit = newVal
+            AppConfig.instance.save()
             logger.debug { "Load limit changed: $newVal" }
         }
 
         maxParallelSubAgentsSpinner.valueProperty().addListener { _, _, newVal ->
+            AppConfig.instance.maxParallelSubAgents = newVal
+            AppConfig.instance.save()
             logger.debug { "Max parallel sub-agents changed: $newVal" }
         }
 
         timeoutSpinner.valueProperty().addListener { _, _, newVal ->
+            AppConfig.instance.timeoutSeconds = newVal
+            AppConfig.instance.save()
             logger.debug { "Timeout changed: $newVal" }
         }
 
-        contextSlider.value = 4096.0
-        streamingToggle.isSelected = true
-        autoCompactionToggle.isSelected = true
+        contextSlider.value = AppConfig.instance.contextLength.toDouble()
+        loadLimitSpinner.valueFactory.value = AppConfig.instance.loadLimit
+        maxParallelSubAgentsSpinner.valueFactory.value = AppConfig.instance.maxParallelSubAgents
+        timeoutSpinner.valueFactory.value = AppConfig.instance.timeoutSeconds
+        streamingToggle.isSelected = AppConfig.instance.streamingEnabled
+        thinkingToggle.isSelected = AppConfig.instance.thinkingEnabled
+        autoCompactionToggle.isSelected = AppConfig.instance.autoCompactionEnabled
+    }
+
+    /**
+     * Returns the minimum panel width required for readable session controls.
+     *
+     * @param height Available height hint from JavaFX layout
+     * @return Minimum width in pixels
+     */
+    override fun computeMinWidth(height: Double): Double = 360.0
+
+    /**
+     * Returns the minimum panel height that still leaves the scroll pane usable.
+     *
+     * @param width Available width hint from JavaFX layout
+     * @return Minimum height in pixels
+     */
+    override fun computeMinHeight(width: Double): Double = 240.0
+
+    /**
+     * Returns the preferred panel width for unconstrained layouts.
+     *
+     * @param height Available height hint from JavaFX layout
+     * @return Preferred width in pixels
+     */
+    override fun computePrefWidth(height: Double): Double = 800.0
+
+    /**
+     * Returns the preferred panel height for unconstrained layouts.
+     *
+     * @param width Available width hint from JavaFX layout
+     * @return Preferred height in pixels
+     */
+    override fun computePrefHeight(width: Double): Double = 600.0
+
+    /**
+     * Resizes the loaded FXML root to this Region's current layout bounds.
+     */
+    override fun layoutChildren() {
+        super.layoutChildren()
+        rootNode.resizeRelocate(0.0, 0.0, width, height)
     }
 
     /**
@@ -138,10 +200,12 @@ class SessionPanel : Region() {
      */
     fun refreshModels() {
         val client = ollamaClient ?: return
+        modelSelector.isDisable = true
+        modelInfoLabel.text = "Loading models..."
         scope.launch {
             val models =
                 try {
-                    client.getModels()
+                    withContext(Dispatchers.IO) { client.getModels() }
                 } catch (e: Exception) {
                     logger.warn { "refreshModels failed: ${e.message}" }
                     emptyList()
@@ -154,7 +218,10 @@ class SessionPanel : Region() {
                     modelSelector.selectionModel.select(currentModel)
                 } else if (models.isNotEmpty()) {
                     modelSelector.selectionModel.select(0)
+                } else {
+                    modelInfoLabel.text = "No models available. Check Ollama connection."
                 }
+                modelSelector.isDisable = models.isEmpty()
             }
         }
     }
@@ -166,9 +233,10 @@ class SessionPanel : Region() {
      */
     fun refreshModelDetails(modelName: String) {
         val client = ollamaClient ?: return
+        modelInfoLabel.text = "Loading model details..."
         scope.launch {
             try {
-                val details = client.getModelDetails(modelName)
+                val details = withContext(Dispatchers.IO) { client.getModelDetails(modelName) }
                 Platform.runLater {
                     val sb = StringBuilder()
                     sb.appendLine("Model: ${details.model}")

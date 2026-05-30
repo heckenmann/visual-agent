@@ -1,30 +1,36 @@
 package de.heckenmann.visualagent.ui
 
+import de.heckenmann.visualagent.AppIdentity
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.LLMProvider
-import de.heckenmann.visualagent.agent.OllamaClient
+import de.heckenmann.visualagent.config.AppConfig
 import de.heckenmann.visualagent.ui.panels.ApplicationSettingsPanel
 import de.heckenmann.visualagent.ui.panels.CanvasPanel
 import de.heckenmann.visualagent.ui.panels.ChatPanel
 import de.heckenmann.visualagent.ui.panels.SessionPanel
 import de.heckenmann.visualagent.ui.panels.SubAgentsPanel
 import de.heckenmann.visualagent.ui.panels.TodoPanel
-import de.heckenmann.visualagent.ui.StatusBar
+import javafx.application.Application
 import javafx.application.Platform
 import javafx.fxml.FXML
 import javafx.scene.Node
 import javafx.scene.Scene
 import javafx.scene.control.Button
+import javafx.scene.control.ChoiceDialog
 import javafx.scene.control.Label
+import javafx.scene.image.ImageView
+import javafx.scene.input.KeyCode
+import javafx.scene.input.KeyCodeCombination
+import javafx.scene.input.KeyCombination
 import javafx.scene.layout.BorderPane
 import javafx.scene.layout.HBox
 import javafx.scene.layout.VBox
 import javafx.stage.Stage
-import javafx.stage.StageStyle
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.springframework.stereotype.Component
 import org.springframework.context.annotation.Lazy
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -34,7 +40,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 @ConditionalOnProperty(name = ["visual-agent.ui.enabled"], havingValue = "true", matchIfMissing = true)
 class MainWindow(
     private val agentManager: AgentManager,
-    private val ollamaClient: OllamaClient,
+    private val llmProvider: LLMProvider,
 ) : Stage() {
     companion object {
         /**
@@ -51,7 +57,7 @@ class MainWindow(
     private lateinit var titleBar: HBox
 
     @FXML
-    private lateinit var globalBackButton: Button
+    private lateinit var appIconImage: ImageView
 
     @FXML
     private lateinit var iconRail: VBox
@@ -66,13 +72,10 @@ class MainWindow(
     private lateinit var agentsLabel: Label
 
     @FXML
-    private lateinit var minimizeButton: Button
+    private lateinit var selectedModelLabel: Label
 
     @FXML
-    private lateinit var maximizeButton: Button
-
-    @FXML
-    private lateinit var closeButton: Button
+    private lateinit var conversationBtn: Button
 
     @FXML
     private lateinit var sessionBtn: Button
@@ -95,29 +98,25 @@ class MainWindow(
     private val todoPanel = TodoPanel(agentManager.todoManager)
     private val canvasPanel = CanvasPanel()
     private val applicationSettingsPanel = ApplicationSettingsPanel()
-    private val statusBar = StatusBar()
+    private val panelByButton = LinkedHashMap<Button, Node>()
 
     private var activeButton: Button? = null
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    private var isMaximized = false
-    private var savedX = 0.0
-    private var savedY = 0.0
-    private var savedWidth = 0.0
-    private var savedHeight = 0.0
-
-    private var dragStartX = 0.0
-    private var dragStartY = 0.0
+    private var currentConnectionState = false
+    private var configListenerRegistration: AutoCloseable? = null
 
     init {
-        initStyle(StageStyle.UNDECORATED)
-        title = "Visual Agent"
+        title = AppIdentity.DISPLAY_NAME
+        AppIdentity.javaFxIcon()?.let { icons.add(it) }
         minWidth = 1200.0
         minHeight = 800.0
+        isResizable = true
 
         val root = FxmlLoader.load(this, "main-window.fxml")
         scene = Scene(root, 1400.0, 900.0)
         loadStyles()
+        applyConfigToUi()
         checkConnection()
         // NOTE: Autonomous processing is NOT started automatically to avoid
         // unintentionally blocking the local environment. Call
@@ -127,23 +126,23 @@ class MainWindow(
 
     @FXML
     private fun initialize() {
-        sessionPanel.setOllamaClient(ollamaClient)
-        rootPane.bottom = statusBar
+        AppIdentity.javaFxIcon()?.let { appIconImage.image = it }
+        sessionPanel.setOllamaClient(llmProvider)
+        registerConfigObserver()
 
-        closeButton.setOnAction { close() }
-        minimizeButton.setOnAction { isIconified = true }
-        maximizeButton.setOnAction { toggleMaximize() }
-
+        conversationBtn.setOnAction { switchPanel(chatPanel, conversationBtn) }
         sessionBtn.setOnAction { switchPanel(sessionPanel, sessionBtn) }
         agentsBtn.setOnAction { switchPanel(subAgentsPanel as Node, agentsBtn) }
         planBtn.setOnAction { switchPanel(todoPanel, planBtn) }
         canvasBtn.setOnAction { switchPanel(canvasPanel, canvasBtn) }
         settingsBtn.setOnAction { switchPanel(applicationSettingsPanel, settingsBtn) }
-
-        // Provide a back handler from settings to switch back to the chat panel
-        applicationSettingsPanel.onBack = {
-            switchPanel(chatPanel, null)
-        }
+        panelByButton.clear()
+        panelByButton[conversationBtn] = chatPanel
+        panelByButton[sessionBtn] = sessionPanel
+        panelByButton[agentsBtn] = subAgentsPanel as Node
+        panelByButton[planBtn] = todoPanel
+        panelByButton[canvasBtn] = canvasPanel
+        panelByButton[settingsBtn] = applicationSettingsPanel
 
         // Wire SubAgentsPanel UI actions to AgentManager backend
         subAgentsPanel.agentActionCallback = { action, agentId ->
@@ -155,14 +154,14 @@ class MainWindow(
                         // attempt to update based on UI changes (name/role/config may have been changed on UI instance)
                         // To keep consistency, refresh UI card from AgentManager after update
                         agentManager.updateAgent(agentId, name = uiAgent.name, role = uiAgent.role, config = uiAgent.config)
-                        Platform.runLater { agentsLabel.text = " ${agentManager.getSubAgents().size}" }
+                        Platform.runLater { updateAgentCountUi() }
                     } else {
                         println("[MainWindow] update: agent not found in manager: $agentId")
                     }
                 }
                 "delete" -> {
                     if (agentManager.deleteAgent(agentId)) {
-                        Platform.runLater { agentsLabel.text = " ${agentManager.getSubAgents().size}" }
+                        Platform.runLater { updateAgentCountUi() }
                     }
                 }
                 "run" -> {
@@ -183,7 +182,7 @@ class MainWindow(
             val created = agentManager.createAgent(name, role, template)
             Platform.runLater {
                 subAgentsPanel.addAgent(created)
-                agentsLabel.text = " ${agentManager.getSubAgents().size}"
+                updateAgentCountUi()
             }
         }
 
@@ -192,14 +191,29 @@ class MainWindow(
 
         chatPanel.setOnSendMessage { text ->
             scope.launch {
+                val startedAt = System.nanoTime()
                 try {
-                    val response = agentManager.sendMessage(text)
-                    Platform.runLater { chatPanel.addAssistantMessage(response) }
+                    val response = withContext(Dispatchers.IO) {
+                        agentManager.sendMessage(text)
+                    }
+                    val elapsedMs = (System.nanoTime() - startedAt) / 1_000_000
+                    Platform.runLater {
+                        chatPanel.addAssistantMessage(response)
+                        chatPanel.updateResponseMetrics(elapsedMs)
+                    }
                 } catch (e: Exception) {
-                    Platform.runLater { chatPanel.addAssistantMessage("Error: ${e.message}") }
+                    val elapsedMs = (System.nanoTime() - startedAt) / 1_000_000
+                    Platform.runLater {
+                        chatPanel.addAssistantMessage("Error: ${e.message}")
+                        chatPanel.updateResponseMetrics(elapsedMs)
+                    }
                 }
             }
         }
+        chatPanel.setOnClearConversation {
+            agentManager.clearHistory()
+        }
+        chatPanel.setConversationHistory(agentManager.getHistory())
 
         AgentManager.setAgentCallback { agentId, message ->
             Platform.runLater {
@@ -210,25 +224,51 @@ class MainWindow(
                 if (a != null) {
                     subAgentsPanel.updateAgentStatus(agentId, a.status, a.currentTask)
                 }
+                updateAgentCountUi()
             }
         }
 
-        switchPanel(chatPanel, null)
-        setupWindowDrag()
+        switchPanel(chatPanel, conversationBtn)
+        rootPane.sceneProperty().addListener { _, _, newScene ->
+            if (newScene != null) {
+                setupKeyboardShortcuts(newScene)
+            }
+        }
+    }
+
+    /**
+     * Subscribes the main window to application-wide configuration changes.
+     *
+     * The title model label, chat context, theme, and font size are derived from AppConfig
+     * in one place so panels do not need to know who else depends on a changed setting.
+     */
+    private fun registerConfigObserver() {
+        configListenerRegistration?.close()
+        configListenerRegistration = AppConfig.instance.addChangeListener {
+            Platform.runLater { applyConfigToUi() }
+        }
+        setOnHidden {
+            configListenerRegistration?.close()
+            configListenerRegistration = null
+        }
+    }
+
+    /**
+     * Applies the current AppConfig snapshot to UI elements that mirror global settings.
+     */
+    private fun applyConfigToUi() {
+        selectedModelLabel.text = " ${AppConfig.instance.ollamaModel}"
+        scene?.root?.style = "-fx-font-size: ${AppConfig.instance.fontSize}px;"
+        Application.setUserAgentStylesheet(AppConfig.instance.getThemeStylesheet())
+        chatPanel.updateSessionContext(
+            model = AppConfig.instance.ollamaModel,
+            connected = currentConnectionState,
+            agentCount = agentManager.getSubAgents().size,
+        )
     }
 
     private fun switchPanel(panel: javafx.scene.Node, button: Button?) {
         chatArea.center = panel
-
-        // Global policy: show back button for any panel except the chat (conversation) panel.
-        // The back action always returns to the chat panel (fixed behavior requested).
-        val showBack = panel !== chatPanel
-        globalBackButton.isVisible = showBack
-        if (showBack) {
-            globalBackButton.setOnAction { switchPanel(chatPanel, null) }
-        } else {
-            globalBackButton.onAction = null
-        }
 
         activeButton?.styleClass?.remove("active")
         if (button != null) {
@@ -237,60 +277,56 @@ class MainWindow(
         activeButton = button
     }
 
-    private fun loadStyles() {
-        val css = javaClass.getResource("/styles/application.css")?.toExternalForm()
-        if (css != null) {
-            scene.stylesheets.add(css)
-        }
-    }
+    private fun setupKeyboardShortcuts(targetScene: Scene) {
+        val shortcuts =
+            mapOf(
+                KeyCode.DIGIT1 to conversationBtn,
+                KeyCode.DIGIT2 to sessionBtn,
+                KeyCode.DIGIT3 to agentsBtn,
+                KeyCode.DIGIT4 to planBtn,
+                KeyCode.DIGIT5 to canvasBtn,
+                KeyCode.DIGIT6 to settingsBtn,
+            )
 
-    private fun setupWindowDrag() {
-        titleBar.setOnMousePressed { event ->
-            dragStartX = event.sceneX
-            dragStartY = event.sceneY
-        }
-
-        titleBar.setOnMouseDragged { event ->
-            if (!isMaximized) {
-                x = event.screenX - dragStartX
-                y = event.screenY - dragStartY
+        shortcuts.forEach { (keyCode, button) ->
+            targetScene.accelerators[KeyCodeCombination(keyCode, KeyCombination.SHORTCUT_DOWN)] = Runnable {
+                panelByButton[button]?.let { panel -> switchPanel(panel, button) }
             }
         }
 
-        titleBar.setOnMouseReleased {
-            persistBounds()
+        targetScene.accelerators[KeyCodeCombination(KeyCode.K, KeyCombination.SHORTCUT_DOWN)] = Runnable {
+            openCommandPalette()
         }
     }
 
-    private fun toggleMaximize() {
-        if (isMaximized) {
-            this.x = savedX
-            this.y = savedY
-            this.width = savedWidth
-            this.height = savedHeight
-            isMaximized = false
-        } else {
-            savedX = this.x
-            savedY = this.y
-            savedWidth = this.width
-            savedHeight = this.height
-            this.x = 0.0
-            this.y = 0.0
-            this.width = 1920.0
-            this.height = 1080.0
-            isMaximized = true
+    private fun openCommandPalette() {
+        val options = listOf("Conversation", "Session", "Agents", "Todos", "Canvas", "Settings")
+        val dialog = ChoiceDialog(options.first(), options)
+        dialog.title = "Command Palette"
+        dialog.headerText = null
+        dialog.contentText = "Switch panel:"
+        val selected = dialog.showAndWait()
+        if (selected.isPresent) {
+            when (selected.get()) {
+                "Conversation" -> switchPanel(chatPanel, conversationBtn)
+                "Session" -> switchPanel(sessionPanel, sessionBtn)
+                "Agents" -> switchPanel(subAgentsPanel as Node, agentsBtn)
+                "Todos" -> switchPanel(todoPanel, planBtn)
+                "Canvas" -> switchPanel(canvasPanel, canvasBtn)
+                "Settings" -> switchPanel(applicationSettingsPanel, settingsBtn)
+            }
         }
     }
 
-    private fun persistBounds() {
-        if (!isMaximized) {
-            savedX = this.x
-            savedY = this.y
-            savedWidth = this.width
-            savedHeight = this.height
+    private fun loadStyles() {
+        javaClass.getResource("/styles/application.css")?.toExternalForm()?.let { stylesheet ->
+            scene.stylesheets.setAll(stylesheet)
         }
     }
 
+    /**
+     * Checks provider connectivity asynchronously and updates connection-dependent UI state.
+     */
     fun checkConnection() {
         scope.launch {
             doCheckConnection()
@@ -298,12 +334,19 @@ class MainWindow(
     }
 
     private suspend fun doCheckConnection() {
-        // OllamaClient checks connection via /api/tags or similar
-        // connected = ...
-        val isConnected = true // Mock for now, Spring AI handles connectivity differently
-        Platform.runLater {
-            statusBar.updateConnectionStatus(isConnected)
-            agentsLabel.text = " ${agentManager.getSubAgents().size}"
+        val isConnected = withContext(Dispatchers.IO) {
+            llmProvider.checkConnection()
         }
+        Platform.runLater {
+            currentConnectionState = isConnected
+            connectionStatus.text = if (isConnected) " Connected" else " Disconnected"
+            updateAgentCountUi()
+            applyConfigToUi()
+        }
+    }
+
+    private fun updateAgentCountUi() {
+        val count = agentManager.getSubAgents().size
+        agentsLabel.text = " $count"
     }
 }

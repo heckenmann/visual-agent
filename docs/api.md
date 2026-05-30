@@ -17,7 +17,9 @@ Located at `de.heckenmann.visualagent.agent.OllamaClient`.
 
 ```kotlin
 class OllamaClient(
-    private val baseUrl: String = AppConfig.instance.ollamaLocalUrl,
+    private val chatModel: ChatModel,
+    private val ollamaApi: OllamaApi,
+    private val toolRegistry: ToolRegistry,
 ) : LLMProvider
 ```
 
@@ -25,17 +27,19 @@ class OllamaClient(
 
 ```kotlin
 override suspend fun chat(messages: List<Message>): ChatResponse
+override suspend fun chat(request: ChatRequestContext): ChatResponse
 ```
 
-Sends a full chat request and returns the complete response. Uses `ChatRequest.serializer()` for JSON encoding.
+Sends a full chat request and returns the complete response. The request-based overload attaches Spring AI function callbacks for enabled tools.
 
 #### stream()
 
 ```kotlin
 override suspend fun stream(messages: List<Message>): Flow<ChatResponse>
+override suspend fun stream(request: ChatRequestContext): Flow<ChatResponse>
 ```
 
-Streams a chat response in real-time chunks. Parses NDJSON response line by line.
+Streams a chat response in real-time chunks through Spring AI.
 
 #### vision()
 
@@ -51,7 +55,7 @@ override suspend fun vision(image: ByteArray, prompt: String): ChatResponse
 override suspend fun embeddings(text: String): List<Double>
 ```
 
-**Known Issue**: Uses raw string interpolation `"""{"model":"...","prompt":"$text"}"""` instead of the serializer. No JSON escaping — if `$text` contains quotes, the request will fail.
+Uses Spring AI's Ollama API embedding request object.
 
 #### checkConnection()
 
@@ -137,10 +141,13 @@ data class ModelDetails(
 ```kotlin
 interface LLMProvider {
     suspend fun chat(messages: List<Message>): ChatResponse
+    suspend fun chat(request: ChatRequestContext): ChatResponse
     suspend fun stream(messages: List<Message>): Flow<ChatResponse>
+    suspend fun stream(request: ChatRequestContext): Flow<ChatResponse>
     suspend fun vision(image: ByteArray, prompt: String): ChatResponse
     suspend fun embeddings(text: String): List<Double>
     fun isConnected(): Boolean
+    suspend fun checkConnection(): Boolean
     suspend fun getModels(): List<String>
     suspend fun getModelDetails(modelName: String): ShowResponse
 }
@@ -154,17 +161,31 @@ interface LLMProvider {
 | OpenAI | `OpenAIProvider` | Planned |
 | Anthropic | `AnthropicProvider` | Planned |
 
-## Tool Calling (Not Yet Implemented)
+## Tool Calling
 
-Tool calling is designed but not yet built. The architecture expects:
+Tool calling is implemented through Spring AI `FunctionCallback` and request-scoped `ChatRequestContext`.
 
 ```kotlin
-data class Tool(
-    val name: String,
-    val description: String,
-    val parameters: JsonSchema
+data class ChatRequestContext(
+    val messages: List<Message>,
+    val model: String? = null,
+    val enabledTools: Set<ToolId> = emptySet(),
+    val metadata: Map<String, Any> = emptyMap()
 )
 ```
+
+`ToolRegistry` maps application tool IDs to provider-safe function names. IDs such as `file:read` are exposed to Spring AI as names such as `file_read`.
+
+Implemented tool IDs:
+
+| Tool ID | Status |
+|---------|--------|
+| `ui` | Reads and updates safe UI/session settings |
+| `file:read`, `file:list`, `file:glob`, `file:grep` | Workspace-bounded read-only file tools |
+| `file:write`, `file:edit` | Workspace-bounded write tools |
+| `terminal` | Bounded non-interactive shell execution in the workspace |
+| `context`, `pwd` | Runtime context and workspace path |
+| `browser`, `search` | Defined tools that return structured unavailable results until a backend is wired |
 
 ## Error Handling (Not Yet Implemented)
 

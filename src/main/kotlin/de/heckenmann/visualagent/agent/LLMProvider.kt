@@ -23,12 +23,29 @@ interface LLMProvider {
     suspend fun chat(messages: List<Message>): ChatResponse
 
     /**
+     * Send a chat request with model, tool, and metadata context.
+     *
+     * @param request Complete request context for the provider
+     * @return Complete chat response from the LLM
+     * @throws Exception if the request fails or model is unavailable
+     */
+    suspend fun chat(request: ChatRequestContext): ChatResponse = chat(request.messages)
+
+    /**
      * Stream a chat response in real-time chunks.
      *
      * @param messages List of conversation messages
      * @return Flow of response chunks for real-time display
      */
     suspend fun stream(messages: List<Message>): Flow<ChatResponse>
+
+    /**
+     * Stream a chat request with model, tool, and metadata context.
+     *
+     * @param request Complete request context for the provider
+     * @return Flow of response chunks for real-time display
+     */
+    suspend fun stream(request: ChatRequestContext): Flow<ChatResponse> = stream(request.messages)
 
     /**
      * Process an image with a vision-capable model.
@@ -55,6 +72,13 @@ interface LLMProvider {
     fun isConnected(): Boolean
 
     /**
+     * Perform an active connectivity check against the backing provider.
+     *
+     * @return true if the provider endpoint is reachable and responsive
+     */
+    suspend fun checkConnection(): Boolean
+
+    /**
      * Get the list of available model names.
      *
      * @return List of model names
@@ -69,6 +93,60 @@ interface LLMProvider {
      */
     suspend fun getModelDetails(modelName: String): ShowResponse
 }
+
+/**
+ * Complete provider request context for chat calls.
+ *
+ * @property messages Ordered conversation messages
+ * @property model Optional model override; defaults to the configured model when null
+ * @property enabledTools Tool IDs that may be exposed to the model for this request
+ * @property metadata Additional provider-neutral execution context
+ */
+data class ChatRequestContext(
+    val messages: List<Message>,
+    val model: String? = null,
+    val enabledTools: Set<ToolId> = emptySet(),
+    val metadata: Map<String, Any> = emptyMap(),
+)
+
+/**
+ * Stable identifier for an application tool.
+ *
+ * @property value External tool ID such as `file:read` or `ui`
+ */
+@JvmInline
+value class ToolId(val value: String)
+
+/**
+ * Provider-neutral description of a callable tool.
+ *
+ * @property id Stable application tool ID
+ * @property name Provider-safe function name exposed to Spring AI
+ * @property description Description used by the model to decide when to call the tool
+ * @property inputSchema JSON schema for the tool input
+ */
+data class ToolDefinition(
+    val id: ToolId,
+    val name: String,
+    val description: String,
+    val inputSchema: String,
+)
+
+/**
+ * Structured result returned by a tool execution.
+ *
+ * @property toolId Tool that produced the result
+ * @property success Whether the tool completed successfully
+ * @property content Human-readable result payload
+ * @property error Optional error message when execution failed
+ */
+@Serializable
+data class ToolResult(
+    val toolId: String,
+    val success: Boolean,
+    val content: String,
+    val error: String? = null,
+)
 
 /**
  * Represents a single message in a conversation.

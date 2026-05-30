@@ -1,68 +1,95 @@
 package de.heckenmann.visualagent.agent
 
+import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.config.AppConfig
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.reactive.asFlow
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import org.springframework.ai.chat.messages.AssistantMessage
 import org.springframework.ai.chat.messages.SystemMessage
 import org.springframework.ai.chat.messages.UserMessage
 import org.springframework.ai.chat.model.ChatModel
 import org.springframework.ai.chat.prompt.Prompt
-import org.springframework.ai.ollama.OllamaChatModel
+import org.springframework.ai.model.function.FunctionCallingOptions
 import org.springframework.ai.ollama.api.OllamaApi
-import org.springframework.ai.ollama.api.OllamaOptions
 import org.springframework.stereotype.Component
 
+/**
+ * Spring AI-backed LLM provider for local Ollama chat, tools, embeddings, and model metadata.
+ */
 @Component
 class OllamaClient(
     private val chatModel: ChatModel,
+    private val ollamaApi: OllamaApi,
+    private val toolRegistry: ToolRegistry,
 ) : LLMProvider {
 
-    override suspend fun chat(messages: List<Message>): ChatResponse {
-        val springMessages = messages.map { msg ->
-            when (msg.role) {
-                "system" -> SystemMessage(msg.content)
-                "user" -> UserMessage(msg.content)
-                else -> AssistantMessage(msg.content)
-            }
-        }
+    override suspend fun chat(messages: List<Message>): ChatResponse =
+        chat(ChatRequestContext(messages = messages))
 
-        val prompt = Prompt(springMessages)
-        val response = chatModel.call(prompt)
-        val result = response.result.output
+    override suspend fun chat(request: ChatRequestContext): ChatResponse {
+        return withContext(Dispatchers.IO) {
+            val selectedModel = request.model ?: AppConfig.instance.ollamaModel
+            val response = chatModel.call(buildPrompt(request, selectedModel))
+            val output = response.result?.output?.content.orEmpty()
 
-        return ChatResponse(
-            model = AppConfig.instance.ollamaModel,
-            message = Message(
-                role = "assistant",
-                content = result.content
-            ),
-            done = true
-        )
-    }
-
-    override suspend fun stream(messages: List<Message>): Flow<ChatResponse> {
-        val springMessages = messages.map { msg ->
-            when (msg.role) {
-                "system" -> SystemMessage(msg.content)
-                "user" -> UserMessage(msg.content)
-                else -> AssistantMessage(msg.content)
-            }
-        }
-
-        val prompt = Prompt(springMessages)
-        return chatModel.stream(prompt).asFlow().map { chunk ->
             ChatResponse(
-                model = AppConfig.instance.ollamaModel,
+                model = response.metadata?.model ?: selectedModel,
                 message = Message(
                     role = "assistant",
-                    content = chunk.result.output.content
+                    content = output,
                 ),
-                done = chunk.result.metadata.finishReason != null
+                done = true,
+                totalDuration = null,
+                promptEvalCount = response.metadata?.usage?.promptTokens?.toInt(),
+                evalCount = response.metadata?.usage?.generationTokens?.toInt(),
             )
         }
+    }
+
+    override suspend fun stream(messages: List<Message>): Flow<ChatResponse> =
+        stream(ChatRequestContext(messages = messages))
+
+    override suspend fun stream(request: ChatRequestContext): Flow<ChatResponse> {
+        val selectedModel = request.model ?: AppConfig.instance.ollamaModel
+        return chatModel.stream(buildPrompt(request, selectedModel)).asFlow().map { chunk ->
+            ChatResponse(
+                model = chunk.metadata?.model ?: selectedModel,
+                message = Message(
+                    role = "assistant",
+                    content = chunk.result?.output?.content.orEmpty(),
+                ),
+                done = chunk.result?.metadata?.finishReason != null,
+                promptEvalCount = chunk.metadata?.usage?.promptTokens?.toInt(),
+                evalCount = chunk.metadata?.usage?.generationTokens?.toInt(),
+            )
+        }.flowOn(Dispatchers.IO)
+    }
+
+    private fun buildPrompt(request: ChatRequestContext, selectedModel: String): Prompt {
+        val callbacks = toolRegistry.functionCallbacks(
+            enabledTools = request.enabledTools,
+            context = request.metadata + mapOf("model" to selectedModel),
+        )
+        val options = FunctionCallingOptions.builder()
+            .model(selectedModel)
+            .functionCallbacks(callbacks)
+            .functions(callbacks.map { it.name }.toSet())
+            .build()
+        return Prompt(
+            request.messages.map { msg ->
+                when (msg.role) {
+                    "system" -> SystemMessage(msg.content)
+                    "assistant" -> AssistantMessage(msg.content)
+                    else -> UserMessage(msg.content)
+                }
+            },
+            options,
+        )
     }
 
     override suspend fun vision(image: ByteArray, prompt: String): ChatResponse {
@@ -72,27 +99,76 @@ class OllamaClient(
     }
 
     override suspend fun embeddings(text: String): List<Double> {
-        return emptyList() // Needs EmbeddingModel injection
+        return withContext(Dispatchers.IO) {
+            try {
+                val response = ollamaApi.embed(OllamaApi.EmbeddingsRequest(AppConfig.instance.ollamaModel, text))
+                response.embeddings()
+                    .firstOrNull()
+                    ?.map { value -> value.toDouble() }
+                    ?: emptyList()
+            } catch (_: Exception) {
+                emptyList()
+            }
+        }
     }
 
     override fun isConnected(): Boolean = true
 
-    suspend fun checkConnection(): Boolean {
-        return try {
-            // We can't easily check connection with Spring AI ChatModel without making a call
-            // But we can use the underlying API if needed.
-            true
-        } catch (e: Exception) {
-            false
+    override suspend fun checkConnection(): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                ollamaApi.listModels()
+                true
+            } catch (_: Exception) {
+                false
+            }
         }
     }
 
     override suspend fun getModels(): List<String> {
-        return listOf(AppConfig.instance.ollamaModel)
+        return withContext(Dispatchers.IO) {
+            val configuredModel = AppConfig.instance.ollamaModel
+            try {
+                val models = ollamaApi.listModels().models()
+                    ?.mapNotNull { model -> model.name() }
+                    ?.distinct()
+                    ?: emptyList()
+                if (models.isEmpty()) listOf(configuredModel) else models
+            } catch (_: Exception) {
+                listOf(configuredModel)
+            }
+        }
     }
 
     override suspend fun getModelDetails(modelName: String): ShowResponse {
-        return ShowResponse(modelName, "")
+        return withContext(Dispatchers.IO) {
+            try {
+                val response = ollamaApi.showModel(OllamaApi.ShowModelRequest(modelName))
+                val details = response.details()
+                ShowResponse(
+                    model = modelName,
+                    modifiedAt = response.modifiedAt()?.toString().orEmpty(),
+                    parameters = response.parameters(),
+                    template = response.template(),
+                    system = response.system(),
+                    license = response.license(),
+                    details = if (details != null) {
+                        ModelDetails(
+                            parentModel = details.parentModel(),
+                            format = details.format(),
+                            family = details.family(),
+                            families = details.families(),
+                            parameterSize = details.parameterSize(),
+                            quantizationLevel = details.quantizationLevel(),
+                        )
+                    } else {
+                        null
+                    },
+                )
+            } catch (_: Exception) {
+                ShowResponse(model = modelName, modifiedAt = "")
+            }
+        }
     }
 }
 

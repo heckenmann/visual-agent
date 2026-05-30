@@ -26,6 +26,23 @@ val platform = when {
 }
 
 val javafxVersion = "21.0.2"
+val javafxModuleArgs = listOf(
+    "--module-path", rootDir.resolve("lib").toString(),
+    "--add-modules", "javafx.controls,javafx.fxml,javafx.web,javafx.graphics,javafx.media,javafx.swing,javafx.base",
+)
+val applicationIdentityArgs = listOf(
+    "-Dapple.awt.application.name=Visual Agent",
+    "-Dcom.apple.mrj.application.apple.menu.about.name=Visual Agent",
+    "-Djavafx.application.name=Visual Agent",
+)
+val macApplicationArgs = if (System.getProperty("os.name").contains("Mac", ignoreCase = true)) {
+    listOf(
+        "-Xdock:name=Visual Agent",
+        "-Xdock:icon=${rootDir.resolve("src/main/resources/icons/visual-agent.png").absolutePath}",
+    )
+} else {
+    emptyList()
+}
 
 dependencies {
     implementation(kotlin("stdlib"))
@@ -53,6 +70,9 @@ dependencies {
 
     // JSON Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
+
+    // Markdown parsing
+    implementation("org.commonmark:commonmark:0.21.0")
 
     // AtlantaFX themes
     implementation("io.github.mkpaz:atlantafx-base:2.0.1")
@@ -82,10 +102,11 @@ tasks.test {
 application {
     mainClass.set("de.heckenmann.visualagent.Main")
 
-    applicationDefaultJvmArgs = listOf(
-        "--module-path", rootDir.resolve("lib").toString(),
-        "--add-modules", "javafx.controls,javafx.fxml,javafx.web,javafx.graphics,javafx.media,javafx.swing,javafx.base",
-    )
+    applicationDefaultJvmArgs = javafxModuleArgs + applicationIdentityArgs + macApplicationArgs
+}
+
+tasks.withType<JavaExec>().configureEach {
+    jvmArgs(javafxModuleArgs + applicationIdentityArgs + macApplicationArgs)
 }
 
 kotlin {

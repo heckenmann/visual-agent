@@ -16,6 +16,8 @@ class Main : Application() {
     private lateinit var springContext: ConfigurableApplicationContext
 
     override fun init() {
+        AppIdentity.configureProcessProperties()
+
         // Force Spring Boot to use the Java logging system in this desktop app runtime
         // to avoid Logback native compatibility issues on some environments.
         System.setProperty("org.springframework.boot.logging.LoggingSystem", "org.springframework.boot.logging.java.JavaLoggingSystem")
@@ -47,6 +49,7 @@ class Main : Application() {
 
         @JvmStatic
         fun main(args: Array<String>) {
+            AppIdentity.configureProcessProperties()
             Application.launch(Main::class.java, *args)
         }
     }
