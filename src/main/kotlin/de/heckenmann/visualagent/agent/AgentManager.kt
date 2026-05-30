@@ -1,20 +1,23 @@
 package de.heckenmann.visualagent.agent
 
+import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.config.AppConfig
 import de.heckenmann.visualagent.knowledge.KnowledgeDb
+import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoChange
 import de.heckenmann.visualagent.todo.TodoChangeType
-import de.heckenmann.visualagent.todo.TodoStatus
 import de.heckenmann.visualagent.todo.TodoManager
-import de.heckenmann.visualagent.todo.Todo
-import org.springframework.stereotype.Service
+import de.heckenmann.visualagent.todo.TodoStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import org.springframework.stereotype.Service
 import java.util.UUID
 
 /**
@@ -27,32 +30,39 @@ class AgentManager(
     private val llmProvider: LLMProvider,
     private val agentToolConfigService: AgentToolConfigService,
 ) {
-    val todoManager: TodoManager = TodoManager(
-        initialTodos = knowledgeDb.listTodos(),
-        onChange = { change -> persistTodoChange(change) },
-    )
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val subAgents = mutableMapOf<String, SubAgent>()
-    private val conversationHistory = mutableListOf<Message>()
-    private var pendingResumeMessage: String? = null
-
-    init {
-        loadAgentsFromDb()
-        loadConversationFromDb()
-        resumeInterruptedConversationIfNeeded()
-    }
-
     companion object {
         private const val MAIN_SESSION_ID = "main"
+        private const val INITIAL_HISTORY_LOAD_LIMIT = 20
+        private const val HISTORY_PAGE_SIZE = 20
         private var globalAgentCallback: ((String, String) -> Unit)? = null
 
         fun setAgentCallback(callback: (String, String) -> Unit) {
             globalAgentCallback = callback
         }
 
-        private fun notifyAgent(agentId: String, message: String) {
+        private fun notifyAgent(
+            agentId: String,
+            message: String,
+        ) {
             globalAgentCallback?.invoke(agentId, message)
         }
+    }
+
+    val todoManager: TodoManager =
+        TodoManager(
+            initialTodos = knowledgeDb.listTodos(),
+            onChange = { change -> persistTodoChange(change) },
+        )
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val subAgents = mutableMapOf<String, SubAgent>()
+    private val conversationHistory = mutableListOf<Message>()
+    private var pendingResumeMessage: String? = null
+    private var loadedHistoryCount: Int = 0
+
+    init {
+        loadAgentsFromDb()
+        loadConversationFromDb()
+        resumeInterruptedConversationIfNeeded()
     }
 
     /**
@@ -75,20 +85,22 @@ class AgentManager(
             try {
                 val rawCurrentTask = agentMap["currentTask"] as? String
                 val currentTask = rawCurrentTask?.ifBlank { null }
-                val agent = SubAgent(
-                    id = agentMap["id"] as String,
-                    name = agentMap["name"] as String,
-                    role = agentMap["role"] as String,
-                    // For deterministic behavior in tests and UI, treat stored agents as IDLE on load
-                    status = AgentStatus.IDLE,
-                    currentTask = null,
-                    parentAgentId = agentMap["parentAgentId"] as? String,
-                    config = try {
-                        Json.decodeFromString(agentMap["config"] as String)
-                    } catch (e: Exception) {
-                        AgentConfig()
-                    },
-                )
+                val agent =
+                    SubAgent(
+                        id = agentMap["id"] as String,
+                        name = agentMap["name"] as String,
+                        role = agentMap["role"] as String,
+                        // For deterministic behavior in tests and UI, treat stored agents as IDLE on load
+                        status = AgentStatus.IDLE,
+                        currentTask = null,
+                        parentAgentId = agentMap["parentAgentId"] as? String,
+                        config =
+                            try {
+                                Json.decodeFromString(agentMap["config"] as String)
+                            } catch (e: Exception) {
+                                AgentConfig()
+                            },
+                    )
                 println("[AgentManager] Loading agent id=${agent.id} status=${agent.status}")
                 subAgents[agent.id] = agent
             } catch (e: Exception) {
@@ -102,11 +114,18 @@ class AgentManager(
      * Create default SubAgents if database is empty.
      */
     private fun createDefaultAgents() {
-        val defaults = listOf(
-            SubAgent("1", "Researcher", "Web research and information gathering", AgentStatus.IDLE, config = AgentConfig.fromTemplate("researcher")),
-            SubAgent("2", "Coder", "Code implementation and review", AgentStatus.IDLE, config = AgentConfig.fromTemplate("coder")),
-            SubAgent("3", "Documenter", "Documentation writing", AgentStatus.IDLE, config = AgentConfig.fromTemplate("documenter")),
-        )
+        val defaults =
+            listOf(
+                SubAgent(
+                    "1",
+                    "Researcher",
+                    "Web research and information gathering",
+                    AgentStatus.IDLE,
+                    config = AgentConfig.fromTemplate("researcher"),
+                ),
+                SubAgent("2", "Coder", "Code implementation and review", AgentStatus.IDLE, config = AgentConfig.fromTemplate("coder")),
+                SubAgent("3", "Documenter", "Documentation writing", AgentStatus.IDLE, config = AgentConfig.fromTemplate("documenter")),
+            )
         defaults.forEach { agent ->
             saveAgentToDb(agent)
             subAgents[agent.id] = agent
@@ -144,7 +163,11 @@ class AgentManager(
      * @param templateName Template name (researcher, coder, documenter, reviewer, tester)
      * @return Created SubAgent with generated UUID
      */
-    fun createAgent(name: String, role: String, templateName: String = "researcher"): SubAgent {
+    fun createAgent(
+        name: String,
+        role: String,
+        templateName: String = "researcher",
+    ): SubAgent {
         val id = UUID.randomUUID().toString().take(8)
         val agent = SubAgent.fromTemplate(id, name, role, templateName)
         saveAgentToDb(agent)
@@ -158,7 +181,12 @@ class AgentManager(
     /**
      * Update an existing SubAgent's properties and persist.
      */
-    fun updateAgent(id: String, name: String? = null, role: String? = null, config: AgentConfig? = null): Boolean {
+    fun updateAgent(
+        id: String,
+        name: String? = null,
+        role: String? = null,
+        config: AgentConfig? = null,
+    ): Boolean {
         val agent = subAgents[id] ?: return false
         if (name != null) agent.name = name
         if (role != null) agent.role = role
@@ -184,7 +212,10 @@ class AgentManager(
 
     // ============ Chat & Messaging ============
 
-    suspend fun sendMessageToAgent(agentId: String, content: String): String {
+    suspend fun sendMessageToAgent(
+        agentId: String,
+        content: String,
+    ): String {
         val agent = subAgents[agentId] ?: return "Error: Agent not found"
         val messages = listOf(Message("user", content))
         val response = agent.chat(messages, llmProvider, agentToolConfigService.toolsFor(agent))
@@ -194,14 +225,17 @@ class AgentManager(
     suspend fun sendMessage(content: String): String {
         val userMessage = Message("user", content)
         conversationHistory.add(userMessage)
-        knowledgeDb.saveConversationMessage(MAIN_SESSION_ID, userMessage.role, userMessage.content)
+        knowledgeDb.saveConversationMessage(MAIN_SESSION_ID, userMessage.role, userMessage.content, userMessage.metadata)
         val response = llmProvider.chat(buildMainRequest(conversationHistory))
         conversationHistory.add(response.message)
-        knowledgeDb.saveConversationMessage(MAIN_SESSION_ID, response.message.role, response.message.content)
+        knowledgeDb.saveConversationMessage(MAIN_SESSION_ID, response.message.role, response.message.content, response.message.metadata)
         return response.message.content
     }
 
-    suspend fun streamMessage(content: String, onChunk: (String) -> Unit) {
+    suspend fun streamMessage(
+        content: String,
+        onChunk: (String) -> Unit,
+    ) {
         conversationHistory.add(Message("user", content))
         llmProvider.stream(buildMainRequest(conversationHistory)).collect { chunk ->
             onChunk(chunk.message.content)
@@ -215,16 +249,81 @@ class AgentManager(
 
     fun getHistory(): List<Message> = conversationHistory.toList()
 
+    /**
+     * Persist a finished tool call into the conversation history with compact text and full metadata.
+     *
+     * @param event Tool call event payload
+     */
+    fun recordToolCall(event: ToolCallEvent) {
+        val status = if (event.result.success) "ok" else "error"
+        val firstDetailLine =
+            event.result.content
+                .trim()
+                .lineSequence()
+                .firstOrNull()
+                .orEmpty()
+                .take(140)
+        val compactText =
+            when {
+                firstDetailLine.isNotBlank() -> "Tool ${event.toolId} · $status · $firstDetailLine"
+                !event.result.error.isNullOrBlank() -> "Tool ${event.toolId} · $status · ${event.result.error}"
+                else -> "Tool ${event.toolId} · $status"
+            }
+        val metadata =
+            buildJsonObject {
+                put("type", "tool_call")
+                put("toolId", event.toolId)
+                put("functionName", event.functionName)
+                put("status", status)
+                put("durationMillis", event.durationMillis)
+                put("inputJson", event.inputJson)
+                put("resultContent", event.result.content)
+                put("resultError", event.result.error ?: "")
+            }.toString()
+        val message = Message(role = "assistant", content = compactText, metadata = metadata)
+        conversationHistory.add(message)
+        knowledgeDb.saveConversationMessage(MAIN_SESSION_ID, message.role, message.content, message.metadata)
+    }
+
+    /**
+     * Load the next older history page and prepend it to in-memory conversation history.
+     *
+     * @param pageSize Number of older messages to load
+     * @return Loaded older messages in chronological order
+     */
+    fun loadOlderHistory(pageSize: Int = HISTORY_PAGE_SIZE): List<Message> {
+        val rows =
+            knowledgeDb.getConversationMessagesPage(
+                sessionId = MAIN_SESSION_ID,
+                limit = pageSize.coerceAtLeast(1),
+                offset = loadedHistoryCount,
+            )
+        val messages =
+            rows.mapNotNull { row ->
+                val role = row["role"].orEmpty()
+                val content = row["content"].orEmpty()
+                val metadata = row["metadata"]
+                if (role.isNotBlank() && content.isNotBlank()) Message(role = role, content = content, metadata = metadata) else null
+            }
+        if (messages.isNotEmpty()) {
+            conversationHistory.addAll(0, messages)
+            loadedHistoryCount += messages.size
+        }
+        return messages
+    }
+
     private fun loadConversationFromDb() {
         conversationHistory.clear()
-        val rows = knowledgeDb.getConversationMessages(MAIN_SESSION_ID)
+        val rows = knowledgeDb.getConversationMessages(MAIN_SESSION_ID, INITIAL_HISTORY_LOAD_LIMIT)
         rows.forEach { row ->
             val role = row["role"].orEmpty()
             val content = row["content"].orEmpty()
+            val metadata = row["metadata"]
             if (role.isNotBlank() && content.isNotBlank()) {
-                conversationHistory.add(Message(role = role, content = content))
+                conversationHistory.add(Message(role = role, content = content, metadata = metadata))
             }
         }
+        loadedHistoryCount = conversationHistory.size
         val last = conversationHistory.lastOrNull()
         pendingResumeMessage = if (last?.role == "user") last.content else null
     }
@@ -254,7 +353,10 @@ class AgentManager(
         return true
     }
 
-    fun assignTodoToAgent(todoId: String, agentId: String): Boolean {
+    fun assignTodoToAgent(
+        todoId: String,
+        agentId: String,
+    ): Boolean {
         val agent = subAgents[agentId] ?: return false
         if (agent.status != AgentStatus.IDLE) return false
 
@@ -277,7 +379,11 @@ class AgentManager(
         return true
     }
 
-    private suspend fun processTodoWithLLM(agent: SubAgent, todoId: String, taskDescription: String) {
+    private suspend fun processTodoWithLLM(
+        agent: SubAgent,
+        todoId: String,
+        taskDescription: String,
+    ) {
         var attempt = 0
         val maxRetries = agent.config.maxRetries
         try {
@@ -287,7 +393,14 @@ class AgentManager(
 
             while (attempt < maxRetries) {
                 try {
-                    val workerResult = agent.performTodo(todoId, taskDescription, llmProvider, knowledgeDb, agentToolConfigService.toolsFor(agent))
+                    val workerResult =
+                        agent.performTodo(
+                            todoId,
+                            taskDescription,
+                            llmProvider,
+                            knowledgeDb,
+                            agentToolConfigService.toolsFor(agent),
+                        )
                     val reviewApproved = reviewWorkerResult(todoId, taskDescription, workerResult)
                     if (reviewApproved) {
                         notifyAgent(agent.id, "Completed todo: $todoId")
@@ -341,28 +454,29 @@ class AgentManager(
      * Seed TodoManager with UX improvement tasks for autonomous processing.
      */
     fun seedUxTodos() {
-        val tasks = listOf(
-            "ChatPanel: implement message grouping visual polish",
-            "ChatPanel: implement typing indicator & streaming partial responses",
-            "ChatPanel: add message actions (retry, edit, delete, pin, reactions)",
-            "ChatPanel: virtualize message list for large histories",
-            "ChatPanel: accessibility pass (focus, labels, contrast)",
-            "MainWindow: persistent left navigation with active state and tooltips",
-            "MainWindow: command palette (Cmd/Ctrl+K) to switch panels/search",
-            "StatusBar: actionable controls (Retry, Reconnect)",
-            "SessionPanel: model search, filter, favorites and quick actions",
-            "SessionPanel: improve loading/error states for model info",
-            "TodoPanel: inline create/edit without modal",
-            "TodoPanel: undo snackbar for deletes",
-            "TodoPanel: bulk actions and filters",
-            "SubAgentsPanel: agent cards with quick run/stop and logs preview",
-            "SubAgentsPanel: agent creation wizard with templates",
-            "CanvasPanel: toolbar (pen, eraser, undo/redo, export)",
-            "CanvasPanel: pan/zoom, grid, snapshots saving",
-            "ApplicationSettings: group settings, live theme preview, import/export config",
-            "Cross-cutting: component library mapping and CSS tokenization",
-            "Cross-cutting: accessibility pass and contrast audit",
-        )
+        val tasks =
+            listOf(
+                "ChatPanel: implement message grouping visual polish",
+                "ChatPanel: implement typing indicator & streaming partial responses",
+                "ChatPanel: add message actions (retry, edit, delete, pin, reactions)",
+                "ChatPanel: virtualize message list for large histories",
+                "ChatPanel: accessibility pass (focus, labels, contrast)",
+                "MainWindow: persistent left navigation with active state and tooltips",
+                "MainWindow: command palette (Cmd/Ctrl+K) to switch panels/search",
+                "StatusBar: actionable controls (Retry, Reconnect)",
+                "SessionPanel: model search, filter, favorites and quick actions",
+                "SessionPanel: improve loading/error states for model info",
+                "TodoPanel: inline create/edit without modal",
+                "TodoPanel: undo snackbar for deletes",
+                "TodoPanel: bulk actions and filters",
+                "SubAgentsPanel: agent cards with quick run/stop and logs preview",
+                "SubAgentsPanel: agent creation wizard with templates",
+                "CanvasPanel: toolbar (pen, eraser, undo/redo, export)",
+                "CanvasPanel: pan/zoom, grid, snapshots saving",
+                "ApplicationSettings: group settings, live theme preview, import/export config",
+                "Cross-cutting: component library mapping and CSS tokenization",
+                "Cross-cutting: accessibility pass and contrast audit",
+            )
         tasks.forEach { desc -> todoManager.add(desc) }
         println("[AgentManager] Seeded ${tasks.size} UX tasks")
     }
@@ -424,20 +538,34 @@ class AgentManager(
 
     private fun buildMainSystemContextPrompt(): String {
         val todos = todoManager.getAll()
-        val todoLines = if (todos.isEmpty()) {
-            "- no active todos"
-        } else {
-            todos.joinToString("\n") { todo ->
-                "- [${todo.status}] ${todo.description} (id=${todo.id}, priority=${todo.priority}, assigned=${todo.assignedAgentId ?: "none"})"
+        val openCount = todos.count { it.status == TodoStatus.PENDING }
+        val inProgressCount = todos.count { it.status == TodoStatus.IN_PROGRESS }
+        val doneCount = todos.count { it.status == TodoStatus.COMPLETED }
+        val cancelledCount = todos.count { it.status == TodoStatus.CANCELLED }
+        val totalCount = todos.size
+        val todoLines =
+            if (todos.isEmpty()) {
+                "- no active todos"
+            } else {
+                todos.joinToString("\n") { todo ->
+                    "- [${todo.status}] ${todo.description} (id=${todo.id}, priority=${todo.priority}, assigned=${todo.assignedAgentId ?: "none"})"
+                }
             }
-        }
-        val resumeHint = pendingResumeMessage?.let {
-            "Resume Hint: The previous app run ended while processing this user request:\n\"$it\""
-        } ?: "Resume Hint: no interrupted user request detected."
+        val resumeHint =
+            pendingResumeMessage?.let {
+                "Resume Hint: The previous app run ended while processing this user request:\n\"$it\""
+            } ?: "Resume Hint: no interrupted user request detected."
         return """
             You are the main orchestrator agent.
             Always use the todo context below for planning and execution.
             $resumeHint
+
+            TODO summary (authoritative counters):
+            - Open: $openCount
+            - In Progress: $inProgressCount
+            - Done: $doneCount
+            - Cancelled: $cancelledCount
+            - Total: $totalCount
             
             Current TODO list:
             $todoLines
@@ -446,17 +574,25 @@ class AgentManager(
             - Break down complex tasks.
             - Delegate implementation/research subtasks to worker agents when useful.
             - Validate worker outputs before declaring completion.
-        """.trimIndent()
+            - Keep todos continuously up to date during execution.
+            - When the user asks about todos (list, count, status, progress), call `todos` with `{"action":"list"}` first, then answer from tool output.
+            - Do not ask clarifying questions for a plain "show/get todos" request; return the current todo state immediately.
+            - After any successful tool call, provide a concrete answer derived from the tool result. Do not respond with generic requests for more context.
+            - Use the `todos` tool to create/update items and set status transitions according to progress (`PENDING` -> `IN_PROGRESS` -> `COMPLETED` or `CANCELLED`).
+            - If additional historic context is required, use the `history` tool (`load`/`search`) instead of guessing.
+            - Do not leave finished work in `PENDING`; reflect the real processing state at all times.
+            """.trimIndent()
     }
 
     private fun resumeInterruptedConversationIfNeeded() {
         val resumeText = pendingResumeMessage ?: return
         scope.launch {
             runCatching {
-                val resumeInstruction = Message(
-                    "system",
-                    "The previous request was interrupted by an app shutdown or failure. Continue the unfinished work from the last user request now.",
-                )
+                val resumeInstruction =
+                    Message(
+                        "system",
+                        "The previous request was interrupted by an app shutdown or failure. Continue the unfinished work from the last user request now.",
+                    )
                 val request = buildMainRequest(listOf(resumeInstruction) + conversationHistory)
                 val response = llmProvider.chat(request)
                 val assistantMessage = Message("assistant", response.message.content)
@@ -474,16 +610,41 @@ class AgentManager(
     private suspend fun expandComplexTodoIfNeeded(): Boolean {
         val candidate = todoManager.getPending().firstOrNull { isComplex(it.description) } ?: return false
         val analyst = ensureAnalysisAgent()
-        val prompt = listOf(
-            Message("system", "Break down the task into up to 5 executable subtasks. Return one subtask per line without numbering decorations."),
-            Message("user", candidate.description),
-        )
+        val prompt =
+            listOf(
+                Message(
+                    "system",
+                    "Break down the task into up to 5 executable subtasks. Return one subtask per line without numbering decorations.",
+                ),
+                Message("user", candidate.description),
+            )
         return runCatching {
             val response = analyst.chat(prompt, llmProvider, agentToolConfigService.toolsFor(analyst))
-            val subtasks = response.message.content.lines().map { it.trim().trimStart('-', '*', '•', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.', ')', ' ') }
-                .filter { it.length > 5 }
-                .distinct()
-                .take(5)
+            val subtasks =
+                response.message.content
+                    .lines()
+                    .map {
+                        it.trim().trimStart(
+                            '-',
+                            '*',
+                            '•',
+                            '0',
+                            '1',
+                            '2',
+                            '3',
+                            '4',
+                            '5',
+                            '6',
+                            '7',
+                            '8',
+                            '9',
+                            '.',
+                            ')',
+                            ' ',
+                        )
+                    }.filter { it.length > 5 }
+                    .distinct()
+                    .take(5)
             if (subtasks.isEmpty()) return false
             subtasks.forEach { todoManager.add("${candidate.description}: $it", candidate.priority) }
             todoManager.cancelTodo(candidate.id)
@@ -504,11 +665,14 @@ class AgentManager(
         val pending = todoManager.getPending().firstOrNull() ?: return null
         val idleAgents = subAgents.values.filter { it.status == AgentStatus.IDLE }
         if (idleAgents.isEmpty()) return null
-        val preferred = idleAgents.firstOrNull {
-            val d = pending.description.lowercase()
-            (d.contains("code") || d.contains("implement") || d.contains("fix")) && it.name.contains("coder", true) ||
-                (d.contains("research") || d.contains("docs") || d.contains("issue")) && it.name.contains("research", true)
-        }
+        val preferred =
+            idleAgents.firstOrNull {
+                val d = pending.description.lowercase()
+                (d.contains("code") || d.contains("implement") || d.contains("fix")) &&
+                    it.name.contains("coder", true) ||
+                    (d.contains("research") || d.contains("docs") || d.contains("issue")) &&
+                    it.name.contains("research", true)
+            }
         return preferred ?: idleAgents.firstOrNull() ?: createDynamicWorkerFor(pending.description)
     }
 
@@ -523,14 +687,15 @@ class AgentManager(
     }
 
     private fun buildWorkerInstruction(todo: Todo): String {
-        val localHints = """
+        val localHints =
+            """
             Prioritize local project context first:
             - read project markdown docs
             - inspect code comments and relevant source files
             If blocked after multiple attempts:
             - gather external references
             - prioritize GitHub issues, StackOverflow, and search engines
-        """.trimIndent()
+            """.trimIndent()
         return """
             Task ID: ${todo.id}
             Priority: ${todo.priority}
@@ -542,24 +707,35 @@ class AgentManager(
             3. If blocked, include attempted steps and next actions.
             
             $localHints
-        """.trimIndent()
+            """.trimIndent()
     }
 
-    private suspend fun reviewWorkerResult(todoId: String, taskDescription: String, workerResult: String): Boolean {
-        val reviewPrompt = listOf(
-            Message("system", "You are the main reviewer. Respond with exactly APPROVED or RETRY in first line, then a short rationale."),
-            Message(
-                "user",
-                """
+    private suspend fun reviewWorkerResult(
+        todoId: String,
+        taskDescription: String,
+        workerResult: String,
+    ): Boolean {
+        val reviewPrompt =
+            listOf(
+                Message(
+                    "system",
+                    "You are the main reviewer. Respond with exactly APPROVED or RETRY in first line, then a short rationale.",
+                ),
+                Message(
+                    "user",
+                    """
                     TODO ID: $todoId
                     Task: $taskDescription
                     Worker Result:
                     $workerResult
-                """.trimIndent(),
-            ),
-        )
+                    """.trimIndent(),
+                ),
+            )
         val response = llmProvider.chat(buildMainRequest(reviewPrompt))
-        return response.message.content.trim().uppercase().startsWith("APPROVED")
+        return response.message.content
+            .trim()
+            .uppercase()
+            .startsWith("APPROVED")
     }
 
     private fun persistTodoChange(change: TodoChange) {

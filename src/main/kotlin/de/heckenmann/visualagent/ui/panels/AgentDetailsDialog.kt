@@ -2,7 +2,12 @@ package de.heckenmann.visualagent.ui.panels
 
 import de.heckenmann.visualagent.agent.SubAgent
 import javafx.geometry.Insets
-import javafx.scene.control.*
+import javafx.scene.control.ButtonBar
+import javafx.scene.control.ButtonType
+import javafx.scene.control.ChoiceBox
+import javafx.scene.control.Dialog
+import javafx.scene.control.Label
+import javafx.scene.control.TextField
 import javafx.scene.layout.GridPane
 
 /**
@@ -11,7 +16,10 @@ import javafx.scene.layout.GridPane
  */
 class AgentDetailsDialog {
     companion object {
-        fun showFor(agent: SubAgent? = null, onSave: ((String, String, String) -> Unit)? = null) {
+        fun showFor(
+            agent: SubAgent? = null,
+            onSave: ((String, String, String) -> Unit)? = null,
+        ) {
             val dialog = Dialog<Unit>()
             dialog.title = if (agent == null) "Create Agent" else "Edit Agent"
             val okButtonType = ButtonType("Save", ButtonBar.ButtonData.OK_DONE)

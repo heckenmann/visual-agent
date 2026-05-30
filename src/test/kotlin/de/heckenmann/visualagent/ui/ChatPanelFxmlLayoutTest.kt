@@ -5,15 +5,19 @@ import org.junit.jupiter.api.Test
 
 class ChatPanelFxmlLayoutTest {
     @Test
-    fun `chat panel fxml includes session info chips`() {
+    fun `chat panel fxml keeps single global status location and local todo info`() {
         val res = javaClass.getResourceAsStream("/fxml/chat-panel.fxml")?.bufferedReader()?.use { it.readText() }
         assertTrue(res != null && res.contains("chat-session-info-bar"), "chat-panel.fxml must include the session info bar")
-        assertTrue(res != null && res.contains("fx:id=\"connectionInfoLabel\""), "chat-panel.fxml must define connection info label")
-        assertTrue(res != null && res.contains("fx:id=\"modelInfoLabel\""), "chat-panel.fxml must define model info label")
-        assertTrue(res != null && res.contains("fx:id=\"agentsInfoLabel\""), "chat-panel.fxml must define agents info label")
+        assertTrue(res != null && !res.contains("fx:id=\"connectionInfoLabel\""), "chat-panel.fxml must not duplicate connection status")
+        assertTrue(res != null && !res.contains("fx:id=\"modelInfoLabel\""), "chat-panel.fxml must not duplicate selected model")
+        assertTrue(res != null && !res.contains("fx:id=\"agentsInfoLabel\""), "chat-panel.fxml must not duplicate agent count")
+        assertTrue(res != null && res.contains("fx:id=\"todoInfoLabel\""), "chat-panel.fxml must define todo summary label")
         assertTrue(res != null && res.contains("fx:id=\"assistantBusySpinner\""), "chat-panel.fxml must define assistant busy spinner")
         assertTrue(res != null && res.contains("fx:id=\"assistantBusyLabel\""), "chat-panel.fxml must define assistant busy label")
-        assertTrue(res != null && res.contains("fx:id=\"conversationIconImage\""), "chat-panel.fxml must use the application icon in the conversation header")
+        assertTrue(
+            res != null && res.contains("fx:id=\"conversationIconImage\""),
+            "chat-panel.fxml must use the application icon in the conversation header",
+        )
     }
 
     @Test

@@ -12,5 +12,8 @@ sealed interface SessionEvent {
      * @param key Setting key (e.g., "model", "streaming", "contextLength")
      * @param value New setting value
      */
-    data class SettingChanged(val key: String, val value: Any) : SessionEvent
+    data class SettingChanged(
+        val key: String,
+        val value: Any,
+    ) : SessionEvent
 }

@@ -1,9 +1,9 @@
 package de.heckenmann.visualagent.ui.panels
 
 import de.heckenmann.visualagent.agent.SubAgent
+import javafx.scene.control.ButtonType
 import javafx.scene.control.Dialog
 import javafx.scene.control.TextArea
-import javafx.scene.control.ButtonType
 import javafx.scene.layout.VBox
 
 /**

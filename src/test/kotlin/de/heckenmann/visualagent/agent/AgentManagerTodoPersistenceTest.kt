@@ -7,7 +7,6 @@ import kotlin.io.path.createTempDirectory
 import kotlin.test.assertEquals
 
 class AgentManagerTodoPersistenceTest {
-
     @Test
     fun `todos survive manager restart via database persistence`() {
         val tempDb = createTempDirectory("visual-agent-agent-todo-persist-test").resolve("agent-todos.db").toString()
@@ -22,7 +21,13 @@ class AgentManagerTodoPersistenceTest {
         val provider2 = mockk<LLMProvider>(relaxed = true)
         val manager2 = AgentManager(db2, provider2, AgentToolConfigService(db2))
         assertEquals(1, manager2.todoManager.getAll().size)
-        assertEquals("Persist this todo", manager2.todoManager.getAll().first().description)
+        assertEquals(
+            "Persist this todo",
+            manager2.todoManager
+                .getAll()
+                .first()
+                .description,
+        )
         db2.close()
     }
 }

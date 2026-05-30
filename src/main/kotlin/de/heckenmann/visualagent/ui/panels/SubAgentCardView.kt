@@ -1,7 +1,7 @@
 package de.heckenmann.visualagent.ui.panels
 
-import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.agent.AgentStatus
+import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.ui.FxmlLoader
 import javafx.fxml.FXML
 import javafx.scene.control.Button
@@ -12,7 +12,9 @@ import javafx.scene.layout.VBox
 /**
  * Rich SubAgent card with quick actions. UI-only; action handlers are provided by the parent panel.
  */
-class SubAgentCardView(val agent: SubAgent) : Region() {
+class SubAgentCardView(
+    val agent: SubAgent,
+) : Region() {
     @FXML
     private lateinit var root: VBox
 
@@ -64,7 +66,10 @@ class SubAgentCardView(val agent: SubAgent) : Region() {
         btnDelete.setOnAction { onDelete?.invoke(agent) }
     }
 
-    fun updateStatus(status: AgentStatus, task: String?) {
+    fun updateStatus(
+        status: AgentStatus,
+        task: String?,
+    ) {
         agent.status = status
         agent.currentTask = task
         statusIndicator.text = status.name

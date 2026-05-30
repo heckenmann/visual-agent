@@ -10,19 +10,19 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class KnowledgeDbTodoTest {
-
     @Test
     fun `todo crud is persisted in sqlite`() {
         val tempDb = createTempDirectory("visual-agent-db-todo-test").resolve("todos.db").toString()
         val db = KnowledgeDb(tempDb)
 
-        val todo = Todo(
-            id = "todo-1",
-            description = "Persisted todo",
-            status = TodoStatus.PENDING,
-            priority = TodoPriority.HIGH,
-            createdAt = Instant.now(),
-        )
+        val todo =
+            Todo(
+                id = "todo-1",
+                description = "Persisted todo",
+                status = TodoStatus.PENDING,
+                priority = TodoPriority.HIGH,
+                createdAt = Instant.now(),
+            )
         db.saveTodo(todo)
         assertEquals(1, db.listTodos().size)
 

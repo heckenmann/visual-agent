@@ -4,8 +4,8 @@ import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.config.AppConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.reactive.asFlow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -27,59 +27,90 @@ class OllamaClient(
     private val ollamaApi: OllamaApi,
     private val toolRegistry: ToolRegistry,
 ) : LLMProvider {
+    override suspend fun chat(messages: List<Message>): ChatResponse = chat(ChatRequestContext(messages = messages))
 
-    override suspend fun chat(messages: List<Message>): ChatResponse =
-        chat(ChatRequestContext(messages = messages))
-
-    override suspend fun chat(request: ChatRequestContext): ChatResponse {
-        return withContext(Dispatchers.IO) {
+    override suspend fun chat(request: ChatRequestContext): ChatResponse =
+        withContext(Dispatchers.IO) {
             val selectedModel = request.model ?: AppConfig.instance.ollamaModel
             val response = chatModel.call(buildPrompt(request, selectedModel))
-            val output = response.result?.output?.content.orEmpty()
+            val output =
+                response.result
+                    ?.output
+                    ?.content
+                    .orEmpty()
 
             ChatResponse(
                 model = response.metadata?.model ?: selectedModel,
-                message = Message(
-                    role = "assistant",
-                    content = output,
-                ),
+                message =
+                    Message(
+                        role = "assistant",
+                        content = output,
+                    ),
                 done = true,
                 totalDuration = null,
-                promptEvalCount = response.metadata?.usage?.promptTokens?.toInt(),
-                evalCount = response.metadata?.usage?.generationTokens?.toInt(),
+                promptEvalCount =
+                    response.metadata
+                        ?.usage
+                        ?.promptTokens
+                        ?.toInt(),
+                evalCount =
+                    response.metadata
+                        ?.usage
+                        ?.generationTokens
+                        ?.toInt(),
             )
         }
-    }
 
-    override suspend fun stream(messages: List<Message>): Flow<ChatResponse> =
-        stream(ChatRequestContext(messages = messages))
+    override suspend fun stream(messages: List<Message>): Flow<ChatResponse> = stream(ChatRequestContext(messages = messages))
 
     override suspend fun stream(request: ChatRequestContext): Flow<ChatResponse> {
         val selectedModel = request.model ?: AppConfig.instance.ollamaModel
-        return chatModel.stream(buildPrompt(request, selectedModel)).asFlow().map { chunk ->
-            ChatResponse(
-                model = chunk.metadata?.model ?: selectedModel,
-                message = Message(
-                    role = "assistant",
-                    content = chunk.result?.output?.content.orEmpty(),
-                ),
-                done = chunk.result?.metadata?.finishReason != null,
-                promptEvalCount = chunk.metadata?.usage?.promptTokens?.toInt(),
-                evalCount = chunk.metadata?.usage?.generationTokens?.toInt(),
-            )
-        }.flowOn(Dispatchers.IO)
+        return chatModel
+            .stream(buildPrompt(request, selectedModel))
+            .asFlow()
+            .map { chunk ->
+                ChatResponse(
+                    model = chunk.metadata?.model ?: selectedModel,
+                    message =
+                        Message(
+                            role = "assistant",
+                            content =
+                                chunk.result
+                                    ?.output
+                                    ?.content
+                                    .orEmpty(),
+                        ),
+                    done = chunk.result?.metadata?.finishReason != null,
+                    promptEvalCount =
+                        chunk.metadata
+                            ?.usage
+                            ?.promptTokens
+                            ?.toInt(),
+                    evalCount =
+                        chunk.metadata
+                            ?.usage
+                            ?.generationTokens
+                            ?.toInt(),
+                )
+            }.flowOn(Dispatchers.IO)
     }
 
-    private fun buildPrompt(request: ChatRequestContext, selectedModel: String): Prompt {
-        val callbacks = toolRegistry.functionCallbacks(
-            enabledTools = request.enabledTools,
-            context = request.metadata + mapOf("model" to selectedModel),
-        )
-        val options = FunctionCallingOptions.builder()
-            .model(selectedModel)
-            .functionCallbacks(callbacks)
-            .functions(callbacks.map { it.name }.toSet())
-            .build()
+    private fun buildPrompt(
+        request: ChatRequestContext,
+        selectedModel: String,
+    ): Prompt {
+        val callbacks =
+            toolRegistry.functionCallbacks(
+                enabledTools = request.enabledTools,
+                context = request.metadata + mapOf("model" to selectedModel),
+            )
+        val options =
+            FunctionCallingOptions
+                .builder()
+                .model(selectedModel)
+                .functionCallbacks(callbacks)
+                .functions(callbacks.map { it.name }.toSet())
+                .build()
         return Prompt(
             request.messages.map { msg ->
                 when (msg.role) {
@@ -92,17 +123,21 @@ class OllamaClient(
         )
     }
 
-    override suspend fun vision(image: ByteArray, prompt: String): ChatResponse {
+    override suspend fun vision(
+        image: ByteArray,
+        prompt: String,
+    ): ChatResponse {
         // Spring AI handles vision via UserMessage with Media
         // Implementation omitted for brevity in first step
         throw UnsupportedOperationException("Vision not yet implemented in Spring AI bridge")
     }
 
-    override suspend fun embeddings(text: String): List<Double> {
-        return withContext(Dispatchers.IO) {
+    override suspend fun embeddings(text: String): List<Double> =
+        withContext(Dispatchers.IO) {
             try {
                 val response = ollamaApi.embed(OllamaApi.EmbeddingsRequest(AppConfig.instance.ollamaModel, text))
-                response.embeddings()
+                response
+                    .embeddings()
                     .firstOrNull()
                     ?.map { value -> value.toDouble() }
                     ?: emptyList()
@@ -110,12 +145,11 @@ class OllamaClient(
                 emptyList()
             }
         }
-    }
 
     override fun isConnected(): Boolean = true
 
-    override suspend fun checkConnection(): Boolean {
-        return withContext(Dispatchers.IO) {
+    override suspend fun checkConnection(): Boolean =
+        withContext(Dispatchers.IO) {
             try {
                 ollamaApi.listModels()
                 true
@@ -123,25 +157,26 @@ class OllamaClient(
                 false
             }
         }
-    }
 
-    override suspend fun getModels(): List<String> {
-        return withContext(Dispatchers.IO) {
+    override suspend fun getModels(): List<String> =
+        withContext(Dispatchers.IO) {
             val configuredModel = AppConfig.instance.ollamaModel
             try {
-                val models = ollamaApi.listModels().models()
-                    ?.mapNotNull { model -> model.name() }
-                    ?.distinct()
-                    ?: emptyList()
+                val models =
+                    ollamaApi
+                        .listModels()
+                        .models()
+                        ?.mapNotNull { model -> model.name() }
+                        ?.distinct()
+                        ?: emptyList()
                 if (models.isEmpty()) listOf(configuredModel) else models
             } catch (_: Exception) {
                 listOf(configuredModel)
             }
         }
-    }
 
-    override suspend fun getModelDetails(modelName: String): ShowResponse {
-        return withContext(Dispatchers.IO) {
+    override suspend fun getModelDetails(modelName: String): ShowResponse =
+        withContext(Dispatchers.IO) {
             try {
                 val response = ollamaApi.showModel(OllamaApi.ShowModelRequest(modelName))
                 val details = response.details()
@@ -152,24 +187,24 @@ class OllamaClient(
                     template = response.template(),
                     system = response.system(),
                     license = response.license(),
-                    details = if (details != null) {
-                        ModelDetails(
-                            parentModel = details.parentModel(),
-                            format = details.format(),
-                            family = details.family(),
-                            families = details.families(),
-                            parameterSize = details.parameterSize(),
-                            quantizationLevel = details.quantizationLevel(),
-                        )
-                    } else {
-                        null
-                    },
+                    details =
+                        if (details != null) {
+                            ModelDetails(
+                                parentModel = details.parentModel(),
+                                format = details.format(),
+                                family = details.family(),
+                                families = details.families(),
+                                parameterSize = details.parameterSize(),
+                                quantizationLevel = details.quantizationLevel(),
+                            )
+                        } else {
+                            null
+                        },
                 )
             } catch (_: Exception) {
                 ShowResponse(model = modelName, modifiedAt = "")
             }
         }
-    }
 }
 
 @Serializable

@@ -23,7 +23,12 @@ data class SubAgent(
         /**
          * Create a SubAgent from a template name.
          */
-        fun fromTemplate(id: String, name: String, role: String, templateName: String): SubAgent {
+        fun fromTemplate(
+            id: String,
+            name: String,
+            role: String,
+            templateName: String,
+        ): SubAgent {
             val config = AgentConfig.fromTemplate(templateName)
             return SubAgent(
                 id = id,
@@ -33,6 +38,7 @@ data class SubAgent(
             )
         }
     }
+
     /**
      * Send messages to this sub-agent using the provided LLM provider.
      *
@@ -41,15 +47,20 @@ data class SubAgent(
      * @param enabledTools Tool IDs exposed to this sub-agent
      * @return Assistant response
      */
-    suspend fun chat(messages: List<Message>, provider: LLMProvider, enabledTools: Set<ToolId> = emptySet()): ChatResponse {
+    suspend fun chat(
+        messages: List<Message>,
+        provider: LLMProvider,
+        enabledTools: Set<ToolId> = emptySet(),
+    ): ChatResponse {
         val combined = chatHistory + messages
-        val response = provider.chat(
-            ChatRequestContext(
-                messages = combined,
-                enabledTools = enabledTools,
-                metadata = mapOf("agentId" to id, "agentName" to name, "agentRole" to role),
-            ),
-        )
+        val response =
+            provider.chat(
+                ChatRequestContext(
+                    messages = combined,
+                    enabledTools = enabledTools,
+                    metadata = mapOf("agentId" to id, "agentName" to name, "agentRole" to role),
+                ),
+            )
         // Save a brief record of the task and the assistant response in the agent's chat history.
         chatHistory.add(Message("user", "Please complete the following task:\n${messages.joinToString("\n") { it.content }}"))
         chatHistory.add(response.message)
@@ -67,10 +78,14 @@ data class SubAgent(
         knowledgeDb: de.heckenmann.visualagent.knowledge.KnowledgeDb,
         enabledTools: Set<ToolId> = emptySet(),
     ): String {
-        val messages = listOf(
-            Message("system", "You are ${name}. Your role is ${role}. Perform the following task and provide a concise result and the next steps."),
-            Message("user", description)
-        )
+        val messages =
+            listOf(
+                Message(
+                    "system",
+                    "You are $name. Your role is $role. Perform the following task and provide a concise result and the next steps.",
+                ),
+                Message("user", description),
+            )
 
         val resp = chat(messages, provider, enabledTools)
 

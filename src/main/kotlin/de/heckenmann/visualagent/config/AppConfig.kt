@@ -21,8 +21,8 @@ import java.util.concurrent.CopyOnWriteArrayList
  * @property browserDefault Default browser for web integration (default: firefox)
  */
 class AppConfig private constructor() {
-
     var ollamaLocalUrl: String = "http://localhost:11434"
+
     // Default to a more commonly available model name; can be overridden in app.properties
     var ollamaModel: String = "llava"
     var databasePath: String = "./data/visual-agent.db"
@@ -75,18 +75,41 @@ class AppConfig private constructor() {
      *
      * @return The fully qualified path to the theme stylesheet, or Dracula as default
      */
-    fun getThemeStylesheet(): String {
-        return when (theme) {
-            "Dracula" -> atlantafx.base.theme.Dracula().getUserAgentStylesheet()
-            "Primer Dark" -> atlantafx.base.theme.PrimerDark().getUserAgentStylesheet()
-            "Primer Light" -> atlantafx.base.theme.PrimerLight().getUserAgentStylesheet()
-            "Nord Dark" -> atlantafx.base.theme.NordDark().getUserAgentStylesheet()
-            "Nord Light" -> atlantafx.base.theme.NordLight().getUserAgentStylesheet()
-            "Cupertino Dark" -> atlantafx.base.theme.CupertinoDark().getUserAgentStylesheet()
-            "Cupertino Light" -> atlantafx.base.theme.CupertinoLight().getUserAgentStylesheet()
-            else -> atlantafx.base.theme.Dracula().getUserAgentStylesheet()
+    fun getThemeStylesheet(): String =
+        when (theme) {
+            "Dracula" ->
+                atlantafx.base.theme
+                    .Dracula()
+                    .getUserAgentStylesheet()
+            "Primer Dark" ->
+                atlantafx.base.theme
+                    .PrimerDark()
+                    .getUserAgentStylesheet()
+            "Primer Light" ->
+                atlantafx.base.theme
+                    .PrimerLight()
+                    .getUserAgentStylesheet()
+            "Nord Dark" ->
+                atlantafx.base.theme
+                    .NordDark()
+                    .getUserAgentStylesheet()
+            "Nord Light" ->
+                atlantafx.base.theme
+                    .NordLight()
+                    .getUserAgentStylesheet()
+            "Cupertino Dark" ->
+                atlantafx.base.theme
+                    .CupertinoDark()
+                    .getUserAgentStylesheet()
+            "Cupertino Light" ->
+                atlantafx.base.theme
+                    .CupertinoLight()
+                    .getUserAgentStylesheet()
+            else ->
+                atlantafx.base.theme
+                    .Dracula()
+                    .getUserAgentStylesheet()
         }
-    }
 
     /**
      * Saves current configuration to app.properties file.

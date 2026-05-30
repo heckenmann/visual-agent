@@ -14,7 +14,6 @@ import javafx.geometry.Pos
 import javafx.scene.control.Button
 import javafx.scene.control.ButtonType
 import javafx.scene.control.CheckBox
-import javafx.scene.input.KeyCode
 import javafx.scene.control.ComboBox
 import javafx.scene.control.Dialog
 import javafx.scene.control.Label
@@ -22,6 +21,7 @@ import javafx.scene.control.ListCell
 import javafx.scene.control.ListView
 import javafx.scene.control.TextField
 import javafx.scene.control.TextInputControl
+import javafx.scene.input.KeyCode
 import javafx.scene.input.KeyEvent
 import javafx.scene.layout.BorderPane
 import javafx.scene.layout.HBox
@@ -36,7 +36,9 @@ import java.util.UUID
  * Loads its layout from `todo-panel.fxml` and provides a cell factory that renders
  * each [Todo] with a checkbox, description, priority badge, and delete button.
  */
-class TodoPanel(private val todoManager: TodoManager) : Region() {
+class TodoPanel(
+    private val todoManager: TodoManager,
+) : Region() {
     companion object {
         /**
          * Determines whether the add-todo shortcut should fire for a key event.
@@ -46,8 +48,11 @@ class TodoPanel(private val todoManager: TodoManager) : Region() {
          * @param focusOwnerIsTextInput Whether the current focus owner is a text input control
          * @return true when the Add Todo dialog should open
          */
-        fun shouldOpenAddDialog(code: KeyCode, shortcutDown: Boolean, focusOwnerIsTextInput: Boolean): Boolean =
-            code == KeyCode.N && shortcutDown && !focusOwnerIsTextInput
+        fun shouldOpenAddDialog(
+            code: KeyCode,
+            shortcutDown: Boolean,
+            focusOwnerIsTextInput: Boolean,
+        ): Boolean = code == KeyCode.N && shortcutDown && !focusOwnerIsTextInput
     }
 
     @FXML
@@ -61,20 +66,21 @@ class TodoPanel(private val todoManager: TodoManager) : Region() {
 
     private val todos = FXCollections.observableArrayList<Todo>()
     private var registeredScene: javafx.scene.Scene? = null
-    private val todoShortcutHandler = javafx.event.EventHandler<KeyEvent> { ev ->
-        val focusOwner = registeredScene?.focusOwner
-        val focusOwnerIsTextInput = focusOwner is TextInputControl
-        if (shouldOpenAddDialog(ev.code, ev.isShortcutDown, focusOwnerIsTextInput)) {
-            showAddDialog()
-            ev.consume()
-        } else if (ev.code == KeyCode.DELETE && !focusOwnerIsTextInput) {
-            val selected = todoListView.selectionModel.selectedItem
-            if (selected != null) {
-                todos.remove(selected)
+    private val todoShortcutHandler =
+        javafx.event.EventHandler<KeyEvent> { ev ->
+            val focusOwner = registeredScene?.focusOwner
+            val focusOwnerIsTextInput = focusOwner is TextInputControl
+            if (shouldOpenAddDialog(ev.code, ev.isShortcutDown, focusOwnerIsTextInput)) {
+                showAddDialog()
                 ev.consume()
+            } else if (ev.code == KeyCode.DELETE && !focusOwnerIsTextInput) {
+                val selected = todoListView.selectionModel.selectedItem
+                if (selected != null) {
+                    todos.remove(selected)
+                    ev.consume()
+                }
             }
         }
-    }
 
     init {
         val root = FxmlLoader.load(this, "todo-panel.fxml")
@@ -160,17 +166,18 @@ class TodoPanel(private val todoManager: TodoManager) : Region() {
         todoManager.remove(todo.id)
         val removed = todo
         // Simple undo window: 5 seconds to undo
-        val thread = Thread {
-            try {
-                Thread.sleep(5000)
-                // deletion confirmed
-            } catch (_: InterruptedException) {
-                Platform.runLater {
-                    val recreated = todoManager.add(removed.description, removed.priority)
-                    todos.add(recreated)
+        val thread =
+            Thread {
+                try {
+                    Thread.sleep(5000)
+                    // deletion confirmed
+                } catch (_: InterruptedException) {
+                    Platform.runLater {
+                        val recreated = todoManager.add(removed.description, removed.priority)
+                        todos.add(recreated)
+                    }
                 }
             }
-        }
         thread.start()
     }
 
@@ -188,7 +195,6 @@ class TodoPanel(private val todoManager: TodoManager) : Region() {
      * and `button-icon` are applied for styling via the dark theme stylesheet.
      */
     private inner class TodoCell : ListCell<Todo>() {
-
         private val checkbox = CheckBox()
         private val descriptionLabel = Label()
         private val priorityBadge = Label()
@@ -221,7 +227,10 @@ class TodoPanel(private val todoManager: TodoManager) : Region() {
             checkbox.selectedProperty().bindBidirectional(completedProperty)
         }
 
-        override fun updateItem(todo: Todo?, empty: Boolean) {
+        override fun updateItem(
+            todo: Todo?,
+            empty: Boolean,
+        ) {
             super.updateItem(todo, empty)
             if (empty || todo == null) {
                 graphic = null

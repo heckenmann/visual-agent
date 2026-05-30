@@ -54,7 +54,10 @@ interface LLMProvider {
      * @param prompt Text prompt for image analysis
      * @return Response describing the image content
      */
-    suspend fun vision(image: ByteArray, prompt: String): ChatResponse
+    suspend fun vision(
+        image: ByteArray,
+        prompt: String,
+    ): ChatResponse
 
     /**
      * Generate embeddings for text.
@@ -115,7 +118,9 @@ data class ChatRequestContext(
  * @property value External tool ID such as `file:read` or `ui`
  */
 @JvmInline
-value class ToolId(val value: String)
+value class ToolId(
+    val value: String,
+)
 
 /**
  * Provider-neutral description of a callable tool.
@@ -153,12 +158,14 @@ data class ToolResult(
  *
  * @property role Message role (system, user, or assistant)
  * @property content Text content of the message
+ * @property metadata Optional JSON metadata payload for UI/system annotations
  * @property images Optional list of base64-encoded images (for vision)
  */
 @Serializable
 data class Message(
     val role: String,
     val content: String,
+    val metadata: String? = null,
     val images: List<String>? = null,
 )
 

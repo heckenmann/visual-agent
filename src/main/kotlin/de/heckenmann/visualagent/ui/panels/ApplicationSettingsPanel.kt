@@ -16,7 +16,6 @@ import javafx.scene.layout.VBox
  * AppConfig observers such as MainWindow, not by this panel directly.
  */
 class ApplicationSettingsPanel : Region() {
-
     @FXML
     private lateinit var root: VBox
 
@@ -26,15 +25,16 @@ class ApplicationSettingsPanel : Region() {
     @FXML
     private lateinit var fontSizeSpinner: Spinner<Int>
 
-    private val themes = listOf(
-        "Dracula",
-        "Primer Dark",
-        "Primer Light",
-        "Nord Dark",
-        "Nord Light",
-        "Cupertino Dark",
-        "Cupertino Light",
-    )
+    private val themes =
+        listOf(
+            "Dracula",
+            "Primer Dark",
+            "Primer Light",
+            "Nord Dark",
+            "Nord Light",
+            "Cupertino Dark",
+            "Cupertino Light",
+        )
 
     init {
         val loaded = FxmlLoader.load(this, "application-settings.fxml")

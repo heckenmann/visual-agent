@@ -117,6 +117,13 @@
     -fx-content-display: graphic-only;
 }
 
+.chat-session-info-bar .chat-toolbar-button {
+    -fx-padding: 3px 10px;
+    -fx-min-width: 74px;
+    -fx-min-height: 24px;
+    -fx-text-fill: -color-fg-muted;
+}
+
 .chat-toolbar-button .ikonli-font-icon {
     -fx-icon-color: -color-fg-muted;
 }
@@ -237,6 +244,19 @@
 
 .chat-row-grouped .chat-row-inner {
     -fx-padding: 1px 18px 1px 18px;
+}
+
+.chat-row-tool .chat-row-inner {
+    -fx-opacity: 0.7;
+}
+
+.chat-row-tool .chat-avatar-assistant {
+    -fx-background-color: -color-neutral-subtle;
+    -fx-text-fill: -color-fg-muted;
+}
+
+.chat-row-tool .chat-role-label {
+    -fx-text-fill: -color-fg-muted;
 }
 
 .chat-avatar {
@@ -362,17 +382,13 @@
 }
 
 .chat-action-buttons {
-    -fx-spacing: 2px;
-    -fx-padding: 3px 0 0 0;
-    -fx-opacity: 0;
-}
-
-.chat-message-list .list-cell:hover .chat-action-buttons {
-    -fx-opacity: 1;
+    -fx-spacing: 4px;
+    -fx-padding: 4px 0 0 0;
+    -fx-alignment: center-left;
 }
 
 .button-icon {
-    -fx-background-color: -color-bg-subtle;
+    -fx-background-color: -color-bg-default;
     -fx-background-radius: 4px;
     -fx-border-color: -color-border-muted;
     -fx-border-radius: 4px;
@@ -382,15 +398,16 @@
 }
 
 .button-icon .ikonli-font-icon {
-    -fx-icon-color: -color-fg-muted;
+    -fx-icon-color: -color-fg-default;
 }
 
 .button-icon:hover {
-    -fx-background-color: -color-neutral-subtle;
+    -fx-background-color: -color-accent-muted;
+    -fx-border-color: -color-accent-emphasis;
 }
 
 .button-icon:hover .ikonli-font-icon {
-    -fx-icon-color: -color-fg-default;
+    -fx-icon-color: -color-accent-fg;
 }
 
 .assistant-loading {

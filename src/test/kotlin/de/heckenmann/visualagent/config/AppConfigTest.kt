@@ -8,7 +8,6 @@ import java.io.File
 import kotlin.io.path.createTempDirectory
 
 class AppConfigTest {
-
     @Test
     fun `save persists settings to user_preferences table`() {
         val config = AppConfig.instance
@@ -122,7 +121,10 @@ class AppConfigTest {
             timeoutSeconds = config.timeoutSeconds,
         )
 
-    private fun restore(config: AppConfig, snapshot: ConfigSnapshot) {
+    private fun restore(
+        config: AppConfig,
+        snapshot: ConfigSnapshot,
+    ) {
         config.databasePath = snapshot.databasePath
         config.ollamaLocalUrl = snapshot.ollamaLocalUrl
         config.ollamaModel = snapshot.ollamaModel

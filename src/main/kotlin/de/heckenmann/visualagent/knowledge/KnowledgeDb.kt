@@ -39,8 +39,9 @@ data class ProjectKnowledge(
 )
 
 @Repository
-class KnowledgeDb(private val dbPath: String = "./data/visual-agent.db") {
-
+class KnowledgeDb(
+    private val dbPath: String = "./data/visual-agent.db",
+) {
     private var connection: Connection? = null
 
     init {
@@ -123,6 +124,70 @@ class KnowledgeDb(private val dbPath: String = "./data/visual-agent.db") {
                 """.trimIndent(),
             )
 
+            // Supports fast session-based paging ordered by creation time.
+            stmt.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_conversation_history_session_created
+                ON conversation_history (session_id, created_at DESC)
+                """.trimIndent(),
+            )
+
+            // Full-text index for scalable keyword search in conversation content.
+            stmt.execute(
+                """
+                CREATE VIRTUAL TABLE IF NOT EXISTS conversation_history_fts USING fts5(
+                    id UNINDEXED,
+                    session_id UNINDEXED,
+                    content
+                )
+                """.trimIndent(),
+            )
+
+            stmt.execute(
+                """
+                CREATE TRIGGER IF NOT EXISTS trg_conversation_history_ai
+                AFTER INSERT ON conversation_history
+                BEGIN
+                    INSERT INTO conversation_history_fts(id, session_id, content)
+                    VALUES (new.id, new.session_id, new.content);
+                END
+                """.trimIndent(),
+            )
+
+            stmt.execute(
+                """
+                CREATE TRIGGER IF NOT EXISTS trg_conversation_history_ad
+                AFTER DELETE ON conversation_history
+                BEGIN
+                    DELETE FROM conversation_history_fts WHERE id = old.id;
+                END
+                """.trimIndent(),
+            )
+
+            stmt.execute(
+                """
+                CREATE TRIGGER IF NOT EXISTS trg_conversation_history_au
+                AFTER UPDATE ON conversation_history
+                BEGIN
+                    DELETE FROM conversation_history_fts WHERE id = old.id;
+                    INSERT INTO conversation_history_fts(id, session_id, content)
+                    VALUES (new.id, new.session_id, new.content);
+                END
+                """.trimIndent(),
+            )
+
+            // Backfill for existing rows created before FTS setup.
+            stmt.execute(
+                """
+                INSERT INTO conversation_history_fts(id, session_id, content)
+                SELECT ch.id, ch.session_id, ch.content
+                FROM conversation_history ch
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM conversation_history_fts fts WHERE fts.id = ch.id
+                )
+                """.trimIndent(),
+            )
+
             stmt.execute(
                 """
                 CREATE TABLE IF NOT EXISTS todos (
@@ -172,21 +237,25 @@ class KnowledgeDb(private val dbPath: String = "./data/visual-agent.db") {
         }
     }
 
-    fun saveMemory(content: String, tags: List<String> = emptyList()): String {
+    fun saveMemory(
+        content: String,
+        tags: List<String> = emptyList(),
+    ): String {
         val id = UUID.randomUUID().toString()
         val conn = getConnection()
-        conn.prepareStatement(
-            """
+        conn
+            .prepareStatement(
+                """
             INSERT INTO long_term_memory (id, content, tags, created_at)
             VALUES (?, ?, ?, ?)
         """,
-        ).use { stmt ->
-            stmt.setString(1, id)
-            stmt.setString(2, content)
-            stmt.setString(3, tags.joinToString(","))
-            stmt.setString(4, Instant.now().toString())
-            stmt.executeUpdate()
-        }
+            ).use { stmt ->
+                stmt.setString(1, id)
+                stmt.setString(2, content)
+                stmt.setString(3, tags.joinToString(","))
+                stmt.setString(4, Instant.now().toString())
+                stmt.executeUpdate()
+            }
         return id
     }
 
@@ -194,40 +263,51 @@ class KnowledgeDb(private val dbPath: String = "./data/visual-agent.db") {
      * Save a structured knowledge record as JSON in the long_term_memory table.
      * This is a best-effort helper for SubAgents to store summaries and next steps.
      */
-    fun saveStructuredKnowledge(subject: String, summary: String, nextSteps: String?): String {
-        val payload = "{\"subject\":\"${subject}\",\"summary\":\"${summary.replace("\"","\\\"")}\",\"next_steps\":\"${nextSteps?.replace("\"","\\\"") ?: ""}\"}"
+    fun saveStructuredKnowledge(
+        subject: String,
+        summary: String,
+        nextSteps: String?,
+    ): String {
+        val payload = "{\"subject\":\"${subject}\",\"summary\":\"${summary.replace(
+            "\"",
+            "\\\"",
+        )}\",\"next_steps\":\"${nextSteps?.replace("\"","\\\"") ?: ""}\"}"
         return saveMemory(payload, listOf(subject))
     }
 
-    fun searchMemories(query: String, limit: Int = 10): List<Memory> {
+    fun searchMemories(
+        query: String,
+        limit: Int = 10,
+    ): List<Memory> {
         val conn = getConnection()
         val memories = mutableListOf<Memory>()
 
-        conn.prepareStatement(
-            """
+        conn
+            .prepareStatement(
+                """
             SELECT * FROM long_term_memory 
             WHERE content LIKE ? OR tags LIKE ?
             ORDER BY created_at DESC
             LIMIT ?
         """,
-        ).use { stmt ->
-            stmt.setString(1, "%$query%")
-            stmt.setString(2, "%$query%")
-            stmt.setInt(3, limit)
+            ).use { stmt ->
+                stmt.setString(1, "%$query%")
+                stmt.setString(2, "%$query%")
+                stmt.setInt(3, limit)
 
-            stmt.executeQuery().use { rs ->
-                while (rs.next()) {
-                    memories.add(
-                        Memory(
-                            id = rs.getString("id"),
-                            content = rs.getString("content"),
-                            tags = rs.getString("tags").split(",").filter { it.isNotBlank() },
-                            createdAt = Instant.parse(rs.getString("created_at")),
-                        ),
-                    )
+                stmt.executeQuery().use { rs ->
+                    while (rs.next()) {
+                        memories.add(
+                            Memory(
+                                id = rs.getString("id"),
+                                content = rs.getString("content"),
+                                tags = rs.getString("tags").split(",").filter { it.isNotBlank() },
+                                createdAt = Instant.parse(rs.getString("created_at")),
+                            ),
+                        )
+                    }
                 }
             }
-        }
         return memories
     }
 
@@ -241,19 +321,23 @@ class KnowledgeDb(private val dbPath: String = "./data/visual-agent.db") {
         }
     }
 
-    fun setPreference(key: String, value: String) {
+    fun setPreference(
+        key: String,
+        value: String,
+    ) {
         val conn = getConnection()
-        conn.prepareStatement(
-            """
+        conn
+            .prepareStatement(
+                """
             INSERT OR REPLACE INTO user_preferences (key, value, updated_at)
             VALUES (?, ?, ?)
         """,
-        ).use { stmt ->
-            stmt.setString(1, key)
-            stmt.setString(2, value)
-            stmt.setString(3, Instant.now().toString())
-            stmt.executeUpdate()
-        }
+            ).use { stmt ->
+                stmt.setString(1, key)
+                stmt.setString(2, value)
+                stmt.setString(3, Instant.now().toString())
+                stmt.executeUpdate()
+            }
     }
 
     /**
@@ -265,23 +349,29 @@ class KnowledgeDb(private val dbPath: String = "./data/visual-agent.db") {
      * @param metadata Optional serialized metadata payload
      * @return Created message ID
      */
-    fun saveConversationMessage(sessionId: String, role: String, content: String, metadata: String? = null): String {
+    fun saveConversationMessage(
+        sessionId: String,
+        role: String,
+        content: String,
+        metadata: String? = null,
+    ): String {
         val id = UUID.randomUUID().toString()
         val conn = getConnection()
-        conn.prepareStatement(
-            """
+        conn
+            .prepareStatement(
+                """
             INSERT INTO conversation_history (id, session_id, role, content, metadata, created_at)
             VALUES (?, ?, ?, ?, ?, ?)
         """,
-        ).use { stmt ->
-            stmt.setString(1, id)
-            stmt.setString(2, sessionId)
-            stmt.setString(3, role)
-            stmt.setString(4, content)
-            stmt.setString(5, metadata)
-            stmt.setString(6, Instant.now().toString())
-            stmt.executeUpdate()
-        }
+            ).use { stmt ->
+                stmt.setString(1, id)
+                stmt.setString(2, sessionId)
+                stmt.setString(3, role)
+                stmt.setString(4, content)
+                stmt.setString(5, metadata)
+                stmt.setString(6, Instant.now().toString())
+                stmt.executeUpdate()
+            }
         return id
     }
 
@@ -291,35 +381,164 @@ class KnowledgeDb(private val dbPath: String = "./data/visual-agent.db") {
      * @param sessionId Logical conversation/session identifier
      * @param limit Maximum number of rows to load (newest rows are selected first and returned chronologically)
      */
-    fun getConversationMessages(sessionId: String, limit: Int = 500): List<Map<String, String>> {
+    fun getConversationMessages(
+        sessionId: String,
+        limit: Int = 500,
+    ): List<Map<String, String>> {
         val conn = getConnection()
         val rows = mutableListOf<Map<String, String>>()
-        conn.prepareStatement(
-            """
+        conn
+            .prepareStatement(
+                """
             SELECT id, role, content, metadata, created_at
             FROM conversation_history
             WHERE session_id = ?
             ORDER BY created_at DESC
             LIMIT ?
         """,
-        ).use { stmt ->
-            stmt.setString(1, sessionId)
-            stmt.setInt(2, limit)
-            stmt.executeQuery().use { rs ->
-                while (rs.next()) {
-                    rows.add(
-                        mapOf(
-                            "id" to rs.getString("id"),
-                            "role" to rs.getString("role"),
-                            "content" to rs.getString("content"),
-                            "metadata" to (rs.getString("metadata") ?: ""),
-                            "createdAt" to rs.getString("created_at"),
-                        ),
-                    )
+            ).use { stmt ->
+                stmt.setString(1, sessionId)
+                stmt.setInt(2, limit)
+                stmt.executeQuery().use { rs ->
+                    while (rs.next()) {
+                        rows.add(
+                            mapOf(
+                                "id" to rs.getString("id"),
+                                "role" to rs.getString("role"),
+                                "content" to rs.getString("content"),
+                                "metadata" to (rs.getString("metadata") ?: ""),
+                                "createdAt" to rs.getString("created_at"),
+                            ),
+                        )
+                    }
                 }
             }
-        }
         return rows.reversed()
+    }
+
+    /**
+     * Load one conversation page for a session in chronological order.
+     *
+     * @param sessionId Logical conversation/session identifier
+     * @param limit Maximum number of rows to load
+     * @param offset Number of newest rows to skip
+     * @return Paged conversation messages ordered from oldest to newest in that page
+     */
+    fun getConversationMessagesPage(
+        sessionId: String,
+        limit: Int,
+        offset: Int,
+    ): List<Map<String, String>> {
+        val conn = getConnection()
+        val rows = mutableListOf<Map<String, String>>()
+        conn
+            .prepareStatement(
+                """
+            SELECT id, role, content, metadata, created_at
+            FROM conversation_history
+            WHERE session_id = ?
+            ORDER BY created_at DESC
+            LIMIT ?
+            OFFSET ?
+        """,
+            ).use { stmt ->
+                stmt.setString(1, sessionId)
+                stmt.setInt(2, limit.coerceAtLeast(1))
+                stmt.setInt(3, offset.coerceAtLeast(0))
+                stmt.executeQuery().use { rs ->
+                    while (rs.next()) {
+                        rows.add(
+                            mapOf(
+                                "id" to rs.getString("id"),
+                                "role" to rs.getString("role"),
+                                "content" to rs.getString("content"),
+                                "metadata" to (rs.getString("metadata") ?: ""),
+                                "createdAt" to rs.getString("created_at"),
+                            ),
+                        )
+                    }
+                }
+            }
+        return rows.reversed()
+    }
+
+    /**
+     * Search conversation messages by keyword for a given session.
+     *
+     * @param sessionId Logical conversation/session identifier
+     * @param query Case-insensitive keyword fragment
+     * @param limit Maximum number of matches
+     * @return Matching messages ordered from newest to oldest
+     */
+    fun searchConversationMessages(
+        sessionId: String,
+        query: String,
+        limit: Int = 20,
+    ): List<Map<String, String>> {
+        val conn = getConnection()
+        val rows = mutableListOf<Map<String, String>>()
+        val safeLimit = limit.coerceIn(1, 200)
+        val normalizedQuery = query.trim()
+        if (normalizedQuery.isBlank()) return rows
+        runCatching {
+            conn
+                .prepareStatement(
+                    """
+                SELECT ch.id, ch.role, ch.content, ch.metadata, ch.created_at
+                FROM conversation_history_fts fts
+                JOIN conversation_history ch ON ch.id = fts.id
+                WHERE fts.session_id = ? AND fts.content MATCH ?
+                ORDER BY ch.created_at DESC
+                LIMIT ?
+            """,
+                ).use { stmt ->
+                    stmt.setString(1, sessionId)
+                    stmt.setString(2, normalizedQuery)
+                    stmt.setInt(3, safeLimit)
+                    stmt.executeQuery().use { rs ->
+                        while (rs.next()) {
+                            rows.add(
+                                mapOf(
+                                    "id" to rs.getString("id"),
+                                    "role" to rs.getString("role"),
+                                    "content" to rs.getString("content"),
+                                    "metadata" to (rs.getString("metadata") ?: ""),
+                                    "createdAt" to rs.getString("created_at"),
+                                ),
+                            )
+                        }
+                    }
+                }
+        }.onFailure {
+            conn
+                .prepareStatement(
+                    """
+                SELECT id, role, content, metadata, created_at
+                FROM conversation_history
+                WHERE session_id = ? AND lower(content) LIKE ?
+                ORDER BY created_at DESC
+                LIMIT ?
+            """,
+                ).use { stmt ->
+                    stmt.setString(1, sessionId)
+                    stmt.setString(2, "%${normalizedQuery.lowercase()}%")
+                    stmt.setInt(3, safeLimit)
+                    stmt.executeQuery().use { rs ->
+                        while (rs.next()) {
+                            rows.add(
+                                mapOf(
+                                    "id" to rs.getString("id"),
+                                    "role" to rs.getString("role"),
+                                    "content" to rs.getString("content"),
+                                    "metadata" to (rs.getString("metadata") ?: ""),
+                                    "createdAt" to rs.getString("created_at"),
+                                ),
+                            )
+                        }
+                    }
+                }
+        }
+        return rows
     }
 
     /**
@@ -343,30 +562,31 @@ class KnowledgeDb(private val dbPath: String = "./data/visual-agent.db") {
      */
     fun saveTodo(todo: Todo) {
         val conn = getConnection()
-        conn.prepareStatement(
-            """
-            INSERT INTO todos (id, description, status, priority, assigned_agent_id, created_at, completed_at, due_date)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET
-                description = excluded.description,
-                status = excluded.status,
-                priority = excluded.priority,
-                assigned_agent_id = excluded.assigned_agent_id,
-                created_at = excluded.created_at,
-                completed_at = excluded.completed_at,
-                due_date = excluded.due_date
-            """.trimIndent(),
-        ).use { stmt ->
-            stmt.setString(1, todo.id)
-            stmt.setString(2, todo.description)
-            stmt.setString(3, todo.status.name)
-            stmt.setString(4, todo.priority.name)
-            stmt.setString(5, todo.assignedAgentId)
-            stmt.setString(6, todo.createdAt.toString())
-            stmt.setString(7, todo.completedAt?.toString())
-            stmt.setString(8, todo.dueDate?.toString())
-            stmt.executeUpdate()
-        }
+        conn
+            .prepareStatement(
+                """
+                INSERT INTO todos (id, description, status, priority, assigned_agent_id, created_at, completed_at, due_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    description = excluded.description,
+                    status = excluded.status,
+                    priority = excluded.priority,
+                    assigned_agent_id = excluded.assigned_agent_id,
+                    created_at = excluded.created_at,
+                    completed_at = excluded.completed_at,
+                    due_date = excluded.due_date
+                """.trimIndent(),
+            ).use { stmt ->
+                stmt.setString(1, todo.id)
+                stmt.setString(2, todo.description)
+                stmt.setString(3, todo.status.name)
+                stmt.setString(4, todo.priority.name)
+                stmt.setString(5, todo.assignedAgentId)
+                stmt.setString(6, todo.createdAt.toString())
+                stmt.setString(7, todo.completedAt?.toString())
+                stmt.setString(8, todo.dueDate?.toString())
+                stmt.executeUpdate()
+            }
     }
 
     /**
@@ -377,31 +597,33 @@ class KnowledgeDb(private val dbPath: String = "./data/visual-agent.db") {
     fun listTodos(): List<Todo> {
         val conn = getConnection()
         val todos = mutableListOf<Todo>()
-        conn.prepareStatement(
-            """
-            SELECT id, description, status, priority, assigned_agent_id, created_at, completed_at, due_date
-            FROM todos
-            ORDER BY created_at ASC
-            """.trimIndent(),
-        ).use { stmt ->
-            stmt.executeQuery().use { rs ->
-                while (rs.next()) {
-                    val createdAt = runCatching { Instant.parse(rs.getString("created_at")) }.getOrElse { Instant.now() }
-                    val completedAt = rs.getString("completed_at")?.let { runCatching { Instant.parse(it) }.getOrNull() }
-                    val dueDate = rs.getString("due_date")?.let { runCatching { Instant.parse(it) }.getOrNull() }
-                    todos += Todo(
-                        id = rs.getString("id"),
-                        description = rs.getString("description"),
-                        status = runCatching { TodoStatus.valueOf(rs.getString("status")) }.getOrDefault(TodoStatus.PENDING),
-                        priority = runCatching { TodoPriority.valueOf(rs.getString("priority")) }.getOrDefault(TodoPriority.MEDIUM),
-                        assignedAgentId = rs.getString("assigned_agent_id"),
-                        createdAt = createdAt,
-                        completedAt = completedAt,
-                        dueDate = dueDate,
-                    )
+        conn
+            .prepareStatement(
+                """
+                SELECT id, description, status, priority, assigned_agent_id, created_at, completed_at, due_date
+                FROM todos
+                ORDER BY created_at ASC
+                """.trimIndent(),
+            ).use { stmt ->
+                stmt.executeQuery().use { rs ->
+                    while (rs.next()) {
+                        val createdAt = runCatching { Instant.parse(rs.getString("created_at")) }.getOrElse { Instant.now() }
+                        val completedAt = rs.getString("completed_at")?.let { runCatching { Instant.parse(it) }.getOrNull() }
+                        val dueDate = rs.getString("due_date")?.let { runCatching { Instant.parse(it) }.getOrNull() }
+                        todos +=
+                            Todo(
+                                id = rs.getString("id"),
+                                description = rs.getString("description"),
+                                status = runCatching { TodoStatus.valueOf(rs.getString("status")) }.getOrDefault(TodoStatus.PENDING),
+                                priority = runCatching { TodoPriority.valueOf(rs.getString("priority")) }.getOrDefault(TodoPriority.MEDIUM),
+                                assignedAgentId = rs.getString("assigned_agent_id"),
+                                createdAt = createdAt,
+                                completedAt = completedAt,
+                                dueDate = dueDate,
+                            )
+                    }
                 }
             }
-        }
         return todos
     }
 
@@ -451,48 +673,51 @@ class KnowledgeDb(private val dbPath: String = "./data/visual-agent.db") {
     ): Boolean {
         val conn = getConnection()
         // Check if agent already exists
-        val exists = conn.prepareStatement("SELECT 1 FROM sub_agents WHERE id = ?").use { stmt ->
-            stmt.setString(1, id)
-            stmt.executeQuery().use { it.next() }
-        }
+        val exists =
+            conn.prepareStatement("SELECT 1 FROM sub_agents WHERE id = ?").use { stmt ->
+                stmt.setString(1, id)
+                stmt.executeQuery().use { it.next() }
+            }
 
         return if (exists) {
-            conn.prepareStatement(
-                """
+            conn
+                .prepareStatement(
+                    """
                 UPDATE sub_agents 
                 SET name = ?, role = ?, status = ?, current_task = ?, parent_agent_id = ?, config = ?, updated_at = ?
                 WHERE id = ?
             """,
-            ).use { stmt ->
-                stmt.setString(1, name)
-                stmt.setString(2, role)
-                stmt.setString(3, status)
-                stmt.setString(4, currentTask)
-                stmt.setString(5, parentAgentId)
-                stmt.setString(6, configJson)
-                stmt.setString(7, Instant.now().toString())
-                stmt.setString(8, id)
-                stmt.executeUpdate() > 0
-            }
+                ).use { stmt ->
+                    stmt.setString(1, name)
+                    stmt.setString(2, role)
+                    stmt.setString(3, status)
+                    stmt.setString(4, currentTask)
+                    stmt.setString(5, parentAgentId)
+                    stmt.setString(6, configJson)
+                    stmt.setString(7, Instant.now().toString())
+                    stmt.setString(8, id)
+                    stmt.executeUpdate() > 0
+                }
             false
         } else {
-            conn.prepareStatement(
-                """
+            conn
+                .prepareStatement(
+                    """
                 INSERT INTO sub_agents (id, name, role, status, current_task, parent_agent_id, config, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            ).use { stmt ->
-                stmt.setString(1, id)
-                stmt.setString(2, name)
-                stmt.setString(3, role)
-                stmt.setString(4, status)
-                stmt.setString(5, currentTask)
-                stmt.setString(6, parentAgentId)
-                stmt.setString(7, configJson)
-                stmt.setString(8, Instant.now().toString())
-                stmt.setString(9, Instant.now().toString())
-                stmt.executeUpdate() > 0
-            }
+                ).use { stmt ->
+                    stmt.setString(1, id)
+                    stmt.setString(2, name)
+                    stmt.setString(3, role)
+                    stmt.setString(4, status)
+                    stmt.setString(5, currentTask)
+                    stmt.setString(6, parentAgentId)
+                    stmt.setString(7, configJson)
+                    stmt.setString(8, Instant.now().toString())
+                    stmt.setString(9, Instant.now().toString())
+                    stmt.executeUpdate() > 0
+                }
             true
         }
     }
@@ -529,11 +754,12 @@ class KnowledgeDb(private val dbPath: String = "./data/visual-agent.db") {
      */
     fun listAgents(status: String? = null): List<Map<String, Any>> {
         val conn = getConnection()
-        val query = if (status != null) {
-            "SELECT * FROM sub_agents WHERE status = ? ORDER BY created_at DESC"
-        } else {
-            "SELECT * FROM sub_agents ORDER BY created_at DESC"
-        }
+        val query =
+            if (status != null) {
+                "SELECT * FROM sub_agents WHERE status = ? ORDER BY created_at DESC"
+            } else {
+                "SELECT * FROM sub_agents ORDER BY created_at DESC"
+            }
 
         val agents = mutableListOf<Map<String, Any>>()
         conn.prepareStatement(query).use { stmt ->
@@ -573,21 +799,26 @@ class KnowledgeDb(private val dbPath: String = "./data/visual-agent.db") {
     /**
      * Update agent status (e.g., IDLE → BUSY).
      */
-    fun updateAgentStatus(id: String, status: String, currentTask: String? = null): Boolean {
+    fun updateAgentStatus(
+        id: String,
+        status: String,
+        currentTask: String? = null,
+    ): Boolean {
         val conn = getConnection()
-        conn.prepareStatement(
-            """
+        conn
+            .prepareStatement(
+                """
             UPDATE sub_agents 
             SET status = ?, current_task = ?, updated_at = ?
             WHERE id = ?
         """,
-        ).use { stmt ->
-            stmt.setString(1, status)
-            stmt.setString(2, currentTask)
-            stmt.setString(3, Instant.now().toString())
-            stmt.setString(4, id)
-            return stmt.executeUpdate() > 0
-        }
+            ).use { stmt ->
+                stmt.setString(1, status)
+                stmt.setString(2, currentTask)
+                stmt.setString(3, Instant.now().toString())
+                stmt.setString(4, id)
+                return stmt.executeUpdate() > 0
+            }
     }
 
     /**
@@ -613,25 +844,26 @@ class KnowledgeDb(private val dbPath: String = "./data/visual-agent.db") {
         enabled: Boolean,
     ) {
         val conn = getConnection()
-        conn.prepareStatement(
-            """
-            INSERT OR REPLACE INTO sub_agent_configs
-                (id, name, description, model, system_prompt, tools, max_turns, enabled, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM sub_agent_configs WHERE id = ?), ?))
-            """.trimIndent(),
-        ).use { stmt ->
-            stmt.setString(1, id)
-            stmt.setString(2, name)
-            stmt.setString(3, description)
-            stmt.setString(4, model)
-            stmt.setString(5, systemPrompt)
-            stmt.setString(6, toolsJson)
-            stmt.setInt(7, maxTurns)
-            stmt.setInt(8, if (enabled) 1 else 0)
-            stmt.setString(9, id)
-            stmt.setString(10, Instant.now().toString())
-            stmt.executeUpdate()
-        }
+        conn
+            .prepareStatement(
+                """
+                INSERT OR REPLACE INTO sub_agent_configs
+                    (id, name, description, model, system_prompt, tools, max_turns, enabled, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM sub_agent_configs WHERE id = ?), ?))
+                """.trimIndent(),
+            ).use { stmt ->
+                stmt.setString(1, id)
+                stmt.setString(2, name)
+                stmt.setString(3, description)
+                stmt.setString(4, model)
+                stmt.setString(5, systemPrompt)
+                stmt.setString(6, toolsJson)
+                stmt.setInt(7, maxTurns)
+                stmt.setInt(8, if (enabled) 1 else 0)
+                stmt.setString(9, id)
+                stmt.setString(10, Instant.now().toString())
+                stmt.executeUpdate()
+            }
     }
 
     /**
@@ -652,9 +884,10 @@ class KnowledgeDb(private val dbPath: String = "./data/visual-agent.db") {
                     description = rs.getString("description"),
                     model = rs.getString("model"),
                     systemPrompt = rs.getString("system_prompt"),
-                    tools = runCatching {
-                        Json.decodeFromString<List<String>>(rs.getString("tools"))
-                    }.getOrElse { emptyList() },
+                    tools =
+                        runCatching {
+                            Json.decodeFromString<List<String>>(rs.getString("tools"))
+                        }.getOrElse { emptyList() },
                     maxTurns = rs.getInt("max_turns"),
                     enabled = rs.getInt("enabled") == 1,
                 )

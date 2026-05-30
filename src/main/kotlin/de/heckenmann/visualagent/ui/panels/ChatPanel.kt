@@ -2,19 +2,22 @@ package de.heckenmann.visualagent.ui.panels
 
 import de.heckenmann.visualagent.AppIdentity
 import de.heckenmann.visualagent.agent.Message
+import de.heckenmann.visualagent.agent.tools.ToolCallEvent
+import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.ui.FxmlLoader
 import javafx.animation.FadeTransition
-import javafx.animation.KeyFrame
-import javafx.animation.Timeline
-import javafx.beans.binding.Bindings
-import javafx.fxml.FXML
 import javafx.application.Platform
+import javafx.beans.binding.Bindings
 import javafx.beans.property.SimpleBooleanProperty
+import javafx.collections.ListChangeListener
+import javafx.fxml.FXML
+import javafx.geometry.Orientation
 import javafx.scene.control.Button
 import javafx.scene.control.Label
 import javafx.scene.control.ListCell
 import javafx.scene.control.ListView
 import javafx.scene.control.ProgressIndicator
+import javafx.scene.control.ScrollBar
 import javafx.scene.control.TextArea
 import javafx.scene.control.Tooltip
 import javafx.scene.image.ImageView
@@ -27,21 +30,21 @@ import javafx.scene.layout.HBox
 import javafx.scene.layout.Priority
 import javafx.scene.layout.Region
 import javafx.scene.layout.VBox
+import javafx.util.Duration
 import org.kordamp.ikonli.fontawesome5.FontAwesomeSolid
 import org.kordamp.ikonli.javafx.FontIcon
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import javafx.util.Duration
 
 data class ChatMessage(
     val role: String,
     val content: String,
     val timestamp: Instant = Instant.now(),
+    val isToolEvent: Boolean = false,
 )
 
 class ChatPanel : Region() {
-
     @FXML
     private lateinit var rootBorderPane: BorderPane
 
@@ -58,16 +61,10 @@ class ChatPanel : Region() {
     private lateinit var clearChatButton: Button
 
     @FXML
-    private lateinit var conversationMetaLabel: Label
+    private lateinit var todoInfoLabel: Label
 
     @FXML
-    private lateinit var connectionInfoLabel: Label
-
-    @FXML
-    private lateinit var modelInfoLabel: Label
-
-    @FXML
-    private lateinit var agentsInfoLabel: Label
+    private lateinit var openTodosButton: Button
 
     @FXML
     private lateinit var assistantBusyContainer: HBox
@@ -83,25 +80,15 @@ class ChatPanel : Region() {
 
     private var onSendMessage: ((String) -> Unit)? = null
     private var onClearConversation: (() -> Unit)? = null
-    private val LOADING_TOKEN = "__loading__"
+    private var onOpenTodos: (() -> Unit)? = null
+    private var onLoadOlderMessages: (() -> Unit)? = null
+    private var suppressAutoScroll = false
+    private var loadingOlderMessages = false
+    private var activeToolCalls = 0
+    private var latestToolId: String? = null
+    private val todoSummaryTooltip = Tooltip()
+    private val loadingToken = "__loading__"
     private val waitingForAssistant = SimpleBooleanProperty(false)
-    private var typingDots = 0
-    private val thinkingPhases = listOf("Analyzing context", "Planning steps", "Generating response")
-    private var thinkingStartedAtMillis: Long = 0L
-    private val typingTimeline = Timeline(
-        KeyFrame(Duration.millis(360.0), {
-            if (waitingForAssistant.get()) {
-                typingDots = (typingDots + 1) % 4
-                val dots = ".".repeat(typingDots)
-                val elapsed = ((System.currentTimeMillis() - thinkingStartedAtMillis) / 1000).coerceAtLeast(0)
-                val phase = thinkingPhases[(elapsed.toInt() / 2) % thinkingPhases.size]
-                conversationMetaLabel.text = "Thinking $dots  $phase  ${elapsed}s"
-                assistantBusyLabel.text = "$phase  ${elapsed}s"
-            }
-        }),
-    ).apply {
-        cycleCount = Timeline.INDEFINITE
-    }
 
     init {
         styleClass.add("chat-panel")
@@ -115,14 +102,32 @@ class ChatPanel : Region() {
         messagesListView.cellFactory = javafx.util.Callback { ChatMessageCell() }
         messagesListView.isFocusTraversable = false
         messagesListView.styleClass.add("chat-message-list-no-hbar")
+        messagesListView.items.addListener(
+            ListChangeListener { change ->
+                if (suppressAutoScroll) return@ListChangeListener
+                var hasAddedItems = false
+                while (change.next()) {
+                    if (change.wasAdded() && change.addedSize > 0) {
+                        hasAddedItems = true
+                    }
+                }
+                if (hasAddedItems) {
+                    scrollToBottom()
+                }
+            },
+        )
 
         sendButton.graphic = FontIcon(FontAwesomeSolid.PAPER_PLANE)
         sendButton.tooltip = Tooltip("Send")
         clearChatButton.graphic = FontIcon(FontAwesomeSolid.BROOM)
         clearChatButton.tooltip = Tooltip("Clear conversation")
         clearChatButton.isFocusTraversable = false
+        openTodosButton.tooltip = Tooltip("Open todo list")
+        openTodosButton.isFocusTraversable = false
+        Tooltip.install(todoInfoLabel, todoSummaryTooltip)
 
         sendButton.setOnAction { sendMessage() }
+        openTodosButton.setOnAction { onOpenTodos?.invoke() }
         clearChatButton.setOnAction {
             clearMessages()
             onClearConversation?.invoke()
@@ -135,7 +140,7 @@ class ChatPanel : Region() {
         // Disable send when input is empty
         sendButton.disableProperty().bind(inputTextField.textProperty().isEmpty.or(waitingForAssistant))
         updateMeta()
-        updateSessionContext(model = "--", connected = false, agentCount = 0)
+        updateTodoSummary(total = 0, open = 0, inProgress = 0, completed = 0, cancelled = 0)
 
         // Enter = send, Shift+Enter = newline
         inputTextField.addEventFilter(KeyEvent.KEY_PRESSED) { event ->
@@ -155,6 +160,9 @@ class ChatPanel : Region() {
                 }
             }
         }
+        messagesListView.skinProperty().addListener { _, _, _ ->
+            installTopScrollListener()
+        }
 
         VBox.setVgrow(this, Priority.ALWAYS)
         BorderPane.setAlignment(rootBorderPane, javafx.geometry.Pos.CENTER)
@@ -168,8 +176,11 @@ class ChatPanel : Region() {
     }
 
     override fun computeMinWidth(height: Double): Double = 400.0
+
     override fun computeMinHeight(width: Double): Double = 300.0
+
     override fun computePrefWidth(height: Double): Double = 800.0
+
     override fun computePrefHeight(width: Double): Double = 600.0
 
     override fun layoutChildren() {
@@ -191,12 +202,10 @@ class ChatPanel : Region() {
         scrollToBottom()
 
         // Show assistant loading placeholder and invoke handler
-        messagesListView.items.add(ChatMessage("assistant", LOADING_TOKEN))
+        messagesListView.items.add(ChatMessage("assistant", loadingToken))
         waitingForAssistant.set(true)
-        thinkingStartedAtMillis = System.currentTimeMillis()
-        typingTimeline.playFromStart()
-        updateBusyIndicator(true, thinkingPhases.first())
-        updateMeta("Thinking")
+        updateRuntimeStatus()
+        updateMeta()
         scrollToBottom()
         onSendMessage?.invoke(text)
     }
@@ -209,42 +218,151 @@ class ChatPanel : Region() {
         onClearConversation = callback
     }
 
+    /**
+     * Registers a callback that opens the dedicated todos panel from the conversation header.
+     *
+     * @param callback Action invoked when the user presses the todos button
+     */
+    fun setOnOpenTodos(callback: () -> Unit) {
+        onOpenTodos = callback
+    }
+
+    /**
+     * Registers a callback that loads older history entries when the conversation reaches the top.
+     *
+     * @param callback Action invoked for lazy history pagination
+     */
+    fun setOnLoadOlderMessages(callback: () -> Unit) {
+        onLoadOlderMessages = callback
+    }
+
     fun setConversationHistory(history: List<Message>) {
+        suppressAutoScroll = true
         messagesListView.items.clear()
         history.forEach { msg ->
             if (msg.content.isNotBlank()) {
-                messagesListView.items.add(ChatMessage(msg.role, msg.content))
+                messagesListView.items.add(
+                    ChatMessage(
+                        role = msg.role,
+                        content = msg.content,
+                        isToolEvent = isToolHistoryEntry(msg),
+                    ),
+                )
             }
         }
+        suppressAutoScroll = false
         waitingForAssistant.set(false)
-        typingTimeline.stop()
-        updateBusyIndicator(false, "Idle")
+        updateRuntimeStatus()
         updateMeta()
         scrollToBottom()
     }
 
-    fun addAssistantMessage(text: String) {
-        // If there is a loading placeholder at the end, replace it with the real message
-        val items = messagesListView.items
-        if (items.isNotEmpty()) {
-            val last = items[items.size - 1]
-            if (last.role == "assistant" && last.content == LOADING_TOKEN) {
-                items[items.size - 1] = ChatMessage("assistant", text)
-                waitingForAssistant.set(false)
-                typingTimeline.stop()
-                updateBusyIndicator(false, "Idle")
-                updateMeta()
-                scrollToBottom()
-                return
+    /**
+     * Prepends older messages without forcing scroll-to-bottom.
+     *
+     * @param history Older messages in chronological order
+     */
+    fun prependConversationHistory(history: List<Message>) {
+        if (history.isEmpty()) {
+            loadingOlderMessages = false
+            return
+        }
+        val mapped =
+            history.filter { it.content.isNotBlank() }.map {
+                ChatMessage(
+                    role = it.role,
+                    content = it.content,
+                    isToolEvent = isToolHistoryEntry(it),
+                )
             }
+        if (mapped.isEmpty()) {
+            loadingOlderMessages = false
+            return
+        }
+        suppressAutoScroll = true
+        messagesListView.items.addAll(0, mapped)
+        suppressAutoScroll = false
+        Platform.runLater {
+            messagesListView.scrollTo(mapped.size.coerceAtLeast(1))
+            loadingOlderMessages = false
+            updateMeta()
+        }
+    }
+
+    fun addAssistantMessage(text: String) {
+        val items = messagesListView.items
+        val normalizedText =
+            if (text.isBlank()) {
+                "(No text response. See tool results above.)"
+            } else {
+                text
+            }
+        val loadingIndex = findLatestLoadingPlaceholderIndex(items)
+        if (loadingIndex >= 0) {
+            items[loadingIndex] = ChatMessage("assistant", normalizedText)
+            waitingForAssistant.set(false)
+            updateRuntimeStatus()
+            updateMeta()
+            scrollToBottom()
+            return
         }
 
-        items.add(ChatMessage("assistant", text))
+        items.add(ChatMessage("assistant", normalizedText))
         waitingForAssistant.set(false)
-        typingTimeline.stop()
-        updateBusyIndicator(false, "Idle")
+        updateRuntimeStatus()
         updateMeta()
         scrollToBottom()
+    }
+
+    /**
+     * Appends a concise tool-call event line to the conversation.
+     *
+     * @param event Tool invocation event
+     */
+    fun addToolCallEvent(event: ToolCallEvent) {
+        if (event.phase != ToolCallPhase.FINISHED) return
+        val status = if (event.result.success) "ok" else "error"
+        val baseSummary = "Tool ${event.toolId} (${event.durationMillis}ms) \u00B7 $status"
+        val details = event.result.content.trim()
+        val summary =
+            if (details.isNotBlank()) {
+                val excerpt =
+                    details
+                        .lineSequence()
+                        .firstOrNull()
+                        .orEmpty()
+                        .take(120)
+                "$baseSummary \u00B7 $excerpt"
+            } else if (!event.result.error.isNullOrBlank()) {
+                "$baseSummary \u00B7 ${event.result.error}"
+            } else {
+                baseSummary
+            }
+        val items = messagesListView.items
+        val loadingIndex = findLatestLoadingPlaceholderIndex(items)
+        val eventMessage = ChatMessage("assistant", summary, isToolEvent = true)
+        if (loadingIndex >= 0) {
+            items.add(loadingIndex, eventMessage)
+        } else {
+            items.add(eventMessage)
+        }
+        scrollToBottom()
+        updateMeta()
+    }
+
+    /**
+     * Updates the dedicated tool-activity indicator in the conversation header.
+     *
+     * @param activeCount Number of active tool calls
+     * @param latestToolId Last tool identifier that started execution
+     */
+    fun updateToolActivity(
+        activeCount: Int,
+        latestToolId: String?,
+    ) {
+        activeToolCalls = activeCount.coerceAtLeast(0)
+        this.latestToolId = latestToolId
+        updateRuntimeStatus()
     }
 
     /**
@@ -259,12 +377,10 @@ class ChatPanel : Region() {
             val m = items[i]
             if (m.role == "user") {
                 // set assistant slot to loading and resend
-                items[assistantIndex] = ChatMessage("assistant", LOADING_TOKEN)
+                items[assistantIndex] = ChatMessage("assistant", loadingToken)
                 waitingForAssistant.set(true)
-                thinkingStartedAtMillis = System.currentTimeMillis()
-                typingTimeline.playFromStart()
-                updateBusyIndicator(true, thinkingPhases.first())
-                updateMeta("Thinking")
+                updateRuntimeStatus()
+                updateMeta()
                 scrollToBottom()
                 onSendMessage?.invoke(m.content)
                 return
@@ -275,29 +391,42 @@ class ChatPanel : Region() {
     fun clearMessages() {
         messagesListView.items.clear()
         waitingForAssistant.set(false)
-        typingTimeline.stop()
-        updateBusyIndicator(false, "Idle")
+        updateRuntimeStatus()
         updateMeta()
     }
 
     private fun scrollToBottom() {
         val count = messagesListView.items.size
         if (count > 0) {
-            messagesListView.scrollTo(count - 1)
+            val target = count - 1
+            messagesListView.scrollTo(target)
+            // Dynamic markdown cell heights can settle over multiple pulses.
+            Platform.runLater {
+                messagesListView.scrollTo(target)
+                Platform.runLater {
+                    messagesListView.scrollTo(target)
+                }
+            }
+        }
+    }
+
+    private fun installTopScrollListener() {
+        val verticalScrollBar =
+            messagesListView
+                .lookupAll(".scroll-bar")
+                .filterIsInstance<ScrollBar>()
+                .firstOrNull { it.orientation == Orientation.VERTICAL } ?: return
+        verticalScrollBar.valueProperty().addListener { _, _, newValue ->
+            if (loadingOlderMessages || suppressAutoScroll) return@addListener
+            if (newValue.toDouble() <= 0.02) {
+                loadingOlderMessages = true
+                onLoadOlderMessages?.invoke() ?: run { loadingOlderMessages = false }
+            }
         }
     }
 
     private fun updateMeta(status: String? = null) {
-        val count = messagesListView.items.size
-        conversationMetaLabel.text = status ?: "$count messages in this session"
-    }
-
-    fun updateSessionContext(model: String, connected: Boolean, agentCount: Int) {
-        connectionInfoLabel.text = if (connected) "Connected" else "Disconnected"
-        connectionInfoLabel.styleClass.removeAll("chat-session-chip-online", "chat-session-chip-offline")
-        connectionInfoLabel.styleClass.add(if (connected) "chat-session-chip-online" else "chat-session-chip-offline")
-        modelInfoLabel.text = "Model $model"
-        agentsInfoLabel.text = "Agents $agentCount"
+        // Header meta label was removed by UX design; status is shown in runtime row below messages.
     }
 
     fun updateResponseMetrics(durationMillis: Long) {
@@ -306,16 +435,64 @@ class ChatPanel : Region() {
         Platform.runLater { updateMeta("Last response in $rounded") }
     }
 
-    private fun updateBusyIndicator(active: Boolean, text: String) {
+    /**
+     * Updates the todo summary chip shown in the conversation header.
+     *
+     * @param total Total todos
+     * @param pending Pending todos
+     */
+    fun updateTodoSummary(
+        total: Int,
+        open: Int,
+        inProgress: Int,
+        completed: Int,
+        cancelled: Int,
+    ) {
+        todoInfoLabel.text = "Open $open of $total"
+        todoSummaryTooltip.text = "Open: $open\nIn Progress: $inProgress\nDone: $completed\nCancelled: $cancelled\nTotal: $total"
+    }
+
+    private fun updateRuntimeStatus() {
+        val active = waitingForAssistant.get() || activeToolCalls > 0
         assistantBusyContainer.isManaged = active
         assistantBusyContainer.isVisible = active
-        assistantBusyLabel.text = text
+        assistantBusyLabel.text =
+            when {
+                activeToolCalls > 0 -> {
+                    val suffix = if (latestToolId.isNullOrBlank()) "" else " · $latestToolId"
+                    "Tools running ($activeToolCalls)$suffix"
+                }
+                waitingForAssistant.get() -> "Waiting for model response"
+                else -> "Idle"
+            }
+    }
+
+    /**
+     * Finds the latest assistant loading placeholder in the message list.
+     *
+     * @param items Current message list
+     * @return Index of the last loading placeholder or -1 when none exists
+     */
+    private fun findLatestLoadingPlaceholderIndex(items: List<ChatMessage>): Int {
+        for (i in items.lastIndex downTo 0) {
+            val msg = items[i]
+            if (msg.role == "assistant" && msg.content == loadingToken) {
+                return i
+            }
+        }
+        return -1
+    }
+
+    private fun isToolHistoryEntry(message: Message): Boolean {
+        val metadata = message.metadata ?: return false
+        return metadata.contains("\"type\":\"tool_call\"")
     }
 
     private inner class ChatMessageCell : ListCell<ChatMessage>() {
-
-        private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
-            .withZone(ZoneId.systemDefault())
+        private val timeFormatter =
+            DateTimeFormatter
+                .ofPattern("HH:mm")
+                .withZone(ZoneId.systemDefault())
 
         private val copyButton = Button(null, FontIcon(FontAwesomeSolid.COPY))
         private val copyRawButton = Button(null, FontIcon(FontAwesomeSolid.FILE))
@@ -333,7 +510,10 @@ class ChatPanel : Region() {
             retryButton.isFocusTraversable = false
         }
 
-        override fun updateItem(item: ChatMessage?, empty: Boolean) {
+        override fun updateItem(
+            item: ChatMessage?,
+            empty: Boolean,
+        ) {
             super.updateItem(item, empty)
             if (empty || item == null) {
                 graphic = null
@@ -359,7 +539,7 @@ class ChatPanel : Region() {
                 row.maxWidth = Double.MAX_VALUE
                 contentArea.maxWidth = Double.MAX_VALUE
                 row.prefWidthProperty().bind(Bindings.subtract(widthProperty(), 24.0))
-                if (item.content != LOADING_TOKEN) {
+                if (item.content != loadingToken) {
                     row.opacity = 0.0
                     val fade = FadeTransition(Duration.millis(180.0), row)
                     fade.fromValue = 0.0
@@ -371,6 +551,9 @@ class ChatPanel : Region() {
                     styleClass.add("chat-row-user")
                 } else {
                     styleClass.add("chat-row-assistant")
+                }
+                if (item.isToolEvent) {
+                    styleClass.add("chat-row-tool")
                 }
 
                 graphic = row
@@ -388,7 +571,10 @@ class ChatPanel : Region() {
             return current.role == previous.role
         }
 
-        private fun createAvatarSlot(item: ChatMessage, isGrouped: Boolean): Region {
+        private fun createAvatarSlot(
+            item: ChatMessage,
+            isGrouped: Boolean,
+        ): Region {
             if (isGrouped) {
                 val spacer = Region()
                 spacer.styleClass.add("chat-avatar-spacer")
@@ -396,16 +582,21 @@ class ChatPanel : Region() {
             }
 
             val avatar = Label(if (item.role == "user") "You" else "AI")
+            if (item.isToolEvent) {
+                avatar.text = "Tool"
+            }
             avatar.styleClass.addAll("chat-avatar", if (item.role == "user") "chat-avatar-user" else "chat-avatar-assistant")
             return avatar
         }
 
-        private fun createContentArea(item: ChatMessage, isGrouped: Boolean): VBox {
+        private fun createContentArea(
+            item: ChatMessage,
+            isGrouped: Boolean,
+        ): VBox {
             if (isGrouped) {
                 val contentBody = createMessageBody(item)
 
-                val actionButtons = HBox(copyButton, copyRawButton)
-                actionButtons.styleClass.add("chat-action-buttons")
+                val actionButtons = createActionButtons(copyButton, copyRawButton)
                 copyButton.setOnAction { copyToClipboard(item.content) }
                 copyRawButton.setOnAction { copyToClipboard(item.content) }
 
@@ -415,7 +606,14 @@ class ChatPanel : Region() {
                 return contentArea
             }
 
-            val roleName = Label(if (item.role == "user") "You" else "Assistant")
+            val roleName =
+                Label(
+                    when {
+                        item.isToolEvent -> "Tool"
+                        item.role == "user" -> "You"
+                        else -> "Assistant"
+                    },
+                )
             roleName.styleClass.add("chat-role-label")
             if (item.role == "user") {
                 roleName.styleClass.add("chat-role-label-user")
@@ -432,8 +630,7 @@ class ChatPanel : Region() {
 
             val contentBody = createMessageBody(item)
 
-            val actionButtons = HBox(copyButton, copyRawButton, retryButton)
-            actionButtons.styleClass.add("chat-action-buttons")
+            val actionButtons = createActionButtons(copyButton, copyRawButton, retryButton)
 
             val contentArea = VBox(header, contentBody, actionButtons)
             contentArea.styleClass.add("chat-content-area")
@@ -453,8 +650,21 @@ class ChatPanel : Region() {
             return contentArea
         }
 
+        /**
+         * Creates the per-message action container and shows it only while hovering the message row.
+         *
+         * @param buttons Action buttons shown for the message
+         * @return Hover-aware actions container
+         */
+        private fun createActionButtons(vararg buttons: Button): HBox {
+            val actionButtons = HBox(*buttons)
+            actionButtons.styleClass.add("chat-action-buttons")
+            actionButtons.visibleProperty().bind(hoverProperty())
+            return actionButtons
+        }
+
         private fun createMessageBody(item: ChatMessage): Region {
-            if (item.content == LOADING_TOKEN) {
+            if (item.content == loadingToken) {
                 val loadingSpinner = ProgressIndicator()
                 loadingSpinner.progress = -1.0
                 loadingSpinner.maxWidth = 16.0

@@ -20,6 +20,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 data class ToolCallEvent(
     val toolId: String,
     val functionName: String,
+    val phase: ToolCallPhase = ToolCallPhase.FINISHED,
     val inputJson: String,
     val context: Map<String, Any>,
     val result: ToolResult,
@@ -27,6 +28,14 @@ data class ToolCallEvent(
     val finishedAtUtc: Instant,
     val durationMillis: Long,
 )
+
+/**
+ * Lifecycle phase of one tool call.
+ */
+enum class ToolCallPhase {
+    STARTED,
+    FINISHED,
+}
 
 /**
  * In-process event bus for tool call notifications.

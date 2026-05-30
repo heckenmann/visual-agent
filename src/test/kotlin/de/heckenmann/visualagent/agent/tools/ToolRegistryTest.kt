@@ -12,7 +12,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ToolRegistryTest {
-
     @Test
     fun `registry returns only enabled registered tools`() {
         val registry = ToolRegistry(listOf(FakeTool("file:read"), FakeTool("terminal")), ToolEventBus())
@@ -34,9 +33,11 @@ class ToolRegistryTest {
 
         assertEquals("context", json["toolId"]!!.jsonPrimitive.content)
         assertTrue(json["success"]!!.jsonPrimitive.content.toBoolean())
-        assertEquals(1, events.size)
-        assertEquals("context", events.single().toolId)
-        assertTrue(events.single().result.success)
+        assertEquals(2, events.size)
+        assertEquals(ToolCallPhase.STARTED, events[0].phase)
+        assertEquals(ToolCallPhase.FINISHED, events[1].phase)
+        assertEquals("context", events[1].toolId)
+        assertTrue(events[1].result.success)
     }
 
     @Test
@@ -58,33 +59,44 @@ class ToolRegistryTest {
         val json = Json.parseToJsonElement(result).jsonObject
 
         assertFalse(json["success"]!!.jsonPrimitive.content.toBoolean())
-        assertEquals(1, events.size)
-        assertFalse(events.single().result.success)
-        assertEquals("boom", events.single().result.error)
+        assertEquals(2, events.size)
+        assertEquals(ToolCallPhase.STARTED, events[0].phase)
+        assertEquals(ToolCallPhase.FINISHED, events[1].phase)
+        assertFalse(events[1].result.success)
+        assertEquals("boom", events[1].result.error)
     }
 
-    private class FakeTool(id: String) : VisualAgentTool {
-        override val definition = ToolDefinition(
-            id = ToolId(id),
-            name = ToolId(id).toFunctionName(),
-            description = "Fake $id",
-            inputSchema = """{"type":"object"}""",
-        )
+    private class FakeTool(
+        id: String,
+    ) : VisualAgentTool {
+        override val definition =
+            ToolDefinition(
+                id = ToolId(id),
+                name = ToolId(id).toFunctionName(),
+                description = "Fake $id",
+                inputSchema = """{"type":"object"}""",
+            )
 
-        override fun execute(inputJson: String, context: Map<String, Any>): ToolResult =
-            ToolResult(definition.id.value, true, "ok")
+        override fun execute(
+            inputJson: String,
+            context: Map<String, Any>,
+        ): ToolResult = ToolResult(definition.id.value, true, "ok")
     }
 
-    private class FailingTool(id: String) : VisualAgentTool {
-        override val definition = ToolDefinition(
-            id = ToolId(id),
-            name = ToolId(id).toFunctionName(),
-            description = "Failing $id",
-            inputSchema = """{"type":"object"}""",
-        )
+    private class FailingTool(
+        id: String,
+    ) : VisualAgentTool {
+        override val definition =
+            ToolDefinition(
+                id = ToolId(id),
+                name = ToolId(id).toFunctionName(),
+                description = "Failing $id",
+                inputSchema = """{"type":"object"}""",
+            )
 
-        override fun execute(inputJson: String, context: Map<String, Any>): ToolResult {
-            throw IllegalStateException("boom")
-        }
+        override fun execute(
+            inputJson: String,
+            context: Map<String, Any>,
+        ): ToolResult = throw IllegalStateException("boom")
     }
 }

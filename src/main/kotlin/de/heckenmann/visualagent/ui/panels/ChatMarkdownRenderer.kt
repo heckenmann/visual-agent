@@ -15,13 +15,13 @@ import org.commonmark.node.HardLineBreak
 import org.commonmark.node.Heading
 import org.commonmark.node.IndentedCodeBlock
 import org.commonmark.node.ListItem
-import org.commonmark.node.Node as MarkdownNode
 import org.commonmark.node.OrderedList
 import org.commonmark.node.Paragraph
 import org.commonmark.node.SoftLineBreak
 import org.commonmark.node.StrongEmphasis
-import org.commonmark.node.Text as MarkdownText
 import org.commonmark.parser.Parser
+import org.commonmark.node.Node as MarkdownNode
+import org.commonmark.node.Text as MarkdownText
 
 /**
  * Renders CommonMark Markdown into JavaFX nodes for chat messages.
@@ -53,7 +53,10 @@ internal object ChatMarkdownRenderer {
         return root
     }
 
-    private fun appendBlockChildren(parent: MarkdownNode, target: VBox) {
+    private fun appendBlockChildren(
+        parent: MarkdownNode,
+        target: VBox,
+    ) {
         var child = parent.firstChild
         while (child != null) {
             target.children += renderBlock(child)
@@ -72,7 +75,10 @@ internal object ChatMarkdownRenderer {
             else -> textFlow(inlineNodes(node), "chat-md-paragraph")
         }
 
-    private fun listBlock(list: MarkdownNode, ordered: Boolean): VBox {
+    private fun listBlock(
+        list: MarkdownNode,
+        ordered: Boolean,
+    ): VBox {
         val container = VBox()
         container.styleClass.add("chat-md-list")
         container.isFillWidth = true
@@ -90,7 +96,11 @@ internal object ChatMarkdownRenderer {
         return container
     }
 
-    private fun listItem(index: Int, item: ListItem, ordered: Boolean): HBox {
+    private fun listItem(
+        index: Int,
+        item: ListItem,
+        ordered: Boolean,
+    ): HBox {
         val marker = Label(if (ordered) "$index." else "•")
         marker.styleClass.add("chat-md-list-marker")
 
@@ -113,7 +123,11 @@ internal object ChatMarkdownRenderer {
         return result.ifEmpty { listOf(Text("")) }
     }
 
-    private fun appendInlineChildren(parent: MarkdownNode, target: MutableList<Text>, bold: Boolean) {
+    private fun appendInlineChildren(
+        parent: MarkdownNode,
+        target: MutableList<Text>,
+        bold: Boolean,
+    ) {
         var child = parent.firstChild
         while (child != null) {
             when (child) {
@@ -128,19 +142,28 @@ internal object ChatMarkdownRenderer {
         }
     }
 
-    private fun plainText(value: String, bold: Boolean): Text =
+    private fun plainText(
+        value: String,
+        bold: Boolean,
+    ): Text =
         Text(value).apply {
             styleClass.add("chat-md-text")
             if (bold) styleClass.add("chat-md-bold")
         }
 
-    private fun inlineCode(value: String, bold: Boolean): Text =
+    private fun inlineCode(
+        value: String,
+        bold: Boolean,
+    ): Text =
         Text(value).apply {
             styleClass.add("chat-md-inline-code")
             if (bold) styleClass.add("chat-md-bold")
         }
 
-    private fun textFlow(children: List<Text>, styleClassName: String): TextFlow =
+    private fun textFlow(
+        children: List<Text>,
+        styleClassName: String,
+    ): TextFlow =
         TextFlow().apply {
             styleClass.addAll("chat-message-content", styleClassName)
             maxWidth = Double.MAX_VALUE

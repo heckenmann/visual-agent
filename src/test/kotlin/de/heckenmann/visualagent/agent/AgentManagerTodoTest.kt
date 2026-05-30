@@ -13,16 +13,16 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class AgentManagerTodoTest {
-
     private fun createManager(): Triple<AgentManager, LLMProvider, KnowledgeDb> {
         val db = KnowledgeDb("jdbc:sqlite::memory:")
         val provider = mockk<LLMProvider>(relaxed = true)
         coEvery { provider.isConnected() } returns true
-        coEvery { provider.chat(any<ChatRequestContext>()) } returns ChatResponse(
-            model = "test",
-            message = Message("assistant", "Task completed"),
-            done = true,
-        )
+        coEvery { provider.chat(any<ChatRequestContext>()) } returns
+            ChatResponse(
+                model = "test",
+                message = Message("assistant", "Task completed"),
+                done = true,
+            )
         val manager = AgentManager(db, provider, AgentToolConfigService(db))
         return Triple(manager, provider, db)
     }

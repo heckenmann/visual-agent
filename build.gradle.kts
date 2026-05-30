@@ -2,7 +2,7 @@ plugins {
     kotlin("jvm") version "2.1.21"
     kotlin("plugin.serialization") version "2.1.21"
     kotlin("plugin.spring") version "2.1.21"
-    // id("org.jlleitschuh.gradle.ktlint") version "12.1.2" // Deactivated: conflicts with Kotlin 2.1.21
+    id("org.jlleitschuh.gradle.ktlint") version "13.1.0"
     id("org.springframework.boot") version "3.4.2"
     id("io.spring.dependency-management") version "1.1.7"
     application
@@ -17,32 +17,41 @@ repositories {
     maven { url = uri("https://jitpack.io") }
 }
 
-val platform = when {
-    System.getProperty("os.name").contains("Mac") && System.getProperty("os.arch").contains("aarch64") -> "mac-aarch64"
-    System.getProperty("os.name").contains("Mac") -> "mac"
-    System.getProperty("os.name").contains("Linux") -> "linux"
-    System.getProperty("os.name").contains("Windows") -> "win"
-    else -> "linux"
-}
+val platform =
+    when {
+        System.getProperty("os.name").contains("Mac") &&
+            System.getProperty("os.arch").contains("aarch64") -> "mac-aarch64"
+        System.getProperty("os.name").contains("Mac") -> "mac"
+        System.getProperty("os.name").contains("Linux") -> "linux"
+        System.getProperty("os.name").contains("Windows") -> "win"
+        else -> "linux"
+    }
 
 val javafxVersion = "21.0.2"
-val javafxModuleArgs = listOf(
-    "--module-path", rootDir.resolve("lib").toString(),
-    "--add-modules", "javafx.controls,javafx.fxml,javafx.web,javafx.graphics,javafx.media,javafx.swing,javafx.base",
-)
-val applicationIdentityArgs = listOf(
-    "-Dapple.awt.application.name=Visual Agent",
-    "-Dcom.apple.mrj.application.apple.menu.about.name=Visual Agent",
-    "-Djavafx.application.name=Visual Agent",
-)
-val macApplicationArgs = if (System.getProperty("os.name").contains("Mac", ignoreCase = true)) {
+val javafxModuleArgs =
     listOf(
-        "-Xdock:name=Visual Agent",
-        "-Xdock:icon=${rootDir.resolve("src/main/resources/icons/visual-agent.png").absolutePath}",
+        "--module-path",
+        rootDir.resolve("lib").toString(),
+        "--add-modules",
+        "javafx.controls,javafx.fxml,javafx.web,javafx.graphics,javafx.media,javafx.swing,javafx.base",
     )
-} else {
-    emptyList()
-}
+val applicationIdentityArgs =
+    listOf(
+        "-Dapple.awt.application.name=Visual Agent",
+        "-Dcom.apple.mrj.application.apple.menu.about.name=Visual Agent",
+        "-Djavafx.application.name=Visual Agent",
+    )
+val macApplicationArgs =
+    if (
+        System.getProperty("os.name").contains("Mac", ignoreCase = true)
+    ) {
+        listOf(
+            "-Xdock:name=Visual Agent",
+            "-Xdock:icon=${rootDir.resolve("src/main/resources/icons/visual-agent.png").absolutePath}",
+        )
+    } else {
+        emptyList()
+    }
 
 dependencies {
     implementation(kotlin("stdlib"))
@@ -122,9 +131,7 @@ tasks.register<Copy>("copyAllDependencies") {
     into("lib")
 }
 
-/*
 ktlint {
-    version.set("1.0.1")
+    version.set("1.5.0")
     android.set(false)
 }
-*/

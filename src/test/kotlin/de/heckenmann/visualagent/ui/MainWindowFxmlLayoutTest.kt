@@ -8,7 +8,10 @@ class MainWindowFxmlLayoutTest {
     fun `main window fxml has native window decorations and model label in header`() {
         val res = javaClass.getResourceAsStream("/fxml/main-window.fxml")?.bufferedReader()?.use { it.readText() }
         assertTrue(res != null && !res.contains("<bottom>"), "main-window.fxml must not render a bottom status bar")
-        assertTrue(res != null && res.contains("fx:id=\"selectedModelLabel\""), "main-window.fxml must expose selectedModelLabel in title bar")
+        assertTrue(
+            res != null && res.contains("fx:id=\"selectedModelLabel\""),
+            "main-window.fxml must expose selectedModelLabel in title bar",
+        )
         assertTrue(res != null && res.contains("fx:id=\"appIconImage\""), "main-window.fxml must show the application icon in the header")
         assertTrue(res != null && !res.contains("minimizeButton"), "main-window.fxml must rely on native minimize controls")
         assertTrue(res != null && !res.contains("maximizeButton"), "main-window.fxml must rely on native maximize controls")

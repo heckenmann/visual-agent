@@ -32,13 +32,14 @@ class AgentToolConfigService(
      * @return Tool IDs configured for the agent role/name
      */
     fun toolsFor(agent: SubAgent): Set<ToolId> {
-        val key = when {
-            agent.name.contains("coder", ignoreCase = true) -> "coder"
-            agent.role.contains("code", ignoreCase = true) -> "coder"
-            agent.name.contains("analyst", ignoreCase = true) -> "analyst"
-            agent.role.contains("review", ignoreCase = true) -> "analyst"
-            else -> "researcher"
-        }
+        val key =
+            when {
+                agent.name.contains("coder", ignoreCase = true) -> "coder"
+                agent.role.contains("code", ignoreCase = true) -> "coder"
+                agent.name.contains("analyst", ignoreCase = true) -> "analyst"
+                agent.role.contains("review", ignoreCase = true) -> "analyst"
+                else -> "researcher"
+            }
         val configured = knowledgeDb.getSubAgentConfig(key)?.tools ?: defaultConfigs().first { it.id == key }.tools
         return configured.map(::ToolId).toSet()
     }
@@ -69,43 +70,71 @@ class AgentToolConfigService(
         }
     }
 
-    private fun defaultConfigs(): List<SubAgentToolConfig> = listOf(
-        SubAgentToolConfig(
-            id = "researcher",
-            name = "Researcher",
-            description = "Search, read, and analyze code, files, and documentation.",
-            tools = listOf("file:read", "file:list", "file:glob", "file:grep", "browser", "search", "context", "pwd", "todos"),
-        ),
-        SubAgentToolConfig(
-            id = "coder",
-            name = "Coder",
-            description = "Implement code changes, write new functions, fix bugs, and modify files.",
-            tools = listOf("file:read", "file:write", "file:edit", "terminal", "file:list", "file:glob", "file:grep", "context", "pwd", "todos"),
-            maxTurns = 8,
-        ),
-        SubAgentToolConfig(
-            id = "analyst",
-            name = "Analyst",
-            description = "Deep analysis, review, and explanation of code and architecture.",
-            tools = listOf("file:read", "file:list", "file:glob", "file:grep", "context", "pwd", "todos"),
-        ),
-    )
+    private fun defaultConfigs(): List<SubAgentToolConfig> =
+        listOf(
+            SubAgentToolConfig(
+                id = "researcher",
+                name = "Researcher",
+                description = "Search, read, and analyze code, files, and documentation.",
+                tools =
+                    listOf(
+                        "file:read",
+                        "file:list",
+                        "file:glob",
+                        "file:grep",
+                        "browser",
+                        "search",
+                        "context",
+                        "pwd",
+                        "todos",
+                        "history",
+                    ),
+            ),
+            SubAgentToolConfig(
+                id = "coder",
+                name = "Coder",
+                description = "Implement code changes, write new functions, fix bugs, and modify files.",
+                tools =
+                    listOf(
+                        "file:read",
+                        "file:write",
+                        "file:edit",
+                        "terminal",
+                        "file:list",
+                        "file:glob",
+                        "file:grep",
+                        "context",
+                        "pwd",
+                        "todos",
+                        "history",
+                    ),
+                maxTurns = 8,
+            ),
+            SubAgentToolConfig(
+                id = "analyst",
+                name = "Analyst",
+                description = "Deep analysis, review, and explanation of code and architecture.",
+                tools = listOf("file:read", "file:list", "file:glob", "file:grep", "context", "pwd", "todos", "history"),
+            ),
+        )
 
-    private fun allTools(): Set<ToolId> = setOf(
-        "ui",
-        "file:read",
-        "file:list",
-        "file:glob",
-        "file:grep",
-        "file:write",
-        "file:edit",
-        "terminal",
-        "browser",
-        "search",
-        "context",
-        "pwd",
-        "todos",
-    ).map(::ToolId).toSet()
+    private fun allTools(): Set<ToolId> =
+        setOf(
+            "ui",
+            "file:read",
+            "file:list",
+            "file:glob",
+            "file:grep",
+            "file:write",
+            "file:edit",
+            "terminal",
+            "browser",
+            "search",
+            "context",
+            "pwd",
+            "todos",
+            "history",
+        ).map(::ToolId).toSet()
 }
 
 /**

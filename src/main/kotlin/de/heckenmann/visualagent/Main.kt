@@ -12,7 +12,6 @@ import org.springframework.context.ConfigurableApplicationContext
  * Main entry point for the Visual Agent application with Spring Boot integration.
  */
 class Main : Application() {
-
     private lateinit var springContext: ConfigurableApplicationContext
 
     override fun init() {
@@ -24,9 +23,10 @@ class Main : Application() {
 
         // Desktop application doesn't need a web server; disable web environment to avoid
         // reactive/server autoconfiguration attempting to start.
-        springContext = SpringApplicationBuilder(VisualAgentApplication::class.java)
-            .web(org.springframework.boot.WebApplicationType.NONE)
-            .run()
+        springContext =
+            SpringApplicationBuilder(VisualAgentApplication::class.java)
+                .web(org.springframework.boot.WebApplicationType.NONE)
+                .run()
     }
 
     override fun start(primaryStage: Stage) {

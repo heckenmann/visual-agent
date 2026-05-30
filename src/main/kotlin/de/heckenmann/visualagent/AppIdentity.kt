@@ -67,6 +67,5 @@ object AppIdentity {
      * @param osName Operating system name to inspect; defaults to the current JVM property
      * @return true when the operating system name represents macOS
      */
-    fun isMacOs(osName: String = System.getProperty("os.name", "")): Boolean =
-        osName.contains("mac", ignoreCase = true)
+    fun isMacOs(osName: String = System.getProperty("os.name", "")): Boolean = osName.contains("mac", ignoreCase = true)
 }

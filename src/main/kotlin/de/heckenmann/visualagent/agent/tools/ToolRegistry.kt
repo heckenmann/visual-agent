@@ -59,26 +59,49 @@ class ToolRegistry(
 
                 override fun call(functionInput: String): String {
                     val startedAt = Instant.now()
-                    val result = runCatching { tool.execute(functionInput, context) }
-                        .getOrElse { error ->
-                            ToolResult(
-                                toolId = definition.id.value,
-                                success = false,
-                                content = "",
-                                error = error.message ?: error::class.simpleName,
-                            )
-                        }
+                    toolEventBus.publish(
+                        ToolCallEvent(
+                            toolId = definition.id.value,
+                            functionName = definition.name,
+                            phase = ToolCallPhase.STARTED,
+                            inputJson = functionInput,
+                            context = context,
+                            result =
+                                ToolResult(
+                                    toolId = definition.id.value,
+                                    success = true,
+                                    content = "",
+                                ),
+                            startedAtUtc = startedAt,
+                            finishedAtUtc = startedAt,
+                            durationMillis = 0L,
+                        ),
+                    )
+                    val result =
+                        runCatching { tool.execute(functionInput, context) }
+                            .getOrElse { error ->
+                                ToolResult(
+                                    toolId = definition.id.value,
+                                    success = false,
+                                    content = "",
+                                    error = error.message ?: error::class.simpleName,
+                                )
+                            }
                     val finishedAt = Instant.now()
                     toolEventBus.publish(
                         ToolCallEvent(
                             toolId = definition.id.value,
                             functionName = definition.name,
+                            phase = ToolCallPhase.FINISHED,
                             inputJson = functionInput,
                             context = context,
                             result = result,
                             startedAtUtc = startedAt,
                             finishedAtUtc = finishedAt,
-                            durationMillis = java.time.Duration.between(startedAt, finishedAt).toMillis(),
+                            durationMillis =
+                                java.time.Duration
+                                    .between(startedAt, finishedAt)
+                                    .toMillis(),
                         ),
                     )
                     return Json.encodeToString(result)

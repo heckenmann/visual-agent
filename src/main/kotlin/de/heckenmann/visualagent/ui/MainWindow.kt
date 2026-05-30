@@ -3,7 +3,10 @@ package de.heckenmann.visualagent.ui
 import de.heckenmann.visualagent.AppIdentity
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.LLMProvider
+import de.heckenmann.visualagent.agent.tools.ToolCallPhase
+import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.todo.TodoStatus
 import de.heckenmann.visualagent.ui.panels.ApplicationSettingsPanel
 import de.heckenmann.visualagent.ui.panels.CanvasPanel
 import de.heckenmann.visualagent.ui.panels.ChatPanel
@@ -31,9 +34,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.springframework.stereotype.Component
-import org.springframework.context.annotation.Lazy
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
+import org.springframework.context.annotation.Lazy
+import org.springframework.stereotype.Component
 
 @Component
 @Lazy // delay instantiation until requested on the JavaFX Application thread
@@ -41,13 +44,17 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 class MainWindow(
     private val agentManager: AgentManager,
     private val llmProvider: LLMProvider,
+    private val toolEventBus: ToolEventBus,
 ) : Stage() {
     companion object {
         /**
          * Testable predicate: whether the global back button should be shown.
          * Uses identity comparison so callers can pass any object representing panels.
          */
-        fun shouldShowBack(activePanel: Any, chatPanel: Any): Boolean = activePanel !== chatPanel
+        fun shouldShowBack(
+            activePanel: Any,
+            chatPanel: Any,
+        ): Boolean = activePanel !== chatPanel
     }
 
     @FXML
@@ -105,6 +112,10 @@ class MainWindow(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var currentConnectionState = false
     private var configListenerRegistration: AutoCloseable? = null
+    private var toolEventListenerRegistration: AutoCloseable? = null
+    private var todoListenerRegistration: AutoCloseable? = null
+    private var activeToolCallCount: Int = 0
+    private var lastToolResultPreview: String? = null
 
     init {
         title = AppIdentity.DISPLAY_NAME
@@ -129,6 +140,8 @@ class MainWindow(
         AppIdentity.javaFxIcon()?.let { appIconImage.image = it }
         sessionPanel.setOllamaClient(llmProvider)
         registerConfigObserver()
+        registerToolEventObserver()
+        registerTodoObserver()
 
         conversationBtn.setOnAction { switchPanel(chatPanel, conversationBtn) }
         sessionBtn.setOnAction { switchPanel(sessionPanel, sessionBtn) }
@@ -192,13 +205,16 @@ class MainWindow(
         chatPanel.setOnSendMessage { text ->
             scope.launch {
                 val startedAt = System.nanoTime()
+                lastToolResultPreview = null
                 try {
-                    val response = withContext(Dispatchers.IO) {
-                        agentManager.sendMessage(text)
-                    }
+                    val response =
+                        withContext(Dispatchers.IO) {
+                            agentManager.sendMessage(text)
+                        }
+                    val normalizedResponse = normalizeAssistantResponse(response)
                     val elapsedMs = (System.nanoTime() - startedAt) / 1_000_000
                     Platform.runLater {
-                        chatPanel.addAssistantMessage(response)
+                        chatPanel.addAssistantMessage(normalizedResponse)
                         chatPanel.updateResponseMetrics(elapsedMs)
                     }
                 } catch (e: Exception) {
@@ -213,7 +229,17 @@ class MainWindow(
         chatPanel.setOnClearConversation {
             agentManager.clearHistory()
         }
+        chatPanel.setOnOpenTodos {
+            switchPanel(todoPanel, planBtn)
+        }
         chatPanel.setConversationHistory(agentManager.getHistory())
+        chatPanel.setOnLoadOlderMessages {
+            scope.launch {
+                val older = withContext(Dispatchers.IO) { agentManager.loadOlderHistory(20) }
+                Platform.runLater { chatPanel.prependConversationHistory(older) }
+            }
+        }
+        refreshTodoSummary()
 
         AgentManager.setAgentCallback { agentId, message ->
             Platform.runLater {
@@ -244,13 +270,103 @@ class MainWindow(
      */
     private fun registerConfigObserver() {
         configListenerRegistration?.close()
-        configListenerRegistration = AppConfig.instance.addChangeListener {
-            Platform.runLater { applyConfigToUi() }
-        }
+        configListenerRegistration =
+            AppConfig.instance.addChangeListener {
+                Platform.runLater { applyConfigToUi() }
+            }
         setOnHidden {
             configListenerRegistration?.close()
             configListenerRegistration = null
+            toolEventListenerRegistration?.close()
+            toolEventListenerRegistration = null
+            todoListenerRegistration?.close()
+            todoListenerRegistration = null
         }
+    }
+
+    /**
+     * Subscribes to global tool-call events and mirrors them into the chat timeline.
+     */
+    private fun registerToolEventObserver() {
+        toolEventListenerRegistration?.close()
+        toolEventListenerRegistration =
+            toolEventBus.addListener { event ->
+                Platform.runLater {
+                    when (event.phase) {
+                        ToolCallPhase.STARTED -> {
+                            activeToolCallCount += 1
+                            chatPanel.updateToolActivity(activeToolCallCount, event.toolId)
+                        }
+                        ToolCallPhase.FINISHED -> {
+                            activeToolCallCount = (activeToolCallCount - 1).coerceAtLeast(0)
+                            chatPanel.updateToolActivity(activeToolCallCount, event.toolId)
+                            lastToolResultPreview = buildToolResultPreview(event)
+                            agentManager.recordToolCall(event)
+                            chatPanel.addToolCallEvent(event)
+                        }
+                    }
+                }
+            }
+    }
+
+    /**
+     * Builds a concise single-line preview from a finished tool call result.
+     *
+     * @param event Finished tool event
+     * @return Compact text preview for fallback assistant messaging
+     */
+    private fun buildToolResultPreview(event: de.heckenmann.visualagent.agent.tools.ToolCallEvent): String {
+        val status = if (event.result.success) "ok" else "error"
+        val line =
+            event.result.content
+                .lineSequence()
+                .firstOrNull()
+                ?.trim()
+                .orEmpty()
+        return when {
+            line.isNotBlank() -> "Tool ${event.toolId} ($status): $line"
+            !event.result.error.isNullOrBlank() -> "Tool ${event.toolId} ($status): ${event.result.error}"
+            else -> "Tool ${event.toolId} ($status)."
+        }.take(240)
+    }
+
+    /**
+     * Replaces low-information clarification responses with actionable content when tool output exists.
+     *
+     * @param response Raw assistant response text
+     * @return Response text suitable for user display
+     */
+    private fun normalizeAssistantResponse(response: String): String {
+        if (response.isBlank()) {
+            val preview = lastToolResultPreview
+            if (!preview.isNullOrBlank()) {
+                return "Ich habe das Tool ausgeführt. Ergebnis: $preview"
+            }
+        }
+        val lower = response.lowercase()
+        val isGenericClarification =
+            lower.contains("mehr kontext") ||
+                lower.contains("nicht eindeutig") ||
+                lower.contains("what exactly should i do") ||
+                lower.contains("i need more context")
+        if (isGenericClarification) {
+            val preview = lastToolResultPreview
+            if (!preview.isNullOrBlank()) {
+                return "Ich habe das Tool bereits ausgeführt. Ergebnis: $preview"
+            }
+        }
+        return response
+    }
+
+    /**
+     * Subscribes to todo changes so the conversation header updates without polling.
+     */
+    private fun registerTodoObserver() {
+        todoListenerRegistration?.close()
+        todoListenerRegistration =
+            agentManager.todoManager.addListener {
+                Platform.runLater { refreshTodoSummary() }
+            }
     }
 
     /**
@@ -260,14 +376,12 @@ class MainWindow(
         selectedModelLabel.text = " ${AppConfig.instance.ollamaModel}"
         scene?.root?.style = "-fx-font-size: ${AppConfig.instance.fontSize}px;"
         Application.setUserAgentStylesheet(AppConfig.instance.getThemeStylesheet())
-        chatPanel.updateSessionContext(
-            model = AppConfig.instance.ollamaModel,
-            connected = currentConnectionState,
-            agentCount = agentManager.getSubAgents().size,
-        )
     }
 
-    private fun switchPanel(panel: javafx.scene.Node, button: Button?) {
+    private fun switchPanel(
+        panel: javafx.scene.Node,
+        button: Button?,
+    ) {
         chatArea.center = panel
 
         activeButton?.styleClass?.remove("active")
@@ -289,14 +403,16 @@ class MainWindow(
             )
 
         shortcuts.forEach { (keyCode, button) ->
-            targetScene.accelerators[KeyCodeCombination(keyCode, KeyCombination.SHORTCUT_DOWN)] = Runnable {
-                panelByButton[button]?.let { panel -> switchPanel(panel, button) }
-            }
+            targetScene.accelerators[KeyCodeCombination(keyCode, KeyCombination.SHORTCUT_DOWN)] =
+                Runnable {
+                    panelByButton[button]?.let { panel -> switchPanel(panel, button) }
+                }
         }
 
-        targetScene.accelerators[KeyCodeCombination(KeyCode.K, KeyCombination.SHORTCUT_DOWN)] = Runnable {
-            openCommandPalette()
-        }
+        targetScene.accelerators[KeyCodeCombination(KeyCode.K, KeyCombination.SHORTCUT_DOWN)] =
+            Runnable {
+                openCommandPalette()
+            }
     }
 
     private fun openCommandPalette() {
@@ -334,9 +450,10 @@ class MainWindow(
     }
 
     private suspend fun doCheckConnection() {
-        val isConnected = withContext(Dispatchers.IO) {
-            llmProvider.checkConnection()
-        }
+        val isConnected =
+            withContext(Dispatchers.IO) {
+                llmProvider.checkConnection()
+            }
         Platform.runLater {
             currentConnectionState = isConnected
             connectionStatus.text = if (isConnected) " Connected" else " Disconnected"
@@ -348,5 +465,23 @@ class MainWindow(
     private fun updateAgentCountUi() {
         val count = agentManager.getSubAgents().size
         agentsLabel.text = " $count"
+    }
+
+    /**
+     * Refreshes conversation header todo counters from the shared todo manager.
+     */
+    private fun refreshTodoSummary() {
+        val all = agentManager.todoManager.getAll()
+        val open = all.count { it.status == TodoStatus.PENDING }
+        val inProgress = all.count { it.status == TodoStatus.IN_PROGRESS }
+        val completed = all.count { it.status == TodoStatus.COMPLETED }
+        val cancelled = all.count { it.status == TodoStatus.CANCELLED }
+        chatPanel.updateTodoSummary(
+            total = all.size,
+            open = open,
+            inProgress = inProgress,
+            completed = completed,
+            cancelled = cancelled,
+        )
     }
 }

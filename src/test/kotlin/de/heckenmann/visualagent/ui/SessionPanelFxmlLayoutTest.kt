@@ -9,7 +9,10 @@ class SessionPanelFxmlLayoutTest {
     fun `session fxml keeps main scroll pane vertically scrollable`() {
         val res = javaClass.getResourceAsStream("/fxml/session-panel.fxml")?.bufferedReader()?.use { it.readText() }
         assertTrue(
-            res != null && res.contains("fx:id=\"scrollPane\"") && res.contains("fitToHeight=\"false\"") && res.contains("vbarPolicy=\"AS_NEEDED\""),
+            res != null &&
+                res.contains("fx:id=\"scrollPane\"") &&
+                res.contains("fitToHeight=\"false\"") &&
+                res.contains("vbarPolicy=\"AS_NEEDED\""),
             "session-panel.fxml must keep the main scroll pane vertically scrollable",
         )
     }

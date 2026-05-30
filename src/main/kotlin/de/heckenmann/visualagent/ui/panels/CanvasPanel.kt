@@ -10,7 +10,6 @@ import javafx.scene.paint.Color
 import javafx.scene.text.Font
 
 class CanvasPanel : Region() {
-
     private val rootBorderPane = BorderPane()
     private val canvas = Canvas()
     private val gc: GraphicsContext = canvas.graphicsContext2D
@@ -45,13 +44,25 @@ class CanvasPanel : Region() {
         gc.fillRect(0.0, 0.0, canvas.width, canvas.height)
     }
 
-    fun drawText(text: String, x: Double, y: Double, color: String = "#e0e0e0") {
+    fun drawText(
+        text: String,
+        x: Double,
+        y: Double,
+        color: String = "#e0e0e0",
+    ) {
         gc.fill = Color.web(color)
         gc.font = Font.font("System", 14.0)
         gc.fillText(text, x, y)
     }
 
-    fun drawRect(x: Double, y: Double, width: Double, height: Double, fillColor: String, strokeColor: String? = null) {
+    fun drawRect(
+        x: Double,
+        y: Double,
+        width: Double,
+        height: Double,
+        fillColor: String,
+        strokeColor: String? = null,
+    ) {
         gc.fill = Color.web(fillColor)
         gc.fillRect(x, y, width, height)
         if (strokeColor != null) {
@@ -60,7 +71,14 @@ class CanvasPanel : Region() {
         }
     }
 
-    fun drawLine(x1: Double, y1: Double, x2: Double, y2: Double, color: String = "#4caf50", width: Double = 2.0) {
+    fun drawLine(
+        x1: Double,
+        y1: Double,
+        x2: Double,
+        y2: Double,
+        color: String = "#4caf50",
+        width: Double = 2.0,
+    ) {
         gc.stroke = Color.web(color)
         gc.lineWidth = width
         gc.beginPath()
@@ -69,7 +87,12 @@ class CanvasPanel : Region() {
         gc.stroke()
     }
 
-    fun drawCircle(centerX: Double, centerY: Double, radius: Double, fillColor: String) {
+    fun drawCircle(
+        centerX: Double,
+        centerY: Double,
+        radius: Double,
+        fillColor: String,
+    ) {
         gc.fill = Color.web(fillColor)
         gc.fillOval(centerX - radius, centerY - radius, radius * 2, radius * 2)
     }

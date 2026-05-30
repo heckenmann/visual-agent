@@ -20,7 +20,10 @@ interface VisualAgentTool {
      * @param context Request-scoped execution metadata
      * @return Structured tool result
      */
-    fun execute(inputJson: String, context: Map<String, Any> = emptyMap()): ToolResult
+    fun execute(
+        inputJson: String,
+        context: Map<String, Any> = emptyMap(),
+    ): ToolResult
 }
 
 /**
@@ -29,4 +32,3 @@ interface VisualAgentTool {
  * @return Name that can be used as a Spring AI function callback name
  */
 fun ToolId.toFunctionName(): String = value.replace(Regex("[^A-Za-z0-9_]"), "_")
-

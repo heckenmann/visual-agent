@@ -1,8 +1,8 @@
 package de.heckenmann.visualagent.ui.panels
 
+import de.heckenmann.visualagent.agent.AgentConfig
 import de.heckenmann.visualagent.agent.AgentStatus
 import de.heckenmann.visualagent.agent.SubAgent
-import de.heckenmann.visualagent.agent.AgentConfig
 import de.heckenmann.visualagent.ui.FxmlLoader
 import javafx.fxml.FXML
 import javafx.scene.Node
@@ -13,7 +13,6 @@ import javafx.scene.layout.VBox
 import java.util.UUID
 
 class SubAgentsPanel : Region() {
-
     @FXML
     private lateinit var rootVBox: VBox
 
@@ -115,13 +114,18 @@ class SubAgentsPanel : Region() {
         agentsContainer.children.add(agentView as Node)
     }
 
-    fun updateAgentStatus(agentId: String, status: AgentStatus, task: String? = null) {
+    fun updateAgentStatus(
+        agentId: String,
+        status: AgentStatus,
+        task: String? = null,
+    ) {
         agentsList.find { it.agent.id == agentId }?.updateStatus(status, task)
     }
 }
 
-class SubAgentView(val agent: SubAgent) : Region() {
-
+class SubAgentView(
+    val agent: SubAgent,
+) : Region() {
     @FXML
     private lateinit var root: VBox
 
@@ -160,15 +164,19 @@ class SubAgentView(val agent: SubAgent) : Region() {
 
     private fun updateStatusIndicator(status: AgentStatus) {
         statusIndicator.styleClass.removeAll("agent-status-idle", "agent-status-busy", "agent-status-offline")
-        val statusClass = when (status) {
-            AgentStatus.IDLE -> "agent-status-idle"
-            AgentStatus.BUSY -> "agent-status-busy"
-            AgentStatus.OFFLINE -> "agent-status-offline"
-        }
+        val statusClass =
+            when (status) {
+                AgentStatus.IDLE -> "agent-status-idle"
+                AgentStatus.BUSY -> "agent-status-busy"
+                AgentStatus.OFFLINE -> "agent-status-offline"
+            }
         statusIndicator.styleClass.add(statusClass)
     }
 
-    fun updateStatus(status: AgentStatus, task: String? = null) {
+    fun updateStatus(
+        status: AgentStatus,
+        task: String? = null,
+    ) {
         agent.status = status
         agent.currentTask = task
         updateStatusIndicator(status)

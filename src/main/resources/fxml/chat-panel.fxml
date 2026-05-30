@@ -19,26 +19,29 @@
                 <ImageView fx:id="conversationIconImage" fitHeight="34.0" fitWidth="34.0" preserveRatio="true" styleClass="chat-header-mark"/>
                 <VBox spacing="1.0">
                     <Label text="Conversation" styleClass="chat-header-title"/>
-                    <Label fx:id="conversationMetaLabel" text="Ready" styleClass="chat-header-meta"/>
                 </VBox>
                 <Region HBox.hgrow="ALWAYS"/>
                 <Button fx:id="clearChatButton" styleClass="chat-toolbar-button"/>
             </ToolBar>
             <HBox styleClass="chat-session-info-bar">
-                <Label fx:id="connectionInfoLabel" text="Offline" styleClass="chat-session-chip"/>
-                <Label fx:id="modelInfoLabel" text="Model --" styleClass="chat-session-chip"/>
-                <Label fx:id="agentsInfoLabel" text="Agents 0" styleClass="chat-session-chip"/>
-                <HBox fx:id="assistantBusyContainer" styleClass="chat-busy-wrap" managed="false" visible="false">
-                    <ProgressIndicator fx:id="assistantBusySpinner" progress="-1.0" styleClass="chat-busy-spinner"/>
-                    <Label fx:id="assistantBusyLabel" text="Idle" styleClass="chat-busy-label"/>
-                </HBox>
+                <Label fx:id="todoInfoLabel" text="Todos 0" styleClass="chat-session-chip"/>
+                <Button fx:id="openTodosButton" text="Open Todos" styleClass="chat-toolbar-button"/>
                 <Region HBox.hgrow="ALWAYS"/>
                 <Label text="Enter send / Shift+Enter line break / Cmd+Enter send" styleClass="chat-hint-label"/>
             </HBox>
         </VBox>
     </top>
     <center>
-        <ListView fx:id="messagesListView" styleClass="chat-message-list"/>
+        <VBox spacing="6.0">
+            <ListView fx:id="messagesListView" styleClass="chat-message-list" VBox.vgrow="ALWAYS"/>
+            <HBox styleClass="chat-runtime-status-row">
+                <HBox fx:id="assistantBusyContainer" styleClass="chat-busy-wrap" managed="false" visible="false">
+                    <ProgressIndicator fx:id="assistantBusySpinner" progress="-1.0" styleClass="chat-busy-spinner"/>
+                    <Label fx:id="assistantBusyLabel" text="Idle" styleClass="chat-busy-label"/>
+                </HBox>
+                <Region HBox.hgrow="ALWAYS"/>
+            </HBox>
+        </VBox>
     </center>
     <bottom>
         <VBox styleClass="chat-composer-wrap">

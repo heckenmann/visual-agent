@@ -8,7 +8,6 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SubAgentTest {
-
     @Test
     fun `AgentStatus enum has expected values`() {
         val statuses = AgentStatus.values()
@@ -51,15 +50,16 @@ class SubAgentTest {
 
     @Test
     fun `SubAgent with all properties set`() {
-        val agent = SubAgent(
-            id = "42",
-            name = "Researcher",
-            role = "Web research",
-            status = AgentStatus.BUSY,
-            currentTask = "Searching docs",
-            currentTodoId = "todo-99",
-            parentAgentId = "parent-1",
-        )
+        val agent =
+            SubAgent(
+                id = "42",
+                name = "Researcher",
+                role = "Web research",
+                status = AgentStatus.BUSY,
+                currentTask = "Searching docs",
+                currentTodoId = "todo-99",
+                parentAgentId = "parent-1",
+            )
         assertEquals("42", agent.id)
         assertEquals("Researcher", agent.name)
         assertEquals("Web research", agent.role)

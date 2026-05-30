@@ -55,7 +55,10 @@ class StatusBar : Region() {
         modelLabel.text = "Model: $model"
     }
 
-    fun updateAgentCount(active: Int, total: Int) {
+    fun updateAgentCount(
+        active: Int,
+        total: Int,
+    ) {
         agentsLabel.text = "Agents: $active/$total"
     }
 
@@ -64,11 +67,12 @@ class StatusBar : Region() {
     }
 
     override fun computeMinHeight(width: Double): Double = HEIGHT
+
     override fun computePrefHeight(width: Double): Double = HEIGHT
+
     override fun computeMaxHeight(width: Double): Double = HEIGHT
 
     override fun layoutChildren() {
         rootBorderPane.resizeRelocate(0.0, 0.0, width, HEIGHT)
     }
 }
-

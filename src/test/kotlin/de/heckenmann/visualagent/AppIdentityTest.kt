@@ -41,7 +41,10 @@ class AppIdentityTest {
         assertTrue(AppIdentity.isMacOs("macOS"))
     }
 
-    private fun restoreProperty(name: String, value: String?) {
+    private fun restoreProperty(
+        name: String,
+        value: String?,
+    ) {
         if (value == null) {
             System.clearProperty(name)
         } else {
