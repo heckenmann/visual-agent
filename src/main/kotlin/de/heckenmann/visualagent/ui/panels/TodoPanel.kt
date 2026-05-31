@@ -28,6 +28,8 @@ import javafx.scene.layout.HBox
 import javafx.scene.layout.Priority
 import javafx.scene.layout.Region
 import javafx.scene.layout.VBox
+import org.springframework.context.annotation.Lazy
+import org.springframework.stereotype.Component
 import java.util.UUID
 
 /**
@@ -36,6 +38,8 @@ import java.util.UUID
  * Loads its layout from `todo-panel.fxml` and provides a cell factory that renders
  * each [Todo] with a checkbox, description, priority badge, and delete button.
  */
+@Component
+@Lazy
 class TodoPanel(
     private val todoManager: TodoManager,
 ) : Region() {

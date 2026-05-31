@@ -8,7 +8,11 @@ import javafx.scene.layout.BorderPane
 import javafx.scene.layout.Region
 import javafx.scene.paint.Color
 import javafx.scene.text.Font
+import org.springframework.context.annotation.Lazy
+import org.springframework.stereotype.Component
 
+@Component
+@Lazy
 class CanvasPanel : Region() {
     private val rootBorderPane = BorderPane()
     private val canvas = Canvas()

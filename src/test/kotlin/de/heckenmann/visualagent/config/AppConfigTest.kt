@@ -1,6 +1,5 @@
 package de.heckenmann.visualagent.config
 
-import de.heckenmann.visualagent.knowledge.KnowledgeDb
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -15,6 +14,10 @@ class AppConfigTest {
         val tempDb = createTempDirectory("visual-agent-config-test").resolve("settings.db").toString()
 
         try {
+            val boundDb =
+                de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                    .create(tempDb)
+            config.bindKnowledgeDb(boundDb)
             config.databasePath = tempDb
             config.theme = "Nord Dark"
             config.fontSize = 18
@@ -22,15 +25,19 @@ class AppConfigTest {
             config.contextLength = 8192
             config.streamingEnabled = false
             config.autoCompactionEnabled = false
+            config.userModelInstruction = "Always respond in German."
             config.save()
 
-            val db = KnowledgeDb(tempDb)
+            val db =
+                de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                    .create(tempDb)
             assertEquals("Nord Dark", db.getPreference("ui.theme"))
             assertEquals("18", db.getPreference("ui.font.size"))
             assertEquals("llama3.2:3b", db.getPreference("ollama.model"))
             assertEquals("8192", db.getPreference("session.context.length"))
             assertEquals("false", db.getPreference("session.streaming.enabled"))
             assertEquals("false", db.getPreference("session.auto.compaction.enabled"))
+            assertEquals("Always respond in German.", db.getPreference("session.user.model.instruction"))
             assertTrue(File(tempDb).exists())
         } finally {
             restore(config, original)
@@ -44,11 +51,16 @@ class AppConfigTest {
         val tempDb = createTempDirectory("visual-agent-config-reload-test").resolve("settings.db").toString()
 
         try {
+            val boundDb =
+                de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                    .create(tempDb)
+            config.bindKnowledgeDb(boundDb)
             config.databasePath = tempDb
             config.theme = "Cupertino Light"
             config.fontSize = 20
             config.timeoutSeconds = 240
             config.maxParallelSubAgents = 7
+            config.userModelInstruction = "Use concise answers."
             config.save()
 
             // Simulate in-memory drift before "next startup"/reload
@@ -56,6 +68,7 @@ class AppConfigTest {
             config.fontSize = 12
             config.timeoutSeconds = 60
             config.maxParallelSubAgents = 2
+            config.userModelInstruction = ""
 
             config.reload()
 
@@ -63,6 +76,7 @@ class AppConfigTest {
             assertEquals(20, config.fontSize)
             assertEquals(240, config.timeoutSeconds)
             assertEquals(7, config.maxParallelSubAgents)
+            assertEquals("Use concise answers.", config.userModelInstruction)
         } finally {
             restore(config, original)
         }
@@ -77,6 +91,10 @@ class AppConfigTest {
         val registration = config.addChangeListener { changes.add(it) }
 
         try {
+            val boundDb =
+                de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                    .create(tempDb)
+            config.bindKnowledgeDb(boundDb)
             config.databasePath = tempDb
             config.ollamaModel = "observer-model"
             config.save()
@@ -102,6 +120,7 @@ class AppConfigTest {
         val loadLimit: Int,
         val maxParallelSubAgents: Int,
         val timeoutSeconds: Int,
+        val userModelInstruction: String,
     )
 
     private fun snapshot(config: AppConfig): ConfigSnapshot =
@@ -119,6 +138,7 @@ class AppConfigTest {
             loadLimit = config.loadLimit,
             maxParallelSubAgents = config.maxParallelSubAgents,
             timeoutSeconds = config.timeoutSeconds,
+            userModelInstruction = config.userModelInstruction,
         )
 
     private fun restore(
@@ -138,6 +158,7 @@ class AppConfigTest {
         config.loadLimit = snapshot.loadLimit
         config.maxParallelSubAgents = snapshot.maxParallelSubAgents
         config.timeoutSeconds = snapshot.timeoutSeconds
+        config.userModelInstruction = snapshot.userModelInstruction
         config.save()
     }
 }

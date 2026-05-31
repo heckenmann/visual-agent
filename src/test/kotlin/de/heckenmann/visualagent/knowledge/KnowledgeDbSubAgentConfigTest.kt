@@ -10,7 +10,9 @@ import kotlin.test.assertTrue
 class KnowledgeDbSubAgentConfigTest {
     @Test
     fun `sub agent config crud persists tool ids`() {
-        val db = KnowledgeDb("jdbc:sqlite::memory:")
+        val db =
+            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                .create("jdbc:sqlite::memory:")
         val service = AgentToolConfigService(db)
         val config =
             SubAgentToolConfig(

@@ -22,4 +22,13 @@ class SessionPanelFxmlLayoutTest {
         val hasOverride = SessionPanel::class.java.declaredMethods.any { it.name == "layoutChildren" }
         assertTrue(hasOverride, "SessionPanel must resize its FXML root in layoutChildren")
     }
+
+    @Test
+    fun `session fxml includes user instruction area`() {
+        val res = javaClass.getResourceAsStream("/fxml/session-panel.fxml")?.bufferedReader()?.use { it.readText() }
+        assertTrue(
+            res != null && res.contains("fx:id=\"userInstructionArea\""),
+            "session-panel.fxml must include a user instruction text area",
+        )
+    }
 }

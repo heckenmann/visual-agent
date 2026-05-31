@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.agent
 
-import de.heckenmann.visualagent.knowledge.KnowledgeDb
+import de.heckenmann.visualagent.agent.tools.ToolEventBus
+import de.heckenmann.visualagent.config.AppConfig
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -15,7 +16,9 @@ class AgentManagerRecoveryAndTodoContextTest {
     @Test
     fun `main request includes current todo list in system context`() =
         runBlocking {
-            val db = KnowledgeDb("jdbc:sqlite::memory:")
+            val db =
+                de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                    .create("jdbc:sqlite::memory:")
             val provider = mockk<LLMProvider>(relaxed = true)
             val requestSlot = slot<ChatRequestContext>()
             coEvery { provider.chat(capture(requestSlot)) } returns
@@ -24,24 +27,35 @@ class AgentManagerRecoveryAndTodoContextTest {
                     message = Message("assistant", "ok"),
                     done = true,
                 )
-            val manager = AgentManager(db, provider, AgentToolConfigService(db))
-            manager.todoManager.add("Implement worker orchestration")
+            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
+            val previousInstruction = AppConfig.instance.userModelInstruction
+            try {
+                AppConfig.instance.userModelInstruction = "Always answer in German."
+                manager.todoManager.add("Implement worker orchestration")
 
-            manager.sendMessage("Start")
+                manager.sendMessage("Start")
 
-            val firstMessage = requestSlot.captured.messages.first()
-            assertTrue(firstMessage.role == "system")
-            assertTrue(firstMessage.content.contains("Current TODO list"))
-            assertTrue(firstMessage.content.contains("Implement worker orchestration"))
-            assertTrue(firstMessage.content.contains("call `todos` with `{\"action\":\"list\"}` first"))
-            assertTrue(firstMessage.content.contains("After any successful tool call, provide a concrete answer"))
+                val firstMessage = requestSlot.captured.messages.first()
+                val secondMessage = requestSlot.captured.messages[1]
+                assertTrue(firstMessage.role == "system")
+                assertTrue(firstMessage.content.contains("Current TODO list"))
+                assertTrue(firstMessage.content.contains("Implement worker orchestration"))
+                assertTrue(firstMessage.content.contains("use `{\"action\":\"count\"}` for counts"))
+                assertTrue(firstMessage.content.contains("After any successful tool call, provide a concrete answer"))
+                assertTrue(secondMessage.role == "system")
+                assertTrue(secondMessage.content.contains("Always answer in German."))
+            } finally {
+                AppConfig.instance.userModelInstruction = previousInstruction
+            }
         }
 
     @Test
     fun `manager resumes interrupted conversation when last message was from user`() =
         runBlocking {
             val tempDb = createTempDirectory("visual-agent-resume-test").resolve("resume.db").toString()
-            val db = KnowledgeDb(tempDb)
+            val db =
+                de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                    .create(tempDb)
             db.saveConversationMessage("main", "user", "Please continue after restart")
 
             val provider = mockk<LLMProvider>(relaxed = true)
@@ -51,7 +65,7 @@ class AgentManagerRecoveryAndTodoContextTest {
                     message = Message("assistant", "Recovered and continued."),
                     done = true,
                 )
-            AgentManager(db, provider, AgentToolConfigService(db))
+            AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
 
             delay(600)
             val messages = db.getConversationMessages("main")

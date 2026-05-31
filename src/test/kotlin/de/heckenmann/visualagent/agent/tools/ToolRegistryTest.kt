@@ -18,7 +18,16 @@ class ToolRegistryTest {
 
         val callbacks = registry.functionCallbacks(setOf(ToolId("file:read"), ToolId("missing")))
 
-        assertEquals(listOf("file_read"), callbacks.map { it.name })
+        assertEquals(listOf("file_read"), callbacks.map { it.toolDefinition.name() })
+    }
+
+    @Test
+    fun `todos tool is exposed only under canonical function name`() {
+        val registry = ToolRegistry(listOf(FakeTool("todos")), ToolEventBus())
+
+        val callbackNames = registry.functionCallbacks(setOf(ToolId("todos"))).map { it.toolDefinition.name() }.sorted()
+
+        assertEquals(listOf("todos"), callbackNames)
     }
 
     @Test

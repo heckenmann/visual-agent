@@ -12,7 +12,10 @@ class ChatPanelFxmlLayoutTest {
         assertTrue(res != null && !res.contains("fx:id=\"modelInfoLabel\""), "chat-panel.fxml must not duplicate selected model")
         assertTrue(res != null && !res.contains("fx:id=\"agentsInfoLabel\""), "chat-panel.fxml must not duplicate agent count")
         assertTrue(res != null && res.contains("fx:id=\"todoInfoLabel\""), "chat-panel.fxml must define todo summary label")
-        assertTrue(res != null && res.contains("fx:id=\"assistantBusySpinner\""), "chat-panel.fxml must define assistant busy spinner")
+        assertTrue(
+            res != null && !res.contains("fx:id=\"assistantBusySpinner\""),
+            "chat-panel.fxml must not define a duplicate runtime spinner",
+        )
         assertTrue(res != null && res.contains("fx:id=\"assistantBusyLabel\""), "chat-panel.fxml must define assistant busy label")
         assertTrue(
             res != null && res.contains("fx:id=\"conversationIconImage\""),

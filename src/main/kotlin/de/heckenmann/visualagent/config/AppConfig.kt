@@ -36,9 +36,13 @@ class AppConfig private constructor() {
     var loadLimit: Int = 50
     var maxParallelSubAgents: Int = 4
     var timeoutSeconds: Int = 120
+    var userModelInstruction: String = ""
 
     private val listeners = CopyOnWriteArrayList<(AppConfigChange) -> Unit>()
     private var lastSnapshot = snapshot()
+
+    @Volatile
+    private var knowledgeDb: KnowledgeDb? = null
 
     companion object {
         /** Singleton instance of AppConfig. */
@@ -57,6 +61,7 @@ class AppConfig private constructor() {
         private const val KEY_SESSION_LOAD_LIMIT = "session.load.limit"
         private const val KEY_SESSION_MAX_PARALLEL_SUB_AGENTS = "session.max.parallel.sub.agents"
         private const val KEY_SESSION_TIMEOUT_SECONDS = "session.timeout.seconds"
+        private const val KEY_SESSION_USER_MODEL_INSTRUCTION = "session.user.model.instruction"
     }
 
     /**
@@ -68,6 +73,15 @@ class AppConfig private constructor() {
     fun addChangeListener(listener: (AppConfigChange) -> Unit): AutoCloseable {
         listeners.add(listener)
         return AutoCloseable { listeners.remove(listener) }
+    }
+
+    /**
+     * Binds the Spring-managed persistence facade used for settings storage.
+     *
+     * @param db Shared [KnowledgeDb] bean
+     */
+    fun bindKnowledgeDb(db: KnowledgeDb) {
+        knowledgeDb = db
     }
 
     /**
@@ -163,6 +177,7 @@ class AppConfig private constructor() {
                 KEY_SESSION_LOAD_LIMIT to loadLimit.toString(),
                 KEY_SESSION_MAX_PARALLEL_SUB_AGENTS to maxParallelSubAgents.toString(),
                 KEY_SESSION_TIMEOUT_SECONDS to timeoutSeconds.toString(),
+                KEY_SESSION_USER_MODEL_INSTRUCTION to userModelInstruction,
             ),
         )
 
@@ -182,7 +197,7 @@ class AppConfig private constructor() {
 
     private fun saveToDatabase() {
         runCatching {
-            val db = KnowledgeDb(databasePath)
+            val db = knowledgeDb ?: return@runCatching
             db.setPreference(KEY_OLLAMA_LOCAL_URL, ollamaLocalUrl)
             db.setPreference(KEY_OLLAMA_MODEL, ollamaModel)
             db.setPreference(KEY_DATABASE_PATH, databasePath)
@@ -196,6 +211,7 @@ class AppConfig private constructor() {
             db.setPreference(KEY_SESSION_LOAD_LIMIT, loadLimit.toString())
             db.setPreference(KEY_SESSION_MAX_PARALLEL_SUB_AGENTS, maxParallelSubAgents.toString())
             db.setPreference(KEY_SESSION_TIMEOUT_SECONDS, timeoutSeconds.toString())
+            db.setPreference(KEY_SESSION_USER_MODEL_INSTRUCTION, userModelInstruction)
         }
     }
 
@@ -219,7 +235,7 @@ class AppConfig private constructor() {
 
     private fun loadFromDatabase() {
         runCatching {
-            val db = KnowledgeDb(databasePath)
+            val db = knowledgeDb ?: return@runCatching
             ollamaLocalUrl = db.getPreference(KEY_OLLAMA_LOCAL_URL) ?: ollamaLocalUrl
             ollamaModel = db.getPreference(KEY_OLLAMA_MODEL) ?: ollamaModel
             theme = db.getPreference(KEY_UI_THEME) ?: theme
@@ -232,6 +248,7 @@ class AppConfig private constructor() {
             loadLimit = db.getPreference(KEY_SESSION_LOAD_LIMIT)?.toIntOrNull() ?: loadLimit
             maxParallelSubAgents = db.getPreference(KEY_SESSION_MAX_PARALLEL_SUB_AGENTS)?.toIntOrNull() ?: maxParallelSubAgents
             timeoutSeconds = db.getPreference(KEY_SESSION_TIMEOUT_SECONDS)?.toIntOrNull() ?: timeoutSeconds
+            userModelInstruction = db.getPreference(KEY_SESSION_USER_MODEL_INSTRUCTION) ?: userModelInstruction
         }
     }
 }

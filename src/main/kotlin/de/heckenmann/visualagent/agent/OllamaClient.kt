@@ -1,20 +1,17 @@
 package de.heckenmann.visualagent.agent
 
-import de.heckenmann.visualagent.agent.tools.ToolRegistry
+import de.heckenmann.visualagent.agent.ollama.OllamaPromptFactory
+import de.heckenmann.visualagent.agent.ollama.OllamaToolRecovery
 import de.heckenmann.visualagent.config.AppConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.reactive.asFlow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
-import org.springframework.ai.chat.messages.AssistantMessage
-import org.springframework.ai.chat.messages.SystemMessage
-import org.springframework.ai.chat.messages.UserMessage
 import org.springframework.ai.chat.model.ChatModel
-import org.springframework.ai.chat.prompt.Prompt
-import org.springframework.ai.model.function.FunctionCallingOptions
 import org.springframework.ai.ollama.api.OllamaApi
 import org.springframework.stereotype.Component
 
@@ -25,18 +22,34 @@ import org.springframework.stereotype.Component
 class OllamaClient(
     private val chatModel: ChatModel,
     private val ollamaApi: OllamaApi,
-    private val toolRegistry: ToolRegistry,
+    private val promptFactory: OllamaPromptFactory,
+    private val toolRecovery: OllamaToolRecovery,
 ) : LLMProvider {
     override suspend fun chat(messages: List<Message>): ChatResponse = chat(ChatRequestContext(messages = messages))
 
     override suspend fun chat(request: ChatRequestContext): ChatResponse =
         withContext(Dispatchers.IO) {
             val selectedModel = request.model ?: AppConfig.instance.ollamaModel
-            val response = chatModel.call(buildPrompt(request, selectedModel))
+            val allowedFunctionNames = promptFactory.allowedFunctionNames(request, selectedModel)
+            val responseResult = runCatching { chatModel.call(promptFactory.buildPrompt(request, selectedModel)) }
+            if (responseResult.isFailure) {
+                val error = responseResult.exceptionOrNull()
+                if (error != null && isMissingFunctionCallbackError(error)) {
+                    val recovered = toolRecovery.runUnknownToolRecovery(request, selectedModel, allowedFunctionNames, error)
+                    return@withContext recovered
+                        ?: ChatResponse(
+                            model = selectedModel,
+                            message = Message(role = "assistant", content = toolRecovery.buildToolListResponse(allowedFunctionNames)),
+                            done = true,
+                        )
+                }
+                throw (error ?: IllegalStateException("Unknown chat model error"))
+            }
+            val response = responseResult.getOrThrow()
             val output =
                 response.result
                     ?.output
-                    ?.content
+                    ?.text
                     .orEmpty()
 
             ChatResponse(
@@ -56,7 +69,7 @@ class OllamaClient(
                 evalCount =
                     response.metadata
                         ?.usage
-                        ?.generationTokens
+                        ?.completionTokens
                         ?.toInt(),
             )
         }
@@ -65,63 +78,62 @@ class OllamaClient(
 
     override suspend fun stream(request: ChatRequestContext): Flow<ChatResponse> {
         val selectedModel = request.model ?: AppConfig.instance.ollamaModel
-        return chatModel
-            .stream(buildPrompt(request, selectedModel))
-            .asFlow()
-            .map { chunk ->
-                ChatResponse(
-                    model = chunk.metadata?.model ?: selectedModel,
-                    message =
-                        Message(
-                            role = "assistant",
-                            content =
-                                chunk.result
-                                    ?.output
-                                    ?.content
-                                    .orEmpty(),
+        val allowedFunctionNames = promptFactory.allowedFunctionNames(request, selectedModel)
+        return flow {
+            try {
+                chatModel
+                    .stream(promptFactory.buildPrompt(request, selectedModel))
+                    .asFlow()
+                    .map { chunk ->
+                        ChatResponse(
+                            model = chunk.metadata?.model ?: selectedModel,
+                            message =
+                                Message(
+                                    role = "assistant",
+                                    content =
+                                        chunk.result
+                                            ?.output
+                                            ?.text
+                                            .orEmpty(),
+                                ),
+                            done = chunk.result?.metadata?.finishReason != null,
+                            promptEvalCount =
+                                chunk.metadata
+                                    ?.usage
+                                    ?.promptTokens
+                                    ?.toInt(),
+                            evalCount =
+                                chunk.metadata
+                                    ?.usage
+                                    ?.completionTokens
+                                    ?.toInt(),
+                        )
+                    }.collect { emit(it) }
+            } catch (error: Throwable) {
+                if (!isMissingFunctionCallbackError(error)) throw error
+                val recovered = toolRecovery.runUnknownToolRecovery(request, selectedModel, allowedFunctionNames, error)
+                emit(
+                    recovered
+                        ?: ChatResponse(
+                            model = selectedModel,
+                            message = Message(role = "assistant", content = toolRecovery.buildToolListResponse(allowedFunctionNames)),
+                            done = true,
                         ),
-                    done = chunk.result?.metadata?.finishReason != null,
-                    promptEvalCount =
-                        chunk.metadata
-                            ?.usage
-                            ?.promptTokens
-                            ?.toInt(),
-                    evalCount =
-                        chunk.metadata
-                            ?.usage
-                            ?.generationTokens
-                            ?.toInt(),
                 )
-            }.flowOn(Dispatchers.IO)
+            }
+        }.flowOn(Dispatchers.IO)
     }
 
-    private fun buildPrompt(
-        request: ChatRequestContext,
-        selectedModel: String,
-    ): Prompt {
-        val callbacks =
-            toolRegistry.functionCallbacks(
-                enabledTools = request.enabledTools,
-                context = request.metadata + mapOf("model" to selectedModel),
-            )
-        val options =
-            FunctionCallingOptions
-                .builder()
-                .model(selectedModel)
-                .functionCallbacks(callbacks)
-                .functions(callbacks.map { it.name }.toSet())
-                .build()
-        return Prompt(
-            request.messages.map { msg ->
-                when (msg.role) {
-                    "system" -> SystemMessage(msg.content)
-                    "assistant" -> AssistantMessage(msg.content)
-                    else -> UserMessage(msg.content)
-                }
-            },
-            options,
-        )
-    }
+    /**
+     * Returns whether the throwable indicates a missing tool callback registration.
+     *
+     * @param throwable Captured chat/tool error
+     * @return `true` for unknown-function callback failures
+     */
+    private fun isMissingFunctionCallbackError(throwable: Throwable): Boolean =
+        throwable.message
+            ?.contains("No function callback found for function name:")
+            ?: false
 
     override suspend fun vision(
         image: ByteArray,

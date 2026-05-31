@@ -13,7 +13,9 @@ class KnowledgeDbTodoTest {
     @Test
     fun `todo crud is persisted in sqlite`() {
         val tempDb = createTempDirectory("visual-agent-db-todo-test").resolve("todos.db").toString()
-        val db = KnowledgeDb(tempDb)
+        val db =
+            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                .create(tempDb)
 
         val todo =
             Todo(

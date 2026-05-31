@@ -4,9 +4,11 @@ import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.agent.ToolResult
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import org.springframework.ai.model.function.FunctionCallback
+import org.springframework.ai.chat.model.ToolContext
+import org.springframework.ai.tool.ToolCallback
 import org.springframework.stereotype.Service
 import java.time.Instant
+import org.springframework.ai.tool.definition.ToolDefinition as SpringToolDefinition
 
 /**
  * Registry for all tools that can be exposed to the LLM.
@@ -42,22 +44,30 @@ class ToolRegistry(
      *
      * @param enabledTools Tool IDs requested for a model call
      * @param context Request-scoped execution metadata passed to each tool
-     * @return Function callbacks that can be attached to Spring AI options
+     * @return Tool callbacks that can be attached to Spring AI options
      */
     fun functionCallbacks(
         enabledTools: Set<ToolId>,
         context: Map<String, Any> = emptyMap(),
-    ): List<FunctionCallback> =
+    ): List<ToolCallback> =
         resolve(enabledTools).map { tool ->
             val definition = tool.definition
-            object : FunctionCallback {
-                override fun getName(): String = definition.name
+            object : ToolCallback {
+                override fun getToolDefinition(): SpringToolDefinition =
+                    SpringToolDefinition
+                        .builder()
+                        .name(definition.name)
+                        .description(definition.description)
+                        .inputSchema(definition.inputSchema)
+                        .build()
 
-                override fun getDescription(): String = definition.description
+                override fun call(functionInput: String): String = call(functionInput, ToolContext(context))
 
-                override fun getInputTypeSchema(): String = definition.inputSchema
-
-                override fun call(functionInput: String): String {
+                override fun call(
+                    functionInput: String,
+                    toolContext: ToolContext?,
+                ): String {
+                    val effectiveContext = context + (toolContext?.context ?: emptyMap())
                     val startedAt = Instant.now()
                     toolEventBus.publish(
                         ToolCallEvent(
@@ -65,7 +75,7 @@ class ToolRegistry(
                             functionName = definition.name,
                             phase = ToolCallPhase.STARTED,
                             inputJson = functionInput,
-                            context = context,
+                            context = effectiveContext,
                             result =
                                 ToolResult(
                                     toolId = definition.id.value,
@@ -78,7 +88,7 @@ class ToolRegistry(
                         ),
                     )
                     val result =
-                        runCatching { tool.execute(functionInput, context) }
+                        runCatching { tool.execute(functionInput, effectiveContext) }
                             .getOrElse { error ->
                                 ToolResult(
                                     toolId = definition.id.value,
@@ -94,7 +104,7 @@ class ToolRegistry(
                             functionName = definition.name,
                             phase = ToolCallPhase.FINISHED,
                             inputJson = functionInput,
-                            context = context,
+                            context = effectiveContext,
                             result = result,
                             startedAtUtc = startedAt,
                             finishedAtUtc = finishedAt,

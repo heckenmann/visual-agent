@@ -9,7 +9,9 @@ class KnowledgeDbConversationTest {
     @Test
     fun `save load and delete conversation messages`() {
         val tempDb = createTempDirectory("visual-agent-conversation-db-test").resolve("history.db").toString()
-        val db = KnowledgeDb(tempDb)
+        val db =
+            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                .create(tempDb)
         val sessionId = "main"
 
         db.saveConversationMessage(sessionId, "user", "Hello")
@@ -33,7 +35,9 @@ class KnowledgeDbConversationTest {
     @Test
     fun `conversation supports paging and keyword search`() {
         val tempDb = createTempDirectory("visual-agent-conversation-page-test").resolve("history.db").toString()
-        val db = KnowledgeDb(tempDb)
+        val db =
+            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                .create(tempDb)
         val sessionId = "main"
         repeat(10) { idx ->
             db.saveConversationMessage(sessionId, if (idx % 2 == 0) "user" else "assistant", "entry-$idx keyword")

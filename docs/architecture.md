@@ -2,132 +2,75 @@
 
 ## Overview
 
-Visual Agent follows a modular architecture with clear separation of concerns. UI shells are built and key backend wiring is in place — ChatPanel sends messages via AgentManager, SessionPanel fetches models from OllamaClient, and StatusBar reflects connection status with quick reconnect actions.
+Visual Agent is a JavaFX desktop application with Spring-managed services.  
+The runtime uses Spring AI for model interaction and tool-calling, and SQLite (`KnowledgeDb`) as the persistent state source.
 
-## Layer Model
+## Runtime Layers
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Presentation Layer                       │
-│                    (JavaFX UI Components)                   │
-├─────────────────────────────────────────────────────────────┤
-│                    Application Layer                        │
-│              (Agent Logic, State Management)                │
-├─────────────────────────────────────────────────────────────┤
-│                    Domain Layer                             │
-│         (Business Logic, Domain Models, Interfaces)         │
-├─────────────────────────────────────────────────────────────┤
-│                    Infrastructure Layer                     │
-│    (Ollama Client, SQLite Repository, Browser Controller)   │
-└─────────────────────────────────────────────────────────────┘
-```
+1. Presentation: JavaFX `MainWindow` + panel controllers.
+2. Application: `AgentManager` orchestrates chat, streaming, history, todos, and sub-agents.
+3. Provider: `LLMProvider` abstraction with `OllamaClient` implementation.
+4. Tools: `ToolRegistry` + `VisualAgentTool` implementations + `ToolEventBus`.
+5. Persistence: `KnowledgeDb` (SQLite, WAL, indexed search paths).
 
-## Current Implementation Status
+## Current Implemented Flow
 
-| Component | UI | Backend | Wired |
-|-----------|----|---------|-------|
-| MainWindow | Done (FXML, window controls) | N/A | N/A |
-| ChatPanel | Done (send handler, Enter/Cmd+Ctrl+Enter, loading state, custom cells) | `AgentManager.sendMessage()` | **Wired** — callback in MainWindow |
-| SubAgentsPanel | Done (CSS classes) | `AgentManager` has hardcoded agents | **Partially** — panel creates its own list |
-| TodoPanel | Done (Add dialog, Delete, checkbox, badges) | `KnowledgeDb` has `todos` table | **Not wired** — panel uses in-memory list |
-| CanvasPanel | Done (CSS classes) | Draw methods exist | Functional |
-| SessionPanel | Done (FXML, model selector, details) | `OllamaClient.getModels()`, `getModelDetails()` | **Wired** — model list + details functional |
-| StatusBar | Done (CSS classes + Retry/Reconnect actions) | `checkConnection()` called on startup | **Wired** — shows connected/disconnected, actions trigger reconnect |
-| ApplicationSettingsPanel | Done (FXML, theme, font size) | AppConfig mutable properties | **Wired** — theme reload + font size |
-| OllamaClient | N/A | `chat()`, `stream()`, `vision()`, `embeddings()`, `getModels()`, `getModelDetails()` | **Wired** — called by SessionPanel and ChatPanel; chat/stream use Spring AI tools |
-| KnowledgeDb | N/A | `saveMemory()`, `searchMemories()`, preferences CRUD, WAL mode, busy_timeout | Initialized but not called by UI |
+1. User sends message in `ChatPanel`.
+2. `MainWindow` forwards to `AgentManager` (`sendMessage` or `streamMessage`).
+3. `AgentManager` builds a `ChatRequestContext` with:
+   - recent persisted history (paged),
+   - active model and runtime metadata,
+   - enabled tools for the active agent.
+4. `OllamaClient` maps context to Spring AI `Prompt` + `OllamaChatOptions`.
+5. Spring AI executes tool calls through registered `ToolCallback`s.
+6. Tool events are emitted (`STARTED`/`FINISHED`) and persisted into conversation history.
+7. UI reflects streaming text, tool activity, and stored history.
 
-## Main Components
+## Persistence Model
 
-### 1. UI Layer (JavaFX)
+DB-first behavior is used app-wide:
 
-| Component | Description | Status |
-|-----------|-------------|--------|
-| `MainWindow` | FXML-based with BorderPane layout, panel switching, keyboard shortcuts (`Cmd/Ctrl+1..6`) and command palette (`Cmd/Ctrl+K`) | Working |
-| `ChatPanel` | Chat with ListView + custom cells + send handler + Enter/Cmd+Ctrl+Enter + assistant loading state | Working — wired to AgentManager |
-| `SubAgentsPanel` | Live view of SubAgents with status indicators | Working — creates own default agents |
-| `TodoPanel` | Todo list with Add dialog, Delete, checkbox toggle, priority badges | Working — in-memory only |
-| `CanvasPanel` | Drawing canvas with text, rect, line, circle | Working |
-| `SessionPanel` | Model selector, context slider, streaming toggle, model details | Working — wired to OllamaClient |
-| `StatusBar` | Connection status, model name, agent count, Retry/Reconnect | Working — updated on startup |
-| `ApplicationSettingsPanel` | Theme selector, font size spinner | Working — applies changes live |
-| `FxmlLoader` | Type-safe FXML loading utility | Working |
+- conversation messages are persisted and reloaded on restart
+- todo state is persisted and surfaced to both UI and agent context
+- tool call history entries are persisted and rendered in conversation
+- sub-agent configurations are loaded from DB and maintained via CRUD
 
-### 2. Agent Layer
+Values are not treated as long-lived in-memory truth; DB is the authoritative source.
 
-**`AgentManager`** — wired to ChatPanel via `setOnSendMessage` callback. Still uses hardcoded agents.
+## Tooling Architecture
 
-```kotlin
-// Current (hardcoded):
-private fun loadAgentsFromDb() {
-    subAgents["1"] = SubAgent("1", "Researcher", "Web research", AgentStatus.IDLE)
-    subAgents["2"] = SubAgent("2", "Coder", "Code implementation", AgentStatus.IDLE)
-    subAgents["3"] = SubAgent("3", "Documenter", "Documentation", AgentStatus.IDLE)
-}
+Tools are exposed via canonical IDs and mapped to provider-safe function names inside `ToolRegistry`.
 
-// Needed: query KnowledgeDb.sub_agents table
-```
+Current tool set:
+- `ui`
+- `history`
+- `todos`
+- `file:read`, `file:list`, `file:glob`, `file:grep`, `file:write`, `file:edit`
+- `terminal`
+- `context`
+- `pwd`
+- `browser` (explicit unavailable backend response)
+- `search` (explicit unavailable backend response)
 
-### 3. Provider Layer
+## UI Architecture Notes
 
-**`OllamaClient`** — implements `LLMProvider`, called by SessionPanel and ChatPanel.
+- Main shell: `MainWindow` (FXML) with panel switching and keyboard shortcuts.
+- Conversation UI:
+  - markdown rendering,
+  - streaming updates,
+  - tool call entries,
+  - persisted history with paged loading.
+- Session UI drives model selection and session preferences.
+- Todo panel and conversation both reflect persisted todo state.
 
-| Method | Status | Notes |
-|--------|--------|-------|
-| `chat()` | Implemented | Uses Spring AI `ChatModel` with request-scoped function callbacks |
-| `stream()` | Implemented | Uses Spring AI streaming with request-scoped function callbacks |
-| `vision()` | Implemented | **Bug**: hardcodes model `"llava"` instead of config |
-| `embeddings()` | Implemented | **Bug**: uses raw string interpolation, no escaping of `$text` |
-| `checkConnection()` | Implemented | Called on startup by MainWindow |
-| `getModels()` | Implemented | Called by SessionPanel via `setOllamaClient()` |
-| `getModelDetails()` | Implemented | Called by SessionPanel on model selection |
+## Current Constraints
 
-### 4. Tool Layer
+The following source files still exceed the 300 LOC target and are marked for modularization:
 
-`ToolRegistry` exposes application tools to Spring AI as `FunctionCallback` instances. Agent code only passes provider-neutral `ToolId` values through `ChatRequestContext`; provider-specific callback creation stays inside the LLM provider boundary.
+- `agent/AgentManager.kt`
+- `knowledge/KnowledgeDb.kt`
+- `ui/panels/ChatPanel.kt`
+- `ui/MainWindow.kt`
+- `agent/OllamaClient.kt`
 
-Implemented tool IDs: `ui`, `file:read`, `file:list`, `file:glob`, `file:grep`, `file:write`, `file:edit`, `terminal`, `browser`, `search`, `context`, `pwd`.
-
-### 5. Data Layer
-
-**`KnowledgeDb`** — creates all tables on `init()`, has partial CRUD. WAL mode and `busy_timeout=5000` enabled.
-
-| Table | Read | Write | Status |
-|-------|------|-------|--------|
-| `long_term_memory` | `searchMemories()` | `saveMemory()` | Working but never called by UI |
-| `user_preferences` | `getPreference()` | `setPreference()` | Working but never called by UI |
-| `conversation_history` | **Missing** | **Missing** | Table created, no CRUD methods |
-| `todos` | **Missing** | **Missing** | Table created, no CRUD methods |
-| `sub_agents` | **Missing** | **Missing** | Table created, no CRUD methods |
-| `project_knowledge` | **Missing** | **Missing** | Table created, no methods |
-
-## Known Issues
-
-1. **SubAgentsPanel creates its own agent list** — not populated from AgentManager, leads to duplicate data
-2. **TodoPanel uses in-memory list** — not persisted to KnowledgeDb
-3. **Vision model hardcoded to `"llava"`** — should be configurable
-4. **Embeddings uses raw string interpolation** — no JSON escaping, injection risk
-5. **AgentManager.loadAgentsFromDb() hardcoded** — should query KnowledgeDb.sub_agents table
-
-## Thread Model
-
-- **JavaFX Application Thread**: UI updates
-- **Coroutines Dispatcher**: Async operations (AgentManager, SessionPanel)
-- **IO Dispatcher**: Database and network (implicit via Ktor CIO)
-- **Default Dispatcher**: CPU-intensive tasks
-
-## Configuration Files
-
-| File | Purpose |
-|------|---------|
-| `src/main/resources/config/app.properties` | General settings |
-| `src/main/resources/fxml/*.fxml` | FXML layouts for panels |
-| `src/main/resources/styles/dark.css` | Dark theme stylesheet (30+ selectors) |
-
-## Extensibility
-
-The system is designed following the Open-Closed Principle:
-
-- New providers by implementing `LLMProvider`
-- New tools by registering in `ToolRegistry`
-- New UI components by extending JavaFX `Region`
+The build now includes automated LOC/package-size checks during `check`; violations are currently reported as warnings (non-blocking) until the modularization work is completed.

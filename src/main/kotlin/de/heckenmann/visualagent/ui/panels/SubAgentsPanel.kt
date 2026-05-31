@@ -10,8 +10,12 @@ import javafx.scene.control.Button
 import javafx.scene.control.Label
 import javafx.scene.layout.Region
 import javafx.scene.layout.VBox
+import org.springframework.context.annotation.Lazy
+import org.springframework.stereotype.Component
 import java.util.UUID
 
+@Component
+@Lazy
 class SubAgentsPanel : Region() {
     @FXML
     private lateinit var rootVBox: VBox

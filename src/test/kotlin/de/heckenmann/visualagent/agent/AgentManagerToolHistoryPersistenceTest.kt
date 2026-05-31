@@ -2,7 +2,7 @@ package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolCallPhase
-import de.heckenmann.visualagent.knowledge.KnowledgeDb
+import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import io.mockk.mockk
 import java.time.Instant
 import kotlin.io.path.createTempDirectory
@@ -14,9 +14,11 @@ class AgentManagerToolHistoryPersistenceTest {
     @Test
     fun `finished tool call is persisted in conversation history with metadata`() {
         val tempDb = createTempDirectory("visual-agent-tool-history-test").resolve("history.db").toString()
-        val db = KnowledgeDb(tempDb)
+        val db =
+            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                .create(tempDb)
         val provider = mockk<LLMProvider>(relaxed = true)
-        val manager = AgentManager(db, provider, AgentToolConfigService(db))
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
         val now = Instant.now()
         val event =
             ToolCallEvent(
@@ -44,9 +46,11 @@ class AgentManagerToolHistoryPersistenceTest {
     @Test
     fun `persisted tool call is loaded again after manager restart`() {
         val tempDb = createTempDirectory("visual-agent-tool-history-restart-test").resolve("history.db").toString()
-        val db1 = KnowledgeDb(tempDb)
+        val db1 =
+            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                .create(tempDb)
         val provider1 = mockk<LLMProvider>(relaxed = true)
-        val manager1 = AgentManager(db1, provider1, AgentToolConfigService(db1))
+        val manager1 = AgentManager(db1, provider1, AgentToolConfigService(db1), ToolEventBus())
         val now = Instant.now()
         manager1.recordToolCall(
             ToolCallEvent(
@@ -63,9 +67,11 @@ class AgentManagerToolHistoryPersistenceTest {
         )
         db1.close()
 
-        val db2 = KnowledgeDb(tempDb)
+        val db2 =
+            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                .create(tempDb)
         val provider2 = mockk<LLMProvider>(relaxed = true)
-        val manager2 = AgentManager(db2, provider2, AgentToolConfigService(db2))
+        val manager2 = AgentManager(db2, provider2, AgentToolConfigService(db2), ToolEventBus())
         val history = manager2.getHistory()
         assertTrue(history.any { it.content.startsWith("Tool todos") })
         assertTrue(history.any { it.metadata?.contains("\"type\":\"tool_call\"") == true })

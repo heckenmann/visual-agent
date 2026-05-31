@@ -2,111 +2,70 @@
 
 ## Prerequisites
 
-| Software | Version | Install |
-|----------|---------|---------|
-| Java JDK | 21+ | [Amazon Corretto](https://aws.amazon.com/corretto/) |
-| Gradle | 9.4.1 | `brew install gradle` (macOS) |
-| Ollama | Latest | [ollama.com/download](https://ollama.com/download) |
+- Java 21+
+- Gradle 9.4.1
+- Ollama running locally (`ollama serve`)
 
-## Installation
+## Build and Run
 
 ```bash
-git clone <repository-url>
-cd visual-agent
-gradle build
+./gradlew build
+./gradlew run
 ```
 
-## Configure Ollama
+## Quality Checks
+
+Standard checks:
 
 ```bash
-# Start Ollama server
+./gradlew build
+./gradlew test
+./gradlew check
+./gradlew ktlintCheck
+```
+
+Additional enforced checks in current build:
+
+- `ktlintJavadocCheck` (public declaration KDoc guard)
+- `unusedCodeCheck` (flags removable unused private declarations)
+- `locAndPackageSizeCheck` (file/package size report; warning-only while modularization is in progress)
+
+## Ollama Runtime
+
+Start server:
+
+```bash
 ollama serve
-
-# Download a model
-ollama pull llama3.2
-
-# Verify it's running
-curl http://localhost:11434/api/tags
 ```
 
-## Run Application
-
-**Important:** JavaFX requires the module path to be set because Java 21 does not bundle JavaFX.
+List local models:
 
 ```bash
-# Option 1: Gradle (sets module path automatically via build.gradle.kts)
-gradle run
+ollama list
 ```
 
-```bash
-# Option 2: Direct Java command (after `gradle copyAllDependencies`)
-java \
-  --module-path lib \
-  --add-modules javafx.controls,javafx.fxml,javafx.web,javafx.graphics,javafx.media,javafx.swing,javafx.base \
-  -cp "build/classes/kotlin/main:lib/*" \
-  de.heckenmann.visualagent.Main
-```
-
-**Note:** `gradle copyAllDependencies` must be run once to populate the `lib/` directory with JavaFX platform JARs before using Option 2.
-
-## Configuration
-
-Configuration is loaded from `src/main/resources/config/app.properties`:
-
-```properties
-# Ollama Configuration
-ollama.local.url=http://localhost:11434
-ollama.model=llama3.2
-
-# Database
-database.path=./data/visual-agent.db
-
-# UI
-ui.theme=dark
-ui.font.size=14
-
-# Browser
-browser.default=firefox
-```
+The selected model is configured via session/UI settings and forwarded in provider requests.
 
 ## Troubleshooting
 
-### "JavaFX Runtime components missing"
+### JavaFX module/runtime issues
 
-This means the JavaFX module path is not set. Use `gradle run` which configures this automatically, or use the direct Java command with `--module-path lib` shown above.
+Use `./gradlew run` first; the project config applies required JavaFX args.
 
-### "Module javafx.base not found"
+### Ollama not reachable
 
-The `lib/` directory is missing JavaFX platform JARs. Run:
+Check:
 
 ```bash
-gradle copyAllDependencies
+curl http://localhost:11434/api/tags
 ```
 
-### "Two versions of module X found in lib"
+### SQLite lock issues
 
-Duplicate JARs in `lib/`. Only the platform-specific JARs (e.g., `*-mac-aarch64.jar`) should remain for the module path. Remove the empty "meta" JARs (e.g., `javafx-base-21.0.2.jar` without platform suffix).
-
-### Ollama Connection Fails
+If lock persists after a crash:
 
 ```bash
-ollama list    # Check if Ollama is running
-ollama serve   # Start Ollama server
-```
-
-### SQLite Errors
-
-```bash
-mkdir -p data  # Create data directory
-```
-
-### SQLITE_BUSY / Database Locked
-
-If the application crashed or was force-killed, stale WAL and SHM files may cause `SQLITE_BUSY` errors. The database has `PRAGMA busy_timeout=5000` set, which makes SQLite wait up to 5 seconds for locks. If the problem persists:
-
-```bash
-# Delete stale WAL/SHM files
 rm data/visual-agent.db-wal data/visual-agent.db-shm
 ```
 
-Then restart the application.
+Restart the app afterwards.

@@ -1,6 +1,8 @@
 package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
+import de.heckenmann.visualagent.agent.tools.ToolCallPhase
+import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfig
 import de.heckenmann.visualagent.knowledge.KnowledgeDb
 import de.heckenmann.visualagent.todo.Todo
@@ -17,8 +19,10 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import org.springframework.beans.factory.DisposableBean
 import org.springframework.stereotype.Service
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * AgentManager manages SubAgents: creation, persistence, task assignment, and execution.
@@ -26,21 +30,40 @@ import java.util.UUID
  */
 @Service
 class AgentManager(
-    private val knowledgeDb: KnowledgeDb,
-    private val llmProvider: LLMProvider,
-    private val agentToolConfigService: AgentToolConfigService,
-) {
+    internal val knowledgeDb: KnowledgeDb,
+    internal val llmProvider: LLMProvider,
+    internal val agentToolConfigService: AgentToolConfigService,
+    private val toolEventBus: ToolEventBus,
+) : DisposableBean {
+    /**
+     * Immutable todo summary snapshot sourced from the database.
+     *
+     * @property total Total number of todos
+     * @property open Number of pending todos
+     * @property inProgress Number of in-progress todos
+     * @property completed Number of completed todos
+     * @property cancelled Number of cancelled todos
+     */
+    data class TodoSummary(
+        val total: Int,
+        val open: Int,
+        val inProgress: Int,
+        val completed: Int,
+        val cancelled: Int,
+    )
+
     companion object {
-        private const val MAIN_SESSION_ID = "main"
-        private const val INITIAL_HISTORY_LOAD_LIMIT = 20
-        private const val HISTORY_PAGE_SIZE = 20
+        internal const val MAIN_SESSION_ID = "main"
+        internal const val INITIAL_HISTORY_LOAD_LIMIT = 20
+        internal const val HISTORY_PAGE_SIZE = 20
+        internal const val REPETITION_GUARD_RETRY_LIMIT = 1
         private var globalAgentCallback: ((String, String) -> Unit)? = null
 
         fun setAgentCallback(callback: (String, String) -> Unit) {
             globalAgentCallback = callback
         }
 
-        private fun notifyAgent(
+        internal fun notifyAgent(
             agentId: String,
             message: String,
         ) {
@@ -53,16 +76,26 @@ class AgentManager(
             initialTodos = knowledgeDb.listTodos(),
             onChange = { change -> persistTodoChange(change) },
         )
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val subAgents = mutableMapOf<String, SubAgent>()
-    private val conversationHistory = mutableListOf<Message>()
-    private var pendingResumeMessage: String? = null
-    private var loadedHistoryCount: Int = 0
+    internal val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    internal val subAgents = mutableMapOf<String, SubAgent>()
+    internal val conversationHistory = mutableListOf<Message>()
+    internal var pendingResumeMessage: String? = null
+    internal var loadedHistoryCount: Int = 0
+    internal val finishedToolEventsByRequestId = ConcurrentHashMap<String, MutableList<ToolCallEvent>>()
+    private val toolEventListenerHandle: AutoCloseable
 
     init {
+        toolEventListenerHandle = registerToolEventListener()
         loadAgentsFromDb()
         loadConversationFromDb()
         resumeInterruptedConversationIfNeeded()
+    }
+
+    /**
+     * Releases tool listeners before bean destruction.
+     */
+    override fun destroy() {
+        runCatching { toolEventListenerHandle.close() }
     }
 
     /**
@@ -83,24 +116,7 @@ class AgentManager(
 
         sortedAgents.forEach { agentMap ->
             try {
-                val rawCurrentTask = agentMap["currentTask"] as? String
-                val currentTask = rawCurrentTask?.ifBlank { null }
-                val agent =
-                    SubAgent(
-                        id = agentMap["id"] as String,
-                        name = agentMap["name"] as String,
-                        role = agentMap["role"] as String,
-                        // For deterministic behavior in tests and UI, treat stored agents as IDLE on load
-                        status = AgentStatus.IDLE,
-                        currentTask = null,
-                        parentAgentId = agentMap["parentAgentId"] as? String,
-                        config =
-                            try {
-                                Json.decodeFromString(agentMap["config"] as String)
-                            } catch (e: Exception) {
-                                AgentConfig()
-                            },
-                    )
+                val agent = mapAgentRecord(agentMap, resetStatusToIdle = true)
                 println("[AgentManager] Loading agent id=${agent.id} status=${agent.status}")
                 subAgents[agent.id] = agent
             } catch (e: Exception) {
@@ -108,6 +124,31 @@ class AgentManager(
             }
         }
         println("[AgentManager] Loaded subAgents keys: ${subAgents.keys} and statuses=${subAgents.mapValues { it.value.status }}")
+    }
+
+    internal fun mapAgentRecord(
+        agentMap: Map<String, Any>,
+        resetStatusToIdle: Boolean,
+    ): SubAgent {
+        val rawCurrentTask = agentMap["currentTask"] as? String
+        val persistedStatus =
+            runCatching {
+                AgentStatus.valueOf((agentMap["status"] as? String).orEmpty())
+            }.getOrDefault(AgentStatus.IDLE)
+        return SubAgent(
+            id = agentMap["id"] as String,
+            name = agentMap["name"] as String,
+            role = agentMap["role"] as String,
+            status = if (resetStatusToIdle) AgentStatus.IDLE else persistedStatus,
+            currentTask = rawCurrentTask?.ifBlank { null },
+            parentAgentId = (agentMap["parentAgentId"] as? String)?.ifBlank { null },
+            config =
+                try {
+                    Json.decodeFromString(agentMap["config"] as String)
+                } catch (_: Exception) {
+                    AgentConfig()
+                },
+        )
     }
 
     /**
@@ -136,7 +177,7 @@ class AgentManager(
     /**
      * Persist SubAgent to KnowledgeDb.
      */
-    private fun saveAgentToDb(agent: SubAgent) {
+    internal fun saveAgentToDb(agent: SubAgent) {
         val configJson = Json.encodeToString(agent.config)
         knowledgeDb.saveAgent(
             id = agent.id,
@@ -154,6 +195,29 @@ class AgentManager(
     fun getSubAgents(): List<SubAgent> = subAgents.values.toList()
 
     fun getSubAgent(id: String): SubAgent? = subAgents[id]
+
+    /**
+     * Loads all todo rows directly from the database.
+     *
+     * @return Current persisted todos
+     */
+    fun getTodosFromDb(): List<Todo> = knowledgeDb.listTodos()
+
+    /**
+     * Loads a persisted todo summary directly from the database.
+     *
+     * @return Todo counters derived from persisted state
+     */
+    fun getTodoSummaryFromDb(): TodoSummary {
+        val todos = knowledgeDb.listTodos()
+        return TodoSummary(
+            total = todos.size,
+            open = todos.count { it.status == TodoStatus.PENDING },
+            inProgress = todos.count { it.status == TodoStatus.IN_PROGRESS },
+            completed = todos.count { it.status == TodoStatus.COMPLETED },
+            cancelled = todos.count { it.status == TodoStatus.CANCELLED },
+        )
+    }
 
     /**
      * Create a new SubAgent with optional template configuration.
@@ -226,25 +290,119 @@ class AgentManager(
         val userMessage = Message("user", content)
         conversationHistory.add(userMessage)
         knowledgeDb.saveConversationMessage(MAIN_SESSION_ID, userMessage.role, userMessage.content, userMessage.metadata)
-        val response = llmProvider.chat(buildMainRequest(conversationHistory))
-        conversationHistory.add(response.message)
-        knowledgeDb.saveConversationMessage(MAIN_SESSION_ID, response.message.role, response.message.content, response.message.metadata)
-        return response.message.content
+        val requestId = UUID.randomUUID().toString()
+        val assistantContent = generateAssistantContentWithRepetitionGuard(requestId)
+        val assistantMessage = Message(role = "assistant", content = assistantContent)
+        conversationHistory.add(assistantMessage)
+        knowledgeDb.saveConversationMessage(MAIN_SESSION_ID, assistantMessage.role, assistantMessage.content, assistantMessage.metadata)
+        finishedToolEventsByRequestId.remove(requestId)
+        return assistantMessage.content
     }
 
     suspend fun streamMessage(
         content: String,
         onChunk: (String) -> Unit,
-    ) {
-        conversationHistory.add(Message("user", content))
-        llmProvider.stream(buildMainRequest(conversationHistory)).collect { chunk ->
-            onChunk(chunk.message.content)
+    ): String {
+        val userMessage = Message("user", content)
+        conversationHistory.add(userMessage)
+        knowledgeDb.saveConversationMessage(MAIN_SESSION_ID, userMessage.role, userMessage.content, userMessage.metadata)
+        val requestId = UUID.randomUUID().toString()
+        val collected = StringBuilder()
+        llmProvider.stream(buildMainRequest(loadRecentHistoryFromDb(), requestId)).collect { chunk ->
+            val part = chunk.message.content
+            if (part.isNotBlank()) {
+                collected.append(part)
+                onChunk(part)
+            }
         }
+        var assistantText = collected.toString().trim()
+        if (looksLikeRunawayRepetition(assistantText)) {
+            println("[AgentManager] repetition-guard: detected runaway repetition in streaming output, retrying once")
+            assistantText = runRepetitionGuardRetry()
+        }
+        assistantText = normalizeAssistantContent(assistantText)
+        if (assistantText == "(No text response. See tool results above.)") {
+            assistantText = completeToolOnlyTurnWithFollowup(requestId) ?: assistantText
+        }
+        val assistantMessage = Message("assistant", assistantText)
+        conversationHistory.add(assistantMessage)
+        knowledgeDb.saveConversationMessage(MAIN_SESSION_ID, assistantMessage.role, assistantMessage.content, assistantMessage.metadata)
+        finishedToolEventsByRequestId.remove(requestId)
+        return assistantText
     }
+
+    private fun loadRecentHistoryFromDb(limit: Int = INITIAL_HISTORY_LOAD_LIMIT): List<Message> =
+        knowledgeDb.getConversationMessages(MAIN_SESSION_ID, limit).mapNotNull { row ->
+            val role = row["role"].orEmpty()
+            val content = row["content"].orEmpty()
+            if (role.isBlank() || content.isBlank()) {
+                null
+            } else {
+                Message(role = role, content = content, metadata = row["metadata"]?.ifBlank { null })
+            }
+        }
+
+    /**
+     * Registers a listener that groups finished tool events by request id.
+     *
+     * @return Close handle that removes the listener
+     */
+    private fun registerToolEventListener(): AutoCloseable =
+        toolEventBus.addListener { event ->
+            if (event.phase != ToolCallPhase.FINISHED) return@addListener
+            val requestId = event.context["requestId"]?.toString().orEmpty()
+            if (requestId.isBlank()) return@addListener
+            finishedToolEventsByRequestId
+                .computeIfAbsent(requestId) { mutableListOf() }
+                .add(event)
+        }
 
     fun clearHistory() {
         conversationHistory.clear()
         knowledgeDb.deleteConversationMessages(MAIN_SESSION_ID)
+    }
+
+    /**
+     * Requests a model-generated welcome message after reset and persists it in conversation history.
+     *
+     * @return Welcome message content generated by the model
+     */
+    suspend fun addWelcomeMessageAfterReset(): String {
+        val request =
+            ChatRequestContext(
+                messages =
+                    listOf(
+                        Message(
+                            role = "system",
+                            content =
+                                """
+                                You are Visual Agent.
+                                Greet the user after a conversation reset.
+                                Then list in short bullet points what you can do in this app:
+                                - answer project questions
+                                - read/search files
+                                - manage todos
+                                - suggest and implement code changes
+                                - run terminal commands in the workspace
+                                - inspect context/history
+                                Keep it concise and friendly.
+                                """.trimIndent(),
+                        ),
+                    ),
+                enabledTools = emptySet(),
+                metadata = mapOf("sessionId" to MAIN_SESSION_ID, "agent" to "main"),
+            )
+        val generated =
+            llmProvider
+                .chat(request)
+                .message
+                .content
+                .trim()
+        val welcome = generated.ifBlank { "Hello! I'm ready to help with your project tasks." }
+        val message = Message(role = "assistant", content = welcome)
+        conversationHistory.add(message)
+        knowledgeDb.saveConversationMessage(MAIN_SESSION_ID, message.role, message.content, message.metadata)
+        return welcome
     }
 
     fun getHistory(): List<Message> = conversationHistory.toList()
@@ -312,6 +470,14 @@ class AgentManager(
         return messages
     }
 
+    /**
+     * Loads sub-agents directly from persistent storage.
+     * Use this for DB-truth snapshots where runtime-only fields are not required.
+     *
+     * @return Persisted agent rows mapped to SubAgent models
+     */
+    fun getSubAgentsFromDb(): List<SubAgent> = listSubAgentsFromDb()
+
     private fun loadConversationFromDb() {
         conversationHistory.clear()
         val rows = knowledgeDb.getConversationMessages(MAIN_SESSION_ID, INITIAL_HISTORY_LOAD_LIMIT)
@@ -332,7 +498,7 @@ class AgentManager(
 
     fun assignNextTodo(): Boolean {
         val idleAgent = selectWorkerAgentForNextTodo() ?: return false
-        val pendingTodo = todoManager.getPending().firstOrNull() ?: return false
+        val pendingTodo = getTodosFromDb().firstOrNull { it.status == TodoStatus.PENDING } ?: return false
 
         val assigned = todoManager.assignToAgent(pendingTodo.id, idleAgent.id)
         if (!assigned) return false
@@ -363,7 +529,7 @@ class AgentManager(
         val assigned = todoManager.assignToAgent(todoId, agentId)
         if (!assigned) return false
 
-        val todo = todoManager.getById(todoId) ?: return false
+        val todo = getTodosFromDb().firstOrNull { it.id == todoId } ?: return false
 
         agent.status = AgentStatus.BUSY
         agent.currentTodoId = todoId
@@ -500,8 +666,8 @@ class AgentManager(
                 }
                 delay(1500)
 
-                val pending = todoManager.getPending()
-                val inProgress = todoManager.getAll().any { it.status == TodoStatus.IN_PROGRESS }
+                val pending = getTodosFromDb().filter { it.status == TodoStatus.PENDING }
+                val inProgress = getTodosFromDb().any { it.status == TodoStatus.IN_PROGRESS }
                 val anyAgentBusy = subAgents.values.any { it.status == AgentStatus.BUSY }
 
                 if (pending.isEmpty() && !inProgress && !anyAgentBusy) {
@@ -524,20 +690,38 @@ class AgentManager(
         startAutonomousProcessing(seed = false)
     }
 
-    private fun buildMainRequest(history: List<Message>): ChatRequestContext {
+    private fun buildMainRequest(
+        history: List<Message>,
+        requestId: String? = null,
+    ): ChatRequestContext {
         val contextPrompt = buildMainSystemContextPrompt()
         val preparedMessages = mutableListOf<Message>()
         preparedMessages += Message("system", contextPrompt)
+        val userInstruction = AppConfig.instance.userModelInstruction.trim()
+        if (userInstruction.isNotBlank()) {
+            preparedMessages +=
+                Message(
+                    "system",
+                    "User preferences and wishes for this session:\n$userInstruction",
+                )
+        }
         preparedMessages += history
+        val metadata =
+            mutableMapOf<String, Any>(
+                "sessionId" to MAIN_SESSION_ID,
+                "agent" to "main",
+            ).apply {
+                if (!requestId.isNullOrBlank()) put("requestId", requestId)
+            }
         return ChatRequestContext(
             messages = preparedMessages,
             enabledTools = agentToolConfigService.mainAgentTools(),
-            metadata = mapOf("sessionId" to MAIN_SESSION_ID, "agent" to "main"),
+            metadata = metadata,
         )
     }
 
     private fun buildMainSystemContextPrompt(): String {
-        val todos = todoManager.getAll()
+        val todos = knowledgeDb.listTodos()
         val openCount = todos.count { it.status == TodoStatus.PENDING }
         val inProgressCount = todos.count { it.status == TodoStatus.IN_PROGRESS }
         val doneCount = todos.count { it.status == TodoStatus.COMPLETED }
@@ -575,9 +759,15 @@ class AgentManager(
             - Delegate implementation/research subtasks to worker agents when useful.
             - Validate worker outputs before declaring completion.
             - Keep todos continuously up to date during execution.
-            - When the user asks about todos (list, count, status, progress), call `todos` with `{"action":"list"}` first, then answer from tool output.
+            - When the user asks about todos (list, count, status, progress), call `todos` first: use `{"action":"count"}` for counts and `{"action":"list"}` for full lists.
             - Do not ask clarifying questions for a plain "show/get todos" request; return the current todo state immediately.
+            - For todo answers, never output JSON code blocks. Return concise plain text or bullet lists.
             - After any successful tool call, provide a concrete answer derived from the tool result. Do not respond with generic requests for more context.
+            - Do not produce boilerplate meta responses like "I can summarize the conversation" unless the user explicitly requested that.
+            - Markdown output rules:
+              - Never concatenate sections without whitespace, e.g. `text.**Heading:**text`.
+              - Put a blank line before a new section heading and a newline after heading labels.
+              - Prefer plain paragraphs over decorative heading-heavy templates.
             - Use the `todos` tool to create/update items and set status transitions according to progress (`PENDING` -> `IN_PROGRESS` -> `COMPLETED` or `CANCELLED`).
             - If additional historic context is required, use the `history` tool (`load`/`search`) instead of guessing.
             - Do not leave finished work in `PENDING`; reflect the real processing state at all times.
@@ -593,9 +783,9 @@ class AgentManager(
                         "system",
                         "The previous request was interrupted by an app shutdown or failure. Continue the unfinished work from the last user request now.",
                     )
-                val request = buildMainRequest(listOf(resumeInstruction) + conversationHistory)
+                val request = buildMainRequest(listOf(resumeInstruction) + loadRecentHistoryFromDb())
                 val response = llmProvider.chat(request)
-                val assistantMessage = Message("assistant", response.message.content)
+                val assistantMessage = Message("assistant", normalizeAssistantContent(response.message.content))
                 conversationHistory.add(assistantMessage)
                 knowledgeDb.saveConversationMessage(MAIN_SESSION_ID, assistantMessage.role, assistantMessage.content)
                 pendingResumeMessage = null
@@ -608,7 +798,7 @@ class AgentManager(
     }
 
     private suspend fun expandComplexTodoIfNeeded(): Boolean {
-        val candidate = todoManager.getPending().firstOrNull { isComplex(it.description) } ?: return false
+        val candidate = getTodosFromDb().firstOrNull { it.status == TodoStatus.PENDING && isComplex(it.description) } ?: return false
         val analyst = ensureAnalysisAgent()
         val prompt =
             listOf(
@@ -655,6 +845,175 @@ class AgentManager(
     private fun isComplex(description: String): Boolean {
         val markers = listOf(" and ", " then ", "anschließend", "mehrere", "complex", "komplex")
         return description.length > 120 || markers.any { description.contains(it, ignoreCase = true) }
+    }
+
+    /**
+     * Loads sub-agents from persistent storage for DB-first read semantics.
+     *
+     * @return Current persisted agent rows mapped to SubAgent models
+     */
+    private fun listSubAgentsFromDb(): List<SubAgent> =
+        knowledgeDb
+            .listAgents()
+            .sortedBy { it["id"]?.toString()?.toIntOrNull() ?: Int.MAX_VALUE }
+            .mapNotNull { row ->
+                runCatching { mapAgentRecord(row, resetStatusToIdle = false) }.getOrNull()
+            }
+
+    /**
+     * Ensures assistant outputs persisted in history are never blank, so follow-up turns retain usable context.
+     *
+     * @param content Raw assistant output
+     * @return Trimmed output or a standard placeholder for tool-only/empty turns
+     */
+    private fun normalizeAssistantContent(content: String): String {
+        val trimmed = content.trim()
+        if (trimmed.isBlank() || isToolCallsOnlyPayload(trimmed)) {
+            return "(No text response. See tool results above.)"
+        }
+        if (looksLikeRunawayRepetition(trimmed)) {
+            return "I generated a malformed repeated output. Please repeat your last request and I will answer it cleanly."
+        }
+        return trimmed
+    }
+
+    /**
+     * Detects placeholder tool-call payloads that do not contain user-facing content.
+     *
+     * @param text Raw assistant text
+     * @return `true` when the payload only contains an empty `tool_calls` array
+     */
+    private fun isToolCallsOnlyPayload(text: String): Boolean {
+        val compact = text.replace(Regex("\\s+"), "")
+        return compact == """{"tool_calls":[]}""" ||
+            compact == """```json{"tool_calls":[]}```""" ||
+            compact == """```{"tool_calls":[]}```"""
+    }
+
+    /**
+     * Generates one assistant response and retries once with a stricter system instruction when repetition is detected.
+     *
+     * @return Assistant content that passed repetition guard or fallback text
+     */
+    private suspend fun generateAssistantContentWithRepetitionGuard(requestId: String): String {
+        var raw =
+            llmProvider
+                .chat(buildMainRequest(loadRecentHistoryFromDb(), requestId))
+                .message
+                .content
+                .trim()
+        if (raw.isBlank()) {
+            val finalFromTools = completeToolOnlyTurnWithFollowup(requestId)
+            if (!finalFromTools.isNullOrBlank()) {
+                return normalizeAssistantContent(finalFromTools)
+            }
+        }
+        if (!looksLikeRunawayRepetition(raw)) {
+            return normalizeAssistantContent(raw)
+        }
+        println("[AgentManager] repetition-guard: detected runaway repetition, retrying once")
+        raw = runRepetitionGuardRetry()
+        return normalizeAssistantContent(raw)
+    }
+
+    /**
+     * Runs a finalization call that turns tool execution outputs into one concrete assistant answer.
+     *
+     * @param requestId Request id used by the original model call
+     * @return Final assistant text derived from tool results, or null when no tool events were captured
+     */
+    private suspend fun completeToolOnlyTurnWithFollowup(requestId: String): String? {
+        val toolEvents = finishedToolEventsByRequestId.remove(requestId).orEmpty()
+        if (toolEvents.isEmpty()) return null
+        val summary =
+            toolEvents.joinToString("\n") { event ->
+                val status = if (event.result.success) "ok" else "error"
+                val payload = event.result.content.ifBlank { event.result.error.orEmpty() }
+                "- ${event.toolId} [$status]: $payload"
+            }
+        val followup =
+            ChatRequestContext(
+                messages =
+                    buildList {
+                        add(Message("system", buildMainSystemContextPrompt()))
+                        add(
+                            Message(
+                                "system",
+                                "Generate the final user-facing answer from the tool results below. Be concrete and do not ask for more context.",
+                            ),
+                        )
+                        addAll(loadRecentHistoryFromDb())
+                        add(Message("assistant", "Tool results:\n$summary"))
+                    },
+                enabledTools = emptySet(),
+                metadata = mapOf("sessionId" to MAIN_SESSION_ID, "agent" to "main", "requestId" to "$requestId:finalize"),
+            )
+        return llmProvider
+            .chat(followup)
+            .message
+            .content
+            .trim()
+    }
+
+    /**
+     * Performs one retry request with an additional anti-repetition system instruction.
+     *
+     * @return Raw assistant content from the retry call
+     */
+    private suspend fun runRepetitionGuardRetry(): String {
+        var retryRaw = ""
+        repeat(REPETITION_GUARD_RETRY_LIMIT) {
+            val retryRequest = buildRepetitionGuardRetryRequest()
+            retryRaw =
+                llmProvider
+                    .chat(retryRequest)
+                    .message
+                    .content
+                    .trim()
+        }
+        return retryRaw
+    }
+
+    /**
+     * Builds a retry request that asks the model to restart the answer without repeated phrase loops.
+     *
+     * @return Chat request with the same conversation and extra guard instruction
+     */
+    private fun buildRepetitionGuardRetryRequest(): ChatRequestContext {
+        val base = buildMainRequest(loadRecentHistoryFromDb())
+        val retryInstruction =
+            Message(
+                role = "system",
+                content =
+                    """
+                    Your previous response was malformed due to repeated phrase loops.
+                    Regenerate the answer once from scratch.
+                    Do not quote or repeat the same sentence pattern.
+                    Keep the answer direct and short.
+                    """.trimIndent(),
+            )
+        return base.copy(messages = listOf(retryInstruction) + base.messages)
+    }
+
+    /**
+     * Detects degenerate responses dominated by repeated phrase loops.
+     *
+     * @param content Assistant output
+     * @return `true` when the output appears to be a repetition loop instead of a valid answer
+     */
+    private fun looksLikeRunawayRepetition(content: String): Boolean {
+        if (content.length < 400) return false
+        val windows =
+            content
+                .windowed(size = 24, step = 6, partialWindows = false)
+                .filter { window ->
+                    val normalized = window.lowercase().filter { it.isLetterOrDigit() || it.isWhitespace() }
+                    normalized.isNotBlank()
+                }
+        if (windows.isEmpty()) return false
+        val frequencies = windows.groupingBy { it }.eachCount()
+        val maxRepeat = frequencies.values.maxOrNull() ?: 0
+        return maxRepeat >= 12
     }
 
     private fun ensureAnalysisAgent(): SubAgent =

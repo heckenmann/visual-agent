@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent
 
+import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.knowledge.KnowledgeDb
 import de.heckenmann.visualagent.todo.TodoPriority
 import de.heckenmann.visualagent.todo.TodoStatus
@@ -14,7 +15,9 @@ import kotlin.test.assertTrue
 
 class AgentManagerTodoTest {
     private fun createManager(): Triple<AgentManager, LLMProvider, KnowledgeDb> {
-        val db = KnowledgeDb("jdbc:sqlite::memory:")
+        val db =
+            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                .create("jdbc:sqlite::memory:")
         val provider = mockk<LLMProvider>(relaxed = true)
         coEvery { provider.isConnected() } returns true
         coEvery { provider.chat(any<ChatRequestContext>()) } returns
@@ -23,7 +26,7 @@ class AgentManagerTodoTest {
                 message = Message("assistant", "Task completed"),
                 done = true,
             )
-        val manager = AgentManager(db, provider, AgentToolConfigService(db))
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
         return Triple(manager, provider, db)
     }
 

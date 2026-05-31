@@ -26,6 +26,13 @@ If available, also run:
 ./gradlew check
 ```
 
+Enforced in build:
+```bash
+./gradlew ktlintJavadocCheck      # public API KDoc/Javadoc guard
+./gradlew locAndPackageSizeCheck  # file/package size report (warning-only)
+./gradlew unusedCodeCheck         # flags removable unused private declarations
+```
+
 ### Security
 
 **Never commit sensitive data:**
@@ -50,20 +57,26 @@ src/main/kotlin/de/heckenmann/visualagent/
 ├── Main.kt                    # Application entry point
 ├── agent/
 │   ├── LLMProvider.kt         # Interface: chat, stream, vision, embeddings, getModels, getModelDetails
-│   ├── OllamaClient.kt        # Implements LLMProvider, connects to Ollama API
-│   ├── AgentManager.kt        # Manages sub-agents, sends messages via OllamaClient
+│   ├── OllamaClient.kt        # Implements LLMProvider using Spring AI + Ollama ChatModel
+│   ├── AgentManager.kt        # Main orchestration: history, tools, todos, sub-agent coordination
 │   ├── SubAgent.kt            # SubAgent data model, AgentStatus enum
 │   └── SessionEvent.kt        # Sealed interface for session-level events
+│   └── tools/
+│       ├── CoreTools.kt       # ui/history/todos/context/pwd tools
+│       ├── FileTools.kt       # file read/list/glob/grep/write/edit tools
+│       ├── RuntimeTools.kt    # terminal/browser/search tools
+│       ├── ToolRegistry.kt    # Tool registration + Spring AI callback mapping
+│       └── ToolSupport.kt     # Shared parsing/path/schema helpers
 ├── config/
 │   └── AppConfig.kt           # Singleton loaded from app.properties
 ├── knowledge/
-│   └── KnowledgeDb.kt         # SQLite with WAL mode, busy_timeout, table creation + partial CRUD
+│   └── KnowledgeDb.kt         # SQLite with WAL mode, busy_timeout, persistence and search APIs
 ├── todo/
 │   └── Todo.kt                # Todo, Priority, Status models
 └── ui/
     ├── MainWindow.kt          # FXML-based, panel switching, shortcuts/command palette, window controls, wires backend to UI
     ├── FxmlLoader.kt          # Type-safe FXML loading utility
-    ├── StatusBar.kt           # Connection status with CSS classes + Retry/Reconnect actions
+    ├── StatusBar.kt           # Legacy status component (currently not wired in MainWindow)
     └── panels/
         ├── SessionPanel.kt         # FXML-based, OllamaClient connected, model list + details
         ├── ChatPanel.kt            # Send handler, Enter/Cmd+Ctrl+Enter, loading placeholder, setOnSendMessage callback, ChatMessage
@@ -83,7 +96,7 @@ src/main/kotlin/de/heckenmann/visualagent/
 | Ktor | 2.3.7 |
 | Kotlinx Coroutines | 1.7.3 |
 | SQLite JDBC | 3.45.0.0 |
-| Logback | 1.4.14 |
+| Logback | 1.5.18 |
 | AtlantaFX | 2.0.1 |
 | Gradle | 9.4.1 (Kotlin DSL) |
 
@@ -97,22 +110,63 @@ src/main/kotlin/de/heckenmann/visualagent/
 - **Code-built panels**: ChatPanel and SubAgentsPanel build UI in code (no FXML)
 - **Panel switching**: Navigation buttons in MainWindow swap `chatArea.center` between panels
 - **Keyboard navigation**: MainWindow supports `Cmd/Ctrl+1..6` for panel switching and `Cmd/Ctrl+K` command palette
-- **CSS classes**: All styling via CSS classes (dark.css), no inline `setStyle()` calls
+- **CSS classes**: All styling via CSS classes (`application.css`), no inline `setStyle()` calls
 - **Callback wiring**: ChatPanel sends messages via `setOnSendMessage` callback wired to `AgentManager.sendMessage()` in MainWindow
 - **OllamaClient integration**: SessionPanel calls `getModels()` and `getModelDetails()` via `setOllamaClient()`
+- **Spring AI tool-calling**: `LLMProvider.chat/stream(ChatRequestContext)` carries enabled tool IDs + metadata; provider builds request-scoped callbacks
+- **Tool event flow**: all tool calls emit STARTED/FINISHED events; UI and persistence consume these events
+- **DB-first state reads**: runtime context (history/todos/sub-agent data) is loaded from DB, not long-lived in-memory caches
+- **Constructor DI style**: use constructor injection with direct constructor properties (`private val`/`private var`) for required dependencies; avoid passing constructor params and re-assigning them in the class body
+- **Markdown parser input**: conversation message text must be passed 1:1 to the CommonMark parser; no pre-normalization, rewriting, or heuristic transformation before parsing
+
+## Model Context Payload
+
+The model does not receive arbitrary global state. It receives a request-scoped context assembled in `AgentManager` and `OllamaPromptFactory`.
+
+### Main Agent Request Context
+
+- System prompt from `buildMainSystemContextPrompt()` including:
+  - resume hint for interrupted runs
+  - authoritative todo counters (`Open`, `In Progress`, `Done`, `Cancelled`, `Total`)
+  - current todo list from DB
+  - execution policy/rules (tool usage, todo/status behavior, markdown output constraints)
+- Optional extra system prompt from `AppConfig.instance.userModelInstruction` (session wishes, language, etc.)
+- Recent conversation history from DB: max `20` messages (`INITIAL_HISTORY_LOAD_LIMIT`)
+- Tool-name guard system message (exact allowed function names for this request)
+- Request metadata:
+  - `sessionId=main`
+  - `agent=main`
+  - optional `requestId`
+- Enabled tools from `agentToolConfigService.mainAgentTools()`
+
+### Sub-Agent Request Context
+
+- `subAgent.chatHistory + new turn messages`
+- Metadata:
+  - `agentId`
+  - `agentName`
+  - `agentRole`
+- Enabled tools from `agentToolConfigService.toolsFor(agent)`
+
+### Additional Notes
+
+- Older context beyond the recent 20 messages is not auto-included.
+- If older context is required, the model should use the `history` tool (`load` / `search`).
 
 ## Done
 
-1. **AtlantaFX integration** — theme selector now works with AtlantaFX Base 2.0.1, switching between dark/light themes updates application styling via CSS classes
-2. **SessionPanel persistence** — model selection is now persisted to AppConfig, surviving application restarts
-3. **OllamaClient error handling** — proper HTTP status checking (200 OK) with detailed error messages for network failures, timeout handling, and JSON parsing errors
-4. **ChatPanel copy icons** — message context menu now displays proper copy icons: 📋 for code blocks, 📄 for plain text
-5. **SubAgents (Phase 2)** — Persistence and UI: added `sub_agents` table and CRUD helpers, AgentConfig templates, SubAgentsPanel card UI with Add/Edit/Delete/Logs, live status updates via AgentManager notifications, and MainWindow wiring to AgentManager (create/update/delete/run). See `docs/subagents.md` for details.
+1. **Spring AI migration** — provider path uses Spring AI (`spring-ai-starter-model-ollama`) with native tool-calling callbacks
+2. **Tool system rebuilt** — canonical tool IDs (`ui`, `history`, `todos`, file/terminal/context/pwd, browser/search placeholders) exposed via `ToolRegistry`
+3. **Persistent runtime history** — conversation and tool-call entries are persisted and restored after restart
+4. **Todo integration** — todo counts/lists are available through tool calls and DB-backed orchestration context
+5. **SubAgents (Phase 2)** — Persistence and UI with DB-backed load/save, templates, and live status updates
+6. **Markdown rendering** — conversation markdown is parsed through `commonmark` library (no hand-written parser)
+7. **Quality gates** — KDoc/Javadoc and LOC/package-size checks integrated into Gradle verification flow
 
 ## Known Bugs
 
-1. **OllamaClient.embeddings()** uses raw string interpolation — no JSON escaping of prompt text
-2. **OllamaClient.vision()** hardcodes model `"llava"` instead of using AppConfig
+1. **`vision()` path** in Spring AI bridge remains unimplemented and currently throws `UnsupportedOperationException`
+2. **LOC modularization incomplete** — several source files are still above 300 LOC and must be split
 
 ## Gotchas
 
@@ -134,6 +188,7 @@ src/main/kotlin/de/heckenmann/visualagent/
 7. **Main class is `de.heckenmann.visualagent.Main`** (not `MainKt`) — because `Main` extends `Application`
 
 8. **`PRAGMA busy_timeout=5000`** in KnowledgeDb — if stale WAL/SHM files from a crashed process cause `SQLITE_BUSY`, delete `data/visual-agent.db-wal` and `data/visual-agent.db-shm` before restarting
+9. **Current LOC policy** — file LOC target is 300; package LOC target is 3000. `locAndPackageSizeCheck` reports violations as warnings (non-blocking) until modularization is complete.
 
 ## Documentation Language
 

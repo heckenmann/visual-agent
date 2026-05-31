@@ -2,20 +2,22 @@
 
 ## Table of Contents
 
-- [Architecture](architecture.md) - System architecture, implementation status, known issues
-- [Setup Guide](setup.md) - Installation, configuration, troubleshooting
-- [API Reference](api.md) - Ollama API integration, known bugs
-- [Database Schema](database.md) - SQLite schema, CRUD status per table
+- [Architecture](architecture.md) - System architecture, runtime flow, and current constraints
+- [Setup Guide](setup.md) - Installation, prerequisites, run/test commands, troubleshooting
+- [API Reference](api.md) - `LLMProvider`, Spring AI integration, tool-calling contracts
+- [Database Schema](database.md) - SQLite schema, indexes, persistence behavior
+- [SubAgents](subagents.md) - Autonomous/sub-agent model and UI integration
 
 ## Quick Start
 
 ```bash
-gradle build
-gradle run
+./gradlew build
+./gradlew run
 ```
 
 ## Important Links
 
+- [Spring AI Tools](https://docs.spring.io/spring-ai/reference/api/tools.html)
 - [Ollama Documentation](https://docs.ollama.com)
 - [JavaFX Documentation](https://openjfx.io)
 - [Kotlin Documentation](https://kotlinlang.org/docs/home.html)

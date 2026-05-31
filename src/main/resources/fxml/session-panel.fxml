@@ -7,6 +7,7 @@
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.Slider?>
 <?import javafx.scene.control.Spinner?>
+<?import javafx.scene.control.TextArea?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Priority?>
 <?import javafx.scene.layout.Region?>
@@ -170,6 +171,27 @@
                             <Spinner fx:id="timeoutSpinner" prefWidth="100.0" maxWidth="100.0" editable="true"/>
                             <Label text="seconds" styleClass="text-caption"/>
                         </HBox>
+                    </VBox>
+                </VBox>
+            </VBox>
+
+            <!-- MODEL INSTRUCTION GROUP -->
+            <VBox spacing="4.0" styleClass="setting-group">
+                <HBox alignment="CENTER_LEFT" spacing="8.0">
+                    <padding>
+                        <Insets top="4.0" bottom="4.0"/>
+                    </padding>
+                    <FontIcon iconLiteral="fas-comment-dots" iconSize="11"/>
+                    <Label text="MODEL INSTRUCTION" styleClass="text-muted, bold"/>
+                </HBox>
+                <VBox spacing="10.0">
+                    <padding>
+                        <Insets left="24.0"/>
+                    </padding>
+                    <VBox spacing="4.0">
+                        <Label text="Prompt with preferences and wishes"/>
+                        <TextArea fx:id="userInstructionArea" promptText="Example: Always answer in German, concise and pragmatic." wrapText="true" prefRowCount="4"/>
+                        <Label text="Applied to each model request as additional system instruction." styleClass="text-caption"/>
                     </VBox>
                 </VBox>
             </VBox>

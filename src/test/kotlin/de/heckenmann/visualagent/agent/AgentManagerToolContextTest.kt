@@ -1,6 +1,6 @@
 package de.heckenmann.visualagent.agent
 
-import de.heckenmann.visualagent.knowledge.KnowledgeDb
+import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import io.mockk.coEvery
 import io.mockk.mockk
 import io.mockk.slot
@@ -13,7 +13,9 @@ class AgentManagerToolContextTest {
     @Test
     fun `main agent passes enabled tools through provider interface`() =
         runTest {
-            val db = KnowledgeDb("jdbc:sqlite::memory:")
+            val db =
+                de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                    .create("jdbc:sqlite::memory:")
             val provider = mockk<LLMProvider>(relaxed = true)
             val requestSlot = slot<ChatRequestContext>()
             coEvery { provider.chat(capture(requestSlot)) } returns
@@ -22,7 +24,7 @@ class AgentManagerToolContextTest {
                     message = Message("assistant", "ok"),
                     done = true,
                 )
-            val manager = AgentManager(db, provider, AgentToolConfigService(db))
+            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
 
             manager.sendMessage("Use a tool")
 

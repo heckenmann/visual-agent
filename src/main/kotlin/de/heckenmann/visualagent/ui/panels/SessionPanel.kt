@@ -14,6 +14,7 @@ import javafx.scene.control.ScrollPane
 import javafx.scene.control.Slider
 import javafx.scene.control.Spinner
 import javafx.scene.control.SpinnerValueFactory.IntegerSpinnerValueFactory
+import javafx.scene.control.TextArea
 import javafx.scene.layout.Region
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -21,6 +22,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mu.KotlinLogging
+import org.springframework.context.annotation.Lazy
+import org.springframework.stereotype.Component
 
 /**
  * Session configuration panel for model selection, context settings, and behavior toggles.
@@ -28,6 +31,8 @@ import mu.KotlinLogging
  * Loads its layout from `session-panel.fxml` and wires all FXML controls to event handlers.
  * Requires a [OllamaClient] via [setOllamaClient] to populate model lists and details.
  */
+@Component
+@Lazy
 class SessionPanel : Region() {
     companion object {
         private val logger = KotlinLogging.logger {}
@@ -62,6 +67,9 @@ class SessionPanel : Region() {
 
     @FXML
     private lateinit var modelInfoLabel: Label
+
+    @FXML
+    private lateinit var userInstructionArea: TextArea
 
     @FXML
     private lateinit var scrollPane: ScrollPane
@@ -135,6 +143,12 @@ class SessionPanel : Region() {
             logger.debug { "Timeout changed: $newVal" }
         }
 
+        userInstructionArea.textProperty().addListener { _, _, newVal ->
+            AppConfig.instance.userModelInstruction = newVal ?: ""
+            AppConfig.instance.save()
+            logger.debug { "User model instruction updated (length=${newVal?.length ?: 0})" }
+        }
+
         contextSlider.value = AppConfig.instance.contextLength.toDouble()
         loadLimitSpinner.valueFactory.value = AppConfig.instance.loadLimit
         maxParallelSubAgentsSpinner.valueFactory.value = AppConfig.instance.maxParallelSubAgents
@@ -142,6 +156,7 @@ class SessionPanel : Region() {
         streamingToggle.isSelected = AppConfig.instance.streamingEnabled
         thinkingToggle.isSelected = AppConfig.instance.thinkingEnabled
         autoCompactionToggle.isSelected = AppConfig.instance.autoCompactionEnabled
+        userInstructionArea.text = AppConfig.instance.userModelInstruction
     }
 
     /**

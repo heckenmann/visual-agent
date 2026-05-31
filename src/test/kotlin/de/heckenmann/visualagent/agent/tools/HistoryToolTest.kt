@@ -1,6 +1,5 @@
 package de.heckenmann.visualagent.agent.tools
 
-import de.heckenmann.visualagent.knowledge.KnowledgeDb
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -8,7 +7,9 @@ import kotlin.test.assertTrue
 class HistoryToolTest {
     @Test
     fun `history tool loads and searches session history`() {
-        val db = KnowledgeDb("jdbc:sqlite::memory:")
+        val db =
+            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                .create("jdbc:sqlite::memory:")
         db.saveConversationMessage("main", "user", "alpha one")
         db.saveConversationMessage("main", "assistant", "beta two")
         db.saveConversationMessage("main", "user", "gamma three")
@@ -27,7 +28,9 @@ class HistoryToolTest {
 
     @Test
     fun `history tool rejects unsupported action`() {
-        val db = KnowledgeDb("jdbc:sqlite::memory:")
+        val db =
+            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                .create("jdbc:sqlite::memory:")
         val tool = HistoryTool(db)
         val result = tool.execute("""{"action":"unknown"}""", mapOf("sessionId" to "main"))
         assertFalse(result.success)

@@ -1,5 +1,7 @@
 package de.heckenmann.visualagent.agent
 
+import de.heckenmann.visualagent.agent.ollama.OllamaPromptFactory
+import de.heckenmann.visualagent.agent.ollama.OllamaToolRecovery
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.agent.tools.VisualAgentTool
@@ -8,6 +10,7 @@ import de.heckenmann.visualagent.config.AppConfig
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.springframework.ai.chat.messages.AssistantMessage
@@ -15,7 +18,7 @@ import org.springframework.ai.chat.metadata.ChatResponseMetadata
 import org.springframework.ai.chat.model.ChatModel
 import org.springframework.ai.chat.model.Generation
 import org.springframework.ai.chat.prompt.Prompt
-import org.springframework.ai.model.function.FunctionCallingOptions
+import org.springframework.ai.model.tool.ToolCallingChatOptions
 import org.springframework.ai.ollama.api.OllamaApi
 import reactor.core.publisher.Flux
 import kotlin.test.assertEquals
@@ -31,7 +34,7 @@ class OllamaClientModelSelectionTest {
                 val chatModel = mockk<ChatModel>()
                 val ollamaApi = mockk<OllamaApi>(relaxed = true)
                 every { chatModel.call(any<Prompt>()) } returns springResponse("unit-test-model", "ok")
-                val client = OllamaClient(chatModel, ollamaApi, ToolRegistry(emptyList(), ToolEventBus()))
+                val client = createClient(chatModel, ollamaApi, ToolRegistry(emptyList(), ToolEventBus()))
 
                 val response = client.chat(listOf(Message("user", "hello")))
 
@@ -58,7 +61,7 @@ class OllamaClientModelSelectionTest {
                 val chatModel = mockk<ChatModel>()
                 val ollamaApi = mockk<OllamaApi>(relaxed = true)
                 every { chatModel.stream(any<Prompt>()) } returns Flux.just(springResponse("stream-model", "chunk"))
-                val client = OllamaClient(chatModel, ollamaApi, ToolRegistry(emptyList(), ToolEventBus()))
+                val client = createClient(chatModel, ollamaApi, ToolRegistry(emptyList(), ToolEventBus()))
 
                 client.stream(listOf(Message("user", "hello"))).collect {}
 
@@ -81,19 +84,22 @@ class OllamaClientModelSelectionTest {
             val ollamaApi = mockk<OllamaApi>(relaxed = true)
             val registry = ToolRegistry(listOf(FakeTool("context"), FakeTool("terminal")), ToolEventBus())
             every { chatModel.call(any<Prompt>()) } answers {
-                val options = firstArg<Prompt>().options as FunctionCallingOptions
-                assertEquals(setOf("context"), options.functions)
-                assertEquals(listOf("context"), options.functionCallbacks.map { it.name })
-                assertTrue(options.toolContext.isNullOrEmpty())
+                val options = firstArg<Prompt>().options as ToolCallingChatOptions
+                assertEquals(setOf("context"), options.toolNames)
+                assertEquals(listOf("context"), options.toolCallbacks.map { it.toolDefinition.name() })
+                assertTrue(options.toolContext.isNotEmpty())
+                val firstMessage = firstArg<Prompt>().instructions.first()
+                assertTrue(firstMessage.text.contains("Tool calling strict mode"))
+                assertTrue(firstMessage.text.contains("context"))
                 assertTrue(
-                    options.functionCallbacks
+                    options.toolCallbacks
                         .single()
                         .call("""{}""")
                         .contains("context"),
                 )
                 springResponse("tool-model", "tool-ready")
             }
-            val client = OllamaClient(chatModel, ollamaApi, registry)
+            val client = createClient(chatModel, ollamaApi, registry)
 
             val response =
                 client.chat(
@@ -107,6 +113,88 @@ class OllamaClientModelSelectionTest {
             assertEquals("tool-ready", response.message.content)
         }
 
+    @Test
+    fun `chat retries with structured tool error context when unknown function callback is requested`() =
+        runTest {
+            val chatModel = mockk<ChatModel>()
+            val ollamaApi = mockk<OllamaApi>(relaxed = true)
+            val registry = ToolRegistry(listOf(FakeTool("todos")), ToolEventBus())
+            every { chatModel.call(any<Prompt>()) } answers {
+                val prompt = firstArg<Prompt>()
+                val options = prompt.options as ToolCallingChatOptions
+                if (options.toolNames.isNotEmpty() && prompt.instructions.none { it.text.contains("Error type: tool-error") }) {
+                    throw IllegalStateException("No function callback found for function name: todo")
+                }
+                springResponse("tool-model", "Recovered after unknown tool error")
+            }
+            val client = createClient(chatModel, ollamaApi, registry)
+
+            val response =
+                client.chat(
+                    ChatRequestContext(
+                        messages = listOf(Message("user", "list todos")),
+                        model = "tool-model",
+                        enabledTools = setOf(ToolId("todos")),
+                    ),
+                )
+
+            assertEquals("Recovered after unknown tool error", response.message.content)
+            verify(exactly = 2) { chatModel.call(any<Prompt>()) }
+        }
+
+    @Test
+    fun `stream retries with structured tool error context when unknown function callback is requested`() =
+        runTest {
+            val chatModel = mockk<ChatModel>()
+            val ollamaApi = mockk<OllamaApi>(relaxed = true)
+            val registry = ToolRegistry(listOf(FakeTool("todos")), ToolEventBus())
+            every { chatModel.stream(any<Prompt>()) } throws
+                IllegalStateException(
+                    "No function callback found for function name: todo:list",
+                )
+            every { chatModel.call(any<Prompt>()) } returns springResponse("tool-model", "Recovered stream fallback")
+            val client = createClient(chatModel, ollamaApi, registry)
+
+            val chunks =
+                client
+                    .stream(
+                        ChatRequestContext(
+                            messages = listOf(Message("user", "list todos")),
+                            model = "tool-model",
+                            enabledTools = setOf(ToolId("todos")),
+                        ),
+                    ).toList()
+
+            assertEquals(1, chunks.size)
+            assertEquals("Recovered stream fallback", chunks.single().message.content)
+            verify(exactly = 1) { chatModel.stream(any<Prompt>()) }
+            verify(exactly = 1) { chatModel.call(any<Prompt>()) }
+        }
+
+    @Test
+    fun `chat falls back to tool list when recovery answer remains blank`() =
+        runTest {
+            val chatModel = mockk<ChatModel>()
+            val ollamaApi = mockk<OllamaApi>(relaxed = true)
+            val registry = ToolRegistry(listOf(FakeTool("todos")), ToolEventBus())
+            every { chatModel.call(any<Prompt>()) } throws
+                IllegalStateException("No function callback found for function name: todo:list")
+            val client = createClient(chatModel, ollamaApi, registry)
+
+            val response =
+                client.chat(
+                    ChatRequestContext(
+                        messages = listOf(Message("user", "list todos")),
+                        model = "tool-model",
+                        enabledTools = setOf(ToolId("todos")),
+                    ),
+                )
+
+            assertTrue(response.message.content.contains("Requested tool function does not exist"))
+            assertTrue(response.message.content.contains("todos"))
+            verify(exactly = 2) { chatModel.call(any<Prompt>()) }
+        }
+
     private fun springResponse(
         model: String,
         content: String,
@@ -115,6 +203,16 @@ class OllamaClientModelSelectionTest {
             listOf(Generation(AssistantMessage(content))),
             ChatResponseMetadata.builder().model(model).build(),
         )
+
+    private fun createClient(
+        chatModel: ChatModel,
+        ollamaApi: OllamaApi,
+        registry: ToolRegistry,
+    ): OllamaClient {
+        val promptFactory = OllamaPromptFactory(registry)
+        val recovery = OllamaToolRecovery(chatModel, promptFactory)
+        return OllamaClient(chatModel, ollamaApi, promptFactory, recovery)
+    }
 
     private class FakeTool(
         id: String,

@@ -1,22 +1,20 @@
 # Visual Agent
 
-A modern Kotlin-based coding agent with JavaFX UI, utilizing local and cloud LLMs via Ollama.
+A Kotlin-based desktop coding agent with JavaFX UI, Spring Boot, Spring AI, and SQLite persistence.
 
 ## Current Status
 
-**Phase 1 — Foundation Complete.** UI shells are built, backend wiring is in progress.
+The app is functional end-to-end with persistent chat/todos/settings, Spring AI tool-calling, and streaming UI.
 
 | Feature | UI | Backend | Wired |
 |---------|----|---------|-------|
-| Chat | Done (send handler + Enter key + Cmd/Ctrl+Enter, loading state, custom cells) | `AgentManager.sendMessage()` | Yes — callback wired in MainWindow |
-| SubAgents | Done (CSS classes, no inline styles) | Hardcoded in `AgentManager` | Partially — panel creates its own list |
-| Todos | Done (Add dialog, Delete, checkbox toggle, badges) | DB table exists | No — panel uses in-memory list |
-| Canvas | Done (CSS classes) | Draw methods work | Yes |
-| Session | Done (FXML, model selector, details) | OllamaClient connected | Yes — model list + details functional |
-| StatusBar | Done (CSS classes + Retry/Reconnect actions) | `checkConnection()` called on startup | Yes — shows connected/disconnected and allows reconnect |
-| Settings | Done (FXML, theme selector, font spinner) | AppConfig mutable | Yes — theme reload + font size |
-| Ollama Client | N/A | `chat()`, `stream()`, `vision()`, `embeddings()`, `getModels()`, `getModelDetails()` | Yes — called by SessionPanel and ChatPanel |
-| Knowledge DB | N/A | Tables + partial CRUD, WAL mode, busy_timeout | Partially — initialized but not called by UI |
+| Chat | Modernized conversation panel, markdown rendering, streaming indicator, tool call timeline | `AgentManager.sendMessage()/streamMessage()` | Yes |
+| SubAgents | Card-based panel with create/edit/delete/run/logs | Persistent sub-agent configs and statuses | Yes |
+| Todos | Panel + tool integration + count/list/update flows | Persisted in `KnowledgeDb` | Yes |
+| Session | Model selector, details, runtime toggles, user instruction | `LLMProvider` + `OllamaClient` | Yes |
+| Settings | Theme/font/model/session options | `AppConfig` + DB-backed runtime usage | Yes |
+| Tool Calling | Tool events and history rendering in conversation | Spring AI `ToolCallback` path | Yes |
+| Knowledge DB | Conversation, todos, tools, agents, preferences, history search | SQLite WAL + indexes | Yes |
 
 ## Tech Stack
 
@@ -29,8 +27,8 @@ A modern Kotlin-based coding agent with JavaFX UI, utilizing local and cloud LLM
 | HTTP Client | Ktor 2.3.7 |
 | Serialization | Kotlinx Serialization JSON 1.8.1 |
 | Coroutines | Kotlinx Coroutines 1.7.3 |
-| Logging | Logback 1.4.14 |
-| LLM Provider | Ollama API |
+| Logging | Logback 1.5.x |
+| LLM Provider | Spring AI + Ollama |
 | Linter | ktlint |
 | Namespace | `de.heckenmann.visualagent` |
 
@@ -45,7 +43,7 @@ A modern Kotlin-based coding agent with JavaFX UI, utilizing local and cloud LLM
 ├──────────────┴──────────────────┴───────────────────────────┤
 │                    CANVAS (visual output)                   │
 ├─────────────────────────────────────────────────────────────┤
-│              STATUS BAR (connection, model, agents)          │
+│             TITLE BAR META (connection, model, agents)        │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -69,7 +67,7 @@ src/main/kotlin/de/heckenmann/visualagent/
 └── ui/
     ├── MainWindow.kt          # FXML-based, panel switching, shortcuts, command palette, window controls
     ├── FxmlLoader.kt          # Type-safe FXML loading utility
-    ├── StatusBar.kt           # Connection status + Retry/Reconnect actions
+    ├── StatusBar.kt           # Legacy status component (not currently used by MainWindow)
     └── panels/
         ├── SessionPanel.kt         # FXML-based, OllamaClient connected, model list + details
         ├── ChatPanel.kt            # Send handler, Enter/Cmd+Ctrl+Enter, loading placeholder, ChatMessage
@@ -100,43 +98,22 @@ gradle copyAllDependencies
 
 ## Roadmap
 
-### Phase 1: Foundation (Current)
+### Completed
+- [x] Spring AI migration to current stable starter and tool-calling path
+- [x] Persistent conversation/todos/sub-agent/tool history in SQLite
+- [x] Tool registry + event bus + conversation tool-call rendering
+- [x] Session settings and user instruction persistence
+- [x] Streaming response path in conversation UI
 
-> NOTE: Releases are drafted automatically using GitHub Release Drafter when merging to `main`. Maintain conventional PR labels (enhancement, bug, documentation, test) so drafts are grouped appropriately. A human should review the drafted release and publish when ready.
+### In Progress
+- [ ] File-size modularization (target: max 300 LOC per source file)
+- [ ] Package-size cleanup and stronger architectural boundaries
+- [ ] Additional GUI integration coverage
 
-
-- [x] Gradle Project Setup
-- [x] JavaFX MainWindow with CSS styling
-- [x] Ollama Local Client (REST API)
-- [x] UI Panels (Chat, SubAgents, Todos, Canvas, StatusBar, Session, Settings)
-- [x] Wire Chat to AgentManager (send handler + callback)
-- [x] Wire SessionPanel to OllamaClient (model list + details)
-- [x] Wire StatusBar to OllamaClient (checkConnection on startup)
-- [x] Todo Add/Delete/Complete with dialog and ListCell
-- [x] Application Settings with theme selector and font size
-- [ ] Remove hardcoded sample data from AgentManager and SubAgentsPanel
-- [ ] Wire TodoPanel to KnowledgeDb for persistence
-
-### Phase 2: Core Features
-- [x] SubAgent System loaded from DB (persistence + AgentConfig templates)
-- [x] SubAgents UI: card view, Add/Edit/Delete, Logs, live status updates
-- [ ] Todo Manager with SQLite persistence
-- [ ] Knowledge DB full CRUD (partial: sub_agents table + helpers implemented)
-- [ ] Chat with streaming responses
-- [ ] Personalization (Name, Image storage)
-
-See `docs/subagents.md` for details on the SubAgents implementation and how to use the new UI features.
-
-### Phase 3: Advanced Features
-- [ ] Canvas with LLM-driven visual output
-- [ ] Ollama Cloud Provider
-- [ ] Tool-Calling Interface
-
-### Phase 4: Integration
-- [ ] Firefox Browser Controller
-- [ ] Screen Capture + Analysis
-- [ ] Input Simulation (Robot)
-- [ ] Multi-Provider Support
+### Planned
+- [ ] Browser/search real backend integration (currently explicit unavailable tool responses)
+- [ ] Additional provider support
+- [ ] Canvas capability expansion
 
 ## License
 

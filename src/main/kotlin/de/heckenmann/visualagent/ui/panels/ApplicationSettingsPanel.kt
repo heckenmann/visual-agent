@@ -8,6 +8,8 @@ import javafx.scene.control.Spinner
 import javafx.scene.control.SpinnerValueFactory.IntegerSpinnerValueFactory
 import javafx.scene.layout.Region
 import javafx.scene.layout.VBox
+import org.springframework.context.annotation.Lazy
+import org.springframework.stereotype.Component
 
 /**
  * Application-wide settings panel for theme and font preferences.
@@ -15,6 +17,8 @@ import javafx.scene.layout.VBox
  * Changes are persisted through [AppConfig]. Global UI updates are handled by
  * AppConfig observers such as MainWindow, not by this panel directly.
  */
+@Component
+@Lazy
 class ApplicationSettingsPanel : Region() {
     @FXML
     private lateinit var root: VBox

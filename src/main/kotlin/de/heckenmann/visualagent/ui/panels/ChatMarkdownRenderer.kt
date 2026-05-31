@@ -39,6 +39,13 @@ internal object ChatMarkdownRenderer {
      * @return JavaFX region containing rendered Markdown blocks
      */
     fun render(markdown: String): Region {
+        if (!looksLikeMarkdown(markdown)) {
+            return Label(markdown).apply {
+                styleClass.addAll("chat-message-content", "chat-md-paragraph")
+                isWrapText = true
+                maxWidth = Double.MAX_VALUE
+            }
+        }
         val root = VBox()
         root.styleClass.add("chat-markdown")
         root.isFillWidth = true
@@ -51,6 +58,21 @@ internal object ChatMarkdownRenderer {
             root.children += textFlow(listOf(Text(markdown)), "chat-md-paragraph")
         }
         return root
+    }
+
+    /**
+     * Lightweight markdown detector used to bypass full CommonMark parsing for plain text replies.
+     */
+    private fun looksLikeMarkdown(text: String): Boolean {
+        if (text.contains("```")) return true
+        if (text.contains("**")) return true
+        if (text.contains("`")) return true
+        if (text.contains("- ")) return true
+        if (text.contains("* ")) return true
+        if (text.contains("\n#")) return true
+        if (text.startsWith("#")) return true
+        if (text.contains("\n1.")) return true
+        return false
     }
 
     private fun appendBlockChildren(

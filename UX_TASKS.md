@@ -1,7 +1,7 @@
 UX Task List
 ===============
 
-Status: The tasks below have been seeded into the in-memory TodoManager by AgentManager.seedUxTodos(). Autonomous processing is NOT started automatically; call AgentManager.startAutonomousProcessing(seed = true) to begin processing. Do NOT run the application repeatedly during development — start processing only when you're ready.
+Status: The tasks below represent UX work tracked by the app todo flow. Todos are persisted in SQLite via `KnowledgeDb`. Autonomous processing is NOT started automatically; call `AgentManager.startAutonomousProcessing(seed = true)` to begin processing.
 
 Tasks (seeded)
 1. ChatPanel: implement message grouping visual polish
@@ -31,5 +31,5 @@ How to start processing (manual)
 - From code: call the same method at a controlled place (not in MainWindow init).
 
 Notes
-- The TodoManager is in-memory. If you want persistence across restarts, persist todos to KnowledgeDb or the SQLite DB.
+- Todo state is persisted and reloaded on restart.
 - Avoid repeated application restarts while autonomous processing is running — it may cause resource contention and rate limits against local models.
