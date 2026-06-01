@@ -1,10 +1,10 @@
 # Visual Agent
 
-A Kotlin-based desktop coding agent with JavaFX UI, Spring Boot, Spring AI, and SQLite persistence.
+Visual Agent is a Kotlin desktop coding agent with JavaFX UI, Spring Boot/Spring AI, and SQLite persistence.
 
 ## Current Status
 
-The app is functional end-to-end with persistent chat/todos/settings, Spring AI tool-calling, and streaming UI.
+The app is functional end-to-end with persistent chat/todos/settings, Spring AI tool-calling, streaming responses, and persisted tool-call history in conversation.
 
 | Feature | UI | Backend | Wired |
 |---------|----|---------|-------|
@@ -13,7 +13,7 @@ The app is functional end-to-end with persistent chat/todos/settings, Spring AI 
 | Todos | Panel + tool integration + count/list/update flows | Persisted in `KnowledgeDb` | Yes |
 | Session | Model selector, details, runtime toggles, user instruction | `LLMProvider` + `OllamaClient` | Yes |
 | Settings | Theme/font/model/session options | `AppConfig` + DB-backed runtime usage | Yes |
-| Tool Calling | Tool events and history rendering in conversation | Spring AI `ToolCallback` path | Yes |
+| Tool Calling | Tool events and minimized tool entries in conversation | Spring AI `ToolCallback` path | Yes |
 | Knowledge DB | Conversation, todos, tools, agents, preferences, history search | SQLite WAL + indexes | Yes |
 
 ## Tech Stack
@@ -28,7 +28,7 @@ The app is functional end-to-end with persistent chat/todos/settings, Spring AI 
 | Serialization | Kotlinx Serialization JSON 1.8.1 |
 | Coroutines | Kotlinx Coroutines 1.7.3 |
 | Logging | Logback 1.5.x |
-| LLM Provider | Spring AI + Ollama |
+| LLM Provider | Spring AI + Ollama (`ChatModel`) |
 | Linter | ktlint |
 | Namespace | `de.heckenmann.visualagent` |
 
@@ -43,7 +43,7 @@ The app is functional end-to-end with persistent chat/todos/settings, Spring AI 
 ├──────────────┴──────────────────┴───────────────────────────┤
 │                    CANVAS (visual output)                   │
 ├─────────────────────────────────────────────────────────────┤
-│             TITLE BAR META (connection, model, agents)        │
+│      TITLE BAR META (connection, model, active agents)      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -54,23 +54,32 @@ src/main/kotlin/de/heckenmann/visualagent/
 ├── Main.kt                    # Application entry point
 ├── agent/
 │   ├── LLMProvider.kt         # Interface: chat, stream, vision, embeddings, getModels, getModelDetails
-│   ├── OllamaClient.kt        # Implements LLMProvider, connects to Ollama API
-│   ├── AgentManager.kt        # Manages sub-agents, sends messages via OllamaClient
+│   ├── OllamaClient.kt        # Implements LLMProvider via Spring AI + Ollama ChatModel
+│   ├── OllamaPromptFactory.kt # Builds request-scoped prompts/options/tool callbacks
+│   ├── OllamaToolRecovery.kt  # Unknown tool-name recovery path
+│   ├── AgentManager.kt        # Main orchestration: chat, todos, history, sub-agents
 │   ├── SubAgent.kt            # SubAgent data model, AgentStatus enum
 │   └── SessionEvent.kt        # Sealed interface for session-level events
+│   └── tools/                 # Core/File/Runtime tools + registry/event bus
 ├── config/
 │   └── AppConfig.kt           # Singleton loaded from app.properties
+│   └── AppConfigPersistenceBinder.kt # DB-backed settings persistence binding
 ├── knowledge/
-│   └── KnowledgeDb.kt         # SQLite with WAL mode, busy_timeout, table creation + partial CRUD
+│   ├── KnowledgeDb.kt         # Facade over DAOs
+│   ├── *Dao.kt                # Conversation/Todo/SubAgent/... persistence modules
+│   └── KnowledgeSchema.kt     # Schema creation + migration helpers
 ├── todo/
-│   └── Todo.kt                # Todo, Priority, Status models
+│   ├── Todo.kt                # Todo, Priority, Status models
+│   └── TodoConfiguration.kt   # Spring bean wiring for TodoManager
 └── ui/
     ├── MainWindow.kt          # FXML-based, panel switching, shortcuts, command palette, window controls
+    ├── MainWindow*Wiring.kt   # Chat/sub-agent/tool event wiring modules
     ├── FxmlLoader.kt          # Type-safe FXML loading utility
     ├── StatusBar.kt           # Legacy status component (not currently used by MainWindow)
     └── panels/
-        ├── SessionPanel.kt         # FXML-based, OllamaClient connected, model list + details
-        ├── ChatPanel.kt            # Send handler, Enter/Cmd+Ctrl+Enter, loading placeholder, ChatMessage
+        ├── SessionPanel.kt         # FXML-based, model/session settings panel
+        ├── ChatPanel.kt            # Conversation panel shell
+        ├── ChatMessage*.kt         # Message rendering/list/runtime status controllers
         ├── TodoPanel.kt            # FXML-based, Add dialog, Delete, checkbox toggle, priority badges
         ├── SubAgentsPanel.kt       # Agent list built in code, CSS classes (no inline styles)
         ├── CanvasPanel.kt          # Drawing canvas built in code, CSS classes
@@ -95,6 +104,31 @@ gradle run
 # Copy dependencies to lib/
 gradle copyAllDependencies
 ```
+
+## Quality Gates
+
+Run before commit:
+
+```bash
+./gradlew ktlintCheck check test
+```
+
+Notes:
+
+- `ktlintJavadocCheck`: enforces KDoc/Javadoc for explicit public declarations.
+- `unusedCodeCheck`: flags removable unused private declarations.
+- `locAndPackageSizeCheck`: currently warning-only while modularization is in progress.
+
+## Model Context (Main Agent)
+
+Each main-agent request includes:
+
+- system context prompt with authoritative todo summary + current todo list
+- optional user session instruction (`userModelInstruction`)
+- last 20 persisted conversation messages from DB
+- enabled tool IDs from `AgentToolConfigService`
+- request metadata (`sessionId`, `agent`, optional `requestId`)
+- strict tool-name guard message (exact callable function names)
 
 ## Roadmap
 

@@ -15,6 +15,9 @@ fun interface ConnectionProvider {
     fun get(): Connection
 }
 
+/**
+ * Represents Memory.
+ */
 data class Memory(
     val id: String,
     val content: String,
@@ -32,6 +35,9 @@ data class Memory(
     override fun hashCode(): Int = id.hashCode()
 }
 
+/**
+ * Represents ProjectKnowledge.
+ */
 data class ProjectKnowledge(
     val id: String,
     val projectPath: String,

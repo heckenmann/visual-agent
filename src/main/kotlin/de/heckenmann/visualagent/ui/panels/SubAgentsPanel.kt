@@ -14,6 +14,9 @@ import org.springframework.context.annotation.Lazy
 import org.springframework.stereotype.Component
 import java.util.UUID
 
+/**
+ * Represents SubAgentsPanel.
+ */
 @Component
 @Lazy
 class SubAgentsPanel : Region() {
@@ -41,6 +44,9 @@ class SubAgentsPanel : Region() {
         createDefaultAgents()
     }
 
+    /**
+     * Executes setAgents.
+     */
     fun setAgents(agents: List<SubAgent>) {
         agentsContainer.children.clear()
         agentsList.clear()
@@ -75,6 +81,9 @@ class SubAgentsPanel : Region() {
     // Optional external callback for agent actions (UI -> backend wiring)
     var agentActionCallback: ((action: String, agentId: String) -> Unit)? = null
 
+    /**
+     * Executes addAgent.
+     */
     fun addAgent(agent: SubAgent) {
         val agentView = SubAgentCardView(agent)
 
@@ -118,6 +127,9 @@ class SubAgentsPanel : Region() {
         agentsContainer.children.add(agentView as Node)
     }
 
+    /**
+     * Executes updateAgentStatus.
+     */
     fun updateAgentStatus(
         agentId: String,
         status: AgentStatus,
@@ -127,6 +139,9 @@ class SubAgentsPanel : Region() {
     }
 }
 
+/**
+ * Represents SubAgentView.
+ */
 class SubAgentView(
     val agent: SubAgent,
 ) : Region() {
@@ -177,6 +192,9 @@ class SubAgentView(
         statusIndicator.styleClass.add(statusClass)
     }
 
+    /**
+     * Executes updateStatus.
+     */
     fun updateStatus(
         status: AgentStatus,
         task: String? = null,

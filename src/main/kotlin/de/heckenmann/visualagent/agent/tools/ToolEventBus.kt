@@ -38,9 +38,7 @@ enum class ToolCallPhase {
 }
 
 /**
- * In-process event bus for tool call notifications.
- *
- * Any component can subscribe to receive all tool call events, independent of the concrete tool type.
+ * Represents ToolEventBus.
  */
 @Component
 class ToolEventBus {

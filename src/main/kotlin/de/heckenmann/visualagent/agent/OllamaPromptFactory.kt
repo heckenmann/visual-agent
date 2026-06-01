@@ -12,9 +12,7 @@ import org.springframework.stereotype.Component
 import org.springframework.ai.chat.messages.Message as SpringMessage
 
 /**
- * Builds Spring AI prompts for Ollama chat requests.
- *
- * @property toolRegistry Registry used to expose request-scoped tool callbacks
+ * Represents OllamaPromptFactory.
  */
 @Component
 class OllamaPromptFactory(
@@ -79,6 +77,8 @@ class OllamaPromptFactory(
                         Tool calling strict mode:
                         - You may only call tool functions with these exact names: ${exactFunctionNames.joinToString(", ")}.
                         - Do not invent variants, prefixes, or suffixes.
+                        - Every tool accepts optional runtime fields: `timeoutSeconds` (1..600) and `async` (true/false).
+                        - Use `timeoutSeconds` for long operations; use `async:true` when the tool can finish in background.
                         - If unsure about a tool name, do not call a tool; ask briefly or answer directly.
                         """.trimIndent(),
                 ),

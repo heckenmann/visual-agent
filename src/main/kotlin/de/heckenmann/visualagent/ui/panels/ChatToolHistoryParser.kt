@@ -16,7 +16,7 @@ internal class ChatToolHistoryParser {
      */
     fun isToolHistoryEntry(message: Message): Boolean {
         val metadata = message.metadata ?: return false
-        return metadata.contains("\"type\":\"tool_call\"")
+        return parseToolMetadata(metadata) != null
     }
 
     /**

@@ -2,26 +2,29 @@ package de.heckenmann.visualagent.agent.tools
 
 import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.agent.ToolResult
+import de.heckenmann.visualagent.config.AppConfig
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.springframework.ai.chat.model.ToolContext
 import org.springframework.ai.tool.ToolCallback
+import org.springframework.beans.factory.DisposableBean
 import org.springframework.stereotype.Service
 import java.time.Instant
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import org.springframework.ai.tool.definition.ToolDefinition as SpringToolDefinition
 
 /**
- * Registry for all tools that can be exposed to the LLM.
- *
- * The registry is the only place that maps application tool IDs to Spring AI function
- * callbacks, allowing providers and agents to stay provider-neutral.
+ * Represents ToolRegistry.
  */
 @Service
 class ToolRegistry(
     tools: List<VisualAgentTool>,
     private val toolEventBus: ToolEventBus,
-) {
+) : DisposableBean {
     private val toolsById = tools.associateBy { it.definition.id }
+    private val executor = Executors.newCachedThreadPool()
 
     /**
      * Return all registered application tool IDs.
@@ -52,6 +55,9 @@ class ToolRegistry(
     ): List<ToolCallback> =
         resolve(enabledTools).map { tool ->
             val definition = tool.definition
+            /**
+             * Represents declaration.
+             */
             object : ToolCallback {
                 override fun getToolDefinition(): SpringToolDefinition =
                     SpringToolDefinition
@@ -68,6 +74,8 @@ class ToolRegistry(
                     toolContext: ToolContext?,
                 ): String {
                     val effectiveContext = context + (toolContext?.context ?: emptyMap())
+                    val inputObject = parseObject(functionInput)
+                    val options = runtimeOptions(inputObject, AppConfig.instance.timeoutSeconds)
                     val startedAt = Instant.now()
                     toolEventBus.publish(
                         ToolCallEvent(
@@ -87,16 +95,23 @@ class ToolRegistry(
                             durationMillis = 0L,
                         ),
                     )
-                    val result =
-                        runCatching { tool.execute(functionInput, effectiveContext) }
-                            .getOrElse { error ->
-                                ToolResult(
-                                    toolId = definition.id.value,
-                                    success = false,
-                                    content = "",
-                                    error = error.message ?: error::class.simpleName,
-                                )
-                            }
+                    if (options.async) {
+                        scheduleAsyncExecution(
+                            tool = tool,
+                            definition = definition,
+                            functionInput = functionInput,
+                            effectiveContext = effectiveContext,
+                            timeoutSeconds = options.timeoutSeconds,
+                            startedAt = startedAt,
+                        )
+                        val accepted =
+                            success(
+                                definition.id.value,
+                                "scheduled async tool call (timeout=${options.timeoutSeconds}s)",
+                            )
+                        return Json.encodeToString(accepted)
+                    }
+                    val result = executeWithTimeout(tool, definition.id.value, functionInput, effectiveContext, options.timeoutSeconds)
                     val finishedAt = Instant.now()
                     toolEventBus.publish(
                         ToolCallEvent(
@@ -118,4 +133,57 @@ class ToolRegistry(
                 }
             }
         }
+
+    override fun destroy() {
+        executor.shutdownNow()
+    }
+
+    private fun scheduleAsyncExecution(
+        tool: VisualAgentTool,
+        definition: de.heckenmann.visualagent.agent.ToolDefinition,
+        functionInput: String,
+        effectiveContext: Map<String, Any>,
+        timeoutSeconds: Int,
+        startedAt: Instant,
+    ) {
+        executor.submit {
+            val result = executeWithTimeout(tool, definition.id.value, functionInput, effectiveContext, timeoutSeconds)
+            val finishedAt = Instant.now()
+            toolEventBus.publish(
+                ToolCallEvent(
+                    toolId = definition.id.value,
+                    functionName = definition.name,
+                    phase = ToolCallPhase.FINISHED,
+                    inputJson = functionInput,
+                    context = effectiveContext + mapOf("async" to true),
+                    result = result,
+                    startedAtUtc = startedAt,
+                    finishedAtUtc = finishedAt,
+                    durationMillis =
+                        java.time.Duration
+                            .between(startedAt, finishedAt)
+                            .toMillis(),
+                ),
+            )
+        }
+    }
+
+    private fun executeWithTimeout(
+        tool: VisualAgentTool,
+        toolId: String,
+        functionInput: String,
+        effectiveContext: Map<String, Any>,
+        timeoutSeconds: Int,
+    ): ToolResult {
+        val future = executor.submit<ToolResult> { tool.execute(functionInput, effectiveContext) }
+        return try {
+            future.get(timeoutSeconds.toLong(), TimeUnit.SECONDS)
+        } catch (_: TimeoutException) {
+            future.cancel(true)
+            failure(toolId, "Tool call timed out after ${timeoutSeconds}s")
+        } catch (error: Exception) {
+            val root = generateSequence(error as Throwable?) { it.cause }.lastOrNull()
+            failure(toolId, root?.message ?: error.message ?: error::class.simpleName.orEmpty())
+        }
+    }
 }

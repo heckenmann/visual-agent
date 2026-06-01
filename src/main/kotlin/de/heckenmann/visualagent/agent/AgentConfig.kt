@@ -7,6 +7,9 @@ import kotlinx.serialization.Serializable
  * Controls behavior like timeouts, retry policies, and resource limits.
  */
 @Serializable
+/**
+ * Represents AgentConfig.
+ */
 data class AgentConfig(
     val timeout: Int = 60,
     val maxRetries: Int = 3,
@@ -25,6 +28,9 @@ data class AgentConfig(
                 "tester" to AgentConfig(timeout = 120, maxRetries = 4, memoryLimitMb = 512),
             )
 
+        /**
+         * Executes fromTemplate.
+         */
         fun fromTemplate(templateName: String): AgentConfig = TEMPLATES[templateName] ?: AgentConfig()
     }
 }

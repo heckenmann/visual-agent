@@ -9,10 +9,7 @@ import org.springframework.context.annotation.Configuration
 @Configuration
 internal class KnowledgePersistenceConfig {
     /**
-     * Exposes a lightweight connection provider for DAO classes.
-     *
-     * @param connectionManager Shared SQLite connection manager
-     * @return Connection provider delegate
+     * Executes connectionProvider.
      */
     @Bean
     fun connectionProvider(connectionManager: KnowledgeConnectionManager): ConnectionProvider =

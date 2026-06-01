@@ -38,6 +38,9 @@ internal class KnowledgeConnectionManager(
         return connection!!
     }
 
+    /**
+     * Executes close.
+     */
     @PreDestroy
     fun close() {
         connection?.close()

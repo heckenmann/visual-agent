@@ -24,6 +24,7 @@ internal class MainWindowChatWiring(
     private val openTodos: () -> Unit,
 ) {
     private var lastToolResultPreview: String? = null
+    private val thinkBlockRegex = Regex("<think>(.*?)</think>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
 
     /**
      * Registers chat send, clear, todo navigation, and history loading callbacks.
@@ -83,12 +84,18 @@ internal class MainWindowChatWiring(
         startedAt: Long,
     ) {
         val normalizedResponse = normalizeAssistantResponse(response)
+        val parsed = extractThinking(normalizedResponse)
         val elapsedMs = (System.nanoTime() - startedAt) / 1_000_000
         Platform.runLater {
+            if (AppConfig.instance.thinkingEnabled) {
+                parsed.thinkingBlocks.forEach { thinking -> chatPanel.addThinkingEvent(thinking) }
+            }
+            val assistantText =
+                parsed.answer.takeIf { it.isNotBlank() } ?: "(No text response. See tool results above.)"
             if (AppConfig.instance.streamingEnabled) {
-                chatPanel.finishStreamingAssistantMessage(normalizedResponse)
+                chatPanel.finishStreamingAssistantMessage(assistantText)
             } else {
-                chatPanel.addAssistantMessage(normalizedResponse)
+                chatPanel.addAssistantMessage(assistantText)
             }
             chatPanel.updateResponseMetrics(elapsedMs)
         }
@@ -136,4 +143,37 @@ internal class MainWindowChatWiring(
         }
         return response
     }
+
+    /**
+     * Extracts `<think>...</think>` blocks from model output and returns clean assistant text.
+     *
+     * @param response Raw assistant text
+     * @return Parsed thinking blocks plus visible answer text
+     */
+    private fun extractThinking(response: String): ParsedThinking {
+        if (response.isBlank()) return ParsedThinking(emptyList(), response)
+        val thoughts =
+            thinkBlockRegex
+                .findAll(response)
+                .map {
+                    it.groupValues
+                        .getOrNull(1)
+                        .orEmpty()
+                        .trim()
+                }.filter { it.isNotBlank() }
+                .toList()
+        val stripped = thinkBlockRegex.replace(response, "").trim()
+        return ParsedThinking(thoughts, stripped)
+    }
+
+    /**
+     * Parsed response container for optional thinking blocks and assistant-visible answer.
+     *
+     * @property thinkingBlocks Extracted model thinking snippets
+     * @property answer Final user-facing assistant answer
+     */
+    private data class ParsedThinking(
+        val thinkingBlocks: List<String>,
+        val answer: String,
+    )
 }

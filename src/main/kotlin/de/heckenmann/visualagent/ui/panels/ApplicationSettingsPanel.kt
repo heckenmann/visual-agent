@@ -12,10 +12,7 @@ import org.springframework.context.annotation.Lazy
 import org.springframework.stereotype.Component
 
 /**
- * Application-wide settings panel for theme and font preferences.
- *
- * Changes are persisted through [AppConfig]. Global UI updates are handled by
- * AppConfig observers such as MainWindow, not by this panel directly.
+ * Represents ApplicationSettingsPanel.
  */
 @Component
 @Lazy
@@ -46,7 +43,7 @@ class ApplicationSettingsPanel : Region() {
     }
 
     /**
-     * Initializes settings controls and persists user changes through AppConfig.
+     * Executes initialize.
      */
     @FXML
     fun initialize() {

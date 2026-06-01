@@ -1,11 +1,17 @@
 package de.heckenmann.visualagent.agent
 
+/**
+ * Represents AgentStatus.
+ */
 enum class AgentStatus {
     IDLE,
     BUSY,
     OFFLINE,
 }
 
+/**
+ * Represents SubAgent.
+ */
 data class SubAgent(
     val id: String,
     var name: String,

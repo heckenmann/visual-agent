@@ -26,7 +26,12 @@ internal class ChatMessageMapper(
      * Maps a finished tool-call event to a compact UI message.
      */
     fun fromToolEvent(event: ToolCallEvent): ChatMessage {
-        val status = if (event.result.success) "ok" else "error"
+        val status =
+            when {
+                event.toolId == "thinking" -> "thinking"
+                event.result.success -> "ok"
+                else -> "error"
+            }
         return ChatMessage(
             role = "assistant",
             content = toolSummary(event, status),

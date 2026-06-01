@@ -7,6 +7,9 @@ import javafx.scene.layout.HBox
 import javafx.scene.layout.Priority
 import javafx.scene.layout.Region
 
+/**
+ * Represents StatusBar.
+ */
 class StatusBar : Region() {
     companion object {
         const val HEIGHT = 32.0
@@ -45,16 +48,25 @@ class StatusBar : Region() {
         maxHeight = HEIGHT
     }
 
+    /**
+     * Executes updateConnectionStatus.
+     */
     fun updateConnectionStatus(connected: Boolean) {
         connectionLabel.text = if (connected) "Ollama: Connected" else "Ollama: Disconnected"
         reconnectButton.isDisable = connected
         retryButton.isDisable = connected
     }
 
+    /**
+     * Executes updateModel.
+     */
     fun updateModel(model: String) {
         modelLabel.text = "Model: $model"
     }
 
+    /**
+     * Executes updateAgentCount.
+     */
     fun updateAgentCount(
         active: Int,
         total: Int,
@@ -62,6 +74,9 @@ class StatusBar : Region() {
         agentsLabel.text = "Agents: $active/$total"
     }
 
+    /**
+     * Executes setOnReconnect.
+     */
     fun setOnReconnect(callback: () -> Unit) {
         onReconnect = callback
     }

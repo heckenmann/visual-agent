@@ -47,6 +47,9 @@ class Main : Application() {
     companion object {
         lateinit var context: ConfigurableApplicationContext
 
+        /**
+         * Executes main.
+         */
         @JvmStatic
         fun main(args: Array<String>) {
             AppIdentity.configureProcessProperties()

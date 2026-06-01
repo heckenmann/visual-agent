@@ -31,4 +31,13 @@ class SessionPanelFxmlLayoutTest {
             "session-panel.fxml must include a user instruction text area",
         )
     }
+
+    @Test
+    fun `session fxml includes model refresh button`() {
+        val res = javaClass.getResourceAsStream("/fxml/session-panel.fxml")?.bufferedReader()?.use { it.readText() }
+        assertTrue(
+            res != null && res.contains("fx:id=\"refreshModelsButton\""),
+            "session-panel.fxml must include a refresh button for model list updates",
+        )
+    }
 }

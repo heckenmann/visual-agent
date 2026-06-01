@@ -2,7 +2,6 @@ package de.heckenmann.visualagent.ui.panels
 
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
-import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.ui.FxmlLoader
 import javafx.application.Platform
 import javafx.beans.property.SimpleBooleanProperty
@@ -22,6 +21,9 @@ import org.springframework.stereotype.Component
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+/**
+ * Represents ChatPanel.
+ */
 @Component
 @Lazy
 class ChatPanel : Region() {
@@ -60,6 +62,7 @@ class ChatPanel : Region() {
     private val messageMapper = ChatMessageMapper(toolHistoryParser)
     private lateinit var messageList: ChatMessageListController
     private lateinit var runtimeStatus: ChatRuntimeStatusController
+    private lateinit var conversationEvents: ChatConversationEventsController
 
     init {
         styleClass.add("chat-panel")
@@ -111,6 +114,16 @@ class ChatPanel : Region() {
             openTodos = { onOpenTodos?.invoke() },
             loadOlderMessages = { onLoadOlderMessages?.invoke() ?: run { messageList.loadingOlderMessages = false } },
         )
+        conversationEvents =
+            ChatConversationEventsController(
+                messageList = messageList,
+                loadingToken = loadingToken,
+                waitingForAssistant = waitingForAssistant,
+                updateRuntimeStatus = ::updateRuntimeStatus,
+                updateMeta = { updateMeta() },
+                sendMessage = { text -> onSendMessage?.invoke(text) },
+                mapToolEvent = messageMapper::fromToolEvent,
+            )
         sendButton.disableProperty().bind(inputTextField.textProperty().isEmpty.or(waitingForAssistant))
         updateMeta()
         updateTodoSummary(total = 0, open = 0, inProgress = 0, completed = 0, cancelled = 0)
@@ -147,10 +160,12 @@ class ChatPanel : Region() {
         onSendMessage?.invoke(text)
     }
 
+    /** Executes setOnSendMessage. */
     fun setOnSendMessage(callback: (String) -> Unit) {
         onSendMessage = callback
     }
 
+    /** Executes setOnClearConversation. */
     fun setOnClearConversation(callback: () -> Unit) {
         onClearConversation = callback
     }
@@ -173,6 +188,7 @@ class ChatPanel : Region() {
         onLoadOlderMessages = callback
     }
 
+    /** Executes setConversationHistory. */
     fun setConversationHistory(history: List<Message>) {
         messageList.setMessages(history.mapNotNull(messageMapper::fromHistory))
         waitingForAssistant.set(false)
@@ -191,60 +207,29 @@ class ChatPanel : Region() {
         updateMeta()
     }
 
+    /** Executes addAssistantMessage. */
     fun addAssistantMessage(text: String) {
-        val normalizedText =
-            if (text.isBlank()) {
-                "(No text response. See tool results above.)"
-            } else {
-                text
-            }
-        val loadingIndex = messageList.latestLoadingIndex()
-        if (loadingIndex >= 0) {
-            messageList.replace(loadingIndex, messageList.messages[loadingIndex].copy(content = normalizedText))
-            waitingForAssistant.set(false)
-            updateRuntimeStatus()
-            updateMeta()
-            messageList.scrollToBottom()
-            return
-        }
-
-        messageList.append(ChatMessage("assistant", normalizedText))
-        waitingForAssistant.set(false)
-        updateRuntimeStatus()
-        updateMeta()
+        conversationEvents.addAssistantMessage(text)
     }
 
     /** Updates the active assistant placeholder with streamed content. */
     fun updateStreamingAssistantMessage(content: String) {
-        messageList.updateStreaming(content)
+        conversationEvents.updateStreamingAssistantMessage(content)
     }
 
     /** Finalizes streaming state once all chunks have been received. */
     fun finishStreamingAssistantMessage(finalText: String) {
-        val normalized =
-            if (finalText.isBlank()) {
-                "(No text response. See tool results above.)"
-            } else {
-                finalText
-            }
-        messageList.updateStreaming(normalized)
-        messageList.scrollToBottom(force = true)
-        waitingForAssistant.set(false)
-        updateRuntimeStatus()
-        updateMeta()
+        conversationEvents.finishStreamingAssistantMessage(finalText)
     }
 
     /** Appends a concise tool-call event line to the conversation. */
     fun addToolCallEvent(event: ToolCallEvent) {
-        if (event.phase != ToolCallPhase.FINISHED) return
-        val eventMessage = messageMapper.fromToolEvent(event)
-        val loadingIndex = messageList.latestLoadingIndex()
-        if (loadingIndex >= 0) {
-            messageList.insert(loadingIndex, eventMessage)
-        } else {
-            messageList.append(eventMessage)
-        }
-        updateMeta()
+        conversationEvents.addToolCallEvent(event)
+    }
+
+    /** Appends one synthetic thinking event block. */
+    fun addThinkingEvent(thinkingContent: String) {
+        conversationEvents.addThinkingEvent(thinkingContent)
     }
 
     /** Updates the dedicated tool-activity indicator. */
@@ -255,25 +240,12 @@ class ChatPanel : Region() {
         runtimeStatus.updateToolActivity(activeCount, latestToolId)
     }
 
-    /**
-     * Retry sending the user message that precedes the assistant message at [assistantIndex].
-     */
+    /** Retry sending the user message that precedes the assistant message at [assistantIndex]. */
     fun retryAssistantAt(assistantIndex: Int) {
-        if (assistantIndex < 0 || assistantIndex >= messageList.messages.size) return
-        for (i in assistantIndex - 1 downTo 0) {
-            val m = messageList.messages[i]
-            if (m.role == "user") {
-                messageList.replace(assistantIndex, messageList.messages[assistantIndex].copy(content = loadingToken))
-                waitingForAssistant.set(true)
-                updateRuntimeStatus()
-                updateMeta()
-                messageList.scrollToBottom(force = true)
-                onSendMessage?.invoke(m.content)
-                return
-            }
-        }
+        conversationEvents.retryAssistantAt(assistantIndex)
     }
 
+    /** Executes clearMessages. */
     fun clearMessages() {
         messageList.clear()
         waitingForAssistant.set(false)
@@ -281,9 +253,7 @@ class ChatPanel : Region() {
         updateMeta()
     }
 
-    /**
-     * Focuses the message input and scrolls the conversation to the newest message.
-     */
+    /** Focuses the message input and scrolls the conversation to the newest message. */
     fun focusInputAndScrollToBottom() {
         Platform.runLater {
             messageList.scrollToBottom(force = true)
@@ -294,6 +264,7 @@ class ChatPanel : Region() {
 
     private fun updateMeta(status: String? = null) {}
 
+    /** Executes updateResponseMetrics. */
     fun updateResponseMetrics(durationMillis: Long) {
         val seconds = durationMillis / 1000.0
         val rounded = String.format("%.2fs", seconds)

@@ -86,6 +86,7 @@ dependencies {
 
     // Markdown parsing
     implementation("org.commonmark:commonmark:0.21.0")
+    implementation("org.commonmark:commonmark-ext-autolink:0.21.0")
 
     // AtlantaFX themes
     implementation("io.github.mkpaz:atlantafx-base:2.0.1")
@@ -188,9 +189,9 @@ tasks.register("ktlintJavadocCheck") {
                                         .orEmpty()
                                 if (visibilityRegex.containsMatchIn(trimmed)) return@forEachIndexed
                                 if (trimmed.startsWith("override ")) return@forEachIndexed
+                                // Enforce KDoc for both explicit and implicit public API declarations.
+                                // Kotlin declarations are public by default unless private/internal/protected.
                                 if (declarationType == "val" || declarationType == "var") return@forEachIndexed
-                                val hasExplicitPublic = Regex("""^\s*public\b""").containsMatchIn(trimmed)
-                                if (!hasExplicitPublic) return@forEachIndexed
                                 val hasKdoc =
                                     run {
                                         var cursor = index - 1
@@ -204,7 +205,17 @@ tasks.register("ktlintJavadocCheck") {
                                                 cursor--
                                                 continue
                                             }
-                                            return@run kdocStartRegex.containsMatchIn(candidate)
+                                            if (kdocStartRegex.containsMatchIn(candidate)) return@run true
+                                            if (candidate.endsWith("*/")) {
+                                                var blockCursor = cursor - 1
+                                                while (blockCursor >= 0) {
+                                                    val blockLine = lines[blockCursor].trim()
+                                                    if (blockLine.startsWith("/**")) return@run true
+                                                    if (blockLine.startsWith("/*")) return@run false
+                                                    blockCursor--
+                                                }
+                                            }
+                                            return@run false
                                         }
                                         return@run false
                                     }

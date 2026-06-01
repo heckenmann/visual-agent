@@ -66,6 +66,9 @@ class SubAgentCardView(
         btnDelete.setOnAction { onDelete?.invoke(agent) }
     }
 
+    /**
+     * Executes updateStatus.
+     */
     fun updateStatus(
         status: AgentStatus,
         task: String?,
@@ -76,6 +79,9 @@ class SubAgentCardView(
         taskLabel.text = task ?: ""
     }
 
+    /**
+     * Executes refreshDisplay.
+     */
     fun refreshDisplay() {
         nameLabel.text = agent.name
         roleLabel.text = agent.role

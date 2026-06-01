@@ -7,9 +7,7 @@ import org.springframework.stereotype.Component
 import java.time.Instant
 
 /**
- * Persists todo rows.
- *
- * @property connectionProvider Provider for the active SQLite connection
+ * Represents TodoDao.
  */
 @Component
 class TodoDao(

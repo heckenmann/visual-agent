@@ -16,6 +16,9 @@ import javafx.scene.layout.GridPane
  */
 class AgentDetailsDialog {
     companion object {
+        /**
+         * Executes showFor.
+         */
         fun showFor(
             agent: SubAgent? = null,
             onSave: ((String, String, String) -> Unit)? = null,

@@ -32,6 +32,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Lazy
 import org.springframework.stereotype.Component
 
+/**
+ * Represents MainWindow.
+ */
 @Component
 @Lazy // delay instantiation until requested on the JavaFX Application thread
 @ConditionalOnProperty(name = ["visual-agent.ui.enabled"], havingValue = "true", matchIfMissing = true)

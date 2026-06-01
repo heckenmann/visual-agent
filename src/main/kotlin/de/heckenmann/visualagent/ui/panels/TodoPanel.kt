@@ -33,10 +33,7 @@ import org.springframework.stereotype.Component
 import java.util.UUID
 
 /**
- * Panel for managing a list of todo items with add, complete, and delete capabilities.
- *
- * Loads its layout from `todo-panel.fxml` and provides a cell factory that renders
- * each [Todo] with a checkbox, description, priority badge, and delete button.
+ * Represents TodoPanel.
  */
 @Component
 @Lazy
@@ -94,8 +91,7 @@ class TodoPanel(
     }
 
     /**
-     * Called automatically by the FXMLLoader after all FXML fields are injected.
-     * Sets up the list view cell factory and the add button handler.
+     * Executes initialize.
      */
     @FXML
     fun initialize() {
@@ -185,6 +181,9 @@ class TodoPanel(
         thread.start()
     }
 
+    /**
+     * Executes refreshFromManager.
+     */
     fun refreshFromManager() {
         Platform.runLater {
             todos.setAll(todoManager.getAll())

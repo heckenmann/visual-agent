@@ -11,6 +11,9 @@ import javafx.scene.text.Font
 import org.springframework.context.annotation.Lazy
 import org.springframework.stereotype.Component
 
+/**
+ * Represents CanvasPanel.
+ */
 @Component
 @Lazy
 class CanvasPanel : Region() {
@@ -43,11 +46,17 @@ class CanvasPanel : Region() {
         maxHeight = 400.0
     }
 
+    /**
+     * Executes clearCanvas.
+     */
     fun clearCanvas() {
         gc.fill = Color.web("#1e1e1e")
         gc.fillRect(0.0, 0.0, canvas.width, canvas.height)
     }
 
+    /**
+     * Executes drawText.
+     */
     fun drawText(
         text: String,
         x: Double,
@@ -59,6 +68,9 @@ class CanvasPanel : Region() {
         gc.fillText(text, x, y)
     }
 
+    /**
+     * Executes drawRect.
+     */
     fun drawRect(
         x: Double,
         y: Double,
@@ -75,6 +87,9 @@ class CanvasPanel : Region() {
         }
     }
 
+    /**
+     * Executes drawLine.
+     */
     fun drawLine(
         x1: Double,
         y1: Double,
@@ -91,6 +106,9 @@ class CanvasPanel : Region() {
         gc.stroke()
     }
 
+    /**
+     * Executes drawCircle.
+     */
     fun drawCircle(
         centerX: Double,
         centerY: Double,

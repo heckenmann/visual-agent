@@ -25,6 +25,37 @@ internal fun JsonObject.int(key: String): Int? = this[key]?.jsonPrimitive?.intOr
 
 internal fun JsonObject.boolean(key: String): Boolean? = this[key]?.jsonPrimitive?.booleanOrNull
 
+/**
+ * Execution options parsed from model-provided tool input.
+ *
+ * @property timeoutSeconds Effective timeout for this tool call
+ * @property async Whether tool execution should happen asynchronously
+ */
+internal data class ToolExecutionOptions(
+    val timeoutSeconds: Int,
+    val async: Boolean,
+)
+
+/**
+ * Parses standard tool runtime options from JSON input.
+ *
+ * Supported fields:
+ * - `timeoutSeconds` (int): per-call timeout override
+ * - `async` (boolean): execute call asynchronously
+ *
+ * @param input Parsed JSON input
+ * @param defaultTimeoutSeconds Application default timeout
+ * @return Sanitized execution options
+ */
+internal fun runtimeOptions(
+    input: JsonObject,
+    defaultTimeoutSeconds: Int,
+): ToolExecutionOptions {
+    val timeout = (input.int("timeoutSeconds") ?: defaultTimeoutSeconds).coerceIn(1, 600)
+    val async = input.boolean("async") ?: false
+    return ToolExecutionOptions(timeoutSeconds = timeout, async = async)
+}
+
 internal fun workspaceRoot(): Path = Path.of(System.getProperty("user.dir")).absolute().normalize()
 
 private fun resolveWorkspacePath(path: String): Path {
@@ -41,10 +72,16 @@ internal fun resolveWorkspacePathOrFailure(
         .getOrElse { PathResolution.Failure(failure(toolId, it.message ?: "Invalid path")) }
 
 internal sealed interface PathResolution {
+    /**
+     * Represents Success.
+     */
     data class Success(
         val path: Path,
     ) : PathResolution
 
+    /**
+     * Represents Failure.
+     */
     data class Failure(
         val result: ToolResult,
     ) : PathResolution

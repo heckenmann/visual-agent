@@ -1,6 +1,8 @@
 package de.heckenmann.visualagent.ui.panels
 
+import org.commonmark.ext.autolink.AutolinkExtension
 import org.commonmark.node.Code
+import org.commonmark.node.Link
 import org.commonmark.node.OrderedList
 import org.commonmark.node.StrongEmphasis
 import org.commonmark.parser.Parser
@@ -27,5 +29,19 @@ class ChatMarkdownRendererTest {
         val strong = assertIs<StrongEmphasis>(firstParagraph.firstChild)
         val code = assertIs<Code>(strong.firstChild)
         assertEquals("search", code.literal)
+    }
+
+    @Test
+    fun `autolink extension parses bare urls as link nodes`() {
+        val document =
+            Parser
+                .builder()
+                .extensions(listOf(AutolinkExtension.create()))
+                .build()
+                .parse("Open https://ollama.com/upgrade for details.")
+
+        val paragraph = document.firstChild
+        val link = assertIs<Link>(paragraph.firstChild.next)
+        assertEquals("https://ollama.com/upgrade", link.destination)
     }
 }

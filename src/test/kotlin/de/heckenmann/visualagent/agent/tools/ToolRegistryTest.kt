@@ -3,9 +3,11 @@ package de.heckenmann.visualagent.agent.tools
 import de.heckenmann.visualagent.agent.ToolDefinition
 import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.agent.ToolResult
+import de.heckenmann.visualagent.config.AppConfig
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -75,6 +77,58 @@ class ToolRegistryTest {
         assertEquals("boom", events[1].result.error)
     }
 
+    @Test
+    fun `tool call uses default timeout when not overridden`() {
+        val previousTimeout = AppConfig.instance.timeoutSeconds
+        AppConfig.instance.timeoutSeconds = 1
+        try {
+            val registry = ToolRegistry(listOf(SlowTool("context", 1500)), ToolEventBus())
+            val result = registry.functionCallbacks(setOf(ToolId("context"))).single().call("""{}""")
+            val json = Json.parseToJsonElement(result).jsonObject
+            assertFalse(json["success"]!!.jsonPrimitive.content.toBoolean())
+            assertTrue(json["error"]!!.jsonPrimitive.content.contains("timed out"))
+        } finally {
+            AppConfig.instance.timeoutSeconds = previousTimeout
+        }
+    }
+
+    @Test
+    fun `tool call timeout can be overridden by model input`() {
+        val previousTimeout = AppConfig.instance.timeoutSeconds
+        AppConfig.instance.timeoutSeconds = 1
+        try {
+            val registry = ToolRegistry(listOf(SlowTool("context", 1200)), ToolEventBus())
+            val result = registry.functionCallbacks(setOf(ToolId("context"))).single().call("""{"timeoutSeconds":2}""")
+            val json = Json.parseToJsonElement(result).jsonObject
+            assertTrue(json["success"]!!.jsonPrimitive.content.toBoolean())
+            assertEquals("ok", json["content"]!!.jsonPrimitive.content)
+        } finally {
+            AppConfig.instance.timeoutSeconds = previousTimeout
+        }
+    }
+
+    @Test
+    fun `tool call can run asynchronously`() {
+        val events = mutableListOf<ToolCallEvent>()
+        val bus = ToolEventBus()
+        bus.addListener { events += it }
+        val registry = ToolRegistry(listOf(SlowTool("context", 200)), bus)
+
+        val result = registry.functionCallbacks(setOf(ToolId("context"))).single().call("""{"async":true}""")
+        val json = Json.parseToJsonElement(result).jsonObject
+        assertTrue(json["success"]!!.jsonPrimitive.content.toBoolean())
+        assertTrue(json["content"]!!.jsonPrimitive.content.contains("scheduled async"))
+
+        val deadline = System.currentTimeMillis() + 3000
+        while (System.currentTimeMillis() < deadline && events.count { it.phase == ToolCallPhase.FINISHED } == 0) {
+            TimeUnit.MILLISECONDS.sleep(25)
+        }
+        assertEquals(2, events.size)
+        assertEquals(ToolCallPhase.STARTED, events[0].phase)
+        assertEquals(ToolCallPhase.FINISHED, events[1].phase)
+        assertTrue(events[1].result.success)
+    }
+
     private class FakeTool(
         id: String,
     ) : VisualAgentTool {
@@ -107,5 +161,26 @@ class ToolRegistryTest {
             inputJson: String,
             context: Map<String, Any>,
         ): ToolResult = throw IllegalStateException("boom")
+    }
+
+    private class SlowTool(
+        id: String,
+        private val delayMillis: Long,
+    ) : VisualAgentTool {
+        override val definition =
+            ToolDefinition(
+                id = ToolId(id),
+                name = ToolId(id).toFunctionName(),
+                description = "Slow $id",
+                inputSchema = """{"type":"object"}""",
+            )
+
+        override fun execute(
+            inputJson: String,
+            context: Map<String, Any>,
+        ): ToolResult {
+            TimeUnit.MILLISECONDS.sleep(delayMillis)
+            return ToolResult(definition.id.value, true, "ok")
+        }
     }
 }

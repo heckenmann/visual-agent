@@ -5,9 +5,7 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * Persists long-term memory rows.
- *
- * @property connectionProvider Provider for the active SQLite connection
+ * Represents MemoryDao.
  */
 @Component
 class MemoryDao(

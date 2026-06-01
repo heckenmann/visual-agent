@@ -2,6 +2,9 @@ package de.heckenmann.visualagent.todo
 
 import java.time.Instant
 
+/**
+ * Represents TodoStatus.
+ */
 enum class TodoStatus {
     PENDING,
     IN_PROGRESS,
@@ -9,6 +12,9 @@ enum class TodoStatus {
     CANCELLED,
 }
 
+/**
+ * Represents TodoPriority.
+ */
 enum class TodoPriority {
     LOW,
     MEDIUM,
@@ -16,6 +22,9 @@ enum class TodoPriority {
     URGENT,
 }
 
+/**
+ * Represents Todo.
+ */
 data class Todo(
     val id: String,
     val description: String,

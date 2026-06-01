@@ -3,6 +3,9 @@ package de.heckenmann.visualagent.todo
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
 
+/**
+ * Represents TodoChangeType.
+ */
 enum class TodoChangeType {
     ADDED,
     UPDATED,
@@ -10,6 +13,9 @@ enum class TodoChangeType {
     CLEARED,
 }
 
+/**
+ * Represents TodoChange.
+ */
 data class TodoChange(
     val type: TodoChangeType,
     val todo: Todo? = null,
@@ -38,14 +44,29 @@ class TodoManager(
         return AutoCloseable { listeners.remove(listener) }
     }
 
+    /**
+     * Executes getAll.
+     */
     fun getAll(): List<Todo> = todos.toList()
 
+    /**
+     * Executes getPending.
+     */
     fun getPending(): List<Todo> = todos.filter { it.status == TodoStatus.PENDING }
 
+    /**
+     * Executes getById.
+     */
     fun getById(id: String): Todo? = todos.find { it.id == id }
 
+    /**
+     * Executes getByAgent.
+     */
     fun getByAgent(agentId: String): List<Todo> = todos.filter { it.assignedAgentId == agentId }
 
+    /**
+     * Executes add.
+     */
     fun add(
         description: String,
         priority: TodoPriority = TodoPriority.MEDIUM,
@@ -62,6 +83,9 @@ class TodoManager(
         return todo
     }
 
+    /**
+     * Executes assignToAgent.
+     */
     fun assignToAgent(
         todoId: String,
         agentId: String,
@@ -74,6 +98,9 @@ class TodoManager(
         return true
     }
 
+    /**
+     * Executes completeTodo.
+     */
     fun completeTodo(todoId: String): Boolean {
         val todo = getById(todoId) ?: return false
         if (todo.status != TodoStatus.IN_PROGRESS) return false
@@ -83,6 +110,9 @@ class TodoManager(
         return true
     }
 
+    /**
+     * Executes cancelTodo.
+     */
     fun cancelTodo(todoId: String): Boolean {
         val todo = getById(todoId) ?: return false
         if (todo.status == TodoStatus.COMPLETED || todo.status == TodoStatus.CANCELLED) return false
@@ -91,12 +121,18 @@ class TodoManager(
         return true
     }
 
+    /**
+     * Executes remove.
+     */
     fun remove(todoId: String): Boolean {
         val removed = todos.removeIf { it.id == todoId }
         if (removed) publishChange(TodoChange(TodoChangeType.REMOVED, todoId = todoId))
         return removed
     }
 
+    /**
+     * Executes clear.
+     */
     fun clear() {
         todos.clear()
         publishChange(TodoChange(TodoChangeType.CLEARED))

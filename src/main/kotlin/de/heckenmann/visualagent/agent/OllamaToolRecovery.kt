@@ -7,10 +7,7 @@ import org.springframework.ai.chat.model.ChatModel
 import org.springframework.stereotype.Component
 
 /**
- * Handles unknown tool-function errors from Spring AI/Ollama chat calls.
- *
- * @property chatModel Spring AI chat model used for the recovery turn
- * @property promptFactory Prompt builder shared with the primary chat path
+ * Represents OllamaToolRecovery.
  */
 @Component
 class OllamaToolRecovery(

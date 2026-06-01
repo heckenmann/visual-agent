@@ -11,6 +11,9 @@ import javafx.scene.layout.VBox
  */
 class AgentLogsDialog {
     companion object {
+        /**
+         * Executes showFor.
+         */
         fun showFor(agent: SubAgent) {
             val dialog = Dialog<Unit>()
             dialog.title = "Agent Logs - ${agent.name}"

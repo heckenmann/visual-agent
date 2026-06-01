@@ -10,6 +10,7 @@ import javafx.scene.input.ClipboardContent
 import javafx.scene.layout.HBox
 import javafx.scene.layout.Priority
 import javafx.scene.layout.Region
+import javafx.scene.layout.StackPane
 import javafx.scene.layout.VBox
 import org.kordamp.ikonli.fontawesome5.FontAwesomeSolid
 import org.kordamp.ikonli.javafx.FontIcon
@@ -53,6 +54,24 @@ internal class ChatMessageRenderer(
         val avatar = Label(if (item.role == "user") "You" else "AI")
         if (item.isToolEvent) avatar.text = "Tool"
         avatar.styleClass.addAll("chat-avatar", if (item.role == "user") "chat-avatar-user" else "chat-avatar-assistant")
+        if (item.role == "assistant" && item.content == loadingToken) {
+            avatar.styleClass.add("chat-avatar-loading-core")
+            val ring =
+                ProgressIndicator().apply {
+                    progress = -1.0
+                    styleClass.add("chat-avatar-loading-ring")
+                    isMouseTransparent = true
+                }
+            return StackPane(avatar, ring).apply {
+                styleClass.add("chat-avatar-loading-wrap")
+                minWidth = 40.0
+                prefWidth = 40.0
+                maxWidth = 40.0
+                minHeight = 40.0
+                prefHeight = 40.0
+                maxHeight = 40.0
+            }
+        }
         return avatar
     }
 
@@ -119,15 +138,8 @@ internal class ChatMessageRenderer(
 
     private fun createMessageBody(item: ChatMessage): Region {
         if (item.content == loadingToken) {
-            val loadingSpinner =
-                ProgressIndicator().apply {
-                    progress = -1.0
-                    maxWidth = 16.0
-                    maxHeight = 16.0
-                    styleClass.add("assistant-loading-spinner")
-                }
             val loadingLabel = Label("Main agent is working").apply { styleClass.add("assistant-loading") }
-            return HBox(loadingSpinner, loadingLabel).apply { styleClass.add("assistant-loading-row") }
+            return HBox(loadingLabel).apply { styleClass.add("assistant-loading-row") }
         }
         if (item.isToolEvent) return createToolEventBody(item)
         return ChatMarkdownRenderer.render(item.content).also {
@@ -159,9 +171,15 @@ internal class ChatMessageRenderer(
         duration: String,
     ): HBox {
         val title = Label(toolId).apply { styleClass.add("chat-tool-title") }
+        val statusClass =
+            when (status) {
+                "OK" -> "chat-tool-status-ok"
+                "THINKING" -> "chat-tool-status-thinking"
+                else -> "chat-tool-status-error"
+            }
         val statusLabel =
             Label(status).apply {
-                styleClass.addAll("chat-tool-status", if (status == "OK") "chat-tool-status-ok" else "chat-tool-status-error")
+                styleClass.addAll("chat-tool-status", statusClass)
             }
         val durationLabel = Label(duration).apply { styleClass.add("chat-tool-duration") }
         return HBox(title, statusLabel, durationLabel).apply { styleClass.add("chat-tool-header") }

@@ -5,9 +5,7 @@ import de.heckenmann.visualagent.todo.Todo
 import org.springframework.stereotype.Repository
 
 /**
- * SQLite facade for Visual Agent persistence.
- *
- * This class delegates table-specific operations to focused DAO beans.
+ * Represents KnowledgeDb.
  */
 @Repository
 class KnowledgeDb(
@@ -23,29 +21,47 @@ class KnowledgeDb(
         knowledgeSchema.initDatabase()
     }
 
+    /**
+     * Executes saveMemory.
+     */
     fun saveMemory(
         content: String,
         tags: List<String> = emptyList(),
     ): String = memoryDao.saveMemory(content, tags)
 
+    /**
+     * Executes saveStructuredKnowledge.
+     */
     fun saveStructuredKnowledge(
         subject: String,
         summary: String,
         nextSteps: String?,
     ): String = memoryDao.saveStructuredKnowledge(subject, summary, nextSteps)
 
+    /**
+     * Executes searchMemories.
+     */
     fun searchMemories(
         query: String,
         limit: Int = 10,
     ): List<Memory> = memoryDao.searchMemories(query, limit)
 
+    /**
+     * Executes getPreference.
+     */
     fun getPreference(key: String): String? = preferenceDao.getPreference(key)
 
+    /**
+     * Executes setPreference.
+     */
     fun setPreference(
         key: String,
         value: String,
     ) = preferenceDao.setPreference(key, value)
 
+    /**
+     * Executes saveConversationMessage.
+     */
     fun saveConversationMessage(
         sessionId: String,
         role: String,
@@ -53,33 +69,60 @@ class KnowledgeDb(
         metadata: String? = null,
     ): String = conversationDao.saveConversationMessage(sessionId, role, content, metadata)
 
+    /**
+     * Executes getConversationMessages.
+     */
     fun getConversationMessages(
         sessionId: String,
         limit: Int = 500,
     ): List<Map<String, String>> = conversationDao.getConversationMessages(sessionId, limit)
 
+    /**
+     * Executes getConversationMessagesPage.
+     */
     fun getConversationMessagesPage(
         sessionId: String,
         limit: Int,
         offset: Int,
     ): List<Map<String, String>> = conversationDao.getConversationMessagesPage(sessionId, limit, offset)
 
+    /**
+     * Executes searchConversationMessages.
+     */
     fun searchConversationMessages(
         sessionId: String,
         query: String,
         limit: Int = 20,
     ): List<Map<String, String>> = conversationDao.searchConversationMessages(sessionId, query, limit)
 
+    /**
+     * Executes deleteConversationMessages.
+     */
     fun deleteConversationMessages(sessionId: String): Int = conversationDao.deleteConversationMessages(sessionId)
 
+    /**
+     * Executes saveTodo.
+     */
     fun saveTodo(todo: Todo) = todoDao.saveTodo(todo)
 
+    /**
+     * Executes listTodos.
+     */
     fun listTodos(): List<Todo> = todoDao.listTodos()
 
+    /**
+     * Executes deleteTodo.
+     */
     fun deleteTodo(todoId: String) = todoDao.deleteTodo(todoId)
 
+    /**
+     * Executes clearTodos.
+     */
     fun clearTodos() = todoDao.clearTodos()
 
+    /**
+     * Executes saveAgent.
+     */
     fun saveAgent(
         id: String,
         name: String,
@@ -90,18 +133,33 @@ class KnowledgeDb(
         configJson: String,
     ): Boolean = agentDao.saveAgent(id, name, role, status, currentTask, parentAgentId, configJson)
 
+    /**
+     * Executes getAgent.
+     */
     fun getAgent(id: String): Map<String, Any>? = agentDao.getAgent(id)
 
+    /**
+     * Executes listAgents.
+     */
     fun listAgents(status: String? = null): List<Map<String, Any>> = agentDao.listAgents(status)
 
+    /**
+     * Executes deleteAgent.
+     */
     fun deleteAgent(id: String): Boolean = agentDao.deleteAgent(id)
 
+    /**
+     * Executes updateAgentStatus.
+     */
     fun updateAgentStatus(
         id: String,
         status: String,
         currentTask: String? = null,
     ): Boolean = agentDao.updateAgentStatus(id, status, currentTask)
 
+    /**
+     * Executes saveSubAgentConfig.
+     */
     fun saveSubAgentConfig(
         id: String,
         name: String,
@@ -113,9 +171,18 @@ class KnowledgeDb(
         enabled: Boolean,
     ) = configDao.saveSubAgentConfig(id, name, description, model, systemPrompt, toolsJson, maxTurns, enabled)
 
+    /**
+     * Executes getSubAgentConfig.
+     */
     fun getSubAgentConfig(id: String): SubAgentToolConfig? = configDao.getSubAgentConfig(id)
 
+    /**
+     * Executes listSubAgentConfigs.
+     */
     fun listSubAgentConfigs(): List<SubAgentToolConfig> = configDao.listSubAgentConfigs()
 
+    /**
+     * Executes close.
+     */
     fun close() = Unit
 }

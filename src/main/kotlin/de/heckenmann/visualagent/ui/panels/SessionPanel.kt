@@ -7,6 +7,7 @@ import de.heckenmann.visualagent.ui.FxmlLoader
 import javafx.application.Platform
 import javafx.fxml.FXML
 import javafx.scene.Parent
+import javafx.scene.control.Button
 import javafx.scene.control.CheckBox
 import javafx.scene.control.ComboBox
 import javafx.scene.control.Label
@@ -26,10 +27,7 @@ import org.springframework.context.annotation.Lazy
 import org.springframework.stereotype.Component
 
 /**
- * Session configuration panel for model selection, context settings, and behavior toggles.
- *
- * Loads its layout from `session-panel.fxml` and wires all FXML controls to event handlers.
- * Requires a [OllamaClient] via [setOllamaClient] to populate model lists and details.
+ * Represents SessionPanel.
  */
 @Component
 @Lazy
@@ -40,6 +38,9 @@ class SessionPanel : Region() {
 
     @FXML
     private lateinit var modelSelector: ComboBox<String>
+
+    @FXML
+    private lateinit var refreshModelsButton: Button
 
     @FXML
     private lateinit var contextSlider: Slider
@@ -84,8 +85,7 @@ class SessionPanel : Region() {
     }
 
     /**
-     * Called automatically by the FXMLLoader after all FXML fields are injected.
-     * Sets up event handlers and spinner value factories.
+     * Executes initialize.
      */
     @FXML
     fun initialize() {
@@ -102,6 +102,7 @@ class SessionPanel : Region() {
                 refreshModelDetails(selected)
             }
         }
+        refreshModelsButton.setOnAction { refreshModels() }
 
         streamingToggle.selectedProperty().addListener { _, _, newVal ->
             AppConfig.instance.streamingEnabled = newVal
@@ -216,6 +217,7 @@ class SessionPanel : Region() {
     fun refreshModels() {
         val client = ollamaClient ?: return
         modelSelector.isDisable = true
+        refreshModelsButton.isDisable = true
         modelInfoLabel.text = "Loading models..."
         scope.launch {
             val models =
@@ -237,6 +239,7 @@ class SessionPanel : Region() {
                     modelInfoLabel.text = "No models available. Check Ollama connection."
                 }
                 modelSelector.isDisable = models.isEmpty()
+                refreshModelsButton.isDisable = false
             }
         }
     }

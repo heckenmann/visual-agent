@@ -4,9 +4,7 @@ import org.springframework.stereotype.Component
 import java.time.Instant
 
 /**
- * Persists user preference key-value rows.
- *
- * @property connectionProvider Provider for the active SQLite connection
+ * Represents PreferenceDao.
  */
 @Component
 class PreferenceDao(

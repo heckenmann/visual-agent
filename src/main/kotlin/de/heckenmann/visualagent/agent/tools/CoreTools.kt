@@ -12,7 +12,7 @@ import kotlinx.serialization.json.JsonObject
 import org.springframework.stereotype.Component
 
 /**
- * Tool for reading and updating safe UI settings.
+ * Represents UiTool.
  */
 @Component
 class UiTool : VisualAgentTool {
@@ -58,7 +58,7 @@ class UiTool : VisualAgentTool {
 }
 
 /**
- * Tool that returns the current workspace path.
+ * Represents PwdTool.
  */
 @Component
 class PwdTool : VisualAgentTool {
@@ -77,7 +77,7 @@ class PwdTool : VisualAgentTool {
 }
 
 /**
- * Tool that returns request and application context.
+ * Represents ContextTool.
  */
 @Component
 class ContextTool : VisualAgentTool {
@@ -107,7 +107,7 @@ class ContextTool : VisualAgentTool {
 }
 
 /**
- * Tool for loading and searching persisted conversation history.
+ * Represents HistoryTool.
  */
 @Component
 class HistoryTool(
@@ -168,7 +168,7 @@ class HistoryTool(
 }
 
 /**
- * Tool for listing and managing todo items stored in the database.
+ * Represents TodosTool.
  */
 @Component
 class TodosTool(

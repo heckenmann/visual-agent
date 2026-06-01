@@ -8,18 +8,22 @@ import javafx.scene.layout.Region
 import javafx.scene.layout.VBox
 import javafx.scene.text.Text
 import javafx.scene.text.TextFlow
+import org.commonmark.ext.autolink.AutolinkExtension
 import org.commonmark.node.BulletList
 import org.commonmark.node.Code
 import org.commonmark.node.FencedCodeBlock
 import org.commonmark.node.HardLineBreak
 import org.commonmark.node.Heading
 import org.commonmark.node.IndentedCodeBlock
+import org.commonmark.node.Link
 import org.commonmark.node.ListItem
 import org.commonmark.node.OrderedList
 import org.commonmark.node.Paragraph
 import org.commonmark.node.SoftLineBreak
 import org.commonmark.node.StrongEmphasis
 import org.commonmark.parser.Parser
+import java.awt.Desktop
+import java.net.URI
 import org.commonmark.node.Node as MarkdownNode
 import org.commonmark.node.Text as MarkdownText
 
@@ -30,7 +34,7 @@ import org.commonmark.node.Text as MarkdownText
  * JavaFX chat styling.
  */
 internal object ChatMarkdownRenderer {
-    private val parser = Parser.builder().build()
+    private val parser = Parser.builder().extensions(listOf(AutolinkExtension.create())).build()
 
     /**
      * Parse and render a Markdown chat message.
@@ -39,13 +43,6 @@ internal object ChatMarkdownRenderer {
      * @return JavaFX region containing rendered Markdown blocks
      */
     fun render(markdown: String): Region {
-        if (!looksLikeMarkdown(markdown)) {
-            return Label(markdown).apply {
-                styleClass.addAll("chat-message-content", "chat-md-paragraph")
-                isWrapText = true
-                maxWidth = Double.MAX_VALUE
-            }
-        }
         val root = VBox()
         root.styleClass.add("chat-markdown")
         root.isFillWidth = true
@@ -58,21 +55,6 @@ internal object ChatMarkdownRenderer {
             root.children += textFlow(listOf(Text(markdown)), "chat-md-paragraph")
         }
         return root
-    }
-
-    /**
-     * Lightweight markdown detector used to bypass full CommonMark parsing for plain text replies.
-     */
-    private fun looksLikeMarkdown(text: String): Boolean {
-        if (text.contains("```")) return true
-        if (text.contains("**")) return true
-        if (text.contains("`")) return true
-        if (text.contains("- ")) return true
-        if (text.contains("* ")) return true
-        if (text.contains("\n#")) return true
-        if (text.startsWith("#")) return true
-        if (text.contains("\n1.")) return true
-        return false
     }
 
     private fun appendBlockChildren(
@@ -141,7 +123,7 @@ internal object ChatMarkdownRenderer {
 
     private fun inlineNodes(parent: MarkdownNode): List<Text> {
         val result = mutableListOf<Text>()
-        appendInlineChildren(parent, result, bold = false)
+        appendInlineChildren(parent, result, bold = false, linkDestination = null)
         return result.ifEmpty { listOf(Text("")) }
     }
 
@@ -149,16 +131,18 @@ internal object ChatMarkdownRenderer {
         parent: MarkdownNode,
         target: MutableList<Text>,
         bold: Boolean,
+        linkDestination: String?,
     ) {
         var child = parent.firstChild
         while (child != null) {
             when (child) {
-                is MarkdownText -> target += plainText(child.literal, bold)
-                is Code -> target += inlineCode(child.literal, bold)
-                is StrongEmphasis -> appendInlineChildren(child, target, bold = true)
-                is SoftLineBreak -> target += plainText("\n", bold)
-                is HardLineBreak -> target += plainText("\n", bold)
-                else -> appendInlineChildren(child, target, bold)
+                is MarkdownText -> target += plainText(child.literal, bold, linkDestination)
+                is Code -> target += inlineCode(child.literal, bold, linkDestination)
+                is StrongEmphasis -> appendInlineChildren(child, target, bold = true, linkDestination = linkDestination)
+                is Link -> appendInlineChildren(child, target, bold = bold, linkDestination = child.destination)
+                is SoftLineBreak -> target += plainText("\n", bold, linkDestination)
+                is HardLineBreak -> target += plainText("\n", bold, linkDestination)
+                else -> appendInlineChildren(child, target, bold, linkDestination)
             }
             child = child.next
         }
@@ -167,20 +151,40 @@ internal object ChatMarkdownRenderer {
     private fun plainText(
         value: String,
         bold: Boolean,
+        linkDestination: String?,
     ): Text =
         Text(value).apply {
             styleClass.add("chat-md-text")
             if (bold) styleClass.add("chat-md-bold")
+            if (!linkDestination.isNullOrBlank()) {
+                styleClass.add("chat-md-link")
+                isUnderline = true
+                setOnMouseClicked { openExternalLink(linkDestination) }
+            }
         }
 
     private fun inlineCode(
         value: String,
         bold: Boolean,
+        linkDestination: String?,
     ): Text =
         Text(value).apply {
             styleClass.add("chat-md-inline-code")
             if (bold) styleClass.add("chat-md-bold")
+            if (!linkDestination.isNullOrBlank()) {
+                styleClass.add("chat-md-link")
+                isUnderline = true
+                setOnMouseClicked { openExternalLink(linkDestination) }
+            }
         }
+
+    private fun openExternalLink(destination: String) {
+        runCatching {
+            if (Desktop.isDesktopSupported()) {
+                Desktop.getDesktop().browse(URI(destination))
+            }
+        }
+    }
 
     private fun textFlow(
         children: List<Text>,

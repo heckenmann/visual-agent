@@ -14,9 +14,10 @@ import kotlinx.serialization.Serializable
 import org.springframework.ai.chat.model.ChatModel
 import org.springframework.ai.ollama.api.OllamaApi
 import org.springframework.stereotype.Component
+import java.lang.reflect.Method
 
 /**
- * Spring AI-backed LLM provider for local Ollama chat, tools, embeddings, and model metadata.
+ * Represents OllamaClient.
  */
 @Component
 class OllamaClient(
@@ -43,7 +44,7 @@ class OllamaClient(
                             done = true,
                         )
                 }
-                throw (error ?: IllegalStateException("Unknown chat model error"))
+                throw buildDetailedProviderError(error)
             }
             val response = responseResult.getOrThrow()
             val output =
@@ -110,7 +111,7 @@ class OllamaClient(
                         )
                     }.collect { emit(it) }
             } catch (error: Throwable) {
-                if (!isMissingFunctionCallbackError(error)) throw error
+                if (!isMissingFunctionCallbackError(error)) throw buildDetailedProviderError(error)
                 val recovered = toolRecovery.runUnknownToolRecovery(request, selectedModel, allowedFunctionNames, error)
                 emit(
                     recovered
@@ -134,6 +135,57 @@ class OllamaClient(
         throwable.message
             ?.contains("No function callback found for function name:")
             ?: false
+
+    /**
+     * Builds an exception with the most specific provider error message available.
+     *
+     * @param throwable Original provider error
+     * @return Exception with expanded message including response body details when available
+     */
+    private fun buildDetailedProviderError(throwable: Throwable?): Throwable {
+        if (throwable == null) return IllegalStateException("Unknown chat model error")
+        val detailedMessage = extractDetailedErrorMessage(throwable)
+        return IllegalStateException(detailedMessage, throwable)
+    }
+
+    /**
+     * Extracts the most helpful error text from nested provider exceptions.
+     *
+     * @param throwable Root error from Spring AI/Ollama call
+     * @return Human-readable message with server response details when present
+     */
+    private fun extractDetailedErrorMessage(throwable: Throwable): String {
+        var current: Throwable? = throwable
+        var fallbackMessage: String? = throwable.message?.takeIf { it.isNotBlank() }
+        while (current != null) {
+            val responseBody = invokeResponseBodyMethod(current)
+            if (!responseBody.isNullOrBlank()) {
+                val statusText = current.message?.takeIf { it.isNotBlank() }
+                return listOfNotNull(statusText, responseBody.trim())
+                    .joinToString(": ")
+                    .trim()
+            }
+            if (!current.message.isNullOrBlank()) {
+                fallbackMessage = current.message
+            }
+            current = current.cause
+        }
+        return fallbackMessage ?: "Unknown chat model error"
+    }
+
+    /**
+     * Invokes `getResponseBodyAsString()` reflectively when available on Spring HTTP exceptions.
+     *
+     * @param throwable Candidate exception
+     * @return Response body text or null
+     */
+    private fun invokeResponseBodyMethod(throwable: Throwable): String? {
+        val method: Method =
+            runCatching { throwable.javaClass.getMethod("getResponseBodyAsString") }
+                .getOrNull()
+                ?: return null
+        return runCatching { method.invoke(throwable) as? String }.getOrNull()
+    }
 
     override suspend fun vision(
         image: ByteArray,
@@ -220,6 +272,9 @@ class OllamaClient(
 }
 
 @Serializable
+/**
+ * Represents ShowResponse.
+ */
 data class ShowResponse(
     val model: String,
     val modifiedAt: String,
@@ -232,6 +287,9 @@ data class ShowResponse(
 )
 
 @Serializable
+/**
+ * Represents ModelDetails.
+ */
 data class ModelDetails(
     val parentModel: String? = null,
     val format: String? = null,

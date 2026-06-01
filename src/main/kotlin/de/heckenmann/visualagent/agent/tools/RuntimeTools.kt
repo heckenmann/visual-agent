@@ -8,7 +8,7 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 
 /**
- * Tool for running bounded shell commands in the workspace.
+ * Represents TerminalTool.
  */
 @Component
 class TerminalTool : VisualAgentTool {
@@ -52,7 +52,7 @@ class TerminalTool : VisualAgentTool {
 }
 
 /**
- * Placeholder browser tool until an in-app browser backend is wired to the application.
+ * Represents BrowserTool.
  */
 @Component
 class BrowserTool : VisualAgentTool {
@@ -71,7 +71,7 @@ class BrowserTool : VisualAgentTool {
 }
 
 /**
- * Placeholder search tool until a search backend is wired to the application.
+ * Represents SearchTool.
  */
 @Component
 class SearchTool : VisualAgentTool {
@@ -87,4 +87,29 @@ class SearchTool : VisualAgentTool {
         inputJson: String,
         context: Map<String, Any>,
     ): ToolResult = failure("search", "Search backend is not configured in this application runtime")
+}
+
+/**
+ * Represents SleepTool.
+ */
+@Component
+class SleepTool : VisualAgentTool {
+    override val definition =
+        ToolDefinition(
+            id = ToolId("sleep"),
+            name = ToolId("sleep").toFunctionName(),
+            description = "Wait for a specified duration. Input: {\"seconds\":2}.",
+            inputSchema = STRING_SCHEMA,
+        )
+
+    override fun execute(
+        inputJson: String,
+        context: Map<String, Any>,
+    ): ToolResult {
+        val input = parseObject(inputJson)
+        val seconds = (input.int("seconds") ?: 1).coerceIn(0, 300)
+        runCatching { TimeUnit.SECONDS.sleep(seconds.toLong()) }
+            .onFailure { error -> return failure("sleep", error.message ?: "Interrupted") }
+        return success("sleep", "slept ${seconds}s")
+    }
 }

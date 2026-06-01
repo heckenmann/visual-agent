@@ -6,7 +6,7 @@ import kotlinx.serialization.json.Json
 import org.springframework.stereotype.Service
 
 /**
- * Loads and stores tool permissions for the main agent and configured sub-agents.
+ * Represents AgentToolConfigService.
  */
 @Service
 class AgentToolConfigService(
@@ -88,6 +88,8 @@ class AgentToolConfigService(
                         "pwd",
                         "todos",
                         "history",
+                        "manual",
+                        "sleep",
                     ),
             ),
             SubAgentToolConfig(
@@ -107,6 +109,8 @@ class AgentToolConfigService(
                         "pwd",
                         "todos",
                         "history",
+                        "manual",
+                        "sleep",
                     ),
                 maxTurns = 8,
             ),
@@ -114,7 +118,7 @@ class AgentToolConfigService(
                 id = "analyst",
                 name = "Analyst",
                 description = "Deep analysis, review, and explanation of code and architecture.",
-                tools = listOf("file:read", "file:list", "file:glob", "file:grep", "context", "pwd", "todos", "history"),
+                tools = listOf("file:read", "file:list", "file:glob", "file:grep", "context", "pwd", "todos", "history", "manual", "sleep"),
             ),
         )
 
@@ -134,6 +138,8 @@ class AgentToolConfigService(
             "pwd",
             "todos",
             "history",
+            "manual",
+            "sleep",
         ).map(::ToolId).toSet()
 }
 

@@ -7,9 +7,7 @@ import org.springframework.stereotype.Component
 import java.time.Instant
 
 /**
- * Persists sub-agent tool configuration rows.
- *
- * @property connectionProvider Provider for the active SQLite connection
+ * Represents SubAgentConfigDao.
  */
 @Component
 class SubAgentConfigDao(

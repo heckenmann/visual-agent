@@ -3,9 +3,7 @@ package de.heckenmann.visualagent.knowledge
 import org.springframework.stereotype.Component
 
 /**
- * Creates and migrates the SQLite schema used by Visual Agent.
- *
- * @property connectionProvider Provider for the active SQLite connection
+ * Represents KnowledgeSchema.
  */
 @Component
 class KnowledgeSchema(

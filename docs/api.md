@@ -46,14 +46,19 @@ Tools are defined through app-level `ToolDefinition` and executed through `Visua
 - maps canonical IDs to function names
 - builds Spring AI `ToolCallback`s
 - emits events through `ToolEventBus`
+- enforces default per-call timeout from `AppConfig.timeoutSeconds`
+- supports per-call timeout override via tool input: `{"timeoutSeconds": N}`
+- supports async execution via tool input: `{"async": true}` (returns immediate scheduled result; `FINISHED` event follows later)
 
 Current tool IDs:
 
 - `ui`
+- `manual` (built-in tool/manual pages, including markdown format reference)
 - `history`
 - `todos`
 - `file:read`, `file:list`, `file:glob`, `file:grep`, `file:write`, `file:edit`
 - `terminal`
+- `sleep`
 - `context`
 - `pwd`
 - `browser` (unavailable placeholder result)

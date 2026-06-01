@@ -2,6 +2,9 @@ package de.heckenmann.visualagent.ui.panels
 
 import java.time.Instant
 
+/**
+ * Represents ChatMessage.
+ */
 data class ChatMessage(
     val role: String,
     val content: String,
@@ -10,6 +13,9 @@ data class ChatMessage(
     val toolData: ToolMessageData? = null,
 )
 
+/**
+ * Represents ToolMessageData.
+ */
 data class ToolMessageData(
     val toolId: String,
     val status: String,

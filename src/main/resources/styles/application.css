@@ -313,6 +313,11 @@
     -fx-text-fill: -color-danger-emphasis;
 }
 
+.chat-tool-status-thinking {
+    -fx-background-color: -color-accent-subtle;
+    -fx-text-fill: -color-accent-fg;
+}
+
 .chat-tool-duration {
     -fx-text-fill: -color-fg-muted;
     -fx-font-size: 11px;
@@ -356,6 +361,38 @@
     -fx-min-width: 40px;
     -fx-pref-width: 40px;
     -fx-max-width: 40px;
+}
+
+.chat-avatar-loading-wrap {
+    -fx-alignment: center;
+}
+
+.chat-avatar-loading-core {
+    -fx-min-width: 30px;
+    -fx-pref-width: 30px;
+    -fx-max-width: 30px;
+    -fx-min-height: 30px;
+    -fx-pref-height: 30px;
+    -fx-max-height: 30px;
+    -fx-background-radius: 15px;
+}
+
+.chat-avatar-loading-ring {
+    -fx-min-width: 40px;
+    -fx-min-height: 40px;
+    -fx-pref-width: 40px;
+    -fx-pref-height: 40px;
+    -fx-max-width: 40px;
+    -fx-max-height: 40px;
+    -fx-progress-color: -color-accent-emphasis;
+}
+
+.chat-avatar-loading-ring > .track {
+    -fx-background-color: transparent;
+}
+
+.chat-avatar-loading-ring .percentage {
+    -fx-fill: transparent;
 }
 
 .chat-content-area {
@@ -408,6 +445,10 @@
 
 .chat-md-bold {
     -fx-font-weight: bold;
+}
+
+.chat-md-link {
+    -fx-fill: -color-accent-fg;
 }
 
 .chat-md-heading {

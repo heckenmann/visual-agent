@@ -1,5 +1,9 @@
 package de.heckenmann.visualagent.agent
 
+import de.heckenmann.visualagent.agent.autonomy.AutonomousCoordinator
+import de.heckenmann.visualagent.agent.context.MainSystemPromptComposer
+import de.heckenmann.visualagent.agent.text.AgentResponseCoordinator
+import de.heckenmann.visualagent.agent.text.ResponseRepetitionGuard
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
@@ -13,7 +17,6 @@ import de.heckenmann.visualagent.todo.TodoStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -25,8 +28,7 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * AgentManager manages SubAgents: creation, persistence, task assignment, and execution.
- * Agents persist to KnowledgeDb and can execute tasks autonomously via LLM.
+ * Represents AgentManager.
  */
 @Service
 class AgentManager(
@@ -59,6 +61,9 @@ class AgentManager(
         internal const val REPETITION_GUARD_RETRY_LIMIT = 1
         private var globalAgentCallback: ((String, String) -> Unit)? = null
 
+        /**
+         * Executes setAgentCallback.
+         */
         fun setAgentCallback(callback: (String, String) -> Unit) {
             globalAgentCallback = callback
         }
@@ -83,9 +88,33 @@ class AgentManager(
     internal var loadedHistoryCount: Int = 0
     internal val finishedToolEventsByRequestId = ConcurrentHashMap<String, MutableList<ToolCallEvent>>()
     private val toolEventListenerHandle: AutoCloseable
+    private val autonomousCoordinator: AutonomousCoordinator
+    private val responseCoordinator: AgentResponseCoordinator
 
     init {
         toolEventListenerHandle = registerToolEventListener()
+        responseCoordinator =
+            AgentResponseCoordinator(
+                llmProvider = llmProvider,
+                mainSessionId = MAIN_SESSION_ID,
+                repetitionGuardRetryLimit = REPETITION_GUARD_RETRY_LIMIT,
+                finishedToolEventsByRequestId = finishedToolEventsByRequestId,
+                buildMainRequest = ::buildMainRequest,
+                buildMainSystemContextPrompt = ::buildMainSystemContextPrompt,
+                loadRecentHistoryFromDb = ::loadRecentHistoryFromDb,
+            )
+        autonomousCoordinator =
+            AutonomousCoordinator(
+                scope = scope,
+                todoManager = todoManager,
+                subAgents = subAgents,
+                llmProvider = llmProvider,
+                knowledgeDb = knowledgeDb,
+                agentToolConfigService = agentToolConfigService,
+                createAgent = { name, role, templateName -> createAgent(name, role, templateName) },
+                saveAgentToDb = ::saveAgentToDb,
+                notifyAgent = ::notifyAgent,
+            )
         loadAgentsFromDb()
         loadConversationFromDb()
         resumeInterruptedConversationIfNeeded()
@@ -192,8 +221,14 @@ class AgentManager(
 
     // ============ Agent Management API ============
 
+    /**
+     * Executes getSubAgents.
+     */
     fun getSubAgents(): List<SubAgent> = subAgents.values.toList()
 
+    /**
+     * Executes getSubAgent.
+     */
     fun getSubAgent(id: String): SubAgent? = subAgents[id]
 
     /**
@@ -276,6 +311,9 @@ class AgentManager(
 
     // ============ Chat & Messaging ============
 
+    /**
+     * Executes sendMessageToAgent.
+     */
     suspend fun sendMessageToAgent(
         agentId: String,
         content: String,
@@ -286,12 +324,15 @@ class AgentManager(
         return response.message.content
     }
 
+    /**
+     * Executes sendMessage.
+     */
     suspend fun sendMessage(content: String): String {
         val userMessage = Message("user", content)
         conversationHistory.add(userMessage)
         knowledgeDb.saveConversationMessage(MAIN_SESSION_ID, userMessage.role, userMessage.content, userMessage.metadata)
         val requestId = UUID.randomUUID().toString()
-        val assistantContent = generateAssistantContentWithRepetitionGuard(requestId)
+        val assistantContent = responseCoordinator.generateAssistantContentWithRepetitionGuard(requestId)
         val assistantMessage = Message(role = "assistant", content = assistantContent)
         conversationHistory.add(assistantMessage)
         knowledgeDb.saveConversationMessage(MAIN_SESSION_ID, assistantMessage.role, assistantMessage.content, assistantMessage.metadata)
@@ -299,6 +340,9 @@ class AgentManager(
         return assistantMessage.content
     }
 
+    /**
+     * Executes streamMessage.
+     */
     suspend fun streamMessage(
         content: String,
         onChunk: (String) -> Unit,
@@ -316,13 +360,13 @@ class AgentManager(
             }
         }
         var assistantText = collected.toString().trim()
-        if (looksLikeRunawayRepetition(assistantText)) {
+        if (ResponseRepetitionGuard.isRunawayRepetition(assistantText)) {
             println("[AgentManager] repetition-guard: detected runaway repetition in streaming output, retrying once")
-            assistantText = runRepetitionGuardRetry()
+            assistantText = responseCoordinator.retryAfterRepetition()
         }
-        assistantText = normalizeAssistantContent(assistantText)
+        assistantText = responseCoordinator.normalizeAssistantContent(assistantText)
         if (assistantText == "(No text response. See tool results above.)") {
-            assistantText = completeToolOnlyTurnWithFollowup(requestId) ?: assistantText
+            assistantText = responseCoordinator.completeToolOnlyTurnWithFollowup(requestId) ?: assistantText
         }
         val assistantMessage = Message("assistant", assistantText)
         conversationHistory.add(assistantMessage)
@@ -357,6 +401,9 @@ class AgentManager(
                 .add(event)
         }
 
+    /**
+     * Executes clearHistory.
+     */
     fun clearHistory() {
         conversationHistory.clear()
         knowledgeDb.deleteConversationMessages(MAIN_SESSION_ID)
@@ -405,6 +452,9 @@ class AgentManager(
         return welcome
     }
 
+    /**
+     * Executes getHistory.
+     */
     fun getHistory(): List<Message> = conversationHistory.toList()
 
     /**
@@ -496,199 +546,41 @@ class AgentManager(
 
     // ============ Task Management & Execution ============
 
-    fun assignNextTodo(): Boolean {
-        val idleAgent = selectWorkerAgentForNextTodo() ?: return false
-        val pendingTodo = getTodosFromDb().firstOrNull { it.status == TodoStatus.PENDING } ?: return false
+    /**
+     * Executes assignNextTodo.
+     */
+    fun assignNextTodo(): Boolean = autonomousCoordinator.assignNextTodo()
 
-        val assigned = todoManager.assignToAgent(pendingTodo.id, idleAgent.id)
-        if (!assigned) return false
-
-        idleAgent.status = AgentStatus.BUSY
-        idleAgent.currentTodoId = pendingTodo.id
-        idleAgent.currentTask = pendingTodo.description
-        saveAgentToDb(idleAgent)
-        // Notify UI/consumers about status change
-        notifyAgent(idleAgent.id, "STATUS:${idleAgent.status.name}")
-
-        println("[AgentManager] assignNextTodo assigned todo=${pendingTodo.id} to agent=${idleAgent.id}")
-
-        scope.launch {
-            processTodoWithLLM(idleAgent, pendingTodo.id, buildWorkerInstruction(pendingTodo))
-        }
-
-        return true
-    }
-
+    /**
+     * Executes assignTodoToAgent.
+     */
     fun assignTodoToAgent(
         todoId: String,
         agentId: String,
-    ): Boolean {
-        val agent = subAgents[agentId] ?: return false
-        if (agent.status != AgentStatus.IDLE) return false
+    ): Boolean = autonomousCoordinator.assignTodoToAgent(todoId, agentId)
 
-        val assigned = todoManager.assignToAgent(todoId, agentId)
-        if (!assigned) return false
-
-        val todo = getTodosFromDb().firstOrNull { it.id == todoId } ?: return false
-
-        agent.status = AgentStatus.BUSY
-        agent.currentTodoId = todoId
-        agent.currentTask = todo.description
-        saveAgentToDb(agent)
-        // Notify UI/consumers about status change
-        notifyAgent(agent.id, "STATUS:${agent.status.name}")
-
-        scope.launch {
-            processTodoWithLLM(agent, todoId, buildWorkerInstruction(todo))
-        }
-
-        return true
-    }
-
-    private suspend fun processTodoWithLLM(
-        agent: SubAgent,
-        todoId: String,
-        taskDescription: String,
-    ) {
-        var attempt = 0
-        val maxRetries = agent.config.maxRetries
-        try {
-            // Small debounce so unit tests and UI have time to observe BUSY status before the job completes
-            // This keeps behavior deterministic in tests where the LLM provider returns instantly.
-            delay(300)
-
-            while (attempt < maxRetries) {
-                try {
-                    val workerResult =
-                        agent.performTodo(
-                            todoId,
-                            taskDescription,
-                            llmProvider,
-                            knowledgeDb,
-                            agentToolConfigService.toolsFor(agent),
-                        )
-                    val reviewApproved = reviewWorkerResult(todoId, taskDescription, workerResult)
-                    if (reviewApproved) {
-                        notifyAgent(agent.id, "Completed todo: $todoId")
-                        todoManager.completeTodo(todoId)
-                        break
-                    }
-                    attempt++
-                    if (attempt >= maxRetries) {
-                        notifyAgent(agent.id, "Main review rejected final result for todo: $todoId")
-                        todoManager.cancelTodo(todoId)
-                        break
-                    }
-                    notifyAgent(agent.id, "Main review requested retry for todo: $todoId")
-                } catch (e: Exception) {
-                    attempt++
-                    val backoff = 500L * attempt
-                    println("[AgentManager] Agent ${agent.id} failed attempt $attempt: ${e.message}, backing off ${backoff}ms")
-                    delay(backoff)
-                    if (attempt >= maxRetries) {
-                        println("[AgentManager] Agent ${agent.id} exhausted retries for todo $todoId")
-                        todoManager.cancelTodo(todoId)
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            todoManager.cancelTodo(todoId)
-        } finally {
-            agent.status = AgentStatus.IDLE
-            agent.currentTask = null
-            agent.currentTodoId = null
-            saveAgentToDb(agent)
-            // Notify UI/consumers that agent is idle again
-            notifyAgent(agent.id, "STATUS:${agent.status.name}")
-        }
-    }
-
-    fun assignAllPendingTodos(): Int {
-        // Assign up to the configured parallelism and currently available idle agents.
-        val idleCount = subAgents.values.count { it.status == AgentStatus.IDLE }
-        val parallelLimit = AppConfig.instance.maxParallelSubAgents.coerceAtLeast(1)
-        val assignmentBudget = minOf(idleCount, parallelLimit)
-        var count = 0
-        repeat(assignmentBudget) {
-            if (assignNextTodo()) count++ else return@repeat
-        }
-        println("[AgentManager] assignAllPendingTodos idleCount=$idleCount limit=$parallelLimit assigned=$count")
-        return count
-    }
+    /**
+     * Executes assignAllPendingTodos.
+     */
+    fun assignAllPendingTodos(): Int = autonomousCoordinator.assignAllPendingTodos()
 
     /**
      * Seed TodoManager with UX improvement tasks for autonomous processing.
      */
-    fun seedUxTodos() {
-        val tasks =
-            listOf(
-                "ChatPanel: implement message grouping visual polish",
-                "ChatPanel: implement typing indicator & streaming partial responses",
-                "ChatPanel: add message actions (retry, edit, delete, pin, reactions)",
-                "ChatPanel: virtualize message list for large histories",
-                "ChatPanel: accessibility pass (focus, labels, contrast)",
-                "MainWindow: persistent left navigation with active state and tooltips",
-                "MainWindow: command palette (Cmd/Ctrl+K) to switch panels/search",
-                "StatusBar: actionable controls (Retry, Reconnect)",
-                "SessionPanel: model search, filter, favorites and quick actions",
-                "SessionPanel: improve loading/error states for model info",
-                "TodoPanel: inline create/edit without modal",
-                "TodoPanel: undo snackbar for deletes",
-                "TodoPanel: bulk actions and filters",
-                "SubAgentsPanel: agent cards with quick run/stop and logs preview",
-                "SubAgentsPanel: agent creation wizard with templates",
-                "CanvasPanel: toolbar (pen, eraser, undo/redo, export)",
-                "CanvasPanel: pan/zoom, grid, snapshots saving",
-                "ApplicationSettings: group settings, live theme preview, import/export config",
-                "Cross-cutting: component library mapping and CSS tokenization",
-                "Cross-cutting: accessibility pass and contrast audit",
-            )
-        tasks.forEach { desc -> todoManager.add(desc) }
-        println("[AgentManager] Seeded ${tasks.size} UX tasks")
-    }
+    fun seedUxTodos() = autonomousCoordinator.seedUxTodos()
 
     /**
      * Start autonomous processing: assign todos to idle agents until queue drained.
      * Runs in background scope.
      */
-    fun startAutonomousProcessing(seed: Boolean = true) {
-        if (seed) seedUxTodos()
-        scope.launch {
-            println("[AgentManager] Autonomous processing started")
-            while (true) {
-                val expanded = expandComplexTodoIfNeeded()
-                if (expanded) {
-                    println("[AgentManager] Expanded complex todo into smaller work items")
-                }
-                val assigned = assignAllPendingTodos()
-                if (assigned > 0) {
-                    println("[AgentManager] Assigned $assigned todos to idle agents")
-                }
-                delay(1500)
-
-                val pending = getTodosFromDb().filter { it.status == TodoStatus.PENDING }
-                val inProgress = getTodosFromDb().any { it.status == TodoStatus.IN_PROGRESS }
-                val anyAgentBusy = subAgents.values.any { it.status == AgentStatus.BUSY }
-
-                if (pending.isEmpty() && !inProgress && !anyAgentBusy) {
-                    println("[AgentManager] Autonomous processing finished")
-                    break
-                }
-            }
-        }
-    }
+    fun startAutonomousProcessing(seed: Boolean = true) = autonomousCoordinator.startAutonomousProcessing(seed)
 
     /**
      * Enqueues a goal for autonomous execution and starts the autonomous loop if needed.
      *
      * @param goal Main objective to solve end-to-end
      */
-    fun startAutonomousMode(goal: String) {
-        if (goal.isNotBlank()) {
-            todoManager.add(goal.trim())
-        }
-        startAutonomousProcessing(seed = false)
-    }
+    fun startAutonomousMode(goal: String) = autonomousCoordinator.startAutonomousMode(goal)
 
     private fun buildMainRequest(
         history: List<Message>,
@@ -722,56 +614,7 @@ class AgentManager(
 
     private fun buildMainSystemContextPrompt(): String {
         val todos = knowledgeDb.listTodos()
-        val openCount = todos.count { it.status == TodoStatus.PENDING }
-        val inProgressCount = todos.count { it.status == TodoStatus.IN_PROGRESS }
-        val doneCount = todos.count { it.status == TodoStatus.COMPLETED }
-        val cancelledCount = todos.count { it.status == TodoStatus.CANCELLED }
-        val totalCount = todos.size
-        val todoLines =
-            if (todos.isEmpty()) {
-                "- no active todos"
-            } else {
-                todos.joinToString("\n") { todo ->
-                    "- [${todo.status}] ${todo.description} (id=${todo.id}, priority=${todo.priority}, assigned=${todo.assignedAgentId ?: "none"})"
-                }
-            }
-        val resumeHint =
-            pendingResumeMessage?.let {
-                "Resume Hint: The previous app run ended while processing this user request:\n\"$it\""
-            } ?: "Resume Hint: no interrupted user request detected."
-        return """
-            You are the main orchestrator agent.
-            Always use the todo context below for planning and execution.
-            $resumeHint
-
-            TODO summary (authoritative counters):
-            - Open: $openCount
-            - In Progress: $inProgressCount
-            - Done: $doneCount
-            - Cancelled: $cancelledCount
-            - Total: $totalCount
-            
-            Current TODO list:
-            $todoLines
-            
-            Execution policy:
-            - Break down complex tasks.
-            - Delegate implementation/research subtasks to worker agents when useful.
-            - Validate worker outputs before declaring completion.
-            - Keep todos continuously up to date during execution.
-            - When the user asks about todos (list, count, status, progress), call `todos` first: use `{"action":"count"}` for counts and `{"action":"list"}` for full lists.
-            - Do not ask clarifying questions for a plain "show/get todos" request; return the current todo state immediately.
-            - For todo answers, never output JSON code blocks. Return concise plain text or bullet lists.
-            - After any successful tool call, provide a concrete answer derived from the tool result. Do not respond with generic requests for more context.
-            - Do not produce boilerplate meta responses like "I can summarize the conversation" unless the user explicitly requested that.
-            - Markdown output rules:
-              - Never concatenate sections without whitespace, e.g. `text.**Heading:**text`.
-              - Put a blank line before a new section heading and a newline after heading labels.
-              - Prefer plain paragraphs over decorative heading-heavy templates.
-            - Use the `todos` tool to create/update items and set status transitions according to progress (`PENDING` -> `IN_PROGRESS` -> `COMPLETED` or `CANCELLED`).
-            - If additional historic context is required, use the `history` tool (`load`/`search`) instead of guessing.
-            - Do not leave finished work in `PENDING`; reflect the real processing state at all times.
-            """.trimIndent()
+        return MainSystemPromptComposer.compose(todos, pendingResumeMessage)
     }
 
     private fun resumeInterruptedConversationIfNeeded() {
@@ -785,7 +628,7 @@ class AgentManager(
                     )
                 val request = buildMainRequest(listOf(resumeInstruction) + loadRecentHistoryFromDb())
                 val response = llmProvider.chat(request)
-                val assistantMessage = Message("assistant", normalizeAssistantContent(response.message.content))
+                val assistantMessage = Message("assistant", responseCoordinator.normalizeAssistantContent(response.message.content))
                 conversationHistory.add(assistantMessage)
                 knowledgeDb.saveConversationMessage(MAIN_SESSION_ID, assistantMessage.role, assistantMessage.content)
                 pendingResumeMessage = null
@@ -795,56 +638,6 @@ class AgentManager(
                 knowledgeDb.saveConversationMessage(MAIN_SESSION_ID, note.role, note.content)
             }
         }
-    }
-
-    private suspend fun expandComplexTodoIfNeeded(): Boolean {
-        val candidate = getTodosFromDb().firstOrNull { it.status == TodoStatus.PENDING && isComplex(it.description) } ?: return false
-        val analyst = ensureAnalysisAgent()
-        val prompt =
-            listOf(
-                Message(
-                    "system",
-                    "Break down the task into up to 5 executable subtasks. Return one subtask per line without numbering decorations.",
-                ),
-                Message("user", candidate.description),
-            )
-        return runCatching {
-            val response = analyst.chat(prompt, llmProvider, agentToolConfigService.toolsFor(analyst))
-            val subtasks =
-                response.message.content
-                    .lines()
-                    .map {
-                        it.trim().trimStart(
-                            '-',
-                            '*',
-                            '•',
-                            '0',
-                            '1',
-                            '2',
-                            '3',
-                            '4',
-                            '5',
-                            '6',
-                            '7',
-                            '8',
-                            '9',
-                            '.',
-                            ')',
-                            ' ',
-                        )
-                    }.filter { it.length > 5 }
-                    .distinct()
-                    .take(5)
-            if (subtasks.isEmpty()) return false
-            subtasks.forEach { todoManager.add("${candidate.description}: $it", candidate.priority) }
-            todoManager.cancelTodo(candidate.id)
-            true
-        }.getOrDefault(false)
-    }
-
-    private fun isComplex(description: String): Boolean {
-        val markers = listOf(" and ", " then ", "anschließend", "mehrere", "complex", "komplex")
-        return description.length > 120 || markers.any { description.contains(it, ignoreCase = true) }
     }
 
     /**
@@ -859,243 +652,6 @@ class AgentManager(
             .mapNotNull { row ->
                 runCatching { mapAgentRecord(row, resetStatusToIdle = false) }.getOrNull()
             }
-
-    /**
-     * Ensures assistant outputs persisted in history are never blank, so follow-up turns retain usable context.
-     *
-     * @param content Raw assistant output
-     * @return Trimmed output or a standard placeholder for tool-only/empty turns
-     */
-    private fun normalizeAssistantContent(content: String): String {
-        val trimmed = content.trim()
-        if (trimmed.isBlank() || isToolCallsOnlyPayload(trimmed)) {
-            return "(No text response. See tool results above.)"
-        }
-        if (looksLikeRunawayRepetition(trimmed)) {
-            return "I generated a malformed repeated output. Please repeat your last request and I will answer it cleanly."
-        }
-        return trimmed
-    }
-
-    /**
-     * Detects placeholder tool-call payloads that do not contain user-facing content.
-     *
-     * @param text Raw assistant text
-     * @return `true` when the payload only contains an empty `tool_calls` array
-     */
-    private fun isToolCallsOnlyPayload(text: String): Boolean {
-        val compact = text.replace(Regex("\\s+"), "")
-        return compact == """{"tool_calls":[]}""" ||
-            compact == """```json{"tool_calls":[]}```""" ||
-            compact == """```{"tool_calls":[]}```"""
-    }
-
-    /**
-     * Generates one assistant response and retries once with a stricter system instruction when repetition is detected.
-     *
-     * @return Assistant content that passed repetition guard or fallback text
-     */
-    private suspend fun generateAssistantContentWithRepetitionGuard(requestId: String): String {
-        var raw =
-            llmProvider
-                .chat(buildMainRequest(loadRecentHistoryFromDb(), requestId))
-                .message
-                .content
-                .trim()
-        if (raw.isBlank()) {
-            val finalFromTools = completeToolOnlyTurnWithFollowup(requestId)
-            if (!finalFromTools.isNullOrBlank()) {
-                return normalizeAssistantContent(finalFromTools)
-            }
-        }
-        if (!looksLikeRunawayRepetition(raw)) {
-            return normalizeAssistantContent(raw)
-        }
-        println("[AgentManager] repetition-guard: detected runaway repetition, retrying once")
-        raw = runRepetitionGuardRetry()
-        return normalizeAssistantContent(raw)
-    }
-
-    /**
-     * Runs a finalization call that turns tool execution outputs into one concrete assistant answer.
-     *
-     * @param requestId Request id used by the original model call
-     * @return Final assistant text derived from tool results, or null when no tool events were captured
-     */
-    private suspend fun completeToolOnlyTurnWithFollowup(requestId: String): String? {
-        val toolEvents = finishedToolEventsByRequestId.remove(requestId).orEmpty()
-        if (toolEvents.isEmpty()) return null
-        val summary =
-            toolEvents.joinToString("\n") { event ->
-                val status = if (event.result.success) "ok" else "error"
-                val payload = event.result.content.ifBlank { event.result.error.orEmpty() }
-                "- ${event.toolId} [$status]: $payload"
-            }
-        val followup =
-            ChatRequestContext(
-                messages =
-                    buildList {
-                        add(Message("system", buildMainSystemContextPrompt()))
-                        add(
-                            Message(
-                                "system",
-                                "Generate the final user-facing answer from the tool results below. Be concrete and do not ask for more context.",
-                            ),
-                        )
-                        addAll(loadRecentHistoryFromDb())
-                        add(Message("assistant", "Tool results:\n$summary"))
-                    },
-                enabledTools = emptySet(),
-                metadata = mapOf("sessionId" to MAIN_SESSION_ID, "agent" to "main", "requestId" to "$requestId:finalize"),
-            )
-        return llmProvider
-            .chat(followup)
-            .message
-            .content
-            .trim()
-    }
-
-    /**
-     * Performs one retry request with an additional anti-repetition system instruction.
-     *
-     * @return Raw assistant content from the retry call
-     */
-    private suspend fun runRepetitionGuardRetry(): String {
-        var retryRaw = ""
-        repeat(REPETITION_GUARD_RETRY_LIMIT) {
-            val retryRequest = buildRepetitionGuardRetryRequest()
-            retryRaw =
-                llmProvider
-                    .chat(retryRequest)
-                    .message
-                    .content
-                    .trim()
-        }
-        return retryRaw
-    }
-
-    /**
-     * Builds a retry request that asks the model to restart the answer without repeated phrase loops.
-     *
-     * @return Chat request with the same conversation and extra guard instruction
-     */
-    private fun buildRepetitionGuardRetryRequest(): ChatRequestContext {
-        val base = buildMainRequest(loadRecentHistoryFromDb())
-        val retryInstruction =
-            Message(
-                role = "system",
-                content =
-                    """
-                    Your previous response was malformed due to repeated phrase loops.
-                    Regenerate the answer once from scratch.
-                    Do not quote or repeat the same sentence pattern.
-                    Keep the answer direct and short.
-                    """.trimIndent(),
-            )
-        return base.copy(messages = listOf(retryInstruction) + base.messages)
-    }
-
-    /**
-     * Detects degenerate responses dominated by repeated phrase loops.
-     *
-     * @param content Assistant output
-     * @return `true` when the output appears to be a repetition loop instead of a valid answer
-     */
-    private fun looksLikeRunawayRepetition(content: String): Boolean {
-        if (content.length < 400) return false
-        val windows =
-            content
-                .windowed(size = 24, step = 6, partialWindows = false)
-                .filter { window ->
-                    val normalized = window.lowercase().filter { it.isLetterOrDigit() || it.isWhitespace() }
-                    normalized.isNotBlank()
-                }
-        if (windows.isEmpty()) return false
-        val frequencies = windows.groupingBy { it }.eachCount()
-        val maxRepeat = frequencies.values.maxOrNull() ?: 0
-        return maxRepeat >= 12
-    }
-
-    private fun ensureAnalysisAgent(): SubAgent =
-        subAgents.values.firstOrNull { it.name.contains("analyst", true) || it.role.contains("analysis", true) }
-            ?: createAgent("Analyst", "Task decomposition and structured planning", "researcher")
-
-    private fun selectWorkerAgentForNextTodo(): SubAgent? {
-        val pending = todoManager.getPending().firstOrNull() ?: return null
-        val idleAgents = subAgents.values.filter { it.status == AgentStatus.IDLE }
-        if (idleAgents.isEmpty()) return null
-        val preferred =
-            idleAgents.firstOrNull {
-                val d = pending.description.lowercase()
-                (d.contains("code") || d.contains("implement") || d.contains("fix")) &&
-                    it.name.contains("coder", true) ||
-                    (d.contains("research") || d.contains("docs") || d.contains("issue")) &&
-                    it.name.contains("research", true)
-            }
-        return preferred ?: idleAgents.firstOrNull() ?: createDynamicWorkerFor(pending.description)
-    }
-
-    private fun createDynamicWorkerFor(description: String): SubAgent {
-        val lower = description.lowercase()
-        return when {
-            lower.contains("test") -> createAgent("Tester", "Focused test implementation and validation", "tester")
-            lower.contains("review") -> createAgent("Reviewer", "Code and architecture review", "reviewer")
-            lower.contains("doc") -> createAgent("Documenter", "Documentation and developer guides", "documenter")
-            else -> createAgent("Worker-${UUID.randomUUID().toString().take(4)}", "General execution worker", "coder")
-        }
-    }
-
-    private fun buildWorkerInstruction(todo: Todo): String {
-        val localHints =
-            """
-            Prioritize local project context first:
-            - read project markdown docs
-            - inspect code comments and relevant source files
-            If blocked after multiple attempts:
-            - gather external references
-            - prioritize GitHub issues, StackOverflow, and search engines
-            """.trimIndent()
-        return """
-            Task ID: ${todo.id}
-            Priority: ${todo.priority}
-            Objective: ${todo.description}
-            
-            Deliverable requirements:
-            1. Provide concrete implementation steps and results.
-            2. Explain which files or components were analyzed.
-            3. If blocked, include attempted steps and next actions.
-            
-            $localHints
-            """.trimIndent()
-    }
-
-    private suspend fun reviewWorkerResult(
-        todoId: String,
-        taskDescription: String,
-        workerResult: String,
-    ): Boolean {
-        val reviewPrompt =
-            listOf(
-                Message(
-                    "system",
-                    "You are the main reviewer. Respond with exactly APPROVED or RETRY in first line, then a short rationale.",
-                ),
-                Message(
-                    "user",
-                    """
-                    TODO ID: $todoId
-                    Task: $taskDescription
-                    Worker Result:
-                    $workerResult
-                    """.trimIndent(),
-                ),
-            )
-        val response = llmProvider.chat(buildMainRequest(reviewPrompt))
-        return response.message.content
-            .trim()
-            .uppercase()
-            .startsWith("APPROVED")
-    }
 
     private fun persistTodoChange(change: TodoChange) {
         when (change.type) {

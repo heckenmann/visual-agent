@@ -5,9 +5,7 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * Persists and searches conversation messages.
- *
- * @property connectionProvider Provider for the active SQLite connection
+ * Represents ConversationDao.
  */
 @Component
 class ConversationDao(
@@ -67,7 +65,7 @@ class ConversationDao(
                 SELECT id, role, content, metadata, created_at
                 FROM conversation_history
                 WHERE session_id = ?
-                ORDER BY created_at DESC
+                ORDER BY created_at DESC, id DESC
                 LIMIT ?
                 """.trimIndent(),
             ).use { stmt ->
@@ -101,7 +99,7 @@ class ConversationDao(
                 SELECT id, role, content, metadata, created_at
                 FROM conversation_history
                 WHERE session_id = ?
-                ORDER BY created_at DESC
+                ORDER BY created_at DESC, id DESC
                 LIMIT ?
                 OFFSET ?
                 """.trimIndent(),
@@ -202,7 +200,7 @@ class ConversationDao(
             FROM conversation_history_fts fts
             JOIN conversation_history ch ON ch.id = fts.id
             WHERE fts.session_id = ? AND fts.content MATCH ?
-            ORDER BY ch.created_at DESC
+            ORDER BY ch.created_at DESC, ch.id DESC
             LIMIT ?
             """.trimIndent()
 
@@ -211,7 +209,7 @@ class ConversationDao(
             SELECT id, role, content, metadata, created_at
             FROM conversation_history
             WHERE session_id = ? AND lower(content) LIKE ?
-            ORDER BY created_at DESC
+            ORDER BY created_at DESC, id DESC
             LIMIT ?
             """.trimIndent()
     }

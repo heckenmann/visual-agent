@@ -22,6 +22,7 @@ import org.springframework.ai.model.tool.ToolCallingChatOptions
 import org.springframework.ai.ollama.api.OllamaApi
 import reactor.core.publisher.Flux
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class OllamaClientModelSelectionTest {
@@ -195,6 +196,28 @@ class OllamaClientModelSelectionTest {
             verify(exactly = 2) { chatModel.call(any<Prompt>()) }
         }
 
+    @Test
+    fun `chat surfaces detailed http response body in thrown error message`() =
+        runTest {
+            val chatModel = mockk<ChatModel>()
+            val ollamaApi = mockk<OllamaApi>(relaxed = true)
+            val registry = ToolRegistry(emptyList(), ToolEventBus())
+            every { chatModel.call(any<Prompt>()) } throws
+                ForbiddenLikeException(
+                    "403 Forbidden from POST http://localhost:11434/api/chat",
+                    "403 Forbidden: this model requires a subscription, upgrade for access",
+                )
+            val client = createClient(chatModel, ollamaApi, registry)
+
+            val error =
+                assertFailsWith<IllegalStateException> {
+                    client.chat(listOf(Message("user", "hello")))
+                }
+
+            assertTrue(error.message.orEmpty().contains("403 Forbidden from POST"))
+            assertTrue(error.message.orEmpty().contains("this model requires a subscription"))
+        }
+
     private fun springResponse(
         model: String,
         content: String,
@@ -229,5 +252,13 @@ class OllamaClientModelSelectionTest {
             inputJson: String,
             context: Map<String, Any>,
         ): ToolResult = ToolResult(definition.id.value, true, "ok")
+    }
+
+    private class ForbiddenLikeException(
+        message: String,
+        private val body: String,
+    ) : RuntimeException(message) {
+        @Suppress("unused")
+        fun getResponseBodyAsString(): String = body
     }
 }

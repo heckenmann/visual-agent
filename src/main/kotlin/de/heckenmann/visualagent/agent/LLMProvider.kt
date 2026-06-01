@@ -146,6 +146,9 @@ data class ToolDefinition(
  * @property error Optional error message when execution failed
  */
 @Serializable
+/**
+ * Represents ToolResult.
+ */
 data class ToolResult(
     val toolId: String,
     val success: Boolean,
@@ -162,6 +165,9 @@ data class ToolResult(
  * @property images Optional list of base64-encoded images (for vision)
  */
 @Serializable
+/**
+ * Represents Message.
+ */
 data class Message(
     val role: String,
     val content: String,
@@ -178,6 +184,9 @@ data class Message(
  * @property options Optional model-specific options
  */
 @Serializable
+/**
+ * Represents ChatRequest.
+ */
 data class ChatRequest(
     val model: String,
     val messages: List<Message>,
@@ -196,6 +205,9 @@ data class ChatRequest(
  * @property evalCount Number of tokens in the response
  */
 @Serializable
+/**
+ * Represents ChatResponse.
+ */
 data class ChatResponse(
     val model: String,
     val message: Message,
