@@ -6,26 +6,21 @@ import de.heckenmann.visualagent.todo.TodoPriority
 import de.heckenmann.visualagent.todo.TodoStatus
 import de.heckenmann.visualagent.ui.FxmlLoader
 import javafx.application.Platform
-import javafx.beans.property.SimpleBooleanProperty
 import javafx.collections.FXCollections
+import javafx.collections.ListChangeListener
 import javafx.fxml.FXML
 import javafx.geometry.Insets
-import javafx.geometry.Pos
 import javafx.scene.control.Button
 import javafx.scene.control.ButtonType
-import javafx.scene.control.CheckBox
 import javafx.scene.control.ComboBox
 import javafx.scene.control.Dialog
 import javafx.scene.control.Label
-import javafx.scene.control.ListCell
 import javafx.scene.control.ListView
 import javafx.scene.control.TextField
 import javafx.scene.control.TextInputControl
 import javafx.scene.input.KeyCode
 import javafx.scene.input.KeyEvent
 import javafx.scene.layout.BorderPane
-import javafx.scene.layout.HBox
-import javafx.scene.layout.Priority
 import javafx.scene.layout.Region
 import javafx.scene.layout.VBox
 import org.springframework.context.annotation.Lazy
@@ -63,9 +58,34 @@ class TodoPanel(
     private lateinit var addButton: Button
 
     @FXML
+    private lateinit var editButton: Button
+
+    @FXML
+    private lateinit var completeAllButton: Button
+
+    @FXML
+    private lateinit var deleteCompletedButton: Button
+
+    @FXML
+    private lateinit var totalCountLabel: Label
+
+    @FXML
+    private lateinit var openCountLabel: Label
+
+    @FXML
+    private lateinit var inProgressCountLabel: Label
+
+    @FXML
+    private lateinit var doneCountLabel: Label
+
+    @FXML
     private lateinit var todoListView: ListView<Todo>
 
+    @FXML
+    private lateinit var statusFilterSelector: ComboBox<String>
+
     private val todos = FXCollections.observableArrayList<Todo>()
+    private var statusFilter = "All"
     private var registeredScene: javafx.scene.Scene? = null
     private val todoShortcutHandler =
         javafx.event.EventHandler<KeyEvent> { ev ->
@@ -77,7 +97,7 @@ class TodoPanel(
             } else if (ev.code == KeyCode.DELETE && !focusOwnerIsTextInput) {
                 val selected = todoListView.selectionModel.selectedItem
                 if (selected != null) {
-                    todos.remove(selected)
+                    removeWithUndo(selected)
                     ev.consume()
                 }
             }
@@ -88,6 +108,7 @@ class TodoPanel(
         children.add(root)
         // initialize from the shared TodoManager if available
         todos.setAll(todoManager.getAll())
+        todoManager.addListener { refreshFromManager() }
     }
 
     /**
@@ -96,8 +117,30 @@ class TodoPanel(
     @FXML
     fun initialize() {
         todoListView.items = todos
-        todoListView.setCellFactory { TodoCell() }
+        todoListView.placeholder = Label("No todos yet. Add one or let the agent create tasks.").apply { styleClass.add("todo-empty") }
+        todoListView.setCellFactory {
+            TodoCell(
+                onStatusChanged = { todo, completed ->
+                    todoManager.updateStatus(
+                        todo.id,
+                        if (completed) TodoStatus.COMPLETED else TodoStatus.PENDING,
+                    )
+                },
+                onRemove = ::removeWithUndo,
+            )
+        }
+        todos.addListener(ListChangeListener { updateSummary() })
         addButton.setOnAction { showAddDialog() }
+        editButton.setOnAction { editSelectedTodo() }
+        completeAllButton.setOnAction { completeAllTodos() }
+        deleteCompletedButton.setOnAction { deleteCompletedTodos() }
+        statusFilterSelector.items.setAll("All", "Open", "Active", "Done", "Cancelled")
+        statusFilterSelector.selectionModel.select("All")
+        statusFilterSelector.selectionModel.selectedItemProperty().addListener { _, _, selected ->
+            statusFilter = selected ?: "All"
+            refreshFromManager()
+        }
+        updateSummary()
         // Keyboard shortcuts: Cmd/Ctrl+N for new todo, Delete for removing selected todo.
         rootBorderPane.sceneProperty().addListener { _, _, newScene ->
             registeredScene?.removeEventFilter(KeyEvent.KEY_PRESSED, todoShortcutHandler)
@@ -152,9 +195,57 @@ class TodoPanel(
         val result = dialog.showAndWait()
         result.ifPresent { _ ->
             // create via shared manager so agents see it
-            val created = todoManager.add(descField.text.trim(), priorityCombo.selectionModel.selectedItem ?: TodoPriority.MEDIUM)
-            todos.add(created)
+            todoManager.add(descField.text.trim(), priorityCombo.selectionModel.selectedItem ?: TodoPriority.MEDIUM)
         }
+    }
+
+    private fun editSelectedTodo() {
+        val selected = todoListView.selectionModel.selectedItem ?: return
+        val dialog = Dialog<Boolean>()
+        dialog.title = "Edit Todo"
+        dialog.dialogPane.styleClass.add("todo-dialog")
+
+        val descField = TextField(selected.description)
+        descField.promptText = "Describe the task..."
+        descField.prefColumnCount = 30
+
+        val priorityCombo = ComboBox<TodoPriority>(FXCollections.observableArrayList(TodoPriority.entries.toList()))
+        priorityCombo.selectionModel.select(selected.priority)
+
+        val content = VBox(14.0)
+        content.padding = Insets(24.0)
+        content.children.addAll(Label("Task Description"), descField, Label("Priority Level"), priorityCombo)
+        dialog.dialogPane.content = content
+        dialog.dialogPane.buttonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)
+
+        dialog.setResultConverter { buttonType ->
+            buttonType == ButtonType.OK && descField.text.isNotBlank()
+        }
+
+        dialog.showAndWait().ifPresent { changed ->
+            if (changed) {
+                todoManager.update(
+                    selected.id,
+                    descField.text.trim(),
+                    priorityCombo.selectionModel.selectedItem ?: TodoPriority.MEDIUM,
+                )
+                refreshFromManager()
+            }
+        }
+    }
+
+    private fun completeAllTodos() {
+        todos.forEach { todo ->
+            if (todo.status != TodoStatus.COMPLETED) {
+                todoManager.updateStatus(todo.id, TodoStatus.COMPLETED)
+            }
+        }
+    }
+
+    private fun deleteCompletedTodos() {
+        val completed = todos.filter { it.status == TodoStatus.COMPLETED }.toList()
+        completed.forEach { todoManager.remove(it.id) }
+        refreshFromManager()
     }
 
     /**
@@ -186,85 +277,30 @@ class TodoPanel(
      */
     fun refreshFromManager() {
         Platform.runLater {
-            todos.setAll(todoManager.getAll())
+            val source = todoManager.getAll()
+            val filtered =
+                source.filter { todo ->
+                    when (statusFilter) {
+                        "Open" -> todo.status == TodoStatus.PENDING
+                        "Active" -> todo.status == TodoStatus.IN_PROGRESS
+                        "Done" -> todo.status == TodoStatus.COMPLETED
+                        "Cancelled" -> todo.status == TodoStatus.CANCELLED
+                        else -> true
+                    }
+                }
+            todos.setAll(filtered)
+            updateSummary()
         }
     }
 
-    /**
-     * Custom [ListCell] that renders a [Todo] with interactive controls.
-     *
-     * Each cell displays a checkbox to toggle completion, the todo description,
-     * a priority badge, and a delete button. CSS classes `todo-view`, `badge`,
-     * and `button-icon` are applied for styling via the dark theme stylesheet.
-     */
-    private inner class TodoCell : ListCell<Todo>() {
-        private val checkbox = CheckBox()
-        private val descriptionLabel = Label()
-        private val priorityBadge = Label()
-        private val spacer = Region()
-        private val deleteButton = Button()
-        private val topRow = HBox(12.0)
-        private val bottomRow = HBox()
-        private val root = VBox(6.0)
-        private val completedProperty = SimpleBooleanProperty(false)
-
-        init {
-            HBox.setHgrow(spacer, Priority.ALWAYS)
-            deleteButton.styleClass.add("button-icon")
-            deleteButton.graphic = Label("\u2715")
-            priorityBadge.styleClass.add("badge")
-            topRow.alignment = Pos.TOP_LEFT
-            topRow.children.addAll(checkbox, descriptionLabel)
-            bottomRow.alignment = Pos.CENTER_LEFT
-            bottomRow.padding = Insets(6.0, 0.0, 0.0, 30.0)
-            bottomRow.children.addAll(priorityBadge, spacer, deleteButton)
-            root.styleClass.add("todo-view")
-            root.children.addAll(topRow, bottomRow)
-
-            completedProperty.addListener { _, _, newVal ->
-                val todo = item ?: return@addListener
-                todo.status = if (newVal) TodoStatus.COMPLETED else TodoStatus.PENDING
-                updateDescriptionStyle(newVal)
-            }
-
-            checkbox.selectedProperty().bindBidirectional(completedProperty)
-        }
-
-        override fun updateItem(
-            todo: Todo?,
-            empty: Boolean,
-        ) {
-            super.updateItem(todo, empty)
-            if (empty || todo == null) {
-                graphic = null
-                return
-            }
-
-            completedProperty.set(todo.status == TodoStatus.COMPLETED)
-            checkbox.selectedProperty().set(todo.status == TodoStatus.COMPLETED)
-
-            descriptionLabel.text = todo.description
-            descriptionLabel.isWrapText = true
-            descriptionLabel.maxWidth = 220.0
-            updateDescriptionStyle(todo.status == TodoStatus.COMPLETED)
-
-            priorityBadge.text = todo.priority.name
-            priorityBadge.styleClass.clear()
-            priorityBadge.styleClass.addAll("badge", "badge-${todo.priority.name.lowercase()}")
-
-            deleteButton.setOnAction {
-                removeWithUndo(todo)
-            }
-
-            graphic = root
-        }
-
-        private fun updateDescriptionStyle(completed: Boolean) {
-            if (completed) {
-                descriptionLabel.styleClass.add("todo-completed")
-            } else {
-                descriptionLabel.styleClass.remove("todo-completed")
-            }
-        }
+    private fun updateSummary() {
+        val total = todos.size
+        val open = todos.count { it.status == TodoStatus.PENDING }
+        val inProgress = todos.count { it.status == TodoStatus.IN_PROGRESS }
+        val done = todos.count { it.status == TodoStatus.COMPLETED }
+        totalCountLabel.text = total.toString()
+        openCountLabel.text = open.toString()
+        inProgressCountLabel.text = inProgress.toString()
+        doneCountLabel.text = done.toString()
     }
 }

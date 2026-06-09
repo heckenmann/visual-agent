@@ -1,7 +1,6 @@
 package de.heckenmann.visualagent.ui.panels
 
 import de.heckenmann.visualagent.agent.LLMProvider
-import de.heckenmann.visualagent.agent.OllamaClient
 import de.heckenmann.visualagent.config.AppConfig
 import de.heckenmann.visualagent.ui.FxmlLoader
 import javafx.application.Platform
@@ -11,12 +10,15 @@ import javafx.scene.control.Button
 import javafx.scene.control.CheckBox
 import javafx.scene.control.ComboBox
 import javafx.scene.control.Label
+import javafx.scene.control.PasswordField
 import javafx.scene.control.ScrollPane
 import javafx.scene.control.Slider
 import javafx.scene.control.Spinner
 import javafx.scene.control.SpinnerValueFactory.IntegerSpinnerValueFactory
 import javafx.scene.control.TextArea
+import javafx.scene.control.TextField
 import javafx.scene.layout.Region
+import javafx.scene.layout.VBox
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -37,10 +39,31 @@ class SessionPanel : Region() {
     }
 
     @FXML
+    private lateinit var providerSelector: ComboBox<String>
+
+    @FXML
     private lateinit var modelSelector: ComboBox<String>
 
     @FXML
+    private lateinit var modelSearchField: TextField
+
+    @FXML
+    private lateinit var favoritesOnlyToggle: CheckBox
+
+    @FXML
+    private lateinit var favoriteButton: Button
+
+    @FXML
     private lateinit var refreshModelsButton: Button
+
+    @FXML
+    private lateinit var openAiApiKeyField: PasswordField
+
+    @FXML
+    private lateinit var openAiBaseUrlField: TextField
+
+    @FXML
+    private lateinit var openAiSettingsGroup: VBox
 
     @FXML
     private lateinit var contextSlider: Slider
@@ -74,14 +97,23 @@ class SessionPanel : Region() {
 
     @FXML
     private lateinit var scrollPane: ScrollPane
-
-    private var ollamaClient: LLMProvider? = null
+    private var llmProvider: LLMProvider? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val rootNode: Parent
+    private val allModels = mutableListOf<String>()
+    private val favoriteModels = linkedSetOf<String>()
 
     init {
         rootNode = FxmlLoader.load(this, "session-panel.fxml")
         children.add(rootNode)
+        if (AppConfig.instance.favoriteModels.isNotBlank()) {
+            favoriteModels.addAll(
+                AppConfig.instance.favoriteModels
+                    .split(',')
+                    .map { it.trim() }
+                    .filter { it.isNotBlank() },
+            )
+        }
     }
 
     /**
@@ -89,19 +121,40 @@ class SessionPanel : Region() {
      */
     @FXML
     fun initialize() {
+        providerSelector.items.setAll("Ollama", "OpenAI")
+        providerSelector.selectionModel.selectedItemProperty().addListener { _, _, selected ->
+            if (selected != null) {
+                AppConfig.instance.llmProvider = selected.lowercase()
+                AppConfig.instance.save()
+                updateProviderSpecificControls()
+                refreshModels()
+            }
+        }
+
+        openAiApiKeyField.textProperty().addListener { _, _, newVal ->
+            AppConfig.instance.openAiApiKey = newVal ?: ""
+            AppConfig.instance.save()
+        }
+        openAiBaseUrlField.textProperty().addListener { _, _, newVal ->
+            AppConfig.instance.openAiBaseUrl = (newVal ?: "").ifBlank { "https://api.openai.com" }
+            AppConfig.instance.save()
+        }
         contextSlider.valueProperty().addListener { _, _, newVal ->
             contextValueLabel.text = newVal.toInt().toString()
             AppConfig.instance.contextLength = newVal.toInt()
             AppConfig.instance.save()
         }
-
         modelSelector.selectionModel.selectedItemProperty().addListener { _, _, selected ->
             if (selected != null) {
-                AppConfig.instance.ollamaModel = selected
+                AppConfig.instance.setActiveModel(selected)
                 AppConfig.instance.save()
                 refreshModelDetails(selected)
+                updateFavoriteButton(selected)
             }
         }
+        modelSearchField.textProperty().addListener { _, _, _ -> applyModelFilter() }
+        favoritesOnlyToggle.selectedProperty().addListener { _, _, _ -> applyModelFilter() }
+        favoriteButton.setOnAction { toggleFavoriteForSelectedModel() }
         refreshModelsButton.setOnAction { refreshModels() }
 
         streamingToggle.selectedProperty().addListener { _, _, newVal ->
@@ -115,7 +168,6 @@ class SessionPanel : Region() {
             AppConfig.instance.save()
             logger.debug { "Thinking toggled: $newVal" }
         }
-
         autoCompactionToggle.selectedProperty().addListener { _, _, newVal ->
             AppConfig.instance.autoCompactionEnabled = newVal
             AppConfig.instance.save()
@@ -158,6 +210,11 @@ class SessionPanel : Region() {
         thinkingToggle.isSelected = AppConfig.instance.thinkingEnabled
         autoCompactionToggle.isSelected = AppConfig.instance.autoCompactionEnabled
         userInstructionArea.text = AppConfig.instance.userModelInstruction
+        providerSelector.selectionModel.select(if (AppConfig.instance.normalizedProvider() == "openai") "OpenAI" else "Ollama")
+        openAiApiKeyField.text = AppConfig.instance.openAiApiKey
+        openAiBaseUrlField.text = AppConfig.instance.openAiBaseUrl
+        updateProviderSpecificControls()
+        updateFavoriteButton(modelSelector.selectionModel.selectedItem)
     }
 
     /**
@@ -177,22 +234,6 @@ class SessionPanel : Region() {
     override fun computeMinHeight(width: Double): Double = 240.0
 
     /**
-     * Returns the preferred panel width for unconstrained layouts.
-     *
-     * @param height Available height hint from JavaFX layout
-     * @return Preferred width in pixels
-     */
-    override fun computePrefWidth(height: Double): Double = 800.0
-
-    /**
-     * Returns the preferred panel height for unconstrained layouts.
-     *
-     * @param width Available width hint from JavaFX layout
-     * @return Preferred height in pixels
-     */
-    override fun computePrefHeight(width: Double): Double = 600.0
-
-    /**
      * Resizes the loaded FXML root to this Region's current layout bounds.
      */
     override fun layoutChildren() {
@@ -201,12 +242,12 @@ class SessionPanel : Region() {
     }
 
     /**
-     * Sets the Ollama client used for fetching model data, then refreshes the model list and details.
+     * Sets the provider used for fetching model data, then refreshes the model list and details.
      *
-     * @param client The [OllamaClient] instance to use for API communication
+     * @param client The configured [LLMProvider] instance to use for API communication
      */
-    fun setOllamaClient(client: LLMProvider) {
-        this.ollamaClient = client
+    fun setLlmProvider(client: LLMProvider) {
+        this.llmProvider = client
         refreshModels()
     }
 
@@ -215,7 +256,7 @@ class SessionPanel : Region() {
      * Selects the configured default model if present.
      */
     fun refreshModels() {
-        val client = ollamaClient ?: return
+        val client = llmProvider ?: return
         modelSelector.isDisable = true
         refreshModelsButton.isDisable = true
         modelInfoLabel.text = "Loading models..."
@@ -229,16 +270,10 @@ class SessionPanel : Region() {
                 }
             Platform.runLater {
                 logger.debug { "refreshModels got ${models.size} models: $models" }
-                val currentModel = AppConfig.instance.ollamaModel
-                modelSelector.items.setAll(models)
-                if (models.contains(currentModel)) {
-                    modelSelector.selectionModel.select(currentModel)
-                } else if (models.isNotEmpty()) {
-                    modelSelector.selectionModel.select(0)
-                } else {
-                    modelInfoLabel.text = "No models available. Check Ollama connection."
-                }
-                modelSelector.isDisable = models.isEmpty()
+                allModels.clear()
+                allModels.addAll(models)
+                applyModelFilter(selectPreferred = true)
+                modelSelector.isDisable = allModels.isEmpty()
                 refreshModelsButton.isDisable = false
             }
         }
@@ -250,7 +285,7 @@ class SessionPanel : Region() {
      * @param modelName Name of the model to look up
      */
     fun refreshModelDetails(modelName: String) {
-        val client = ollamaClient ?: return
+        val client = llmProvider ?: return
         modelInfoLabel.text = "Loading model details..."
         scope.launch {
             try {
@@ -272,5 +307,62 @@ class SessionPanel : Region() {
                 }
             }
         }
+    }
+
+    private fun updateProviderSpecificControls() {
+        val openAiSelected = AppConfig.instance.normalizedProvider() == "openai"
+        openAiSettingsGroup.isVisible = openAiSelected
+        openAiSettingsGroup.isManaged = openAiSelected
+    }
+
+    private fun applyModelFilter(selectPreferred: Boolean = false) {
+        val query = modelSearchField.text.trim().lowercase()
+        val favoritesOnly = favoritesOnlyToggle.isSelected
+        val filtered =
+            allModels.filter { model ->
+                val matchesQuery = query.isBlank() || model.lowercase().contains(query)
+                val matchesFavorite = !favoritesOnly || favoriteModels.contains(model)
+                matchesQuery && matchesFavorite
+            }
+        modelSelector.items.setAll(filtered)
+
+        if (filtered.isEmpty()) {
+            modelInfoLabel.text =
+                if (allModels.isEmpty()) {
+                    "No models available. Check Ollama connection."
+                } else {
+                    "No models match the current filter."
+                }
+            return
+        }
+
+        val currentModel = AppConfig.instance.activeModel()
+        when {
+            filtered.contains(currentModel) -> modelSelector.selectionModel.select(currentModel)
+            selectPreferred -> modelSelector.selectionModel.select(0)
+            modelSelector.selectionModel.selectedIndex < 0 -> modelSelector.selectionModel.select(0)
+        }
+
+        updateFavoriteButton(modelSelector.selectionModel.selectedItem)
+    }
+
+    private fun toggleFavoriteForSelectedModel() {
+        val selected = modelSelector.selectionModel.selectedItem ?: return
+        if (favoriteModels.contains(selected)) {
+            favoriteModels.remove(selected)
+        } else {
+            favoriteModels.add(selected)
+        }
+        AppConfig.instance.favoriteModels = favoriteModels.joinToString(",")
+        AppConfig.instance.save()
+        updateFavoriteButton(selected)
+        applyModelFilter(selectPreferred = false)
+    }
+
+    private fun updateFavoriteButton(selected: String?) {
+        val isFavorite = selected != null && favoriteModels.contains(selected)
+        favoriteButton.text = if (isFavorite) "★" else "☆"
+        favoriteButton.isDisable = selected == null
+        favoriteButton.tooltip = javafx.scene.control.Tooltip(if (isFavorite) "Remove from favorites" else "Add to favorites")
     }
 }

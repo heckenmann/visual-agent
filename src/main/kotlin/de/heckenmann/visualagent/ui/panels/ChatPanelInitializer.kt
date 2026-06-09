@@ -76,10 +76,16 @@ internal class ChatPanelInitializer(
 
     private fun bindInputShortcut(sendMessage: () -> Unit) {
         inputTextField.addEventFilter(KeyEvent.KEY_PRESSED) { event ->
-            val shortcutEnter = event.code == KeyCode.ENTER && event.isShortcutDown
-            if ((event.code == KeyCode.ENTER && !event.isShiftDown) || shortcutEnter) {
-                sendMessage()
-                event.consume()
+            when (keyboardAction(event.code, event.isShiftDown, event.isShortcutDown)) {
+                InputKeyboardAction.INSERT_LINE_BREAK -> {
+                    inputTextField.replaceSelection("\n")
+                    event.consume()
+                }
+                InputKeyboardAction.SEND -> {
+                    sendMessage()
+                    event.consume()
+                }
+                InputKeyboardAction.NONE -> Unit
             }
         }
     }
@@ -105,4 +111,27 @@ internal class ChatPanelInitializer(
             rootBorderPane.prefHeight = newH.toDouble() - 1
         }
     }
+
+    internal companion object {
+        /**
+         * Maps chat input key state to the composer action.
+         */
+        fun keyboardAction(
+            code: KeyCode,
+            shiftDown: Boolean,
+            shortcutDown: Boolean,
+        ): InputKeyboardAction =
+            when {
+                code != KeyCode.ENTER -> InputKeyboardAction.NONE
+                shiftDown -> InputKeyboardAction.INSERT_LINE_BREAK
+                shortcutDown -> InputKeyboardAction.SEND
+                else -> InputKeyboardAction.SEND
+            }
+    }
+}
+
+internal enum class InputKeyboardAction {
+    NONE,
+    SEND,
+    INSERT_LINE_BREAK,
 }

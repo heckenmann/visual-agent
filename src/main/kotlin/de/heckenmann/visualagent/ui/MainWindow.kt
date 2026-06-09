@@ -2,9 +2,11 @@ package de.heckenmann.visualagent.ui
 
 import de.heckenmann.visualagent.AppIdentity
 import de.heckenmann.visualagent.agent.AgentManager
+import de.heckenmann.visualagent.agent.AgentStatus
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.ui.StatusBar
 import de.heckenmann.visualagent.ui.panels.ApplicationSettingsPanel
 import de.heckenmann.visualagent.ui.panels.CanvasPanel
 import de.heckenmann.visualagent.ui.panels.ChatPanel
@@ -81,6 +83,8 @@ class MainWindow(
     @FXML
     private lateinit var selectedModelLabel: Label
 
+    private val statusBar = StatusBar()
+
     @FXML
     private lateinit var conversationBtn: Button
 
@@ -133,7 +137,8 @@ class MainWindow(
     @FXML
     private fun initialize() {
         AppIdentity.javaFxIcon()?.let { appIconImage.image = it }
-        sessionPanel.setOllamaClient(llmProvider)
+        sessionPanel.setLlmProvider(llmProvider)
+        rootPane.bottom = statusBar
         registerConfigObserver()
 
         conversationBtn.setOnAction { switchPanel(chatPanel, conversationBtn) }
@@ -154,6 +159,7 @@ class MainWindow(
         chatWiring.register()
         chatPanel.setConversationHistory(agentManager.getHistory())
         registerEventObservers()
+        statusBar.setOnReconnect { checkConnection() }
         refreshTodoSummary()
 
         switchPanel(chatPanel, conversationBtn)
@@ -203,7 +209,8 @@ class MainWindow(
      * Applies the current AppConfig snapshot to UI elements that mirror global settings.
      */
     private fun applyConfigToUi() {
-        selectedModelLabel.text = " ${AppConfig.instance.ollamaModel}"
+        selectedModelLabel.text = " ${AppConfig.instance.normalizedProvider()}: ${AppConfig.instance.activeModel()}"
+        statusBar.updateModel(AppConfig.instance.activeModel())
         scene?.root?.style = "-fx-font-size: ${AppConfig.instance.fontSize}px;"
         Application.setUserAgentStylesheet(AppConfig.instance.getThemeStylesheet())
     }
@@ -244,6 +251,9 @@ class MainWindow(
         Platform.runLater {
             currentConnectionState = isConnected
             connectionStatus.text = if (isConnected) " Connected" else " Disconnected"
+            statusBar.updateConnectionStatus(isConnected)
+            val agents = agentManager.getSubAgents()
+            statusBar.updateAgentCount(agents.count { it.status == AgentStatus.BUSY }, agents.size)
             updateAgentCountUi()
             applyConfigToUi()
         }

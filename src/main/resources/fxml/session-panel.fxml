@@ -5,10 +5,12 @@
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.Button?>
+<?import javafx.scene.control.PasswordField?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.Slider?>
 <?import javafx.scene.control.Spinner?>
 <?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Priority?>
 <?import javafx.scene.layout.Region?>
@@ -46,7 +48,27 @@
                         <Insets left="24.0"/>
                     </padding>
                     <VBox spacing="4.0">
+                        <Label text="Provider"/>
+                        <ComboBox fx:id="providerSelector" maxWidth="Infinity"/>
+                    </VBox>
+                    <VBox fx:id="openAiSettingsGroup" spacing="10.0">
+                        <VBox spacing="4.0">
+                            <Label text="OpenAI API Key"/>
+                            <PasswordField fx:id="openAiApiKeyField" promptText="sk-..." maxWidth="Infinity"/>
+                            <Label text="Stored in SQLite plaintext by current product configuration." styleClass="text-caption"/>
+                        </VBox>
+                        <VBox spacing="4.0">
+                            <Label text="OpenAI Base URL"/>
+                            <TextField fx:id="openAiBaseUrlField" promptText="https://api.openai.com" maxWidth="Infinity"/>
+                        </VBox>
+                    </VBox>
+                    <VBox spacing="4.0">
                         <Label text="Active Model"/>
+                        <HBox spacing="8.0" alignment="CENTER_LEFT">
+                            <TextField fx:id="modelSearchField" promptText="Search models..." maxWidth="Infinity" HBox.hgrow="ALWAYS"/>
+                            <CheckBox fx:id="favoritesOnlyToggle" text="Favorites"/>
+                            <Button fx:id="favoriteButton" text="☆"/>
+                        </HBox>
                         <HBox spacing="8.0" alignment="CENTER_LEFT">
                             <ComboBox fx:id="modelSelector" maxWidth="Infinity" HBox.hgrow="ALWAYS"/>
                             <Button fx:id="refreshModelsButton" text="Refresh"/>

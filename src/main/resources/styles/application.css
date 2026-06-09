@@ -22,6 +22,101 @@
     -fx-background-color: -color-bg-default;
 }
 
+/* Todos */
+.todo-root {
+    -fx-background-color: -color-bg-default;
+}
+
+.todo-header {
+    -fx-background-color: -color-bg-default;
+    -fx-border-color: -color-border-muted;
+    -fx-border-width: 0 0 1px 0;
+}
+
+.todo-summary-row {
+    -fx-padding: 2px 0 0 0;
+}
+
+.todo-summary-chip {
+    -fx-background-color: -color-bg-subtle;
+    -fx-border-color: -color-border-muted;
+    -fx-border-radius: 999px;
+    -fx-background-radius: 999px;
+    -fx-padding: 4px 10px;
+}
+
+.todo-list {
+    -fx-background-color: -color-bg-default;
+    -fx-background-insets: 0;
+    -fx-padding: 10px 12px 14px 12px;
+}
+
+.todo-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-padding: 4px 0;
+}
+
+.todo-list .list-cell:selected,
+.todo-list .list-cell:hover {
+    -fx-background-color: transparent;
+}
+
+.todo-list .list-cell:empty {
+    -fx-padding: 0;
+}
+
+.todo-row {
+    -fx-background-color: -color-bg-subtle;
+    -fx-border-color: -color-border-muted;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
+    -fx-padding: 12px;
+}
+
+.todo-list .list-cell:selected .todo-row,
+.todo-row:hover {
+    -fx-background-color: -color-neutral-subtle;
+}
+
+.todo-description {
+    -fx-text-fill: -color-fg-default;
+    -fx-font-size: 13px;
+}
+
+.todo-completed {
+    -fx-text-fill: -color-fg-muted;
+    -fx-strikethrough: true;
+}
+
+.todo-status-badge {
+    -fx-background-color: -color-bg-default;
+    -fx-border-color: -color-border-muted;
+    -fx-border-radius: 999px;
+}
+
+.todo-status-pending { -fx-text-fill: -color-fg-muted; }
+.todo-status-in-progress { -fx-text-fill: -color-warning-emphasis; }
+.todo-status-completed { -fx-text-fill: -color-success-emphasis; }
+.todo-status-cancelled { -fx-text-fill: -color-danger-emphasis; }
+
+.todo-agent-badge {
+    -fx-background-color: -color-accent-muted;
+    -fx-text-fill: -color-accent-fg;
+}
+
+.todo-delete-button {
+    -fx-opacity: 0.72;
+}
+
+.todo-delete-button:hover {
+    -fx-opacity: 1.0;
+}
+
+.todo-empty {
+    -fx-text-fill: -color-fg-muted;
+    -fx-padding: 36px;
+}
+
 /* Conversation */
 .chat-header-bar {
     -fx-background-color: -color-bg-default;
