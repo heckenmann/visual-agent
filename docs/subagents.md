@@ -32,7 +32,7 @@ Main-agent prompts include todo summaries and execution policy so model planning
 
 ## Persistence
 
-State is persisted via `KnowledgeDb` (`sub_agents`, related config tables).  
+State is persisted via typed Spring Data JPA stores over SQLite tables (`sub_agents`, `sub_agent_configs`, and related tables).  
 UI and runtime reload from DB after restart.
 
 ## Remaining Work

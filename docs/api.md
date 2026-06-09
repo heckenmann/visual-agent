@@ -27,7 +27,26 @@ Primary methods:
 
 This is what `AgentManager` sends into the provider.
 
-## Ollama Provider Implementation
+## Provider Implementations
+
+`ConfiguredLLMProvider` is the primary `LLMProvider` bean injected into UI and agent orchestration code. It delegates each request to the active backend configured in `AppConfig`:
+
+- `llm.provider=ollama`
+- `llm.provider=openai`
+
+Model selection is provider-specific:
+
+- `ollama.model`
+- `openai.model`
+
+OpenAI-compatible endpoints also use:
+
+- `openai.base.url`
+- `openai.api.key`
+
+Current product decision: `openai.api.key` is stored plaintext in SQLite `user_preferences`. The key must never be included in model context or tool output.
+
+### Ollama
 
 `OllamaClient` is implemented on top of Spring AI:
 
@@ -36,6 +55,17 @@ This is what `AgentManager` sends into the provider.
 - tool integration via request-scoped `ToolCallback`s from `ToolRegistry`
 
 Unknown tool-call names are handled with a structured recovery path and a fallback response listing available function names.
+
+### OpenAI
+
+`OpenAiClient` is implemented on top of Spring AI OpenAI:
+
+- model calls via dynamically created OpenAI `ChatModel`
+- options via `OpenAiChatOptions`
+- tool integration via request-scoped `ToolCallback`s from `ToolRegistry`
+- model listing through the OpenAI-compatible `/v1/models` endpoint
+
+OpenAI model details are intentionally minimal because OpenAI-compatible model-list responses do not provide Ollama-style metadata.
 
 ## Tool Calling
 

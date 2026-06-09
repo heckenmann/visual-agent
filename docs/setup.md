@@ -5,6 +5,7 @@
 - Java 21+
 - Gradle 9.4.1
 - Ollama running locally (`ollama serve`)
+- SQLite is embedded and managed automatically through Spring Data JPA + Flyway
 
 ## Build and Run
 
@@ -46,6 +47,13 @@ ollama list
 
 The selected model is configured via session/UI settings and forwarded in provider requests.
 
+## Persistence Runtime
+
+- Database path defaults to `./data/visual-agent.db`
+- Schema changes are applied through Flyway migrations at startup
+- Hibernate validates the mapped entities, but does not generate schema in production
+- Conversation search uses SQLite FTS5 with a fallback `LIKE` path
+
 ## Troubleshooting
 
 ### JavaFX module/runtime issues
@@ -69,3 +77,7 @@ rm data/visual-agent.db-wal data/visual-agent.db-shm
 ```
 
 Restart the app afterwards.
+
+### Migration startup issues
+
+If Flyway or JPA fails during startup, check the `data/visual-agent.db` file path in `src/main/resources/config/app.properties` and ensure the application can create or write to the `data/` directory.

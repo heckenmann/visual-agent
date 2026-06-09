@@ -3,7 +3,7 @@
 ## Overview
 
 Visual Agent is a JavaFX desktop application with Spring-managed services.  
-The runtime uses Spring AI for model interaction and tool-calling, and SQLite (`KnowledgeDb`) as the persistent state source.
+The runtime uses Spring AI for model interaction and tool-calling, and Spring Data JPA on SQLite as the persistent state source.
 
 ## Runtime Layers
 
@@ -11,7 +11,7 @@ The runtime uses Spring AI for model interaction and tool-calling, and SQLite (`
 2. Application: `AgentManager` orchestrates chat, streaming, history, todos, and sub-agents.
 3. Provider: `LLMProvider` abstraction with `OllamaClient` implementation.
 4. Tools: `ToolRegistry` + `VisualAgentTool` implementations + `ToolEventBus`.
-5. Persistence: `KnowledgeDb` (SQLite, WAL, indexed search paths).
+5. Persistence: JPA-backed stores on SQLite, with Flyway migrations and a native FTS5 search path for conversation history.
 
 ## Current Implemented Flow
 
@@ -34,6 +34,7 @@ DB-first behavior is used app-wide:
 - todo state is persisted and surfaced to both UI and agent context
 - tool call history entries are persisted and rendered in conversation
 - sub-agent configurations are loaded from DB and maintained via CRUD
+- persistence access is routed through typed stores, not a JDBC facade
 
 Values are not treated as long-lived in-memory truth; DB is the authoritative source.
 
@@ -68,7 +69,6 @@ Current tool set:
 The following source files still exceed the 300 LOC target and are marked for modularization:
 
 - `agent/AgentManager.kt`
-- `knowledge/KnowledgeDb.kt`
 - `ui/panels/ChatPanel.kt`
 - `ui/MainWindow.kt`
 - `agent/OllamaClient.kt`

@@ -1,7 +1,7 @@
 UX Task List
 ===============
 
-Status: The tasks below represent UX work tracked by the app todo flow. Todos are persisted in SQLite via `KnowledgeDb`. Autonomous processing is NOT started automatically; call `AgentManager.startAutonomousProcessing(seed = true)` to begin processing.
+Status: The tasks below represent UX work tracked by the app todo flow. Todos are persisted in SQLite via the JPA-backed `TodoStore`. Autonomous processing is NOT started automatically; call `AgentManager.startAutonomousProcessing(seed = true)` to begin processing.
 
 Tasks (seeded)
 1. ChatPanel: implement message grouping visual polish

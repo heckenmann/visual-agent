@@ -33,6 +33,20 @@ Enforced in build:
 ./gradlew unusedCodeCheck         # flags removable unused private declarations
 ```
 
+## Commit Conventions
+
+- Use Conventional Commits: `type(scope): short imperative summary`
+- Keep one logical change per commit.
+- Prefer small, reviewable commits over broad mixed changes.
+- Use present tense and imperative mood.
+- Add a scope when it improves clarity, for example `ui`, `agent`, `todo`, `knowledge`, or `docs`.
+- Do not mix refactors, UI work, and documentation in one commit unless they are tightly coupled.
+- Examples:
+  - `feat(ui): add canvas zoom and pan controls`
+  - `fix(todo): persist status updates through TodoManager`
+  - `refactor(knowledge): move persistence to repository stores`
+  - `docs: update agent and UX documentation`
+
 ### Security
 
 **Never commit sensitive data:**
@@ -49,6 +63,7 @@ Store sensitive data in environment variables or secure configuration files that
 - Java 21+
 - Gradle 9.4.1 (installed via Homebrew on macOS)
 - Ollama running (`ollama serve`) for local LLM
+- OpenAI API key when using the OpenAI provider
 
 ## Project Structure
 
@@ -57,7 +72,9 @@ src/main/kotlin/de/heckenmann/visualagent/
 ├── Main.kt                    # Application entry point
 ├── agent/
 │   ├── LLMProvider.kt         # Interface: chat, stream, vision, embeddings, getModels, getModelDetails
+│   ├── ConfiguredLLMProvider.kt # Primary LLMProvider router selected by AppConfig
 │   ├── OllamaClient.kt        # Implements LLMProvider using Spring AI + Ollama ChatModel
+│   ├── openai/                # OpenAI/OpenAI-compatible Spring AI provider implementation
 │   ├── AgentManager.kt        # Main orchestration: history, tools, todos, sub-agent coordination
 │   ├── SubAgent.kt            # SubAgent data model, AgentStatus enum
 │   └── SessionEvent.kt        # Sealed interface for session-level events
@@ -78,7 +95,7 @@ src/main/kotlin/de/heckenmann/visualagent/
     ├── FxmlLoader.kt          # Type-safe FXML loading utility
     ├── StatusBar.kt           # Legacy status component (currently not wired in MainWindow)
     └── panels/
-        ├── SessionPanel.kt         # FXML-based, OllamaClient connected, model list + details
+        ├── SessionPanel.kt         # FXML-based provider/model/session settings panel
         ├── ChatPanel.kt            # Send handler, Enter/Cmd+Ctrl+Enter, loading placeholder, setOnSendMessage callback, ChatMessage
         ├── TodoPanel.kt            # FXML-based, Add dialog, Delete, checkbox toggle, priority badges
         ├── SubAgentsPanel.kt       # Agent list built in code, CSS classes (no inline styles)
@@ -103,7 +120,8 @@ src/main/kotlin/de/heckenmann/visualagent/
 ## Key Patterns
 
 - **AppConfig**: Singleton loaded from `src/main/resources/config/app.properties`
-- **LLMProvider**: Interface for Ollama/Cloud providers in `agent/LLMProvider.kt` — includes `chat`, `stream`, `vision`, `embeddings`, `getModels`, `getModelDetails`
+- **LLMProvider**: Interface for Ollama/OpenAI providers in `agent/LLMProvider.kt` — includes `chat`, `stream`, `vision`, `embeddings`, `getModels`, `getModelDetails`
+- **ConfiguredLLMProvider**: Primary `LLMProvider` bean; routes calls to Ollama or OpenAI based on `AppConfig.instance.llmProvider`
 - **Region inheritance**: UI panels extend `javafx.scene.layout.Region`
 - **VBox orientation**: VBox is always vertical in JavaFX — no `.orientation` property
 - **FXML loading**: Panels use `FxmlLoader.load(controller, "file.fxml")` — sets controller before loading, no `fx:controller` attribute in FXML (MainWindow, SessionPanel, TodoPanel, ApplicationSettingsPanel)
@@ -112,16 +130,18 @@ src/main/kotlin/de/heckenmann/visualagent/
 - **Keyboard navigation**: MainWindow supports `Cmd/Ctrl+1..6` for panel switching and `Cmd/Ctrl+K` command palette
 - **CSS classes**: All styling via CSS classes (`application.css`), no inline `setStyle()` calls
 - **Callback wiring**: ChatPanel sends messages via `setOnSendMessage` callback wired to `AgentManager.sendMessage()` in MainWindow
-- **OllamaClient integration**: SessionPanel calls `getModels()` and `getModelDetails()` via `setOllamaClient()`
+- **Provider integration**: SessionPanel calls `getModels()` and `getModelDetails()` through the primary `LLMProvider`
 - **Spring AI tool-calling**: `LLMProvider.chat/stream(ChatRequestContext)` carries enabled tool IDs + metadata; provider builds request-scoped callbacks
 - **Tool event flow**: all tool calls emit STARTED/FINISHED events; UI and persistence consume these events
 - **DB-first state reads**: runtime context (history/todos/sub-agent data) is loaded from DB, not long-lived in-memory caches
 - **Constructor DI style**: use constructor injection with direct constructor properties (`private val`/`private var`) for required dependencies; avoid passing constructor params and re-assigning them in the class body
 - **Markdown parser input**: conversation message text must be passed 1:1 to the CommonMark parser; no pre-normalization, rewriting, or heuristic transformation before parsing
+- **Provider settings**: active provider/model values are DB-backed (`llm.provider`, `ollama.model`, `openai.model`, `openai.base.url`, `openai.api.key`)
+- **OpenAI key storage**: `openai.api.key` is intentionally stored plaintext in SQLite by current product decision; never expose the raw key to model context, tool output, or logs
 
 ## Model Context Payload
 
-The model does not receive arbitrary global state. It receives a request-scoped context assembled in `AgentManager` and `OllamaPromptFactory`.
+The model does not receive arbitrary global state. It receives a request-scoped context assembled in `AgentManager` and the active provider prompt factory.
 
 ### Main Agent Request Context
 
@@ -129,10 +149,11 @@ The model does not receive arbitrary global state. It receives a request-scoped 
   - resume hint for interrupted runs
   - authoritative todo counters (`Open`, `In Progress`, `Done`, `Cancelled`, `Total`)
   - current todo list from DB
+  - active provider and active model
   - execution policy/rules (tool usage, todo/status behavior, markdown output constraints)
 - Optional extra system prompt from `AppConfig.instance.userModelInstruction` (session wishes, language, etc.)
 - Recent conversation history from DB: max `20` messages (`INITIAL_HISTORY_LOAD_LIMIT`)
-- Tool-name guard system message (exact allowed function names for this request)
+- Tool-name guard system message from the active provider factory (exact allowed function names for this request)
 - Request metadata:
   - `sessionId=main`
   - `agent=main`
@@ -155,13 +176,14 @@ The model does not receive arbitrary global state. It receives a request-scoped 
 
 ## Done
 
-1. **Spring AI migration** — provider path uses Spring AI (`spring-ai-starter-model-ollama`) with native tool-calling callbacks
+1. **Spring AI migration** — provider path uses Spring AI with native tool-calling callbacks
 2. **Tool system rebuilt** — canonical tool IDs (`ui`, `history`, `todos`, file/terminal/context/pwd, browser/search placeholders) exposed via `ToolRegistry`
 3. **Persistent runtime history** — conversation and tool-call entries are persisted and restored after restart
 4. **Todo integration** — todo counts/lists are available through tool calls and DB-backed orchestration context
 5. **SubAgents (Phase 2)** — Persistence and UI with DB-backed load/save, templates, and live status updates
 6. **Markdown rendering** — conversation markdown is parsed through `commonmark` library (no hand-written parser)
 7. **Quality gates** — KDoc/Javadoc and LOC/package-size checks integrated into Gradle verification flow
+8. **OpenAI provider support** — `ConfiguredLLMProvider` routes between Ollama and OpenAI-compatible endpoints
 
 ## Known Bugs
 

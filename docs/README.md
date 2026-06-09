@@ -1,5 +1,7 @@
 # Documentation
 
+Visual Agent now uses Spring Data JPA on SQLite with Flyway migrations for persistence. The docs below reflect the current runtime stack.
+
 ## Table of Contents
 
 - [Architecture](architecture.md) - System architecture, runtime flow, and current constraints
