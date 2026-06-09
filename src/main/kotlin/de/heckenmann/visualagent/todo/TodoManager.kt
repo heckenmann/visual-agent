@@ -84,6 +84,39 @@ class TodoManager(
     }
 
     /**
+     * Executes update.
+     */
+    fun update(
+        todoId: String,
+        description: String,
+        priority: TodoPriority,
+    ): Boolean {
+        val todo = getById(todoId) ?: return false
+        todo.description = description
+        todo.priority = priority
+        publishChange(TodoChange(TodoChangeType.UPDATED, todo = todo))
+        return true
+    }
+
+    /**
+     * Updates a todo status and publishes the change for persistence and UI observers.
+     *
+     * @param todoId Identifier of the todo to update
+     * @param status New lifecycle status
+     * @return true if the todo exists and was updated
+     */
+    fun updateStatus(
+        todoId: String,
+        status: TodoStatus,
+    ): Boolean {
+        val todo = getById(todoId) ?: return false
+        todo.status = status
+        todo.completedAt = if (status == TodoStatus.COMPLETED) java.time.Instant.now() else null
+        publishChange(TodoChange(TodoChangeType.UPDATED, todo = todo))
+        return true
+    }
+
+    /**
      * Executes assignToAgent.
      */
     fun assignToAgent(

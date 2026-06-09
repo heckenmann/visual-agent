@@ -6,7 +6,8 @@ import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.config.AppConfig
-import de.heckenmann.visualagent.knowledge.KnowledgeDb
+import de.heckenmann.visualagent.knowledge.MemoryStore
+import de.heckenmann.visualagent.knowledge.TodoStore
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoManager
 import de.heckenmann.visualagent.todo.TodoStatus
@@ -22,7 +23,8 @@ internal class AutonomousCoordinator(
     private val todoManager: TodoManager,
     private val subAgents: MutableMap<String, SubAgent>,
     private val llmProvider: LLMProvider,
-    private val knowledgeDb: KnowledgeDb,
+    private val todoStore: TodoStore,
+    private val memoryStore: MemoryStore,
     private val agentToolConfigService: AgentToolConfigService,
     private val createAgent: (name: String, role: String, templateName: String) -> SubAgent,
     private val saveAgentToDb: (SubAgent) -> Unit,
@@ -126,7 +128,7 @@ internal class AutonomousCoordinator(
         startAutonomousProcessing(seed = false)
     }
 
-    private fun getTodosFromDb(): List<Todo> = knowledgeDb.listTodos()
+    private fun getTodosFromDb(): List<Todo> = todoStore.listTodos()
 
     private suspend fun processTodoWithLLM(
         agent: SubAgent,
@@ -140,7 +142,7 @@ internal class AutonomousCoordinator(
             while (attempt < maxRetries) {
                 try {
                     val workerResult =
-                        agent.performTodo(todoId, taskDescription, llmProvider, knowledgeDb, agentToolConfigService.toolsFor(agent))
+                        agent.performTodo(todoId, taskDescription, llmProvider, memoryStore, agentToolConfigService.toolsFor(agent))
                     val reviewApproved = reviewWorkerResult(todoId, taskDescription, workerResult)
                     if (reviewApproved) {
                         notifyAgent(agent.id, "Completed todo: $todoId")

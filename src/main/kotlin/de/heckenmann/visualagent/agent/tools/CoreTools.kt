@@ -4,7 +4,8 @@ import de.heckenmann.visualagent.agent.ToolDefinition
 import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.agent.ToolResult
 import de.heckenmann.visualagent.config.AppConfig
-import de.heckenmann.visualagent.knowledge.KnowledgeDb
+import de.heckenmann.visualagent.knowledge.ConversationStore
+import de.heckenmann.visualagent.knowledge.TodoStore
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoPriority
 import de.heckenmann.visualagent.todo.TodoStatus
@@ -33,7 +34,9 @@ class UiTool : VisualAgentTool {
             "set" -> {
                 input.string("theme")?.let { AppConfig.instance.theme = it }
                 input.int("fontSize")?.let { AppConfig.instance.fontSize = it.coerceIn(10, 24) }
-                input.string("model")?.let { AppConfig.instance.ollamaModel = it }
+                input.string("provider")?.let { AppConfig.instance.llmProvider = it.lowercase() }
+                input.string("model")?.let { AppConfig.instance.setActiveModel(it) }
+                input.string("openAiBaseUrl")?.let { AppConfig.instance.openAiBaseUrl = it }
                 input.boolean("streamingEnabled")?.let { AppConfig.instance.streamingEnabled = it }
                 input.boolean("thinkingEnabled")?.let { AppConfig.instance.thinkingEnabled = it }
                 AppConfig.instance.save()
@@ -47,7 +50,10 @@ class UiTool : VisualAgentTool {
             Current UI Settings:
               Theme: ${AppConfig.instance.theme}
               Font size: ${AppConfig.instance.fontSize}px
-              Model: ${AppConfig.instance.ollamaModel}
+              Provider: ${AppConfig.instance.normalizedProvider()}
+              Model: ${AppConfig.instance.activeModel()}
+              OpenAI Base URL: ${AppConfig.instance.openAiBaseUrl}
+              OpenAI API key configured: ${AppConfig.instance.openAiApiKey.isNotBlank()}
               Streaming: ${AppConfig.instance.streamingEnabled}
               Thinking: ${AppConfig.instance.thinkingEnabled}
             Available themes: Dracula, Primer Dark, Primer Light, Nord Dark, Nord Light, Cupertino Dark, Cupertino Light
@@ -97,7 +103,10 @@ class ContextTool : VisualAgentTool {
             "context",
             buildString {
                 appendLine("Workspace: ${workspaceRoot()}")
-                appendLine("Model: ${AppConfig.instance.ollamaModel}")
+                appendLine("Provider: ${AppConfig.instance.normalizedProvider()}")
+                appendLine("Model: ${AppConfig.instance.activeModel()}")
+                appendLine("OpenAI Base URL: ${AppConfig.instance.openAiBaseUrl}")
+                appendLine("OpenAI API key configured: ${AppConfig.instance.openAiApiKey.isNotBlank()}")
                 appendLine("Theme: ${AppConfig.instance.theme}")
                 context.entries.sortedBy { it.key }.forEach { (key, value) ->
                     appendLine("$key: $value")
@@ -111,7 +120,7 @@ class ContextTool : VisualAgentTool {
  */
 @Component
 class HistoryTool(
-    private val knowledgeDb: KnowledgeDb,
+    private val conversationStore: ConversationStore,
 ) : VisualAgentTool {
     override val definition =
         ToolDefinition(
@@ -142,11 +151,11 @@ class HistoryTool(
     ): ToolResult {
         val limit = (input.int("limit") ?: 20).coerceIn(1, 100)
         val offset = (input.int("offset") ?: 0).coerceAtLeast(0)
-        val rows = knowledgeDb.getConversationMessagesPage(sessionId, limit, offset)
+        val rows = conversationStore.getConversationMessagesPage(sessionId, limit, offset)
         if (rows.isEmpty()) return success("history", "No messages found for load request.")
         val content =
             rows.joinToString("\n") { row ->
-                "[${row["createdAt"]}] ${row["role"]}: ${row["content"]}"
+                "[${row.createdAt}] ${row.role}: ${row.content}"
             }
         return success("history", content)
     }
@@ -157,11 +166,11 @@ class HistoryTool(
     ): ToolResult {
         val query = input.requiredString("query")
         val limit = (input.int("limit") ?: 20).coerceIn(1, 100)
-        val rows = knowledgeDb.searchConversationMessages(sessionId, query, limit)
+        val rows = conversationStore.searchConversationMessages(sessionId, query, limit)
         if (rows.isEmpty()) return success("history", "No messages matched query '$query'.")
         val content =
             rows.joinToString("\n") { row ->
-                "[${row["createdAt"]}] ${row["role"]}: ${row["content"]}"
+                "[${row.createdAt}] ${row.role}: ${row.content}"
             }
         return success("history", content)
     }
@@ -172,7 +181,7 @@ class HistoryTool(
  */
 @Component
 class TodosTool(
-    private val knowledgeDb: KnowledgeDb,
+    private val todoStore: TodoStore,
 ) : VisualAgentTool {
     override val definition =
         ToolDefinition(
@@ -202,7 +211,7 @@ class TodosTool(
     }
 
     private fun listTodos(): ToolResult {
-        val rows = knowledgeDb.listTodos()
+        val rows = todoStore.listTodos()
         if (rows.isEmpty()) return success("todos", "No todos.")
         val text =
             rows.joinToString("\n") {
@@ -212,7 +221,7 @@ class TodosTool(
     }
 
     private fun countTodos(): ToolResult {
-        val rows = knowledgeDb.listTodos()
+        val rows = todoStore.listTodos()
         val pending = rows.count { it.status == TodoStatus.PENDING }
         val inProgress = rows.count { it.status == TodoStatus.IN_PROGRESS }
         val completed = rows.count { it.status == TodoStatus.COMPLETED }
@@ -235,13 +244,13 @@ class TodosTool(
                 status = TodoStatus.PENDING,
                 priority = parsePriority(input.string("priority")),
             )
-        knowledgeDb.saveTodo(todo)
+        todoStore.saveTodo(todo)
         return success("todos", "Added todo ${todo.id}")
     }
 
     private fun updateTodo(input: JsonObject): ToolResult {
         val id = input.requiredString("id")
-        val existing = knowledgeDb.listTodos().firstOrNull { it.id == id } ?: return failure("todos", "Todo not found")
+        val existing = todoStore.listTodos().firstOrNull { it.id == id } ?: return failure("todos", "Todo not found")
         val updated =
             existing
                 .copy(
@@ -254,7 +263,7 @@ class TodosTool(
                             ?: existing.status
                     it.completedAt = existing.completedAt
                 }
-        knowledgeDb.saveTodo(updated)
+        todoStore.saveTodo(updated)
         return success("todos", "Updated todo $id")
     }
 
@@ -263,7 +272,7 @@ class TodosTool(
         status: TodoStatus,
     ): ToolResult {
         val id = input.requiredString("id")
-        val existing = knowledgeDb.listTodos().firstOrNull { it.id == id } ?: return failure("todos", "Todo not found")
+        val existing = todoStore.listTodos().firstOrNull { it.id == id } ?: return failure("todos", "Todo not found")
         val updated =
             existing.copy().also {
                 it.status = status
@@ -271,13 +280,13 @@ class TodosTool(
                     it.completedAt = java.time.Instant.now()
                 }
             }
-        knowledgeDb.saveTodo(updated)
+        todoStore.saveTodo(updated)
         return success("todos", "Set todo $id to $status")
     }
 
     private fun removeTodo(input: JsonObject): ToolResult {
         val id = input.requiredString("id")
-        knowledgeDb.deleteTodo(id)
+        todoStore.deleteTodo(id)
         return success("todos", "Removed todo $id")
     }
 

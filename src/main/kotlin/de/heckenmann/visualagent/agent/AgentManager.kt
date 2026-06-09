@@ -8,7 +8,12 @@ import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfig
-import de.heckenmann.visualagent.knowledge.KnowledgeDb
+import de.heckenmann.visualagent.knowledge.ConversationStore
+import de.heckenmann.visualagent.knowledge.MemoryStore
+import de.heckenmann.visualagent.knowledge.PersistedSubAgent
+import de.heckenmann.visualagent.knowledge.PersistenceStores
+import de.heckenmann.visualagent.knowledge.SubAgentStore
+import de.heckenmann.visualagent.knowledge.TodoStore
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoChange
 import de.heckenmann.visualagent.todo.TodoChangeType
@@ -23,7 +28,9 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.springframework.beans.factory.DisposableBean
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
+import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
@@ -31,12 +38,32 @@ import java.util.concurrent.ConcurrentHashMap
  * Represents AgentManager.
  */
 @Service
-class AgentManager(
-    internal val knowledgeDb: KnowledgeDb,
+class AgentManager
+@Autowired
+constructor(
+    internal val conversationStore: ConversationStore,
+    internal val todoStore: TodoStore,
+    internal val subAgentStore: SubAgentStore,
+    internal val memoryStore: MemoryStore,
     internal val llmProvider: LLMProvider,
     internal val agentToolConfigService: AgentToolConfigService,
     private val toolEventBus: ToolEventBus,
 ) : DisposableBean {
+    internal constructor(
+        stores: PersistenceStores,
+        llmProvider: LLMProvider,
+        agentToolConfigService: AgentToolConfigService,
+        toolEventBus: ToolEventBus,
+    ) : this(
+        stores,
+        stores,
+        stores,
+        stores,
+        llmProvider,
+        agentToolConfigService,
+        toolEventBus,
+    )
+
     /**
      * Immutable todo summary snapshot sourced from the database.
      *
@@ -78,7 +105,7 @@ class AgentManager(
 
     val todoManager: TodoManager =
         TodoManager(
-            initialTodos = knowledgeDb.listTodos(),
+            initialTodos = todoStore.listTodos(),
             onChange = { change -> persistTodoChange(change) },
         )
     internal val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -109,7 +136,8 @@ class AgentManager(
                 todoManager = todoManager,
                 subAgents = subAgents,
                 llmProvider = llmProvider,
-                knowledgeDb = knowledgeDb,
+                todoStore = todoStore,
+                memoryStore = memoryStore,
                 agentToolConfigService = agentToolConfigService,
                 createAgent = { name, role, templateName -> createAgent(name, role, templateName) },
                 saveAgentToDb = ::saveAgentToDb,
@@ -131,7 +159,7 @@ class AgentManager(
      * Load SubAgents from KnowledgeDb. Create default agents if DB is empty.
      */
     private fun loadAgentsFromDb() {
-        val agents = knowledgeDb.listAgents()
+        val agents = subAgentStore.listAgents()
         println("[AgentManager] Found ${agents.size} agents in DB")
         // Ensure a minimum set of default agents for deterministic behavior in tests and UI
         if (agents.size < 3) {
@@ -141,7 +169,7 @@ class AgentManager(
         }
 
         // Sort agents by numeric id when possible to preserve expected ordering (1,2,3...)
-        val sortedAgents = agents.sortedBy { it["id"]?.toString()?.toIntOrNull() ?: Int.MAX_VALUE }
+        val sortedAgents = agents.sortedBy { it.id.toIntOrNull() ?: Int.MAX_VALUE }
 
         sortedAgents.forEach { agentMap ->
             try {
@@ -156,27 +184,28 @@ class AgentManager(
     }
 
     internal fun mapAgentRecord(
-        agentMap: Map<String, Any>,
+        agentRecord: PersistedSubAgent,
         resetStatusToIdle: Boolean,
     ): SubAgent {
-        val rawCurrentTask = agentMap["currentTask"] as? String
         val persistedStatus =
             runCatching {
-                AgentStatus.valueOf((agentMap["status"] as? String).orEmpty())
+                AgentStatus.valueOf(agentRecord.status)
             }.getOrDefault(AgentStatus.IDLE)
         return SubAgent(
-            id = agentMap["id"] as String,
-            name = agentMap["name"] as String,
-            role = agentMap["role"] as String,
+            id = agentRecord.id,
+            name = agentRecord.name,
+            role = agentRecord.role,
             status = if (resetStatusToIdle) AgentStatus.IDLE else persistedStatus,
-            currentTask = rawCurrentTask?.ifBlank { null },
-            parentAgentId = (agentMap["parentAgentId"] as? String)?.ifBlank { null },
+            currentTask = agentRecord.currentTask?.ifBlank { null },
+            parentAgentId = agentRecord.parentAgentId?.ifBlank { null },
             config =
                 try {
-                    Json.decodeFromString(agentMap["config"] as String)
+                    Json.decodeFromString(agentRecord.config)
                 } catch (_: Exception) {
                     AgentConfig()
                 },
+            createdAt = agentRecord.createdAt.toEpochMilli(),
+            updatedAt = agentRecord.updatedAt.toEpochMilli(),
         )
     }
 
@@ -208,14 +237,18 @@ class AgentManager(
      */
     internal fun saveAgentToDb(agent: SubAgent) {
         val configJson = Json.encodeToString(agent.config)
-        knowledgeDb.saveAgent(
+        subAgentStore.saveAgent(
+            PersistedSubAgent(
             id = agent.id,
             name = agent.name,
             role = agent.role,
             status = agent.status.name,
             currentTask = agent.currentTask,
             parentAgentId = agent.parentAgentId,
-            configJson = configJson,
+            config = configJson,
+            createdAt = Instant.ofEpochMilli(agent.createdAt),
+            updatedAt = Instant.now(),
+            ),
         )
     }
 
@@ -236,7 +269,7 @@ class AgentManager(
      *
      * @return Current persisted todos
      */
-    fun getTodosFromDb(): List<Todo> = knowledgeDb.listTodos()
+    fun getTodosFromDb(): List<Todo> = todoStore.listTodos()
 
     /**
      * Loads a persisted todo summary directly from the database.
@@ -244,7 +277,7 @@ class AgentManager(
      * @return Todo counters derived from persisted state
      */
     fun getTodoSummaryFromDb(): TodoSummary {
-        val todos = knowledgeDb.listTodos()
+        val todos = todoStore.listTodos()
         return TodoSummary(
             total = todos.size,
             open = todos.count { it.status == TodoStatus.PENDING },
@@ -302,7 +335,7 @@ class AgentManager(
     fun deleteAgent(id: String): Boolean {
         val removed = subAgents.remove(id)
         if (removed != null) {
-            knowledgeDb.deleteAgent(id)
+            subAgentStore.deleteAgent(id)
             println("[AgentManager] Deleted agent: $id")
             return true
         }
@@ -330,12 +363,12 @@ class AgentManager(
     suspend fun sendMessage(content: String): String {
         val userMessage = Message("user", content)
         conversationHistory.add(userMessage)
-        knowledgeDb.saveConversationMessage(MAIN_SESSION_ID, userMessage.role, userMessage.content, userMessage.metadata)
+        conversationStore.saveConversationMessage(MAIN_SESSION_ID, userMessage.role, userMessage.content, userMessage.metadata)
         val requestId = UUID.randomUUID().toString()
         val assistantContent = responseCoordinator.generateAssistantContentWithRepetitionGuard(requestId)
         val assistantMessage = Message(role = "assistant", content = assistantContent)
         conversationHistory.add(assistantMessage)
-        knowledgeDb.saveConversationMessage(MAIN_SESSION_ID, assistantMessage.role, assistantMessage.content, assistantMessage.metadata)
+        conversationStore.saveConversationMessage(MAIN_SESSION_ID, assistantMessage.role, assistantMessage.content, assistantMessage.metadata)
         finishedToolEventsByRequestId.remove(requestId)
         return assistantMessage.content
     }
@@ -349,7 +382,7 @@ class AgentManager(
     ): String {
         val userMessage = Message("user", content)
         conversationHistory.add(userMessage)
-        knowledgeDb.saveConversationMessage(MAIN_SESSION_ID, userMessage.role, userMessage.content, userMessage.metadata)
+        conversationStore.saveConversationMessage(MAIN_SESSION_ID, userMessage.role, userMessage.content, userMessage.metadata)
         val requestId = UUID.randomUUID().toString()
         val collected = StringBuilder()
         llmProvider.stream(buildMainRequest(loadRecentHistoryFromDb(), requestId)).collect { chunk ->
@@ -370,19 +403,19 @@ class AgentManager(
         }
         val assistantMessage = Message("assistant", assistantText)
         conversationHistory.add(assistantMessage)
-        knowledgeDb.saveConversationMessage(MAIN_SESSION_ID, assistantMessage.role, assistantMessage.content, assistantMessage.metadata)
+        conversationStore.saveConversationMessage(MAIN_SESSION_ID, assistantMessage.role, assistantMessage.content, assistantMessage.metadata)
         finishedToolEventsByRequestId.remove(requestId)
         return assistantText
     }
 
     private fun loadRecentHistoryFromDb(limit: Int = INITIAL_HISTORY_LOAD_LIMIT): List<Message> =
-        knowledgeDb.getConversationMessages(MAIN_SESSION_ID, limit).mapNotNull { row ->
-            val role = row["role"].orEmpty()
-            val content = row["content"].orEmpty()
+        conversationStore.getConversationMessages(MAIN_SESSION_ID, limit).mapNotNull { row ->
+            val role = row.role
+            val content = row.content
             if (role.isBlank() || content.isBlank()) {
                 null
             } else {
-                Message(role = role, content = content, metadata = row["metadata"]?.ifBlank { null })
+                Message(role = role, content = content, metadata = row.metadata?.ifBlank { null })
             }
         }
 
@@ -406,7 +439,7 @@ class AgentManager(
      */
     fun clearHistory() {
         conversationHistory.clear()
-        knowledgeDb.deleteConversationMessages(MAIN_SESSION_ID)
+        conversationStore.deleteConversationMessages(MAIN_SESSION_ID)
     }
 
     /**
@@ -448,7 +481,7 @@ class AgentManager(
         val welcome = generated.ifBlank { "Hello! I'm ready to help with your project tasks." }
         val message = Message(role = "assistant", content = welcome)
         conversationHistory.add(message)
-        knowledgeDb.saveConversationMessage(MAIN_SESSION_ID, message.role, message.content, message.metadata)
+        conversationStore.saveConversationMessage(MAIN_SESSION_ID, message.role, message.content, message.metadata)
         return welcome
     }
 
@@ -490,7 +523,7 @@ class AgentManager(
             }.toString()
         val message = Message(role = "assistant", content = compactText, metadata = metadata)
         conversationHistory.add(message)
-        knowledgeDb.saveConversationMessage(MAIN_SESSION_ID, message.role, message.content, message.metadata)
+        conversationStore.saveConversationMessage(MAIN_SESSION_ID, message.role, message.content, message.metadata)
     }
 
     /**
@@ -501,16 +534,16 @@ class AgentManager(
      */
     fun loadOlderHistory(pageSize: Int = HISTORY_PAGE_SIZE): List<Message> {
         val rows =
-            knowledgeDb.getConversationMessagesPage(
+            conversationStore.getConversationMessagesPage(
                 sessionId = MAIN_SESSION_ID,
                 limit = pageSize.coerceAtLeast(1),
                 offset = loadedHistoryCount,
             )
         val messages =
             rows.mapNotNull { row ->
-                val role = row["role"].orEmpty()
-                val content = row["content"].orEmpty()
-                val metadata = row["metadata"]
+                val role = row.role
+                val content = row.content
+                val metadata = row.metadata
                 if (role.isNotBlank() && content.isNotBlank()) Message(role = role, content = content, metadata = metadata) else null
             }
         if (messages.isNotEmpty()) {
@@ -530,11 +563,11 @@ class AgentManager(
 
     private fun loadConversationFromDb() {
         conversationHistory.clear()
-        val rows = knowledgeDb.getConversationMessages(MAIN_SESSION_ID, INITIAL_HISTORY_LOAD_LIMIT)
+        val rows = conversationStore.getConversationMessages(MAIN_SESSION_ID, INITIAL_HISTORY_LOAD_LIMIT)
         rows.forEach { row ->
-            val role = row["role"].orEmpty()
-            val content = row["content"].orEmpty()
-            val metadata = row["metadata"]
+            val role = row.role
+            val content = row.content
+            val metadata = row.metadata
             if (role.isNotBlank() && content.isNotBlank()) {
                 conversationHistory.add(Message(role = role, content = content, metadata = metadata))
             }
@@ -613,7 +646,7 @@ class AgentManager(
     }
 
     private fun buildMainSystemContextPrompt(): String {
-        val todos = knowledgeDb.listTodos()
+        val todos = todoStore.listTodos()
         return MainSystemPromptComposer.compose(todos, pendingResumeMessage)
     }
 
@@ -630,12 +663,12 @@ class AgentManager(
                 val response = llmProvider.chat(request)
                 val assistantMessage = Message("assistant", responseCoordinator.normalizeAssistantContent(response.message.content))
                 conversationHistory.add(assistantMessage)
-                knowledgeDb.saveConversationMessage(MAIN_SESSION_ID, assistantMessage.role, assistantMessage.content)
+                conversationStore.saveConversationMessage(MAIN_SESSION_ID, assistantMessage.role, assistantMessage.content)
                 pendingResumeMessage = null
             }.onFailure { error ->
                 val note = Message("assistant", "Recovery note: Could not auto-resume interrupted request (${error.message}).")
                 conversationHistory.add(note)
-                knowledgeDb.saveConversationMessage(MAIN_SESSION_ID, note.role, note.content)
+                conversationStore.saveConversationMessage(MAIN_SESSION_ID, note.role, note.content)
             }
         }
     }
@@ -646,9 +679,9 @@ class AgentManager(
      * @return Current persisted agent rows mapped to SubAgent models
      */
     private fun listSubAgentsFromDb(): List<SubAgent> =
-        knowledgeDb
+        subAgentStore
             .listAgents()
-            .sortedBy { it["id"]?.toString()?.toIntOrNull() ?: Int.MAX_VALUE }
+            .sortedBy { it.id.toIntOrNull() ?: Int.MAX_VALUE }
             .mapNotNull { row ->
                 runCatching { mapAgentRecord(row, resetStatusToIdle = false) }.getOrNull()
             }
@@ -657,13 +690,13 @@ class AgentManager(
         when (change.type) {
             TodoChangeType.ADDED, TodoChangeType.UPDATED -> {
                 val todo = change.todo ?: return
-                knowledgeDb.saveTodo(todo)
+                todoStore.saveTodo(todo)
             }
             TodoChangeType.REMOVED -> {
                 val todoId = change.todoId ?: return
-                knowledgeDb.deleteTodo(todoId)
+                todoStore.deleteTodo(todoId)
             }
-            TodoChangeType.CLEARED -> knowledgeDb.clearTodos()
+            TodoChangeType.CLEARED -> todoStore.clearTodos()
         }
     }
 }

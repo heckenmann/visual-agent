@@ -81,7 +81,7 @@ data class SubAgent(
         todoId: String,
         description: String,
         provider: LLMProvider,
-        knowledgeDb: de.heckenmann.visualagent.knowledge.KnowledgeDb,
+        memoryStore: de.heckenmann.visualagent.knowledge.MemoryStore,
         enabledTools: Set<ToolId> = emptySet(),
     ): String {
         val messages =
@@ -100,7 +100,7 @@ data class SubAgent(
             // Persist a structured knowledge record: summary + simple next steps (best-effort)
             val summary = resp.message.content.take(1000)
             val nextSteps = "Review and implement improvements as needed."
-            knowledgeDb.saveStructuredKnowledge(subject = "todo:$todoId", summary = summary, nextSteps = nextSteps)
+            memoryStore.saveStructuredKnowledge(subject = "todo:$todoId", summary = summary, nextSteps = nextSteps)
         } catch (e: Exception) {
             // swallow persistence errors to avoid blocking agent progress
         }

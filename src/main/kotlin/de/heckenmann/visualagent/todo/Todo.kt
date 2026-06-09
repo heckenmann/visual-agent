@@ -27,9 +27,9 @@ enum class TodoPriority {
  */
 data class Todo(
     val id: String,
-    val description: String,
+    var description: String,
     var status: TodoStatus = TodoStatus.PENDING,
-    val priority: TodoPriority = TodoPriority.MEDIUM,
+    var priority: TodoPriority = TodoPriority.MEDIUM,
     var assignedAgentId: String? = null,
     val createdAt: Instant = Instant.now(),
     var completedAt: Instant? = null,

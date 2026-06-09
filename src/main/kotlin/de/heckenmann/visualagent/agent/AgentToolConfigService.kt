@@ -1,8 +1,6 @@
 package de.heckenmann.visualagent.agent
 
-import de.heckenmann.visualagent.knowledge.KnowledgeDb
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import de.heckenmann.visualagent.knowledge.SubAgentConfigStore
 import org.springframework.stereotype.Service
 
 /**
@@ -10,10 +8,8 @@ import org.springframework.stereotype.Service
  */
 @Service
 class AgentToolConfigService(
-    private val knowledgeDb: KnowledgeDb,
+    private val configStore: SubAgentConfigStore,
 ) {
-    private val json = Json { ignoreUnknownKeys = true }
-
     init {
         ensureDefaultConfigs()
     }
@@ -40,7 +36,7 @@ class AgentToolConfigService(
                 agent.role.contains("review", ignoreCase = true) -> "analyst"
                 else -> "researcher"
             }
-        val configured = knowledgeDb.getSubAgentConfig(key)?.tools ?: defaultConfigs().first { it.id == key }.tools
+        val configured = configStore.getSubAgentConfig(key)?.tools ?: defaultConfigs().first { it.id == key }.tools
         return configured.map(::ToolId).toSet()
     }
 
@@ -50,21 +46,12 @@ class AgentToolConfigService(
      * @param config Configuration to save
      */
     fun save(config: SubAgentToolConfig) {
-        knowledgeDb.saveSubAgentConfig(
-            id = config.id,
-            name = config.name,
-            description = config.description,
-            model = config.model,
-            systemPrompt = config.systemPrompt,
-            toolsJson = json.encodeToString(config.tools),
-            maxTurns = config.maxTurns,
-            enabled = config.enabled,
-        )
+        configStore.saveSubAgentConfig(config)
     }
 
     private fun ensureDefaultConfigs() {
         defaultConfigs().forEach { config ->
-            if (knowledgeDb.getSubAgentConfig(config.id) == null) {
+            if (configStore.getSubAgentConfig(config.id) == null) {
                 save(config)
             }
         }
