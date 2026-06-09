@@ -21,7 +21,11 @@ class AppConfigTest {
             config.databasePath = tempDb
             config.theme = "Nord Dark"
             config.fontSize = 18
+            config.llmProvider = "openai"
             config.ollamaModel = "llama3.2:3b"
+            config.openAiApiKey = "sk-test"
+            config.openAiBaseUrl = "https://openai-compatible.example"
+            config.openAiModel = "gpt-test"
             config.contextLength = 8192
             config.streamingEnabled = false
             config.autoCompactionEnabled = false
@@ -33,7 +37,11 @@ class AppConfigTest {
                     .create(tempDb)
             assertEquals("Nord Dark", db.getPreference("ui.theme"))
             assertEquals("18", db.getPreference("ui.font.size"))
+            assertEquals("openai", db.getPreference("llm.provider"))
             assertEquals("llama3.2:3b", db.getPreference("ollama.model"))
+            assertEquals("sk-test", db.getPreference("openai.api.key"))
+            assertEquals("https://openai-compatible.example", db.getPreference("openai.base.url"))
+            assertEquals("gpt-test", db.getPreference("openai.model"))
             assertEquals("8192", db.getPreference("session.context.length"))
             assertEquals("false", db.getPreference("session.streaming.enabled"))
             assertEquals("false", db.getPreference("session.auto.compaction.enabled"))
@@ -58,6 +66,10 @@ class AppConfigTest {
             config.databasePath = tempDb
             config.theme = "Cupertino Light"
             config.fontSize = 20
+            config.llmProvider = "openai"
+            config.openAiApiKey = "sk-reload"
+            config.openAiBaseUrl = "https://reload.example"
+            config.openAiModel = "gpt-reload"
             config.timeoutSeconds = 240
             config.maxParallelSubAgents = 7
             config.userModelInstruction = "Use concise answers."
@@ -66,6 +78,10 @@ class AppConfigTest {
             // Simulate in-memory drift before "next startup"/reload
             config.theme = "Dracula"
             config.fontSize = 12
+            config.llmProvider = "ollama"
+            config.openAiApiKey = ""
+            config.openAiBaseUrl = "https://api.openai.com"
+            config.openAiModel = "gpt-4o-mini"
             config.timeoutSeconds = 60
             config.maxParallelSubAgents = 2
             config.userModelInstruction = ""
@@ -74,6 +90,10 @@ class AppConfigTest {
 
             assertEquals("Cupertino Light", config.theme)
             assertEquals(20, config.fontSize)
+            assertEquals("openai", config.normalizedProvider())
+            assertEquals("sk-reload", config.openAiApiKey)
+            assertEquals("https://reload.example", config.openAiBaseUrl)
+            assertEquals("gpt-reload", config.openAiModel)
             assertEquals(240, config.timeoutSeconds)
             assertEquals(7, config.maxParallelSubAgents)
             assertEquals("Use concise answers.", config.userModelInstruction)
@@ -109,7 +129,11 @@ class AppConfigTest {
     private data class ConfigSnapshot(
         val databasePath: String,
         val ollamaLocalUrl: String,
+        val llmProvider: String,
         val ollamaModel: String,
+        val openAiApiKey: String,
+        val openAiBaseUrl: String,
+        val openAiModel: String,
         val theme: String,
         val fontSize: Int,
         val browserDefault: String,
@@ -127,7 +151,11 @@ class AppConfigTest {
         ConfigSnapshot(
             databasePath = config.databasePath,
             ollamaLocalUrl = config.ollamaLocalUrl,
+            llmProvider = config.llmProvider,
             ollamaModel = config.ollamaModel,
+            openAiApiKey = config.openAiApiKey,
+            openAiBaseUrl = config.openAiBaseUrl,
+            openAiModel = config.openAiModel,
             theme = config.theme,
             fontSize = config.fontSize,
             browserDefault = config.browserDefault,
@@ -147,7 +175,11 @@ class AppConfigTest {
     ) {
         config.databasePath = snapshot.databasePath
         config.ollamaLocalUrl = snapshot.ollamaLocalUrl
+        config.llmProvider = snapshot.llmProvider
         config.ollamaModel = snapshot.ollamaModel
+        config.openAiApiKey = snapshot.openAiApiKey
+        config.openAiBaseUrl = snapshot.openAiBaseUrl
+        config.openAiModel = snapshot.openAiModel
         config.theme = snapshot.theme
         config.fontSize = snapshot.fontSize
         config.browserDefault = snapshot.browserDefault

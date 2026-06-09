@@ -3,6 +3,7 @@ import kotlin.io.path.extension
 
 plugins {
     kotlin("jvm") version "2.1.21"
+    kotlin("plugin.jpa") version "2.1.21"
     kotlin("plugin.serialization") version "2.1.21"
     kotlin("plugin.spring") version "2.1.21"
     id("org.jlleitschuh.gradle.ktlint") version "13.1.0"
@@ -58,11 +59,16 @@ val macApplicationArgs =
 
 dependencies {
     implementation(kotlin("stdlib"))
+    implementation(kotlin("reflect"))
 
     // Spring Boot & AI
     implementation("org.springframework.boot:spring-boot-starter")
+    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation(platform("org.springframework.ai:spring-ai-bom:1.1.7"))
     implementation("org.springframework.ai:spring-ai-starter-model-ollama")
+    implementation("org.springframework.ai:spring-ai-openai")
+    implementation("org.hibernate.orm:hibernate-community-dialects")
+    implementation("org.flywaydb:flyway-core")
 
     // JavaFX 21
     implementation("org.openjfx:javafx-base:$javafxVersion:$platform")

@@ -1,6 +1,6 @@
 package de.heckenmann.visualagent.config
 
-import de.heckenmann.visualagent.knowledge.KnowledgeDb
+import de.heckenmann.visualagent.knowledge.PreferenceStore
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -13,18 +13,24 @@ import java.util.concurrent.CopyOnWriteArrayList
  * Loads configuration from `src/main/resources/config/app.properties`.
  * Provides access to Ollama settings, database path, UI preferences, and browser configuration.
  *
+ * @property llmProvider Active provider identifier (`ollama` or `openai`)
  * @property ollamaLocalUrl Ollama API endpoint (default: http://localhost:11434)
  * @property ollamaModel Default model name (default: llava)
+ * @property openAiApiKey Plaintext OpenAI API key stored in SQLite by current product decision
+ * @property openAiBaseUrl OpenAI-compatible API base URL
+ * @property openAiModel Default OpenAI-compatible chat model
  * @property databasePath Path to SQLite database file
  * @property theme UI theme (default: Dracula)
  * @property fontSize UI font size (default: 14)
  * @property browserDefault Default browser for web integration (default: firefox)
  */
 class AppConfig private constructor() {
+    var llmProvider: String = "ollama"
     var ollamaLocalUrl: String = "http://localhost:11434"
-
-    // Default to a more commonly available model name; can be overridden in app.properties
     var ollamaModel: String = "llava"
+    var openAiApiKey: String = ""
+    var openAiBaseUrl: String = "https://api.openai.com"
+    var openAiModel: String = "gpt-4o-mini"
     var databasePath: String = "./data/visual-agent.db"
     var theme: String = "Dracula"
     var fontSize: Int = 14
@@ -37,19 +43,24 @@ class AppConfig private constructor() {
     var maxParallelSubAgents: Int = 4
     var timeoutSeconds: Int = 120
     var userModelInstruction: String = ""
+    var favoriteModels: String = ""
 
     private val listeners = CopyOnWriteArrayList<(AppConfigChange) -> Unit>()
     private var lastSnapshot = snapshot()
 
     @Volatile
-    private var knowledgeDb: KnowledgeDb? = null
+    private var preferenceStore: PreferenceStore? = null
 
     companion object {
         /** Singleton instance of AppConfig. */
         val instance: AppConfig by lazy { AppConfig().reload() }
 
+        private const val KEY_LLM_PROVIDER = "llm.provider"
         private const val KEY_OLLAMA_LOCAL_URL = "ollama.local.url"
         private const val KEY_OLLAMA_MODEL = "ollama.model"
+        private const val KEY_OPENAI_API_KEY = "openai.api.key"
+        private const val KEY_OPENAI_BASE_URL = "openai.base.url"
+        private const val KEY_OPENAI_MODEL = "openai.model"
         private const val KEY_DATABASE_PATH = "database.path"
         private const val KEY_UI_THEME = "ui.theme"
         private const val KEY_UI_FONT_SIZE = "ui.font.size"
@@ -62,6 +73,7 @@ class AppConfig private constructor() {
         private const val KEY_SESSION_MAX_PARALLEL_SUB_AGENTS = "session.max.parallel.sub.agents"
         private const val KEY_SESSION_TIMEOUT_SECONDS = "session.timeout.seconds"
         private const val KEY_SESSION_USER_MODEL_INSTRUCTION = "session.user.model.instruction"
+        private const val KEY_SESSION_FAVORITE_MODELS = "session.favorite.models"
     }
 
     /**
@@ -78,10 +90,20 @@ class AppConfig private constructor() {
     /**
      * Binds the Spring-managed persistence facade used for settings storage.
      *
-     * @param db Shared [KnowledgeDb] bean
+     * @param store Shared preference store
      */
-    fun bindKnowledgeDb(db: KnowledgeDb) {
-        knowledgeDb = db
+    fun bindPreferenceStore(store: PreferenceStore) {
+        preferenceStore = store
+    }
+
+    /**
+     * Backward-compatible binding for older tests and callers during the migration window.
+     *
+     * @param store Shared persistence store
+     */
+    @Deprecated("Use bindPreferenceStore")
+    fun bindKnowledgeDb(store: PreferenceStore) {
+        bindPreferenceStore(store)
     }
 
     /**
@@ -89,40 +111,40 @@ class AppConfig private constructor() {
      *
      * @return The fully qualified path to the theme stylesheet, or Dracula as default
      */
-    fun getThemeStylesheet(): String =
-        when (theme) {
-            "Dracula" ->
-                atlantafx.base.theme
-                    .Dracula()
-                    .getUserAgentStylesheet()
-            "Primer Dark" ->
-                atlantafx.base.theme
-                    .PrimerDark()
-                    .getUserAgentStylesheet()
-            "Primer Light" ->
-                atlantafx.base.theme
-                    .PrimerLight()
-                    .getUserAgentStylesheet()
-            "Nord Dark" ->
-                atlantafx.base.theme
-                    .NordDark()
-                    .getUserAgentStylesheet()
-            "Nord Light" ->
-                atlantafx.base.theme
-                    .NordLight()
-                    .getUserAgentStylesheet()
-            "Cupertino Dark" ->
-                atlantafx.base.theme
-                    .CupertinoDark()
-                    .getUserAgentStylesheet()
-            "Cupertino Light" ->
-                atlantafx.base.theme
-                    .CupertinoLight()
-                    .getUserAgentStylesheet()
-            else ->
-                atlantafx.base.theme
-                    .Dracula()
-                    .getUserAgentStylesheet()
+    fun getThemeStylesheet(): String = AppThemeStylesheets.stylesheetFor(theme)
+
+    /**
+     * Returns the currently selected model for the active provider.
+     *
+     * @return Active model name used for new provider requests
+     */
+    fun activeModel(): String =
+        when (normalizedProvider()) {
+            "openai" -> openAiModel
+            else -> ollamaModel
+        }
+
+    /**
+     * Updates the selected model for the active provider.
+     *
+     * @param model Model name selected in the session UI
+     */
+    fun setActiveModel(model: String) {
+        when (normalizedProvider()) {
+            "openai" -> openAiModel = model
+            else -> ollamaModel = model
+        }
+    }
+
+    /**
+     * Returns the persisted provider after normalizing unsupported values to Ollama.
+     *
+     * @return `ollama` or `openai`
+     */
+    fun normalizedProvider(): String =
+        when (llmProvider.lowercase()) {
+            "openai" -> "openai"
+            else -> "ollama"
         }
 
     /**
@@ -164,8 +186,12 @@ class AppConfig private constructor() {
     private fun snapshot(): AppConfigSnapshot =
         AppConfigSnapshot(
             mapOf(
+                KEY_LLM_PROVIDER to llmProvider,
                 KEY_OLLAMA_LOCAL_URL to ollamaLocalUrl,
                 KEY_OLLAMA_MODEL to ollamaModel,
+                KEY_OPENAI_API_KEY to openAiApiKey,
+                KEY_OPENAI_BASE_URL to openAiBaseUrl,
+                KEY_OPENAI_MODEL to openAiModel,
                 KEY_DATABASE_PATH to databasePath,
                 KEY_UI_THEME to theme,
                 KEY_UI_FONT_SIZE to fontSize.toString(),
@@ -178,18 +204,23 @@ class AppConfig private constructor() {
                 KEY_SESSION_MAX_PARALLEL_SUB_AGENTS to maxParallelSubAgents.toString(),
                 KEY_SESSION_TIMEOUT_SECONDS to timeoutSeconds.toString(),
                 KEY_SESSION_USER_MODEL_INSTRUCTION to userModelInstruction,
+                KEY_SESSION_FAVORITE_MODELS to favoriteModels,
             ),
         )
 
     private fun saveToProperties() {
         val configFile = File("src/main/resources/config/app.properties")
         val props = Properties()
+        props.setProperty(KEY_LLM_PROVIDER, llmProvider)
         props.setProperty(KEY_OLLAMA_LOCAL_URL, ollamaLocalUrl)
         props.setProperty(KEY_OLLAMA_MODEL, ollamaModel)
+        props.setProperty(KEY_OPENAI_BASE_URL, openAiBaseUrl)
+        props.setProperty(KEY_OPENAI_MODEL, openAiModel)
         props.setProperty(KEY_DATABASE_PATH, databasePath)
         props.setProperty(KEY_UI_THEME, theme)
         props.setProperty(KEY_UI_FONT_SIZE, fontSize.toString())
         props.setProperty(KEY_BROWSER_DEFAULT, browserDefault)
+        props.setProperty(KEY_SESSION_FAVORITE_MODELS, favoriteModels)
         FileOutputStream(configFile).use { fos ->
             props.store(fos, "Visual Agent Configuration")
         }
@@ -197,9 +228,13 @@ class AppConfig private constructor() {
 
     private fun saveToDatabase() {
         runCatching {
-            val db = knowledgeDb ?: return@runCatching
+            val db = preferenceStore ?: return@runCatching
+            db.setPreference(KEY_LLM_PROVIDER, llmProvider)
             db.setPreference(KEY_OLLAMA_LOCAL_URL, ollamaLocalUrl)
             db.setPreference(KEY_OLLAMA_MODEL, ollamaModel)
+            db.setPreference(KEY_OPENAI_API_KEY, openAiApiKey)
+            db.setPreference(KEY_OPENAI_BASE_URL, openAiBaseUrl)
+            db.setPreference(KEY_OPENAI_MODEL, openAiModel)
             db.setPreference(KEY_DATABASE_PATH, databasePath)
             db.setPreference(KEY_UI_THEME, theme)
             db.setPreference(KEY_UI_FONT_SIZE, fontSize.toString())
@@ -212,6 +247,7 @@ class AppConfig private constructor() {
             db.setPreference(KEY_SESSION_MAX_PARALLEL_SUB_AGENTS, maxParallelSubAgents.toString())
             db.setPreference(KEY_SESSION_TIMEOUT_SECONDS, timeoutSeconds.toString())
             db.setPreference(KEY_SESSION_USER_MODEL_INSTRUCTION, userModelInstruction)
+            db.setPreference(KEY_SESSION_FAVORITE_MODELS, favoriteModels)
         }
     }
 
@@ -224,20 +260,28 @@ class AppConfig private constructor() {
                 props.load(fis)
             }
 
+            llmProvider = props.getProperty(KEY_LLM_PROVIDER, llmProvider)
             ollamaLocalUrl = props.getProperty(KEY_OLLAMA_LOCAL_URL, ollamaLocalUrl)
             ollamaModel = props.getProperty(KEY_OLLAMA_MODEL, ollamaModel)
+            openAiBaseUrl = props.getProperty(KEY_OPENAI_BASE_URL, openAiBaseUrl)
+            openAiModel = props.getProperty(KEY_OPENAI_MODEL, openAiModel)
             databasePath = props.getProperty(KEY_DATABASE_PATH, databasePath)
             theme = props.getProperty(KEY_UI_THEME, theme)
             fontSize = props.getProperty(KEY_UI_FONT_SIZE, fontSize.toString()).toIntOrNull() ?: fontSize
             browserDefault = props.getProperty(KEY_BROWSER_DEFAULT, browserDefault)
+            favoriteModels = props.getProperty(KEY_SESSION_FAVORITE_MODELS, favoriteModels)
         }
     }
 
     private fun loadFromDatabase() {
         runCatching {
-            val db = knowledgeDb ?: return@runCatching
+            val db = preferenceStore ?: return@runCatching
+            llmProvider = db.getPreference(KEY_LLM_PROVIDER) ?: llmProvider
             ollamaLocalUrl = db.getPreference(KEY_OLLAMA_LOCAL_URL) ?: ollamaLocalUrl
             ollamaModel = db.getPreference(KEY_OLLAMA_MODEL) ?: ollamaModel
+            openAiApiKey = db.getPreference(KEY_OPENAI_API_KEY) ?: openAiApiKey
+            openAiBaseUrl = db.getPreference(KEY_OPENAI_BASE_URL) ?: openAiBaseUrl
+            openAiModel = db.getPreference(KEY_OPENAI_MODEL) ?: openAiModel
             theme = db.getPreference(KEY_UI_THEME) ?: theme
             fontSize = db.getPreference(KEY_UI_FONT_SIZE)?.toIntOrNull() ?: fontSize
             browserDefault = db.getPreference(KEY_BROWSER_DEFAULT) ?: browserDefault
@@ -249,6 +293,7 @@ class AppConfig private constructor() {
             maxParallelSubAgents = db.getPreference(KEY_SESSION_MAX_PARALLEL_SUB_AGENTS)?.toIntOrNull() ?: maxParallelSubAgents
             timeoutSeconds = db.getPreference(KEY_SESSION_TIMEOUT_SECONDS)?.toIntOrNull() ?: timeoutSeconds
             userModelInstruction = db.getPreference(KEY_SESSION_USER_MODEL_INSTRUCTION) ?: userModelInstruction
+            favoriteModels = db.getPreference(KEY_SESSION_FAVORITE_MODELS) ?: favoriteModels
         }
     }
 }
