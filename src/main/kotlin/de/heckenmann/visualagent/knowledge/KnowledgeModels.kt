@@ -1,19 +1,6 @@
 package de.heckenmann.visualagent.knowledge
 
-import java.sql.Connection
 import java.time.Instant
-
-/**
- * Supplies SQLite connections to table-specific DAO classes.
- */
-fun interface ConnectionProvider {
-    /**
-     * Returns the active SQLite connection.
-     *
-     * @return Open JDBC connection
-     */
-    fun get(): Connection
-}
 
 /**
  * Represents Memory.

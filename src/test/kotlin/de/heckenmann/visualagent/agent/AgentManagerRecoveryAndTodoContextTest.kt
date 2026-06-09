@@ -69,7 +69,7 @@ class AgentManagerRecoveryAndTodoContextTest {
 
             delay(600)
             val messages = db.getConversationMessages("main")
-            assertTrue(messages.any { it["role"] == "assistant" && it["content"]?.contains("Recovered and continued.") == true })
+            assertTrue(messages.any { it.role == "assistant" && it.content.contains("Recovered and continued.") })
             coVerify(atLeast = 1) { provider.chat(any<ChatRequestContext>()) }
         }
 }

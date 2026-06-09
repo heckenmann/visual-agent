@@ -1,6 +1,6 @@
 package de.heckenmann.visualagent.config
 
-import de.heckenmann.visualagent.knowledge.KnowledgeDb
+import de.heckenmann.visualagent.knowledge.PreferenceStore
 import jakarta.annotation.PostConstruct
 import org.springframework.stereotype.Component
 
@@ -9,13 +9,13 @@ import org.springframework.stereotype.Component
  */
 @Component
 class AppConfigPersistenceBinder(
-    private val knowledgeDb: KnowledgeDb,
+    private val preferenceStore: PreferenceStore,
 ) {
     /**
      * Executes bind.
      */
     @PostConstruct
     fun bind() {
-        AppConfig.instance.bindKnowledgeDb(knowledgeDb)
+        AppConfig.instance.bindPreferenceStore(preferenceStore)
     }
 }

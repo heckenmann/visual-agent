@@ -134,8 +134,8 @@ class AgentManagerConversationPersistenceTest {
         assertTrue(answer.contains("korrigierte"))
         val rows = db.getConversationMessages("main", 20)
         val last = rows.last()
-        assertEquals("assistant", last["role"])
-        assertTrue(last["content"]?.contains("korrigierte") == true)
+        assertEquals("assistant", last.role)
+        assertTrue(last.content.contains("korrigierte"))
         coVerify(exactly = 2) { provider.chat(any<ChatRequestContext>()) }
         db.close()
     }
