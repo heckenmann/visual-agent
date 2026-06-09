@@ -40,4 +40,16 @@ class SessionPanelFxmlLayoutTest {
             "session-panel.fxml must include a refresh button for model list updates",
         )
     }
+
+    @Test
+    fun `session fxml groups openai-only settings`() {
+        val res = javaClass.getResourceAsStream("/fxml/session-panel.fxml")?.bufferedReader()?.use { it.readText() }
+        assertTrue(
+            res != null &&
+                res.contains("fx:id=\"openAiSettingsGroup\"") &&
+                res.contains("fx:id=\"openAiApiKeyField\"") &&
+                res.contains("fx:id=\"openAiBaseUrlField\""),
+            "session-panel.fxml must group OpenAI-specific settings for provider-based visibility",
+        )
+    }
 }

@@ -4,11 +4,13 @@ import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.todo.TodoStatus
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 
 @SpringBootTest(properties = ["visual-agent.ui.enabled=false"])
+@Disabled("Exploratory autonomous-processing test; depends on local LLM availability and is not part of the core regression suite")
 class AutonomousAgentProcessingTest {
     @Autowired
     private lateinit var agentManager: AgentManager

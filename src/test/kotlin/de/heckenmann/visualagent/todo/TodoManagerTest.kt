@@ -114,6 +114,23 @@ class TodoManagerTest {
     }
 
     @Test
+    fun `updateStatus publishes update and manages completed timestamp`() {
+        val changes = mutableListOf<TodoChange>()
+        val manager = TodoManager(onChange = changes::add)
+        val todo = manager.add("Status task")
+
+        assertTrue(manager.updateStatus(todo.id, TodoStatus.COMPLETED))
+        assertEquals(TodoStatus.COMPLETED, todo.status)
+        assertNotNull(todo.completedAt)
+        assertEquals(TodoChangeType.UPDATED, changes.last().type)
+
+        assertTrue(manager.updateStatus(todo.id, TodoStatus.PENDING))
+        assertEquals(TodoStatus.PENDING, todo.status)
+        assertNull(todo.completedAt)
+        assertEquals(TodoChangeType.UPDATED, changes.last().type)
+    }
+
+    @Test
     fun `cancelTodo changes status to CANCELLED`() {
         val todo = manager.add("Cancel me")
         val result = manager.cancelTodo(todo.id)

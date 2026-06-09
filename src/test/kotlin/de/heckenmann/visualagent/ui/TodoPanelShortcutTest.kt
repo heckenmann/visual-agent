@@ -21,4 +21,17 @@ class TodoPanelShortcutTest {
     fun `shortcut n is ignored inside text input`() {
         assertFalse(TodoPanel.shouldOpenAddDialog(KeyCode.N, shortcutDown = true, focusOwnerIsTextInput = true))
     }
+
+    @Test
+    fun `todo panel fxml contains summary counters`() {
+        val res = javaClass.getResourceAsStream("/fxml/todo-panel.fxml")?.bufferedReader()?.use { it.readText() }
+        assertTrue(
+            res != null &&
+                res.contains("fx:id=\"totalCountLabel\"") &&
+                res.contains("fx:id=\"openCountLabel\"") &&
+                res.contains("fx:id=\"inProgressCountLabel\"") &&
+                res.contains("fx:id=\"doneCountLabel\""),
+            "todo-panel.fxml must expose summary counters in the header",
+        )
+    }
 }
