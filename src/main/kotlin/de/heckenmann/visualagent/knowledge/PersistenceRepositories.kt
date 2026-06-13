@@ -17,7 +17,10 @@ internal interface MemoryRepository : JpaRepository<MemoryEntity, String> {
         ORDER BY memory.createdAt DESC
         """,
     )
-    fun search(@Param("query") query: String, pageable: Pageable): List<MemoryEntity>
+    fun search(
+        @Param("query") query: String,
+        pageable: Pageable,
+    ): List<MemoryEntity>
 }
 
 internal interface ProjectKnowledgeRepository : JpaRepository<ProjectKnowledgeEntity, String>
@@ -34,7 +37,9 @@ internal interface ConversationRepository :
 
     @Modifying
     @Query("DELETE FROM ConversationEntity message WHERE message.sessionId = :sessionId")
-    fun deleteBySessionId(@Param("sessionId") sessionId: String): Int
+    fun deleteBySessionId(
+        @Param("sessionId") sessionId: String,
+    ): Int
 }
 
 internal interface ConversationRepositoryCustom {
