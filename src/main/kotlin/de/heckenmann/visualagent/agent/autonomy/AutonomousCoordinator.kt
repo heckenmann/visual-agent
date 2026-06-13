@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.agent.AgentToolConfigService
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.SubAgent
+import de.heckenmann.visualagent.agent.SubAgentJobScheduler
 import de.heckenmann.visualagent.config.AppConfig
 import de.heckenmann.visualagent.knowledge.MemoryStore
 import de.heckenmann.visualagent.knowledge.TodoStore
@@ -26,6 +27,7 @@ internal class AutonomousCoordinator(
     private val todoStore: TodoStore,
     private val memoryStore: MemoryStore,
     private val agentToolConfigService: AgentToolConfigService,
+    private val jobScheduler: SubAgentJobScheduler,
     private val createAgent: (name: String, role: String, templateName: String) -> SubAgent,
     private val saveAgentToDb: (SubAgent) -> Unit,
     private val notifyAgent: (agentId: String, message: String) -> Unit,
@@ -45,7 +47,11 @@ internal class AutonomousCoordinator(
         idleAgent.currentTask = pendingTodo.description
         saveAgentToDb(idleAgent)
         notifyAgent(idleAgent.id, "STATUS:${idleAgent.status.name}")
-        scope.launch { processTodoWithLLM(idleAgent, pendingTodo.id, buildWorkerInstruction(pendingTodo)) }
+        scope.launch {
+            jobScheduler.run {
+                processTodoWithLLM(idleAgent, pendingTodo.id, buildWorkerInstruction(pendingTodo))
+            }
+        }
         return true
     }
 
@@ -70,7 +76,11 @@ internal class AutonomousCoordinator(
         agent.currentTask = todo.description
         saveAgentToDb(agent)
         notifyAgent(agent.id, "STATUS:${agent.status.name}")
-        scope.launch { processTodoWithLLM(agent, todoId, buildWorkerInstruction(todo)) }
+        scope.launch {
+            jobScheduler.run {
+                processTodoWithLLM(agent, todoId, buildWorkerInstruction(todo))
+            }
+        }
         return true
     }
 

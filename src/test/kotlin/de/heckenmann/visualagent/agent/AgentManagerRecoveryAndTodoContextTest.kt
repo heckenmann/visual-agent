@@ -40,8 +40,12 @@ class AgentManagerRecoveryAndTodoContextTest {
                 assertTrue(firstMessage.role == "system")
                 assertTrue(firstMessage.content.contains("Current TODO list"))
                 assertTrue(firstMessage.content.contains("Implement worker orchestration"))
-                assertTrue(firstMessage.content.contains("use `{\"action\":\"count\"}` for counts"))
-                assertTrue(firstMessage.content.contains("After any successful tool call, provide a concrete answer"))
+                assertTrue(
+                    firstMessage.content.contains(
+                        "The main agent must not use direct workspace, file, terminal, browser, search, history, or todo tools",
+                    ),
+                )
+                assertTrue(firstMessage.content.contains("Use only sub-agent control tools"))
                 assertTrue(secondMessage.role == "system")
                 assertTrue(secondMessage.content.contains("Always answer in German."))
             } finally {

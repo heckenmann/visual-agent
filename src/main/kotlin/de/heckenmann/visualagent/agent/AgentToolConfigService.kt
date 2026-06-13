@@ -15,11 +15,24 @@ class AgentToolConfigService(
     }
 
     /**
-     * Return enabled tools for the main conversation agent.
+     * Return enabled tools for the main orchestration agent.
+     *
+     * The main agent is restricted to sub-agent control tools only.
      *
      * @return Set of tool IDs exposed to the main agent
      */
-    fun mainAgentTools(): Set<ToolId> = allTools()
+    fun mainAgentTools(): Set<ToolId> =
+        setOf(
+            "agent:list",
+            "agent:start",
+            "agent:create",
+            "agent:update",
+            "agent:delete",
+            "agent:message",
+            "agent:assign-todo",
+            "agent:assign-next-todo",
+            "agent:assign-all-todos",
+        ).map(::ToolId).toSet()
 
     /**
      * Return enabled tools for a sub-agent.
@@ -108,26 +121,6 @@ class AgentToolConfigService(
                 tools = listOf("file:read", "file:list", "file:glob", "file:grep", "context", "pwd", "todos", "history", "manual", "sleep"),
             ),
         )
-
-    private fun allTools(): Set<ToolId> =
-        setOf(
-            "ui",
-            "file:read",
-            "file:list",
-            "file:glob",
-            "file:grep",
-            "file:write",
-            "file:edit",
-            "terminal",
-            "browser",
-            "search",
-            "context",
-            "pwd",
-            "todos",
-            "history",
-            "manual",
-            "sleep",
-        ).map(::ToolId).toSet()
 }
 
 /**

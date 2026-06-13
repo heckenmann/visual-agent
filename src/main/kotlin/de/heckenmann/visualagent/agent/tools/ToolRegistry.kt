@@ -95,6 +95,34 @@ class ToolRegistry(
                             durationMillis = 0L,
                         ),
                     )
+                    if (tool.managesExecution) {
+                        val result =
+                            runCatching { tool.execute(functionInput, effectiveContext) }
+                                .getOrElse { error ->
+                                    failure(
+                                        definition.id.value,
+                                        error.message ?: error::class.simpleName.orEmpty(),
+                                    )
+                                }
+                        val finishedAt = Instant.now()
+                        toolEventBus.publish(
+                            ToolCallEvent(
+                                toolId = definition.id.value,
+                                functionName = definition.name,
+                                phase = ToolCallPhase.FINISHED,
+                                inputJson = functionInput,
+                                context = effectiveContext + mapOf("managedExecution" to true),
+                                result = result,
+                                startedAtUtc = startedAt,
+                                finishedAtUtc = finishedAt,
+                                durationMillis =
+                                    java.time.Duration
+                                        .between(startedAt, finishedAt)
+                                        .toMillis(),
+                            ),
+                        )
+                        return Json.encodeToString(result)
+                    }
                     if (options.async) {
                         scheduleAsyncExecution(
                             tool = tool,

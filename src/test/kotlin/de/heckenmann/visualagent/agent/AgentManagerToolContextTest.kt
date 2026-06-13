@@ -7,11 +7,12 @@ import io.mockk.slot
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class AgentManagerToolContextTest {
     @Test
-    fun `main agent passes enabled tools through provider interface`() =
+    fun `main agent only exposes sub-agent control tools`() =
         runTest {
             val db =
                 de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
@@ -28,10 +29,14 @@ class AgentManagerToolContextTest {
 
             manager.sendMessage("Use a tool")
 
-            assertTrue(ToolId("ui") in requestSlot.captured.enabledTools)
-            assertTrue(ToolId("file:read") in requestSlot.captured.enabledTools)
-            assertTrue(ToolId("terminal") in requestSlot.captured.enabledTools)
-            assertTrue(ToolId("history") in requestSlot.captured.enabledTools)
+            assertTrue(ToolId("agent:list") in requestSlot.captured.enabledTools)
+            assertTrue(ToolId("agent:start") in requestSlot.captured.enabledTools)
+            assertTrue(ToolId("agent:assign-todo") in requestSlot.captured.enabledTools)
+            assertTrue(ToolId("agent:message") in requestSlot.captured.enabledTools)
+            assertFalse(ToolId("ui") in requestSlot.captured.enabledTools)
+            assertFalse(ToolId("file:read") in requestSlot.captured.enabledTools)
+            assertFalse(ToolId("terminal") in requestSlot.captured.enabledTools)
+            assertFalse(ToolId("history") in requestSlot.captured.enabledTools)
             assertEquals("main", requestSlot.captured.metadata["agent"])
         }
 }

@@ -1,7 +1,7 @@
 package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
-import de.heckenmann.visualagent.knowledge.KnowledgeDb
+import de.heckenmann.visualagent.knowledge.PersistenceStores
 import de.heckenmann.visualagent.todo.TodoPriority
 import de.heckenmann.visualagent.todo.TodoStatus
 import io.mockk.coEvery
@@ -14,7 +14,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class AgentManagerTodoTest {
-    private fun createManager(): Triple<AgentManager, LLMProvider, KnowledgeDb> {
+    private fun createManager(): Triple<AgentManager, LLMProvider, PersistenceStores> {
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                 .create("jdbc:sqlite::memory:")

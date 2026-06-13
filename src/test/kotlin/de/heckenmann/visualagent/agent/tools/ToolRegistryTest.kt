@@ -129,6 +129,21 @@ class ToolRegistryTest {
         assertTrue(events[1].result.success)
     }
 
+    @Test
+    fun `managed tool handles async input itself`() {
+        val events = mutableListOf<ToolCallEvent>()
+        val bus = ToolEventBus()
+        bus.addListener { events += it }
+        val registry = ToolRegistry(listOf(ManagedTool("agent:start")), bus)
+
+        val result = registry.functionCallbacks(setOf(ToolId("agent:start"))).single().call("""{"async":true}""")
+        val json = Json.parseToJsonElement(result).jsonObject
+
+        assertEquals("managed", json["content"]!!.jsonPrimitive.content)
+        assertEquals(2, events.size)
+        assertEquals(true, events.last().context["managedExecution"])
+    }
+
     private class FakeTool(
         id: String,
     ) : VisualAgentTool {
@@ -182,5 +197,23 @@ class ToolRegistryTest {
             TimeUnit.MILLISECONDS.sleep(delayMillis)
             return ToolResult(definition.id.value, true, "ok")
         }
+    }
+
+    private class ManagedTool(
+        id: String,
+    ) : VisualAgentTool {
+        override val managesExecution: Boolean = true
+        override val definition =
+            ToolDefinition(
+                id = ToolId(id),
+                name = ToolId(id).toFunctionName(),
+                description = "Managed $id",
+                inputSchema = """{"type":"object"}""",
+            )
+
+        override fun execute(
+            inputJson: String,
+            context: Map<String, Any>,
+        ): ToolResult = ToolResult(definition.id.value, true, "managed")
     }
 }
