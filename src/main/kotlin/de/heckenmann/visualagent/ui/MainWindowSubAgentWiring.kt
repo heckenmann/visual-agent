@@ -26,7 +26,11 @@ internal class MainWindowSubAgentWiring(
     fun register() {
         subAgentsPanel.agentActionCallback = { action, agentId -> handleAgentAction(action, agentId) }
         subAgentsPanel.onCreateAgent = { name, role, template -> createAgent(name, role, template) }
-        subAgentsPanel.setAgents(agentManager.getSubAgents())
+        val agents = agentManager.getSubAgents()
+        subAgentsPanel.setAgents(
+            agents,
+            agents.associate { agent -> agent.id to agentManager.getActiveJobCount(agent.id) },
+        )
         AgentManager.setAgentCallback { agentId, message -> handleAgentCallback(agentId, message) }
     }
 
@@ -77,7 +81,7 @@ internal class MainWindowSubAgentWiring(
     ) {
         val created = agentManager.createAgent(name, role, template)
         Platform.runLater {
-            subAgentsPanel.addAgent(created)
+            subAgentsPanel.addAgent(created, agentManager.getActiveJobCount(created.id))
             updateAgentCountUi()
         }
     }
@@ -90,7 +94,12 @@ internal class MainWindowSubAgentWiring(
             chatPanel.addAssistantMessage("[$agentId]: $message")
             val agent = agentManager.getSubAgent(agentId)
             if (agent != null) {
-                subAgentsPanel.updateAgentStatus(agentId, agent.status, agent.currentTask)
+                subAgentsPanel.updateAgentStatus(
+                    agentId,
+                    agent.status,
+                    agent.currentTask,
+                    agentManager.getActiveJobCount(agentId),
+                )
             }
             updateAgentCountUi()
         }

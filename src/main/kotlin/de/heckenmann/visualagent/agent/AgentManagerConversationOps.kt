@@ -343,6 +343,7 @@ internal class AgentManagerConversationOps(
         agent: SubAgent,
         content: String,
     ): AgentJobResult {
+        owner.activeJobsByAgentId.compute(agent.id) { _, count -> (count ?: 0) + 1 }
         agent.status = AgentStatus.BUSY
         agent.currentTask = content
         agent.currentTodoId = null
@@ -357,8 +358,15 @@ internal class AgentManagerConversationOps(
                 )
             AgentJobResult(agent.id, agent.name, response.message.content)
         } finally {
-            agent.status = AgentStatus.IDLE
-            agent.currentTask = null
+            val remainingJobs =
+                owner.activeJobsByAgentId.compute(agent.id) { _, count ->
+                    val remaining = (count ?: 1) - 1
+                    remaining.takeIf { it > 0 }
+                } ?: 0
+            agent.status = if (remainingJobs > 0) AgentStatus.BUSY else AgentStatus.IDLE
+            if (remainingJobs == 0) {
+                agent.currentTask = null
+            }
             agent.currentTodoId = null
             owner.saveSubAgent(agent)
             AgentManager.notifyAgent(agent.id, "STATUS:${agent.status.name}")

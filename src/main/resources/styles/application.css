@@ -761,6 +761,11 @@
 .badge { -fx-font-size: 0.8em; -fx-padding: 2px 8px; -fx-background-radius: 10px; }
 .badge-low { -fx-background-color: -color-info-muted; }
 .badge-medium { -fx-background-color: -color-success-muted; }
+.agent-job-count {
+    -fx-text-fill: -color-fg-muted;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+}
 .badge-high { -fx-background-color: -color-warning-muted; }
 .badge-urgent { -fx-background-color: -color-danger-muted; }
 

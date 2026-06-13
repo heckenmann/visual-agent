@@ -101,6 +101,7 @@ class AgentManager
                 AppConfig.instance.maxParallelSubAgents
             }
         internal val subAgents = mutableMapOf<String, SubAgent>()
+        internal val activeJobsByAgentId = ConcurrentHashMap<String, Int>()
         internal val conversationHistory = mutableListOf<Message>()
         internal var pendingResumeMessage: String? = null
         internal var loadedHistoryCount: Int = 0
@@ -222,6 +223,14 @@ class AgentManager
             )
 
         fun getSubAgentJobQueueSnapshot(): SubAgentJobQueueSnapshot = subAgentJobScheduler.snapshot()
+
+        /**
+         * Returns the number of jobs currently executing for one sub-agent.
+         *
+         * @param agentId Stable sub-agent identifier
+         * @return Active execution count
+         */
+        fun getActiveJobCount(agentId: String): Int = activeJobsByAgentId[agentId] ?: 0
 
         suspend fun sendMessage(content: String): String = conversationOps.sendMessage(content)
 

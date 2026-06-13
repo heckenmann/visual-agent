@@ -13,6 +13,7 @@
                     <children>
                         <Label fx:id="nameLabel" styleClass="bold" />
                         <Label fx:id="roleLabel" styleClass="text-muted, text-caption" />
+                        <Label fx:id="jobsLabel" styleClass="text-caption" />
                     </children>
                 </VBox>
             </children>

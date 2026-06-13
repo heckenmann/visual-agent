@@ -10,6 +10,7 @@
     <Label fx:id="statusIndicator" styleClass="agent-status-indicator" />
   </HBox>
   <Label fx:id="roleLabel" />
+  <Label fx:id="jobsLabel" styleClass="agent-job-count" />
   <Label fx:id="taskLabel" wrapText="true" />
   <Separator />
   <HBox spacing="8.0">

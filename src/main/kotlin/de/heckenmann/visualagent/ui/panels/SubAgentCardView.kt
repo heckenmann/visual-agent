@@ -14,6 +14,7 @@ import javafx.scene.layout.VBox
  */
 class SubAgentCardView(
     val agent: SubAgent,
+    private var activeJobCount: Int = 0,
 ) : Region() {
     @FXML
     private lateinit var root: VBox
@@ -23,6 +24,9 @@ class SubAgentCardView(
 
     @FXML
     private lateinit var roleLabel: Label
+
+    @FXML
+    private lateinit var jobsLabel: Label
 
     @FXML
     private lateinit var statusIndicator: Label
@@ -58,7 +62,7 @@ class SubAgentCardView(
         nameLabel.text = agent.name
         roleLabel.text = agent.role
         taskLabel.isWrapText = true
-        updateStatus(agent.status, agent.currentTask)
+        updateStatus(agent.status, agent.currentTask, activeJobCount)
 
         btnConfigure.setOnAction { onConfigure?.invoke(agent) }
         btnRun.setOnAction { onRun?.invoke(agent) }
@@ -72,10 +76,13 @@ class SubAgentCardView(
     fun updateStatus(
         status: AgentStatus,
         task: String?,
+        activeJobCount: Int = this.activeJobCount,
     ) {
         agent.status = status
         agent.currentTask = task
+        this.activeJobCount = activeJobCount.coerceAtLeast(0)
         statusIndicator.text = status.name
+        jobsLabel.text = "Jobs: ${this.activeJobCount}"
         taskLabel.text = task ?: ""
     }
 
@@ -87,5 +94,6 @@ class SubAgentCardView(
         roleLabel.text = agent.role
         taskLabel.text = agent.currentTask ?: ""
         statusIndicator.text = agent.status.name
+        jobsLabel.text = "Jobs: $activeJobCount"
     }
 }

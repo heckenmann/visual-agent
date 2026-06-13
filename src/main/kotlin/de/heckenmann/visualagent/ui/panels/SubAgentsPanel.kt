@@ -47,10 +47,13 @@ class SubAgentsPanel : Region() {
     /**
      * Executes setAgents.
      */
-    fun setAgents(agents: List<SubAgent>) {
+    fun setAgents(
+        agents: List<SubAgent>,
+        activeJobsByAgentId: Map<String, Int> = emptyMap(),
+    ) {
         agentsContainer.children.clear()
         agentsList.clear()
-        agents.forEach { addAgent(it) }
+        agents.forEach { agent -> addAgent(agent, activeJobsByAgentId[agent.id] ?: 0) }
     }
 
     private fun setupUI() {
@@ -84,8 +87,11 @@ class SubAgentsPanel : Region() {
     /**
      * Executes addAgent.
      */
-    fun addAgent(agent: SubAgent) {
-        val agentView = SubAgentCardView(agent)
+    fun addAgent(
+        agent: SubAgent,
+        activeJobCount: Int = 0,
+    ) {
+        val agentView = SubAgentCardView(agent, activeJobCount)
 
         // Configure callbacks: delegate to agentActionCallback if present, otherwise perform local UI-only behavior
         agentView.onConfigure = { a ->
@@ -134,8 +140,9 @@ class SubAgentsPanel : Region() {
         agentId: String,
         status: AgentStatus,
         task: String? = null,
+        activeJobCount: Int = 0,
     ) {
-        agentsList.find { it.agent.id == agentId }?.updateStatus(status, task)
+        agentsList.find { it.agent.id == agentId }?.updateStatus(status, task, activeJobCount)
     }
 }
 
@@ -153,6 +160,9 @@ class SubAgentView(
 
     @FXML
     private lateinit var roleLabel: Label
+
+    @FXML
+    private lateinit var jobsLabel: Label
 
     @FXML
     private lateinit var statusIndicator: Label
@@ -174,6 +184,7 @@ class SubAgentView(
 
         statusIndicator.styleClass.addAll("agent-status-indicator", "agent-status-idle")
         updateStatusIndicator(agent.status)
+        jobsLabel.text = "Jobs: 0"
 
         taskLabel.isWrapText = true
 
@@ -198,10 +209,12 @@ class SubAgentView(
     fun updateStatus(
         status: AgentStatus,
         task: String? = null,
+        activeJobCount: Int = 0,
     ) {
         agent.status = status
         agent.currentTask = task
         updateStatusIndicator(status)
+        jobsLabel.text = "Jobs: ${activeJobCount.coerceAtLeast(0)}"
         taskLabel.text = task ?: ""
     }
 }
