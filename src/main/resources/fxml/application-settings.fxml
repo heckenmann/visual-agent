@@ -5,50 +5,73 @@
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.Spinner?>
+<?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Priority?>
 <?import javafx.scene.layout.VBox?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<VBox fx:id="root" prefWidth="260.0" minWidth="260.0" spacing="12.0"
+<VBox fx:id="root" styleClass="page-root"
       xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1">
-    <padding>
-        <Insets top="16.0" right="20.0" bottom="16.0" left="20.0"/>
-    </padding>
-
-    <HBox alignment="CENTER_LEFT" spacing="8.0">
-        <FontIcon iconLiteral="fas-cog" iconSize="14"/>
-        <Label text="Settings" styleClass="title-4"/>
+    <HBox alignment="CENTER_LEFT" styleClass="page-header">
+        <VBox spacing="2.0">
+            <Label text="Application Settings" styleClass="page-title"/>
+            <Label text="Customize appearance and manage your local configuration." styleClass="page-subtitle"/>
+        </VBox>
     </HBox>
 
-    <Separator/>
+    <ScrollPane fitToWidth="true" hbarPolicy="NEVER" styleClass="page-scroll" VBox.vgrow="ALWAYS">
+        <VBox spacing="16.0" styleClass="page-content">
+            <VBox spacing="14.0" styleClass="settings-card">
+                <HBox alignment="CENTER_LEFT" spacing="10.0">
+                    <FontIcon iconLiteral="fas-palette" iconSize="14" styleClass="card-icon"/>
+                    <VBox spacing="1.0">
+                        <Label text="Appearance" styleClass="card-title"/>
+                        <Label text="Choose a theme and comfortable reading size." styleClass="card-description"/>
+                    </VBox>
+                </HBox>
+                <Separator/>
+                <HBox spacing="24.0" alignment="CENTER_LEFT">
+                    <VBox spacing="6.0" HBox.hgrow="ALWAYS">
+                        <Label text="Theme" styleClass="field-label"/>
+                        <ComboBox fx:id="themeSelector" maxWidth="Infinity"/>
+                        <Label text="Applied immediately across the application." styleClass="field-help"/>
+                    </VBox>
+                    <VBox spacing="6.0">
+                        <Label text="Font size" styleClass="field-label"/>
+                        <HBox spacing="8.0" alignment="CENTER_LEFT">
+                            <Spinner fx:id="fontSizeSpinner" prefWidth="100.0" editable="true"/>
+                            <Label text="px" styleClass="field-help"/>
+                        </HBox>
+                        <Label text="10 to 24 pixels" styleClass="field-help"/>
+                    </VBox>
+                </HBox>
+            </VBox>
 
-    <HBox alignment="CENTER_LEFT" spacing="8.0">
-        <FontIcon iconLiteral="fas-palette" iconSize="11"/>
-        <Label text="Appearance" styleClass="text-muted, bold"/>
-    </HBox>
+            <VBox spacing="14.0" styleClass="settings-card">
+                <HBox alignment="CENTER_LEFT" spacing="10.0">
+                    <FontIcon iconLiteral="fas-file-export" iconSize="14" styleClass="card-icon"/>
+                    <VBox spacing="1.0">
+                        <Label text="Configuration" styleClass="card-title"/>
+                        <Label text="Back up, restore, or reset local preferences." styleClass="card-description"/>
+                    </VBox>
+                </HBox>
+                <Separator/>
+                <HBox spacing="10.0" alignment="CENTER_LEFT">
+                    <Button fx:id="importConfigButton" text="Import configuration"/>
+                    <Button fx:id="exportConfigButton" text="Export configuration" styleClass="accent"/>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <Button fx:id="resetDefaultsButton" text="Reset defaults" styleClass="danger-outline"/>
+                </HBox>
+            </VBox>
 
-    <VBox spacing="4.0">
-        <Label text="Theme"/>
-        <ComboBox fx:id="themeSelector" prefWidth="Infinity"/>
-    </VBox>
-
-    <VBox spacing="4.0">
-        <Label text="Font Size"/>
-        <HBox spacing="6.0" alignment="CENTER_LEFT">
-            <Spinner fx:id="fontSizeSpinner" prefWidth="80.0" editable="true"/>
-            <Label text="px" styleClass="text-caption"/>
-        </HBox>
-    </VBox>
-
-    <HBox VBox.vgrow="ALWAYS"/>
-
-    <HBox spacing="8.0">
-        <Button fx:id="importConfigButton" text="Import"/>
-        <Button fx:id="exportConfigButton" text="Export"/>
-        <Button fx:id="resetDefaultsButton" text="Reset Defaults"/>
-    </HBox>
-
-    <Label text="Visual Agent v0.1.0" styleClass="text-caption"/>
+            <HBox alignment="CENTER_LEFT" styleClass="settings-footer">
+                <Label text="Visual Agent" styleClass="field-help"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Label text="Local desktop workspace" styleClass="field-help"/>
+            </HBox>
+        </VBox>
+    </ScrollPane>
 </VBox>

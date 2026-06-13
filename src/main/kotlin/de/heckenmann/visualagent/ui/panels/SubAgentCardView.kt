@@ -14,8 +14,11 @@ import javafx.scene.layout.VBox
  */
 class SubAgentCardView(
     val agent: SubAgent,
-    private var activeJobCount: Int = 0,
+    activeJobCount: Int = 0,
 ) : Region() {
+    var activeJobCount: Int = activeJobCount
+        private set
+
     @FXML
     private lateinit var root: VBox
 
@@ -82,8 +85,16 @@ class SubAgentCardView(
         agent.currentTask = task
         this.activeJobCount = activeJobCount.coerceAtLeast(0)
         statusIndicator.text = status.name
+        statusIndicator.styleClass.removeAll("agent-status-idle", "agent-status-busy", "agent-status-offline")
+        statusIndicator.styleClass.add(
+            when (status) {
+                AgentStatus.IDLE -> "agent-status-idle"
+                AgentStatus.BUSY -> "agent-status-busy"
+                AgentStatus.OFFLINE -> "agent-status-offline"
+            },
+        )
         jobsLabel.text = "Jobs: ${this.activeJobCount}"
-        taskLabel.text = task ?: ""
+        taskLabel.text = task?.takeIf(String::isNotBlank) ?: "Waiting for work"
     }
 
     /**

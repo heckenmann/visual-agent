@@ -15,36 +15,34 @@
 
 <BorderPane fx:id="rootPane" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1">
     <top>
-        <HBox fx:id="titleBar" styleClass="title-bar" alignment="CENTER_LEFT" prefHeight="40.0">
-            <ImageView fx:id="appIconImage" fitHeight="20.0" fitWidth="20.0" preserveRatio="true"/>
-            <Label text=" Visual Agent" styleClass="bold"/>
+        <HBox fx:id="titleBar" styleClass="title-bar" alignment="CENTER_LEFT">
+            <ImageView fx:id="appIconImage" fitHeight="24.0" fitWidth="24.0" preserveRatio="true"/>
+            <VBox spacing="0.0">
+                <Label text="Visual Agent" styleClass="app-title"/>
+                <Label text="Agent workspace" styleClass="app-subtitle"/>
+            </VBox>
             <Region HBox.hgrow="ALWAYS"/>
-            <Label fx:id="connectionStatus" text=" Standby" styleClass="text-muted">
-                <padding>
-                    <Insets right="12.0"/>
-                </padding>
+            <Label fx:id="connectionStatus" text="Standby" styleClass="shell-status-chip">
                 <graphic>
                     <FontIcon iconLiteral="fas-circle" iconSize="6" styleClass="status-connected"/>
                 </graphic>
             </Label>
-            <Label fx:id="agentsLabel" text=" 0" styleClass="text-muted">
+            <Label fx:id="agentsLabel" text="0 agents" styleClass="shell-status-chip">
                 <graphic>
                     <FontIcon iconLiteral="fas-robot" iconSize="10"/>
                 </graphic>
             </Label>
-            <Label fx:id="selectedModelLabel" text=" --" styleClass="text-muted">
+            <Label fx:id="selectedModelLabel" text="No model" styleClass="shell-model-chip">
                 <graphic>
                     <FontIcon iconLiteral="fas-microchip" iconSize="10"/>
                 </graphic>
-                <padding>
-                    <Insets right="8.0"/>
-                </padding>
             </Label>
         </HBox>
     </top>
     <left>
-        <VBox fx:id="iconRail" styleClass="icon-rail" alignment="TOP_CENTER" prefWidth="48.0" minWidth="48.0">
-            <Button fx:id="conversationBtn" styleClass="icon-rail-button">
+        <VBox fx:id="iconRail" styleClass="icon-rail" alignment="TOP_LEFT" prefWidth="184.0" minWidth="184.0">
+            <Label text="WORKSPACE" styleClass="nav-section-label"/>
+            <Button fx:id="conversationBtn" text="Conversation" styleClass="icon-rail-button">
                 <graphic>
                     <FontIcon iconLiteral="fas-comments" iconSize="16"/>
                 </graphic>
@@ -52,7 +50,7 @@
                     <Tooltip text="Conversation"/>
                 </tooltip>
             </Button>
-            <Button fx:id="sessionBtn" styleClass="icon-rail-button">
+            <Button fx:id="sessionBtn" text="Session" styleClass="icon-rail-button">
                 <graphic>
                     <FontIcon iconLiteral="fas-bars" iconSize="16"/>
                 </graphic>
@@ -60,7 +58,7 @@
                     <Tooltip text="Session"/>
                 </tooltip>
             </Button>
-            <Button fx:id="agentsBtn" styleClass="icon-rail-button">
+            <Button fx:id="agentsBtn" text="Agents" styleClass="icon-rail-button">
                 <graphic>
                     <FontIcon iconLiteral="fas-users" iconSize="16"/>
                 </graphic>
@@ -68,7 +66,7 @@
                     <Tooltip text="Agents"/>
                 </tooltip>
             </Button>
-            <Button fx:id="planBtn" styleClass="icon-rail-button">
+            <Button fx:id="planBtn" text="Todos" styleClass="icon-rail-button">
                 <graphic>
                     <FontIcon iconLiteral="fas-copy" iconSize="16"/>
                 </graphic>
@@ -76,7 +74,7 @@
                     <Tooltip text="Todos"/>
                 </tooltip>
             </Button>
-            <Button fx:id="canvasBtn" styleClass="icon-rail-button">
+            <Button fx:id="canvasBtn" text="Canvas" styleClass="icon-rail-button">
                 <graphic>
                     <FontIcon iconLiteral="fas-palette" iconSize="16"/>
                 </graphic>
@@ -85,7 +83,8 @@
                 </tooltip>
             </Button>
             <Region VBox.vgrow="ALWAYS"/>
-            <Button fx:id="settingsBtn" styleClass="icon-rail-button">
+            <Label text="SYSTEM" styleClass="nav-section-label"/>
+            <Button fx:id="settingsBtn" text="Settings" styleClass="icon-rail-button">
                 <graphic>
                     <FontIcon iconLiteral="fas-cog" iconSize="16"/>
                 </graphic>

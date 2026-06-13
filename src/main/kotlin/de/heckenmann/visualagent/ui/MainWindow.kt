@@ -209,7 +209,8 @@ class MainWindow(
      * Applies the current AppConfig snapshot to UI elements that mirror global settings.
      */
     private fun applyConfigToUi() {
-        selectedModelLabel.text = " ${AppConfig.instance.normalizedProvider()}: ${AppConfig.instance.activeModel()}"
+        val provider = AppConfig.instance.normalizedProvider().replaceFirstChar(Char::uppercase)
+        selectedModelLabel.text = "$provider · ${AppConfig.instance.activeModel()}"
         scene?.root?.style = "-fx-font-size: ${AppConfig.instance.fontSize}px;"
         Application.setUserAgentStylesheet(AppConfig.instance.getThemeStylesheet())
     }
@@ -249,7 +250,9 @@ class MainWindow(
             }
         Platform.runLater {
             currentConnectionState = isConnected
-            connectionStatus.text = if (isConnected) " Connected" else " Disconnected"
+            connectionStatus.text = if (isConnected) "Connected" else "Offline"
+            connectionStatus.styleClass.removeAll("shell-status-online", "shell-status-offline")
+            connectionStatus.styleClass.add(if (isConnected) "shell-status-online" else "shell-status-offline")
             val agents = agentManager.getSubAgents()
             statusBar.updateAgentCount(agents.count { it.status == AgentStatus.BUSY }, agents.size)
             updateAgentCountUi()
@@ -259,7 +262,7 @@ class MainWindow(
 
     private fun updateAgentCountUi() {
         val count = agentManager.getSubAgents().size
-        agentsLabel.text = " $count"
+        agentsLabel.text = if (count == 1) "1 agent" else "$count agents"
     }
 
     /**

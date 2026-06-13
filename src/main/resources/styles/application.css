@@ -10,6 +10,86 @@
 .bold { -fx-font-weight: bold; }
 .italic { -fx-font-style: italic; }
 
+/* Shared page language */
+.page-root {
+    -fx-background-color: -color-bg-subtle;
+}
+
+.page-header {
+    -fx-background-color: -color-bg-default;
+    -fx-border-color: -color-border-muted;
+    -fx-border-width: 0 0 1px 0;
+    -fx-padding: 18px 22px;
+    -fx-min-height: 76px;
+}
+
+.page-title {
+    -fx-text-fill: -color-fg-default;
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+}
+
+.page-subtitle,
+.card-description,
+.field-help {
+    -fx-text-fill: -color-fg-muted;
+    -fx-font-size: 12px;
+}
+
+.page-scroll,
+.page-scroll > .viewport {
+    -fx-background-color: -color-bg-subtle;
+    -fx-border-width: 0;
+}
+
+.page-content {
+    -fx-padding: 22px;
+    -fx-fill-width: true;
+}
+
+.settings-card,
+.agent-card {
+    -fx-background-color: -color-bg-default;
+    -fx-border-color: -color-border-muted;
+    -fx-border-radius: 10px;
+    -fx-background-radius: 10px;
+    -fx-padding: 18px;
+}
+
+.settings-card {
+    -fx-max-width: 920px;
+}
+
+.card-title,
+.field-label {
+    -fx-text-fill: -color-fg-default;
+    -fx-font-weight: bold;
+}
+
+.card-title {
+    -fx-font-size: 15px;
+}
+
+.card-icon {
+    -fx-icon-color: -color-accent-fg;
+}
+
+.settings-footer {
+    -fx-max-width: 920px;
+    -fx-padding: 0 2px;
+}
+
+.primary-action {
+    -fx-padding: 8px 14px;
+    -fx-font-weight: bold;
+}
+
+.danger-outline,
+.danger-button {
+    -fx-text-fill: -color-danger-emphasis;
+    -fx-border-color: -color-danger-muted;
+}
+
 /* Base Panel Layouts */
 .subagents-panel,
 .chat-panel,
@@ -655,33 +735,91 @@
 /* Custom UI Elements */
 .icon-rail {
     -fx-background-color: -color-bg-default;
-    -fx-padding: 8px 0px;
-    -fx-spacing: 4px;
+    -fx-padding: 16px 10px 12px 10px;
+    -fx-spacing: 5px;
     -fx-border-color: -color-border-default;
     -fx-border-width: 0px 1px 0px 0px;
 }
 
+.nav-section-label {
+    -fx-text-fill: -color-fg-muted;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+    -fx-padding: 8px 10px 5px 10px;
+}
+
 .icon-rail-button {
     -fx-background-color: transparent;
-    -fx-min-width: 48px;
-    -fx-min-height: 48px;
+    -fx-background-radius: 7px;
+    -fx-min-width: 162px;
+    -fx-pref-width: 162px;
+    -fx-min-height: 38px;
+    -fx-alignment: center-left;
+    -fx-content-display: left;
+    -fx-graphic-text-gap: 12px;
+    -fx-padding: 0 12px;
+    -fx-text-fill: -color-fg-muted;
 }
 
 .icon-rail-button:hover {
     -fx-background-color: -color-bg-subtle;
+    -fx-text-fill: -color-fg-default;
 }
 
 .icon-rail-button.active {
-    -fx-background-color: -color-bg-subtle;
-    -fx-border-color: -color-accent-emphasis;
-    -fx-border-width: 0px 0px 0px 3px;
+    -fx-background-color: -color-accent-muted;
+    -fx-text-fill: -color-accent-fg;
+    -fx-font-weight: bold;
+}
+
+.icon-rail-button .ikonli-font-icon {
+    -fx-icon-color: -color-fg-muted;
+}
+
+.icon-rail-button.active .ikonli-font-icon {
+    -fx-icon-color: -color-accent-fg;
 }
 
 .title-bar {
     -fx-background-color: -color-bg-default;
-    -fx-padding: 0px 8px;
+    -fx-padding: 10px 14px;
+    -fx-spacing: 10px;
+    -fx-min-height: 58px;
     -fx-border-color: -color-border-default;
     -fx-border-width: 0px 0px 1px 0px;
+}
+
+.app-title {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+}
+
+.app-subtitle {
+    -fx-font-size: 10px;
+    -fx-text-fill: -color-fg-muted;
+}
+
+.shell-status-chip,
+.shell-model-chip {
+    -fx-background-color: -color-bg-subtle;
+    -fx-border-color: -color-border-muted;
+    -fx-border-radius: 999px;
+    -fx-background-radius: 999px;
+    -fx-padding: 5px 10px;
+    -fx-graphic-text-gap: 6px;
+    -fx-font-size: 11px;
+}
+
+.shell-status-online {
+    -fx-text-fill: -color-success-emphasis;
+}
+
+.shell-status-offline {
+    -fx-text-fill: -color-danger-emphasis;
+}
+
+.shell-model-chip {
+    -fx-text-fill: -color-fg-muted;
 }
 
 /* Status Indicators */
@@ -762,9 +900,72 @@
 .agent-status-busy { -fx-background-color: -color-warning-emphasis; }
 .agent-status-offline { -fx-background-color: -color-fg-muted; }
 .agent-job-count {
+    -fx-background-color: -color-bg-subtle;
+    -fx-background-radius: 999px;
+    -fx-padding: 4px 9px;
     -fx-text-fill: -color-fg-muted;
     -fx-font-size: 11px;
     -fx-font-weight: bold;
+}
+
+.agent-summary-bar {
+    -fx-background-color: -color-bg-default;
+    -fx-border-color: -color-border-muted;
+    -fx-border-width: 0 0 1px 0;
+    -fx-padding: 10px 22px;
+    -fx-alignment: center-left;
+}
+
+.summary-pill {
+    -fx-background-color: -color-bg-subtle;
+    -fx-background-radius: 999px;
+    -fx-padding: 4px 10px;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+}
+
+.summary-pill-accent {
+    -fx-background-color: -color-accent-muted;
+    -fx-text-fill: -color-accent-fg;
+}
+
+.agent-grid {
+    -fx-background-color: -color-bg-subtle;
+}
+
+.agent-card {
+    -fx-max-width: 920px;
+}
+
+.agent-card:hover {
+    -fx-border-color: -color-border-default;
+}
+
+.agent-name {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+}
+
+.agent-role {
+    -fx-text-fill: -color-fg-muted;
+    -fx-font-size: 12px;
+}
+
+.agent-task-box {
+    -fx-background-color: -color-bg-subtle;
+    -fx-background-radius: 7px;
+    -fx-padding: 10px 12px;
+}
+
+.agent-task-caption {
+    -fx-text-fill: -color-fg-muted;
+    -fx-font-size: 9px;
+    -fx-font-weight: bold;
+}
+
+.agent-task {
+    -fx-text-fill: -color-fg-default;
+    -fx-font-size: 12px;
 }
 
 /* Badges */

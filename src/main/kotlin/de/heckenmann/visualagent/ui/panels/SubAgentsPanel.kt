@@ -32,6 +32,12 @@ class SubAgentsPanel : Region() {
     @FXML
     private lateinit var agentsContainer: VBox
 
+    @FXML
+    private lateinit var agentCountLabel: Label
+
+    @FXML
+    private lateinit var activeJobsLabel: Label
+
     private val agentsList = mutableListOf<SubAgentCardView>()
 
     // Callback for creating new agents (UI -> backend)
@@ -54,14 +60,12 @@ class SubAgentsPanel : Region() {
         agentsContainer.children.clear()
         agentsList.clear()
         agents.forEach { agent -> addAgent(agent, activeJobsByAgentId[agent.id] ?: 0) }
+        updateSummary()
     }
 
     private fun setupUI() {
         styleClass.add("subagents-panel")
-        titleLabel.text = "SubAgents"
-
         // Add button behavior: open dialog and delegate creation to callback or create locally
-        btnAddAgent.text = "Add Agent"
         btnAddAgent.setOnAction {
             AgentDetailsDialog.showFor(null) { name, role, template ->
                 if (onCreateAgent != null) {
@@ -125,12 +129,14 @@ class SubAgentsPanel : Region() {
                 // remove from UI
                 agentsContainer.children.remove(agentView)
                 agentsList.remove(agentView)
+                updateSummary()
                 agentActionCallback?.invoke("delete", a.id)
             }
         }
 
         agentsList.add(agentView)
         agentsContainer.children.add(agentView as Node)
+        updateSummary()
     }
 
     /**
@@ -143,6 +149,14 @@ class SubAgentsPanel : Region() {
         activeJobCount: Int = 0,
     ) {
         agentsList.find { it.agent.id == agentId }?.updateStatus(status, task, activeJobCount)
+        updateSummary()
+    }
+
+    private fun updateSummary() {
+        val count = agentsList.size
+        val activeJobs = agentsList.sumOf(SubAgentCardView::activeJobCount)
+        agentCountLabel.text = if (count == 1) "1 agent" else "$count agents"
+        activeJobsLabel.text = if (activeJobs == 1) "1 active job" else "$activeJobs active jobs"
     }
 }
 
