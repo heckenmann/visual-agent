@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent.openai
 
+import com.openai.client.OpenAIClient
 import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.ChatResponse
 import de.heckenmann.visualagent.agent.LLMProvider
@@ -7,6 +8,7 @@ import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ModelDetails
 import de.heckenmann.visualagent.agent.ShowResponse
 import de.heckenmann.visualagent.config.AppConfig
+import io.micrometer.observation.ObservationRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -14,18 +16,13 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.reactive.asFlow
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import org.springframework.ai.chat.model.ChatModel
 import org.springframework.ai.openai.OpenAiChatModel
-import org.springframework.ai.openai.api.OpenAiApi
+import org.springframework.ai.openai.OpenAiChatOptions
+import org.springframework.ai.openai.setup.OpenAiSetup
 import org.springframework.stereotype.Component
 import java.lang.reflect.Method
 import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 import java.time.Duration
 
 /**
@@ -35,8 +32,6 @@ import java.time.Duration
 class OpenAiClient(
     private val promptFactory: OpenAiPromptFactory,
 ) : LLMProvider {
-    private val json = Json { ignoreUnknownKeys = true }
-
     override suspend fun chat(messages: List<Message>): ChatResponse = chat(ChatRequestContext(messages = messages))
 
     override suspend fun chat(request: ChatRequestContext): ChatResponse =
@@ -126,27 +121,14 @@ class OpenAiClient(
 
     override suspend fun getModels(): List<String> =
         withContext(Dispatchers.IO) {
-            val configuredModel = AppConfig.instance.openAiModel
-            if (AppConfig.instance.openAiApiKey.isBlank()) return@withContext listOf(configuredModel)
-            runCatching {
-                val request =
-                    HttpRequest
-                        .newBuilder(modelsUri())
-                        .timeout(Duration.ofSeconds(20))
-                        .header("Authorization", "Bearer ${AppConfig.instance.openAiApiKey}")
-                        .header("Accept", "application/json")
-                        .GET()
-                        .build()
-                val response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString())
-                if (response.statusCode() !in 200..299) return@runCatching listOf(configuredModel)
-                val decoded = json.decodeFromString<ModelListResponse>(response.body())
-                decoded.data
-                    .map { it.id }
-                    .filter { it.isNotBlank() }
-                    .distinct()
-                    .sorted()
-                    .ifEmpty { listOf(configuredModel) }
-            }.getOrElse { listOf(configuredModel) }
+            if (AppConfig.instance.openAiApiKey.isBlank()) {
+                throw IllegalStateException("OpenAI API key is not configured")
+            }
+            try {
+                OpenAiModelCatalog(::openAiClient).load(modelsUri())
+            } catch (error: Throwable) {
+                throw buildDetailedProviderError(error)
+            }
         }
 
     override suspend fun getModelDetails(modelName: String): ShowResponse =
@@ -162,20 +144,39 @@ class OpenAiClient(
         if (AppConfig.instance.openAiApiKey.isBlank()) {
             throw IllegalStateException("OpenAI API key is not configured")
         }
-        val api =
-            OpenAiApi
+        val options =
+            OpenAiChatOptions
                 .builder()
                 .apiKey(AppConfig.instance.openAiApiKey)
-                .baseUrl(AppConfig.instance.openAiBaseUrl.trimEnd('/'))
+                .baseUrl(apiBaseUrl())
+                .model(AppConfig.instance.openAiModel)
                 .build()
-        return OpenAiChatModel.builder().openAiApi(api).build()
+        return OpenAiChatModel.builder().options(options).build()
     }
 
-    private fun modelsUri(): URI {
-        val baseUrl = AppConfig.instance.openAiBaseUrl.trimEnd('/')
-        val modelsUrl = if (baseUrl.endsWith("/v1")) "$baseUrl/models" else "$baseUrl/v1/models"
-        return URI.create(modelsUrl)
-    }
+    private fun openAiClient(): OpenAIClient =
+        OpenAiSetup.setupSyncClient(
+            apiBaseUrl(),
+            AppConfig.instance.openAiApiKey,
+            null,
+            null,
+            null,
+            null,
+            false,
+            false,
+            AppConfig.instance.openAiModel,
+            Duration.ofSeconds(20),
+            2,
+            null,
+            emptyMap(),
+            ObservationRegistry.NOOP,
+            null,
+            emptyList(),
+        )
+
+    private fun apiBaseUrl(): String = OpenAiEndpointNormalizer.apiBaseUrl(AppConfig.instance.openAiBaseUrl)
+
+    private fun modelsUri(): URI = URI.create("${apiBaseUrl()}/models")
 
     private fun buildDetailedProviderError(throwable: Throwable?): Throwable {
         if (throwable == null) return IllegalStateException("Unknown OpenAI chat model error")
@@ -205,15 +206,4 @@ class OpenAiClient(
                 ?: return null
         return runCatching { method.invoke(throwable) as? String }.getOrNull()
     }
-
-    @Serializable
-    private data class ModelListResponse(
-        val data: List<ModelInfo> = emptyList(),
-    )
-
-    @Serializable
-    private data class ModelInfo(
-        @SerialName("id")
-        val id: String,
-    )
 }

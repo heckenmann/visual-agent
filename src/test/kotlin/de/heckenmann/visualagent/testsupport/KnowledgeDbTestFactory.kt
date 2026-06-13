@@ -17,8 +17,8 @@ import de.heckenmann.visualagent.knowledge.TodoStore
 import de.heckenmann.visualagent.todo.Todo
 import org.springframework.boot.SpringBootConfiguration
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration
-import org.springframework.boot.autoconfigure.domain.EntityScan
 import org.springframework.boot.builder.SpringApplicationBuilder
+import org.springframework.boot.persistence.autoconfigure.EntityScan
 import org.springframework.context.ConfigurableApplicationContext
 import org.springframework.context.annotation.ComponentScan
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories
@@ -51,7 +51,8 @@ object KnowledgeDbTestFactory {
  */
 class TestPersistence internal constructor(
     private val context: ConfigurableApplicationContext,
-) : PersistenceStores, AutoCloseable {
+) : PersistenceStores,
+    AutoCloseable {
     val conversationStore: ConversationStore = context.getBean(ConversationStore::class.java)
     val todoStore: TodoStore = context.getBean(TodoStore::class.java)
     val subAgentStore: SubAgentStore = context.getBean(SubAgentStore::class.java)
@@ -75,17 +76,29 @@ class TestPersistence internal constructor(
         )
     }
 
-    override fun saveConversationMessage(sessionId: String, role: String, content: String, metadata: String?): String =
-        conversationStore.saveConversationMessage(sessionId, role, content, metadata)
+    override fun saveConversationMessage(
+        sessionId: String,
+        role: String,
+        content: String,
+        metadata: String?,
+    ): String = conversationStore.saveConversationMessage(sessionId, role, content, metadata)
 
-    override fun getConversationMessages(sessionId: String, limit: Int) =
-        conversationStore.getConversationMessages(sessionId, limit)
+    override fun getConversationMessages(
+        sessionId: String,
+        limit: Int,
+    ) = conversationStore.getConversationMessages(sessionId, limit)
 
-    override fun getConversationMessagesPage(sessionId: String, limit: Int, offset: Int) =
-        conversationStore.getConversationMessagesPage(sessionId, limit, offset)
+    override fun getConversationMessagesPage(
+        sessionId: String,
+        limit: Int,
+        offset: Int,
+    ) = conversationStore.getConversationMessagesPage(sessionId, limit, offset)
 
-    override fun searchConversationMessages(sessionId: String, query: String, limit: Int) =
-        conversationStore.searchConversationMessages(sessionId, query, limit)
+    override fun searchConversationMessages(
+        sessionId: String,
+        query: String,
+        limit: Int,
+    ) = conversationStore.searchConversationMessages(sessionId, query, limit)
 
     override fun deleteConversationMessages(sessionId: String): Int = conversationStore.deleteConversationMessages(sessionId)
 
@@ -97,16 +110,28 @@ class TestPersistence internal constructor(
 
     override fun clearTodos() = todoStore.clearTodos()
 
-    override fun saveMemory(content: String, tags: List<String>): String = memoryStore.saveMemory(content, tags)
+    override fun saveMemory(
+        content: String,
+        tags: List<String>,
+    ): String = memoryStore.saveMemory(content, tags)
 
-    override fun saveStructuredKnowledge(subject: String, summary: String, nextSteps: String?): String =
-        memoryStore.saveStructuredKnowledge(subject, summary, nextSteps)
+    override fun saveStructuredKnowledge(
+        subject: String,
+        summary: String,
+        nextSteps: String?,
+    ): String = memoryStore.saveStructuredKnowledge(subject, summary, nextSteps)
 
-    override fun searchMemories(query: String, limit: Int): List<Memory> = memoryStore.searchMemories(query, limit)
+    override fun searchMemories(
+        query: String,
+        limit: Int,
+    ): List<Memory> = memoryStore.searchMemories(query, limit)
 
     override fun getPreference(key: String): String? = preferenceStore.getPreference(key)
 
-    override fun setPreference(key: String, value: String) = preferenceStore.setPreference(key, value)
+    override fun setPreference(
+        key: String,
+        value: String,
+    ) = preferenceStore.setPreference(key, value)
 
     override fun saveAgent(agent: PersistedSubAgent): Boolean = subAgentStore.saveAgent(agent)
 
@@ -116,8 +141,11 @@ class TestPersistence internal constructor(
 
     override fun deleteAgent(id: String): Boolean = subAgentStore.deleteAgent(id)
 
-    override fun updateAgentStatus(id: String, status: String, currentTask: String?): Boolean =
-        subAgentStore.updateAgentStatus(id, status, currentTask)
+    override fun updateAgentStatus(
+        id: String,
+        status: String,
+        currentTask: String?,
+    ): Boolean = subAgentStore.updateAgentStatus(id, status, currentTask)
 
     override fun saveSubAgentConfig(config: SubAgentToolConfig) = subAgentConfigStore.saveSubAgentConfig(config)
 

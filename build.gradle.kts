@@ -2,12 +2,12 @@ import java.nio.file.Files
 import kotlin.io.path.extension
 
 plugins {
-    kotlin("jvm") version "2.1.21"
-    kotlin("plugin.jpa") version "2.1.21"
-    kotlin("plugin.serialization") version "2.1.21"
-    kotlin("plugin.spring") version "2.1.21"
+    kotlin("jvm") version "2.2.21"
+    kotlin("plugin.jpa") version "2.2.21"
+    kotlin("plugin.serialization") version "2.2.21"
+    kotlin("plugin.spring") version "2.2.21"
     id("org.jlleitschuh.gradle.ktlint") version "13.1.0"
-    id("org.springframework.boot") version "3.4.2"
+    id("org.springframework.boot") version "4.1.0"
     id("io.spring.dependency-management") version "1.1.7"
     application
 }
@@ -64,11 +64,11 @@ dependencies {
     // Spring Boot & AI
     implementation("org.springframework.boot:spring-boot-starter")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
-    implementation(platform("org.springframework.ai:spring-ai-bom:1.1.7"))
+    implementation(platform("org.springframework.ai:spring-ai-bom:2.0.0"))
     implementation("org.springframework.ai:spring-ai-starter-model-ollama")
     implementation("org.springframework.ai:spring-ai-openai")
     implementation("org.hibernate.orm:hibernate-community-dialects")
-    implementation("org.flywaydb:flyway-core")
+    implementation("org.springframework.boot:spring-boot-starter-flyway")
 
     // JavaFX 21
     implementation("org.openjfx:javafx-base:$javafxVersion:$platform")

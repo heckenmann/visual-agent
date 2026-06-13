@@ -44,7 +44,7 @@ class OllamaClientModelSelectionTest {
                 verify(exactly = 1) {
                     chatModel.call(
                         withArg<Prompt> { prompt ->
-                            assertEquals("unit-test-model", prompt.options.model)
+                            assertEquals("unit-test-model", prompt.options?.model)
                         },
                     )
                 }
@@ -69,7 +69,7 @@ class OllamaClientModelSelectionTest {
                 verify(exactly = 1) {
                     chatModel.stream(
                         withArg<Prompt> { prompt ->
-                            assertEquals("stream-model", prompt.options.model)
+                            assertEquals("stream-model", prompt.options?.model)
                         },
                     )
                 }
@@ -86,14 +86,14 @@ class OllamaClientModelSelectionTest {
             val registry = ToolRegistry(listOf(FakeTool("context"), FakeTool("terminal")), ToolEventBus())
             every { chatModel.call(any<Prompt>()) } answers {
                 val options = firstArg<Prompt>().options as ToolCallingChatOptions
-                assertEquals(setOf("context"), options.toolNames)
-                assertEquals(listOf("context"), options.toolCallbacks.map { it.toolDefinition.name() })
-                assertTrue(options.toolContext.isNotEmpty())
+                assertEquals(listOf("context"), options.toolCallbacks.orEmpty().map { it.toolDefinition.name() })
+                assertTrue(options.toolContext.orEmpty().isNotEmpty())
                 val firstMessage = firstArg<Prompt>().instructions.first()
-                assertTrue(firstMessage.text.contains("Tool calling strict mode"))
-                assertTrue(firstMessage.text.contains("context"))
+                assertTrue(firstMessage.text.orEmpty().contains("Tool calling strict mode"))
+                assertTrue(firstMessage.text.orEmpty().contains("context"))
                 assertTrue(
                     options.toolCallbacks
+                        .orEmpty()
                         .single()
                         .call("""{}""")
                         .contains("context"),
@@ -123,7 +123,10 @@ class OllamaClientModelSelectionTest {
             every { chatModel.call(any<Prompt>()) } answers {
                 val prompt = firstArg<Prompt>()
                 val options = prompt.options as ToolCallingChatOptions
-                if (options.toolNames.isNotEmpty() && prompt.instructions.none { it.text.contains("Error type: tool-error") }) {
+                if (
+                    options.toolCallbacks.orEmpty().isNotEmpty() &&
+                    prompt.instructions.none { it.text.orEmpty().contains("Error type: tool-error") }
+                ) {
                     throw IllegalStateException("No function callback found for function name: todo")
                 }
                 springResponse("tool-model", "Recovered after unknown tool error")

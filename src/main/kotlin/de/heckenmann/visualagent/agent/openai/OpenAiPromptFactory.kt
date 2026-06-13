@@ -59,7 +59,6 @@ class OpenAiPromptFactory(
                 .builder()
                 .model(selectedModel)
                 .toolCallbacks(callbacks)
-                .toolNames(callbacks.map { it.toolDefinition.name() }.toSet())
                 .toolContext(request.metadata + mapOf("model" to selectedModel, "provider" to "openai"))
                 .build()
         return Prompt(toSpringMessages(toolNameGuardMessage(exactFunctionNames) + request.messages), options)

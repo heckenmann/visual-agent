@@ -94,16 +94,8 @@ class AppConfig private constructor() {
      */
     fun bindPreferenceStore(store: PreferenceStore) {
         preferenceStore = store
-    }
-
-    /**
-     * Backward-compatible binding for older tests and callers during the migration window.
-     *
-     * @param store Shared persistence store
-     */
-    @Deprecated("Use bindPreferenceStore")
-    fun bindKnowledgeDb(store: PreferenceStore) {
-        bindPreferenceStore(store)
+        loadFromDatabase()
+        publishChanges()
     }
 
     /**
@@ -297,20 +289,3 @@ class AppConfig private constructor() {
         }
     }
 }
-
-/**
- * Immutable notification payload emitted when one AppConfig value changes.
- *
- * @property key Stable persisted preference key
- * @property oldValue Previous string value, or null when no value was known
- * @property newValue Current string value
- */
-data class AppConfigChange(
-    val key: String,
-    val oldValue: String?,
-    val newValue: String,
-)
-
-private data class AppConfigSnapshot(
-    val values: Map<String, String>,
-)

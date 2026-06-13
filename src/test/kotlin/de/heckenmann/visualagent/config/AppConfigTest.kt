@@ -17,7 +17,7 @@ class AppConfigTest {
             val boundDb =
                 de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                     .create(tempDb)
-            config.bindKnowledgeDb(boundDb)
+            config.bindPreferenceStore(boundDb)
             config.databasePath = tempDb
             config.theme = "Nord Dark"
             config.fontSize = 18
@@ -62,7 +62,7 @@ class AppConfigTest {
             val boundDb =
                 de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                     .create(tempDb)
-            config.bindKnowledgeDb(boundDb)
+            config.bindPreferenceStore(boundDb)
             config.databasePath = tempDb
             config.theme = "Cupertino Light"
             config.fontSize = 20
@@ -103,6 +103,33 @@ class AppConfigTest {
     }
 
     @Test
+    fun `binding preference store immediately restores settings for application startup`() {
+        val config = AppConfig.instance
+        val original = snapshot(config)
+        val tempDb = createTempDirectory("visual-agent-config-bind-test").resolve("settings.db").toString()
+
+        try {
+            val boundDb =
+                de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                    .create(tempDb)
+            boundDb.setPreference("openai.api.key", "sk-startup")
+            boundDb.setPreference("openai.base.url", "https://startup.example")
+            boundDb.setPreference("openai.model", "gpt-startup")
+
+            config.openAiApiKey = ""
+            config.openAiBaseUrl = "https://api.openai.com"
+            config.openAiModel = "gpt-4o-mini"
+            config.bindPreferenceStore(boundDb)
+
+            assertEquals("sk-startup", config.openAiApiKey)
+            assertEquals("https://startup.example", config.openAiBaseUrl)
+            assertEquals("gpt-startup", config.openAiModel)
+        } finally {
+            restore(config, original)
+        }
+    }
+
+    @Test
     fun `save notifies observers for changed model`() {
         val config = AppConfig.instance
         val original = snapshot(config)
@@ -114,7 +141,7 @@ class AppConfigTest {
             val boundDb =
                 de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                     .create(tempDb)
-            config.bindKnowledgeDb(boundDb)
+            config.bindPreferenceStore(boundDb)
             config.databasePath = tempDb
             config.ollamaModel = "observer-model"
             config.save()

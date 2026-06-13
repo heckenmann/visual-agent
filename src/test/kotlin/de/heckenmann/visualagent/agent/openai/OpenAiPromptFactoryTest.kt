@@ -30,18 +30,18 @@ class OpenAiPromptFactoryTest {
             )
         val options = prompt.options as ToolCallingChatOptions
 
-        assertEquals("gpt-test", prompt.options.model)
-        assertEquals(setOf("context"), options.toolNames)
-        assertEquals(listOf("context"), options.toolCallbacks.map { it.toolDefinition.name() })
+        assertEquals("gpt-test", prompt.options?.model)
+        assertEquals(listOf("context"), options.toolCallbacks.orEmpty().map { it.toolDefinition.name() })
         assertTrue(
             prompt.instructions
                 .first()
                 .text
+                .orEmpty()
                 .contains("Tool calling strict mode"),
         )
         assertEquals(
             "openai",
-            options.toolContext["provider"].toString(),
+            options.toolContext.orEmpty()["provider"].toString(),
         )
     }
 
