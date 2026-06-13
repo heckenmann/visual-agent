@@ -1,9 +1,8 @@
 package de.heckenmann.visualagent.ui.panels
 
-import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.config.AppConfig
 import de.heckenmann.visualagent.ui.FxmlLoader
-import javafx.application.Platform
+import de.heckenmann.visualagent.ui.panels.session.SessionModelController
 import javafx.fxml.FXML
 import javafx.scene.Parent
 import javafx.scene.control.Button
@@ -19,12 +18,6 @@ import javafx.scene.control.TextArea
 import javafx.scene.control.TextField
 import javafx.scene.layout.Region
 import javafx.scene.layout.VBox
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import mu.KotlinLogging
 import org.springframework.context.annotation.Lazy
 import org.springframework.stereotype.Component
 
@@ -34,10 +27,6 @@ import org.springframework.stereotype.Component
 @Component
 @Lazy
 class SessionPanel : Region() {
-    companion object {
-        private val logger = KotlinLogging.logger {}
-    }
-
     @FXML
     private lateinit var providerSelector: ComboBox<String>
 
@@ -97,23 +86,12 @@ class SessionPanel : Region() {
 
     @FXML
     private lateinit var scrollPane: ScrollPane
-    private var llmProvider: LLMProvider? = null
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val rootNode: Parent
-    private val allModels = mutableListOf<String>()
-    private val favoriteModels = linkedSetOf<String>()
+    private lateinit var modelController: SessionModelController
 
     init {
         rootNode = FxmlLoader.load(this, "session-panel.fxml")
         children.add(rootNode)
-        if (AppConfig.instance.favoriteModels.isNotBlank()) {
-            favoriteModels.addAll(
-                AppConfig.instance.favoriteModels
-                    .split(',')
-                    .map { it.trim() }
-                    .filter { it.isNotBlank() },
-            )
-        }
     }
 
     /**
@@ -121,13 +99,23 @@ class SessionPanel : Region() {
      */
     @FXML
     fun initialize() {
+        modelController =
+            SessionModelController(
+                modelSelector = modelSelector,
+                modelSearchField = modelSearchField,
+                favoritesOnlyToggle = favoritesOnlyToggle,
+                favoriteButton = favoriteButton,
+                refreshModelsButton = refreshModelsButton,
+                openAiSettingsGroup = openAiSettingsGroup,
+                modelInfoLabel = modelInfoLabel,
+            )
         providerSelector.items.setAll("Ollama", "OpenAI")
         providerSelector.selectionModel.selectedItemProperty().addListener { _, _, selected ->
             if (selected != null) {
                 AppConfig.instance.llmProvider = selected.lowercase()
                 AppConfig.instance.save()
-                updateProviderSpecificControls()
-                refreshModels()
+                modelController.updateProviderSpecificControls()
+                modelController.refreshModels()
             }
         }
 
@@ -148,30 +136,27 @@ class SessionPanel : Region() {
             if (selected != null) {
                 AppConfig.instance.setActiveModel(selected)
                 AppConfig.instance.save()
-                refreshModelDetails(selected)
-                updateFavoriteButton(selected)
+                modelController.refreshModelDetails(selected)
+                modelController.updateFavoriteButton(selected)
             }
         }
-        modelSearchField.textProperty().addListener { _, _, _ -> applyModelFilter() }
-        favoritesOnlyToggle.selectedProperty().addListener { _, _, _ -> applyModelFilter() }
-        favoriteButton.setOnAction { toggleFavoriteForSelectedModel() }
-        refreshModelsButton.setOnAction { refreshModels() }
+        modelSearchField.textProperty().addListener { _, _, _ -> modelController.applyModelFilter() }
+        favoritesOnlyToggle.selectedProperty().addListener { _, _, _ -> modelController.applyModelFilter() }
+        favoriteButton.setOnAction { modelController.toggleFavoriteForSelectedModel() }
+        refreshModelsButton.setOnAction { modelController.refreshModels() }
 
         streamingToggle.selectedProperty().addListener { _, _, newVal ->
             AppConfig.instance.streamingEnabled = newVal
             AppConfig.instance.save()
-            logger.debug { "Streaming toggled: $newVal" }
         }
 
         thinkingToggle.selectedProperty().addListener { _, _, newVal ->
             AppConfig.instance.thinkingEnabled = newVal
             AppConfig.instance.save()
-            logger.debug { "Thinking toggled: $newVal" }
         }
         autoCompactionToggle.selectedProperty().addListener { _, _, newVal ->
             AppConfig.instance.autoCompactionEnabled = newVal
             AppConfig.instance.save()
-            logger.debug { "Auto compaction toggled: $newVal" }
         }
 
         loadLimitSpinner.valueFactory = IntegerSpinnerValueFactory(1, 1000, 50)
@@ -181,25 +166,21 @@ class SessionPanel : Region() {
         loadLimitSpinner.valueProperty().addListener { _, _, newVal ->
             AppConfig.instance.loadLimit = newVal
             AppConfig.instance.save()
-            logger.debug { "Load limit changed: $newVal" }
         }
 
         maxParallelSubAgentsSpinner.valueProperty().addListener { _, _, newVal ->
             AppConfig.instance.maxParallelSubAgents = newVal
             AppConfig.instance.save()
-            logger.debug { "Max parallel sub-agents changed: $newVal" }
         }
 
         timeoutSpinner.valueProperty().addListener { _, _, newVal ->
             AppConfig.instance.timeoutSeconds = newVal
             AppConfig.instance.save()
-            logger.debug { "Timeout changed: $newVal" }
         }
 
         userInstructionArea.textProperty().addListener { _, _, newVal ->
             AppConfig.instance.userModelInstruction = newVal ?: ""
             AppConfig.instance.save()
-            logger.debug { "User model instruction updated (length=${newVal?.length ?: 0})" }
         }
 
         contextSlider.value = AppConfig.instance.contextLength.toDouble()
@@ -213,8 +194,8 @@ class SessionPanel : Region() {
         providerSelector.selectionModel.select(if (AppConfig.instance.normalizedProvider() == "openai") "OpenAI" else "Ollama")
         openAiApiKeyField.text = AppConfig.instance.openAiApiKey
         openAiBaseUrlField.text = AppConfig.instance.openAiBaseUrl
-        updateProviderSpecificControls()
-        updateFavoriteButton(modelSelector.selectionModel.selectedItem)
+        modelController.updateProviderSpecificControls()
+        modelController.updateFavoriteButton(modelSelector.selectionModel.selectedItem)
     }
 
     /**
@@ -244,125 +225,9 @@ class SessionPanel : Region() {
     /**
      * Sets the provider used for fetching model data, then refreshes the model list and details.
      *
-     * @param client The configured [LLMProvider] instance to use for API communication
+     * @param client The configured [de.heckenmann.visualagent.agent.LLMProvider] instance to use for API communication
      */
-    fun setLlmProvider(client: LLMProvider) {
-        this.llmProvider = client
-        refreshModels()
-    }
-
-    /**
-     * Fetches available models from the LLM provider and populates the model selector.
-     * Selects the configured default model if present.
-     */
-    fun refreshModels() {
-        val client = llmProvider ?: return
-        modelSelector.isDisable = true
-        refreshModelsButton.isDisable = true
-        modelInfoLabel.text = "Loading models..."
-        scope.launch {
-            val models =
-                try {
-                    withContext(Dispatchers.IO) { client.getModels() }
-                } catch (e: Exception) {
-                    logger.warn { "refreshModels failed: ${e.message}" }
-                    emptyList()
-                }
-            Platform.runLater {
-                logger.debug { "refreshModels got ${models.size} models: $models" }
-                allModels.clear()
-                allModels.addAll(models)
-                applyModelFilter(selectPreferred = true)
-                modelSelector.isDisable = allModels.isEmpty()
-                refreshModelsButton.isDisable = false
-            }
-        }
-    }
-
-    /**
-     * Fetches details for the specified model and displays them in the model info label.
-     *
-     * @param modelName Name of the model to look up
-     */
-    fun refreshModelDetails(modelName: String) {
-        val client = llmProvider ?: return
-        modelInfoLabel.text = "Loading model details..."
-        scope.launch {
-            try {
-                val details = withContext(Dispatchers.IO) { client.getModelDetails(modelName) }
-                Platform.runLater {
-                    val sb = StringBuilder()
-                    sb.appendLine("Model: ${details.model}")
-                    sb.appendLine("Modified: ${details.modifiedAt}")
-                    if (details.details != null) {
-                        sb.appendLine("Family: ${details.details.family ?: "unknown"}")
-                        sb.appendLine("Size: ${details.details.parameterSize ?: "unknown"}")
-                        sb.appendLine("Format: ${details.details.format ?: "unknown"}")
-                    }
-                    modelInfoLabel.text = sb.toString().ifEmpty { "No details available" }
-                }
-            } catch (e: Exception) {
-                Platform.runLater {
-                    modelInfoLabel.text = "Error loading details: ${e.message}"
-                }
-            }
-        }
-    }
-
-    private fun updateProviderSpecificControls() {
-        val openAiSelected = AppConfig.instance.normalizedProvider() == "openai"
-        openAiSettingsGroup.isVisible = openAiSelected
-        openAiSettingsGroup.isManaged = openAiSelected
-    }
-
-    private fun applyModelFilter(selectPreferred: Boolean = false) {
-        val query = modelSearchField.text.trim().lowercase()
-        val favoritesOnly = favoritesOnlyToggle.isSelected
-        val filtered =
-            allModels.filter { model ->
-                val matchesQuery = query.isBlank() || model.lowercase().contains(query)
-                val matchesFavorite = !favoritesOnly || favoriteModels.contains(model)
-                matchesQuery && matchesFavorite
-            }
-        modelSelector.items.setAll(filtered)
-
-        if (filtered.isEmpty()) {
-            modelInfoLabel.text =
-                if (allModels.isEmpty()) {
-                    "No models available. Check Ollama connection."
-                } else {
-                    "No models match the current filter."
-                }
-            return
-        }
-
-        val currentModel = AppConfig.instance.activeModel()
-        when {
-            filtered.contains(currentModel) -> modelSelector.selectionModel.select(currentModel)
-            selectPreferred -> modelSelector.selectionModel.select(0)
-            modelSelector.selectionModel.selectedIndex < 0 -> modelSelector.selectionModel.select(0)
-        }
-
-        updateFavoriteButton(modelSelector.selectionModel.selectedItem)
-    }
-
-    private fun toggleFavoriteForSelectedModel() {
-        val selected = modelSelector.selectionModel.selectedItem ?: return
-        if (favoriteModels.contains(selected)) {
-            favoriteModels.remove(selected)
-        } else {
-            favoriteModels.add(selected)
-        }
-        AppConfig.instance.favoriteModels = favoriteModels.joinToString(",")
-        AppConfig.instance.save()
-        updateFavoriteButton(selected)
-        applyModelFilter(selectPreferred = false)
-    }
-
-    private fun updateFavoriteButton(selected: String?) {
-        val isFavorite = selected != null && favoriteModels.contains(selected)
-        favoriteButton.text = if (isFavorite) "★" else "☆"
-        favoriteButton.isDisable = selected == null
-        favoriteButton.tooltip = javafx.scene.control.Tooltip(if (isFavorite) "Remove from favorites" else "Add to favorites")
+    fun setLlmProvider(client: de.heckenmann.visualagent.agent.LLMProvider) {
+        modelController.setLlmProvider(client)
     }
 }
