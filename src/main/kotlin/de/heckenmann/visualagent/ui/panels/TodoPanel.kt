@@ -35,22 +35,6 @@ import java.util.UUID
 class TodoPanel(
     private val todoManager: TodoManager,
 ) : Region() {
-    companion object {
-        /**
-         * Determines whether the add-todo shortcut should fire for a key event.
-         *
-         * @param code Pressed key code
-         * @param shortcutDown Whether Cmd/Ctrl is pressed
-         * @param focusOwnerIsTextInput Whether the current focus owner is a text input control
-         * @return true when the Add Todo dialog should open
-         */
-        fun shouldOpenAddDialog(
-            code: KeyCode,
-            shortcutDown: Boolean,
-            focusOwnerIsTextInput: Boolean,
-        ): Boolean = code == KeyCode.N && shortcutDown && !focusOwnerIsTextInput
-    }
-
     @FXML
     private lateinit var rootBorderPane: BorderPane
 
@@ -91,7 +75,7 @@ class TodoPanel(
         javafx.event.EventHandler<KeyEvent> { ev ->
             val focusOwner = registeredScene?.focusOwner
             val focusOwnerIsTextInput = focusOwner is TextInputControl
-            if (shouldOpenAddDialog(ev.code, ev.isShortcutDown, focusOwnerIsTextInput)) {
+            if (shouldOpenAddTodoDialog(ev.code, ev.isShortcutDown, focusOwnerIsTextInput)) {
                 showAddDialog()
                 ev.consume()
             } else if (ev.code == KeyCode.DELETE && !focusOwnerIsTextInput) {
