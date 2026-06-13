@@ -210,7 +210,6 @@ class MainWindow(
      */
     private fun applyConfigToUi() {
         selectedModelLabel.text = " ${AppConfig.instance.normalizedProvider()}: ${AppConfig.instance.activeModel()}"
-        statusBar.updateModel(AppConfig.instance.activeModel())
         scene?.root?.style = "-fx-font-size: ${AppConfig.instance.fontSize}px;"
         Application.setUserAgentStylesheet(AppConfig.instance.getThemeStylesheet())
     }
@@ -251,7 +250,6 @@ class MainWindow(
         Platform.runLater {
             currentConnectionState = isConnected
             connectionStatus.text = if (isConnected) " Connected" else " Disconnected"
-            statusBar.updateConnectionStatus(isConnected)
             val agents = agentManager.getSubAgents()
             statusBar.updateAgentCount(agents.count { it.status == AgentStatus.BUSY }, agents.size)
             updateAgentCountUi()

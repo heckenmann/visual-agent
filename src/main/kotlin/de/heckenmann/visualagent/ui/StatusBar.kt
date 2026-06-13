@@ -1,10 +1,10 @@
 package de.heckenmann.visualagent.ui
 
+import javafx.geometry.Pos
 import javafx.scene.control.Button
 import javafx.scene.control.Label
 import javafx.scene.layout.BorderPane
 import javafx.scene.layout.HBox
-import javafx.scene.layout.Priority
 import javafx.scene.layout.Region
 
 /**
@@ -12,12 +12,10 @@ import javafx.scene.layout.Region
  */
 class StatusBar : Region() {
     companion object {
-        const val HEIGHT = 32.0
+        const val HEIGHT = 40.0
     }
 
     private val rootBorderPane = BorderPane()
-    private val connectionLabel = Label("Ollama: Disconnected")
-    private val modelLabel = Label("Model: --")
     private val agentsLabel = Label("Agents: 0/0")
     private val reconnectButton = Button("Reconnect")
     private val retryButton = Button("Retry")
@@ -28,40 +26,36 @@ class StatusBar : Region() {
     }
 
     private fun setupUI() {
+        rootBorderPane.styleClass.add("status-bar")
+
         reconnectButton.isFocusTraversable = false
         retryButton.isFocusTraversable = false
         reconnectButton.setOnAction { onReconnect?.invoke() }
         retryButton.setOnAction { onReconnect?.invoke() }
+        reconnectButton.styleClass.addAll("status-action-button")
+        retryButton.styleClass.addAll("status-action-button", "status-action-secondary")
+        agentsLabel.styleClass.add("status-bar-muted")
 
-        val spacer = Region()
-        HBox.setHgrow(spacer, Priority.ALWAYS)
+        val agentsChip =
+            HBox(agentsLabel).apply {
+                styleClass.add("status-chip")
+                alignment = Pos.CENTER_LEFT
+            }
 
-        val statusBox = HBox(connectionLabel, modelLabel, spacer, retryButton, reconnectButton, agentsLabel)
-        statusBox.spacing = 12.0
-        statusBox.isFillHeight = true
+        val rightGroup =
+            HBox(agentsChip, retryButton, reconnectButton).apply {
+                styleClass.add("status-group")
+                alignment = Pos.CENTER_RIGHT
+                spacing = 8.0
+            }
 
-        rootBorderPane.center = statusBox
+        rootBorderPane.left = null
+        rootBorderPane.right = rightGroup
         children.add(rootBorderPane)
 
         minHeight = HEIGHT
         prefHeight = HEIGHT
         maxHeight = HEIGHT
-    }
-
-    /**
-     * Executes updateConnectionStatus.
-     */
-    fun updateConnectionStatus(connected: Boolean) {
-        connectionLabel.text = if (connected) "Ollama: Connected" else "Ollama: Disconnected"
-        reconnectButton.isDisable = connected
-        retryButton.isDisable = connected
-    }
-
-    /**
-     * Executes updateModel.
-     */
-    fun updateModel(model: String) {
-        modelLabel.text = "Model: $model"
     }
 
     /**

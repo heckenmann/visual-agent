@@ -695,12 +695,13 @@
     -fx-background-insets: 0;
     -fx-border-color: -color-border-default;
     -fx-border-width: 1px 0px 0px 0px;
-    -fx-padding: 6px 12px;
+    -fx-padding: 8px 16px;
     -fx-opacity: 1.0;
 }
 
 .status-bar .label {
     -fx-text-fill: -color-fg-default;
+    -fx-font-size: 12px;
 }
 
 .status-content {
@@ -719,8 +720,9 @@
 
 .status-chip {
     -fx-background-color: -color-bg-subtle;
-    -fx-background-radius: 10px;
-    -fx-padding: 2px 8px;
+    -fx-background-radius: 999px;
+    -fx-padding: 4px 10px;
+    -fx-alignment: center-left;
 }
 
 .status-dot {
@@ -742,6 +744,9 @@
     -fx-border-radius: 6px;
     -fx-background-radius: 6px;
     -fx-padding: 4px 10px;
+    -fx-min-height: 26px;
+    -fx-pref-height: 26px;
+    -fx-font-size: 11px;
 }
 
 .status-action-button:hover {
@@ -756,16 +761,16 @@
 .agent-status-idle { -fx-background-color: -color-success-emphasis; }
 .agent-status-busy { -fx-background-color: -color-warning-emphasis; }
 .agent-status-offline { -fx-background-color: -color-fg-muted; }
-
-/* Badges */
-.badge { -fx-font-size: 0.8em; -fx-padding: 2px 8px; -fx-background-radius: 10px; }
-.badge-low { -fx-background-color: -color-info-muted; }
-.badge-medium { -fx-background-color: -color-success-muted; }
 .agent-job-count {
     -fx-text-fill: -color-fg-muted;
     -fx-font-size: 11px;
     -fx-font-weight: bold;
 }
+
+/* Badges */
+.badge { -fx-font-size: 0.8em; -fx-padding: 2px 8px; -fx-background-radius: 10px; }
+.badge-low { -fx-background-color: -color-info-muted; }
+.badge-medium { -fx-background-color: -color-success-muted; }
 .badge-high { -fx-background-color: -color-warning-muted; }
 .badge-urgent { -fx-background-color: -color-danger-muted; }
 
