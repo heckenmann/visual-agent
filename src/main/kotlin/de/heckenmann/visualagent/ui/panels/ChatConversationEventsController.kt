@@ -1,4 +1,4 @@
-package de.heckenmann.visualagent.ui.panels
+package de.heckenmann.visualagent.ui.panels.chat
 
 import de.heckenmann.visualagent.agent.ToolResult
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
@@ -13,7 +13,6 @@ import java.time.Instant
  * @property loadingToken Placeholder token for pending assistant responses
  * @property waitingForAssistant Busy-state property bound to UI controls
  * @property updateRuntimeStatus Callback to refresh runtime indicator state
- * @property updateMeta Callback to refresh panel meta information
  * @property sendMessage Retry callback for resubmitting user messages
  * @property mapToolEvent Converts tool events to conversation messages
  */
@@ -22,7 +21,6 @@ internal class ChatConversationEventsController(
     private val loadingToken: String,
     private val waitingForAssistant: SimpleBooleanProperty,
     private val updateRuntimeStatus: () -> Unit,
-    private val updateMeta: () -> Unit,
     private val sendMessage: (String) -> Unit,
     private val mapToolEvent: (ToolCallEvent) -> ChatMessage,
 ) {
@@ -38,14 +36,12 @@ internal class ChatConversationEventsController(
             messageList.replace(loadingIndex, messageList.messages[loadingIndex].copy(content = normalizedText))
             waitingForAssistant.set(false)
             updateRuntimeStatus()
-            updateMeta()
             messageList.scrollToBottom()
             return
         }
         messageList.append(ChatMessage("assistant", normalizedText))
         waitingForAssistant.set(false)
         updateRuntimeStatus()
-        updateMeta()
     }
 
     /**
@@ -68,7 +64,6 @@ internal class ChatConversationEventsController(
         messageList.scrollToBottom(force = true)
         waitingForAssistant.set(false)
         updateRuntimeStatus()
-        updateMeta()
     }
 
     /**
@@ -85,7 +80,6 @@ internal class ChatConversationEventsController(
         } else {
             messageList.append(eventMessage)
         }
-        updateMeta()
     }
 
     /**
@@ -124,7 +118,6 @@ internal class ChatConversationEventsController(
                 messageList.replace(assistantIndex, messageList.messages[assistantIndex].copy(content = loadingToken))
                 waitingForAssistant.set(true)
                 updateRuntimeStatus()
-                updateMeta()
                 messageList.scrollToBottom(force = true)
                 sendMessage(message.content)
                 return

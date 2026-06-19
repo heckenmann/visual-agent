@@ -1,10 +1,12 @@
 package de.heckenmann.visualagent.ui
 
+import de.heckenmann.visualagent.agent.AgentConfig
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.todo.TodoStatus
 import de.heckenmann.visualagent.ui.panels.ChatPanel
 import de.heckenmann.visualagent.ui.panels.SubAgentsPanel
 import javafx.application.Platform
+import mu.KotlinLogging
 
 /**
  * Wires sub-agent UI actions and runtime notifications.
@@ -20,12 +22,14 @@ internal class MainWindowSubAgentWiring(
     private val chatPanel: ChatPanel,
     private val updateAgentCountUi: () -> Unit,
 ) {
+    private val logger = KotlinLogging.logger {}
+
     /**
      * Registers sub-agent actions and initializes the panel from persisted state.
      */
     fun register() {
         subAgentsPanel.agentActionCallback = { action, agentId -> handleAgentAction(action, agentId) }
-        subAgentsPanel.onCreateAgent = { name, role, template -> createAgent(name, role, template) }
+        subAgentsPanel.onCreateAgent = { name, role, config -> createAgent(name, role, config) }
         val agents = agentManager.getSubAgents()
         subAgentsPanel.setAgents(
             agents,
@@ -51,7 +55,7 @@ internal class MainWindowSubAgentWiring(
             agentManager.updateAgent(agentId, name = uiAgent.name, role = uiAgent.role, config = uiAgent.config)
             Platform.runLater { updateAgentCountUi() }
         } else {
-            println("[MainWindow] update: agent not found in manager: $agentId")
+            logger.warn { "Cannot update missing agent: $agentId" }
         }
     }
 
@@ -68,18 +72,19 @@ internal class MainWindowSubAgentWiring(
                 .firstOrNull { it.status == TodoStatus.PENDING }
         if (pending != null) {
             val ok = agentManager.assignTodoToAgent(pending.id, agentId)
-            if (!ok) println("[MainWindow] Failed to assign todo ${pending.id} to agent $agentId")
+            if (!ok) logger.warn { "Failed to assign todo ${pending.id} to agent $agentId" }
         } else {
-            println("[MainWindow] No pending todos to run")
+            logger.info { "No pending todos available for agent run action" }
         }
     }
 
     private fun createAgent(
         name: String,
         role: String,
-        template: String,
+        config: AgentConfig,
     ) {
-        val created = agentManager.createAgent(name, role, template)
+        val created = agentManager.createAgent(name, role)
+        agentManager.updateAgent(created.id, config = config)
         Platform.runLater {
             subAgentsPanel.addAgent(created, agentManager.getActiveJobCount(created.id))
             updateAgentCountUi()

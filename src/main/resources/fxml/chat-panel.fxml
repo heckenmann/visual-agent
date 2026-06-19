@@ -7,6 +7,7 @@
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.control.ToolBar?>
 <?import javafx.scene.image.ImageView?>
@@ -18,6 +19,7 @@
                 <ImageView fx:id="conversationIconImage" fitHeight="34.0" fitWidth="34.0" preserveRatio="true" styleClass="chat-header-mark"/>
                 <VBox spacing="1.0">
                     <Label text="Conversation" styleClass="chat-header-title"/>
+                    <Label fx:id="responseMetaLabel" text="Ready" styleClass="chat-header-meta"/>
                 </VBox>
                 <Region HBox.hgrow="ALWAYS"/>
                 <Button fx:id="clearChatButton" styleClass="chat-toolbar-button"/>
@@ -32,11 +34,20 @@
     </top>
     <center>
         <VBox spacing="6.0">
-            <ScrollPane fx:id="messagesScrollPane" fitToWidth="true" hbarPolicy="NEVER" styleClass="chat-message-list-scroll" VBox.vgrow="ALWAYS">
-                <content>
-                    <VBox fx:id="messagesContainer" styleClass="chat-message-list"/>
-                </content>
-            </ScrollPane>
+            <StackPane VBox.vgrow="ALWAYS">
+                <ScrollPane fx:id="messagesScrollPane" fitToWidth="true" hbarPolicy="NEVER" styleClass="chat-message-list-scroll">
+                    <content>
+                        <VBox fx:id="messagesContainer" styleClass="chat-message-list"/>
+                    </content>
+                </ScrollPane>
+                <VBox fx:id="emptyConversationState" alignment="CENTER" spacing="10.0"
+                      styleClass="chat-empty-state" mouseTransparent="true">
+                    <Label text="Start a conversation" styleClass="empty-state-title"/>
+                    <Label text="Ask a question, describe a change, or delegate work to your agents."
+                           wrapText="true" textAlignment="CENTER" styleClass="empty-state-description"/>
+                    <Label text="Press / to focus the composer" styleClass="chat-empty-shortcut"/>
+                </VBox>
+            </StackPane>
             <HBox styleClass="chat-runtime-status-row">
                 <HBox fx:id="assistantBusyContainer" styleClass="chat-busy-wrap" managed="false" visible="false">
                     <Label fx:id="assistantBusyLabel" text="Idle" styleClass="chat-busy-label"/>

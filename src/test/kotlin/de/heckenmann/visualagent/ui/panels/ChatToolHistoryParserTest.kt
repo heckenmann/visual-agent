@@ -1,9 +1,12 @@
 package de.heckenmann.visualagent.ui.panels
 
 import de.heckenmann.visualagent.agent.Message
+import de.heckenmann.visualagent.ui.panels.chat.ChatToolHistoryParser
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -33,5 +36,25 @@ class ChatToolHistoryParserTest {
         assertEquals("todos", data.toolId)
         assertEquals("ok", data.status)
         assertEquals(12L, data.durationMillis)
+    }
+
+    @Test
+    fun `invalid and unrelated metadata are ignored`() {
+        val parser = ChatToolHistoryParser()
+
+        assertFalse(parser.isToolHistoryEntry(Message("assistant", "plain")))
+        assertNull(parser.parseToolMetadata("not-json"))
+        assertNull(parser.parseToolMetadata("[]"))
+        assertNull(parser.parseToolMetadata("""{"type":"other"}"""))
+        assertNull(parser.parseToolMetadata("""{"status":"ok"}"""))
+    }
+
+    @Test
+    fun `missing optional tool fields use safe defaults`() {
+        val data = assertNotNull(ChatToolHistoryParser().parseToolMetadata("""{"type":"tool_call"}"""))
+
+        assertEquals("tool", data.toolId)
+        assertEquals("ok", data.status)
+        assertNull(data.durationMillis)
     }
 }

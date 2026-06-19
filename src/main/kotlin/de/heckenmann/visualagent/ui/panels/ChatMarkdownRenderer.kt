@@ -1,4 +1,4 @@
-package de.heckenmann.visualagent.ui.panels
+package de.heckenmann.visualagent.ui.panels.chat
 
 import javafx.scene.Node
 import javafx.scene.control.Label

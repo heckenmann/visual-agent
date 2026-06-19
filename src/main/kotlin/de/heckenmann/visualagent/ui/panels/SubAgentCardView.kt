@@ -58,6 +58,7 @@ class SubAgentCardView(
     init {
         val rootNode = FxmlLoader.load(this, "agent-card.fxml")
         children.add(rootNode as Region)
+        maxWidth = Double.MAX_VALUE
         setupUI()
     }
 
@@ -74,7 +75,7 @@ class SubAgentCardView(
     }
 
     /**
-     * Executes updateStatus.
+     * Updates the status badge, current task, and active job count shown on the card.
      */
     fun updateStatus(
         status: AgentStatus,
@@ -98,7 +99,7 @@ class SubAgentCardView(
     }
 
     /**
-     * Executes refreshDisplay.
+     * Refreshes labels after the backing [SubAgent] has been edited.
      */
     fun refreshDisplay() {
         nameLabel.text = agent.name
@@ -106,5 +107,12 @@ class SubAgentCardView(
         taskLabel.text = agent.currentTask ?: ""
         statusIndicator.text = agent.status.name
         jobsLabel.text = "Jobs: $activeJobCount"
+    }
+
+    /**
+     * Resizes the loaded card root to the full width assigned by its parent.
+     */
+    override fun layoutChildren() {
+        root.resizeRelocate(0.0, 0.0, width, height)
     }
 }

@@ -1,6 +1,9 @@
 package de.heckenmann.visualagent.ui.panels.session
 
 import de.heckenmann.visualagent.agent.LLMProvider
+import de.heckenmann.visualagent.agent.provider.ProviderAdapter
+import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
+import de.heckenmann.visualagent.agent.provider.ProviderErrorMessages
 import de.heckenmann.visualagent.config.AppConfig
 import javafx.application.Platform
 import javafx.scene.control.Button
@@ -25,8 +28,10 @@ internal class SessionModelController(
     private val favoritesOnlyToggle: CheckBox,
     private val favoriteButton: Button,
     private val refreshModelsButton: Button,
+    private val ollamaSettingsGroup: VBox,
     private val openAiSettingsGroup: VBox,
     private val modelInfoLabel: Label,
+    private val providerCatalog: ProviderCatalogService,
 ) {
     companion object {
         private val logger = KotlinLogging.logger {}
@@ -61,13 +66,22 @@ internal class SessionModelController(
         scope.launch {
             val result =
                 try {
-                    Result.success(withContext(Dispatchers.IO) { client.getModels() })
+                    Result.success(
+                        withContext(Dispatchers.IO) {
+                            client.getModels(providerCatalog.activeProviderId())
+                        },
+                    )
                 } catch (e: Exception) {
                     logger.warn { "refreshModels failed: ${e.message}" }
                     Result.failure(e)
                 }
             Platform.runLater {
-                val models = result.getOrDefault(emptyList())
+                val models =
+                    result.getOrElse {
+                        providerCatalog
+                            .selectableModels(providerCatalog.activeProviderId())
+                            .map { model -> model.id }
+                    }
                 logger.debug { "refreshModels got ${models.size} models: $models" }
                 allModels.clear()
                 allModels.addAll(models)
@@ -75,7 +89,7 @@ internal class SessionModelController(
                 modelSelector.isDisable = allModels.isEmpty()
                 refreshModelsButton.isDisable = false
                 result.exceptionOrNull()?.let { error ->
-                    modelInfoLabel.text = "Could not load models: ${error.message ?: "Unknown provider error"}"
+                    modelInfoLabel.text = ProviderErrorMessages.userFacing(error)
                 }
             }
         }
@@ -86,7 +100,10 @@ internal class SessionModelController(
         modelInfoLabel.text = "Loading model details..."
         scope.launch {
             try {
-                val details = withContext(Dispatchers.IO) { client.getModelDetails(modelName) }
+                val details =
+                    withContext(Dispatchers.IO) {
+                        client.getModelDetails(providerCatalog.activeProviderId(), modelName)
+                    }
                 Platform.runLater {
                     val sb = StringBuilder()
                     sb.appendLine("Model: ${details.model}")
@@ -100,16 +117,19 @@ internal class SessionModelController(
                 }
             } catch (e: Exception) {
                 Platform.runLater {
-                    modelInfoLabel.text = "Error loading details: ${e.message}"
+                    modelInfoLabel.text = ProviderErrorMessages.userFacing(e)
                 }
             }
         }
     }
 
     fun updateProviderSpecificControls() {
-        val openAiSelected = AppConfig.instance.normalizedProvider() == "openai"
-        openAiSettingsGroup.isVisible = openAiSelected
-        openAiSettingsGroup.isManaged = openAiSelected
+        val adapter = providerCatalog.getProvider(providerCatalog.activeProviderId())?.adapter
+        val ollamaSelected = adapter == ProviderAdapter.OLLAMA
+        ollamaSettingsGroup.isVisible = ollamaSelected
+        ollamaSettingsGroup.isManaged = ollamaSelected
+        openAiSettingsGroup.isVisible = !ollamaSelected
+        openAiSettingsGroup.isManaged = !ollamaSelected
     }
 
     fun applyModelFilter(selectPreferred: Boolean = false) {
@@ -133,7 +153,7 @@ internal class SessionModelController(
             return
         }
 
-        val currentModel = AppConfig.instance.activeModel()
+        val currentModel = providerCatalog.getProvider(providerCatalog.activeProviderId())?.defaultModel.orEmpty()
         when {
             filtered.contains(currentModel) -> modelSelector.selectionModel.select(currentModel)
             selectPreferred -> modelSelector.selectionModel.select(0)

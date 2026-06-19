@@ -2,21 +2,17 @@ package de.heckenmann.visualagent.ui.panels
 
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoManager
-import de.heckenmann.visualagent.todo.TodoPriority
 import de.heckenmann.visualagent.todo.TodoStatus
+import de.heckenmann.visualagent.ui.ConfirmationDialogs
 import de.heckenmann.visualagent.ui.FxmlLoader
 import javafx.application.Platform
 import javafx.collections.FXCollections
 import javafx.collections.ListChangeListener
 import javafx.fxml.FXML
-import javafx.geometry.Insets
 import javafx.scene.control.Button
-import javafx.scene.control.ButtonType
 import javafx.scene.control.ComboBox
-import javafx.scene.control.Dialog
 import javafx.scene.control.Label
 import javafx.scene.control.ListView
-import javafx.scene.control.TextField
 import javafx.scene.control.TextInputControl
 import javafx.scene.input.KeyCode
 import javafx.scene.input.KeyEvent
@@ -25,10 +21,9 @@ import javafx.scene.layout.Region
 import javafx.scene.layout.VBox
 import org.springframework.context.annotation.Lazy
 import org.springframework.stereotype.Component
-import java.util.UUID
 
 /**
- * Represents TodoPanel.
+ * Todo management panel with filtering, bulk actions, keyboard shortcuts, and shared manager binding.
  */
 @Component
 @Lazy
@@ -40,6 +35,9 @@ class TodoPanel(
 
     @FXML
     private lateinit var addButton: Button
+
+    @FXML
+    private lateinit var emptyAddButton: Button
 
     @FXML
     private lateinit var editButton: Button
@@ -66,6 +64,15 @@ class TodoPanel(
     private lateinit var todoListView: ListView<Todo>
 
     @FXML
+    private lateinit var todoEmptyState: VBox
+
+    @FXML
+    private lateinit var todoEmptyTitleLabel: Label
+
+    @FXML
+    private lateinit var todoEmptyDescriptionLabel: Label
+
+    @FXML
     private lateinit var statusFilterSelector: ComboBox<String>
 
     private val todos = FXCollections.observableArrayList<Todo>()
@@ -81,7 +88,7 @@ class TodoPanel(
             } else if (ev.code == KeyCode.DELETE && !focusOwnerIsTextInput) {
                 val selected = todoListView.selectionModel.selectedItem
                 if (selected != null) {
-                    removeWithUndo(selected)
+                    removeTodo(selected)
                     ev.consume()
                 }
             }
@@ -96,12 +103,12 @@ class TodoPanel(
     }
 
     /**
-     * Executes initialize.
+     * Wires FXML controls, list rendering, keyboard shortcuts, and manager-backed state refresh.
      */
     @FXML
     fun initialize() {
         todoListView.items = todos
-        todoListView.placeholder = Label("No todos yet. Add one or let the agent create tasks.").apply { styleClass.add("todo-empty") }
+        todoListView.placeholder = Region()
         todoListView.setCellFactory {
             TodoCell(
                 onStatusChanged = { todo, completed ->
@@ -110,11 +117,12 @@ class TodoPanel(
                         if (completed) TodoStatus.COMPLETED else TodoStatus.PENDING,
                     )
                 },
-                onRemove = ::removeWithUndo,
+                onRemove = ::removeTodo,
             )
         }
         todos.addListener(ListChangeListener { updateSummary() })
         addButton.setOnAction { showAddDialog() }
+        emptyAddButton.setOnAction { showAddDialog() }
         editButton.setOnAction { editSelectedTodo() }
         completeAllButton.setOnAction { completeAllTodos() }
         deleteCompletedButton.setOnAction { deleteCompletedTodos() }
@@ -124,6 +132,7 @@ class TodoPanel(
             statusFilter = selected ?: "All"
             refreshFromManager()
         }
+        todoListView.selectionModel.selectedItemProperty().addListener { _, _, _ -> updateActionStates() }
         updateSummary()
         // Keyboard shortcuts: Cmd/Ctrl+N for new todo, Delete for removing selected todo.
         rootBorderPane.sceneProperty().addListener { _, _, newScene ->
@@ -135,91 +144,22 @@ class TodoPanel(
         }
     }
 
-    /**
-     * Shows a dialog for creating a new todo item.
-     *
-     * The dialog contains a description text field and a priority combo box.
-     * If the user confirms, a new [Todo] is added to the list.
-     */
     private fun showAddDialog() {
-        val dialog = Dialog<Todo>()
-        dialog.title = "Add Todo"
-        dialog.dialogPane.styleClass.add("todo-dialog")
-
-        val descField = TextField()
-        descField.promptText = "Describe the task..."
-        descField.styleClass.add("chat-input")
-        descField.prefColumnCount = 30
-
-        val priorityCombo = ComboBox<TodoPriority>(FXCollections.observableArrayList(TodoPriority.entries.toList()))
-        priorityCombo.selectionModel.select(TodoPriority.MEDIUM)
-
-        val content = VBox(14.0)
-        content.padding = Insets(24.0)
-        content.children.addAll(Label("Task Description"), descField, Label("Priority Level"), priorityCombo)
-        dialog.dialogPane.content = content
-        dialog.dialogPane.buttonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)
-
-        val okButton = dialog.dialogPane.lookupButton(ButtonType.OK) as Button
-        okButton.disableProperty().bind(descField.textProperty().isEmpty)
-
-        dialog.setResultConverter { buttonType ->
-            if (buttonType == ButtonType.OK && descField.text.isNotBlank()) {
-                Todo(
-                    id = UUID.randomUUID().toString(),
-                    description = descField.text.trim(),
-                    priority = priorityCombo.selectionModel.selectedItem ?: TodoPriority.MEDIUM,
-                    status = TodoStatus.PENDING,
-                )
-            } else {
-                null
-            }
-        }
-
-        val result = dialog.showAndWait()
-        result.ifPresent { _ ->
-            // create via shared manager so agents see it
-            todoManager.add(descField.text.trim(), priorityCombo.selectionModel.selectedItem ?: TodoPriority.MEDIUM)
+        showAddTodoDialog()?.let { result ->
+            todoManager.add(result.description, result.priority)
         }
     }
 
     private fun editSelectedTodo() {
         val selected = todoListView.selectionModel.selectedItem ?: return
-        val dialog = Dialog<Boolean>()
-        dialog.title = "Edit Todo"
-        dialog.dialogPane.styleClass.add("todo-dialog")
-
-        val descField = TextField(selected.description)
-        descField.promptText = "Describe the task..."
-        descField.prefColumnCount = 30
-
-        val priorityCombo = ComboBox<TodoPriority>(FXCollections.observableArrayList(TodoPriority.entries.toList()))
-        priorityCombo.selectionModel.select(selected.priority)
-
-        val content = VBox(14.0)
-        content.padding = Insets(24.0)
-        content.children.addAll(Label("Task Description"), descField, Label("Priority Level"), priorityCombo)
-        dialog.dialogPane.content = content
-        dialog.dialogPane.buttonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)
-
-        dialog.setResultConverter { buttonType ->
-            buttonType == ButtonType.OK && descField.text.isNotBlank()
-        }
-
-        dialog.showAndWait().ifPresent { changed ->
-            if (changed) {
-                todoManager.update(
-                    selected.id,
-                    descField.text.trim(),
-                    priorityCombo.selectionModel.selectedItem ?: TodoPriority.MEDIUM,
-                )
-                refreshFromManager()
-            }
+        showEditTodoDialog(selected)?.let { result ->
+            todoManager.update(selected.id, result.description, result.priority)
+            refreshFromManager()
         }
     }
 
     private fun completeAllTodos() {
-        todos.forEach { todo ->
+        todoManager.getAll().forEach { todo ->
             if (todo.status != TodoStatus.COMPLETED) {
                 todoManager.updateStatus(todo.id, TodoStatus.COMPLETED)
             }
@@ -227,37 +167,22 @@ class TodoPanel(
     }
 
     private fun deleteCompletedTodos() {
-        val completed = todos.filter { it.status == TodoStatus.COMPLETED }.toList()
+        val completed = todoManager.getAll().filter { it.status == TodoStatus.COMPLETED }
         completed.forEach { todoManager.remove(it.id) }
         refreshFromManager()
     }
 
     /**
-     * Called by UI to remove a todo with undo support (5 seconds to undo).
+     * Removes a todo from the shared manager.
      */
-    private fun removeWithUndo(todo: Todo) {
+    private fun removeTodo(todo: Todo) {
+        if (!ConfirmationDialogs.confirm("Delete Todo", "This action cannot be undone", "Delete \"${todo.description}\"?")) return
         todos.remove(todo)
-        // Ask shared manager to remove; keep a local copy for undo
         todoManager.remove(todo.id)
-        val removed = todo
-        // Simple undo window: 5 seconds to undo
-        val thread =
-            Thread {
-                try {
-                    Thread.sleep(5000)
-                    // deletion confirmed
-                } catch (_: InterruptedException) {
-                    Platform.runLater {
-                        val recreated = todoManager.add(removed.description, removed.priority)
-                        todos.add(recreated)
-                    }
-                }
-            }
-        thread.start()
     }
 
     /**
-     * Executes refreshFromManager.
+     * Reloads todos from the shared manager and applies the current status filter.
      */
     fun refreshFromManager() {
         Platform.runLater {
@@ -273,18 +198,50 @@ class TodoPanel(
                     }
                 }
             todos.setAll(filtered)
+            syncTodoEmptyState(source.isEmpty(), filtered.isEmpty())
             updateSummary()
         }
     }
 
     private fun updateSummary() {
-        val total = todos.size
-        val open = todos.count { it.status == TodoStatus.PENDING }
-        val inProgress = todos.count { it.status == TodoStatus.IN_PROGRESS }
-        val done = todos.count { it.status == TodoStatus.COMPLETED }
+        val allTodos = todoManager.getAll()
+        val total = allTodos.size
+        val open = allTodos.count { it.status == TodoStatus.PENDING }
+        val inProgress = allTodos.count { it.status == TodoStatus.IN_PROGRESS }
+        val done = allTodos.count { it.status == TodoStatus.COMPLETED }
         totalCountLabel.text = total.toString()
         openCountLabel.text = open.toString()
         inProgressCountLabel.text = inProgress.toString()
         doneCountLabel.text = done.toString()
+        syncTodoEmptyState(allTodos.isEmpty(), todos.isEmpty())
+        updateActionStates(allTodos)
+    }
+
+    private fun syncTodoEmptyState(
+        sourceIsEmpty: Boolean,
+        filteredIsEmpty: Boolean,
+    ) {
+        updateTodoEmptyState(
+            todoEmptyState,
+            emptyAddButton,
+            todoEmptyTitleLabel,
+            todoEmptyDescriptionLabel,
+            sourceIsEmpty,
+            filteredIsEmpty,
+        )
+    }
+
+    private fun updateActionStates(allTodos: List<Todo> = todoManager.getAll()) {
+        updateTodoActionStates(
+            editButton,
+            completeAllButton,
+            deleteCompletedButton,
+            todoListView.selectionModel.selectedItem,
+            allTodos,
+        )
+    }
+
+    override fun layoutChildren() {
+        rootBorderPane.resizeRelocate(0.0, 0.0, width, height)
     }
 }

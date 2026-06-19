@@ -3,6 +3,7 @@ package de.heckenmann.visualagent.ui.panels
 import de.heckenmann.visualagent.agent.AgentConfig
 import de.heckenmann.visualagent.agent.AgentStatus
 import de.heckenmann.visualagent.agent.SubAgent
+import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.ui.FxmlLoader
 import javafx.fxml.FXML
 import javafx.scene.Node
@@ -15,11 +16,16 @@ import org.springframework.stereotype.Component
 import java.util.UUID
 
 /**
- * Represents SubAgentsPanel.
+ * Panel that displays configured sub-agents, their workload, and quick actions.
+ *
+ * The panel can run in Spring-backed mode with a [ProviderCatalogService] or
+ * in UI tests without one; in the latter case model/provider choices are empty.
  */
 @Component
 @Lazy
-class SubAgentsPanel : Region() {
+class SubAgentsPanel(
+    private val providerCatalog: ProviderCatalogService? = null,
+) : Region() {
     @FXML
     private lateinit var rootVBox: VBox
 
@@ -30,6 +36,9 @@ class SubAgentsPanel : Region() {
     private lateinit var btnAddAgent: Button
 
     @FXML
+    private lateinit var emptyCreateAgentButton: Button
+
+    @FXML
     private lateinit var agentsContainer: VBox
 
     @FXML
@@ -38,10 +47,13 @@ class SubAgentsPanel : Region() {
     @FXML
     private lateinit var activeJobsLabel: Label
 
+    @FXML
+    private lateinit var emptyState: VBox
+
     private val agentsList = mutableListOf<SubAgentCardView>()
 
     // Callback for creating new agents (UI -> backend)
-    var onCreateAgent: ((name: String, role: String, template: String) -> Unit)? = null
+    var onCreateAgent: ((name: String, role: String, config: AgentConfig) -> Unit)? = null
 
     init {
         val root = FxmlLoader.load(this, "sub-agents-panel.fxml")
@@ -51,7 +63,10 @@ class SubAgentsPanel : Region() {
     }
 
     /**
-     * Executes setAgents.
+     * Replaces the visible agent cards with persisted runtime state.
+     *
+     * @param agents Agents to render
+     * @param activeJobsByAgentId Current active job count keyed by agent ID
      */
     fun setAgents(
         agents: List<SubAgent>,
@@ -65,16 +80,18 @@ class SubAgentsPanel : Region() {
 
     private fun setupUI() {
         styleClass.add("subagents-panel")
-        // Add button behavior: open dialog and delegate creation to callback or create locally
-        btnAddAgent.setOnAction {
-            AgentDetailsDialog.showFor(null) { name, role, template ->
-                if (onCreateAgent != null) {
-                    onCreateAgent!!.invoke(name, role, template)
-                } else {
-                    val id = UUID.randomUUID().toString().take(8)
-                    val newAgent = SubAgent.fromTemplate(id, name, role, template)
-                    addAgent(newAgent)
-                }
+        btnAddAgent.setOnAction { showCreateAgentDialog() }
+        emptyCreateAgentButton.setOnAction { showCreateAgentDialog() }
+    }
+
+    private fun showCreateAgentDialog() {
+        AgentDetailsDialog.showFor(null, selectableProviderProfiles()) { name, role, config ->
+            if (onCreateAgent != null) {
+                onCreateAgent!!.invoke(name, role, config)
+            } else {
+                val id = UUID.randomUUID().toString().take(8)
+                val newAgent = SubAgent(id = id, name = name, role = role, config = config)
+                addAgent(newAgent)
             }
         }
     }
@@ -89,7 +106,10 @@ class SubAgentsPanel : Region() {
     var agentActionCallback: ((action: String, agentId: String) -> Unit)? = null
 
     /**
-     * Executes addAgent.
+     * Adds one agent card and wires its local action callbacks.
+     *
+     * @param agent Agent to render
+     * @param activeJobCount Current number of jobs running for this agent
      */
     fun addAgent(
         agent: SubAgent,
@@ -99,10 +119,10 @@ class SubAgentsPanel : Region() {
 
         // Configure callbacks: delegate to agentActionCallback if present, otherwise perform local UI-only behavior
         agentView.onConfigure = { a ->
-            AgentDetailsDialog.showFor(a) { name, role, template ->
+            AgentDetailsDialog.showFor(a, selectableProviderProfiles()) { name, role, config ->
                 a.name = name
                 a.role = role
-                a.config = AgentConfig.fromTemplate(template)
+                a.config = config
                 agentView.refreshDisplay()
                 // propagate to backend if available
                 agentActionCallback?.invoke("update", a.id)
@@ -110,7 +130,7 @@ class SubAgentsPanel : Region() {
         }
 
         agentView.onRun = { a ->
-            agentActionCallback?.invoke("run", a.id) ?: println("[UI] Run agent ${a.id}")
+            agentActionCallback?.invoke("run", a.id)
         }
 
         agentView.onLogs = { a ->
@@ -140,7 +160,12 @@ class SubAgentsPanel : Region() {
     }
 
     /**
-     * Executes updateAgentStatus.
+     * Updates one visible agent card after scheduler or backend state changes.
+     *
+     * @param agentId Agent card identifier
+     * @param status New runtime status
+     * @param task Optional task summary
+     * @param activeJobCount Number of active jobs for this agent
      */
     fun updateAgentStatus(
         agentId: String,
@@ -157,78 +182,20 @@ class SubAgentsPanel : Region() {
         val activeJobs = agentsList.sumOf(SubAgentCardView::activeJobCount)
         agentCountLabel.text = if (count == 1) "1 agent" else "$count agents"
         activeJobsLabel.text = if (activeJobs == 1) "1 active job" else "$activeJobs active jobs"
-    }
-}
-
-/**
- * Represents SubAgentView.
- */
-class SubAgentView(
-    val agent: SubAgent,
-) : Region() {
-    @FXML
-    private lateinit var root: VBox
-
-    @FXML
-    private lateinit var nameLabel: Label
-
-    @FXML
-    private lateinit var roleLabel: Label
-
-    @FXML
-    private lateinit var jobsLabel: Label
-
-    @FXML
-    private lateinit var statusIndicator: Label
-
-    @FXML
-    private lateinit var taskLabel: Label
-
-    init {
-        val root = FxmlLoader.load(this, "sub-agent-item.fxml")
-        children.add(root as Region)
-        setupUI()
+        emptyState.isVisible = count == 0
+        emptyState.isManaged = count == 0
     }
 
-    private fun setupUI() {
-        styleClass.add("agent-view")
-
-        nameLabel.text = agent.name
-        roleLabel.text = agent.role
-
-        statusIndicator.styleClass.addAll("agent-status-indicator", "agent-status-idle")
-        updateStatusIndicator(agent.status)
-        jobsLabel.text = "Jobs: 0"
-
-        taskLabel.isWrapText = true
-
-        val content = root.children.first()
-        content.styleClass.add("agent-content")
-    }
-
-    private fun updateStatusIndicator(status: AgentStatus) {
-        statusIndicator.styleClass.removeAll("agent-status-idle", "agent-status-busy", "agent-status-offline")
-        val statusClass =
-            when (status) {
-                AgentStatus.IDLE -> "agent-status-idle"
-                AgentStatus.BUSY -> "agent-status-busy"
-                AgentStatus.OFFLINE -> "agent-status-offline"
-            }
-        statusIndicator.styleClass.add(statusClass)
-    }
+    private fun selectableProviderProfiles() =
+        providerCatalog
+            ?.enabledProviders()
+            ?.map { profile -> profile.copy(models = providerCatalog.selectableModels(profile.id)) }
+            .orEmpty()
 
     /**
-     * Executes updateStatus.
+     * Resizes the loaded FXML root to the full panel bounds.
      */
-    fun updateStatus(
-        status: AgentStatus,
-        task: String? = null,
-        activeJobCount: Int = 0,
-    ) {
-        agent.status = status
-        agent.currentTask = task
-        updateStatusIndicator(status)
-        jobsLabel.text = "Jobs: ${activeJobCount.coerceAtLeast(0)}"
-        taskLabel.text = task ?: ""
+    override fun layoutChildren() {
+        rootVBox.resizeRelocate(0.0, 0.0, width, height)
     }
 }

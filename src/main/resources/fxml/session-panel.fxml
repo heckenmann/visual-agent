@@ -1,225 +1,176 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
 <?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
-<?import javafx.scene.control.Button?>
 <?import javafx.scene.control.PasswordField?>
 <?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.Slider?>
 <?import javafx.scene.control.Spinner?>
 <?import javafx.scene.control.TextArea?>
 <?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.Tooltip?>
+<?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Priority?>
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.VBox?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<VBox fx:id="root" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1">
-    <ScrollPane fitToWidth="true" fitToHeight="false" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED"
-                styleClass="scroll-transparent" fx:id="scrollPane" VBox.vgrow="ALWAYS">
-        <VBox spacing="16.0">
-            <padding>
-                <Insets top="20.0" right="20.0" bottom="20.0" left="20.0"/>
-            </padding>
+<VBox fx:id="root" styleClass="page-root" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1">
+    <HBox alignment="CENTER_LEFT" styleClass="page-header">
+        <VBox spacing="2.0">
+            <Label text="Session" styleClass="page-title"/>
+            <Label text="Configure the active model, execution limits, and agent behavior." styleClass="page-subtitle"/>
+        </VBox>
+    </HBox>
 
-            <!-- Section Header: Session Control -->
-            <HBox alignment="CENTER_LEFT" spacing="8.0">
-                <padding>
-                    <Insets bottom="8.0"/>
-                </padding>
-                <FontIcon iconLiteral="fas-bars" iconSize="14"/>
-                <Label text="Session Control" styleClass="title-3"/>
-            </HBox>
-
-            <!-- MODEL GROUP -->
-            <VBox spacing="4.0" styleClass="setting-group">
-                <HBox alignment="CENTER_LEFT" spacing="8.0">
-                    <padding>
-                        <Insets top="4.0" bottom="4.0"/>
-                    </padding>
-                    <FontIcon iconLiteral="fas-laptop" iconSize="11"/>
-                    <Label text="MODEL" styleClass="text-muted, bold"/>
-                </HBox>
-                <VBox spacing="10.0">
-                    <padding>
-                        <Insets left="24.0"/>
-                    </padding>
-                    <VBox spacing="4.0">
-                        <Label text="Provider"/>
-                        <ComboBox fx:id="providerSelector" maxWidth="Infinity"/>
+    <ScrollPane fx:id="scrollPane" fitToWidth="true" fitToHeight="false" hbarPolicy="NEVER"
+                vbarPolicy="AS_NEEDED" styleClass="page-scroll" VBox.vgrow="ALWAYS">
+        <VBox spacing="16.0" styleClass="page-content">
+            <VBox spacing="14.0" styleClass="settings-card">
+                <HBox alignment="CENTER_LEFT" spacing="10.0">
+                    <FontIcon iconLiteral="fas-microchip" iconSize="14" styleClass="card-icon"/>
+                    <VBox spacing="1.0">
+                        <Label text="Model Provider" styleClass="card-title"/>
+                        <Label text="Select the service and model used for new requests." styleClass="card-description"/>
                     </VBox>
-                    <VBox fx:id="openAiSettingsGroup" spacing="10.0">
-                        <VBox spacing="4.0">
-                            <Label text="OpenAI API Key"/>
-                            <PasswordField fx:id="openAiApiKeyField" promptText="sk-..." maxWidth="Infinity"/>
-                            <Label text="Stored in SQLite plaintext by current product configuration." styleClass="text-caption"/>
+                </HBox>
+                <Separator/>
+                <GridPane hgap="18.0" vgap="12.0">
+                    <VBox spacing="6.0" GridPane.columnIndex="0" GridPane.rowIndex="0">
+                        <Label text="Provider" styleClass="field-label"/>
+                        <ComboBox fx:id="providerSelector" prefWidth="210.0" maxWidth="Infinity"/>
+                        <HBox spacing="6.0">
+                            <Button fx:id="addProviderButton" text="Add"/>
+                            <Button fx:id="editProviderButton" text="Edit"/>
+                            <Button fx:id="deleteProviderButton" text="Delete"/>
+                        </HBox>
+                    </VBox>
+                    <VBox fx:id="ollamaSettingsGroup" spacing="12.0" GridPane.columnIndex="1" GridPane.rowIndex="0">
+                        <VBox spacing="6.0">
+                            <Label text="Ollama API key" styleClass="field-label"/>
+                            <PasswordField fx:id="ollamaApiKeyField" promptText="Optional bearer token"
+                                           prefWidth="360.0" maxWidth="Infinity"/>
+                            <Label text="Optional. Stored locally in SQLite for secured endpoints." styleClass="field-help"/>
                         </VBox>
-                        <VBox spacing="4.0">
-                            <Label text="OpenAI Base URL"/>
+                        <VBox spacing="6.0">
+                            <Label text="Base URL" styleClass="field-label"/>
+                            <TextField fx:id="ollamaBaseUrlField" promptText="http://localhost:11434" maxWidth="Infinity"/>
+                        </VBox>
+                    </VBox>
+                    <VBox fx:id="openAiSettingsGroup" spacing="12.0" GridPane.columnIndex="1" GridPane.rowIndex="0">
+                        <VBox spacing="6.0">
+                            <Label text="OpenAI API key" styleClass="field-label"/>
+                            <PasswordField fx:id="openAiApiKeyField" promptText="sk-..." prefWidth="360.0" maxWidth="Infinity"/>
+                            <Label text="Stored locally in SQLite by the current product configuration." styleClass="field-help"/>
+                        </VBox>
+                        <VBox spacing="6.0">
+                            <Label text="Base URL" styleClass="field-label"/>
                             <TextField fx:id="openAiBaseUrlField" promptText="https://api.openai.com" maxWidth="Infinity"/>
                         </VBox>
                     </VBox>
-                    <VBox spacing="4.0">
-                        <Label text="Active Model"/>
-                        <HBox spacing="8.0" alignment="CENTER_LEFT">
-                            <TextField fx:id="modelSearchField" promptText="Search models..." maxWidth="Infinity" HBox.hgrow="ALWAYS"/>
-                            <CheckBox fx:id="favoritesOnlyToggle" text="Favorites"/>
-                            <Button fx:id="favoriteButton" text="☆"/>
-                        </HBox>
-                        <HBox spacing="8.0" alignment="CENTER_LEFT">
-                            <ComboBox fx:id="modelSelector" maxWidth="Infinity" HBox.hgrow="ALWAYS"/>
-                            <Button fx:id="refreshModelsButton" text="Refresh"/>
-                        </HBox>
-                    </VBox>
-                    
-                    <!-- Model Details Section -->
-                    <VBox spacing="4.0">
-                        <Label text="Model Details" styleClass="text-muted, bold"/>
-                        <VBox spacing="2.0">
-                            <padding>
-                                <Insets left="20.0"/>
-                            </padding>
-                            <ScrollPane fitToWidth="true" styleClass="scroll-transparent">
-                                <Label fx:id="modelInfoLabel" text="No model selected" styleClass="text-caption"/>
-                            </ScrollPane>
-                        </VBox>
-                    </VBox>
+                </GridPane>
+                <VBox spacing="7.0">
+                    <Label text="Active model" styleClass="field-label"/>
+                    <HBox spacing="8.0" alignment="CENTER_LEFT">
+                        <TextField fx:id="modelSearchField" promptText="Search available models" HBox.hgrow="ALWAYS"/>
+                        <CheckBox fx:id="favoritesOnlyToggle" text="Favorites only"/>
+                    </HBox>
+                    <HBox spacing="8.0" alignment="CENTER_LEFT">
+                        <ComboBox fx:id="modelSelector" maxWidth="Infinity" HBox.hgrow="ALWAYS"
+                                  promptText="Select a model"/>
+                        <Button fx:id="favoriteButton" text="☆" styleClass="button-icon"/>
+                        <Button fx:id="refreshModelsButton" styleClass="button-icon">
+                            <graphic><FontIcon iconLiteral="fas-sync-alt" iconSize="10"/></graphic>
+                            <tooltip><Tooltip text="Refresh available models"/></tooltip>
+                        </Button>
+                    </HBox>
+                    <Label fx:id="modelInfoLabel" text="Select a provider to load models."
+                           wrapText="true" styleClass="model-info-box"/>
                 </VBox>
             </VBox>
 
-            <!-- MODEL CONTEXT GROUP -->
-            <VBox spacing="4.0" styleClass="setting-group">
-                <HBox alignment="CENTER_LEFT" spacing="8.0">
-                    <padding>
-                        <Insets top="4.0" bottom="4.0"/>
-                    </padding>
-                    <FontIcon iconLiteral="fas-brain" iconSize="11"/>
-                    <Label text="MODEL CONTEXT" styleClass="text-muted, bold"/>
+            <VBox spacing="14.0" styleClass="settings-card">
+                <HBox alignment="CENTER_LEFT" spacing="10.0">
+                    <FontIcon iconLiteral="fas-sliders-h" iconSize="14" styleClass="card-icon"/>
+                    <VBox spacing="1.0">
+                        <Label text="Execution" styleClass="card-title"/>
+                        <Label text="Control context capacity, concurrency, and request limits." styleClass="card-description"/>
+                    </VBox>
                 </HBox>
-                <VBox spacing="10.0">
-                    <padding>
-                        <Insets left="24.0"/>
-                    </padding>
-                    <VBox spacing="4.0">
-                        <Label text="Context Length"/>
-                        <HBox spacing="8.0" alignment="CENTER_LEFT">
-                            <Slider fx:id="contextSlider" HBox.hgrow="ALWAYS"
-                                    min="1024.0" max="32768.0" blockIncrement="1024.0"
-                                    majorTickUnit="8192.0" snapToTicks="true"/>
-                            <HBox spacing="4.0" alignment="CENTER_LEFT">
-                                <Label fx:id="contextValueLabel" text="4096" styleClass="bold, status-connected"/>
-                                <Label text="tokens" styleClass="text-caption"/>
-                            </HBox>
+                <Separator/>
+                <VBox spacing="7.0">
+                    <HBox alignment="CENTER_LEFT">
+                        <Label text="Context length" styleClass="field-label"/>
+                        <Region HBox.hgrow="ALWAYS"/>
+                        <Label fx:id="contextValueLabel" text="4096" styleClass="value-label"/>
+                        <Label text=" tokens" styleClass="field-help"/>
+                    </HBox>
+                    <Slider fx:id="contextSlider" min="1024.0" max="32768.0" blockIncrement="1024.0"
+                            majorTickUnit="8192.0" snapToTicks="true"/>
+                </VBox>
+                <GridPane hgap="24.0" vgap="12.0">
+                    <VBox spacing="6.0" GridPane.columnIndex="0" GridPane.rowIndex="0">
+                        <Label text="Startup history" styleClass="field-label"/>
+                        <HBox spacing="7.0" alignment="CENTER_LEFT">
+                            <Spinner fx:id="loadLimitSpinner" prefWidth="110.0" editable="true"/>
+                            <Label text="messages" styleClass="field-help"/>
                         </HBox>
                     </VBox>
-                </VBox>
+                    <VBox spacing="6.0" GridPane.columnIndex="1" GridPane.rowIndex="0">
+                        <Label text="Parallel sub-agents" styleClass="field-label"/>
+                        <Spinner fx:id="maxParallelSubAgentsSpinner" prefWidth="110.0" editable="true"/>
+                    </VBox>
+                    <VBox spacing="6.0" GridPane.columnIndex="2" GridPane.rowIndex="0">
+                        <Label text="Request timeout" styleClass="field-label"/>
+                        <HBox spacing="7.0" alignment="CENTER_LEFT">
+                            <Spinner fx:id="timeoutSpinner" prefWidth="110.0" editable="true"/>
+                            <Label text="seconds" styleClass="field-help"/>
+                        </HBox>
+                    </VBox>
+                </GridPane>
             </VBox>
 
-            <!-- BEHAVIOR GROUP -->
-            <VBox spacing="4.0" styleClass="setting-group">
-                <HBox alignment="CENTER_LEFT" spacing="8.0">
-                    <padding>
-                        <Insets top="4.0" bottom="4.0"/>
-                    </padding>
-                    <FontIcon iconLiteral="fas-cog" iconSize="11"/>
-                    <Label text="BEHAVIOR" styleClass="text-muted, bold"/>
+            <VBox spacing="14.0" styleClass="settings-card">
+                <HBox alignment="CENTER_LEFT" spacing="10.0">
+                    <FontIcon iconLiteral="fas-cog" iconSize="14" styleClass="card-icon"/>
+                    <VBox spacing="1.0">
+                        <Label text="Response Behavior" styleClass="card-title"/>
+                        <Label text="Choose how responses are generated and displayed." styleClass="card-description"/>
+                    </VBox>
                 </HBox>
-                <VBox spacing="10.0">
-                    <padding>
-                        <Insets left="24.0"/>
-                    </padding>
-                    <!-- Streaming Toggle -->
-                    <VBox spacing="2.0">
-                        <padding>
-                            <Insets top="2.0" bottom="2.0"/>
-                        </padding>
-                        <CheckBox fx:id="streamingToggle" text="Streaming"/>
-                        <Label text="Real-time token streaming" styleClass="text-caption"/>
+                <Separator/>
+                <HBox spacing="28.0">
+                    <VBox spacing="3.0" HBox.hgrow="ALWAYS">
+                        <CheckBox fx:id="streamingToggle" text="Stream responses"/>
+                        <Label text="Show tokens as they arrive." styleClass="field-help"/>
                     </VBox>
-                    <!-- Thinking Toggle -->
-                    <VBox spacing="2.0">
-                        <padding>
-                            <Insets top="2.0" bottom="2.0"/>
-                        </padding>
-                        <CheckBox fx:id="thinkingToggle" text="Thought Display"/>
-                        <Label text="Show model reasoning" styleClass="text-caption"/>
+                    <VBox spacing="3.0" HBox.hgrow="ALWAYS">
+                        <CheckBox fx:id="thinkingToggle" text="Show reasoning"/>
+                        <Label text="Display model reasoning when available." styleClass="field-help"/>
                     </VBox>
-                    <!-- Auto Compaction Toggle -->
-                    <VBox spacing="2.0">
-                        <padding>
-                            <Insets top="2.0" bottom="2.0"/>
-                        </padding>
-                        <CheckBox fx:id="autoCompactionToggle" text="Auto Compaction"/>
-                        <Label text="Compact history on overflow" styleClass="text-caption"/>
+                    <VBox spacing="3.0" HBox.hgrow="ALWAYS">
+                        <CheckBox fx:id="autoCompactionToggle" text="Compact automatically"/>
+                        <Label text="Reduce history when context fills up." styleClass="field-help"/>
                     </VBox>
-                    <!-- Load Limit Spinner -->
-                    <VBox spacing="2.0">
-                        <padding>
-                            <Insets top="2.0" bottom="2.0"/>
-                        </padding>
-                        <HBox spacing="6.0" alignment="CENTER_LEFT">
-                            <Spinner fx:id="loadLimitSpinner" prefWidth="100.0" maxWidth="100.0" editable="true"/>
-                            <Label text="messages loaded on startup" styleClass="text-caption"/>
-                        </HBox>
-                    </VBox>
-                    <!-- Parallel Sub-Agents -->
-                    <VBox spacing="2.0">
-                        <padding>
-                            <Insets top="2.0" bottom="2.0"/>
-                        </padding>
-                        <HBox spacing="6.0" alignment="CENTER_LEFT">
-                            <Spinner fx:id="maxParallelSubAgentsSpinner" prefWidth="100.0" maxWidth="100.0" editable="true"/>
-                            <Label text="max parallel sub-agents per turn" styleClass="text-caption"/>
-                        </HBox>
-                    </VBox>
-                </VBox>
+                </HBox>
             </VBox>
 
-            <!-- TIMEOUT GROUP -->
-            <VBox spacing="4.0" styleClass="setting-group">
-                <HBox alignment="CENTER_LEFT" spacing="8.0">
-                    <padding>
-                        <Insets top="4.0" bottom="4.0"/>
-                    </padding>
-                    <FontIcon iconLiteral="fas-clock" iconSize="11"/>
-                    <Label text="TIMEOUT" styleClass="text-muted, bold"/>
-                </HBox>
-                <VBox spacing="10.0">
-                    <padding>
-                        <Insets left="24.0"/>
-                    </padding>
-                    <VBox spacing="4.0">
-                        <Label text="Request Timeout"/>
-                        <HBox spacing="6.0" alignment="CENTER_LEFT">
-                            <Spinner fx:id="timeoutSpinner" prefWidth="100.0" maxWidth="100.0" editable="true"/>
-                            <Label text="seconds" styleClass="text-caption"/>
-                        </HBox>
+            <VBox spacing="12.0" styleClass="settings-card">
+                <HBox alignment="CENTER_LEFT" spacing="10.0">
+                    <FontIcon iconLiteral="fas-comment-dots" iconSize="14" styleClass="card-icon"/>
+                    <VBox spacing="1.0">
+                        <Label text="Model Instruction" styleClass="card-title"/>
+                        <Label text="Add persistent preferences to every model request." styleClass="card-description"/>
                     </VBox>
-                </VBox>
-            </VBox>
-
-            <!-- MODEL INSTRUCTION GROUP -->
-            <VBox spacing="4.0" styleClass="setting-group">
-                <HBox alignment="CENTER_LEFT" spacing="8.0">
-                    <padding>
-                        <Insets top="4.0" bottom="4.0"/>
-                    </padding>
-                    <FontIcon iconLiteral="fas-comment-dots" iconSize="11"/>
-                    <Label text="MODEL INSTRUCTION" styleClass="text-muted, bold"/>
                 </HBox>
-                <VBox spacing="10.0">
-                    <padding>
-                        <Insets left="24.0"/>
-                    </padding>
-                    <VBox spacing="4.0">
-                        <Label text="Prompt with preferences and wishes"/>
-                        <TextArea fx:id="userInstructionArea" promptText="Example: Always answer in German, concise and pragmatic." wrapText="true" prefRowCount="4"/>
-                        <Label text="Applied to each model request as additional system instruction." styleClass="text-caption"/>
-                    </VBox>
-                </VBox>
+                <TextArea fx:id="userInstructionArea"
+                          promptText="Example: Always answer in German, concise and pragmatic."
+                          wrapText="true" prefRowCount="4"/>
+                <Label text="Do not place credentials or other secrets in this instruction." styleClass="field-help"/>
             </VBox>
         </VBox>
     </ScrollPane>

@@ -1,5 +1,7 @@
 package de.heckenmann.visualagent.ui.panels
 
+import de.heckenmann.visualagent.ui.panels.chat.ChatPanelInitializer
+import de.heckenmann.visualagent.ui.panels.chat.InputKeyboardAction
 import javafx.scene.input.KeyCode
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test

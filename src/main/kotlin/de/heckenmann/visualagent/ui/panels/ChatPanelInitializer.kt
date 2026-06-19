@@ -1,4 +1,4 @@
-package de.heckenmann.visualagent.ui.panels
+package de.heckenmann.visualagent.ui.panels.chat
 
 import de.heckenmann.visualagent.AppIdentity
 import javafx.scene.control.Button

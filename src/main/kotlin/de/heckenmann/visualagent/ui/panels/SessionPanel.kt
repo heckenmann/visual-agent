@@ -1,8 +1,11 @@
 package de.heckenmann.visualagent.ui.panels
 
+import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.config.AppConfig
 import de.heckenmann.visualagent.ui.FxmlLoader
+import de.heckenmann.visualagent.ui.panels.session.ProviderProfileDialog
 import de.heckenmann.visualagent.ui.panels.session.SessionModelController
+import de.heckenmann.visualagent.ui.panels.session.SessionProviderSettingsBinder
 import javafx.fxml.FXML
 import javafx.scene.Parent
 import javafx.scene.control.Button
@@ -22,11 +25,13 @@ import org.springframework.context.annotation.Lazy
 import org.springframework.stereotype.Component
 
 /**
- * Represents SessionPanel.
+ * Session settings panel for provider/model selection, generation options, and runtime limits.
  */
 @Component
 @Lazy
-class SessionPanel : Region() {
+class SessionPanel(
+    private val providerCatalog: ProviderCatalogService,
+) : Region() {
     @FXML
     private lateinit var providerSelector: ComboBox<String>
 
@@ -44,6 +49,24 @@ class SessionPanel : Region() {
 
     @FXML
     private lateinit var refreshModelsButton: Button
+
+    @FXML
+    private lateinit var addProviderButton: Button
+
+    @FXML
+    private lateinit var editProviderButton: Button
+
+    @FXML
+    private lateinit var deleteProviderButton: Button
+
+    @FXML
+    private lateinit var ollamaApiKeyField: PasswordField
+
+    @FXML
+    private lateinit var ollamaBaseUrlField: TextField
+
+    @FXML
+    private lateinit var ollamaSettingsGroup: VBox
 
     @FXML
     private lateinit var openAiApiKeyField: PasswordField
@@ -88,6 +111,7 @@ class SessionPanel : Region() {
     private lateinit var scrollPane: ScrollPane
     private val rootNode: Parent
     private lateinit var modelController: SessionModelController
+    private lateinit var providerSettingsBinder: SessionProviderSettingsBinder
 
     init {
         rootNode = FxmlLoader.load(this, "session-panel.fxml")
@@ -95,7 +119,7 @@ class SessionPanel : Region() {
     }
 
     /**
-     * Executes initialize.
+     * Wires provider settings, model discovery, toggles, and runtime limit controls.
      */
     @FXML
     fun initialize() {
@@ -106,26 +130,51 @@ class SessionPanel : Region() {
                 favoritesOnlyToggle = favoritesOnlyToggle,
                 favoriteButton = favoriteButton,
                 refreshModelsButton = refreshModelsButton,
+                ollamaSettingsGroup = ollamaSettingsGroup,
                 openAiSettingsGroup = openAiSettingsGroup,
                 modelInfoLabel = modelInfoLabel,
+                providerCatalog = providerCatalog,
             )
-        providerSelector.items.setAll("Ollama", "OpenAI")
+        refreshProviderChoices()
         providerSelector.selectionModel.selectedItemProperty().addListener { _, _, selected ->
             if (selected != null) {
-                AppConfig.instance.llmProvider = selected.lowercase()
+                val provider = providerCatalog.enabledProviders().firstOrNull { it.name == selected } ?: return@addListener
+                providerCatalog.setActiveProvider(provider.id)
                 AppConfig.instance.save()
+                providerSettingsBinder.showActiveProvider()
                 modelController.updateProviderSpecificControls()
                 modelController.refreshModels()
             }
         }
-
-        openAiApiKeyField.textProperty().addListener { _, _, newVal ->
-            AppConfig.instance.openAiApiKey = newVal ?: ""
-            AppConfig.instance.save()
+        providerSettingsBinder =
+            SessionProviderSettingsBinder(
+                ollamaApiKeyField,
+                ollamaBaseUrlField,
+                openAiApiKeyField,
+                openAiBaseUrlField,
+                providerCatalog,
+            ).also(SessionProviderSettingsBinder::bind)
+        addProviderButton.setOnAction {
+            ProviderProfileDialog.show { profile ->
+                providerCatalog.saveProvider(profile)
+                refreshProviderChoices(profile.id)
+            }
         }
-        openAiBaseUrlField.textProperty().addListener { _, _, newVal ->
-            AppConfig.instance.openAiBaseUrl = (newVal ?: "").ifBlank { "https://api.openai.com" }
-            AppConfig.instance.save()
+        editProviderButton.setOnAction {
+            providerCatalog.getProvider(providerCatalog.activeProviderId())?.let { profile ->
+                ProviderProfileDialog.show(profile) { updated ->
+                    providerCatalog.saveProvider(updated)
+                    refreshProviderChoices(updated.id)
+                    providerSettingsBinder.showActiveProvider()
+                }
+            }
+        }
+        deleteProviderButton.setOnAction {
+            if (providerCatalog.deleteProvider(providerCatalog.activeProviderId())) {
+                refreshProviderChoices()
+                providerSettingsBinder.showActiveProvider()
+                modelController.refreshModels()
+            }
         }
         contextSlider.valueProperty().addListener { _, _, newVal ->
             contextValueLabel.text = newVal.toInt().toString()
@@ -134,7 +183,13 @@ class SessionPanel : Region() {
         }
         modelSelector.selectionModel.selectedItemProperty().addListener { _, _, selected ->
             if (selected != null) {
-                AppConfig.instance.setActiveModel(selected)
+                val providerId = providerCatalog.activeProviderId()
+                providerCatalog.getProvider(providerId)?.let { profile ->
+                    providerCatalog.saveProvider(profile.copy(defaultModel = selected))
+                }
+                when (providerId) {
+                    "ollama", "openai" -> AppConfig.instance.setActiveModel(selected)
+                }
                 AppConfig.instance.save()
                 modelController.refreshModelDetails(selected)
                 modelController.updateFavoriteButton(selected)
@@ -191,11 +246,17 @@ class SessionPanel : Region() {
         thinkingToggle.isSelected = AppConfig.instance.thinkingEnabled
         autoCompactionToggle.isSelected = AppConfig.instance.autoCompactionEnabled
         userInstructionArea.text = AppConfig.instance.userModelInstruction
-        providerSelector.selectionModel.select(if (AppConfig.instance.normalizedProvider() == "openai") "OpenAI" else "Ollama")
-        openAiApiKeyField.text = AppConfig.instance.openAiApiKey
-        openAiBaseUrlField.text = AppConfig.instance.openAiBaseUrl
+        val activeProvider = providerCatalog.getProvider(providerCatalog.activeProviderId())
+        providerSelector.selectionModel.select(activeProvider?.name)
         modelController.updateProviderSpecificControls()
         modelController.updateFavoriteButton(modelSelector.selectionModel.selectedItem)
+    }
+
+    private fun refreshProviderChoices(selectProviderId: String = providerCatalog.activeProviderId()) {
+        val providers = providerCatalog.enabledProviders()
+        providerSelector.items.setAll(providers.map { it.name })
+        providerSelector.selectionModel.select(providers.firstOrNull { it.id == selectProviderId }?.name)
+        deleteProviderButton.isDisable = providers.size <= 1
     }
 
     /**

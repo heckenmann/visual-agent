@@ -1,4 +1,4 @@
-package de.heckenmann.visualagent.ui.panels
+package de.heckenmann.visualagent.ui.panels.chat
 
 import de.heckenmann.visualagent.agent.Message
 import kotlinx.serialization.json.Json

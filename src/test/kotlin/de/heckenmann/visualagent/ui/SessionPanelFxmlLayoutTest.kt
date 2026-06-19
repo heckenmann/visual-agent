@@ -52,4 +52,28 @@ class SessionPanelFxmlLayoutTest {
             "session-panel.fxml must group OpenAI-specific settings for provider-based visibility",
         )
     }
+
+    @Test
+    fun `session fxml groups ollama endpoint and optional credentials`() {
+        val res = javaClass.getResourceAsStream("/fxml/session-panel.fxml")?.bufferedReader()?.use { it.readText() }
+        assertTrue(
+            res != null &&
+                res.contains("fx:id=\"ollamaSettingsGroup\"") &&
+                res.contains("fx:id=\"ollamaApiKeyField\"") &&
+                res.contains("fx:id=\"ollamaBaseUrlField\""),
+            "session-panel.fxml must group Ollama endpoint and credential settings",
+        )
+    }
+
+    @Test
+    fun `session fxml uses shared professional page structure`() {
+        val res = javaClass.getResourceAsStream("/fxml/session-panel.fxml")?.bufferedReader()?.use { it.readText() }
+        assertTrue(
+            res != null &&
+                res.contains("styleClass=\"page-root\"") &&
+                res.contains("styleClass=\"page-header\"") &&
+                res.contains("styleClass=\"settings-card\""),
+            "session-panel.fxml must use the shared page and card design language",
+        )
+    }
 }

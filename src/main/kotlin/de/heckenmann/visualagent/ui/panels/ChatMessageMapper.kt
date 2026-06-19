@@ -1,4 +1,4 @@
-package de.heckenmann.visualagent.ui.panels
+package de.heckenmann.visualagent.ui.panels.chat
 
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
@@ -16,7 +16,7 @@ internal class ChatMessageMapper(
         if (message.content.isBlank()) return null
         return ChatMessage(
             role = message.role,
-            content = message.content,
+            content = normalizeHistoryContent(message.content),
             isToolEvent = toolHistoryParser.isToolHistoryEntry(message),
             toolData = message.metadata?.let(toolHistoryParser::parseToolMetadata),
         )
@@ -60,4 +60,20 @@ internal class ChatMessageMapper(
             else -> baseSummary
         }
     }
+
+    private fun normalizeHistoryContent(content: String): String =
+        when {
+            content.startsWith("Recovery note: Could not auto-resume interrupted request") ->
+                "I could not resume the previous request automatically. ${recoveryHint(content)}"
+            else -> content
+        }
+
+    private fun recoveryHint(content: String): String =
+        when {
+            "api key" in content.lowercase() ->
+                "Authentication failed. Check the provider API key and base URL in Session settings."
+            "subscription" in content.lowercase() || "upgrade" in content.lowercase() || "403" in content ->
+                "The selected model is not available for this account. Choose another model or update the provider subscription."
+            else -> "Check the active provider and model, then try again."
+        }
 }

@@ -8,17 +8,16 @@ import javafx.scene.layout.HBox
 import javafx.scene.layout.Region
 
 /**
- * Represents StatusBar.
+ * Fixed-height footer that shows workspace persistence, agent activity, and reconnect controls.
  */
 class StatusBar : Region() {
     companion object {
-        const val HEIGHT = 40.0
+        const val HEIGHT = 34.0
     }
 
     private val rootBorderPane = BorderPane()
-    private val agentsLabel = Label("Agents: 0/0")
+    private val agentsLabel = Label("0 of 0 agents active")
     private val reconnectButton = Button("Reconnect")
-    private val retryButton = Button("Retry")
     private var onReconnect: (() -> Unit)? = null
 
     init {
@@ -29,12 +28,13 @@ class StatusBar : Region() {
         rootBorderPane.styleClass.add("status-bar")
 
         reconnectButton.isFocusTraversable = false
-        retryButton.isFocusTraversable = false
         reconnectButton.setOnAction { onReconnect?.invoke() }
-        retryButton.setOnAction { onReconnect?.invoke() }
         reconnectButton.styleClass.addAll("status-action-button")
-        retryButton.styleClass.addAll("status-action-button", "status-action-secondary")
         agentsLabel.styleClass.add("status-bar-muted")
+        val workspaceLabel =
+            Label("Workspace changes are saved automatically").apply {
+                styleClass.add("status-bar-muted")
+            }
 
         val agentsChip =
             HBox(agentsLabel).apply {
@@ -43,13 +43,13 @@ class StatusBar : Region() {
             }
 
         val rightGroup =
-            HBox(agentsChip, retryButton, reconnectButton).apply {
+            HBox(agentsChip, reconnectButton).apply {
                 styleClass.add("status-group")
                 alignment = Pos.CENTER_RIGHT
                 spacing = 8.0
             }
 
-        rootBorderPane.left = null
+        rootBorderPane.left = workspaceLabel
         rootBorderPane.right = rightGroup
         children.add(rootBorderPane)
 
@@ -59,17 +59,22 @@ class StatusBar : Region() {
     }
 
     /**
-     * Executes updateAgentCount.
+     * Updates the active-agent summary shown in the footer.
+     *
+     * @param active Number of agents currently running work
+     * @param total Total number of configured agents
      */
     fun updateAgentCount(
         active: Int,
         total: Int,
     ) {
-        agentsLabel.text = "Agents: $active/$total"
+        agentsLabel.text = "$active of $total agents active"
     }
 
     /**
-     * Executes setOnReconnect.
+     * Registers the action invoked when the user clicks the reconnect button.
+     *
+     * @param callback Reconnection callback owned by the main window
      */
     fun setOnReconnect(callback: () -> Unit) {
         onReconnect = callback

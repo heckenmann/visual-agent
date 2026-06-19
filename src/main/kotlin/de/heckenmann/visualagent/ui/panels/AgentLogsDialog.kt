@@ -3,41 +3,64 @@ package de.heckenmann.visualagent.ui.panels
 import de.heckenmann.visualagent.agent.SubAgent
 import javafx.scene.control.ButtonType
 import javafx.scene.control.Dialog
+import javafx.scene.control.Label
 import javafx.scene.control.TextArea
+import javafx.scene.layout.HBox
+import javafx.scene.layout.Priority
+import javafx.scene.layout.Region
 import javafx.scene.layout.VBox
 
 /**
- * Simple dialog to show an agent's chat history/logs.
+ * Displays an agent's conversation history and current execution status.
  */
 class AgentLogsDialog {
     companion object {
         /**
-         * Executes showFor.
+         * Opens a read-only activity view for [agent].
          */
         fun showFor(agent: SubAgent) {
-            val dialog = Dialog<Unit>()
-            dialog.title = "Agent Logs - ${agent.name}"
-            dialog.dialogPane.buttonTypes.add(ButtonType.CLOSE)
-
-            val ta = TextArea()
-            ta.isEditable = false
-            ta.isWrapText = true
-
-            val sb = StringBuilder()
-            if (agent.chatHistory.isEmpty()) {
-                sb.append("(no logs)")
-            } else {
-                agent.chatHistory.forEach { msg ->
-                    sb.append("[${msg.role}] ${msg.content}\n\n")
+            val dialog =
+                Dialog<Unit>().apply {
+                    title = "${agent.name} Activity"
+                    headerText = "Conversation and execution history"
+                    dialogPane.buttonTypes.add(ButtonType.CLOSE)
+                    dialogPane.styleClass.add("agent-logs-dialog")
                 }
-            }
-            ta.text = sb.toString()
+            val history =
+                TextArea(renderHistory(agent)).apply {
+                    isEditable = false
+                    isWrapText = true
+                    styleClass.add("agent-log-content")
+                    VBox.setVgrow(this, Priority.ALWAYS)
+                }
+            val summary =
+                HBox(
+                    Label(
+                        agent.status.name
+                            .lowercase()
+                            .replaceFirstChar(Char::uppercase),
+                    ).apply { styleClass.addAll("summary-pill", "summary-pill-accent") },
+                    Label(agent.role).apply { styleClass.add("field-help") },
+                    Region().apply { HBox.setHgrow(this, Priority.ALWAYS) },
+                    Label("${agent.chatHistory.size} messages").apply { styleClass.add("field-help") },
+                ).apply { styleClass.add("agent-log-summary") }
 
-            val box = VBox(ta)
-            box.prefWidth = 600.0
-            box.prefHeight = 400.0
-            dialog.dialogPane.content = box
+            dialog.dialogPane.content =
+                VBox(12.0, summary, history).apply {
+                    styleClass.add("dialog-form")
+                    prefWidth = 720.0
+                    prefHeight = 480.0
+                }
             dialog.showAndWait()
         }
+
+        private fun renderHistory(agent: SubAgent): String =
+            if (agent.chatHistory.isEmpty()) {
+                "No activity has been recorded for this agent yet."
+            } else {
+                agent.chatHistory.joinToString("\n\n") { message ->
+                    "${message.role.uppercase()}\n${message.content}"
+                }
+            }
     }
 }

@@ -9,22 +9,20 @@
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Priority?>
 <?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <BorderPane fx:id="rootBorderPane" styleClass="todo-root" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1">
     <top>
         <VBox spacing="10.0" styleClass="todo-header">
-            <padding>
-                <Insets top="16.0" right="18.0" bottom="12.0" left="18.0"/>
-            </padding>
             <HBox alignment="CENTER_LEFT" spacing="10.0">
                 <VBox spacing="2.0">
-                    <Label text="Todos" styleClass="title-3"/>
-                    <Label text="Tasks shared by the user, main agent, and sub-agents" styleClass="text-caption"/>
+                    <Label text="Todos" styleClass="page-title"/>
+                    <Label text="Tasks shared by the user, main agent, and sub-agents." styleClass="page-subtitle"/>
                 </VBox>
                 <Region HBox.hgrow="ALWAYS"/>
-                <Button fx:id="addButton" text="Add" styleClass="accent">
+                <Button fx:id="addButton" text="New todo" styleClass="accent, primary-action">
                     <graphic>
                         <FontIcon iconLiteral="fas-plus" iconSize="11"/>
                     </graphic>
@@ -34,12 +32,12 @@
                         <FontIcon iconLiteral="fas-pen" iconSize="11"/>
                     </graphic>
                 </Button>
-                <Button fx:id="completeAllButton" text="Complete All">
+                <Button fx:id="completeAllButton" text="Complete all">
                     <graphic>
                         <FontIcon iconLiteral="fas-check-double" iconSize="11"/>
                     </graphic>
                 </Button>
-                <Button fx:id="deleteCompletedButton" text="Delete Done">
+                <Button fx:id="deleteCompletedButton" text="Delete done">
                     <graphic>
                         <FontIcon iconLiteral="fas-trash" iconSize="11"/>
                     </graphic>
@@ -69,7 +67,19 @@
         </VBox>
     </top>
     <center>
-        <ListView fx:id="todoListView" styleClass="todo-list">
-        </ListView>
+        <StackPane>
+            <ListView fx:id="todoListView" styleClass="todo-list">
+            </ListView>
+            <VBox fx:id="todoEmptyState" alignment="CENTER" spacing="8.0" styleClass="empty-state" visible="false" managed="false">
+                <FontIcon iconLiteral="fas-clipboard-list" iconSize="28" styleClass="empty-state-icon"/>
+                <Label fx:id="todoEmptyTitleLabel" text="No todos yet" styleClass="empty-state-title"/>
+                <Label fx:id="todoEmptyDescriptionLabel" text="Create a task yourself or let an agent create one." styleClass="empty-state-description"/>
+                <Button fx:id="emptyAddButton" text="Create first todo" styleClass="accent, primary-action">
+                    <graphic>
+                        <FontIcon iconLiteral="fas-plus" iconSize="11"/>
+                    </graphic>
+                </Button>
+            </VBox>
+        </StackPane>
     </center>
 </BorderPane>

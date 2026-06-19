@@ -1,4 +1,4 @@
-package de.heckenmann.visualagent.ui.panels
+package de.heckenmann.visualagent.ui.panels.chat
 
 import javafx.scene.CacheHint
 import javafx.scene.control.Button
@@ -82,17 +82,15 @@ internal class ChatMessageRenderer(
     ): VBox {
         val contentBody = createMessageBody(item)
         val copyButton = createIconButton(FontAwesomeSolid.COPY, "Copy") { copyToClipboard(item.content) }
-        val copyRawButton = createIconButton(FontAwesomeSolid.FILE, "Copy raw") { copyToClipboard(item.content) }
         val actionButtons =
             if (item.role == "assistant") {
-                HBox(copyButton, copyRawButton, createIconButton(FontAwesomeSolid.REDO, "Retry") { retryAtRow(row) })
+                HBox(copyButton, createIconButton(FontAwesomeSolid.REDO, "Retry") { retryAtRow(row) })
             } else {
-                HBox(copyButton, copyRawButton)
+                HBox(copyButton)
             }
         actionButtons.styleClass.add("chat-action-buttons")
         actionButtons.maxWidth = Double.MAX_VALUE
         copyButton.styleClass.add("chat-action-button")
-        copyRawButton.styleClass.add("chat-action-button")
         actionButtons.children
             .filterIsInstance<Button>()
             .forEach { it.styleClass.add("chat-action-button") }

@@ -1,4 +1,4 @@
-package de.heckenmann.visualagent.ui.panels
+package de.heckenmann.visualagent.ui.panels.chat
 
 import javafx.application.Platform
 import javafx.scene.control.ScrollPane
@@ -11,12 +11,14 @@ import kotlin.math.abs
  *
  * @property messagesScrollPane Scroll container
  * @property messagesContainer VBox containing rendered rows
+ * @property emptyConversationState Empty state shown until the first message is available
  * @property renderer Row renderer
  * @property loadingToken Placeholder text for pending assistant responses
  */
 internal class ChatMessageListController(
     private val messagesScrollPane: ScrollPane,
     private val messagesContainer: VBox,
+    private val emptyConversationState: VBox,
     private val renderer: ChatMessageRenderer,
     private val loadingToken: String,
 ) {
@@ -58,6 +60,7 @@ internal class ChatMessageListController(
             messageRows.add(index, row)
             messagesContainer.children.add(index, row)
         }
+        updateEmptyState()
         refreshGroupingStyles()
         suppressAutoScroll = false
         Platform.runLater {
@@ -91,6 +94,7 @@ internal class ChatMessageListController(
         val row = renderer.createMessageRow(message, index)
         messageRows.add(index, row)
         messagesContainer.children.add(index, row)
+        updateEmptyState()
         refreshGroupingStyles()
         scrollToBottom()
     }
@@ -118,6 +122,7 @@ internal class ChatMessageListController(
         messageRows.clear()
         messagesContainer.children.clear()
         latestStreamingContent = ""
+        updateEmptyState()
     }
 
     /**
@@ -164,6 +169,7 @@ internal class ChatMessageListController(
         val row = renderer.createMessageRow(message, index)
         messageRows.add(row)
         messagesContainer.children.add(row)
+        updateEmptyState()
         refreshGroupingStylesAround(index)
         if (autoScroll && !suppressAutoScroll) scrollToBottom()
     }
@@ -188,6 +194,12 @@ internal class ChatMessageListController(
     }
 
     private fun isNearBottom(): Boolean = messagesScrollPane.vvalue >= 0.94
+
+    private fun updateEmptyState() {
+        val empty = messages.isEmpty()
+        emptyConversationState.isVisible = empty
+        emptyConversationState.isManaged = empty
+    }
 
     private fun refreshGroupingStyles() {
         messages.indices.forEach { idx -> applyGroupingStyle(idx) }

@@ -104,13 +104,14 @@
 
 /* Todos */
 .todo-root {
-    -fx-background-color: -color-bg-default;
+    -fx-background-color: -color-bg-subtle;
 }
 
 .todo-header {
     -fx-background-color: -color-bg-default;
     -fx-border-color: -color-border-muted;
     -fx-border-width: 0 0 1px 0;
+    -fx-padding: 18px 22px 12px 22px;
 }
 
 .todo-summary-row {
@@ -126,9 +127,9 @@
 }
 
 .todo-list {
-    -fx-background-color: -color-bg-default;
+    -fx-background-color: -color-bg-subtle;
     -fx-background-insets: 0;
-    -fx-padding: 10px 12px 14px 12px;
+    -fx-padding: 14px 22px 22px 22px;
 }
 
 .todo-list .list-cell {
@@ -195,6 +196,59 @@
 .todo-empty {
     -fx-text-fill: -color-fg-muted;
     -fx-padding: 36px;
+    -fx-font-size: 13px;
+}
+
+/* Canvas */
+.canvas-root {
+    -fx-background-color: -color-bg-subtle;
+}
+
+.canvas-viewport {
+    -fx-alignment: top-left;
+}
+
+.canvas-toolbar {
+    -fx-background-color: -color-bg-default;
+    -fx-border-color: -color-border-muted;
+    -fx-border-width: 0 0 1px 0;
+}
+
+.canvas-toolbar-header,
+.canvas-toolbar-controls {
+    -fx-alignment: center-left;
+}
+
+.canvas-toolbar-header {
+    -fx-spacing: 10px;
+}
+
+.canvas-toolbar .separator {
+    -fx-padding: 4px 2px;
+}
+
+.canvas-tool-button {
+    -fx-min-height: 32px;
+}
+
+.canvas-tool-button .ikonli-font-icon {
+    -fx-icon-color: -color-fg-muted;
+}
+
+.canvas-tool-button.active {
+    -fx-background-color: -color-accent-muted;
+    -fx-text-fill: -color-accent-fg;
+    -fx-font-weight: bold;
+}
+
+.canvas-tool-button.active .ikonli-font-icon,
+.canvas-export-button .ikonli-font-icon {
+    -fx-icon-color: -color-accent-fg;
+}
+
+.canvas-surface {
+    -fx-cursor: crosshair;
+    -fx-effect: dropshadow(gaussian, rgba(15, 23, 42, 0.12), 14, 0.1, 0, 3);
 }
 
 /* Conversation */
@@ -315,7 +369,7 @@
     -fx-background: -color-bg-default;
     -fx-background-color: -color-bg-default;
     -fx-border-width: 0;
-    -fx-padding: 12px 0 4px 0;
+    -fx-padding: 12px 0 96px 0;
     -fx-spacing: 0;
 }
 
@@ -327,6 +381,19 @@
 
 .chat-message-list-scroll > .viewport {
     -fx-background-color: -color-bg-default;
+}
+
+.chat-empty-state {
+    -fx-padding: 40px;
+    -fx-max-width: 440px;
+}
+
+.chat-empty-shortcut {
+    -fx-background-color: -color-bg-subtle;
+    -fx-background-radius: 999px;
+    -fx-padding: 5px 10px;
+    -fx-text-fill: -color-fg-muted;
+    -fx-font-size: 11px;
 }
 
 .chat-message-list-scroll .scroll-bar:horizontal {
@@ -371,6 +438,8 @@
 
 .chat-composer-wrap {
     -fx-background-color: -color-bg-default;
+    -fx-border-color: -color-border-muted;
+    -fx-border-width: 1px 0 0 0;
     -fx-padding: 8px 16px 18px 16px;
 }
 
@@ -822,6 +891,72 @@
     -fx-text-fill: -color-fg-muted;
 }
 
+.workspace-desktop {
+    -fx-background-color: linear-gradient(from 0% 0% to 100% 100%, -color-bg-subtle 0%, -color-bg-default 100%);
+    -fx-padding: 18px;
+}
+
+.workspace-window {
+    -fx-background-color: -color-bg-default;
+    -fx-background-radius: 12px;
+    -fx-border-color: -color-border-muted;
+    -fx-border-radius: 12px;
+    -fx-effect: dropshadow(gaussian, rgba(31, 35, 40, 0.18), 18, 0.18, 0, 6);
+}
+
+.workspace-window-active {
+    -fx-border-color: -color-accent-emphasis;
+    -fx-effect: dropshadow(gaussian, rgba(9, 105, 218, 0.24), 24, 0.22, 0, 8);
+}
+
+.workspace-window-header {
+    -fx-background-color: -color-bg-subtle;
+    -fx-background-radius: 12px 12px 0 0;
+    -fx-border-color: -color-border-muted;
+    -fx-border-width: 0 0 1px 0;
+    -fx-padding: 8px 10px;
+}
+
+.workspace-window-title {
+    -fx-text-fill: -color-fg-default;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+
+.workspace-window-icon,
+.workspace-window-grip,
+.workspace-window-resize-icon {
+    -fx-icon-color: -color-fg-muted;
+}
+
+.workspace-window-active .workspace-window-icon {
+    -fx-icon-color: -color-accent-fg;
+}
+
+.workspace-window-close {
+    -fx-background-color: transparent;
+    -fx-background-radius: 999px;
+    -fx-padding: 4px 6px;
+}
+
+.workspace-window-close:hover {
+    -fx-background-color: -color-danger-muted;
+}
+
+.workspace-window-close-icon {
+    -fx-icon-color: -color-fg-muted;
+}
+
+.workspace-window-close:hover .workspace-window-close-icon {
+    -fx-icon-color: -color-danger-emphasis;
+}
+
+.workspace-window-resize {
+    -fx-background-color: transparent;
+    -fx-padding: 0 10px 8px 0;
+    -fx-min-height: 14px;
+}
+
 /* Status Indicators */
 .status-connected { -fx-text-fill: -color-success-emphasis; }
 .status-disconnected { -fx-text-fill: -color-danger-emphasis; }
@@ -833,7 +968,7 @@
     -fx-background-insets: 0;
     -fx-border-color: -color-border-default;
     -fx-border-width: 1px 0px 0px 0px;
-    -fx-padding: 8px 16px;
+    -fx-padding: 4px 14px;
     -fx-opacity: 1.0;
 }
 
@@ -859,7 +994,7 @@
 .status-chip {
     -fx-background-color: -color-bg-subtle;
     -fx-background-radius: 999px;
-    -fx-padding: 4px 10px;
+    -fx-padding: 3px 9px;
     -fx-alignment: center-left;
 }
 
@@ -968,6 +1103,62 @@
     -fx-font-size: 12px;
 }
 
+.empty-state {
+    -fx-padding: 72px 24px;
+}
+
+.empty-state-icon {
+    -fx-icon-color: -color-fg-muted;
+}
+
+.empty-state-title {
+    -fx-text-fill: -color-fg-default;
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+}
+
+.empty-state-description {
+    -fx-text-fill: -color-fg-muted;
+    -fx-font-size: 12px;
+}
+
+/* Dialogs */
+.dialog-form {
+    -fx-padding: 8px 4px 4px 4px;
+}
+
+.dialog-pane.agent-dialog,
+.dialog-pane.agent-logs-dialog,
+.dialog-pane.todo-dialog {
+    -fx-background-color: -color-bg-default;
+}
+
+.dialog-pane.agent-dialog .header-panel,
+.dialog-pane.agent-logs-dialog .header-panel {
+    -fx-background-color: -color-bg-subtle;
+}
+
+.dialog-pane.agent-dialog .content {
+    -fx-padding: 8px 18px 4px 18px;
+}
+
+.dialog-validation {
+    -fx-text-fill: -color-danger-emphasis;
+    -fx-font-size: 11px;
+}
+
+.agent-log-summary {
+    -fx-alignment: center-left;
+    -fx-spacing: 10px;
+}
+
+.agent-log-content {
+    -fx-font-family: "Menlo", "Monaco", "Consolas", monospace;
+    -fx-font-size: 12px;
+    -fx-control-inner-background: -color-bg-subtle;
+    -fx-text-fill: -color-fg-default;
+}
+
 /* Badges */
 .badge { -fx-font-size: 0.8em; -fx-padding: 2px 8px; -fx-background-radius: 10px; }
 .badge-low { -fx-background-color: -color-info-muted; }
@@ -980,4 +1171,18 @@
     -fx-background-color: -color-bg-default;
     -fx-padding: 12px 16px;
     -fx-background-radius: 6px;
+}
+
+.model-info-box {
+    -fx-background-color: -color-bg-subtle;
+    -fx-background-radius: 7px;
+    -fx-padding: 10px 12px;
+    -fx-text-fill: -color-fg-muted;
+    -fx-font-size: 11px;
+    -fx-max-width: Infinity;
+}
+
+.value-label {
+    -fx-text-fill: -color-accent-fg;
+    -fx-font-weight: bold;
 }

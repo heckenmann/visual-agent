@@ -3,6 +3,14 @@ package de.heckenmann.visualagent.ui.panels
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.ui.FxmlLoader
+import de.heckenmann.visualagent.ui.panels.chat.ChatConversationEventsController
+import de.heckenmann.visualagent.ui.panels.chat.ChatMessage
+import de.heckenmann.visualagent.ui.panels.chat.ChatMessageListController
+import de.heckenmann.visualagent.ui.panels.chat.ChatMessageMapper
+import de.heckenmann.visualagent.ui.panels.chat.ChatMessageRenderer
+import de.heckenmann.visualagent.ui.panels.chat.ChatPanelInitializer
+import de.heckenmann.visualagent.ui.panels.chat.ChatRuntimeStatusController
+import de.heckenmann.visualagent.ui.panels.chat.ChatToolHistoryParser
 import javafx.application.Platform
 import javafx.beans.property.SimpleBooleanProperty
 import javafx.fxml.FXML
@@ -21,9 +29,7 @@ import org.springframework.stereotype.Component
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-/**
- * Represents ChatPanel.
- */
+/** Conversation workspace panel with markdown, streaming, tool previews, todos, and input handling. */
 @Component
 @Lazy
 class ChatPanel : Region() {
@@ -35,6 +41,8 @@ class ChatPanel : Region() {
 
     @FXML private lateinit var messagesContainer: VBox
 
+    @FXML private lateinit var emptyConversationState: VBox
+
     @FXML private lateinit var inputTextField: TextArea
 
     @FXML private lateinit var sendButton: Button
@@ -42,6 +50,8 @@ class ChatPanel : Region() {
     @FXML private lateinit var clearChatButton: Button
 
     @FXML private lateinit var todoInfoLabel: Label
+
+    @FXML private lateinit var responseMetaLabel: Label
 
     @FXML private lateinit var openTodosButton: Button
 
@@ -77,12 +87,14 @@ class ChatPanel : Region() {
                 assistantBusyContainer = assistantBusyContainer,
                 assistantBusyLabel = assistantBusyLabel,
                 todoInfoLabel = todoInfoLabel,
+                responseMetaLabel = responseMetaLabel,
                 todoSummaryTooltip = todoSummaryTooltip,
             )
         messageList =
             ChatMessageListController(
                 messagesScrollPane = messagesScrollPane,
                 messagesContainer = messagesContainer,
+                emptyConversationState = emptyConversationState,
                 renderer =
                     ChatMessageRenderer(
                         loadingToken = loadingToken,
@@ -120,12 +132,10 @@ class ChatPanel : Region() {
                 loadingToken = loadingToken,
                 waitingForAssistant = waitingForAssistant,
                 updateRuntimeStatus = ::updateRuntimeStatus,
-                updateMeta = { updateMeta() },
                 sendMessage = { text -> onSendMessage?.invoke(text) },
                 mapToolEvent = messageMapper::fromToolEvent,
             )
         sendButton.disableProperty().bind(inputTextField.textProperty().isEmpty.or(waitingForAssistant))
-        updateMeta()
         updateTodoSummary(total = 0, open = 0, inProgress = 0, completed = 0, cancelled = 0)
     }
 
@@ -156,16 +166,19 @@ class ChatPanel : Region() {
         messageList.append(ChatMessage("assistant", loadingToken))
         waitingForAssistant.set(true)
         updateRuntimeStatus()
-        updateMeta()
         onSendMessage?.invoke(text)
     }
 
-    /** Executes setOnSendMessage. */
+    /**
+     * Registers the callback invoked when the user submits a message.
+     */
     fun setOnSendMessage(callback: (String) -> Unit) {
         onSendMessage = callback
     }
 
-    /** Executes setOnClearConversation. */
+    /**
+     * Registers the callback invoked after the user clears the conversation UI.
+     */
     fun setOnClearConversation(callback: () -> Unit) {
         onClearConversation = callback
     }
@@ -175,7 +188,6 @@ class ChatPanel : Region() {
         messageList.append(ChatMessage("assistant", loadingToken))
         waitingForAssistant.set(true)
         updateRuntimeStatus()
-        updateMeta()
     }
 
     /** Registers a callback that opens the dedicated todos panel. */
@@ -188,12 +200,13 @@ class ChatPanel : Region() {
         onLoadOlderMessages = callback
     }
 
-    /** Executes setConversationHistory. */
+    /**
+     * Replaces the visible conversation with persisted history.
+     */
     fun setConversationHistory(history: List<Message>) {
         messageList.setMessages(history.mapNotNull(messageMapper::fromHistory))
         waitingForAssistant.set(false)
         updateRuntimeStatus()
-        updateMeta()
     }
 
     /** Prepends older messages without forcing scroll-to-bottom. */
@@ -204,10 +217,11 @@ class ChatPanel : Region() {
             return
         }
         messageList.prepend(mapped)
-        updateMeta()
     }
 
-    /** Executes addAssistantMessage. */
+    /**
+     * Appends a completed assistant message and clears waiting indicators.
+     */
     fun addAssistantMessage(text: String) {
         conversationEvents.addAssistantMessage(text)
     }
@@ -245,12 +259,13 @@ class ChatPanel : Region() {
         conversationEvents.retryAssistantAt(assistantIndex)
     }
 
-    /** Executes clearMessages. */
+    /**
+     * Clears the visible message list and resets assistant waiting state.
+     */
     fun clearMessages() {
         messageList.clear()
         waitingForAssistant.set(false)
         updateRuntimeStatus()
-        updateMeta()
     }
 
     /** Focuses the message input and scrolls the conversation to the newest message. */
@@ -262,13 +277,11 @@ class ChatPanel : Region() {
         }
     }
 
-    private fun updateMeta(status: String? = null) {}
-
-    /** Executes updateResponseMetrics. */
+    /**
+     * Records the last response duration for status display.
+     */
     fun updateResponseMetrics(durationMillis: Long) {
-        val seconds = durationMillis / 1000.0
-        val rounded = String.format("%.2fs", seconds)
-        Platform.runLater { updateMeta("Last response in $rounded") }
+        Platform.runLater { runtimeStatus.updateResponseMetrics(durationMillis) }
     }
 
     /** Updates the todo summary chip shown in the conversation header. */

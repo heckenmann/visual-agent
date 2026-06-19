@@ -3,7 +3,9 @@ package de.heckenmann.visualagent.ui.panels
 import de.heckenmann.visualagent.config.AppConfig
 import de.heckenmann.visualagent.ui.FxmlLoader
 import javafx.fxml.FXML
+import javafx.scene.control.Alert
 import javafx.scene.control.Button
+import javafx.scene.control.ButtonType
 import javafx.scene.control.ComboBox
 import javafx.scene.control.Spinner
 import javafx.scene.control.SpinnerValueFactory.IntegerSpinnerValueFactory
@@ -12,11 +14,9 @@ import javafx.scene.layout.VBox
 import javafx.stage.FileChooser
 import org.springframework.context.annotation.Lazy
 import org.springframework.stereotype.Component
-import java.io.File
-import java.nio.file.Files
 
 /**
- * Represents ApplicationSettingsPanel.
+ * Application-level settings panel for appearance, configuration import/export, and reset actions.
  */
 @Component
 @Lazy
@@ -56,7 +56,7 @@ class ApplicationSettingsPanel : Region() {
     }
 
     /**
-     * Executes initialize.
+     * Wires controls to persisted application settings.
      */
     @FXML
     fun initialize() {
@@ -89,11 +89,8 @@ class ApplicationSettingsPanel : Region() {
                 initialFileName = "visual-agent.properties"
             }
         val file = chooser.showSaveDialog(fontSizeSpinner.scene?.window) ?: return
-        Files.copy(
-            File("src/main/resources/config/app.properties").toPath(),
-            file.toPath(),
-            java.nio.file.StandardCopyOption.REPLACE_EXISTING,
-        )
+        runCatching { AppConfig.instance.exportTo(file) }
+            .onFailure { showFileError("Could not export configuration", it) }
     }
 
     private fun importConfig() {
@@ -102,17 +99,51 @@ class ApplicationSettingsPanel : Region() {
                 title = "Import Visual Agent Config"
             }
         val file = chooser.showOpenDialog(fontSizeSpinner.scene?.window) ?: return
-        Files.copy(
-            file.toPath(),
-            File("src/main/resources/config/app.properties").toPath(),
-            java.nio.file.StandardCopyOption.REPLACE_EXISTING,
-        )
-        AppConfig.instance.reload()
+        runCatching { AppConfig.instance.importFrom(file) }
+            .onSuccess { syncControlsFromConfig() }
+            .onFailure { showFileError("Could not import configuration", it) }
     }
 
     private fun resetDefaults() {
+        val confirmation =
+            Alert(
+                Alert.AlertType.CONFIRMATION,
+                "Reset appearance settings to their defaults?",
+                ButtonType.CANCEL,
+                ButtonType.OK,
+            ).apply {
+                title = "Reset Appearance"
+                headerText = "Reset theme and font size"
+            }
+        if (confirmation.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) return
+
         AppConfig.instance.theme = "Dracula"
         AppConfig.instance.fontSize = 14
         AppConfig.instance.save()
+        syncControlsFromConfig()
+    }
+
+    private fun syncControlsFromConfig() {
+        themeSelector.selectionModel.select(AppConfig.instance.theme)
+        fontSizeSpinner.valueFactory.value = AppConfig.instance.fontSize.coerceIn(10, 24)
+    }
+
+    private fun showFileError(
+        message: String,
+        error: Throwable,
+    ) {
+        Alert(Alert.AlertType.ERROR)
+            .apply {
+                title = "Configuration Error"
+                headerText = message
+                contentText = error.message ?: "The selected file could not be processed."
+            }.showAndWait()
+    }
+
+    /**
+     * Resizes the loaded FXML root to the full panel bounds.
+     */
+    override fun layoutChildren() {
+        root.resizeRelocate(0.0, 0.0, width, height)
     }
 }

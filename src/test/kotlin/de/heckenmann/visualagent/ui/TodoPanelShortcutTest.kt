@@ -30,8 +30,10 @@ class TodoPanelShortcutTest {
                 res.contains("fx:id=\"totalCountLabel\"") &&
                 res.contains("fx:id=\"openCountLabel\"") &&
                 res.contains("fx:id=\"inProgressCountLabel\"") &&
-                res.contains("fx:id=\"doneCountLabel\""),
-            "todo-panel.fxml must expose summary counters in the header",
+                res.contains("fx:id=\"doneCountLabel\"") &&
+                res.contains("fx:id=\"todoEmptyState\"") &&
+                res.contains("fx:id=\"emptyAddButton\""),
+            "todo-panel.fxml must expose summary counters and an actionable empty state",
         )
     }
 }
