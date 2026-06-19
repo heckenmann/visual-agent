@@ -62,7 +62,8 @@ Store sensitive data in environment variables or secure configuration files that
 
 - Java 21+
 - Gradle 9.4.1 (installed via Homebrew on macOS)
-- Ollama running (`ollama serve`) for local LLM
+- Ollama running (`ollama serve`) for local LLM, or a reachable remote Ollama endpoint
+- Ollama API key when the endpoint requires bearer authentication
 - OpenAI API key when using the OpenAI provider
 
 ## Project Structure
@@ -74,6 +75,7 @@ src/main/kotlin/de/heckenmann/visualagent/
 │   ├── LLMProvider.kt         # Interface: chat, stream, vision, embeddings, getModels, getModelDetails
 │   ├── ConfiguredLLMProvider.kt # Primary LLMProvider router selected by AppConfig
 │   ├── OllamaClient.kt        # Implements LLMProvider using Spring AI + Ollama ChatModel
+│   ├── ollama/                # Ollama API configuration with optional bearer authentication
 │   ├── openai/                # OpenAI/OpenAI-compatible Spring AI provider implementation
 │   ├── AgentManager.kt        # Main orchestration: history, tools, todos, sub-agent coordination
 │   ├── SubAgent.kt            # SubAgent data model, AgentStatus enum
@@ -87,7 +89,9 @@ src/main/kotlin/de/heckenmann/visualagent/
 ├── config/
 │   └── AppConfig.kt           # Singleton loaded from app.properties
 ├── knowledge/
-│   └── KnowledgeDb.kt         # SQLite with WAL mode, busy_timeout, persistence and search APIs
+│   ├── PersistenceEntities.kt # JPA entities for the SQLite schema
+│   ├── PersistenceRepositories.kt # Spring Data repositories and FTS query path
+│   └── PersistenceStores.kt   # Typed persistence service interfaces/implementations
 ├── todo/
 │   └── Todo.kt                # Todo, Priority, Status models
 └── ui/
@@ -96,10 +100,10 @@ src/main/kotlin/de/heckenmann/visualagent/
     ├── StatusBar.kt           # Legacy status component (currently not wired in MainWindow)
     └── panels/
         ├── SessionPanel.kt         # FXML-based provider/model/session settings panel
-        ├── ChatPanel.kt            # Send handler, Enter/Cmd+Ctrl+Enter, loading placeholder, setOnSendMessage callback, ChatMessage
+        ├── ChatPanel.kt            # FXML-backed conversation panel and send callback surface
         ├── TodoPanel.kt            # FXML-based, Add dialog, Delete, checkbox toggle, priority badges
-        ├── SubAgentsPanel.kt       # Agent list built in code, CSS classes (no inline styles)
-        ├── CanvasPanel.kt          # Drawing canvas built in code, CSS classes
+        ├── SubAgentsPanel.kt       # FXML-backed agent list with code-built cards
+        ├── canvas/                 # Drawing canvas panel, toolbar, and resize support
         └── ApplicationSettingsPanel.kt  # FXML-based, theme selector, font size spinner
 ```
 
@@ -107,10 +111,12 @@ src/main/kotlin/de/heckenmann/visualagent/
 
 | Component | Version |
 |-----------|---------|
-| Kotlin | 2.1.21 |
+| Kotlin | 2.2.21 |
 | Kotlinx Serialization JSON | 1.8.1 |
 | JavaFX | 21.0.2 |
-| Ktor | 2.3.7 |
+| Spring Boot | 4.1.0 |
+| Spring AI | 2.0.0 |
+| HTTP | Spring `RestClient` / `WebClient` |
 | Kotlinx Coroutines | 1.7.3 |
 | SQLite JDBC | 3.45.0.0 |
 | Logback | 1.5.18 |
@@ -125,7 +131,7 @@ src/main/kotlin/de/heckenmann/visualagent/
 - **Region inheritance**: UI panels extend `javafx.scene.layout.Region`
 - **VBox orientation**: VBox is always vertical in JavaFX — no `.orientation` property
 - **FXML loading**: Panels use `FxmlLoader.load(controller, "file.fxml")` — sets controller before loading, no `fx:controller` attribute in FXML (MainWindow, SessionPanel, TodoPanel, ApplicationSettingsPanel)
-- **Code-built panels**: ChatPanel and SubAgentsPanel build UI in code (no FXML)
+- **Panel composition**: ChatPanel and SubAgentsPanel use FXML shells; message rows and agent cards are built by their controllers
 - **Panel switching**: Navigation buttons in MainWindow swap `chatArea.center` between panels
 - **Keyboard navigation**: MainWindow supports `Cmd/Ctrl+1..6` for panel switching and `Cmd/Ctrl+K` command palette
 - **CSS classes**: All styling via CSS classes (`application.css`), no inline `setStyle()` calls
@@ -136,8 +142,9 @@ src/main/kotlin/de/heckenmann/visualagent/
 - **DB-first state reads**: runtime context (history/todos/sub-agent data) is loaded from DB, not long-lived in-memory caches
 - **Constructor DI style**: use constructor injection with direct constructor properties (`private val`/`private var`) for required dependencies; avoid passing constructor params and re-assigning them in the class body
 - **Markdown parser input**: conversation message text must be passed 1:1 to the CommonMark parser; no pre-normalization, rewriting, or heuristic transformation before parsing
-- **Provider settings**: active provider/model values are DB-backed (`llm.provider`, `ollama.model`, `openai.model`, `openai.base.url`, `openai.api.key`)
-- **OpenAI key storage**: `openai.api.key` is intentionally stored plaintext in SQLite by current product decision; never expose the raw key to model context, tool output, or logs
+- **Provider settings**: provider endpoint/model/credential values are DB-backed (`llm.provider`, `ollama.local.url`, `ollama.model`, `ollama.api.key`, `openai.model`, `openai.base.url`, `openai.api.key`)
+- **Provider key storage**: `ollama.api.key` and `openai.api.key` are intentionally stored plaintext in SQLite by current product decision; never expose raw keys to model context, tool output, logs, or configuration exports
+- **Ollama authentication**: a non-blank `ollama.api.key` is sent as `Authorization: Bearer <key>` on synchronous and streaming requests; key changes apply immediately, while Base URL changes require restart
 
 ## Model Context Payload
 
@@ -184,6 +191,7 @@ The model does not receive arbitrary global state. It receives a request-scoped 
 6. **Markdown rendering** — conversation markdown is parsed through `commonmark` library (no hand-written parser)
 7. **Quality gates** — KDoc/Javadoc and LOC/package-size checks integrated into Gradle verification flow
 8. **OpenAI provider support** — `ConfiguredLLMProvider` routes between Ollama and OpenAI-compatible endpoints
+9. **Secured Ollama endpoints** — optional bearer authentication is supported for all Ollama API request paths
 
 ## Known Bugs
 
@@ -197,20 +205,31 @@ The model does not receive arbitrary global state. It receives a request-scoped 
    "--add-modules", "javafx.controls,javafx.fxml,javafx.web,javafx.graphics,javafx.media,javafx.swing,javafx.base"
    ```
 
-2. `ollama serve` must be running before `gradle run`
+2. JavaFX rendering is configured through Prism JVM args in `build.gradle.kts`:
+   - macOS: `-Dprism.order=es2,sw`
+   - Windows: `-Dprism.order=d3d,es2,sw`
+   - Linux/other: `-Dprism.order=es2,sw`
+   - all platforms: `-Dprism.vsync=true`
 
-3. Dependencies copied to `lib/` via `gradle copyAllDependencies`
+   To print the selected pipeline at startup:
+   ```bash
+   ./gradlew run -PvisualagentPrismVerbose=true
+   ```
 
-4. Kotlinx Serialization requires explicit `@Serializable` annotation on data classes used with `Json.encodeToString/decodeFromString`
+3. `ollama serve` must be running before `gradle run`
 
-5. `json.parseToJsonElement()` returns `JsonElement` — use `.jsonObject`, `.jsonArray`, `.jsonPrimitive` extensions
+4. Dependencies copied to `lib/` via `gradle copyAllDependencies`
 
-6. **JavaFX `--module-path`** must point to `lib/` — without it you get "JavaFX Runtime components missing"
+5. Kotlinx Serialization requires explicit `@Serializable` annotation on data classes used with `Json.encodeToString/decodeFromString`
 
-7. **Main class is `de.heckenmann.visualagent.Main`** (not `MainKt`) — because `Main` extends `Application`
+6. `json.parseToJsonElement()` returns `JsonElement` — use `.jsonObject`, `.jsonArray`, `.jsonPrimitive` extensions
 
-8. **`PRAGMA busy_timeout=5000`** in KnowledgeDb — if stale WAL/SHM files from a crashed process cause `SQLITE_BUSY`, delete `data/visual-agent.db-wal` and `data/visual-agent.db-shm` before restarting
-9. **Current LOC policy** — file LOC target is 300; package LOC target is 3000. `locAndPackageSizeCheck` reports violations as warnings (non-blocking) until modularization is complete.
+7. **JavaFX `--module-path`** must point to `lib/` — without it you get "JavaFX Runtime components missing"
+
+8. **Main class is `de.heckenmann.visualagent.Main`** (not `MainKt`) — because `Main` extends `Application`
+
+9. **`PRAGMA busy_timeout=5000`** in KnowledgeDb — if stale WAL/SHM files from a crashed process cause `SQLITE_BUSY`, delete `data/visual-agent.db-wal` and `data/visual-agent.db-shm` before restarting
+10. **Current LOC policy** — file LOC target is 300; package LOC target is 3000. `locAndPackageSizeCheck` reports violations as warnings (non-blocking).
 
 ## Documentation Language
 

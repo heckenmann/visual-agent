@@ -42,6 +42,7 @@ Stores sub-agent metadata and configuration.
 Used for:
 - startup loading
 - CRUD operations from SubAgents UI
+- per-agent provider, model, temperature, Top P, and maximum output tokens inside the serialized agent configuration
 - autonomous assignment/runtime orchestration
 
 ### `sub_agent_configs`
@@ -57,6 +58,25 @@ Used for:
 Stores user configuration values persisted beyond app restarts.
 
 It now backs the application settings binder through the `PreferenceStore` abstraction.
+
+Provider-related entries include:
+
+- `llm.provider.catalog.v1`: versioned provider profiles, models, status, limits, variants, filters, and options
+- `llm.provider`
+- `ollama.local.url`
+- `ollama.model`
+- `ollama.api.key`
+- `openai.base.url`
+- `openai.model`
+- `openai.api.key`
+
+Legacy provider entries are migrated into the catalog when no catalog exists. API keys are currently stored as plaintext by product decision. They are excluded from file-based configuration exports and must not be exposed to model context, tool output, or logs.
+
+Canvas-related entries include:
+
+- `canvas.document.xml`: serialized JHotDraw document containing layers, editable figures, image references, and transforms
+
+The canvas document is updated after model changes and restored when the canvas panel is created.
 
 ## Search/Index Notes
 

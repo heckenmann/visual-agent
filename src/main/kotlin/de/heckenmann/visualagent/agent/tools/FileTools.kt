@@ -16,7 +16,7 @@ import kotlin.io.path.readText
 import kotlin.io.path.writeText
 
 /**
- * Represents FileReadTool.
+ * Tool that reads UTF-8 text files inside the workspace boundary.
  */
 @Component
 class FileReadTool : VisualAgentTool {
@@ -43,7 +43,7 @@ class FileReadTool : VisualAgentTool {
 }
 
 /**
- * Represents FileListTool.
+ * Tool that lists immediate children of a workspace directory.
  */
 @Component
 class FileListTool : VisualAgentTool {
@@ -78,7 +78,7 @@ class FileListTool : VisualAgentTool {
 }
 
 /**
- * Represents FileGlobTool.
+ * Tool that finds workspace files matching a glob pattern.
  */
 @Component
 class FileGlobTool : VisualAgentTool {
@@ -111,7 +111,7 @@ class FileGlobTool : VisualAgentTool {
 }
 
 /**
- * Represents FileGrepTool.
+ * Tool that searches UTF-8 files under a workspace path.
  */
 @Component
 class FileGrepTool : VisualAgentTool {
@@ -152,7 +152,7 @@ class FileGrepTool : VisualAgentTool {
 }
 
 /**
- * Represents FileWriteTool.
+ * Tool that writes UTF-8 text files inside the workspace boundary.
  */
 @Component
 class FileWriteTool : VisualAgentTool {
@@ -181,7 +181,7 @@ class FileWriteTool : VisualAgentTool {
 }
 
 /**
- * Represents FileEditTool.
+ * Tool that performs exact text replacement in a workspace file.
  */
 @Component
 class FileEditTool : VisualAgentTool {

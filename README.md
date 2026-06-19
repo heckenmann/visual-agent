@@ -9,22 +9,26 @@ The app is functional end-to-end with persistent chat/todos/settings, Spring AI 
 | Feature | UI | Backend | Wired |
 |---------|----|---------|-------|
 | Chat | Modernized conversation panel, markdown rendering, streaming indicator, tool call timeline | `AgentManager.sendMessage()/streamMessage()` | Yes |
-| SubAgents | Card-based panel with create/edit/delete/run/logs | Persistent sub-agent configs and statuses | Yes |
+| SubAgents | Card-based panel with create/edit/delete/run/logs and per-agent provider/model parameters | Persistent sub-agent configs and statuses | Yes |
 | Todos | Panel + tool integration + count/list/update flows | Persisted via Spring Data JPA stores | Yes |
-| Session | Provider selector, model selector, OpenAI key/base URL, runtime toggles, user instruction | `ConfiguredLLMProvider` + Ollama/OpenAI clients | Yes |
+| Session | Dynamic provider profiles, filtered model catalogs, credentials/base URLs, runtime toggles, user instruction | `ProviderCatalogService` + runtime adapters | Yes |
 | Settings | Theme/font/model/session options | `AppConfig` + DB-backed runtime usage | Yes |
-| Tool Calling | Tool events and minimized tool entries in conversation | Spring AI `ToolCallback` path | Yes |
+| Canvas | Persistent editable shapes, freehand paths, image import, zoom/grid/export, model-readable snapshots | JHotDraw 8 drawing model, undo manager, JavaFX-safe canvas service | Yes |
+| Tool Calling | Tool events, minimized tool entries, sub-agent canvas/workspace tools | Spring AI `ToolCallback` path | Yes |
 | Persistence | Conversation, todos, tools, agents, preferences, history search | SQLite + JPA + Flyway + FTS5 | Yes |
 
 ## Tech Stack
 
 | Component | Version |
 |-----------|---------|
-| Language | Kotlin 2.1.21 |
+| Language | Kotlin 2.2.21 |
 | Build System | Gradle 9.4.1 (Kotlin DSL) |
+| Application Framework | Spring Boot 4.1.0 |
+| AI Integration | Spring AI 2.0.0 |
 | UI Framework | JavaFX 21.0.2 |
+| Drawing Framework | JHotDraw 8 version 0.5 |
 | Database | SQLite 3.45.0.0 (embedded, via JPA/Flyway) |
-| HTTP Client | Ktor 2.3.7 |
+| HTTP Client | Spring `RestClient` / `WebClient` |
 | Serialization | Kotlinx Serialization JSON 1.8.1 |
 | Coroutines | Kotlinx Coroutines 1.7.3 |
 | Logging | Logback 1.5.x |
@@ -58,6 +62,7 @@ src/main/kotlin/de/heckenmann/visualagent/
 │   ├── OllamaClient.kt        # Implements LLMProvider via Spring AI + Ollama ChatModel
 │   ├── OllamaPromptFactory.kt # Builds request-scoped prompts/options/tool callbacks
 │   ├── OllamaToolRecovery.kt  # Unknown tool-name recovery path
+│   ├── ollama/                # Authenticated Ollama API client configuration
 │   ├── openai/                # OpenAI-compatible provider implementation
 │   ├── AgentManager.kt        # Main orchestration: chat, todos, history, sub-agents
 │   ├── SubAgent.kt            # SubAgent data model, AgentStatus enum
@@ -85,7 +90,7 @@ src/main/kotlin/de/heckenmann/visualagent/
         ├── ChatMessage*.kt         # Message rendering/list/runtime status controllers
         ├── TodoPanel.kt            # FXML-based, Add dialog, Delete, checkbox toggle, priority badges
         ├── SubAgentsPanel.kt       # Agent list built in code, CSS classes (no inline styles)
-        ├── CanvasPanel.kt          # Drawing canvas built in code, CSS classes
+        ├── canvas/                 # JHotDraw editor panel, toolbar, and model-facing canvas operations
         └── ApplicationSettingsPanel.kt  # FXML-based, theme selector, font size spinner
 ```
 
@@ -93,7 +98,7 @@ src/main/kotlin/de/heckenmann/visualagent/
 
 - Java 21+
 - Gradle 9.4.1
-- Ollama running (`ollama serve`) for local models, or an OpenAI/OpenAI-compatible API key for cloud models
+- Ollama running (`ollama serve`) or a reachable Ollama endpoint, or an OpenAI/OpenAI-compatible API key
 
 ## Quick Start
 
@@ -110,18 +115,28 @@ gradle copyAllDependencies
 
 ## Provider Setup
 
-Visual Agent supports two provider modes:
+Visual Agent supports persisted provider profiles backed by two runtime adapters:
 
-- `ollama`: local Ollama models from `ollama.local.url`
-- `openai`: OpenAI or OpenAI-compatible `/v1` chat endpoints
+- `OLLAMA`: local or secured Ollama-compatible endpoints
+- `OPENAI_COMPATIBLE`: OpenAI and compatible `/v1` endpoints
 
-The Session panel lets the user choose the provider, refresh the provider-specific model list, and save the active model. For OpenAI-compatible usage, configure:
+The Session panel lets the user add, edit, delete, and select provider profiles, refresh provider-specific models, and configure model status, limits, filters, and options. Each sub-agent may inherit the session selection or choose its own provider, model, variant, generation parameters, and provider-specific options.
+
+For Ollama usage, configure:
+
+- Ollama Base URL, default `http://localhost:11434`
+- Optional Ollama API Key for endpoints protected by bearer authentication
+- Ollama model
+
+When an Ollama profile has a non-blank API key, every synchronous and streaming request includes `Authorization: Bearer <key>`. Profile URL and key changes apply to subsequent requests without restarting the application.
+
+For OpenAI-compatible usage, configure:
 
 - OpenAI API Key
 - OpenAI Base URL, default `https://api.openai.com`
 - OpenAI model, default `gpt-4o-mini`
 
-Current product decision: the OpenAI API key is stored as plaintext in the SQLite `user_preferences` table.
+Current product decision: provider API keys are stored as plaintext in the SQLite `user_preferences` table. They are excluded from configuration exports and must never be exposed to model context, tool output, or logs.
 
 ## Persistence
 
@@ -168,6 +183,7 @@ Each main-agent request includes:
 - [x] Session settings and user instruction persistence
 - [x] Streaming response path in conversation UI
 - [x] OpenAI/OpenAI-compatible provider support with provider-specific model selection
+- [x] Optional bearer authentication for secured Ollama endpoints
 
 ### In Progress
 - [ ] File-size modularization (target: max 300 LOC per source file)

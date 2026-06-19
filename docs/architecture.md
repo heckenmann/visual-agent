@@ -9,7 +9,7 @@ The runtime uses Spring AI for model interaction and tool-calling, and Spring Da
 
 1. Presentation: JavaFX `MainWindow` + panel controllers.
 2. Application: `AgentManager` orchestrates chat, streaming, history, todos, and sub-agents.
-3. Provider: `LLMProvider` abstraction with `OllamaClient` implementation.
+3. Provider: `ConfiguredLLMProvider` routes to the Ollama or OpenAI implementation.
 4. Tools: `ToolRegistry` + `VisualAgentTool` implementations + `ToolEventBus`.
 5. Persistence: JPA-backed stores on SQLite, with Flyway migrations and a native FTS5 search path for conversation history.
 
@@ -21,10 +21,25 @@ The runtime uses Spring AI for model interaction and tool-calling, and Spring Da
    - recent persisted history (paged),
    - active model and runtime metadata,
    - enabled tools for the active agent.
-4. `OllamaClient` maps context to Spring AI `Prompt` + `OllamaChatOptions`.
+4. The active provider maps context to its Spring AI prompt and model options.
+
+`ProviderCatalogService` is the authoritative source for dynamic provider profiles and model metadata. It persists a versioned JSON catalog in SQLite, migrates legacy settings, filters unavailable models, and resolves `providerId/modelId` references.
+
+Sub-agents can override the session provider, model, and variant. Options are merged in provider, model, agent, then variant order. Shared generation parameters are translated to Spring AI options, while supported provider-specific values remain available through an open options map.
 5. Spring AI executes tool calls through registered `ToolCallback`s.
 6. Tool events are emitted (`STARTED`/`FINISHED`) and persisted into conversation history.
 7. UI reflects streaming text, tool activity, and stored history.
+
+## Ollama Client Configuration
+
+`OllamaApiConfiguration` provides the legacy default client. Provider-profile requests create endpoint-specific Spring AI clients so URL and key changes apply without restart.
+
+- `ollama.local.url` selects the endpoint when the bean is created.
+- `ollama.api.key` is optional.
+- A non-blank key is sent as an `Authorization: Bearer` header on synchronous and reactive requests.
+- The current key is read for every request, so key changes do not require a restart.
+- Base URL changes require a restart.
+- Raw credentials are not included in model context, tool output, logs, or configuration exports.
 
 ## Persistence Model
 
@@ -63,6 +78,21 @@ Current tool set:
   - persisted history with paged loading.
 - Session UI drives model selection and session preferences.
 - Todo panel and conversation both reflect persisted todo state.
+
+### Canvas Editor
+
+The canvas uses JHotDraw 8 as its structured drawing engine:
+
+- `SimpleDrawingView` renders editable figures without rasterizing the document during resize.
+- `SimpleDrawingEditor` and `DrawingModelUndoAdapter` provide selection and undo/redo.
+- `GridConstrainer` provides the visible grid independently from drawing content.
+- Shapes, text, freehand paths, and imported images remain selectable and transformable JHotDraw figures.
+- Drawing model changes are serialized as JHotDraw XML into the preference store after a short debounce and restored when the canvas is created.
+- `CanvasService` exposes JavaFX-thread-safe model operations for tool calls while resolving the lazy `CanvasPanel` only when the tool is actually used.
+- `CanvasTool` lets sub-agents inspect the canvas and add text, rectangles, lines, circles, and workspace-local images.
+- The application pins JavaFX to version 21 and uses `org.jhotdraw8.color:0.4` because JHotDraw 0.5 did not publish the referenced color module version.
+
+The main orchestration agent does not receive direct canvas tools. It must create or message a sub-agent, and that sub-agent can use the `canvas` tool when its configured tool set allows it.
 
 ## Current Constraints
 
