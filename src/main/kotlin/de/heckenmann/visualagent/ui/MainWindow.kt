@@ -4,15 +4,16 @@ import de.heckenmann.visualagent.AppIdentity
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.AgentStatus
 import de.heckenmann.visualagent.agent.LLMProvider
+import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfig
 import de.heckenmann.visualagent.ui.StatusBar
 import de.heckenmann.visualagent.ui.panels.ApplicationSettingsPanel
-import de.heckenmann.visualagent.ui.panels.CanvasPanel
 import de.heckenmann.visualagent.ui.panels.ChatPanel
 import de.heckenmann.visualagent.ui.panels.SessionPanel
 import de.heckenmann.visualagent.ui.panels.SubAgentsPanel
 import de.heckenmann.visualagent.ui.panels.TodoPanel
+import de.heckenmann.visualagent.ui.panels.canvas.CanvasPanel
 import javafx.application.Application
 import javafx.application.Platform
 import javafx.fxml.FXML
@@ -22,8 +23,7 @@ import javafx.scene.control.Button
 import javafx.scene.control.Label
 import javafx.scene.image.ImageView
 import javafx.scene.layout.BorderPane
-import javafx.scene.layout.HBox
-import javafx.scene.layout.VBox
+import javafx.scene.layout.Pane
 import javafx.stage.Stage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -35,7 +35,9 @@ import org.springframework.context.annotation.Lazy
 import org.springframework.stereotype.Component
 
 /**
- * Represents MainWindow.
+ * Primary JavaFX stage that hosts navigation, workspace panels, status indicators, and backend wiring.
+ *
+ * The bean is lazy so JavaFX controls are constructed on the JavaFX application thread.
  */
 @Component
 @Lazy // delay instantiation until requested on the JavaFX Application thread
@@ -50,29 +52,18 @@ class MainWindow(
     private val todoPanel: TodoPanel,
     private val canvasPanel: CanvasPanel,
     private val applicationSettingsPanel: ApplicationSettingsPanel,
+    private val providerCatalog: ProviderCatalogService,
+    private val workspaceLayoutPersistence: WorkspaceLayoutPersistence,
+    private val workspaceLayoutService: WorkspaceLayoutService,
 ) : Stage() {
-    companion object {
-        /** Testable predicate for global back-button visibility. */
-        fun shouldShowBack(
-            activePanel: Any,
-            chatPanel: Any,
-        ): Boolean = activePanel !== chatPanel
-    }
-
     @FXML
     private lateinit var rootPane: BorderPane
-
-    @FXML
-    private lateinit var titleBar: HBox
 
     @FXML
     private lateinit var appIconImage: ImageView
 
     @FXML
-    private lateinit var iconRail: VBox
-
-    @FXML
-    private lateinit var chatArea: BorderPane
+    private lateinit var workspaceDesktop: Pane
 
     @FXML
     private lateinit var connectionStatus: Label
@@ -104,23 +95,23 @@ class MainWindow(
     private lateinit var settingsBtn: Button
 
     private val panelByButton = LinkedHashMap<Button, Node>()
+    private lateinit var workspaceWindows: WorkspaceWindowManager
 
     private var activeButton: Button? = null
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    private var currentConnectionState = false
     private var configListenerRegistration: AutoCloseable? = null
     private var eventListenerRegistration: AutoCloseable? = null
     private val chatWiring =
         MainWindowChatWiring(agentManager, chatPanel, scope) {
-            switchPanel(todoPanel, planBtn)
+            focusPanel(todoPanel, planBtn)
         }
 
     init {
         title = AppIdentity.DISPLAY_NAME
         AppIdentity.javaFxIcon()?.let { icons.add(it) }
-        minWidth = 1200.0
-        minHeight = 800.0
+        minWidth = 960.0
+        minHeight = 680.0
         isResizable = true
 
         val root = FxmlLoader.load(this, "main-window.fxml")
@@ -141,19 +132,14 @@ class MainWindow(
         rootPane.bottom = statusBar
         registerConfigObserver()
 
-        conversationBtn.setOnAction { switchPanel(chatPanel, conversationBtn) }
-        sessionBtn.setOnAction { switchPanel(sessionPanel, sessionBtn) }
-        agentsBtn.setOnAction { switchPanel(subAgentsPanel as Node, agentsBtn) }
-        planBtn.setOnAction { switchPanel(todoPanel, planBtn) }
-        canvasBtn.setOnAction { switchPanel(canvasPanel, canvasBtn) }
-        settingsBtn.setOnAction { switchPanel(applicationSettingsPanel, settingsBtn) }
         panelByButton.clear()
-        panelByButton[conversationBtn] = chatPanel
-        panelByButton[sessionBtn] = sessionPanel
-        panelByButton[agentsBtn] = subAgentsPanel as Node
-        panelByButton[planBtn] = todoPanel
-        panelByButton[canvasBtn] = canvasPanel
-        panelByButton[settingsBtn] = applicationSettingsPanel
+        panelByButton.putAll(
+            wireMainWorkspaceNavigation(
+                mainWorkspaceButtons(),
+                mainWorkspacePanels(),
+            ) { panel, button -> focusPanel(panel, button) },
+        )
+        registerWorkspaceWindows()
 
         MainWindowSubAgentWiring(agentManager, subAgentsPanel, chatPanel) { updateAgentCountUi() }.register()
         chatWiring.register()
@@ -162,13 +148,13 @@ class MainWindow(
         statusBar.setOnReconnect { checkConnection() }
         refreshTodoSummary()
 
-        switchPanel(chatPanel, conversationBtn)
+        focusPanel(chatPanel, conversationBtn)
         setOnShown {
             chatPanel.focusInputAndScrollToBottom()
         }
         rootPane.sceneProperty().addListener { _, _, newScene ->
             if (newScene != null) {
-                MainWindowNavigation(panelByButton) { panel, button -> switchPanel(panel, button) }
+                MainWindowNavigation(panelByButton) { panel, button -> focusPanel(panel, button) }
                     .setupKeyboardShortcuts(newScene)
             }
         }
@@ -209,17 +195,50 @@ class MainWindow(
      * Applies the current AppConfig snapshot to UI elements that mirror global settings.
      */
     private fun applyConfigToUi() {
-        val provider = AppConfig.instance.normalizedProvider().replaceFirstChar(Char::uppercase)
-        selectedModelLabel.text = "$provider · ${AppConfig.instance.activeModel()}"
+        val provider = providerCatalog.getProvider(providerCatalog.activeProviderId())
+        selectedModelLabel.text = "${provider?.name ?: providerCatalog.activeProviderId()} · ${provider?.defaultModel.orEmpty()}"
         scene?.root?.style = "-fx-font-size: ${AppConfig.instance.fontSize}px;"
         Application.setUserAgentStylesheet(AppConfig.instance.getThemeStylesheet())
     }
 
-    private fun switchPanel(
+    private fun registerWorkspaceWindows() {
+        workspaceWindows =
+            createMainWorkspaceWindows(
+                workspaceDesktop,
+                mainWorkspacePanels(),
+            )
+        workspaceLayoutService.bind(workspaceWindows, this)
+        workspaceWindows.restore(workspaceLayoutPersistence.load())
+        setOnCloseRequest {
+            workspaceLayoutPersistence.save(workspaceWindows.snapshot())
+        }
+    }
+
+    private fun mainWorkspacePanels(): MainWorkspacePanels =
+        MainWorkspacePanels(
+            chatPanel = chatPanel,
+            sessionPanel = sessionPanel,
+            subAgentsPanel = subAgentsPanel as Node,
+            todoPanel = todoPanel,
+            canvasPanel = canvasPanel,
+            settingsPanel = applicationSettingsPanel,
+        )
+
+    private fun mainWorkspaceButtons(): MainWorkspaceButtons =
+        MainWorkspaceButtons(
+            conversationBtn = conversationBtn,
+            sessionBtn = sessionBtn,
+            agentsBtn = agentsBtn,
+            planBtn = planBtn,
+            canvasBtn = canvasBtn,
+            settingsBtn = settingsBtn,
+        )
+
+    private fun focusPanel(
         panel: javafx.scene.Node,
         button: Button?,
     ) {
-        chatArea.center = panel
+        workspaceWindows.focus(panel)
 
         activeButton?.styleClass?.remove("active")
         if (button != null) {
@@ -249,7 +268,6 @@ class MainWindow(
                 llmProvider.checkConnection()
             }
         Platform.runLater {
-            currentConnectionState = isConnected
             connectionStatus.text = if (isConnected) "Connected" else "Offline"
             connectionStatus.styleClass.removeAll("shell-status-online", "shell-status-offline")
             connectionStatus.styleClass.add(if (isConnected) "shell-status-online" else "shell-status-offline")

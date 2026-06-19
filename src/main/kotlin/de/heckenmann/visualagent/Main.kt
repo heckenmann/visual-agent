@@ -48,7 +48,7 @@ class Main : Application() {
         lateinit var context: ConfigurableApplicationContext
 
         /**
-         * Executes main.
+         * Launches the JavaFX desktop application.
          */
         @JvmStatic
         fun main(args: Array<String>) {

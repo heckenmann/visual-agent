@@ -9,13 +9,13 @@ class MainWindowBackButtonTest {
     fun `shouldShowBack returns false when active is chatPanel`() {
         val chat = Any()
         val active = chat
-        assertFalse(MainWindow.shouldShowBack(active, chat))
+        assertFalse(shouldShowBack(active, chat))
     }
 
     @Test
     fun `shouldShowBack returns true when active is not chatPanel`() {
         val chat = Any()
         val active = Any()
-        assertTrue(MainWindow.shouldShowBack(active, chat))
+        assertTrue(shouldShowBack(active, chat))
     }
 }

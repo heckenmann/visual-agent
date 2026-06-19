@@ -28,6 +28,7 @@ object FxmlLoader {
             controller::class.java.getResource("/fxml/$fxmlFile")
                 ?: throw IllegalStateException("FXML file not found: /fxml/$fxmlFile")
         val loader = FXMLLoader(resource)
+        loader.classLoader = controller::class.java.classLoader
         loader.setController(controller)
         logger.debug { "Loading FXML: /fxml/$fxmlFile with controller: ${controller::class.simpleName}" }
         return loader.load()

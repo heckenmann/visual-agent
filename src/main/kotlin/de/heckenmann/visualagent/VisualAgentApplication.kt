@@ -4,13 +4,13 @@ import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 
 /**
- * Represents VisualAgentApplication.
+ * Spring Boot application root used to assemble persistence, provider, tool, and UI beans.
  */
 @SpringBootApplication
 class VisualAgentApplication
 
 /**
- * Executes main.
+ * Starts the non-JavaFX Spring Boot entry point used by tests and tooling.
  */
 fun main(args: Array<String>) {
     runApplication<VisualAgentApplication>(*args)

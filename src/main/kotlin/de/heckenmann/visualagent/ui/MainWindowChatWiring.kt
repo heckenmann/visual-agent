@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.ui
 
 import de.heckenmann.visualagent.agent.AgentManager
+import de.heckenmann.visualagent.agent.provider.ProviderErrorMessages
 import de.heckenmann.visualagent.config.AppConfig
 import de.heckenmann.visualagent.ui.panels.ChatPanel
 import javafx.application.Platform
@@ -60,7 +61,7 @@ internal class MainWindowChatWiring(
             } catch (e: Exception) {
                 val elapsedMs = (System.nanoTime() - startedAt) / 1_000_000
                 Platform.runLater {
-                    chatPanel.addAssistantMessage("Error: ${e.message}")
+                    chatPanel.addAssistantMessage(ProviderErrorMessages.userFacing(e))
                     chatPanel.updateResponseMetrics(elapsedMs)
                 }
             }
@@ -72,8 +73,9 @@ internal class MainWindowChatWiring(
         return withContext(Dispatchers.IO) {
             agentManager.streamMessage(text) { chunk ->
                 collected.append(chunk)
+                val partialResponse = collected.toString()
                 Platform.runLater {
-                    chatPanel.updateStreamingAssistantMessage(collected.toString())
+                    chatPanel.updateStreamingAssistantMessage(partialResponse)
                 }
             }
         }

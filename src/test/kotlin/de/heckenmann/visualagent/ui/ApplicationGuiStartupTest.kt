@@ -2,7 +2,7 @@ package de.heckenmann.visualagent.ui
 
 import de.heckenmann.visualagent.VisualAgentApplication
 import javafx.application.Platform
-import org.junit.jupiter.api.AfterAll
+import javafx.fxml.FXMLLoader
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.springframework.boot.WebApplicationType
@@ -61,6 +61,7 @@ class ApplicationGuiStartupTest {
         @BeforeAll
         fun startToolkit() {
             if (toolkitStarted) return
+            FXMLLoader.setDefaultClassLoader(ApplicationGuiStartupTest::class.java.classLoader)
             val latch = CountDownLatch(1)
             runCatching {
                 Platform.startup { latch.countDown() }
@@ -70,13 +71,8 @@ class ApplicationGuiStartupTest {
                     throw error
                 }
             }
-            toolkitStarted = true
-        }
-
-        @JvmStatic
-        @AfterAll
-        fun shutdownToolkit() {
             Platform.setImplicitExit(false)
+            toolkitStarted = true
         }
     }
 }
