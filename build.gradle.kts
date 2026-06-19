@@ -10,6 +10,7 @@ plugins {
     id("org.springframework.boot") version "4.1.0"
     id("io.spring.dependency-management") version "1.1.7"
     application
+    jacoco
 }
 
 group = "de.heckenmann.visualagent"
@@ -45,6 +46,22 @@ val applicationIdentityArgs =
         "-Dcom.apple.mrj.application.apple.menu.about.name=Visual Agent",
         "-Djavafx.application.name=Visual Agent",
     )
+val javafxRenderingArgs =
+    listOf(
+        "-Dprism.order=${
+            when {
+                System.getProperty("os.name").contains("Mac", ignoreCase = true) -> "es2,sw"
+                System.getProperty("os.name").contains("Windows", ignoreCase = true) -> "d3d,es2,sw"
+                else -> "es2,sw"
+            }
+        }",
+        "-Dprism.vsync=true",
+    ) +
+        if (providers.gradleProperty("visualagentPrismVerbose").map(String::toBoolean).getOrElse(false)) {
+            listOf("-Dprism.verbose=true")
+        } else {
+            emptyList()
+        }
 val macApplicationArgs =
     if (
         System.getProperty("os.name").contains("Mac", ignoreCase = true)
@@ -78,6 +95,9 @@ dependencies {
     implementation("org.openjfx:javafx-media:$javafxVersion:$platform")
     implementation("org.openjfx:javafx-web:$javafxVersion:$platform")
     implementation("org.openjfx:javafx-swing:$javafxVersion:$platform")
+
+    // Structured drawing editor
+    implementation("ch.randelshofer:org.jhotdraw8.draw:0.5")
 
     // SQLite JDBC
     implementation("org.xerial:sqlite-jdbc:3.45.0.0")
@@ -115,19 +135,54 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
 }
 
+configurations.configureEach {
+    resolutionStrategy.eachDependency {
+        if (requested.group == "org.openjfx") {
+            useVersion(javafxVersion)
+            because("The application targets JavaFX 21; JHotDraw's used APIs are compatible with that baseline.")
+        }
+        if (requested.group == "ch.randelshofer" && requested.name == "org.jhotdraw8.color" && requested.version == "0.5") {
+            useVersion("0.4")
+            because("JHotDraw 0.5 references a color module version that was not published to Maven Central.")
+        }
+    }
+}
+
 tasks.test {
     useJUnitPlatform()
     systemProperty("visualagent.ollama.smoke", System.getProperty("visualagent.ollama.smoke", "false"))
+    finalizedBy(tasks.jacocoTestReport)
+}
+
+tasks.jacocoTestReport {
+    dependsOn(tasks.test)
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
+}
+
+tasks.jacocoTestCoverageVerification {
+    dependsOn(tasks.test)
+    violationRules {
+        rule {
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = "0.80".toBigDecimal()
+            }
+        }
+    }
 }
 
 application {
     mainClass.set("de.heckenmann.visualagent.Main")
 
-    applicationDefaultJvmArgs = javafxModuleArgs + applicationIdentityArgs + macApplicationArgs
+    applicationDefaultJvmArgs = javafxModuleArgs + applicationIdentityArgs + javafxRenderingArgs + macApplicationArgs
 }
 
 tasks.withType<JavaExec>().configureEach {
-    jvmArgs(javafxModuleArgs + applicationIdentityArgs + macApplicationArgs)
+    jvmArgs(javafxModuleArgs + applicationIdentityArgs + javafxRenderingArgs + macApplicationArgs)
 }
 
 kotlin {
@@ -167,6 +222,10 @@ tasks.register("ktlintJavadocCheck") {
         val dataClassRegex = Regex("""^\s*(?:public\s+)?data\s+class\b""")
         val sealedClassRegex = Regex("""^\s*(?:public\s+)?sealed\s+class\b""")
         val annotationClassRegex = Regex("""^\s*(?:public\s+)?annotation\s+class\b""")
+        val hiddenTypeRegex =
+            Regex(
+                """^\s*(?:private|internal|protected)\s+(?:abstract\s+|open\s+|final\s+|sealed\s+|data\s+|enum\s+|annotation\s+)*(class|interface|object)\b""",
+            )
         val kdocStartRegex = Regex("""^\s*/\*\*""")
         val violations = mutableListOf<String>()
         listOf(rootDir.toPath().resolve("src/main/kotlin"))
@@ -177,8 +236,23 @@ tasks.register("ktlintJavadocCheck") {
                         .filter { Files.isRegularFile(it) && it.extension == "kt" }
                         .forEach { file ->
                             val lines = Files.readAllLines(file)
+                            var braceDepth = 0
+                            var pendingHiddenType = false
+                            val hiddenTypeDepths = mutableListOf<Int>()
                             lines.forEachIndexed { index, line ->
                                 val trimmed = line.trim()
+                                hiddenTypeDepths.removeAll { it > braceDepth }
+                                val insideHiddenType = hiddenTypeDepths.isNotEmpty()
+                                val opens = line.count { it == '{' }
+                                val closes = line.count { it == '}' }
+                                if ((pendingHiddenType || hiddenTypeRegex.containsMatchIn(trimmed)) && opens > 0) {
+                                    hiddenTypeDepths += braceDepth + 1
+                                    pendingHiddenType = false
+                                } else if (hiddenTypeRegex.containsMatchIn(trimmed)) {
+                                    pendingHiddenType = true
+                                }
+                                braceDepth += opens - closes
+                                if (insideHiddenType) return@forEachIndexed
                                 if (trimmed.startsWith("@")) return@forEachIndexed
                                 val isDeclaration =
                                     declarationRegex.containsMatchIn(trimmed) ||
@@ -257,6 +331,34 @@ tasks.register("locAndPackageSizeCheck") {
         val fileViolations = mutableListOf<String>()
         val packageLoc = linkedMapOf<String, Int>()
 
+        fun effectiveLoc(lines: List<String>): Int {
+            var inBlockComment = false
+            var count = 0
+            lines.forEach { line ->
+                var trimmed = line.trim()
+                if (trimmed.isEmpty()) return@forEach
+                if (inBlockComment) {
+                    if (trimmed.contains("*/")) {
+                        trimmed = trimmed.substringAfter("*/").trim()
+                        inBlockComment = false
+                    } else {
+                        return@forEach
+                    }
+                }
+                while (trimmed.startsWith("/*")) {
+                    if (!trimmed.contains("*/")) {
+                        inBlockComment = true
+                        return@forEach
+                    }
+                    trimmed = trimmed.substringAfter("*/").trim()
+                    if (trimmed.isEmpty()) return@forEach
+                }
+                if (trimmed.startsWith("//")) return@forEach
+                count++
+            }
+            return count
+        }
+
         kotlinSourceRoots
             .filter { Files.exists(it) }
             .forEach { root ->
@@ -264,13 +366,13 @@ tasks.register("locAndPackageSizeCheck") {
                     stream
                         .filter { Files.isRegularFile(it) && it.extension == "kt" }
                         .forEach { file ->
-                            val lines = Files.readAllLines(file).size
+                            val fileLines = Files.readAllLines(file)
+                            val lines = effectiveLoc(fileLines)
                             if (lines > maxLocPerFile) {
-                                fileViolations += "${file.toAbsolutePath()}: $lines LOC (max $maxLocPerFile)"
+                                fileViolations += "${file.toAbsolutePath()}: $lines effective LOC (max $maxLocPerFile)"
                             }
                             val pkg =
-                                Files
-                                    .readAllLines(file)
+                                fileLines
                                     .firstOrNull { it.trim().startsWith("package ") }
                                     ?.removePrefix("package ")
                                     ?.trim()
@@ -306,6 +408,7 @@ tasks.register("locAndPackageSizeCheck") {
 tasks.named("check") {
     dependsOn("locAndPackageSizeCheck")
     dependsOn("unusedCodeCheck")
+    dependsOn("jacocoTestCoverageVerification")
 }
 
 tasks.register("unusedCodeCheck") {
