@@ -3,8 +3,8 @@ package de.heckenmann.visualagent.agent.tools
 import de.heckenmann.visualagent.agent.ToolDefinition
 import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.agent.ToolResult
+import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.config.AppConfig
-import de.heckenmann.visualagent.knowledge.ConversationStore
 import de.heckenmann.visualagent.knowledge.TodoStore
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoPriority
@@ -13,10 +13,15 @@ import kotlinx.serialization.json.JsonObject
 import org.springframework.stereotype.Component
 
 /**
- * Represents UiTool.
+ * Tool that exposes safe UI/session settings to the model.
+ *
+ * API keys are reported only as configured/not configured and are never included
+ * in the returned content.
  */
 @Component
-class UiTool : VisualAgentTool {
+class UiTool(
+    private val providerCatalog: ProviderCatalogService,
+) : VisualAgentTool {
     override val definition =
         ToolDefinition(
             id = ToolId("ui"),
@@ -34,8 +39,11 @@ class UiTool : VisualAgentTool {
             "set" -> {
                 input.string("theme")?.let { AppConfig.instance.theme = it }
                 input.int("fontSize")?.let { AppConfig.instance.fontSize = it.coerceIn(10, 24) }
-                input.string("provider")?.let { AppConfig.instance.llmProvider = it.lowercase() }
-                input.string("model")?.let { AppConfig.instance.setActiveModel(it) }
+                input.string("provider")?.let(providerCatalog::setActiveProvider)
+                input.string("model")?.let { model ->
+                    val provider = providerCatalog.getProvider(providerCatalog.activeProviderId())
+                    if (provider != null) providerCatalog.saveProvider(provider.copy(defaultModel = model))
+                }
                 input.string("openAiBaseUrl")?.let { AppConfig.instance.openAiBaseUrl = it }
                 input.boolean("streamingEnabled")?.let { AppConfig.instance.streamingEnabled = it }
                 input.boolean("thinkingEnabled")?.let { AppConfig.instance.thinkingEnabled = it }
@@ -50,8 +58,8 @@ class UiTool : VisualAgentTool {
             Current UI Settings:
               Theme: ${AppConfig.instance.theme}
               Font size: ${AppConfig.instance.fontSize}px
-              Provider: ${AppConfig.instance.normalizedProvider()}
-              Model: ${AppConfig.instance.activeModel()}
+              Provider: ${providerCatalog.activeProviderId()}
+              Model: ${providerCatalog.getProvider(providerCatalog.activeProviderId())?.defaultModel.orEmpty()}
               OpenAI Base URL: ${AppConfig.instance.openAiBaseUrl}
               OpenAI API key configured: ${AppConfig.instance.openAiApiKey.isNotBlank()}
               Streaming: ${AppConfig.instance.streamingEnabled}
@@ -64,7 +72,7 @@ class UiTool : VisualAgentTool {
 }
 
 /**
- * Represents PwdTool.
+ * Tool that returns the workspace root used for file and terminal operations.
  */
 @Component
 class PwdTool : VisualAgentTool {
@@ -83,10 +91,12 @@ class PwdTool : VisualAgentTool {
 }
 
 /**
- * Represents ContextTool.
+ * Tool that summarizes request metadata, workspace state, and active provider selection.
  */
 @Component
-class ContextTool : VisualAgentTool {
+class ContextTool(
+    private val providerCatalog: ProviderCatalogService? = null,
+) : VisualAgentTool {
     override val definition =
         ToolDefinition(
             id = ToolId("context"),
@@ -103,8 +113,9 @@ class ContextTool : VisualAgentTool {
             "context",
             buildString {
                 appendLine("Workspace: ${workspaceRoot()}")
-                appendLine("Provider: ${AppConfig.instance.normalizedProvider()}")
-                appendLine("Model: ${AppConfig.instance.activeModel()}")
+                val activeProvider = providerCatalog?.activeProviderId() ?: AppConfig.instance.llmProvider
+                appendLine("Provider: $activeProvider")
+                appendLine("Model: ${providerCatalog?.getProvider(activeProvider)?.defaultModel ?: AppConfig.instance.activeModel()}")
                 appendLine("OpenAI Base URL: ${AppConfig.instance.openAiBaseUrl}")
                 appendLine("OpenAI API key configured: ${AppConfig.instance.openAiApiKey.isNotBlank()}")
                 appendLine("Theme: ${AppConfig.instance.theme}")
@@ -116,68 +127,7 @@ class ContextTool : VisualAgentTool {
 }
 
 /**
- * Represents HistoryTool.
- */
-@Component
-class HistoryTool(
-    private val conversationStore: ConversationStore,
-) : VisualAgentTool {
-    override val definition =
-        ToolDefinition(
-            id = ToolId("history"),
-            name = ToolId("history").toFunctionName(),
-            description =
-                "Read conversation history. Actions: load older pages or search by keyword. " +
-                    "Input: {\"action\":\"load|search\", ...}.",
-            inputSchema = STRING_SCHEMA,
-        )
-
-    override fun execute(
-        inputJson: String,
-        context: Map<String, Any>,
-    ): ToolResult {
-        val input = parseObject(inputJson)
-        val sessionId = context["sessionId"]?.toString().orEmpty().ifBlank { "main" }
-        return when (input.string("action") ?: "load") {
-            "load" -> loadPage(sessionId, input)
-            "search" -> search(sessionId, input)
-            else -> failure("history", "Unsupported history action")
-        }
-    }
-
-    private fun loadPage(
-        sessionId: String,
-        input: JsonObject,
-    ): ToolResult {
-        val limit = (input.int("limit") ?: 20).coerceIn(1, 100)
-        val offset = (input.int("offset") ?: 0).coerceAtLeast(0)
-        val rows = conversationStore.getConversationMessagesPage(sessionId, limit, offset)
-        if (rows.isEmpty()) return success("history", "No messages found for load request.")
-        val content =
-            rows.joinToString("\n") { row ->
-                "[${row.createdAt}] ${row.role}: ${row.content}"
-            }
-        return success("history", content)
-    }
-
-    private fun search(
-        sessionId: String,
-        input: JsonObject,
-    ): ToolResult {
-        val query = input.requiredString("query")
-        val limit = (input.int("limit") ?: 20).coerceIn(1, 100)
-        val rows = conversationStore.searchConversationMessages(sessionId, query, limit)
-        if (rows.isEmpty()) return success("history", "No messages matched query '$query'.")
-        val content =
-            rows.joinToString("\n") { row ->
-                "[${row.createdAt}] ${row.role}: ${row.content}"
-            }
-        return success("history", content)
-    }
-}
-
-/**
- * Represents TodosTool.
+ * Tool that lets the model inspect and mutate persisted todo records.
  */
 @Component
 class TodosTool(

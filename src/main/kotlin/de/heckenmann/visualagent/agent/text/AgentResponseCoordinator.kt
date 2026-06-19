@@ -60,7 +60,7 @@ internal class AgentResponseCoordinator(
     }
 
     /**
-     * Executes one repetition-guard retry and returns normalized output.
+     * Performs one retry after a runaway-repetition response and normalizes the result.
      *
      * @return Normalized assistant output
      */

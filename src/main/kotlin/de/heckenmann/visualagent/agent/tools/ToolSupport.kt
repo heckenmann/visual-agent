@@ -73,14 +73,14 @@ internal fun resolveWorkspacePathOrFailure(
 
 internal sealed interface PathResolution {
     /**
-     * Represents Success.
+     * Successful workspace path resolution.
      */
     data class Success(
         val path: Path,
     ) : PathResolution
 
     /**
-     * Represents Failure.
+     * Failed path resolution represented as a tool result.
      */
     data class Failure(
         val result: ToolResult,

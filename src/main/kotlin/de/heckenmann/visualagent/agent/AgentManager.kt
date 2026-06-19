@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.agent
 
-import de.heckenmann.visualagent.agent.autonomy.AutonomousCoordinator
+import de.heckenmann.visualagent.agent.config.AgentToolConfigService
+import de.heckenmann.visualagent.agent.conversation.AgentManagerConversationOps
 import de.heckenmann.visualagent.agent.text.AgentResponseCoordinator
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
@@ -10,6 +11,7 @@ import de.heckenmann.visualagent.knowledge.MemoryStore
 import de.heckenmann.visualagent.knowledge.PersistenceStores
 import de.heckenmann.visualagent.knowledge.SubAgentStore
 import de.heckenmann.visualagent.knowledge.TodoStore
+import de.heckenmann.visualagent.orchestration.AutonomousCoordinator
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoManager
 import kotlinx.coroutines.CoroutineScope
@@ -51,23 +53,6 @@ class AgentManager
             toolEventBus,
         )
 
-        /**
-         * Immutable todo summary snapshot sourced from the database.
-         *
-         * @property total Total number of todos
-         * @property open Number of pending todos
-         * @property inProgress Number of in-progress todos
-         * @property completed Number of completed todos
-         * @property cancelled Number of cancelled todos
-         */
-        data class TodoSummary(
-            val total: Int,
-            val open: Int,
-            val inProgress: Int,
-            val completed: Int,
-            val cancelled: Int,
-        )
-
         companion object {
             internal const val MAIN_SESSION_ID = "main"
             internal const val INITIAL_HISTORY_LOAD_LIMIT = 20
@@ -76,7 +61,9 @@ class AgentManager
             private var globalAgentCallback: ((String, String) -> Unit)? = null
 
             /**
-             * Executes setAgentCallback.
+             * Registers the UI callback that receives sub-agent lifecycle notifications.
+             *
+             * @param callback Callback invoked with agent ID and user-facing message
              */
             fun setAgentCallback(callback: (String, String) -> Unit) {
                 globalAgentCallback = callback
@@ -152,24 +139,30 @@ class AgentManager
             scope.cancel()
         }
 
+        /** Returns the current in-memory sub-agent snapshot. */
         fun getSubAgents(): List<SubAgent> = lifecycleOps.getSubAgents()
 
+        /** Returns one sub-agent by its stable identifier. */
         fun getSubAgent(id: String): SubAgent? = lifecycleOps.getSubAgent(id)
 
         internal fun saveSubAgent(agent: SubAgent) {
             lifecycleOps.saveAgentToDb(agent)
         }
 
+        /** Loads the authoritative todo list from persistence. */
         fun getTodosFromDb(): List<Todo> = lifecycleOps.getTodosFromDb()
 
+        /** Returns authoritative todo counters from persistence. */
         fun getTodoSummaryFromDb(): TodoSummary = lifecycleOps.getTodoSummaryFromDb()
 
+        /** Creates and persists a sub-agent from the requested template. */
         fun createAgent(
             name: String,
             role: String,
             templateName: String = "researcher",
         ): SubAgent = lifecycleOps.createAgent(name, role, templateName)
 
+        /** Updates mutable sub-agent metadata and configuration. */
         fun updateAgent(
             id: String,
             name: String? = null,
@@ -177,13 +170,16 @@ class AgentManager
             config: AgentConfig? = null,
         ): Boolean = lifecycleOps.updateAgent(id, name, role, config)
 
+        /** Deletes a sub-agent and its persisted tool configuration. */
         fun deleteAgent(id: String): Boolean = lifecycleOps.deleteAgent(id)
 
+        /** Sends a conversational message directly to an existing sub-agent. */
         suspend fun sendMessageToAgent(
             agentId: String,
             content: String,
         ): String = conversationOps.sendMessageToAgent(agentId, content)
 
+        /** Runs a synchronous job on an existing sub-agent under the concurrency limit. */
         suspend fun runAgentJob(
             agentId: String,
             content: String,
@@ -192,6 +188,7 @@ class AgentManager
                 conversationOps.runAgentJob(agentId, content)
             }
 
+        /** Queues an asynchronous job for an existing sub-agent. */
         fun enqueueAgentJob(
             agentId: String,
             content: String,
@@ -201,6 +198,7 @@ class AgentManager
                 onFinished = conversationOps::notifyMainAgentOfJobCompletion,
             )
 
+        /** Creates a sub-agent and runs a synchronous job under the concurrency limit. */
         suspend fun startAgentJob(
             name: String,
             role: String,
@@ -211,6 +209,7 @@ class AgentManager
                 conversationOps.startAgentJob(name, role, templateName, content)
             }
 
+        /** Queues creation and asynchronous execution of a sub-agent job. */
         fun enqueueAgentJob(
             name: String,
             role: String,
@@ -222,6 +221,7 @@ class AgentManager
                 onFinished = conversationOps::notifyMainAgentOfJobCompletion,
             )
 
+        /** Returns active and queued sub-agent job counts. */
         fun getSubAgentJobQueueSnapshot(): SubAgentJobQueueSnapshot = subAgentJobScheduler.snapshot()
 
         /**
@@ -232,41 +232,55 @@ class AgentManager
          */
         fun getActiveJobCount(agentId: String): Int = activeJobsByAgentId[agentId] ?: 0
 
+        /** Sends a message to the main agent and persists both conversation turns. */
         suspend fun sendMessage(content: String): String = conversationOps.sendMessage(content)
 
+        /** Streams a main-agent response while persisting the completed turn. */
         suspend fun streamMessage(
             content: String,
             onChunk: (String) -> Unit,
         ): String = conversationOps.streamMessage(content, onChunk)
 
+        /** Deletes the main conversation history from memory and persistence. */
         fun clearHistory() {
             conversationOps.clearHistory()
         }
 
+        /** Generates and persists the post-reset welcome message. */
         suspend fun addWelcomeMessageAfterReset(): String = conversationOps.addWelcomeMessageAfterReset()
 
+        /** Returns the currently loaded main conversation history. */
         fun getHistory(): List<Message> = conversationOps.getHistory()
 
+        /** Persists a completed tool-call event as conversation history. */
         fun recordToolCall(event: ToolCallEvent) {
             conversationOps.recordToolCall(event)
         }
 
+        /** Loads an older page and prepends it to the in-memory history. */
         fun loadOlderHistory(pageSize: Int = HISTORY_PAGE_SIZE): List<Message> = conversationOps.loadOlderHistory(pageSize)
 
+        /** Loads all persisted sub-agent records. */
         fun getSubAgentsFromDb(): List<SubAgent> = lifecycleOps.getSubAgentsFromDb()
 
+        /** Assigns the next pending todo to an available worker. */
         fun assignNextTodo(): Boolean = autonomyOps.assignNextTodo()
 
+        /** Assigns one todo to a specific sub-agent. */
         fun assignTodoToAgent(
             todoId: String,
             agentId: String,
         ): Boolean = autonomyOps.assignTodoToAgent(todoId, agentId)
 
+        /** Assigns as many pending todos as current capacity permits. */
         fun assignAllPendingTodos(): Int = autonomyOps.assignAllPendingTodos()
 
+        /** Adds the predefined UX improvement tasks when they are absent. */
         fun seedUxTodos() = autonomyOps.seedUxTodos()
 
+        /** Starts background autonomous todo processing. */
         fun startAutonomousProcessing(seed: Boolean = true) = autonomyOps.startAutonomousProcessing(seed)
 
+        /** Starts autonomous processing for a newly created top-level goal. */
         fun startAutonomousMode(goal: String) = autonomyOps.startAutonomousMode(goal)
     }

@@ -3,7 +3,16 @@ package de.heckenmann.visualagent.knowledge
 import java.time.Instant
 
 /**
- * Represents Memory.
+ * Knowledge entry stored for later retrieval by agents and context tools.
+ *
+ * Equality is intentionally based on [id] only so embedding byte arrays do not
+ * make repository comparisons unstable.
+ *
+ * @property id Stable storage identifier
+ * @property content Human-readable memory content
+ * @property tags Search and grouping labels associated with the memory
+ * @property createdAt Creation timestamp used for ordering and pruning
+ * @property embedding Optional vector representation for semantic search
  */
 data class Memory(
     val id: String,
@@ -23,7 +32,14 @@ data class Memory(
 }
 
 /**
- * Represents ProjectKnowledge.
+ * Cached knowledge summary for a workspace or project path.
+ *
+ * @property id Stable storage identifier
+ * @property projectPath Absolute or user-facing path this summary belongs to
+ * @property name Optional project display name
+ * @property description Optional short project description
+ * @property summary Optional accumulated context summary
+ * @property lastAccessed Last time the project context was used
  */
 data class ProjectKnowledge(
     val id: String,

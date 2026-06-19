@@ -27,7 +27,7 @@ class ManualTool(
         )
 
     /**
-     * Executes the manual lookup command.
+     * Renders a built-in manual page or lists available manual topics.
      *
      * @param inputJson JSON payload with `action` and optional `topic`
      * @param context Request metadata, not used by this tool

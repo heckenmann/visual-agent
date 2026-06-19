@@ -8,7 +8,7 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 
 /**
- * Represents TerminalTool.
+ * Tool that runs bounded, non-interactive shell commands in the workspace.
  */
 @Component
 class TerminalTool : VisualAgentTool {
@@ -52,7 +52,7 @@ class TerminalTool : VisualAgentTool {
 }
 
 /**
- * Represents BrowserTool.
+ * Placeholder tool for browser automation when no browser backend is configured.
  */
 @Component
 class BrowserTool : VisualAgentTool {
@@ -71,7 +71,7 @@ class BrowserTool : VisualAgentTool {
 }
 
 /**
- * Represents SearchTool.
+ * Placeholder tool for web/search access when no search backend is configured.
  */
 @Component
 class SearchTool : VisualAgentTool {
@@ -90,7 +90,7 @@ class SearchTool : VisualAgentTool {
 }
 
 /**
- * Represents SleepTool.
+ * Tool that pauses execution for a bounded duration.
  */
 @Component
 class SleepTool : VisualAgentTool {

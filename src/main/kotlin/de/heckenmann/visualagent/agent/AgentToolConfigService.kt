@@ -1,10 +1,12 @@
-package de.heckenmann.visualagent.agent
+package de.heckenmann.visualagent.agent.config
 
+import de.heckenmann.visualagent.agent.SubAgent
+import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.knowledge.SubAgentConfigStore
 import org.springframework.stereotype.Service
 
 /**
- * Represents AgentToolConfigService.
+ * Resolves the tool set exposed to the main agent and each sub-agent role.
  */
 @Service
 class AgentToolConfigService(
@@ -64,8 +66,14 @@ class AgentToolConfigService(
 
     private fun ensureDefaultConfigs() {
         defaultConfigs().forEach { config ->
-            if (configStore.getSubAgentConfig(config.id) == null) {
+            val existing = configStore.getSubAgentConfig(config.id)
+            if (existing == null) {
                 save(config)
+            } else {
+                val mergedTools = (existing.tools + config.tools.filter { it !in existing.tools }).distinct()
+                if (mergedTools != existing.tools) {
+                    save(existing.copy(tools = mergedTools))
+                }
             }
         }
     }
@@ -90,6 +98,8 @@ class AgentToolConfigService(
                         "history",
                         "manual",
                         "sleep",
+                        "workspace:layout",
+                        "canvas",
                     ),
             ),
             SubAgentToolConfig(
@@ -111,6 +121,8 @@ class AgentToolConfigService(
                         "history",
                         "manual",
                         "sleep",
+                        "workspace:layout",
+                        "canvas",
                     ),
                 maxTurns = 8,
             ),
@@ -118,7 +130,21 @@ class AgentToolConfigService(
                 id = "analyst",
                 name = "Analyst",
                 description = "Deep analysis, review, and explanation of code and architecture.",
-                tools = listOf("file:read", "file:list", "file:glob", "file:grep", "context", "pwd", "todos", "history", "manual", "sleep"),
+                tools =
+                    listOf(
+                        "file:read",
+                        "file:list",
+                        "file:glob",
+                        "file:grep",
+                        "context",
+                        "pwd",
+                        "todos",
+                        "history",
+                        "manual",
+                        "sleep",
+                        "workspace:layout",
+                        "canvas",
+                    ),
             ),
         )
 }

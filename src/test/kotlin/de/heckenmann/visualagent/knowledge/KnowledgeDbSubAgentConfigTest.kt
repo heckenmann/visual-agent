@@ -1,7 +1,7 @@
 package de.heckenmann.visualagent.knowledge
 
-import de.heckenmann.visualagent.agent.AgentToolConfigService
-import de.heckenmann.visualagent.agent.SubAgentToolConfig
+import de.heckenmann.visualagent.agent.config.AgentToolConfigService
+import de.heckenmann.visualagent.agent.config.SubAgentToolConfig
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

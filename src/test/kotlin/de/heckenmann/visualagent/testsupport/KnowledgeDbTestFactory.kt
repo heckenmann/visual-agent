@@ -1,9 +1,9 @@
 package de.heckenmann.visualagent.testsupport
 
 import de.heckenmann.visualagent.agent.AgentManager
-import de.heckenmann.visualagent.agent.AgentToolConfigService
 import de.heckenmann.visualagent.agent.LLMProvider
-import de.heckenmann.visualagent.agent.SubAgentToolConfig
+import de.heckenmann.visualagent.agent.config.AgentToolConfigService
+import de.heckenmann.visualagent.agent.config.SubAgentToolConfig
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.knowledge.ConversationStore
 import de.heckenmann.visualagent.knowledge.Memory

@@ -1,7 +1,7 @@
 package de.heckenmann.visualagent.agent
 
 /**
- * Represents AgentStatus.
+ * Runtime availability shown in the sub-agent list and used for scheduling.
  */
 enum class AgentStatus {
     IDLE,
@@ -10,7 +10,19 @@ enum class AgentStatus {
 }
 
 /**
- * Represents SubAgent.
+ * Configurable worker agent that can receive chat turns and execute assigned todos.
+ *
+ * @property id Stable agent identifier
+ * @property name User-visible agent name
+ * @property role Role prompt and UI description
+ * @property status Current scheduling state
+ * @property currentTask Optional human-readable task currently being executed
+ * @property currentTodoId Optional todo identifier currently assigned to the agent
+ * @property parentAgentId Parent agent that spawned this agent, if any
+ * @property chatHistory Recent per-agent conversation history
+ * @property config Runtime, model, and tool-related configuration
+ * @property createdAt Creation timestamp in epoch milliseconds
+ * @property updatedAt Last update timestamp in epoch milliseconds
  */
 data class SubAgent(
     val id: String,
@@ -27,7 +39,13 @@ data class SubAgent(
 ) {
     companion object {
         /**
-         * Create a SubAgent from a template name.
+         * Creates a sub-agent with configuration loaded from a named template.
+         *
+         * @param id Stable agent identifier
+         * @param name User-visible agent name
+         * @param role Role prompt and UI description
+         * @param templateName Template key used to initialize [AgentConfig]
+         * @return New sub-agent instance
          */
         fun fromTemplate(
             id: String,
@@ -59,10 +77,16 @@ data class SubAgent(
         enabledTools: Set<ToolId> = emptySet(),
     ): ChatResponse {
         val combined = chatHistory + messages
+        val modelSelection = config.modelSelection()
         val response =
             provider.chat(
                 ChatRequestContext(
                     messages = combined,
+                    provider = modelSelection.provider,
+                    model = modelSelection.model,
+                    variant = modelSelection.variant,
+                    parameters = modelSelection.parameters,
+                    options = modelSelection.options,
                     enabledTools = enabledTools,
                     metadata = mapOf("agentId" to id, "agentName" to name, "agentRole" to role),
                 ),

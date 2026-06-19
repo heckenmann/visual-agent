@@ -1,6 +1,6 @@
 package de.heckenmann.visualagent.knowledge
 
-import de.heckenmann.visualagent.agent.SubAgentToolConfig
+import de.heckenmann.visualagent.agent.config.SubAgentToolConfig
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoPriority
 import de.heckenmann.visualagent.todo.TodoStatus

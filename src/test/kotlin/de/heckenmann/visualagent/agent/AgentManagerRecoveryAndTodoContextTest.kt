@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent
 
+import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfig
 import io.mockk.coEvery
@@ -75,5 +76,29 @@ class AgentManagerRecoveryAndTodoContextTest {
             val messages = db.getConversationMessages("main")
             assertTrue(messages.any { it.role == "assistant" && it.content.contains("Recovered and continued.") })
             coVerify(atLeast = 1) { provider.chat(any<ChatRequestContext>()) }
+        }
+
+    @Test
+    fun `manager records concise recovery failure when interrupted resume fails`() =
+        runBlocking {
+            val tempDb = createTempDirectory("visual-agent-resume-failure-test").resolve("resume.db").toString()
+            val db =
+                de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                    .create(tempDb)
+            db.saveConversationMessage("main", "user", "Please continue after restart")
+
+            val provider = mockk<LLMProvider>(relaxed = true)
+            coEvery { provider.chat(any<ChatRequestContext>()) } throws IllegalStateException("401 invalid api key")
+            AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
+
+            delay(600)
+            val messages = db.getConversationMessages("main")
+            assertTrue(
+                messages.any {
+                    it.role == "assistant" &&
+                        it.content.contains("I could not resume the previous request automatically.") &&
+                        it.content.contains("Authentication failed")
+                },
+            )
         }
 }

@@ -16,7 +16,7 @@ import java.util.concurrent.TimeoutException
 import org.springframework.ai.tool.definition.ToolDefinition as SpringToolDefinition
 
 /**
- * Represents ToolRegistry.
+ * Registry that converts application tools into request-scoped Spring AI callbacks.
  */
 @Service
 class ToolRegistry(
@@ -56,7 +56,7 @@ class ToolRegistry(
         resolve(enabledTools).map { tool ->
             val definition = tool.definition
             /**
-             * Represents declaration.
+             * Spring AI callback wrapper that emits lifecycle events around one Visual Agent tool.
              */
             object : ToolCallback {
                 override fun getToolDefinition(): SpringToolDefinition =

@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent
 
+import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import io.mockk.coEvery
 import io.mockk.mockk
@@ -37,6 +38,8 @@ class AgentManagerToolContextTest {
             assertFalse(ToolId("file:read") in requestSlot.captured.enabledTools)
             assertFalse(ToolId("terminal") in requestSlot.captured.enabledTools)
             assertFalse(ToolId("history") in requestSlot.captured.enabledTools)
+            assertFalse(ToolId("workspace:layout") in requestSlot.captured.enabledTools)
+            assertFalse(ToolId("canvas") in requestSlot.captured.enabledTools)
             assertEquals("main", requestSlot.captured.metadata["agent"])
         }
 }

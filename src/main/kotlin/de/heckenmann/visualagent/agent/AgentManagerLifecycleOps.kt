@@ -4,6 +4,7 @@ import de.heckenmann.visualagent.knowledge.PersistedSubAgent
 import de.heckenmann.visualagent.todo.Todo
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import mu.KotlinLogging
 import java.time.Instant
 import java.util.UUID
 
@@ -13,12 +14,14 @@ import java.util.UUID
 internal class AgentManagerLifecycleOps(
     private val owner: AgentManager,
 ) {
+    private val logger = KotlinLogging.logger {}
+
     fun loadAgentsFromDb() {
         val agents = owner.subAgentStore.listAgents()
-        println("[AgentManager] Found ${agents.size} agents in DB")
+        logger.info { "Found ${agents.size} agents in DB" }
         if (agents.size < 3) {
             createDefaultAgents()
-            println("[AgentManager] Created default agents; subAgents size=${owner.subAgents.size}")
+            logger.info { "Created default agents; subAgents size=${owner.subAgents.size}" }
             return
         }
 
@@ -26,15 +29,13 @@ internal class AgentManagerLifecycleOps(
         sortedAgents.forEach { agentMap ->
             try {
                 val agent = mapAgentRecord(agentMap, resetStatusToIdle = true)
-                println("[AgentManager] Loading agent id=${agent.id} status=${agent.status}")
+                logger.debug { "Loading agent id=${agent.id} status=${agent.status}" }
                 owner.subAgents[agent.id] = agent
             } catch (e: Exception) {
-                println("[AgentManager] Error loading agent: ${e.message}")
+                logger.warn(e) { "Error loading agent ${agentMap.id}" }
             }
         }
-        println(
-            "[AgentManager] Loaded subAgents keys: ${owner.subAgents.keys} and statuses=${owner.subAgents.mapValues { it.value.status }}",
-        )
+        logger.debug { "Loaded subAgents keys: ${owner.subAgents.keys} and statuses=${owner.subAgents.mapValues { it.value.status }}" }
     }
 
     fun mapAgentRecord(
@@ -80,7 +81,7 @@ internal class AgentManagerLifecycleOps(
             saveAgentToDb(agent)
             owner.subAgents[agent.id] = agent
         }
-        println("[AgentManager] Created ${defaults.size} default agents")
+        logger.info { "Created ${defaults.size} default agents" }
     }
 
     fun saveAgentToDb(agent: SubAgent) {
@@ -106,9 +107,9 @@ internal class AgentManagerLifecycleOps(
 
     fun getTodosFromDb(): List<Todo> = owner.todoStore.listTodos()
 
-    fun getTodoSummaryFromDb(): AgentManager.TodoSummary {
+    fun getTodoSummaryFromDb(): TodoSummary {
         val todos = owner.todoStore.listTodos()
-        return AgentManager.TodoSummary(
+        return TodoSummary(
             total = todos.size,
             open = todos.count { it.status == de.heckenmann.visualagent.todo.TodoStatus.PENDING },
             inProgress = todos.count { it.status == de.heckenmann.visualagent.todo.TodoStatus.IN_PROGRESS },
@@ -127,7 +128,7 @@ internal class AgentManagerLifecycleOps(
         saveAgentToDb(agent)
         owner.subAgents[agent.id] = agent
         AgentManager.notifyAgent(agent.id, "CREATED")
-        println("[AgentManager] Created agent: $id ($name)")
+        logger.info { "Created agent: $id ($name)" }
         return agent
     }
 
@@ -143,7 +144,7 @@ internal class AgentManagerLifecycleOps(
         if (config != null) agent.config = config
         agent.updatedAt = System.currentTimeMillis()
         saveAgentToDb(agent)
-        println("[AgentManager] Updated agent: $id")
+        logger.debug { "Updated agent: $id" }
         return true
     }
 
@@ -151,7 +152,7 @@ internal class AgentManagerLifecycleOps(
         val removed = owner.subAgents.remove(id)
         if (removed != null) {
             owner.subAgentStore.deleteAgent(id)
-            println("[AgentManager] Deleted agent: $id")
+            logger.info { "Deleted agent: $id" }
             return true
         }
         return false

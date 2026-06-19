@@ -1,5 +1,11 @@
-package de.heckenmann.visualagent.agent
+package de.heckenmann.visualagent.agent.tests
 
+import de.heckenmann.visualagent.agent.AgentManager
+import de.heckenmann.visualagent.agent.ChatRequestContext
+import de.heckenmann.visualagent.agent.ChatResponse
+import de.heckenmann.visualagent.agent.LLMProvider
+import de.heckenmann.visualagent.agent.Message
+import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import io.mockk.coEvery
 import io.mockk.mockk

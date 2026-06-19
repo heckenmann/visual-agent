@@ -38,7 +38,7 @@ enum class ToolCallPhase {
 }
 
 /**
- * Represents ToolEventBus.
+ * In-process pub/sub bus for tool execution lifecycle events.
  */
 @Component
 class ToolEventBus {

@@ -4,7 +4,7 @@ import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
- * Represents TodoChangeType.
+ * Mutation type emitted when the todo list changes.
  */
 enum class TodoChangeType {
     ADDED,
@@ -14,7 +14,11 @@ enum class TodoChangeType {
 }
 
 /**
- * Represents TodoChange.
+ * Event payload sent to todo persistence and UI observers after a mutation.
+ *
+ * @property type Kind of mutation that occurred
+ * @property todo Updated todo for add/update style events
+ * @property todoId Removed todo identifier for delete events
  */
 data class TodoChange(
     val type: TodoChangeType,
@@ -45,27 +49,36 @@ class TodoManager(
     }
 
     /**
-     * Executes getAll.
+     * Returns a defensive snapshot of all todos in their current order.
      */
     fun getAll(): List<Todo> = todos.toList()
 
     /**
-     * Executes getPending.
+     * Returns todos that are ready to be assigned to an agent.
      */
     fun getPending(): List<Todo> = todos.filter { it.status == TodoStatus.PENDING }
 
     /**
-     * Executes getById.
+     * Finds one todo by stable identifier.
+     *
+     * @param id Todo identifier
+     * @return Matching todo or null
      */
     fun getById(id: String): Todo? = todos.find { it.id == id }
 
     /**
-     * Executes getByAgent.
+     * Returns todos assigned to a specific sub-agent.
+     *
+     * @param agentId Sub-agent identifier
      */
     fun getByAgent(agentId: String): List<Todo> = todos.filter { it.assignedAgentId == agentId }
 
     /**
-     * Executes add.
+     * Creates a pending todo and publishes an add event.
+     *
+     * @param description User-facing task description
+     * @param priority Initial task priority
+     * @return Created todo with generated identifier
      */
     fun add(
         description: String,
@@ -84,7 +97,12 @@ class TodoManager(
     }
 
     /**
-     * Executes update.
+     * Updates editable todo fields and publishes an update event.
+     *
+     * @param todoId Identifier of the todo to update
+     * @param description New task description
+     * @param priority New task priority
+     * @return true if the todo exists and was updated
      */
     fun update(
         todoId: String,
@@ -117,7 +135,11 @@ class TodoManager(
     }
 
     /**
-     * Executes assignToAgent.
+     * Assigns a pending todo to an agent and moves it to in-progress.
+     *
+     * @param todoId Identifier of the pending todo
+     * @param agentId Sub-agent that should execute the todo
+     * @return true if the todo was pending and is now assigned
      */
     fun assignToAgent(
         todoId: String,
@@ -132,7 +154,10 @@ class TodoManager(
     }
 
     /**
-     * Executes completeTodo.
+     * Completes an in-progress todo and records the completion timestamp.
+     *
+     * @param todoId Identifier of the in-progress todo
+     * @return true if the todo could be completed
      */
     fun completeTodo(todoId: String): Boolean {
         val todo = getById(todoId) ?: return false
@@ -144,7 +169,10 @@ class TodoManager(
     }
 
     /**
-     * Executes cancelTodo.
+     * Cancels an unfinished todo.
+     *
+     * @param todoId Identifier of the todo to cancel
+     * @return true if the todo existed and was not already terminal
      */
     fun cancelTodo(todoId: String): Boolean {
         val todo = getById(todoId) ?: return false
@@ -155,7 +183,10 @@ class TodoManager(
     }
 
     /**
-     * Executes remove.
+     * Removes one todo and publishes a remove event.
+     *
+     * @param todoId Identifier of the todo to delete
+     * @return true if a todo was removed
      */
     fun remove(todoId: String): Boolean {
         val removed = todos.removeIf { it.id == todoId }
@@ -164,7 +195,7 @@ class TodoManager(
     }
 
     /**
-     * Executes clear.
+     * Removes all todos and publishes one clear event.
      */
     fun clear() {
         todos.clear()

@@ -1,12 +1,16 @@
-package de.heckenmann.visualagent.agent
+package de.heckenmann.visualagent.agent.conversation
 
+import de.heckenmann.visualagent.agent.AgentJobResult
+import de.heckenmann.visualagent.agent.AgentManager
+import de.heckenmann.visualagent.agent.AgentStatus
+import de.heckenmann.visualagent.agent.ChatRequestContext
+import de.heckenmann.visualagent.agent.Message
+import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.agent.text.ResponseRepetitionGuard
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.launch
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
+import mu.KotlinLogging
 
 /**
  * Handles conversation and history operations for [AgentManager].
@@ -14,6 +18,9 @@ import kotlinx.serialization.json.put
 internal class AgentManagerConversationOps(
     private val owner: AgentManager,
 ) {
+    private val logger = KotlinLogging.logger {}
+    private val historyOps = AgentConversationHistoryOps(owner, ::buildMainRequest)
+
     suspend fun sendMessageToAgent(
         agentId: String,
         content: String,
@@ -121,7 +128,7 @@ internal class AgentManagerConversationOps(
         }
         var assistantText = collected.toString().trim()
         if (ResponseRepetitionGuard.isRunawayRepetition(assistantText)) {
-            println("[AgentManager] repetition-guard: detected runaway repetition in streaming output, retrying once")
+            logger.warn { "Repetition guard detected runaway streaming output; retrying once" }
             assistantText = owner.responseCoordinator.retryAfterRepetition()
         }
         assistantText = owner.responseCoordinator.normalizeAssistantContent(assistantText)
@@ -140,10 +147,7 @@ internal class AgentManagerConversationOps(
         return assistantText
     }
 
-    fun clearHistory() {
-        owner.conversationHistory.clear()
-        owner.conversationStore.deleteConversationMessages(AgentManager.MAIN_SESSION_ID)
-    }
+    fun clearHistory() = historyOps.clearHistory()
 
     suspend fun addWelcomeMessageAfterReset(): String {
         val request =
@@ -182,113 +186,18 @@ internal class AgentManagerConversationOps(
         return welcome
     }
 
-    fun getHistory(): List<Message> = owner.conversationHistory.toList()
+    fun getHistory(): List<Message> = historyOps.getHistory()
 
-    fun recordToolCall(event: ToolCallEvent) {
-        val status = if (event.result.success) "ok" else "error"
-        val firstDetailLine =
-            event.result.content
-                .trim()
-                .lineSequence()
-                .firstOrNull()
-                .orEmpty()
-                .take(140)
-        val compactText =
-            when {
-                firstDetailLine.isNotBlank() -> "Tool ${event.toolId} · $status · $firstDetailLine"
-                !event.result.error.isNullOrBlank() -> "Tool ${event.toolId} · $status · ${event.result.error}"
-                else -> "Tool ${event.toolId} · $status"
-            }
-        val metadata =
-            buildJsonObject {
-                put("type", "tool_call")
-                put("toolId", event.toolId)
-                put("functionName", event.functionName)
-                put("status", status)
-                put("durationMillis", event.durationMillis)
-                put("inputJson", event.inputJson)
-                put("resultContent", event.result.content)
-                put("resultError", event.result.error ?: "")
-            }.toString()
-        val message = Message(role = "assistant", content = compactText, metadata = metadata)
-        owner.conversationHistory.add(message)
-        owner.conversationStore.saveConversationMessage(AgentManager.MAIN_SESSION_ID, message.role, message.content, message.metadata)
-    }
+    fun recordToolCall(event: ToolCallEvent) = historyOps.recordToolCall(event)
 
-    fun loadOlderHistory(pageSize: Int = AgentManager.HISTORY_PAGE_SIZE): List<Message> {
-        val rows =
-            owner.conversationStore.getConversationMessagesPage(
-                sessionId = AgentManager.MAIN_SESSION_ID,
-                limit = pageSize.coerceAtLeast(1),
-                offset = owner.loadedHistoryCount,
-            )
-        val messages =
-            rows.mapNotNull { row ->
-                val role = row.role
-                val content = row.content
-                val metadata = row.metadata
-                if (role.isNotBlank() && content.isNotBlank()) Message(role = role, content = content, metadata = metadata) else null
-            }
-        if (messages.isNotEmpty()) {
-            owner.conversationHistory.addAll(0, messages)
-            owner.loadedHistoryCount += messages.size
-        }
-        return messages
-    }
+    fun loadOlderHistory(pageSize: Int = AgentManager.HISTORY_PAGE_SIZE): List<Message> = historyOps.loadOlderHistory(pageSize)
 
     fun loadRecentHistoryFromDb(limit: Int = AgentManager.INITIAL_HISTORY_LOAD_LIMIT): List<Message> =
-        owner.conversationStore.getConversationMessages(AgentManager.MAIN_SESSION_ID, limit).mapNotNull { row ->
-            val role = row.role
-            val content = row.content
-            if (role.isBlank() || content.isBlank()) {
-                null
-            } else {
-                Message(role = role, content = content, metadata = row.metadata?.ifBlank { null })
-            }
-        }
+        historyOps.loadRecentHistoryFromDb(limit)
 
-    fun loadConversationFromDb() {
-        owner.conversationHistory.clear()
-        val rows = owner.conversationStore.getConversationMessages(AgentManager.MAIN_SESSION_ID, AgentManager.INITIAL_HISTORY_LOAD_LIMIT)
-        rows.forEach { row ->
-            val role = row.role
-            val content = row.content
-            val metadata = row.metadata
-            if (role.isNotBlank() && content.isNotBlank()) {
-                owner.conversationHistory.add(Message(role = role, content = content, metadata = metadata))
-            }
-        }
-        owner.loadedHistoryCount = owner.conversationHistory.size
-        val last = owner.conversationHistory.lastOrNull()
-        owner.pendingResumeMessage = if (last?.role == "user") last.content else null
-    }
+    fun loadConversationFromDb() = historyOps.loadConversationFromDb()
 
-    fun resumeInterruptedConversationIfNeeded() {
-        val resumeText = owner.pendingResumeMessage ?: return
-        owner.scope.launch {
-            runCatching {
-                val resumeInstruction =
-                    Message(
-                        "system",
-                        "The previous request was interrupted by an app shutdown or failure. Continue the unfinished work from the last user request now.",
-                    )
-                val request = buildMainRequest(listOf(resumeInstruction) + loadRecentHistoryFromDb())
-                val response = owner.llmProvider.chat(request)
-                val assistantMessage = Message("assistant", owner.responseCoordinator.normalizeAssistantContent(response.message.content))
-                owner.conversationHistory.add(assistantMessage)
-                owner.conversationStore.saveConversationMessage(
-                    AgentManager.MAIN_SESSION_ID,
-                    assistantMessage.role,
-                    assistantMessage.content,
-                )
-                owner.pendingResumeMessage = null
-            }.onFailure { error ->
-                val note = Message("assistant", "Recovery note: Could not auto-resume interrupted request (${error.message}).")
-                owner.conversationHistory.add(note)
-                owner.conversationStore.saveConversationMessage(AgentManager.MAIN_SESSION_ID, note.role, note.content)
-            }
-        }
-    }
+    fun resumeInterruptedConversationIfNeeded() = historyOps.resumeInterruptedConversationIfNeeded()
 
     fun registerToolEventListener(): AutoCloseable =
         owner.toolEventBus.addListener { event ->
