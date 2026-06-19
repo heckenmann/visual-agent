@@ -54,13 +54,19 @@ class OpenAiPromptFactory(
                 context = request.metadata + mapOf("model" to selectedModel, "provider" to "openai"),
             )
         val exactFunctionNames = callbacks.map { it.toolDefinition.name() }.distinct().sorted()
-        val options =
+        val optionsBuilder =
             OpenAiChatOptions
                 .builder()
                 .model(selectedModel)
                 .toolCallbacks(callbacks)
                 .toolContext(request.metadata + mapOf("model" to selectedModel, "provider" to "openai"))
-                .build()
+        request.parameters.temperature?.let(optionsBuilder::temperature)
+        request.parameters.topP?.let(optionsBuilder::topP)
+        request.parameters.maxTokens?.let(optionsBuilder::maxCompletionTokens)
+        request.options["seed"]?.toIntOrNull()?.let(optionsBuilder::seed)
+        request.options["reasoningEffort"]?.let(optionsBuilder::reasoningEffort)
+        request.options["verbosity"]?.let(optionsBuilder::verbosity)
+        val options = optionsBuilder.build()
         return Prompt(toSpringMessages(toolNameGuardMessage(exactFunctionNames) + request.messages), options)
     }
 

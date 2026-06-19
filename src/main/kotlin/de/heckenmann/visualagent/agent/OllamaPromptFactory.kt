@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component
 import org.springframework.ai.chat.messages.Message as SpringMessage
 
 /**
- * Represents OllamaPromptFactory.
+ * Builds Ollama prompts with Spring AI tool-calling options and provider-safe tool names.
  */
 @Component
 class OllamaPromptFactory(
@@ -54,13 +54,19 @@ class OllamaPromptFactory(
                 context = request.metadata + mapOf("model" to selectedModel),
             )
         val exactFunctionNames = callbacks.map { it.toolDefinition.name() }.distinct().sorted()
-        val options =
+        val optionsBuilder =
             OllamaChatOptions
                 .builder()
                 .model(selectedModel)
                 .toolCallbacks(callbacks)
                 .toolContext(request.metadata + mapOf("model" to selectedModel))
-                .build()
+        request.parameters.temperature?.let(optionsBuilder::temperature)
+        request.parameters.topP?.let(optionsBuilder::topP)
+        request.parameters.maxTokens?.let(optionsBuilder::numPredict)
+        request.options["topK"]?.toIntOrNull()?.let(optionsBuilder::topK)
+        request.options["seed"]?.toIntOrNull()?.let(optionsBuilder::seed)
+        request.options["repeatPenalty"]?.toDoubleOrNull()?.let(optionsBuilder::repeatPenalty)
+        val options = optionsBuilder.build()
         return Prompt(toSpringMessages(toolNameGuardMessage(exactFunctionNames) + request.messages), options)
     }
 

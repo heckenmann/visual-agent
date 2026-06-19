@@ -7,7 +7,7 @@ import org.springframework.ai.chat.model.ChatModel
 import org.springframework.stereotype.Component
 
 /**
- * Represents OllamaToolRecovery.
+ * Recovery helper for Ollama models that request unknown or unavailable tool callbacks.
  */
 @Component
 class OllamaToolRecovery(

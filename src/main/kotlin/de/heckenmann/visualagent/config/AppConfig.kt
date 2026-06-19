@@ -8,14 +8,12 @@ import java.util.Properties
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
- * Application configuration singleton.
- *
  * Loads configuration from `src/main/resources/config/app.properties`.
  * Provides access to Ollama settings, database path, UI preferences, and browser configuration.
  *
  * @property llmProvider Active provider identifier (`ollama` or `openai`)
  * @property ollamaLocalUrl Ollama API endpoint (default: http://localhost:11434)
- * @property ollamaModel Default model name (default: llava)
+ * @property ollamaApiKey Optional plaintext API key for secured Ollama endpoints, stored in SQLite
  * @property openAiApiKey Plaintext OpenAI API key stored in SQLite by current product decision
  * @property openAiBaseUrl OpenAI-compatible API base URL
  * @property openAiModel Default OpenAI-compatible chat model
@@ -28,6 +26,7 @@ class AppConfig private constructor() {
     var llmProvider: String = "ollama"
     var ollamaLocalUrl: String = "http://localhost:11434"
     var ollamaModel: String = "llava"
+    var ollamaApiKey: String = ""
     var openAiApiKey: String = ""
     var openAiBaseUrl: String = "https://api.openai.com"
     var openAiModel: String = "gpt-4o-mini"
@@ -55,25 +54,26 @@ class AppConfig private constructor() {
         /** Singleton instance of AppConfig. */
         val instance: AppConfig by lazy { AppConfig().reload() }
 
-        private const val KEY_LLM_PROVIDER = "llm.provider"
-        private const val KEY_OLLAMA_LOCAL_URL = "ollama.local.url"
-        private const val KEY_OLLAMA_MODEL = "ollama.model"
+        internal const val KEY_LLM_PROVIDER = "llm.provider"
+        internal const val KEY_OLLAMA_LOCAL_URL = "ollama.local.url"
+        internal const val KEY_OLLAMA_MODEL = "ollama.model"
+        private const val KEY_OLLAMA_API_KEY = "ollama.api.key"
         private const val KEY_OPENAI_API_KEY = "openai.api.key"
-        private const val KEY_OPENAI_BASE_URL = "openai.base.url"
-        private const val KEY_OPENAI_MODEL = "openai.model"
-        private const val KEY_DATABASE_PATH = "database.path"
-        private const val KEY_UI_THEME = "ui.theme"
-        private const val KEY_UI_FONT_SIZE = "ui.font.size"
-        private const val KEY_BROWSER_DEFAULT = "browser.default"
-        private const val KEY_SESSION_CONTEXT_LENGTH = "session.context.length"
-        private const val KEY_SESSION_STREAMING = "session.streaming.enabled"
-        private const val KEY_SESSION_THINKING = "session.thinking.enabled"
-        private const val KEY_SESSION_AUTO_COMPACTION = "session.auto.compaction.enabled"
-        private const val KEY_SESSION_LOAD_LIMIT = "session.load.limit"
-        private const val KEY_SESSION_MAX_PARALLEL_SUB_AGENTS = "session.max.parallel.sub.agents"
-        private const val KEY_SESSION_TIMEOUT_SECONDS = "session.timeout.seconds"
-        private const val KEY_SESSION_USER_MODEL_INSTRUCTION = "session.user.model.instruction"
-        private const val KEY_SESSION_FAVORITE_MODELS = "session.favorite.models"
+        internal const val KEY_OPENAI_BASE_URL = "openai.base.url"
+        internal const val KEY_OPENAI_MODEL = "openai.model"
+        internal const val KEY_DATABASE_PATH = "database.path"
+        internal const val KEY_UI_THEME = "ui.theme"
+        internal const val KEY_UI_FONT_SIZE = "ui.font.size"
+        internal const val KEY_BROWSER_DEFAULT = "browser.default"
+        internal const val KEY_SESSION_CONTEXT_LENGTH = "session.context.length"
+        internal const val KEY_SESSION_STREAMING = "session.streaming.enabled"
+        internal const val KEY_SESSION_THINKING = "session.thinking.enabled"
+        internal const val KEY_SESSION_AUTO_COMPACTION = "session.auto.compaction.enabled"
+        internal const val KEY_SESSION_LOAD_LIMIT = "session.load.limit"
+        internal const val KEY_SESSION_MAX_PARALLEL_SUB_AGENTS = "session.max.parallel.sub.agents"
+        internal const val KEY_SESSION_TIMEOUT_SECONDS = "session.timeout.seconds"
+        internal const val KEY_SESSION_USER_MODEL_INSTRUCTION = "session.user.model.instruction"
+        internal const val KEY_SESSION_FAVORITE_MODELS = "session.favorite.models"
     }
 
     /**
@@ -161,6 +161,33 @@ class AppConfig private constructor() {
         return this
     }
 
+    /**
+     * Exports non-secret application settings to a properties file.
+     *
+     * Provider API keys are intentionally excluded.
+     *
+     * @param file Destination properties file
+     */
+    fun exportTo(file: File) {
+        FileOutputStream(file).use { output ->
+            AppConfigProperties.exportFrom(this).store(output, "Visual Agent Configuration")
+        }
+    }
+
+    /**
+     * Imports non-secret application settings and persists them to all configured stores.
+     *
+     * Current provider API keys are retained because configuration exports never contain them.
+     *
+     * @param file Source properties file
+     */
+    fun importFrom(file: File) {
+        val props = Properties()
+        FileInputStream(file).use(props::load)
+        AppConfigProperties.applyTo(this, props)
+        save()
+    }
+
     private fun publishChanges() {
         val previous = lastSnapshot
         val current = snapshot()
@@ -181,6 +208,7 @@ class AppConfig private constructor() {
                 KEY_LLM_PROVIDER to llmProvider,
                 KEY_OLLAMA_LOCAL_URL to ollamaLocalUrl,
                 KEY_OLLAMA_MODEL to ollamaModel,
+                KEY_OLLAMA_API_KEY to ollamaApiKey,
                 KEY_OPENAI_API_KEY to openAiApiKey,
                 KEY_OPENAI_BASE_URL to openAiBaseUrl,
                 KEY_OPENAI_MODEL to openAiModel,
@@ -202,19 +230,8 @@ class AppConfig private constructor() {
 
     private fun saveToProperties() {
         val configFile = File("src/main/resources/config/app.properties")
-        val props = Properties()
-        props.setProperty(KEY_LLM_PROVIDER, llmProvider)
-        props.setProperty(KEY_OLLAMA_LOCAL_URL, ollamaLocalUrl)
-        props.setProperty(KEY_OLLAMA_MODEL, ollamaModel)
-        props.setProperty(KEY_OPENAI_BASE_URL, openAiBaseUrl)
-        props.setProperty(KEY_OPENAI_MODEL, openAiModel)
-        props.setProperty(KEY_DATABASE_PATH, databasePath)
-        props.setProperty(KEY_UI_THEME, theme)
-        props.setProperty(KEY_UI_FONT_SIZE, fontSize.toString())
-        props.setProperty(KEY_BROWSER_DEFAULT, browserDefault)
-        props.setProperty(KEY_SESSION_FAVORITE_MODELS, favoriteModels)
         FileOutputStream(configFile).use { fos ->
-            props.store(fos, "Visual Agent Configuration")
+            AppConfigProperties.bootstrapFrom(this).store(fos, "Visual Agent Configuration")
         }
     }
 
@@ -224,6 +241,7 @@ class AppConfig private constructor() {
             db.setPreference(KEY_LLM_PROVIDER, llmProvider)
             db.setPreference(KEY_OLLAMA_LOCAL_URL, ollamaLocalUrl)
             db.setPreference(KEY_OLLAMA_MODEL, ollamaModel)
+            db.setPreference(KEY_OLLAMA_API_KEY, ollamaApiKey)
             db.setPreference(KEY_OPENAI_API_KEY, openAiApiKey)
             db.setPreference(KEY_OPENAI_BASE_URL, openAiBaseUrl)
             db.setPreference(KEY_OPENAI_MODEL, openAiModel)
@@ -251,17 +269,7 @@ class AppConfig private constructor() {
             FileInputStream(configFile).use { fis ->
                 props.load(fis)
             }
-
-            llmProvider = props.getProperty(KEY_LLM_PROVIDER, llmProvider)
-            ollamaLocalUrl = props.getProperty(KEY_OLLAMA_LOCAL_URL, ollamaLocalUrl)
-            ollamaModel = props.getProperty(KEY_OLLAMA_MODEL, ollamaModel)
-            openAiBaseUrl = props.getProperty(KEY_OPENAI_BASE_URL, openAiBaseUrl)
-            openAiModel = props.getProperty(KEY_OPENAI_MODEL, openAiModel)
-            databasePath = props.getProperty(KEY_DATABASE_PATH, databasePath)
-            theme = props.getProperty(KEY_UI_THEME, theme)
-            fontSize = props.getProperty(KEY_UI_FONT_SIZE, fontSize.toString()).toIntOrNull() ?: fontSize
-            browserDefault = props.getProperty(KEY_BROWSER_DEFAULT, browserDefault)
-            favoriteModels = props.getProperty(KEY_SESSION_FAVORITE_MODELS, favoriteModels)
+            AppConfigProperties.applyTo(this, props)
         }
     }
 
@@ -271,6 +279,7 @@ class AppConfig private constructor() {
             llmProvider = db.getPreference(KEY_LLM_PROVIDER) ?: llmProvider
             ollamaLocalUrl = db.getPreference(KEY_OLLAMA_LOCAL_URL) ?: ollamaLocalUrl
             ollamaModel = db.getPreference(KEY_OLLAMA_MODEL) ?: ollamaModel
+            ollamaApiKey = db.getPreference(KEY_OLLAMA_API_KEY) ?: ollamaApiKey
             openAiApiKey = db.getPreference(KEY_OPENAI_API_KEY) ?: openAiApiKey
             openAiBaseUrl = db.getPreference(KEY_OPENAI_BASE_URL) ?: openAiBaseUrl
             openAiModel = db.getPreference(KEY_OPENAI_MODEL) ?: openAiModel

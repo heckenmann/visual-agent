@@ -5,14 +5,14 @@ import jakarta.annotation.PostConstruct
 import org.springframework.stereotype.Component
 
 /**
- * Represents AppConfigPersistenceBinder.
+ * Connects the singleton application configuration to the persisted preference store.
  */
 @Component
 class AppConfigPersistenceBinder(
     private val preferenceStore: PreferenceStore,
 ) {
     /**
-     * Executes bind.
+     * Installs the preference store after Spring has constructed persistence beans.
      */
     @PostConstruct
     fun bind() {

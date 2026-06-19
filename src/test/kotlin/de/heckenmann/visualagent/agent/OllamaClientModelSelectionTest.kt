@@ -1,5 +1,11 @@
-package de.heckenmann.visualagent.agent
+package de.heckenmann.visualagent.agent.tests
 
+import de.heckenmann.visualagent.agent.ChatRequestContext
+import de.heckenmann.visualagent.agent.Message
+import de.heckenmann.visualagent.agent.OllamaClient
+import de.heckenmann.visualagent.agent.ToolDefinition
+import de.heckenmann.visualagent.agent.ToolId
+import de.heckenmann.visualagent.agent.ToolResult
 import de.heckenmann.visualagent.agent.ollama.OllamaPromptFactory
 import de.heckenmann.visualagent.agent.ollama.OllamaToolRecovery
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
@@ -257,7 +263,7 @@ class OllamaClientModelSelectionTest {
         ): ToolResult = ToolResult(definition.id.value, true, "ok")
     }
 
-    private class ForbiddenLikeException(
+    class ForbiddenLikeException(
         message: String,
         private val body: String,
     ) : RuntimeException(message) {

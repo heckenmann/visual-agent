@@ -7,6 +7,7 @@ import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ModelDetails
 import de.heckenmann.visualagent.agent.ShowResponse
+import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.config.AppConfig
 import io.micrometer.observation.ObservationRegistry
 import kotlinx.coroutines.Dispatchers
@@ -37,7 +38,7 @@ class OpenAiClient(
     override suspend fun chat(request: ChatRequestContext): ChatResponse =
         withContext(Dispatchers.IO) {
             val selectedModel = request.model ?: AppConfig.instance.openAiModel
-            val responseResult = runCatching { chatModel().call(promptFactory.buildPrompt(request, selectedModel)) }
+            val responseResult = runCatching { chatModel(request.providerProfile).call(promptFactory.buildPrompt(request, selectedModel)) }
             if (responseResult.isFailure) throw buildDetailedProviderError(responseResult.exceptionOrNull())
             val response = responseResult.getOrThrow()
             ChatResponse(
@@ -71,7 +72,7 @@ class OpenAiClient(
         val selectedModel = request.model ?: AppConfig.instance.openAiModel
         return flow {
             try {
-                chatModel()
+                chatModel(request.providerProfile)
                     .stream(promptFactory.buildPrompt(request, selectedModel))
                     .asFlow()
                     .map { chunk ->
@@ -131,6 +132,22 @@ class OpenAiClient(
             }
         }
 
+    internal suspend fun getModels(profile: ProviderProfile): List<String> =
+        withContext(Dispatchers.IO) {
+            requireUsableApiKey(profile.baseUrl, profile.apiKey)
+            OpenAiModelCatalog { openAiClient(profile) }.load(modelsUri(profile))
+        }
+
+    internal suspend fun getModelDetails(
+        profile: ProviderProfile,
+        modelName: String,
+    ): ShowResponse =
+        ShowResponse(
+            model = modelName,
+            modifiedAt = "",
+            details = ModelDetails(family = profile.name),
+        )
+
     override suspend fun getModelDetails(modelName: String): ShowResponse =
         withContext(Dispatchers.IO) {
             ShowResponse(
@@ -140,18 +157,56 @@ class OpenAiClient(
             )
         }
 
-    private fun chatModel(): ChatModel {
-        if (AppConfig.instance.openAiApiKey.isBlank()) {
-            throw IllegalStateException("OpenAI API key is not configured")
-        }
+    private fun chatModel(profile: ProviderProfile? = null): ChatModel {
+        val configuredBaseUrl = profile?.baseUrl ?: AppConfig.instance.openAiBaseUrl
+        val apiKey = apiKeyFor(configuredBaseUrl, profile?.apiKey ?: AppConfig.instance.openAiApiKey)
+        val baseUrl = OpenAiEndpointNormalizer.apiBaseUrl(configuredBaseUrl)
+        val model = profile?.defaultModel ?: AppConfig.instance.openAiModel
         val options =
             OpenAiChatOptions
                 .builder()
-                .apiKey(AppConfig.instance.openAiApiKey)
-                .baseUrl(apiBaseUrl())
-                .model(AppConfig.instance.openAiModel)
+                .apiKey(apiKey)
+                .baseUrl(baseUrl)
+                .model(model)
                 .build()
         return OpenAiChatModel.builder().options(options).build()
+    }
+
+    private fun openAiClient(profile: ProviderProfile): OpenAIClient =
+        OpenAiSetup.setupSyncClient(
+            OpenAiEndpointNormalizer.apiBaseUrl(profile.baseUrl),
+            apiKeyFor(profile.baseUrl, profile.apiKey),
+            null,
+            null,
+            null,
+            null,
+            false,
+            false,
+            profile.defaultModel,
+            Duration.ofSeconds(20),
+            2,
+            null,
+            emptyMap(),
+            ObservationRegistry.NOOP,
+            null,
+            emptyList(),
+        )
+
+    private fun apiKeyFor(
+        baseUrl: String,
+        configuredApiKey: String,
+    ): String {
+        requireUsableApiKey(baseUrl, configuredApiKey)
+        return configuredApiKey.ifBlank { "none" }
+    }
+
+    private fun requireUsableApiKey(
+        baseUrl: String,
+        configuredApiKey: String,
+    ) {
+        if (configuredApiKey.isBlank() && OpenAiEndpointNormalizer.requiresApiKey(baseUrl)) {
+            throw IllegalStateException("OpenAI API key is not configured")
+        }
     }
 
     private fun openAiClient(): OpenAIClient =
@@ -177,6 +232,8 @@ class OpenAiClient(
     private fun apiBaseUrl(): String = OpenAiEndpointNormalizer.apiBaseUrl(AppConfig.instance.openAiBaseUrl)
 
     private fun modelsUri(): URI = URI.create("${apiBaseUrl()}/models")
+
+    private fun modelsUri(profile: ProviderProfile): URI = URI.create("${OpenAiEndpointNormalizer.apiBaseUrl(profile.baseUrl)}/models")
 
     private fun buildDetailedProviderError(throwable: Throwable?): Throwable {
         if (throwable == null) return IllegalStateException("Unknown OpenAI chat model error")

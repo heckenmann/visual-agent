@@ -23,6 +23,7 @@ class AppConfigTest {
             config.fontSize = 18
             config.llmProvider = "openai"
             config.ollamaModel = "llama3.2:3b"
+            config.ollamaApiKey = "ollama-test"
             config.openAiApiKey = "sk-test"
             config.openAiBaseUrl = "https://openai-compatible.example"
             config.openAiModel = "gpt-test"
@@ -39,6 +40,7 @@ class AppConfigTest {
             assertEquals("18", db.getPreference("ui.font.size"))
             assertEquals("openai", db.getPreference("llm.provider"))
             assertEquals("llama3.2:3b", db.getPreference("ollama.model"))
+            assertEquals("ollama-test", db.getPreference("ollama.api.key"))
             assertEquals("sk-test", db.getPreference("openai.api.key"))
             assertEquals("https://openai-compatible.example", db.getPreference("openai.base.url"))
             assertEquals("gpt-test", db.getPreference("openai.model"))
@@ -67,6 +69,7 @@ class AppConfigTest {
             config.theme = "Cupertino Light"
             config.fontSize = 20
             config.llmProvider = "openai"
+            config.ollamaApiKey = "ollama-reload"
             config.openAiApiKey = "sk-reload"
             config.openAiBaseUrl = "https://reload.example"
             config.openAiModel = "gpt-reload"
@@ -79,6 +82,7 @@ class AppConfigTest {
             config.theme = "Dracula"
             config.fontSize = 12
             config.llmProvider = "ollama"
+            config.ollamaApiKey = ""
             config.openAiApiKey = ""
             config.openAiBaseUrl = "https://api.openai.com"
             config.openAiModel = "gpt-4o-mini"
@@ -91,6 +95,7 @@ class AppConfigTest {
             assertEquals("Cupertino Light", config.theme)
             assertEquals(20, config.fontSize)
             assertEquals("openai", config.normalizedProvider())
+            assertEquals("ollama-reload", config.ollamaApiKey)
             assertEquals("sk-reload", config.openAiApiKey)
             assertEquals("https://reload.example", config.openAiBaseUrl)
             assertEquals("gpt-reload", config.openAiModel)
@@ -113,15 +118,18 @@ class AppConfigTest {
                 de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                     .create(tempDb)
             boundDb.setPreference("openai.api.key", "sk-startup")
+            boundDb.setPreference("ollama.api.key", "ollama-startup")
             boundDb.setPreference("openai.base.url", "https://startup.example")
             boundDb.setPreference("openai.model", "gpt-startup")
 
             config.openAiApiKey = ""
+            config.ollamaApiKey = ""
             config.openAiBaseUrl = "https://api.openai.com"
             config.openAiModel = "gpt-4o-mini"
             config.bindPreferenceStore(boundDb)
 
             assertEquals("sk-startup", config.openAiApiKey)
+            assertEquals("ollama-startup", config.ollamaApiKey)
             assertEquals("https://startup.example", config.openAiBaseUrl)
             assertEquals("gpt-startup", config.openAiModel)
         } finally {
@@ -158,6 +166,7 @@ class AppConfigTest {
         val ollamaLocalUrl: String,
         val llmProvider: String,
         val ollamaModel: String,
+        val ollamaApiKey: String,
         val openAiApiKey: String,
         val openAiBaseUrl: String,
         val openAiModel: String,
@@ -180,6 +189,7 @@ class AppConfigTest {
             ollamaLocalUrl = config.ollamaLocalUrl,
             llmProvider = config.llmProvider,
             ollamaModel = config.ollamaModel,
+            ollamaApiKey = config.ollamaApiKey,
             openAiApiKey = config.openAiApiKey,
             openAiBaseUrl = config.openAiBaseUrl,
             openAiModel = config.openAiModel,
@@ -204,6 +214,7 @@ class AppConfigTest {
         config.ollamaLocalUrl = snapshot.ollamaLocalUrl
         config.llmProvider = snapshot.llmProvider
         config.ollamaModel = snapshot.ollamaModel
+        config.ollamaApiKey = snapshot.ollamaApiKey
         config.openAiApiKey = snapshot.openAiApiKey
         config.openAiBaseUrl = snapshot.openAiBaseUrl
         config.openAiModel = snapshot.openAiModel

@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent
 
+import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.Serializable
 
@@ -89,12 +90,32 @@ interface LLMProvider {
     suspend fun getModels(): List<String>
 
     /**
+     * Gets model names for a specific configured provider.
+     *
+     * @param providerId Provider profile identifier
+     * @return Selectable model names
+     */
+    suspend fun getModels(providerId: String): List<String> = getModels()
+
+    /**
      * Get detailed information about a specific model.
      *
      * @param modelName Name of the model to get details for
      * @return ShowResponse containing model details
      */
     suspend fun getModelDetails(modelName: String): ShowResponse
+
+    /**
+     * Gets model details for a specific configured provider.
+     *
+     * @param providerId Provider profile identifier
+     * @param modelName Provider-facing model identifier
+     * @return Model details
+     */
+    suspend fun getModelDetails(
+        providerId: String,
+        modelName: String,
+    ): ShowResponse = getModelDetails(modelName)
 }
 
 /**
@@ -107,10 +128,49 @@ interface LLMProvider {
  */
 data class ChatRequestContext(
     val messages: List<Message>,
+    val provider: String? = null,
     val model: String? = null,
+    val variant: String? = null,
+    val parameters: ModelParameters = ModelParameters(),
+    val options: Map<String, String> = emptyMap(),
     val enabledTools: Set<ToolId> = emptySet(),
     val metadata: Map<String, Any> = emptyMap(),
+    val providerProfile: ProviderProfile? = null,
 )
+
+/**
+ * Provider-neutral model selection used by agents and request routing.
+ *
+ * @property provider Optional provider override; null inherits the active session provider
+ * @property model Optional model override; null inherits the selected provider model
+ * @property parameters Sampling and output limits for this model call
+ */
+data class ModelSelection(
+    val provider: String? = null,
+    val model: String? = null,
+    val variant: String? = null,
+    val parameters: ModelParameters = ModelParameters(),
+    val options: Map<String, String> = emptyMap(),
+)
+
+/**
+ * Provider-neutral generation parameters supported by both configured backends.
+ *
+ * @property temperature Sampling temperature in the range 0.0 through 2.0
+ * @property topP Nucleus sampling probability in the range 0.0 through 1.0
+ * @property maxTokens Maximum number of generated tokens
+ */
+data class ModelParameters(
+    val temperature: Double? = null,
+    val topP: Double? = null,
+    val maxTokens: Int? = null,
+) {
+    init {
+        require(temperature == null || temperature in 0.0..2.0) { "temperature must be between 0.0 and 2.0" }
+        require(topP == null || topP in 0.0..1.0) { "topP must be between 0.0 and 1.0" }
+        require(maxTokens == null || maxTokens > 0) { "maxTokens must be greater than zero" }
+    }
+}
 
 /**
  * Stable identifier for an application tool.
@@ -146,9 +206,6 @@ data class ToolDefinition(
  * @property error Optional error message when execution failed
  */
 @Serializable
-/**
- * Represents ToolResult.
- */
 data class ToolResult(
     val toolId: String,
     val success: Boolean,
@@ -157,7 +214,7 @@ data class ToolResult(
 )
 
 /**
- * Represents a single message in a conversation.
+ * Single provider-neutral message in a conversation.
  *
  * @property role Message role (system, user, or assistant)
  * @property content Text content of the message
@@ -165,9 +222,6 @@ data class ToolResult(
  * @property images Optional list of base64-encoded images (for vision)
  */
 @Serializable
-/**
- * Represents Message.
- */
 data class Message(
     val role: String,
     val content: String,
@@ -184,9 +238,6 @@ data class Message(
  * @property options Optional model-specific options
  */
 @Serializable
-/**
- * Represents ChatRequest.
- */
 data class ChatRequest(
     val model: String,
     val messages: List<Message>,
@@ -205,9 +256,6 @@ data class ChatRequest(
  * @property evalCount Number of tokens in the response
  */
 @Serializable
-/**
- * Represents ChatResponse.
- */
 data class ChatResponse(
     val model: String,
     val message: Message,

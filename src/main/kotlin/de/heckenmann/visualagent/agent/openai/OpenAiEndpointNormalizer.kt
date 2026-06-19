@@ -30,4 +30,22 @@ internal object OpenAiEndpointNormalizer {
             uri.fragment,
         ).toString()
     }
+
+    /**
+     * Returns whether the endpoint is the official OpenAI API and therefore
+     * must not be called with a placeholder API key.
+     *
+     * OpenAI-compatible local gateways are allowed to omit credentials because
+     * some deployments intentionally run without authentication.
+     */
+    fun requiresApiKey(configuredBaseUrl: String): Boolean {
+        val baseUrl = configuredBaseUrl.trim().ifBlank { "https://api.openai.com" }
+        val host =
+            URI
+                .create(baseUrl)
+                .host
+                .orEmpty()
+                .lowercase()
+        return host == "api.openai.com"
+    }
 }

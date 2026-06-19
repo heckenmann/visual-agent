@@ -2,6 +2,8 @@ package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.ollama.OllamaPromptFactory
 import de.heckenmann.visualagent.agent.ollama.OllamaToolRecovery
+import de.heckenmann.visualagent.agent.ollama.createOllamaApi
+import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.config.AppConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -10,14 +12,14 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.reactive.asFlow
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.Serializable
 import org.springframework.ai.chat.model.ChatModel
+import org.springframework.ai.ollama.OllamaChatModel
 import org.springframework.ai.ollama.api.OllamaApi
+import org.springframework.ai.ollama.api.OllamaChatOptions
 import org.springframework.stereotype.Component
-import java.lang.reflect.Method
 
 /**
- * Represents OllamaClient.
+ * Spring AI backed LLM provider for Ollama endpoints and Ollama-compatible profiles.
  */
 @Component
 class OllamaClient(
@@ -32,7 +34,7 @@ class OllamaClient(
         withContext(Dispatchers.IO) {
             val selectedModel = request.model ?: AppConfig.instance.ollamaModel
             val allowedFunctionNames = promptFactory.allowedFunctionNames(request, selectedModel)
-            val responseResult = runCatching { chatModel.call(promptFactory.buildPrompt(request, selectedModel)) }
+            val responseResult = runCatching { chatModelFor(request).call(promptFactory.buildPrompt(request, selectedModel)) }
             if (responseResult.isFailure) {
                 val error = responseResult.exceptionOrNull()
                 if (error != null && isMissingFunctionCallbackError(error)) {
@@ -82,7 +84,7 @@ class OllamaClient(
         val allowedFunctionNames = promptFactory.allowedFunctionNames(request, selectedModel)
         return flow {
             try {
-                chatModel
+                chatModelFor(request)
                     .stream(promptFactory.buildPrompt(request, selectedModel))
                     .asFlow()
                     .map { chunk ->
@@ -144,47 +146,7 @@ class OllamaClient(
      */
     private fun buildDetailedProviderError(throwable: Throwable?): Throwable {
         if (throwable == null) return IllegalStateException("Unknown chat model error")
-        val detailedMessage = extractDetailedErrorMessage(throwable)
-        return IllegalStateException(detailedMessage, throwable)
-    }
-
-    /**
-     * Extracts the most helpful error text from nested provider exceptions.
-     *
-     * @param throwable Root error from Spring AI/Ollama call
-     * @return Human-readable message with server response details when present
-     */
-    private fun extractDetailedErrorMessage(throwable: Throwable): String {
-        var current: Throwable? = throwable
-        var fallbackMessage: String? = throwable.message?.takeIf { it.isNotBlank() }
-        while (current != null) {
-            val responseBody = invokeResponseBodyMethod(current)
-            if (!responseBody.isNullOrBlank()) {
-                val statusText = current.message?.takeIf { it.isNotBlank() }
-                return listOfNotNull(statusText, responseBody.trim())
-                    .joinToString(": ")
-                    .trim()
-            }
-            if (!current.message.isNullOrBlank()) {
-                fallbackMessage = current.message
-            }
-            current = current.cause
-        }
-        return fallbackMessage ?: "Unknown chat model error"
-    }
-
-    /**
-     * Invokes `getResponseBodyAsString()` reflectively when available on Spring HTTP exceptions.
-     *
-     * @param throwable Candidate exception
-     * @return Response body text or null
-     */
-    private fun invokeResponseBodyMethod(throwable: Throwable): String? {
-        val method: Method =
-            runCatching { throwable.javaClass.getMethod("getResponseBodyAsString") }
-                .getOrNull()
-                ?: return null
-        return runCatching { method.invoke(throwable) as? String }.getOrNull()
+        return ProviderErrorDetailExtractor.toIllegalState("Unknown chat model error", throwable)
     }
 
     override suspend fun vision(
@@ -239,6 +201,37 @@ class OllamaClient(
             }
         }
 
+    internal suspend fun getModels(profile: ProviderProfile): List<String> =
+        withContext(Dispatchers.IO) {
+            val models =
+                createOllamaApi(profile)
+                    .listModels()
+                    .models()
+                    ?.mapNotNull { model -> model.name() }
+                    ?.distinct()
+                    .orEmpty()
+            if (models.isEmpty()) listOf(profile.defaultModel).filter(String::isNotBlank) else models
+        }
+
+    internal suspend fun getModelDetails(
+        profile: ProviderProfile,
+        modelName: String,
+    ): ShowResponse =
+        withContext(Dispatchers.IO) {
+            val response = createOllamaApi(profile).showModel(OllamaApi.ShowModelRequest(modelName))
+            ShowResponse(
+                model = modelName,
+                modifiedAt = "",
+                details =
+                    ModelDetails(
+                        family = response.details()?.family(),
+                        format = response.details()?.format(),
+                        parameterSize = response.details()?.parameterSize(),
+                        quantizationLevel = response.details()?.quantizationLevel(),
+                    ),
+            )
+        }
+
     override suspend fun getModelDetails(modelName: String): ShowResponse =
         withContext(Dispatchers.IO) {
             try {
@@ -252,49 +245,26 @@ class OllamaClient(
                     system = response.system(),
                     license = response.license(),
                     details =
-                        if (details != null) {
-                            ModelDetails(
-                                parentModel = details.parentModel(),
-                                format = details.format(),
-                                family = details.family(),
-                                families = details.families(),
-                                parameterSize = details.parameterSize(),
-                                quantizationLevel = details.quantizationLevel(),
-                            )
-                        } else {
-                            null
-                        },
+                        ModelDetails(
+                            parentModel = details.parentModel(),
+                            format = details.format(),
+                            family = details.family(),
+                            families = details.families(),
+                            parameterSize = details.parameterSize(),
+                            quantizationLevel = details.quantizationLevel(),
+                        ),
                 )
             } catch (_: Exception) {
                 ShowResponse(model = modelName, modifiedAt = "")
             }
         }
+
+    private fun chatModelFor(request: ChatRequestContext): ChatModel {
+        val profile = request.providerProfile ?: return chatModel
+        return OllamaChatModel
+            .builder()
+            .ollamaApi(createOllamaApi(profile))
+            .options(OllamaChatOptions.builder().model(request.model ?: profile.defaultModel).build())
+            .build()
+    }
 }
-
-@Serializable
-/**
- * Represents ShowResponse.
- */
-data class ShowResponse(
-    val model: String,
-    val modifiedAt: String,
-    val parameters: String? = null,
-    val template: String? = null,
-    val system: String? = null,
-    val license: String? = null,
-    val details: ModelDetails? = null,
-    val messages: List<Message>? = null,
-)
-
-@Serializable
-/**
- * Represents ModelDetails.
- */
-data class ModelDetails(
-    val parentModel: String? = null,
-    val format: String? = null,
-    val family: String? = null,
-    val families: List<String>? = null,
-    val parameterSize: String? = null,
-    val quantizationLevel: String? = null,
-)
