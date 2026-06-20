@@ -188,6 +188,12 @@ internal class AgentManagerConversationOps(
 
     fun getHistory(): List<Message> = historyOps.getHistory()
 
+    fun appendSystemMessage(content: String) {
+        val message = Message(role = "system", content = content)
+        owner.conversationHistory.add(message)
+        owner.conversationStore.saveConversationMessage(AgentManager.MAIN_SESSION_ID, message.role, message.content, message.metadata)
+    }
+
     fun recordToolCall(event: ToolCallEvent) = historyOps.recordToolCall(event)
 
     fun loadOlderHistory(pageSize: Int = AgentManager.HISTORY_PAGE_SIZE): List<Message> = historyOps.loadOlderHistory(pageSize)

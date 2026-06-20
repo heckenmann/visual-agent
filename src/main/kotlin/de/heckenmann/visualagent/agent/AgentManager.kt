@@ -252,6 +252,11 @@ class AgentManager
         /** Returns the currently loaded main conversation history. */
         fun getHistory(): List<Message> = conversationOps.getHistory()
 
+        /** Appends and persists a system message to the main conversation. */
+        fun appendSystemMessage(content: String) {
+            conversationOps.appendSystemMessage(content)
+        }
+
         /** Persists a completed tool-call event as conversation history. */
         fun recordToolCall(event: ToolCallEvent) {
             conversationOps.recordToolCall(event)
