@@ -22,8 +22,6 @@ import org.commonmark.node.Paragraph
 import org.commonmark.node.SoftLineBreak
 import org.commonmark.node.StrongEmphasis
 import org.commonmark.parser.Parser
-import java.awt.Desktop
-import java.net.URI
 import org.commonmark.node.Node as MarkdownNode
 import org.commonmark.node.Text as MarkdownText
 
@@ -159,7 +157,6 @@ internal object ChatMarkdownRenderer {
             if (!linkDestination.isNullOrBlank()) {
                 styleClass.add("chat-md-link")
                 isUnderline = true
-                setOnMouseClicked { openExternalLink(linkDestination) }
             }
         }
 
@@ -174,17 +171,8 @@ internal object ChatMarkdownRenderer {
             if (!linkDestination.isNullOrBlank()) {
                 styleClass.add("chat-md-link")
                 isUnderline = true
-                setOnMouseClicked { openExternalLink(linkDestination) }
             }
         }
-
-    private fun openExternalLink(destination: String) {
-        runCatching {
-            if (Desktop.isDesktopSupported()) {
-                Desktop.getDesktop().browse(URI(destination))
-            }
-        }
-    }
 
     private fun textFlow(
         children: List<Text>,

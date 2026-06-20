@@ -21,11 +21,6 @@ object AppIdentity {
     const val ICON_RESOURCE: String = "/icons/visual-agent.png"
 
     /**
-     * JVM system property that macOS reads for the application menu name.
-     */
-    const val MAC_APPLICATION_NAME_PROPERTY: String = "apple.awt.application.name"
-
-    /**
      * Legacy JVM system property used by older macOS Java integrations for the About menu name.
      */
     const val MAC_ABOUT_NAME_PROPERTY: String = "com.apple.mrj.application.apple.menu.about.name"
@@ -52,11 +47,9 @@ object AppIdentity {
     /**
      * Set JVM desktop identity properties before JavaFX initializes native desktop integration.
      *
-     * This is intentionally safe to call more than once. On macOS, the properties must be present very early so the
-     * application menu does not fall back to "java".
+     * This is intentionally safe to call more than once.
      */
     fun configureProcessProperties() {
-        System.setProperty(MAC_APPLICATION_NAME_PROPERTY, DISPLAY_NAME)
         System.setProperty(MAC_ABOUT_NAME_PROPERTY, DISPLAY_NAME)
         System.setProperty(JAVAFX_APPLICATION_NAME_PROPERTY, DISPLAY_NAME)
     }

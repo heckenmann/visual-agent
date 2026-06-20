@@ -38,11 +38,10 @@ val javafxModuleArgs =
         "--module-path",
         rootDir.resolve("lib").toString(),
         "--add-modules",
-        "javafx.controls,javafx.fxml,javafx.web,javafx.graphics,javafx.media,javafx.swing,javafx.base",
+        "javafx.controls,javafx.fxml,javafx.web,javafx.graphics,javafx.media,javafx.base",
     )
 val applicationIdentityArgs =
     listOf(
-        "-Dapple.awt.application.name=Visual Agent",
         "-Dcom.apple.mrj.application.apple.menu.about.name=Visual Agent",
         "-Djavafx.application.name=Visual Agent",
     )
@@ -411,7 +410,54 @@ tasks.register("locAndPackageSizeCheck") {
 tasks.named("check") {
     dependsOn("locAndPackageSizeCheck")
     dependsOn("unusedCodeCheck")
+    dependsOn("desktopApiUsageCheck")
     dependsOn("jacocoTestCoverageVerification")
+}
+
+tasks.register("desktopApiUsageCheck") {
+    group = "verification"
+    description = "Fails when source files use desktop image or Swing integration APIs."
+    doLast {
+        val forbidden =
+            listOf(
+                "java." + "aw" + "t",
+                "javax." + "imageio",
+                "swingfxutils",
+                "bufferedimage",
+                "imageio",
+                "pdfbox." + "rendering",
+                "javafx." + "swing",
+                "apple." + "aw" + "t",
+            )
+        val violations = mutableListOf<String>()
+        listOf(rootDir.toPath().resolve("src/main"), rootDir.toPath().resolve("src/test"))
+            .filter { Files.exists(it) }
+            .forEach { root ->
+                Files.walk(root).use { stream ->
+                    stream
+                        .filter { Files.isRegularFile(it) }
+                        .filter { it.extension in setOf("kt", "java", "fxml", "properties", "md") }
+                        .forEach { file ->
+                            Files.readAllLines(file).forEachIndexed { index, line ->
+                                val lower = line.lowercase()
+                                forbidden
+                                    .filter(lower::contains)
+                                    .forEach { token ->
+                                        violations += "${file.toAbsolutePath()}:${index + 1} forbidden token '$token'"
+                                    }
+                            }
+                        }
+                }
+            }
+        if (violations.isNotEmpty()) {
+            error(
+                buildString {
+                    appendLine("Desktop API usage check failed with ${violations.size} violation(s):")
+                    violations.forEach { appendLine(it) }
+                },
+            )
+        }
+    }
 }
 
 tasks.register("unusedCodeCheck") {

@@ -2,11 +2,11 @@ package de.heckenmann.visualagent.ui
 
 import de.heckenmann.visualagent.VisualAgentApplication
 import de.heckenmann.visualagent.config.AppThemeStylesheets
+import de.heckenmann.visualagent.image.PngEncoder
 import de.heckenmann.visualagent.ui.panels.ChatPanel
 import de.heckenmann.visualagent.ui.panels.SubAgentsPanel
 import javafx.application.Application
 import javafx.application.Platform
-import javafx.embed.swing.SwingFXUtils
 import javafx.scene.control.Button
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
@@ -18,7 +18,6 @@ import java.nio.file.Path
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
-import javax.imageio.ImageIO
 import kotlin.test.assertTrue
 
 class UxSnapshotTest {
@@ -98,7 +97,7 @@ class UxSnapshotTest {
         window.scene.root.applyCss()
         window.scene.root.layout()
         val image = window.scene.snapshot(null)
-        ImageIO.write(SwingFXUtils.fromFXImage(image, null), "png", destination.toFile())
+        Files.write(destination, PngEncoder.encode(image))
     }
 
     companion object {
