@@ -102,6 +102,7 @@ Current tool IDs:
 - `todos`
 - `canvas`
 - `workspace:layout`
+- `workspace:file`
 - `file:read`, `file:list`, `file:glob`, `file:grep`, `file:write`, `file:edit`
 - `terminal`
 - `sleep`
@@ -123,6 +124,7 @@ Supported actions:
 - `drawLine`: requires `x1`, `y1`, `x2`, and `y2`; optional `color`, `width`.
 - `drawCircle`: requires `centerX`, `centerY`, and `radius`; optional `fillColor`.
 - `insertImage`: requires a workspace-relative `path`; paths outside the workspace are rejected.
+- `captureImage`: optional `format` (`png`, `jpg`, or `jpeg`); renders the current canvas and stores an immutable image entry in persisted conversation history.
 
 Example:
 
@@ -141,6 +143,27 @@ Example:
 ### Workspace Layout Tool
 
 The `workspace:layout` tool is available to sub-agents, not to the main orchestration agent. It lets model calls inspect screens, the main window, the internal desktop, and internal workspace windows. It can also reposition or resize internal windows by ID.
+
+### Workspace File Tool
+
+The `workspace:file` tool is available to sub-agents. It operates on files imported into the managed workspace directory next to the configured SQLite database, defaulting to `./data/workspace/`.
+
+Supported actions:
+
+- `list`: returns imported file IDs, relative paths, MIME types, sizes, timestamps, and SHA-256 hashes.
+- `search`: requires `query`; searches metadata and bounded text/PDF content.
+- `info`: requires `id` or `path`; returns persisted metadata.
+- `sync`: reconciles workspace files on disk with persisted metadata and reports added, updated, and removed records.
+- `hash`: requires `id` or `path`; computes the current SHA-256 hash from file bytes.
+- `readText`: requires `id` or `path`; reads bounded UTF-8 text content.
+- `extractPdfText`: requires `id` or `path`; extracts bounded PDF text and caches it.
+- `renderPdfPage`: currently returns a clear failure until a non-desktop PDF renderer is integrated.
+- `imageInfo`: requires `id` or `path`; returns dimensions, MIME type, size, and hash.
+- `imageBytes`: requires `id` or `path`; returns bounded base64 image bytes.
+- `analyzeImage`: requires `id` or `path` plus `prompt`; sends the image to the active provider vision path.
+
+Imported files are not injected into model context automatically. The model must request content explicitly through this tool.
+Saved canvas documents are regular managed workspace files with MIME type `application/vnd.visual-agent.canvas+xml`, so they can be listed, searched, hashed, renamed, deleted, read, and reopened like other workspace files.
 
 ## Event Surfaces
 
@@ -165,5 +188,5 @@ All are provider-neutral at application boundaries.
 
 ## Known API Constraints
 
-- `vision()` currently throws `UnsupportedOperationException` in the Spring AI bridge.
+- `vision()` requires a provider/model combination that supports image input; unsupported combinations return provider-level failures.
 - `browser` and `search` tools intentionally return unavailable results until backends are integrated.

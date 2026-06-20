@@ -62,6 +62,7 @@ Current tool set:
 - `history`
 - `todos`
 - `file:read`, `file:list`, `file:glob`, `file:grep`, `file:write`, `file:edit`
+- `workspace:file`
 - `terminal`
 - `context`
 - `pwd`
@@ -78,6 +79,7 @@ Current tool set:
   - persisted history with paged loading.
 - Session UI drives model selection and session preferences.
 - Todo panel and conversation both reflect persisted todo state.
+- Files panel imports, searches, reconciles, renames, deletes, and opens managed workspace files. It can also save the current editable canvas as a managed workspace document and reopen saved canvas documents.
 
 ### Canvas Editor
 
@@ -88,6 +90,8 @@ The canvas uses JHotDraw 8 as its structured drawing engine:
 - `GridConstrainer` provides the visible grid independently from drawing content.
 - Shapes, text, freehand paths, and imported images remain selectable and transformable JHotDraw figures.
 - Drawing model changes are serialized as JHotDraw XML into the preference store after a short debounce and restored when the canvas is created.
+- Users can set a fixed editable canvas surface size; the configured width and height are stored in preferences and are independent from the surrounding window size.
+- Canvas documents can be saved as managed workspace files under `workspace/canvas/` and reopened from the Files panel.
 - `CanvasService` exposes JavaFX-thread-safe model operations for tool calls while resolving the lazy `CanvasPanel` only when the tool is actually used.
 - `CanvasTool` lets sub-agents inspect the canvas and add text, rectangles, lines, circles, and workspace-local images.
 - The application pins JavaFX to version 21 and uses `org.jhotdraw8.color:0.4` because JHotDraw 0.5 did not publish the referenced color module version.

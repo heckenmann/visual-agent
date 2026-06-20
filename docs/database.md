@@ -12,6 +12,7 @@ Runtime defaults:
 - Hibernate schema validation in production, migration-driven schema creation through Flyway
 
 The application uses DB-first reads for conversation, todos, and related runtime context.
+Managed workspace files are stored on disk next to the configured database directory, defaulting to `./data/workspace/`.
 
 ## Active Tables
 
@@ -52,6 +53,19 @@ Stores per-agent allowed tool sets and related configuration payloads.
 Used for:
 - main/sub-agent tool policy loading
 - persisted tool enablement
+
+### `workspace_files`
+
+Stores metadata for files imported into the managed workspace.
+
+Used for:
+- Files panel display and rename/delete operations
+- `workspace:file` tool lookup by ID or relative path
+- SHA-256 verification and PDF extracted-text caching
+- Workspace search and filesystem/DB reconciliation
+- Saved editable canvas documents under `workspace/canvas/`
+
+The table stores relative workspace paths only. External source paths are never persisted.
 
 ### `user_preferences`
 
