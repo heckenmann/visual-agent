@@ -5,6 +5,8 @@ import javafx.scene.control.Button
 import javafx.scene.control.Label
 import javafx.scene.control.ProgressIndicator
 import javafx.scene.control.Tooltip
+import javafx.scene.image.Image
+import javafx.scene.image.ImageView
 import javafx.scene.input.Clipboard
 import javafx.scene.input.ClipboardContent
 import javafx.scene.layout.HBox
@@ -14,7 +16,9 @@ import javafx.scene.layout.StackPane
 import javafx.scene.layout.VBox
 import org.kordamp.ikonli.fontawesome5.FontAwesomeSolid
 import org.kordamp.ikonli.javafx.FontIcon
+import java.io.ByteArrayInputStream
 import java.time.format.DateTimeFormatter
+import java.util.Base64
 
 /**
  * Creates JavaFX rows for conversation messages.
@@ -139,11 +143,30 @@ internal class ChatMessageRenderer(
             val loadingLabel = Label("Main agent is working").apply { styleClass.add("assistant-loading") }
             return HBox(loadingLabel).apply { styleClass.add("assistant-loading-row") }
         }
+        item.imageData?.let { return createImageBody(item.content, it) }
         if (item.isToolEvent) return createToolEventBody(item)
         return ChatMarkdownRenderer.render(item.content).also {
             it.isCache = true
             it.cacheHint = CacheHint.SPEED
         }
+    }
+
+    private fun createImageBody(
+        title: String,
+        imageData: ImageMessageData,
+    ): Region {
+        val image = Image(ByteArrayInputStream(imageData.bytes()))
+        val imageView =
+            ImageView(image).apply {
+                isPreserveRatio = true
+                fitWidth = 520.0
+                styleClass.add("chat-image-preview")
+            }
+        val titleLabel =
+            Label("$title · ${imageData.width}x${imageData.height}").apply {
+                styleClass.add("chat-image-title")
+            }
+        return VBox(titleLabel, imageView).apply { styleClass.add("chat-image-body") }
     }
 
     private fun createToolEventBody(item: ChatMessage): Region {
@@ -211,4 +234,9 @@ internal class ChatMessageRenderer(
         content.putString(text)
         clipboard.setContent(content)
     }
+
+    private fun ImageMessageData.bytes(): ByteArray =
+        Base64
+            .getDecoder()
+            .decode(dataUrl.substringAfter("base64,"))
 }

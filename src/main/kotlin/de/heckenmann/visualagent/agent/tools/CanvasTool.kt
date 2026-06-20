@@ -3,13 +3,17 @@ package de.heckenmann.visualagent.agent.tools
 import de.heckenmann.visualagent.agent.ToolDefinition
 import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.agent.ToolResult
+import de.heckenmann.visualagent.knowledge.ConversationStore
 import de.heckenmann.visualagent.ui.panels.canvas.CanvasOperations
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import org.springframework.stereotype.Component
+import java.util.Base64
 
 /**
  * Tool that lets sub-agents inspect and edit the structured canvas.
@@ -17,13 +21,14 @@ import org.springframework.stereotype.Component
 @Component
 class CanvasTool(
     private val canvas: CanvasOperations,
+    private val conversationStore: ConversationStore,
 ) : VisualAgentTool {
     override val definition =
         ToolDefinition(
             id = ToolId(TOOL_ID),
             name = ToolId(TOOL_ID).toFunctionName(),
             description =
-                "Inspect or edit the canvas. Actions: get, clear, drawText, drawRect, drawLine, drawCircle, insertImage. " +
+                "Inspect or edit the canvas. Actions: get, clear, drawText, drawRect, drawLine, drawCircle, insertImage, captureImage. " +
                     "Coordinates are canvas coordinates. Use get before making layout-sensitive changes.",
             inputSchema = STRING_SCHEMA,
         )
@@ -42,6 +47,7 @@ class CanvasTool(
                 "drawLine" -> drawLine(input)
                 "drawCircle" -> drawCircle(input)
                 "insertImage" -> insertImage(input)
+                "captureImage" -> captureImage(input, context)
                 else -> failure(TOOL_ID, "Unsupported canvas action")
             }
         }.getOrElse { error ->
@@ -119,6 +125,37 @@ class CanvasTool(
         }
     }
 
+    private fun captureImage(
+        input: JsonObject,
+        context: Map<String, Any>,
+    ): ToolResult {
+        val snapshot = canvas.captureImage(input.string("format") ?: "png")
+        val encoded = Base64.getEncoder().encodeToString(snapshot.bytes)
+        val dataUrl = "data:${snapshot.mimeType};base64,$encoded"
+        val metadata =
+            buildJsonObject {
+                put("type", "image")
+                put("source", "canvas")
+                put("format", snapshot.format)
+                put("mimeType", snapshot.mimeType)
+                put("dataUrl", dataUrl)
+                put("width", snapshot.width)
+                put("height", snapshot.height)
+                put("immutable", true)
+            }.toString()
+        val messageId =
+            conversationStore.saveConversationMessage(
+                sessionId = context["sessionId"]?.toString()?.ifBlank { null } ?: MAIN_SESSION_ID,
+                role = "assistant",
+                content = "Canvas snapshot (${snapshot.format.uppercase()})",
+                metadata = metadata,
+            )
+        return success(
+            TOOL_ID,
+            "Saved immutable canvas snapshot $messageId to conversation history (${snapshot.format}, ${snapshot.bytes.size} bytes).",
+        )
+    }
+
     private fun JsonObject.requiredDouble(key: String): Double =
         double(key) ?: throw IllegalArgumentException("Missing required field '$key'")
 
@@ -126,6 +163,7 @@ class CanvasTool(
 
     private companion object {
         const val TOOL_ID = "canvas"
+        const val MAIN_SESSION_ID = "main"
         const val DEFAULT_TEXT_COLOR = "#24292f"
         const val DEFAULT_FILL_COLOR = "#ffffff"
         const val DEFAULT_STROKE_COLOR = "#1f6feb"

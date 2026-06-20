@@ -1,6 +1,9 @@
 package de.heckenmann.visualagent.agent.tools
 
+import de.heckenmann.visualagent.knowledge.ConversationRecord
+import de.heckenmann.visualagent.knowledge.ConversationStore
 import de.heckenmann.visualagent.ui.panels.canvas.CanvasFigureSnapshot
+import de.heckenmann.visualagent.ui.panels.canvas.CanvasImageSnapshot
 import de.heckenmann.visualagent.ui.panels.canvas.CanvasOperations
 import de.heckenmann.visualagent.ui.panels.canvas.CanvasSnapshot
 import kotlinx.serialization.json.Json
@@ -14,7 +17,7 @@ import kotlin.test.assertTrue
 class CanvasToolTest {
     @Test
     fun `get returns current canvas snapshot`() {
-        val tool = CanvasTool(FakeCanvasOperations())
+        val tool = CanvasTool(FakeCanvasOperations(), FakeConversationStore())
 
         val result = tool.execute("""{"action":"get"}""")
         val content = Json.parseToJsonElement(result.content).jsonObject
@@ -26,7 +29,7 @@ class CanvasToolTest {
     @Test
     fun `draw actions delegate to canvas operations`() {
         val canvas = FakeCanvasOperations()
-        val tool = CanvasTool(canvas)
+        val tool = CanvasTool(canvas, FakeConversationStore())
 
         tool.execute("""{"action":"drawText","text":"Hello","x":1,"y":2}""")
         tool.execute("""{"action":"drawLine","x1":1,"y1":2,"x2":3,"y2":4}""")
@@ -42,7 +45,7 @@ class CanvasToolTest {
     @Test
     fun `clear and unsupported actions return deterministic results`() {
         val canvas = FakeCanvasOperations()
-        val tool = CanvasTool(canvas)
+        val tool = CanvasTool(canvas, FakeConversationStore())
 
         tool.execute("""{"action":"drawText","text":"Hello","x":1,"y":2}""")
         val clear = tool.execute("""{"action":"clear"}""")
@@ -57,7 +60,7 @@ class CanvasToolTest {
 
     @Test
     fun `missing required fields return a tool failure`() {
-        val tool = CanvasTool(FakeCanvasOperations())
+        val tool = CanvasTool(FakeCanvasOperations(), FakeConversationStore())
 
         val result = tool.execute("""{"action":"drawText","x":1,"y":2}""")
 
@@ -67,12 +70,33 @@ class CanvasToolTest {
 
     @Test
     fun `insert image rejects paths outside workspace`() {
-        val tool = CanvasTool(FakeCanvasOperations())
+        val tool = CanvasTool(FakeCanvasOperations(), FakeConversationStore())
 
         val result = tool.execute("""{"action":"insertImage","path":"../outside.png"}""")
 
         assertFalse(result.success)
         assertEquals("canvas", result.toolId)
+    }
+
+    @Test
+    fun `capture image persists immutable history image and returns compact result`() {
+        val canvas = FakeCanvasOperations()
+        val store = FakeConversationStore()
+        val tool = CanvasTool(canvas, store)
+
+        val result = tool.execute("""{"action":"captureImage","format":"png"}""", mapOf("sessionId" to "main"))
+
+        assertTrue(result.success)
+        assertEquals(listOf("captureImage:png"), canvas.actions)
+        assertFalse(result.content.contains("base64"))
+        val saved = store.saved.single()
+        assertEquals("main", saved.sessionId)
+        assertEquals("assistant", saved.role)
+        assertEquals("Canvas snapshot (PNG)", saved.content)
+        assertTrue(saved.metadata.orEmpty().contains(""""type":"image""""))
+        assertTrue(saved.metadata.orEmpty().contains(""""source":"canvas""""))
+        assertTrue(saved.metadata.orEmpty().contains("data:image/png;base64,AQID"))
+        assertTrue(saved.metadata.orEmpty().contains(""""immutable":true"""))
     }
 
     private class FakeCanvasOperations : CanvasOperations {
@@ -141,6 +165,17 @@ class CanvasToolTest {
             return snapshot()
         }
 
+        override fun captureImage(format: String): CanvasImageSnapshot {
+            actions += "captureImage:$format"
+            return CanvasImageSnapshot(
+                format = if (format == "jpg" || format == "jpeg") "jpg" else "png",
+                mimeType = if (format == "jpg" || format == "jpeg") "image/jpeg" else "image/png",
+                bytes = byteArrayOf(1, 2, 3),
+                width = 2,
+                height = 1,
+            )
+        }
+
         private fun snapshotOf(figures: List<CanvasFigureSnapshot>): CanvasSnapshot =
             CanvasSnapshot(
                 figureCount = figures.size,
@@ -149,4 +184,44 @@ class CanvasToolTest {
                 figures = figures,
             )
     }
+
+    private class FakeConversationStore : ConversationStore {
+        val saved = mutableListOf<SavedMessage>()
+
+        override fun saveConversationMessage(
+            sessionId: String,
+            role: String,
+            content: String,
+            metadata: String?,
+        ): String {
+            saved += SavedMessage(sessionId, role, content, metadata)
+            return "message-${saved.size}"
+        }
+
+        override fun getConversationMessages(
+            sessionId: String,
+            limit: Int,
+        ): List<ConversationRecord> = emptyList()
+
+        override fun getConversationMessagesPage(
+            sessionId: String,
+            limit: Int,
+            offset: Int,
+        ): List<ConversationRecord> = emptyList()
+
+        override fun searchConversationMessages(
+            sessionId: String,
+            query: String,
+            limit: Int,
+        ): List<ConversationRecord> = emptyList()
+
+        override fun deleteConversationMessages(sessionId: String): Int = 0
+    }
+
+    private data class SavedMessage(
+        val sessionId: String,
+        val role: String,
+        val content: String,
+        val metadata: String?,
+    )
 }

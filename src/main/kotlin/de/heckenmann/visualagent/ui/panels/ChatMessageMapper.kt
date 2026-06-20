@@ -2,6 +2,11 @@ package de.heckenmann.visualagent.ui.panels.chat
 
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Maps provider/tool events into ChatPanel message models.
@@ -19,6 +24,7 @@ internal class ChatMessageMapper(
             content = normalizeHistoryContent(message.content),
             isToolEvent = toolHistoryParser.isToolHistoryEntry(message),
             toolData = message.metadata?.let(toolHistoryParser::parseToolMetadata),
+            imageData = message.metadata?.let(::parseImageMetadata),
         )
     }
 
@@ -76,4 +82,20 @@ internal class ChatMessageMapper(
                 "The selected model is not available for this account. Choose another model or update the provider subscription."
             else -> "Check the active provider and model, then try again."
         }
+
+    private fun parseImageMetadata(metadata: String): ImageMessageData? =
+        runCatching {
+            val root = json.parseToJsonElement(metadata).jsonObject
+            if (root["type"]?.jsonPrimitive?.contentOrNull != "image") return null
+            ImageMessageData(
+                mimeType = root["mimeType"]?.jsonPrimitive?.contentOrNull ?: return null,
+                dataUrl = root["dataUrl"]?.jsonPrimitive?.contentOrNull ?: return null,
+                width = root["width"]?.jsonPrimitive?.intOrNull ?: 0,
+                height = root["height"]?.jsonPrimitive?.intOrNull ?: 0,
+            )
+        }.getOrNull()
+
+    private companion object {
+        val json = Json { ignoreUnknownKeys = true }
+    }
 }

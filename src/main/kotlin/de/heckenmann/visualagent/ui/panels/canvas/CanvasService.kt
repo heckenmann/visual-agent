@@ -57,6 +57,8 @@ class CanvasService(
             canvasPanel.snapshot()
         }
 
+    override fun captureImage(format: String): CanvasImageSnapshot = onFxThread { canvasPanel.captureImage(format) }
+
     private fun <T> onFxThread(action: () -> T): T {
         if (Platform.isFxApplicationThread()) return action()
         val completed = CountDownLatch(1)

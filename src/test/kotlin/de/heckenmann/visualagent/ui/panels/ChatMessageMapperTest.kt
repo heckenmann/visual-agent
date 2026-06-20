@@ -35,6 +35,24 @@ class ChatMessageMapperTest {
     }
 
     @Test
+    fun `history mapping preserves immutable image metadata`() {
+        val image =
+            mapper.fromHistory(
+                Message(
+                    "assistant",
+                    "Canvas snapshot (PNG)",
+                    """{"type":"image","source":"canvas","mimeType":"image/png","dataUrl":"data:image/png;base64,AQID","width":2,"height":1,"immutable":true}""",
+                ),
+            )
+
+        assertEquals("Canvas snapshot (PNG)", image?.content)
+        assertEquals("image/png", image?.imageData?.mimeType)
+        assertEquals("data:image/png;base64,AQID", image?.imageData?.dataUrl)
+        assertEquals(2, image?.imageData?.width)
+        assertEquals(1, image?.imageData?.height)
+    }
+
+    @Test
     fun `history mapping normalizes legacy recovery provider errors`() {
         val auth =
             mapper.fromHistory(

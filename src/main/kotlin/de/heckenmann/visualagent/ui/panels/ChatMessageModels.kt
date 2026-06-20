@@ -10,6 +10,7 @@ import java.time.Instant
  * @property timestamp Display timestamp
  * @property isToolEvent Whether this row represents tool execution rather than a normal message
  * @property toolData Optional structured tool-call details
+ * @property imageData Optional immutable persisted image details
  */
 data class ChatMessage(
     val role: String,
@@ -17,6 +18,7 @@ data class ChatMessage(
     val timestamp: Instant = Instant.now(),
     val isToolEvent: Boolean = false,
     val toolData: ToolMessageData? = null,
+    val imageData: ImageMessageData? = null,
 )
 
 /**
@@ -36,4 +38,19 @@ data class ToolMessageData(
     val inputJson: String?,
     val resultContent: String?,
     val resultError: String?,
+)
+
+/**
+ * Persisted immutable image attachment displayed in the conversation.
+ *
+ * @property mimeType MIME type such as `image/png` or `image/jpeg`
+ * @property dataUrl Base64 data URL containing the exact persisted bytes
+ * @property width Original rendered width in pixels
+ * @property height Original rendered height in pixels
+ */
+data class ImageMessageData(
+    val mimeType: String,
+    val dataUrl: String,
+    val width: Int,
+    val height: Int,
 )

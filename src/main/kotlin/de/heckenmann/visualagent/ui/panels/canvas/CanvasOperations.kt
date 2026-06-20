@@ -78,6 +78,14 @@ interface CanvasOperations {
      * @return Snapshot after insertion
      */
     fun insertImage(path: String): CanvasSnapshot
+
+    /**
+     * Renders the current canvas as immutable image bytes.
+     *
+     * @param format Image format, either `png` or `jpg`
+     * @return Rendered image snapshot
+     */
+    fun captureImage(format: String): CanvasImageSnapshot
 }
 
 /**
@@ -114,4 +122,21 @@ data class CanvasFigureSnapshot(
     val y: Double,
     val width: Double,
     val height: Double,
+)
+
+/**
+ * Immutable rendered image snapshot of the current canvas.
+ *
+ * @property format Encoded image format such as `png` or `jpg`
+ * @property mimeType MIME type for displaying the image
+ * @property bytes Encoded image bytes
+ * @property width Rendered image width in pixels
+ * @property height Rendered image height in pixels
+ */
+data class CanvasImageSnapshot(
+    val format: String,
+    val mimeType: String,
+    val bytes: ByteArray,
+    val width: Int,
+    val height: Int,
 )
