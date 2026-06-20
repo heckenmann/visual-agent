@@ -28,8 +28,7 @@ class CanvasSelectionDeletionTest {
             viewport.fireEvent(keyPressed(KeyCode.DELETE))
 
             assertTrue(panel.figures().isEmpty())
-            val toolbarButtons = descendants(panel.field<CanvasToolbar>("toolbar")).filterIsInstance<Button>()
-            toolbarButtons.first { it.text == "Undo" }.fire()
+            buttonByTooltip(panel.field("toolbar"), "Undo").fire()
             assertEquals(1, panel.figures().size)
         }
 
@@ -65,8 +64,7 @@ class CanvasSelectionDeletionTest {
         FxTestSupport.run {
             val panel = panel()
             val drawingView = panel.field<SimpleDrawingView>("drawingView")
-            val toolbarButtons = descendants(panel.field<CanvasToolbar>("toolbar")).filterIsInstance<Button>()
-            val deleteButton = toolbarButtons.first { it.text == "Delete" }
+            val deleteButton = buttonByTooltip(panel.field("toolbar"), "Delete selection")
             panel.drawRect(20.0, 20.0, 40.0, 30.0, "#ff0000")
 
             assertTrue(deleteButton.isDisable)
@@ -93,6 +91,11 @@ class CanvasSelectionDeletionTest {
             false,
             false,
         )
+
+    private fun buttonByTooltip(
+        root: CanvasToolbar,
+        tooltip: String,
+    ): Button = descendants(root).filterIsInstance<Button>().first { it.tooltip?.text == tooltip }
 
     companion object {
         @JvmStatic

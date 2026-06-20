@@ -35,15 +35,15 @@ internal class CanvasToolbar(
     onCanvasSize: () -> Unit = {},
 ) : VBox(8.0) {
     private val selectButton = toolButton("Select", FontAwesomeSolid.MOUSE_POINTER, onSelect)
-    private val penButton = toolButton("Pen", FontAwesomeSolid.PEN, onPen)
-    private val imageButton = toolButton("Image", FontAwesomeSolid.IMAGE, onInsertImage)
+    private val penButton = toolButton("Draw with pen", FontAwesomeSolid.PEN, onPen)
+    private val imageButton = toolButton("Insert image", FontAwesomeSolid.IMAGE, onInsertImage)
     private val deleteButton =
-        toolButton("Delete", FontAwesomeSolid.TRASH_ALT, onDeleteSelection).apply {
+        toolButton("Delete selection", FontAwesomeSolid.TRASH_ALT, onDeleteSelection).apply {
             isDisable = true
         }
     private val undoButton = toolButton("Undo", FontAwesomeSolid.UNDO, onUndo)
     private val redoButton = toolButton("Redo", FontAwesomeSolid.REDO, onRedo)
-    private val zoomResetButton = toolButton("100%", FontAwesomeSolid.SEARCH, onZoomReset)
+    private val zoomResetButton = toolButton("Reset zoom (100%)", FontAwesomeSolid.SEARCH, onZoomReset)
 
     init {
         styleClass.add("canvas-toolbar")
@@ -75,15 +75,15 @@ internal class CanvasToolbar(
                 undoButton,
                 redoButton,
                 Separator(Orientation.VERTICAL),
-                toolButton("Out", FontAwesomeSolid.SEARCH_MINUS, onZoomOut),
+                toolButton("Zoom out", FontAwesomeSolid.SEARCH_MINUS, onZoomOut),
                 zoomResetButton,
-                toolButton("In", FontAwesomeSolid.SEARCH_PLUS, onZoomIn),
+                toolButton("Zoom in", FontAwesomeSolid.SEARCH_PLUS, onZoomIn),
                 gridToggle,
                 Region().apply { HBox.setHgrow(this, Priority.ALWAYS) },
-                toolButton("Size", FontAwesomeSolid.EXPAND_ARROWS_ALT, onCanvasSize),
-                toolButton("Save", FontAwesomeSolid.SAVE, onSaveWorkspace),
-                toolButton("Open", FontAwesomeSolid.FOLDER_OPEN, onOpenWorkspace),
-                toolButton("Clear", FontAwesomeSolid.BROOM, onClear),
+                toolButton("Set canvas size", FontAwesomeSolid.EXPAND_ARROWS_ALT, onCanvasSize),
+                toolButton("Save canvas to workspace", FontAwesomeSolid.SAVE, onSaveWorkspace),
+                toolButton("Open canvas from workspace", FontAwesomeSolid.FOLDER_OPEN, onOpenWorkspace),
+                toolButton("Clear canvas", FontAwesomeSolid.BROOM, onClear),
                 exportButton,
             ).apply { styleClass.add("canvas-toolbar-controls") }
         children.addAll(header, controls)
@@ -102,7 +102,7 @@ internal class CanvasToolbar(
 
     /** Updates the displayed zoom percentage. */
     fun updateZoom(percent: Int) {
-        zoomResetButton.text = "$percent%"
+        zoomResetButton.tooltip.text = "Reset zoom ($percent%)"
     }
 
     /** Enables undo and redo buttons according to the drawing history state. */
@@ -124,9 +124,9 @@ internal class CanvasToolbar(
         icon: FontAwesomeSolid,
         action: () -> Unit,
     ): Button =
-        Button(text, FontIcon(icon)).apply {
+        Button(null, FontIcon(icon)).apply {
             styleClass.add("canvas-tool-button")
-            graphicTextGap = 6.0
+            isFocusTraversable = false
             tooltip = Tooltip(text)
             setOnAction { action() }
         }

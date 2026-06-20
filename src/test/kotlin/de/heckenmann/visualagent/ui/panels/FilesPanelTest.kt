@@ -47,24 +47,24 @@ class FilesPanelTest {
                 val table = descendants(panel).filterIsInstance<TableView<*>>().single()
                 val searchField = descendants(panel).filterIsInstance<TextField>().single()
                 table.selectionModel.select(table.items.indexOf(imported))
-                descendants(panel).filterIsInstance<Button>().first { it.text == "Copy Path" }.fire()
+                buttonByTooltip(panel, "Copy Path").fire()
                 assertEquals(imported.relativePath, Clipboard.getSystemClipboard().string)
-                descendants(panel).filterIsInstance<Button>().first { it.text == "Copy Hash" }.fire()
+                buttonByTooltip(panel, "Copy Hash").fire()
                 assertEquals(imported.sha256, Clipboard.getSystemClipboard().string)
                 searchField.text = "Alpha"
-                descendants(panel).filterIsInstance<Button>().first { it.text == "Search" }.fire()
+                buttonByTooltip(panel, "Search").fire()
                 assertEquals(1, table.items.size)
                 val unmanaged = service.workspaceRoot().resolve("imports/manual.txt")
                 unmanaged.parent.toFile().mkdirs()
                 Files.writeString(unmanaged, "Manual")
-                descendants(panel).filterIsInstance<Button>().first { it.text == "Sync DB" }.fire()
+                buttonByTooltip(panel, "Sync DB").fire()
                 assertTrue(table.items.any { (it as WorkspaceFileRecord).relativePath == "imports/manual.txt" })
-                descendants(panel).filterIsInstance<Button>().first { it.text == "Save Canvas" }.fire()
+                buttonByTooltip(panel, "Save Canvas").fire()
                 val canvasRecord = table.items.filterIsInstance<WorkspaceFileRecord>().first { it.relativePath.startsWith("canvas/") }
                 table.selectionModel.select(table.items.indexOf(canvasRecord))
-                descendants(panel).filterIsInstance<Button>().first { it.text == "Open in Canvas" }.fire()
-                descendants(panel).filterIsInstance<Button>().first { it.text == "Refresh" }.fire()
-                descendants(panel).filterIsInstance<Button>().first { it.text == "Open in Canvas" }.fire()
+                buttonByTooltip(panel, "Open in Canvas").fire()
+                buttonByTooltip(panel, "Refresh").fire()
+                buttonByTooltip(panel, "Open in Canvas").fire()
                 panel.renameFile(textFile, "renamed")
                 val renamed = service.requireFile(null, "imports/renamed.txt")
                 panel.deleteFile(renamed)
@@ -83,6 +83,11 @@ class FilesPanelTest {
         root.childrenUnmodifiable.flatMap { child ->
             listOf(child) + if (child is Parent) descendants(child) else emptyList()
         }
+
+    private fun buttonByTooltip(
+        root: Parent,
+        tooltip: String,
+    ): Button = descendants(root).filterIsInstance<Button>().first { it.tooltip?.text == tooltip }
 
     companion object {
         @JvmStatic

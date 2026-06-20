@@ -46,13 +46,19 @@ internal class ChatPanelInitializer(
         loadOlderMessages: () -> Unit,
     ) {
         AppIdentity.javaFxIcon()?.let { conversationIconImage.image = it }
+        sendButton.text = null
         sendButton.graphic = FontIcon(FontAwesomeSolid.PAPER_PLANE)
         sendButton.tooltip = Tooltip("Send")
+        sendButton.isFocusTraversable = false
+        clearChatButton.text = null
         clearChatButton.graphic = FontIcon(FontAwesomeSolid.BROOM)
         clearChatButton.tooltip = Tooltip("Clear conversation")
         clearChatButton.isFocusTraversable = false
+        openTodosButton.text = null
+        openTodosButton.graphic = FontIcon(FontAwesomeSolid.CHECK)
         openTodosButton.tooltip = Tooltip("Open todo list")
         openTodosButton.isFocusTraversable = false
+        openFileButton.text = null
         openFileButton.graphic = FontIcon(FontAwesomeSolid.FOLDER_OPEN)
         openFileButton.tooltip = Tooltip("Import files into workspace")
         openFileButton.isFocusTraversable = false

@@ -12,6 +12,7 @@ import javafx.scene.control.TableColumn
 import javafx.scene.control.TableView
 import javafx.scene.control.TextField
 import javafx.scene.control.TextInputDialog
+import javafx.scene.control.Tooltip
 import javafx.scene.input.Clipboard
 import javafx.scene.input.ClipboardContent
 import javafx.scene.layout.HBox
@@ -202,9 +203,10 @@ class FilesPanel(
         icon: FontAwesomeSolid,
         action: () -> Unit,
     ): Button =
-        Button(text, FontIcon(icon)).apply {
+        Button(null, FontIcon(icon)).apply {
             styleClass.add("chat-toolbar-button")
             isFocusTraversable = false
+            tooltip = Tooltip(text)
             setOnAction { action() }
         }
 

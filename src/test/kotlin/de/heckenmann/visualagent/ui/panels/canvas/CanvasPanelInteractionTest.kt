@@ -71,11 +71,10 @@ class CanvasPanelInteractionTest {
             val panel = panel()
             val drawingView = panel.field<SimpleDrawingView>("drawingView")
             val toolbar = panel.field<CanvasToolbar>("toolbar")
-            val buttons = descendants(toolbar).filterIsInstance<Button>()
             panel.drawRect(20.0, 20.0, 40.0, 30.0, "#ff0000")
 
-            val undo = buttons.first { it.text == "Undo" }
-            val redo = buttons.first { it.text == "Redo" }
+            val undo = buttonByTooltip(toolbar, "Undo")
+            val redo = buttonByTooltip(toolbar, "Redo")
             assertFalse(undo.isDisable)
             undo.fire()
             assertTrue(panel.figures().isEmpty())
@@ -83,9 +82,9 @@ class CanvasPanelInteractionTest {
             redo.fire()
             assertEquals(1, panel.figures().size)
 
-            buttons.first { it.text == "In" }.fire()
+            buttonByTooltip(toolbar, "Zoom in").fire()
             assertEquals(1.1, drawingView.zoomFactor, 0.001)
-            buttons.first { it.text == "110%" }.fire()
+            buttonByTooltip(toolbar, "Reset zoom (110%)").fire()
             assertEquals(1.0, drawingView.zoomFactor, 0.001)
         }
 
@@ -96,14 +95,13 @@ class CanvasPanelInteractionTest {
             val toolbar = panel.field<CanvasToolbar>("toolbar")
             val editor = panel.field<SimpleDrawingEditor>("drawingEditor")
             val grid = panel.field<GridConstrainer>("gridConstrainer")
-            val buttons = descendants(toolbar).filterIsInstance<Button>()
 
-            buttons.first { it.text == "Pen" }.fire()
-            assertTrue(buttons.first { it.text == "Pen" }.styleClass.contains("active"))
+            buttonByTooltip(toolbar, "Draw with pen").fire()
+            assertTrue(buttonByTooltip(toolbar, "Draw with pen").styleClass.contains("active"))
             assertEquals(null, editor.activeTool)
 
-            buttons.first { it.text == "Select" }.fire()
-            assertTrue(buttons.first { it.text == "Select" }.styleClass.contains("active"))
+            buttonByTooltip(toolbar, "Select").fire()
+            assertTrue(buttonByTooltip(toolbar, "Select").styleClass.contains("active"))
             assertTrue(editor.activeTool != null)
 
             descendants(toolbar).filterIsInstance<CheckBox>().single().fire()
@@ -119,7 +117,7 @@ class CanvasPanelInteractionTest {
             panel.layout()
             val toolbar = panel.field<CanvasToolbar>("toolbar")
             val viewport = panel.field<StackPane>("editorViewport")
-            descendants(toolbar).filterIsInstance<Button>().first { it.text == "Pen" }.fire()
+            buttonByTooltip(toolbar, "Draw with pen").fire()
 
             viewport.fireEvent(mouseEvent(viewport, MouseEvent.MOUSE_PRESSED, 40.0, 80.0))
             viewport.fireEvent(mouseEvent(viewport, MouseEvent.MOUSE_DRAGGED, 80.0, 100.0))
@@ -128,7 +126,7 @@ class CanvasPanelInteractionTest {
             assertIs<PolylineFigure>(panel.figures().single())
             panel.clearCanvas()
             assertTrue(panel.figures().isEmpty())
-            descendants(toolbar).filterIsInstance<Button>().first { it.text == "Undo" }.fire()
+            buttonByTooltip(toolbar, "Undo").fire()
             assertEquals(1, panel.figures().size)
         }
 
@@ -287,12 +285,12 @@ class CanvasPanelInteractionTest {
             toolbar.selectTool(CanvasTool.PEN)
 
             val buttons = descendants(toolbar).filterIsInstance<Button>()
-            assertTrue(buttons.first { it.text == "Undo" }.isDisable)
-            assertFalse(buttons.first { it.text == "Redo" }.isDisable)
-            assertTrue(buttons.first { it.text == "Delete" }.isDisable)
+            assertTrue(buttonByTooltip(toolbar, "Undo").isDisable)
+            assertFalse(buttonByTooltip(toolbar, "Redo").isDisable)
+            assertTrue(buttonByTooltip(toolbar, "Delete selection").isDisable)
             toolbar.updateSelectionActions(hasDeletableSelection = true)
-            assertFalse(buttons.first { it.text == "Delete" }.isDisable)
-            assertEquals("125%", buttons.first { it.text == "125%" }.text)
+            assertFalse(buttonByTooltip(toolbar, "Delete selection").isDisable)
+            assertEquals("Reset zoom (125%)", buttonByTooltip(toolbar, "Reset zoom (125%)").tooltip.text)
             buttons.filterNot(Button::isDisable).forEach(Button::fire)
             descendants(toolbar).filterIsInstance<CheckBox>().single().fire()
 
@@ -301,6 +299,11 @@ class CanvasPanelInteractionTest {
         }
 
     private fun panel() = CanvasPanel(preferenceStore)
+
+    private fun buttonByTooltip(
+        root: Parent,
+        tooltip: String,
+    ): Button = descendants(root).filterIsInstance<Button>().first { it.tooltip?.text == tooltip }
 
     companion object {
         @JvmStatic
