@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent.tools
 
+import de.heckenmann.visualagent.agent.ToolDefinition
 import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.agent.ToolResult
 import de.heckenmann.visualagent.config.AppConfig
@@ -32,6 +33,13 @@ class ToolRegistry(
      * @return Tool IDs known by the registry
      */
     fun allToolIds(): Set<ToolId> = toolsById.keys
+
+    /**
+     * Return all registered tool definitions.
+     *
+     * @return Tool definitions known by the registry
+     */
+    fun toolDefinitions(): List<ToolDefinition> = toolsById.values.map { it.definition }.sortedBy { it.id.value }
 
     /**
      * Resolve registered tools by ID.

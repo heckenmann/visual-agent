@@ -2,6 +2,7 @@
 
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.Separator?>
@@ -48,6 +49,18 @@
                         <Label text="10 to 24 pixels" styleClass="field-help"/>
                     </VBox>
                 </HBox>
+            </VBox>
+
+            <VBox spacing="14.0" styleClass="settings-card">
+                <HBox alignment="CENTER_LEFT" spacing="10.0">
+                    <FontIcon iconLiteral="fas-tools" iconSize="14" styleClass="card-icon"/>
+                    <VBox spacing="1.0">
+                        <Label text="Tools" styleClass="card-title"/>
+                        <Label text="Enable or disable model tools globally for future requests." styleClass="card-description"/>
+                    </VBox>
+                </HBox>
+                <Separator/>
+                <VBox fx:id="toolToggleBox" spacing="8.0"/>
             </VBox>
 
             <VBox spacing="14.0" styleClass="settings-card">

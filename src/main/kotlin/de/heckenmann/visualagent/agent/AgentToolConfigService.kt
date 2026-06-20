@@ -2,6 +2,7 @@ package de.heckenmann.visualagent.agent.config
 
 import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.agent.ToolId
+import de.heckenmann.visualagent.knowledge.PreferenceStore
 import de.heckenmann.visualagent.knowledge.SubAgentConfigStore
 import org.springframework.stereotype.Service
 
@@ -12,6 +13,8 @@ import org.springframework.stereotype.Service
 class AgentToolConfigService(
     private val configStore: SubAgentConfigStore,
 ) {
+    private val preferenceStore = configStore as? PreferenceStore
+
     init {
         ensureDefaultConfigs()
     }
@@ -34,7 +37,7 @@ class AgentToolConfigService(
             "agent:assign-todo",
             "agent:assign-next-todo",
             "agent:assign-all-todos",
-        ).map(::ToolId).toSet()
+        ).let(::filterEnabledTools).map(::ToolId).toSet()
 
     /**
      * Return enabled tools for a sub-agent.
@@ -52,8 +55,49 @@ class AgentToolConfigService(
                 else -> "researcher"
             }
         val configured = configStore.getSubAgentConfig(key)?.tools ?: defaultConfigs().first { it.id == key }.tools
-        return configured.map(::ToolId).toSet()
+        return filterEnabledTools(configured).map(::ToolId).toSet()
     }
+
+    /**
+     * Returns whether a tool is globally enabled.
+     *
+     * @param toolId Canonical tool ID
+     * @return true when the tool is not globally disabled
+     */
+    fun isToolGloballyEnabled(toolId: String): Boolean = toolId !in disabledToolIds()
+
+    /**
+     * Enables or disables one tool globally.
+     *
+     * Disabled tools are filtered from main-agent and sub-agent tool sets.
+     *
+     * @param toolId Canonical tool ID
+     * @param enabled Whether the tool should be exposed to model requests
+     */
+    fun setToolGloballyEnabled(
+        toolId: String,
+        enabled: Boolean,
+    ) {
+        val next =
+            if (enabled) {
+                disabledToolIds() - toolId
+            } else {
+                disabledToolIds() + toolId
+            }
+        preferenceStore?.setPreference(DISABLED_TOOLS_KEY, next.sorted().joinToString("\n"))
+    }
+
+    /**
+     * Returns globally disabled tool IDs.
+     */
+    fun disabledToolIds(): Set<String> =
+        preferenceStore
+            ?.getPreference(DISABLED_TOOLS_KEY)
+            .orEmpty()
+            .lineSequence()
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .toSet()
 
     /**
      * Persist a sub-agent tool configuration.
@@ -78,6 +122,8 @@ class AgentToolConfigService(
         }
     }
 
+    private fun filterEnabledTools(tools: Collection<String>): List<String> = tools.filter(::isToolGloballyEnabled)
+
     private fun defaultConfigs(): List<SubAgentToolConfig> =
         listOf(
             SubAgentToolConfig(
@@ -99,6 +145,7 @@ class AgentToolConfigService(
                         "manual",
                         "sleep",
                         "workspace:layout",
+                        "workspace:file",
                         "canvas",
                     ),
             ),
@@ -122,6 +169,7 @@ class AgentToolConfigService(
                         "manual",
                         "sleep",
                         "workspace:layout",
+                        "workspace:file",
                         "canvas",
                     ),
                 maxTurns = 8,
@@ -143,11 +191,14 @@ class AgentToolConfigService(
                         "manual",
                         "sleep",
                         "workspace:layout",
+                        "workspace:file",
                         "canvas",
                     ),
             ),
         )
 }
+
+private const val DISABLED_TOOLS_KEY = "tools.disabled.global"
 
 /**
  * Persisted tool configuration for one agent template.

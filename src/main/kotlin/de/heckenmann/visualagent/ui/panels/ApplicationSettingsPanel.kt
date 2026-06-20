@@ -1,14 +1,20 @@
 package de.heckenmann.visualagent.ui.panels
 
+import de.heckenmann.visualagent.agent.config.AgentToolConfigService
+import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.config.AppConfig
 import de.heckenmann.visualagent.ui.FxmlLoader
 import javafx.fxml.FXML
 import javafx.scene.control.Alert
 import javafx.scene.control.Button
 import javafx.scene.control.ButtonType
+import javafx.scene.control.CheckBox
 import javafx.scene.control.ComboBox
+import javafx.scene.control.Label
 import javafx.scene.control.Spinner
 import javafx.scene.control.SpinnerValueFactory.IntegerSpinnerValueFactory
+import javafx.scene.layout.HBox
+import javafx.scene.layout.Priority
 import javafx.scene.layout.Region
 import javafx.scene.layout.VBox
 import javafx.stage.FileChooser
@@ -20,7 +26,10 @@ import org.springframework.stereotype.Component
  */
 @Component
 @Lazy
-class ApplicationSettingsPanel : Region() {
+class ApplicationSettingsPanel(
+    private val toolRegistry: ToolRegistry? = null,
+    private val toolConfigService: AgentToolConfigService? = null,
+) : Region() {
     @FXML
     private lateinit var root: VBox
 
@@ -29,6 +38,9 @@ class ApplicationSettingsPanel : Region() {
 
     @FXML
     private lateinit var fontSizeSpinner: Spinner<Int>
+
+    @FXML
+    private lateinit var toolToggleBox: VBox
 
     @FXML
     private lateinit var importConfigButton: Button
@@ -80,6 +92,7 @@ class ApplicationSettingsPanel : Region() {
         importConfigButton.setOnAction { importConfig() }
         exportConfigButton.setOnAction { exportConfig() }
         resetDefaultsButton.setOnAction { resetDefaults() }
+        refreshToolToggles()
     }
 
     private fun exportConfig() {
@@ -126,6 +139,44 @@ class ApplicationSettingsPanel : Region() {
     private fun syncControlsFromConfig() {
         themeSelector.selectionModel.select(AppConfig.instance.theme)
         fontSizeSpinner.valueFactory.value = AppConfig.instance.fontSize.coerceIn(10, 24)
+        refreshToolToggles()
+    }
+
+    private fun refreshToolToggles() {
+        toolToggleBox.children.clear()
+        val registry = toolRegistry
+        val configService = toolConfigService
+        if (registry == null || configService == null) {
+            toolToggleBox.children.add(
+                Label("Tool settings are available when the application is running.").apply {
+                    styleClass.add("field-help")
+                },
+            )
+            return
+        }
+        registry
+            .toolDefinitions()
+            .sortedBy { it.id.value }
+            .forEach { definition ->
+                val checkBox =
+                    CheckBox(definition.id.value).apply {
+                        isSelected = configService.isToolGloballyEnabled(definition.id.value)
+                        setOnAction {
+                            configService.setToolGloballyEnabled(definition.id.value, isSelected)
+                        }
+                    }
+                val description =
+                    Label(definition.description).apply {
+                        styleClass.add("field-help")
+                        isWrapText = true
+                    }
+                toolToggleBox.children.add(
+                    HBox(12.0, checkBox, description).apply {
+                        styleClass.add("tool-toggle-row")
+                        HBox.setHgrow(description, Priority.ALWAYS)
+                    },
+                )
+            }
     }
 
     private fun showFileError(
