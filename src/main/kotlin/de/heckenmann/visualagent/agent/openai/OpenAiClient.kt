@@ -7,6 +7,7 @@ import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ModelDetails
 import de.heckenmann.visualagent.agent.ShowResponse
+import de.heckenmann.visualagent.agent.VisionSupport
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.config.AppConfig
 import io.micrometer.observation.ObservationRegistry
@@ -17,7 +18,9 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.reactive.asFlow
 import kotlinx.coroutines.withContext
+import org.springframework.ai.chat.messages.UserMessage
 import org.springframework.ai.chat.model.ChatModel
+import org.springframework.ai.chat.prompt.Prompt
 import org.springframework.ai.openai.OpenAiChatModel
 import org.springframework.ai.openai.OpenAiChatOptions
 import org.springframework.ai.openai.setup.OpenAiSetup
@@ -109,7 +112,47 @@ class OpenAiClient(
     override suspend fun vision(
         image: ByteArray,
         prompt: String,
-    ): ChatResponse = throw UnsupportedOperationException("Vision not yet implemented in OpenAI bridge")
+    ): ChatResponse =
+        withContext(Dispatchers.IO) {
+            val selectedModel = AppConfig.instance.openAiModel
+            val response =
+                chatModel()
+                    .call(
+                        Prompt(
+                            listOf(
+                                UserMessage
+                                    .builder()
+                                    .text(prompt)
+                                    .media(VisionSupport.media(image))
+                                    .build(),
+                            ),
+                            OpenAiChatOptions.builder().model(selectedModel).build(),
+                        ),
+                    )
+            ChatResponse(
+                model = response.metadata?.model ?: selectedModel,
+                message =
+                    Message(
+                        role = "assistant",
+                        content =
+                            response.result
+                                ?.output
+                                ?.text
+                                .orEmpty(),
+                    ),
+                done = true,
+                promptEvalCount =
+                    response.metadata
+                        ?.usage
+                        ?.promptTokens
+                        ?.toInt(),
+                evalCount =
+                    response.metadata
+                        ?.usage
+                        ?.completionTokens
+                        ?.toInt(),
+            )
+        }
 
     override suspend fun embeddings(text: String): List<Double> = emptyList()
 

@@ -12,7 +12,9 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.reactive.asFlow
 import kotlinx.coroutines.withContext
+import org.springframework.ai.chat.messages.UserMessage
 import org.springframework.ai.chat.model.ChatModel
+import org.springframework.ai.chat.prompt.Prompt
 import org.springframework.ai.ollama.OllamaChatModel
 import org.springframework.ai.ollama.api.OllamaApi
 import org.springframework.ai.ollama.api.OllamaChatOptions
@@ -152,11 +154,46 @@ class OllamaClient(
     override suspend fun vision(
         image: ByteArray,
         prompt: String,
-    ): ChatResponse {
-        // Spring AI handles vision via UserMessage with Media
-        // Implementation omitted for brevity in first step
-        throw UnsupportedOperationException("Vision not yet implemented in Spring AI bridge")
-    }
+    ): ChatResponse =
+        withContext(Dispatchers.IO) {
+            val selectedModel = AppConfig.instance.ollamaModel
+            val response =
+                chatModel.call(
+                    Prompt(
+                        listOf(
+                            UserMessage
+                                .builder()
+                                .text(prompt)
+                                .media(VisionSupport.media(image))
+                                .build(),
+                        ),
+                        OllamaChatOptions.builder().model(selectedModel).build(),
+                    ),
+                )
+            ChatResponse(
+                model = response.metadata?.model ?: selectedModel,
+                message =
+                    Message(
+                        role = "assistant",
+                        content =
+                            response.result
+                                ?.output
+                                ?.text
+                                .orEmpty(),
+                    ),
+                done = true,
+                promptEvalCount =
+                    response.metadata
+                        ?.usage
+                        ?.promptTokens
+                        ?.toInt(),
+                evalCount =
+                    response.metadata
+                        ?.usage
+                        ?.completionTokens
+                        ?.toInt(),
+            )
+        }
 
     override suspend fun embeddings(text: String): List<Double> =
         withContext(Dispatchers.IO) {

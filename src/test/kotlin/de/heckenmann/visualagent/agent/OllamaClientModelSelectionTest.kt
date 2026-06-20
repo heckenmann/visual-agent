@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.springframework.ai.chat.messages.AssistantMessage
+import org.springframework.ai.chat.messages.UserMessage
 import org.springframework.ai.chat.metadata.ChatResponseMetadata
 import org.springframework.ai.chat.model.ChatModel
 import org.springframework.ai.chat.model.Generation
@@ -27,6 +28,7 @@ import org.springframework.ai.chat.prompt.Prompt
 import org.springframework.ai.model.tool.ToolCallingChatOptions
 import org.springframework.ai.ollama.api.OllamaApi
 import reactor.core.publisher.Flux
+import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
@@ -225,6 +227,63 @@ class OllamaClientModelSelectionTest {
 
             assertTrue(error.message.orEmpty().contains("403 Forbidden from POST"))
             assertTrue(error.message.orEmpty().contains("this model requires a subscription"))
+        }
+
+    @Test
+    fun `vision sends image media through chat model`() =
+        runTest {
+            val previousModel = AppConfig.instance.ollamaModel
+            AppConfig.instance.ollamaModel = "vision-model"
+            try {
+                val chatModel = mockk<ChatModel>()
+                val ollamaApi = mockk<OllamaApi>(relaxed = true)
+                val promptSlot = io.mockk.slot<Prompt>()
+                every { chatModel.call(capture(promptSlot)) } returns springResponse("vision-model", "image description")
+                val client = createClient(chatModel, ollamaApi, ToolRegistry(emptyList(), ToolEventBus()))
+
+                val response = client.vision(byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47), "describe")
+
+                val message = promptSlot.captured.instructions.single() as UserMessage
+                assertEquals("image description", response.message.content)
+                assertEquals("describe", message.text)
+                assertEquals(1, message.media.size)
+            } finally {
+                AppConfig.instance.ollamaModel = previousModel
+            }
+        }
+
+    @Test
+    fun `ollama api helpers expose embeddings models and details`() =
+        runTest {
+            val chatModel = mockk<ChatModel>(relaxed = true)
+            val ollamaApi = mockk<OllamaApi>()
+            val details = OllamaApi.Model.Details("parent", "gguf", "llama", listOf("llama"), "7B", "Q4")
+            every { ollamaApi.embed(any()) } returns OllamaApi.EmbeddingsResponse("embed", listOf(floatArrayOf(1f, 2f)), 1L, 1L, 1)
+            every { ollamaApi.listModels() } returns
+                OllamaApi.ListModelResponse(
+                    listOf(OllamaApi.Model("llama", "llama", Instant.EPOCH, 1L, "digest", details)),
+                )
+            every { ollamaApi.showModel(any()) } returns
+                OllamaApi.ShowModelResponse(
+                    "license",
+                    "modelfile",
+                    "parameters",
+                    "template",
+                    "system",
+                    details,
+                    emptyList(),
+                    emptyMap(),
+                    emptyMap(),
+                    listOf("vision"),
+                    Instant.EPOCH,
+                )
+            val client = createClient(chatModel, ollamaApi, ToolRegistry(emptyList(), ToolEventBus()))
+
+            assertEquals(listOf(1.0, 2.0), client.embeddings("hello"))
+            assertEquals(listOf("llama"), client.getModels())
+            val modelDetails = client.getModelDetails("llama")
+            assertEquals("llama", modelDetails.details?.family)
+            assertEquals("7B", modelDetails.details?.parameterSize)
         }
 
     private fun springResponse(
