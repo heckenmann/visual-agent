@@ -83,6 +83,14 @@
                     <Tooltip text="Canvas"/>
                 </tooltip>
             </Button>
+            <Button fx:id="filesBtn" text="Files" styleClass="icon-rail-button">
+                <graphic>
+                    <FontIcon iconLiteral="fas-folder-open" iconSize="16"/>
+                </graphic>
+                <tooltip>
+                    <Tooltip text="Files"/>
+                </tooltip>
+            </Button>
             <Region VBox.vgrow="ALWAYS"/>
             <Label text="SYSTEM" styleClass="nav-section-label"/>
             <Button fx:id="settingsBtn" text="Settings" styleClass="icon-rail-button">

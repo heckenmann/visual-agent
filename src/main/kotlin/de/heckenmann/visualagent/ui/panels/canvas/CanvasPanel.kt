@@ -1,10 +1,11 @@
 package de.heckenmann.visualagent.ui.panels.canvas
 
+import de.heckenmann.visualagent.image.PngEncoder
 import de.heckenmann.visualagent.knowledge.PreferenceStore
 import javafx.animation.PauseTransition
-import javafx.embed.swing.SwingFXUtils
 import javafx.geometry.Point2D
 import javafx.scene.SnapshotParameters
+import javafx.scene.control.TextInputDialog
 import javafx.scene.input.MouseButton
 import javafx.scene.input.MouseEvent
 import javafx.scene.layout.BorderPane
@@ -24,7 +25,7 @@ import org.jhotdraw8.draw.undo.DrawingModelUndoAdapter
 import org.springframework.context.annotation.Lazy
 import org.springframework.stereotype.Component
 import java.io.File
-import javax.imageio.ImageIO
+import java.nio.file.Files
 
 /**
  * Hosts the JHotDraw-based structured drawing editor.
@@ -35,7 +36,7 @@ import javax.imageio.ImageIO
 @Component
 @Lazy
 class CanvasPanel(
-    preferenceStore: PreferenceStore,
+    private val preferenceStore: PreferenceStore,
 ) : Region() {
     private val rootBorderPane = BorderPane()
     private val drawingView = SimpleDrawingView()
@@ -59,6 +60,10 @@ class CanvasPanel(
     private var restoringDocument = false
     private var pendingStroke: MutableList<Point2D>? = null
     private var activeTool = CanvasTool.SELECT
+    private var canvasWidth = loadCanvasDimension(CANVAS_WIDTH_KEY, DEFAULT_CANVAS_WIDTH)
+    private var canvasHeight = loadCanvasDimension(CANVAS_HEIGHT_KEY, DEFAULT_CANVAS_HEIGHT)
+    private var onSaveWorkspace: (() -> Unit)? = null
+    private var onOpenWorkspace: (() -> Unit)? = null
     private val toolbar =
         CanvasToolbar(
             onSelect = { selectTool(CanvasTool.SELECT) },
@@ -72,6 +77,9 @@ class CanvasPanel(
             onZoomIn = { setZoom(drawingView.zoomFactor + 0.1) },
             onGridChanged = { gridConstrainer.drawGridProperty().set(it) },
             onClear = ::clearCanvas,
+            onSaveWorkspace = { onSaveWorkspace?.invoke() },
+            onOpenWorkspace = { onOpenWorkspace?.invoke() },
+            onCanvasSize = ::promptCanvasSize,
             onExport = ::exportPng,
         )
     private val selectionDeletionController =
@@ -135,6 +143,7 @@ class CanvasPanel(
         minHeight = 100.0
         prefHeight = 600.0
         maxHeight = Double.MAX_VALUE
+        applyCanvasSize()
         selectTool(CanvasTool.SELECT)
     }
 
@@ -239,6 +248,70 @@ class CanvasPanel(
     }
 
     /**
+     * Adds an image file from the managed workspace to the editable canvas.
+     *
+     * @param file Workspace image file
+     */
+    fun addWorkspaceImage(file: File) {
+        addImage(file)
+    }
+
+    /**
+     * Registers workspace save/open callbacks supplied by the files panel.
+     */
+    fun setWorkspaceFileActions(
+        onSave: () -> Unit,
+        onOpen: () -> Unit,
+    ) {
+        onSaveWorkspace = onSave
+        onOpenWorkspace = onOpen
+    }
+
+    /**
+     * Serializes the current editable canvas document.
+     */
+    fun canvasDocumentBytes(): ByteArray = persistence.writeDrawing(activeDrawing).toByteArray(Charsets.UTF_8)
+
+    /**
+     * Opens a serialized editable canvas document.
+     *
+     * @param file Managed workspace canvas document
+     * @return true when the file was loaded
+     */
+    fun openCanvasDocument(file: File): Boolean {
+        val drawing = persistence.readDrawing(file.readText(Charsets.UTF_8)) ?: return false
+        restoringDocument = true
+        activeDrawing = drawing
+        activeLayer =
+            activeDrawing.children.filterIsInstance<LayerFigure>().firstOrNull()
+                ?: LayerFigure().also(activeDrawing::addChild)
+        drawingView.model.setRoot(activeDrawing)
+        drawingView.selectedFigures.clear()
+        restoringDocument = false
+        persistDocument()
+        updateHistoryActions()
+        selectionDeletionController.refreshSelectionActions()
+        return true
+    }
+
+    /**
+     * Sets the editable canvas work-surface size and stores it as a user preference.
+     */
+    fun setCanvasSize(
+        width: Double,
+        height: Double,
+    ) {
+        canvasWidth = width.coerceIn(MIN_CANVAS_SIZE, MAX_CANVAS_SIZE)
+        canvasHeight = height.coerceIn(MIN_CANVAS_SIZE, MAX_CANVAS_SIZE)
+        preferenceStore.setPreference(CANVAS_WIDTH_KEY, canvasWidth.toInt().toString())
+        preferenceStore.setPreference(CANVAS_HEIGHT_KEY, canvasHeight.toInt().toString())
+        applyCanvasSize()
+    }
+
+    /** Returns the configured editable canvas work-surface size. */
+    fun canvasSize(): Pair<Double, Double> = canvasWidth to canvasHeight
+
+    /**
      * Deletes all currently selected figures that can be removed from the drawing.
      *
      * @return true when at least one figure was deleted
@@ -261,6 +334,14 @@ class CanvasPanel(
             figures = figures,
         )
     }
+
+    /**
+     * Renders the current canvas to immutable PNG or JPG bytes.
+     *
+     * @param requestedFormat Requested output format, `png` or `jpg`
+     * @return Encoded canvas image
+     */
+    fun captureImage(requestedFormat: String): CanvasImageSnapshot = CanvasImageCapture.capture(drawingView.node, requestedFormat)
 
     private fun addFigure(figure: Figure) {
         drawingView.model.insertChildAt(figure, activeLayer, activeLayer.children.size)
@@ -323,15 +404,67 @@ class CanvasPanel(
         toolbar.updateHistoryActions(drawingEditor.undoManager.canUndo(), drawingEditor.undoManager.canRedo())
     }
 
+    private fun promptCanvasSize() {
+        val result =
+            TextInputDialog("${canvasWidth.toInt()}x${canvasHeight.toInt()}")
+                .apply {
+                    title = "Canvas size"
+                    headerText = "Set editable canvas size"
+                    contentText = "Width x Height"
+                }.showAndWait()
+        if (result.isEmpty) return
+        val parts =
+            result
+                .get()
+                .lowercase()
+                .split("x", ",", " ")
+                .filter(String::isNotBlank)
+        if (parts.size < 2) return
+        setCanvasSize(parts[0].toDoubleOrNull() ?: canvasWidth, parts[1].toDoubleOrNull() ?: canvasHeight)
+    }
+
+    private fun applyCanvasSize() {
+        editorViewport.minWidth = canvasWidth
+        editorViewport.minHeight = canvasHeight
+        editorViewport.prefWidth = canvasWidth
+        editorViewport.prefHeight = canvasHeight
+        if (drawingView.node is Region) {
+            val surface = drawingView.node as Region
+            surface.minWidth = canvasWidth
+            surface.minHeight = canvasHeight
+            surface.prefWidth = canvasWidth
+            surface.prefHeight = canvasHeight
+        }
+    }
+
+    private fun loadCanvasDimension(
+        key: String,
+        fallback: Double,
+    ): Double =
+        preferenceStore
+            .getPreference(key)
+            ?.toDoubleOrNull()
+            ?.coerceIn(MIN_CANVAS_SIZE, MAX_CANVAS_SIZE)
+            ?: fallback
+
     @GeneratedUiGlue
     private fun exportPng() {
         val file = CanvasFileDialogs.showPngSaveDialog(scene?.window) ?: return
         drawingView.clearSelection()
         val snapshot = drawingView.node.snapshot(SnapshotParameters(), null)
-        ImageIO.write(SwingFXUtils.fromFXImage(snapshot, null), "png", file)
+        Files.write(file.toPath(), PngEncoder.encode(snapshot))
     }
 
     override fun layoutChildren() {
         rootBorderPane.resizeRelocate(0.0, 0.0, width, height)
+    }
+
+    private companion object {
+        const val CANVAS_WIDTH_KEY = "canvas.surface.width"
+        const val CANVAS_HEIGHT_KEY = "canvas.surface.height"
+        const val DEFAULT_CANVAS_WIDTH = 1200.0
+        const val DEFAULT_CANVAS_HEIGHT = 800.0
+        const val MIN_CANVAS_SIZE = 100.0
+        const val MAX_CANVAS_SIZE = 10_000.0
     }
 }

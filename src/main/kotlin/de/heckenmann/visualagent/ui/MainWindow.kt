@@ -10,6 +10,7 @@ import de.heckenmann.visualagent.config.AppConfig
 import de.heckenmann.visualagent.ui.StatusBar
 import de.heckenmann.visualagent.ui.panels.ApplicationSettingsPanel
 import de.heckenmann.visualagent.ui.panels.ChatPanel
+import de.heckenmann.visualagent.ui.panels.FilesPanel
 import de.heckenmann.visualagent.ui.panels.SessionPanel
 import de.heckenmann.visualagent.ui.panels.SubAgentsPanel
 import de.heckenmann.visualagent.ui.panels.TodoPanel
@@ -51,6 +52,7 @@ class MainWindow(
     private val subAgentsPanel: SubAgentsPanel,
     private val todoPanel: TodoPanel,
     private val canvasPanel: CanvasPanel,
+    private val filesPanel: FilesPanel,
     private val applicationSettingsPanel: ApplicationSettingsPanel,
     private val providerCatalog: ProviderCatalogService,
     private val workspaceLayoutPersistence: WorkspaceLayoutPersistence,
@@ -90,6 +92,9 @@ class MainWindow(
 
     @FXML
     private lateinit var canvasBtn: Button
+
+    @FXML
+    private lateinit var filesBtn: Button
 
     @FXML
     private lateinit var settingsBtn: Button
@@ -142,6 +147,7 @@ class MainWindow(
         registerWorkspaceWindows()
 
         MainWindowSubAgentWiring(agentManager, subAgentsPanel, chatPanel) { updateAgentCountUi() }.register()
+        registerFilesPanelCallbacks()
         chatWiring.register()
         chatPanel.setConversationHistory(agentManager.getHistory())
         registerEventObservers()
@@ -221,6 +227,7 @@ class MainWindow(
             subAgentsPanel = subAgentsPanel as Node,
             todoPanel = todoPanel,
             canvasPanel = canvasPanel,
+            filesPanel = filesPanel,
             settingsPanel = applicationSettingsPanel,
         )
 
@@ -231,6 +238,7 @@ class MainWindow(
             agentsBtn = agentsBtn,
             planBtn = planBtn,
             canvasBtn = canvasBtn,
+            filesBtn = filesBtn,
             settingsBtn = settingsBtn,
         )
 
@@ -250,6 +258,25 @@ class MainWindow(
     private fun loadStyles() {
         javaClass.getResource("/styles/application.css")?.toExternalForm()?.let { stylesheet ->
             scene.stylesheets.setAll(stylesheet)
+        }
+    }
+
+    private fun registerFilesPanelCallbacks() {
+        filesPanel.setOnFilesImported { imported ->
+            if (imported.isEmpty()) return@setOnFilesImported
+            val summary =
+                imported.joinToString("\n") { file ->
+                    "- ${file.relativePath} (${file.mimeType}, sha256=${file.sha256.take(12)}...)"
+                }
+            agentManager.appendSystemMessage("Imported workspace files:\n$summary")
+            chatPanel.setConversationHistory(agentManager.getHistory())
+            focusPanel(filesPanel, filesBtn)
+        }
+        filesPanel.setOnCanvasOpened {
+            focusPanel(canvasPanel, canvasBtn)
+        }
+        chatPanel.setOnOpenFile {
+            filesPanel.importWithDialog()
         }
     }
 

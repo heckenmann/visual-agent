@@ -30,6 +30,9 @@ internal class CanvasToolbar(
     onGridChanged: (Boolean) -> Unit,
     onClear: () -> Unit,
     onExport: () -> Unit,
+    onSaveWorkspace: () -> Unit = {},
+    onOpenWorkspace: () -> Unit = {},
+    onCanvasSize: () -> Unit = {},
 ) : VBox(8.0) {
     private val selectButton = toolButton("Select", FontAwesomeSolid.MOUSE_POINTER, onSelect)
     private val penButton = toolButton("Pen", FontAwesomeSolid.PEN, onPen)
@@ -77,12 +80,16 @@ internal class CanvasToolbar(
                 toolButton("In", FontAwesomeSolid.SEARCH_PLUS, onZoomIn),
                 gridToggle,
                 Region().apply { HBox.setHgrow(this, Priority.ALWAYS) },
+                toolButton("Size", FontAwesomeSolid.EXPAND_ARROWS_ALT, onCanvasSize),
+                toolButton("Save", FontAwesomeSolid.SAVE, onSaveWorkspace),
+                toolButton("Open", FontAwesomeSolid.FOLDER_OPEN, onOpenWorkspace),
                 toolButton("Clear", FontAwesomeSolid.BROOM, onClear),
                 exportButton,
             ).apply { styleClass.add("canvas-toolbar-controls") }
         children.addAll(header, controls)
     }
 
+    /** Marks the active canvas tool in the toolbar. */
     fun selectTool(tool: CanvasTool) {
         selectButton.styleClass.remove("active")
         penButton.styleClass.remove("active")
@@ -93,10 +100,12 @@ internal class CanvasToolbar(
         }.styleClass.add("active")
     }
 
+    /** Updates the displayed zoom percentage. */
     fun updateZoom(percent: Int) {
         zoomResetButton.text = "$percent%"
     }
 
+    /** Enables undo and redo buttons according to the drawing history state. */
     fun updateHistoryActions(
         canUndo: Boolean,
         canRedo: Boolean,
@@ -105,6 +114,7 @@ internal class CanvasToolbar(
         redoButton.isDisable = !canRedo
     }
 
+    /** Enables selection actions only when the current selection can be modified. */
     fun updateSelectionActions(hasDeletableSelection: Boolean) {
         deleteButton.isDisable = !hasDeletableSelection
     }

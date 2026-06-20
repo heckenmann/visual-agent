@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.ui.panels.canvas
 
+import de.heckenmann.visualagent.testsupport.TestPng
 import de.heckenmann.visualagent.ui.panels.FxTestSupport
 import javafx.scene.Parent
 import javafx.scene.Scene
@@ -20,9 +21,7 @@ import org.jhotdraw8.draw.tool.SelectionTool
 import org.jhotdraw8.draw.tool.SimpleDragTracker
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
-import java.awt.image.BufferedImage
 import java.nio.file.Files
-import javax.imageio.ImageIO
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
@@ -156,7 +155,7 @@ class CanvasPanelInteractionTest {
         FxTestSupport.run {
             val file = Files.createTempFile("visual-agent-canvas", ".png").toFile()
             try {
-                ImageIO.write(BufferedImage(800, 400, BufferedImage.TYPE_INT_ARGB), "png", file)
+                TestPng.write(file.toPath(), 800, 400)
                 val panel = panel()
 
                 panel.addImage(file)
@@ -175,7 +174,7 @@ class CanvasPanelInteractionTest {
         FxTestSupport.run {
             val file = Files.createTempFile("visual-agent-editable-image", ".png").toFile()
             try {
-                ImageIO.write(BufferedImage(200, 100, BufferedImage.TYPE_INT_ARGB), "png", file)
+                TestPng.write(file.toPath(), 200, 100)
                 val panel = panel()
                 Scene(panel, 800.0, 600.0)
                 panel.resize(800.0, 600.0)

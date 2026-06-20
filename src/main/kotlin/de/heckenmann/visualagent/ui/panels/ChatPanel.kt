@@ -55,6 +55,8 @@ class ChatPanel : Region() {
 
     @FXML private lateinit var openTodosButton: Button
 
+    @FXML private lateinit var openFileButton: Button
+
     @FXML private lateinit var assistantBusyContainer: HBox
 
     @FXML private lateinit var assistantBusyLabel: Label
@@ -64,6 +66,7 @@ class ChatPanel : Region() {
     private var onSendMessage: ((String) -> Unit)? = null
     private var onClearConversation: (() -> Unit)? = null
     private var onOpenTodos: (() -> Unit)? = null
+    private var onOpenFile: (() -> Unit)? = null
     private var onLoadOlderMessages: (() -> Unit)? = null
     private val todoSummaryTooltip = Tooltip()
     private val loadingToken = "__loading__"
@@ -113,6 +116,7 @@ class ChatPanel : Region() {
             clearChatButton = clearChatButton,
             todoInfoLabel = todoInfoLabel,
             openTodosButton = openTodosButton,
+            openFileButton = openFileButton,
             assistantBusyContainer = assistantBusyContainer,
             conversationIconImage = conversationIconImage,
             todoSummaryTooltip = todoSummaryTooltip,
@@ -124,6 +128,7 @@ class ChatPanel : Region() {
                 onClearConversation?.invoke()
             },
             openTodos = { onOpenTodos?.invoke() },
+            openFile = { onOpenFile?.invoke() },
             loadOlderMessages = { onLoadOlderMessages?.invoke() ?: run { messageList.loadingOlderMessages = false } },
         )
         conversationEvents =
@@ -193,6 +198,11 @@ class ChatPanel : Region() {
     /** Registers a callback that opens the dedicated todos panel. */
     fun setOnOpenTodos(callback: () -> Unit) {
         onOpenTodos = callback
+    }
+
+    /** Registers a callback that opens the workspace file import flow. */
+    fun setOnOpenFile(callback: () -> Unit) {
+        onOpenFile = callback
     }
 
     /** Registers a callback for lazy history pagination. */

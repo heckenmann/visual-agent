@@ -7,6 +7,7 @@ import org.springframework.beans.BeansException
 import org.springframework.beans.factory.ObjectProvider
 import java.util.stream.Stream
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class CanvasServiceTest {
     @Test
@@ -27,6 +28,8 @@ class CanvasServiceTest {
     fun `service reports live canvas snapshots`() =
         FxTestSupport.run {
             val panel = CanvasPanel(InMemoryPreferenceStore())
+            panel.resize(320.0, 240.0)
+            panel.layout()
             val service = CanvasService(SingleObjectProvider(panel))
 
             service.drawRect(10.0, 20.0, 30.0, 40.0, "#ffffff", "#000000")
@@ -34,6 +37,39 @@ class CanvasServiceTest {
 
             assertEquals(1, snapshot.figureCount)
             assertEquals("rectangle", snapshot.figures.single().type)
+        }
+
+    @Test
+    fun `service captures live canvas as image bytes`() =
+        FxTestSupport.run {
+            val panel = CanvasPanel(InMemoryPreferenceStore())
+            panel.resize(320.0, 240.0)
+            panel.layout()
+            val service = CanvasService(SingleObjectProvider(panel))
+
+            service.drawRect(10.0, 20.0, 30.0, 40.0, "#ffffff", "#000000")
+            val snapshot = service.captureImage("png")
+
+            assertEquals("png", snapshot.format)
+            assertEquals("image/png", snapshot.mimeType)
+            assertTrue(snapshot.bytes.isNotEmpty())
+            assertTrue(snapshot.width > 0)
+            assertTrue(snapshot.height > 0)
+        }
+
+    @Test
+    fun `canvas panel stores configured surface size`() =
+        FxTestSupport.run {
+            val preferences = InMemoryPreferenceStore()
+            val panel = CanvasPanel(preferences)
+
+            panel.setCanvasSize(1600.0, 900.0)
+            val recreated = CanvasPanel(preferences)
+
+            assertEquals(1600.0, panel.canvasSize().first)
+            assertEquals(900.0, panel.canvasSize().second)
+            assertEquals(1600.0, recreated.canvasSize().first)
+            assertEquals(900.0, recreated.canvasSize().second)
         }
 
     companion object {

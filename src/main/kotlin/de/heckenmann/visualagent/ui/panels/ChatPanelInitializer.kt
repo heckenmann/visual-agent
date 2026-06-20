@@ -29,6 +29,7 @@ internal class ChatPanelInitializer(
     private val clearChatButton: Button,
     private val todoInfoLabel: Label,
     private val openTodosButton: Button,
+    private val openFileButton: Button,
     private val assistantBusyContainer: HBox,
     private val conversationIconImage: ImageView,
     private val todoSummaryTooltip: Tooltip,
@@ -41,6 +42,7 @@ internal class ChatPanelInitializer(
         sendMessage: () -> Unit,
         clearConversation: () -> Unit,
         openTodos: () -> Unit,
+        openFile: () -> Unit,
         loadOlderMessages: () -> Unit,
     ) {
         AppIdentity.javaFxIcon()?.let { conversationIconImage.image = it }
@@ -51,11 +53,15 @@ internal class ChatPanelInitializer(
         clearChatButton.isFocusTraversable = false
         openTodosButton.tooltip = Tooltip("Open todo list")
         openTodosButton.isFocusTraversable = false
+        openFileButton.graphic = FontIcon(FontAwesomeSolid.FOLDER_OPEN)
+        openFileButton.tooltip = Tooltip("Import files into workspace")
+        openFileButton.isFocusTraversable = false
         Tooltip.install(todoInfoLabel, todoSummaryTooltip)
         messagesScrollPane.hvalue = 0.0
         bindScroll(loadOlderMessages)
         sendButton.setOnAction { sendMessage() }
         openTodosButton.setOnAction { openTodos() }
+        openFileButton.setOnAction { openFile() }
         clearChatButton.setOnAction { clearConversation() }
         assistantBusyContainer.isManaged = false
         assistantBusyContainer.isVisible = false

@@ -19,6 +19,14 @@ internal class CanvasDocumentPersistence(
 ) {
     fun load(): SimpleLayeredDrawing? {
         val xml = preferenceStore.getPreference(CANVAS_DOCUMENT_KEY)?.takeIf(String::isNotBlank) ?: return null
+        return readDrawing(xml)
+    }
+
+    fun save(drawing: Drawing) {
+        preferenceStore.setPreference(CANVAS_DOCUMENT_KEY, writeDrawing(drawing))
+    }
+
+    fun readDrawing(xml: String): SimpleLayeredDrawing? {
         val factory = DefaultFigureFactory()
         val reader = SimpleXmlReader(factory, SimpleFigureIdFactory(), null)
         return reader
@@ -26,11 +34,11 @@ internal class CanvasDocumentPersistence(
             as? SimpleLayeredDrawing
     }
 
-    fun save(drawing: Drawing) {
+    fun writeDrawing(drawing: Drawing): String {
         val output = ByteArrayOutputStream()
         val writer = SimpleXmlWriter(DefaultFigureFactory(), SimpleFigureIdFactory())
         writer.write(output, null, drawing, SimpleWorkState())
-        preferenceStore.setPreference(CANVAS_DOCUMENT_KEY, output.toString(Charsets.UTF_8))
+        return output.toString(Charsets.UTF_8)
     }
 
     private companion object {

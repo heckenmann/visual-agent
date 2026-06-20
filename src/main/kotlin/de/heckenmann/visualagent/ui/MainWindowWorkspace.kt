@@ -14,6 +14,7 @@ internal fun createMainWorkspaceWindows(
         register("agents", "Agents", "fas-users", panels.subAgentsPanel, WindowPlacement(700.0, 500.0, 430.0, 330.0))
         register("todos", "Todos", "fas-copy", panels.todoPanel, WindowPlacement(60.0, 540.0, 520.0, 300.0))
         register("canvas", "Canvas", "fas-palette", panels.canvasPanel, WindowPlacement(220.0, 130.0, 720.0, 560.0))
+        register("files", "Files", "fas-folder-open", panels.filesPanel, WindowPlacement(80.0, 120.0, 620.0, 460.0))
         register("settings", "Settings", "fas-cog", panels.settingsPanel, WindowPlacement(740.0, 120.0, 420.0, 430.0))
     }
 
@@ -23,6 +24,7 @@ internal data class MainWorkspacePanels(
     val subAgentsPanel: Node,
     val todoPanel: Node,
     val canvasPanel: Node,
+    val filesPanel: Node,
     val settingsPanel: Node,
 )
 
@@ -37,6 +39,7 @@ internal fun wireMainWorkspaceNavigation(
     mapping[buttons.agentsBtn] = panels.subAgentsPanel
     mapping[buttons.planBtn] = panels.todoPanel
     mapping[buttons.canvasBtn] = panels.canvasPanel
+    mapping[buttons.filesBtn] = panels.filesPanel
     mapping[buttons.settingsBtn] = panels.settingsPanel
     mapping.forEach { (button, panel) -> button.setOnAction { focusPanel(panel, button) } }
     return mapping
@@ -48,5 +51,6 @@ internal data class MainWorkspaceButtons(
     val agentsBtn: Button,
     val planBtn: Button,
     val canvasBtn: Button,
+    val filesBtn: Button,
     val settingsBtn: Button,
 )

@@ -12,6 +12,7 @@ class ChatPanelFxmlLayoutTest {
         assertTrue(res != null && !res.contains("fx:id=\"modelInfoLabel\""), "chat-panel.fxml must not duplicate selected model")
         assertTrue(res != null && !res.contains("fx:id=\"agentsInfoLabel\""), "chat-panel.fxml must not duplicate agent count")
         assertTrue(res != null && res.contains("fx:id=\"todoInfoLabel\""), "chat-panel.fxml must define todo summary label")
+        assertTrue(res != null && res.contains("fx:id=\"openFileButton\""), "chat-panel.fxml must define workspace file import button")
         assertTrue(
             res != null && !res.contains("fx:id=\"assistantBusySpinner\""),
             "chat-panel.fxml must not define a duplicate runtime spinner",
@@ -21,6 +22,13 @@ class ChatPanelFxmlLayoutTest {
             res != null && res.contains("fx:id=\"conversationIconImage\""),
             "chat-panel.fxml must use the application icon in the conversation header",
         )
+    }
+
+    @Test
+    fun `main window fxml defines files navigation button`() {
+        val res = javaClass.getResourceAsStream("/fxml/main-window.fxml")?.bufferedReader()?.use { it.readText() }
+
+        assertTrue(res != null && res.contains("fx:id=\"filesBtn\""), "main-window.fxml must define files navigation")
     }
 
     @Test

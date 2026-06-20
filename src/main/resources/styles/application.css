@@ -60,6 +60,10 @@
     -fx-max-width: 920px;
 }
 
+.tool-toggle-row {
+    -fx-alignment: center-left;
+}
+
 .card-title,
 .field-label {
     -fx-text-fill: -color-fg-default;
@@ -570,6 +574,34 @@
 .chat-tool-details {
     -fx-text-fill: -color-fg-muted;
     -fx-font-size: 12px;
+}
+
+.chat-image-body {
+    -fx-spacing: 8px;
+    -fx-background-color: -color-bg-subtle;
+    -fx-border-color: -color-border-muted;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-padding: 10px;
+}
+
+.chat-image-title {
+    -fx-text-fill: -color-fg-muted;
+    -fx-font-size: 12px;
+}
+
+.chat-image-preview {
+    -fx-background-radius: 10px;
+    -fx-effect: dropshadow(gaussian, rgba(31, 35, 40, 0.16), 14, 0.16, 0, 4);
+}
+
+.files-panel,
+.files-root {
+    -fx-background-color: -color-bg-default;
+}
+
+.files-toolbar {
+    -fx-alignment: center-left;
 }
 
 .chat-tool-toggle {

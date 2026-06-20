@@ -27,6 +27,7 @@
             <HBox styleClass="chat-session-info-bar">
                 <Label fx:id="todoInfoLabel" text="Todos 0" styleClass="chat-session-chip"/>
                 <Button fx:id="openTodosButton" text="Open Todos" styleClass="chat-toolbar-button"/>
+                <Button fx:id="openFileButton" text="Open File" styleClass="chat-toolbar-button"/>
                 <Region HBox.hgrow="ALWAYS"/>
                 <Label text="Enter send / Shift+Enter line break / Cmd+Enter send" styleClass="chat-hint-label"/>
             </HBox>
