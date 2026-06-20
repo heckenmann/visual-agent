@@ -14,6 +14,8 @@ import de.heckenmann.visualagent.knowledge.PreferenceStore
 import de.heckenmann.visualagent.knowledge.SubAgentConfigStore
 import de.heckenmann.visualagent.knowledge.SubAgentStore
 import de.heckenmann.visualagent.knowledge.TodoStore
+import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
+import de.heckenmann.visualagent.knowledge.WorkspaceFileStore
 import de.heckenmann.visualagent.todo.Todo
 import org.springframework.boot.SpringBootConfiguration
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration
@@ -59,6 +61,7 @@ class TestPersistence internal constructor(
     val memoryStore: MemoryStore = context.getBean(MemoryStore::class.java)
     val preferenceStore: PreferenceStore = context.getBean(PreferenceStore::class.java)
     val subAgentConfigStore: SubAgentConfigStore = context.getBean(SubAgentConfigStore::class.java)
+    val workspaceFileStore: WorkspaceFileStore = context.getBean(WorkspaceFileStore::class.java)
 
     fun createAgentManager(
         provider: LLMProvider,
@@ -101,6 +104,17 @@ class TestPersistence internal constructor(
     ) = conversationStore.searchConversationMessages(sessionId, query, limit)
 
     override fun deleteConversationMessages(sessionId: String): Int = conversationStore.deleteConversationMessages(sessionId)
+
+    override fun saveWorkspaceFile(record: WorkspaceFileRecord) = workspaceFileStore.saveWorkspaceFile(record)
+
+    override fun listWorkspaceFiles(): List<WorkspaceFileRecord> = workspaceFileStore.listWorkspaceFiles()
+
+    override fun getWorkspaceFile(id: String): WorkspaceFileRecord? = workspaceFileStore.getWorkspaceFile(id)
+
+    override fun getWorkspaceFileByPath(relativePath: String): WorkspaceFileRecord? =
+        workspaceFileStore.getWorkspaceFileByPath(relativePath)
+
+    override fun deleteWorkspaceFile(id: String): Boolean = workspaceFileStore.deleteWorkspaceFile(id)
 
     override fun saveTodo(todo: Todo) = todoStore.saveTodo(todo)
 

@@ -128,6 +128,12 @@ internal class ConversationRepositoryCustomImpl(
     }
 }
 
+internal interface WorkspaceFileRepository : JpaRepository<WorkspaceFileEntity, String> {
+    fun findAllByOrderByImportedAtDescIdDesc(): List<WorkspaceFileEntity>
+
+    fun findByRelativePath(relativePath: String): WorkspaceFileEntity?
+}
+
 internal interface TodoRepository : JpaRepository<TodoEntity, String> {
     fun findAllByOrderByCreatedAtAscIdAsc(): List<TodoEntity>
 }

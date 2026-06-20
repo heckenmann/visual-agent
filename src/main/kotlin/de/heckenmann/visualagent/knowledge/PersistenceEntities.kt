@@ -75,6 +75,32 @@ internal class ConversationEntity(
 )
 
 @Entity
+@Table(name = "workspace_files")
+internal class WorkspaceFileEntity(
+    @Id
+    var id: String = "",
+    @Column(name = "relative_path", nullable = false, unique = true)
+    var relativePath: String = "",
+    @Column(name = "original_name", nullable = false)
+    var originalName: String = "",
+    @Column(name = "mime_type", nullable = false)
+    var mimeType: String = "",
+    @Column(name = "size_bytes", nullable = false)
+    var sizeBytes: Long = 0L,
+    @Column(nullable = false)
+    var sha256: String = "",
+    @Lob
+    @Column(name = "extracted_text")
+    var extractedText: String? = null,
+    @Convert(converter = InstantStringConverter::class)
+    @Column(name = "imported_at", columnDefinition = "TIMESTAMP")
+    var importedAt: Instant = Instant.EPOCH,
+    @Convert(converter = InstantStringConverter::class)
+    @Column(name = "updated_at", columnDefinition = "TIMESTAMP")
+    var updatedAt: Instant = Instant.EPOCH,
+)
+
+@Entity
 @Table(name = "todos")
 internal class TodoEntity(
     @Id

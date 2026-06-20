@@ -27,6 +27,21 @@ data class ConversationRecord(
 }
 
 /**
+ * Persisted metadata for one managed workspace file.
+ */
+data class WorkspaceFileRecord(
+    val id: String,
+    val relativePath: String,
+    val originalName: String,
+    val mimeType: String,
+    val sizeBytes: Long,
+    val sha256: String,
+    val extractedText: String?,
+    val importedAt: Instant,
+    val updatedAt: Instant,
+)
+
+/**
  * Persisted sub-agent state exposed to orchestration consumers.
  */
 data class PersistedSubAgent(
@@ -124,6 +139,24 @@ interface ConversationStore {
     fun deleteConversationMessages(sessionId: String): Int
 }
 
+/** Stores metadata for files imported into the managed workspace. */
+interface WorkspaceFileStore {
+    /** Inserts or replaces one workspace file record. */
+    fun saveWorkspaceFile(record: WorkspaceFileRecord)
+
+    /** Returns all workspace files ordered by import time. */
+    fun listWorkspaceFiles(): List<WorkspaceFileRecord>
+
+    /** Returns one workspace file by identifier. */
+    fun getWorkspaceFile(id: String): WorkspaceFileRecord?
+
+    /** Returns one workspace file by relative path. */
+    fun getWorkspaceFileByPath(relativePath: String): WorkspaceFileRecord?
+
+    /** Deletes one workspace file metadata record. */
+    fun deleteWorkspaceFile(id: String): Boolean
+}
+
 /** Stores and retrieves todo domain objects. */
 interface TodoStore {
     /** Inserts or replaces a todo. */
@@ -180,6 +213,7 @@ interface PersistenceStores :
     MemoryStore,
     PreferenceStore,
     ConversationStore,
+    WorkspaceFileStore,
     TodoStore,
     SubAgentStore,
     SubAgentConfigStore
