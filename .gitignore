@@ -21,3 +21,10 @@ Thumbs.db
 # Application
 data/
 lib/
+src/main/resources/config/app.local.properties
+
+# Local secrets
+.env
+.env.*
+*.pem
+*.key
