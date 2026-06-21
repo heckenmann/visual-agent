@@ -2,6 +2,9 @@
 
 Visual Agent is a Kotlin desktop coding agent with JavaFX UI, Spring Boot/Spring AI, and Spring Data JPA on SQLite.
 
+> **Development notice:** This project was written entirely with LLM assistance and is still under active development.
+> Expect rapid changes, incomplete features, and rough edges until the project reaches a stable release.
+
 ## Current Status
 
 The app is functional end-to-end with persistent chat/todos/settings, Spring AI tool-calling, streaming responses, persisted tool-call history, managed workspace files, and draggable internal workspace windows.
