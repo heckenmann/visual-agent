@@ -8,8 +8,8 @@ import java.util.Properties
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
- * Loads configuration from `src/main/resources/config/app.properties`.
- * Provides access to Ollama settings, database path, UI preferences, and browser configuration.
+ * Loads the database connection bootstrap from `src/main/resources/config/app.properties`.
+ * Runtime configuration is persisted in SQLite preferences after the database is available.
  *
  * @property llmProvider Active provider identifier (`ollama` or `openai`)
  * @property ollamaLocalUrl Ollama API endpoint (default: http://localhost:11434)
@@ -140,11 +140,12 @@ class AppConfig private constructor() {
         }
 
     /**
-     * Saves current configuration to app.properties file.
-     * Called when user changes settings in the application.
+     * Saves current runtime configuration to the database-backed preference store.
+     *
+     * The file-backed bootstrap configuration is intentionally not rewritten during
+     * normal application usage.
      */
     fun save() {
-        saveToProperties()
         saveToDatabase()
         publishChanges()
     }
@@ -228,13 +229,6 @@ class AppConfig private constructor() {
             ),
         )
 
-    private fun saveToProperties() {
-        val configFile = File("src/main/resources/config/app.properties")
-        FileOutputStream(configFile).use { fos ->
-            AppConfigProperties.bootstrapFrom(this).store(fos, "Visual Agent Configuration")
-        }
-    }
-
     private fun saveToDatabase() {
         runCatching {
             val db = preferenceStore ?: return@runCatching
@@ -245,7 +239,6 @@ class AppConfig private constructor() {
             db.setPreference(KEY_OPENAI_API_KEY, openAiApiKey)
             db.setPreference(KEY_OPENAI_BASE_URL, openAiBaseUrl)
             db.setPreference(KEY_OPENAI_MODEL, openAiModel)
-            db.setPreference(KEY_DATABASE_PATH, databasePath)
             db.setPreference(KEY_UI_THEME, theme)
             db.setPreference(KEY_UI_FONT_SIZE, fontSize.toString())
             db.setPreference(KEY_BROWSER_DEFAULT, browserDefault)
@@ -269,7 +262,7 @@ class AppConfig private constructor() {
             FileInputStream(configFile).use { fis ->
                 props.load(fis)
             }
-            AppConfigProperties.applyTo(this, props)
+            AppConfigProperties.applyBootstrapTo(this, props)
         }
     }
 

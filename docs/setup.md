@@ -63,6 +63,8 @@ Leaving the key blank omits the `Authorization` header. Profile URL and key chan
 ## Persistence Runtime
 
 - Database path defaults to `./data/visual-agent.db`
+- `src/main/resources/config/app.properties` is bootstrap-only and stores the database path.
+- Runtime configuration is stored in SQLite `user_preferences`; normal saves do not rewrite `app.properties`.
 - Imported workspace files default to `./data/workspace/`
 - Files panel search covers metadata and bounded text/PDF content. The `Sync DB` action reconciles metadata with files found below the managed workspace directory.
 - Editable canvas documents saved from the Canvas or Files panel are stored as regular workspace files under `./data/workspace/canvas/`.

@@ -8,6 +8,11 @@ import java.util.Properties
 internal object AppConfigProperties {
     fun bootstrapFrom(config: AppConfig): Properties =
         Properties().apply {
+            setProperty(AppConfig.KEY_DATABASE_PATH, config.databasePath)
+        }
+
+    fun exportFrom(config: AppConfig): Properties =
+        Properties().apply {
             setProperty(AppConfig.KEY_LLM_PROVIDER, config.llmProvider)
             setProperty(AppConfig.KEY_OLLAMA_LOCAL_URL, config.ollamaLocalUrl)
             setProperty(AppConfig.KEY_OLLAMA_MODEL, config.ollamaModel)
@@ -18,10 +23,6 @@ internal object AppConfigProperties {
             setProperty(AppConfig.KEY_UI_FONT_SIZE, config.fontSize.toString())
             setProperty(AppConfig.KEY_BROWSER_DEFAULT, config.browserDefault)
             setProperty(AppConfig.KEY_SESSION_FAVORITE_MODELS, config.favoriteModels)
-        }
-
-    fun exportFrom(config: AppConfig): Properties =
-        bootstrapFrom(config).apply {
             setProperty(AppConfig.KEY_SESSION_CONTEXT_LENGTH, config.contextLength.toString())
             setProperty(AppConfig.KEY_SESSION_STREAMING, config.streamingEnabled.toString())
             setProperty(AppConfig.KEY_SESSION_THINKING, config.thinkingEnabled.toString())
@@ -31,6 +32,13 @@ internal object AppConfigProperties {
             setProperty(AppConfig.KEY_SESSION_TIMEOUT_SECONDS, config.timeoutSeconds.toString())
             setProperty(AppConfig.KEY_SESSION_USER_MODEL_INSTRUCTION, config.userModelInstruction)
         }
+
+    fun applyBootstrapTo(
+        config: AppConfig,
+        properties: Properties,
+    ) {
+        config.databasePath = properties.string(AppConfig.KEY_DATABASE_PATH, config.databasePath)
+    }
 
     fun applyTo(
         config: AppConfig,

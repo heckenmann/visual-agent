@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.config
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.io.File
@@ -12,6 +13,8 @@ class AppConfigTest {
         val config = AppConfig.instance
         val original = snapshot(config)
         val tempDb = createTempDirectory("visual-agent-config-test").resolve("settings.db").toString()
+        val propertiesFile = File("src/main/resources/config/app.properties")
+        val propertiesBefore = propertiesFile.readText()
 
         try {
             val boundDb =
@@ -48,6 +51,8 @@ class AppConfigTest {
             assertEquals("false", db.getPreference("session.streaming.enabled"))
             assertEquals("false", db.getPreference("session.auto.compaction.enabled"))
             assertEquals("Always respond in German.", db.getPreference("session.user.model.instruction"))
+            assertNull(db.getPreference("database.path"))
+            assertEquals(propertiesBefore, propertiesFile.readText())
             assertTrue(File(tempDb).exists())
         } finally {
             restore(config, original)
