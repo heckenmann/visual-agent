@@ -26,7 +26,7 @@ class InternalWorkspaceWindowTest {
             val window = manager.windowFor(panel)
             assertEquals(1, desktop.children.size)
             assertSame(window, desktop.children.single())
-            assertSame(panel, window?.center)
+            assertTrue((window?.center as Pane).children.contains(panel))
             assertEquals(12.0, window?.layoutX)
             assertEquals(18.0, window?.layoutY)
             assertEquals(420.0, window?.prefWidth)
@@ -62,6 +62,26 @@ class InternalWorkspaceWindowTest {
 
             assertEquals(420.0, window.prefWidth)
             assertEquals(320.0, window.prefHeight)
+        }
+
+    @Test
+    fun `workspace window respects hosted content minimum size`() =
+        FxTestSupport.run {
+            val panel =
+                Pane().apply {
+                    minWidth = 640.0
+                    minHeight = 360.0
+                }
+            val window = InternalWorkspaceWindow("Panel", "fas-copy", panel)
+
+            window.place(0.0, 0.0, 120.0, 90.0)
+
+            assertEquals(640.0, window.prefWidth)
+            assertTrue(window.prefHeight > 360.0)
+            assertEquals(window.minWidth, window.prefWidth)
+            assertEquals(window.minHeight, window.prefHeight)
+            assertTrue(window.clip == null)
+            assertTrue((window.center as Pane).clip != null)
         }
 
     @Test
@@ -199,7 +219,7 @@ class InternalWorkspaceWindowTest {
 
             assertTrue(!window.isVisible)
             assertTrue(!window.isManaged)
-            assertSame(panel, window.center)
+            assertTrue((window.center as Pane).children.contains(panel))
         }
 
     companion object {

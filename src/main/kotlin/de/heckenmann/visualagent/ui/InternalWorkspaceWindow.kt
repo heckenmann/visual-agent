@@ -10,6 +10,7 @@ import javafx.scene.layout.HBox
 import javafx.scene.layout.Pane
 import javafx.scene.layout.Region
 import javafx.scene.layout.StackPane
+import javafx.scene.shape.Rectangle
 import org.kordamp.ikonli.javafx.FontIcon
 import kotlin.math.max
 import kotlin.math.min
@@ -23,7 +24,7 @@ import kotlin.math.min
 internal class InternalWorkspaceWindow(
     title: String,
     iconLiteral: String,
-    content: Node,
+    private val content: Node,
 ) : BorderPane() {
     private var dragStartSceneX = 0.0
     private var dragStartSceneY = 0.0
@@ -33,15 +34,24 @@ internal class InternalWorkspaceWindow(
     private var resizeStartSceneY = 0.0
     private var resizeStartWidth = 0.0
     private var resizeStartHeight = 0.0
+    private val contentClip = Rectangle()
+    private val contentContainer =
+        object : Pane(content) {
+            override fun layoutChildren() {
+                content.resizeRelocate(0.0, 0.0, width, height)
+            }
+        }
 
     init {
         styleClass.add("workspace-window")
-        minWidth = MIN_WIDTH
-        minHeight = MIN_HEIGHT
 
         top = windowHeader(title, iconLiteral)
-        center = content
+        center = contentContainer
         bottom = resizeHandle()
+        contentContainer.clip = contentClip
+        contentClip.widthProperty().bind(contentContainer.widthProperty())
+        contentClip.heightProperty().bind(contentContainer.heightProperty())
+        updateMinimumSize()
         setOnMousePressed { toFront() }
     }
 
@@ -58,29 +68,33 @@ internal class InternalWorkspaceWindow(
         width: Double,
         height: Double,
     ) {
+        updateMinimumSize()
         layoutX = x
         layoutY = y
-        prefWidth = width.coerceAtLeast(MIN_WIDTH)
-        prefHeight = height.coerceAtLeast(MIN_HEIGHT)
+        prefWidth = width.coerceAtLeast(requiredMinWidth())
+        prefHeight = height.coerceAtLeast(requiredMinHeight())
     }
 
     fun keepInside(
         desktopWidth: Double,
         desktopHeight: Double,
     ) {
+        updateMinimumSize()
+        val minWindowWidth = requiredMinWidth()
+        val minWindowHeight = requiredMinHeight()
         val currentWidth = if (width > 0.0) width else prefWidth
         val currentHeight = if (height > 0.0) height else prefHeight
         val boundedWidth =
             if (desktopWidth > 0.0) {
-                currentWidth.coerceAtLeast(MIN_WIDTH).coerceAtMost(max(MIN_WIDTH, desktopWidth))
+                currentWidth.coerceAtLeast(minWindowWidth).coerceAtMost(max(minWindowWidth, desktopWidth))
             } else {
-                currentWidth.coerceAtLeast(MIN_WIDTH)
+                currentWidth.coerceAtLeast(minWindowWidth)
             }
         val boundedHeight =
             if (desktopHeight > 0.0) {
-                currentHeight.coerceAtLeast(MIN_HEIGHT).coerceAtMost(max(MIN_HEIGHT, desktopHeight))
+                currentHeight.coerceAtLeast(minWindowHeight).coerceAtMost(max(minWindowHeight, desktopHeight))
             } else {
-                currentHeight.coerceAtLeast(MIN_HEIGHT)
+                currentHeight.coerceAtLeast(minWindowHeight)
             }
         prefWidth = boundedWidth
         prefHeight = boundedHeight
@@ -155,6 +169,7 @@ internal class InternalWorkspaceWindow(
         handle.styleClass.add("workspace-window-resize")
         handle.setOnMousePressed { event ->
             toFront()
+            updateMinimumSize()
             resizeStartSceneX = event.sceneX
             resizeStartSceneY = event.sceneY
             resizeStartWidth = width
@@ -163,13 +178,41 @@ internal class InternalWorkspaceWindow(
         }
         handle.setOnMouseDragged { event ->
             val parentPane = parent as? Pane
-            val maxWidth = max(MIN_WIDTH, (parentPane?.width ?: Double.MAX_VALUE) - layoutX)
-            val maxHeight = max(MIN_HEIGHT, (parentPane?.height ?: Double.MAX_VALUE) - layoutY)
-            prefWidth = clamp(resizeStartWidth + event.sceneX - resizeStartSceneX, MIN_WIDTH, maxWidth)
-            prefHeight = clamp(resizeStartHeight + event.sceneY - resizeStartSceneY, MIN_HEIGHT, maxHeight)
+            val minWindowWidth = requiredMinWidth()
+            val minWindowHeight = requiredMinHeight()
+            val maxWidth = max(minWindowWidth, (parentPane?.width ?: Double.MAX_VALUE) - layoutX)
+            val maxHeight = max(minWindowHeight, (parentPane?.height ?: Double.MAX_VALUE) - layoutY)
+            prefWidth = clamp(resizeStartWidth + event.sceneX - resizeStartSceneX, minWindowWidth, maxWidth)
+            prefHeight = clamp(resizeStartHeight + event.sceneY - resizeStartSceneY, minWindowHeight, maxHeight)
             event.consume()
         }
         return handle
+    }
+
+    private fun updateMinimumSize() {
+        minWidth = requiredMinWidth()
+        minHeight = requiredMinHeight()
+    }
+
+    private fun requiredMinWidth(): Double = max(MIN_WIDTH, contentMinWidth())
+
+    private fun requiredMinHeight(): Double = max(MIN_HEIGHT, contentMinHeight() + chromeMinHeight())
+
+    private fun contentMinWidth(): Double = regionMetric(content as? Region) { it.minWidth(-1.0) }
+
+    private fun contentMinHeight(): Double = regionMetric(content as? Region) { it.minHeight(-1.0) }
+
+    private fun chromeMinHeight(): Double =
+        regionMetric(top as? Region, HEADER_MIN_HEIGHT) { it.prefHeight(-1.0) } +
+            regionMetric(bottom as? Region, RESIZE_HANDLE_MIN_HEIGHT) { it.prefHeight(-1.0) }
+
+    private fun regionMetric(
+        region: Region?,
+        fallback: Double = 0.0,
+        metric: (Region) -> Double,
+    ): Double {
+        val value = region?.let(metric) ?: fallback
+        return if (value.isFinite() && value > 0.0) value else fallback
     }
 
     private fun clamp(
@@ -181,5 +224,7 @@ internal class InternalWorkspaceWindow(
     private companion object {
         const val MIN_WIDTH = 420.0
         const val MIN_HEIGHT = 320.0
+        const val HEADER_MIN_HEIGHT = 36.0
+        const val RESIZE_HANDLE_MIN_HEIGHT = 22.0
     }
 }
