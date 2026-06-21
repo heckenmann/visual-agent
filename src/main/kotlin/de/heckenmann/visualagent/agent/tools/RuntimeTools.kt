@@ -5,6 +5,8 @@ import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.agent.ToolResult
 import org.springframework.stereotype.Component
 import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 
 /**
@@ -30,7 +32,7 @@ class TerminalTool : VisualAgentTool {
         val command = input.requiredString("command")
         val timeout = (input.int("timeoutSeconds") ?: 10).coerceIn(1, 30)
         val process =
-            ProcessBuilder("zsh", "-lc", command)
+            ProcessBuilder(shellCommand(command))
                 .directory(workspaceRoot().toFile())
                 .redirectErrorStream(true)
                 .start()
@@ -50,6 +52,22 @@ class TerminalTool : VisualAgentTool {
             output,
             if (process.exitValue() == 0) null else "Exit ${process.exitValue()}",
         )
+    }
+
+    private fun shellCommand(command: String): List<String> {
+        val shell =
+            listOf("zsh", "bash", "sh")
+                .firstOrNull(::isExecutableOnPath) ?: "sh"
+        return listOf(shell, "-lc", command)
+    }
+
+    private fun isExecutableOnPath(command: String): Boolean {
+        val path = System.getenv("PATH").orEmpty()
+        return path
+            .split(java.io.File.pathSeparator)
+            .asSequence()
+            .map { Path.of(it, command) }
+            .any { Files.isExecutable(it) }
     }
 }
 

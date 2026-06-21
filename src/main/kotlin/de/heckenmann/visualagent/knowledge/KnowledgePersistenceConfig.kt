@@ -7,6 +7,8 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.env.Environment
 import org.sqlite.SQLiteConfig
+import java.nio.file.Files
+import java.nio.file.Path
 import javax.sql.DataSource
 
 /**
@@ -29,6 +31,7 @@ internal class KnowledgePersistenceConfig {
             }
         val databasePath = environment.getProperty("visual-agent.db.path") ?: AppConfig.instance.databasePath
         val jdbcUrl = if (databasePath.startsWith("jdbc:sqlite:")) databasePath else "jdbc:sqlite:$databasePath"
+        createParentDirectory(databasePath)
         return HikariDataSource(
             HikariConfig().apply {
                 this.jdbcUrl = jdbcUrl
@@ -39,5 +42,18 @@ internal class KnowledgePersistenceConfig {
                 dataSourceProperties = sqliteConfig.toProperties()
             },
         )
+    }
+
+    private fun createParentDirectory(databasePath: String) {
+        val path =
+            if (databasePath.startsWith("jdbc:sqlite:")) {
+                databasePath.removePrefix("jdbc:sqlite:")
+            } else {
+                databasePath
+            }
+        if (path.isBlank() || path == ":memory:" || path.startsWith("file:")) {
+            return
+        }
+        Path.of(path).parent?.let(Files::createDirectories)
     }
 }
