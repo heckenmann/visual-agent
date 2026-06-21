@@ -1,6 +1,5 @@
 package de.heckenmann.visualagent.workspace
 
-import de.heckenmann.visualagent.config.AppConfig
 import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
 import de.heckenmann.visualagent.knowledge.WorkspaceFileStore
 import javafx.scene.image.Image
@@ -10,13 +9,11 @@ import org.springframework.stereotype.Service
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
-import java.security.MessageDigest
 import java.time.Instant
 import java.util.Base64
 import java.util.UUID
 import kotlin.io.path.createDirectories
 import kotlin.io.path.deleteIfExists
-import kotlin.io.path.exists
 import kotlin.io.path.extension
 import kotlin.io.path.fileSize
 import kotlin.io.path.isRegularFile
@@ -28,6 +25,8 @@ import kotlin.streams.asSequence
 
 /**
  * Manages imported user files in the application workspace next to the SQLite database.
+ *
+ * Use cases: UC-0000023, UC-0000024, UC-0000025, UC-0000026, UC-0000027, UC-0000031.
  */
 @Service
 class WorkspaceFileService(
@@ -37,28 +36,22 @@ class WorkspaceFileService(
      * Returns the managed workspace root directory, creating it when necessary.
      *
      * @return Absolute normalized workspace directory
+     * @see docs/usecases/uc_0000023_import_workspace_file.md
      */
-    fun workspaceRoot(): Path {
-        val dbPath = normalizedDatabasePath()
-        val parent = dbPath.parent ?: Path.of("data").toAbsolutePath().normalize()
-        return parent
-            .resolve("workspace")
-            .toAbsolutePath()
-            .normalize()
-            .also { it.createDirectories() }
-    }
+    fun workspaceRoot(): Path = WorkspaceFilePaths.workspaceRoot()
 
     /**
      * Imports one external file into the managed workspace.
      *
      * @param source Existing user-selected file
      * @return Persisted metadata for the imported copy
+     * @see docs/usecases/uc_0000023_import_workspace_file.md
      */
     fun importFile(source: File): WorkspaceFileRecord {
         require(source.isFile) { "File does not exist: ${source.name}" }
         require(source.length() <= MAX_IMPORT_BYTES) { "File is larger than ${MAX_IMPORT_BYTES / 1024 / 1024} MB" }
         val importsDir = workspaceRoot().resolve("imports").also { it.createDirectories() }
-        val destination = uniqueDestination(importsDir, source.name)
+        val destination = WorkspaceFilePaths.uniqueDestination(importsDir, source.name)
         Files.copy(source.toPath(), destination)
         return recordManagedFile(destination, source.name)
     }
@@ -71,6 +64,7 @@ class WorkspaceFileService(
      * @param bytes File bytes to persist
      * @param mimeType Optional MIME type override
      * @return Persisted workspace metadata
+     * @see docs/usecases/uc_0000031_save_and_open_canvas_workspace_file.md
      */
     fun createManagedFile(
         directoryName: String,
@@ -79,8 +73,8 @@ class WorkspaceFileService(
         mimeType: String? = null,
     ): WorkspaceFileRecord {
         require(bytes.size <= MAX_IMPORT_BYTES) { "File is larger than ${MAX_IMPORT_BYTES / 1024 / 1024} MB" }
-        val directory = workspaceRoot().resolve(safeDirectoryName(directoryName)).also { it.createDirectories() }
-        val destination = uniqueDestination(directory, requestedName)
+        val directory = workspaceRoot().resolve(WorkspaceFilePaths.safeDirectoryName(directoryName)).also { it.createDirectories() }
+        val destination = WorkspaceFilePaths.uniqueDestination(directory, requestedName)
         destination.writeBytes(bytes)
         return recordManagedFile(destination, requestedName, mimeType)
     }
@@ -94,11 +88,11 @@ class WorkspaceFileService(
         val record =
             WorkspaceFileRecord(
                 id = UUID.randomUUID().toString(),
-                relativePath = relativePath(destination),
-                originalName = safeFileName(originalName),
-                mimeType = mimeType ?: detectMimeType(destination),
+                relativePath = WorkspaceFilePaths.relativePath(destination),
+                originalName = WorkspaceFilePaths.safeFileName(originalName),
+                mimeType = mimeType ?: WorkspaceFilePaths.detectMimeType(destination),
                 sizeBytes = destination.fileSize(),
-                sha256 = sha256(destination),
+                sha256 = WorkspaceFilePaths.sha256(destination),
                 extractedText = null,
                 importedAt = now,
                 updatedAt = now,
@@ -107,7 +101,7 @@ class WorkspaceFileService(
         return record
     }
 
-    /** Returns all imported workspace files. */
+    /** Returns all imported workspace files. Use cases: UC-0000024, UC-0000027. */
     fun listFiles(): List<WorkspaceFileRecord> = store.listWorkspaceFiles()
 
     /**
@@ -115,6 +109,7 @@ class WorkspaceFileService(
      *
      * @param query Case-insensitive query
      * @return Matching records with compact match descriptions
+     * @see docs/usecases/uc_0000025_search_workspace_files.md
      */
     fun searchFiles(query: String): WorkspaceSearchResult {
         val normalized = query.trim().lowercase()
@@ -128,11 +123,13 @@ class WorkspaceFileService(
 
     /**
      * Reconciles filesystem content below the managed workspace with persisted metadata.
+     *
+     * Use cases: UC-0000026.
      */
     fun syncMetadataWithFilesystem(): WorkspaceSyncResult {
         val root = workspaceRoot()
         val existingRecords = listFiles()
-        val pathsByRelative = existingRecords.associateBy { normalizeRelativePath(it.relativePath) }
+        val pathsByRelative = existingRecords.associateBy { WorkspaceFilePaths.normalizeRelativePath(it.relativePath) }
         val filesByRelative =
             Files
                 .walk(root)
@@ -140,7 +137,7 @@ class WorkspaceFileService(
                     stream
                         .asSequence()
                         .filter { it.isRegularFile() }
-                        .associateBy { relativePath(it) }
+                        .associateBy { WorkspaceFilePaths.relativePath(it) }
                 }
         var added = 0
         var updated = 0
@@ -151,15 +148,15 @@ class WorkspaceFileService(
                 store.saveWorkspaceFile(recordForExistingFile(path, path.name))
                 added++
             } else {
-                val currentHash = sha256(path)
+                val currentHash = WorkspaceFilePaths.sha256(path)
                 if (
                     current.sha256 != currentHash ||
                     current.sizeBytes != path.fileSize() ||
-                    current.mimeType != detectMimeType(path)
+                    current.mimeType != WorkspaceFilePaths.detectMimeType(path)
                 ) {
                     store.saveWorkspaceFile(
                         current.copy(
-                            mimeType = detectMimeType(path),
+                            mimeType = WorkspaceFilePaths.detectMimeType(path),
                             sizeBytes = path.fileSize(),
                             sha256 = currentHash,
                             updatedAt = Instant.now(),
@@ -170,7 +167,7 @@ class WorkspaceFileService(
             }
         }
         existingRecords
-            .filter { normalizeRelativePath(it.relativePath) !in filesByRelative.keys }
+            .filter { WorkspaceFilePaths.normalizeRelativePath(it.relativePath) !in filesByRelative.keys }
             .forEach {
                 if (store.deleteWorkspaceFile(it.id)) removed++
             }
@@ -183,13 +180,14 @@ class WorkspaceFileService(
      * @param id Optional workspace file ID
      * @param path Optional workspace-relative path
      * @return Matching file record
+     * @see docs/usecases/uc_0000027_analyze_workspace_file_via_tool.md
      */
     fun requireFile(
         id: String?,
         path: String?,
     ): WorkspaceFileRecord =
         id?.let(store::getWorkspaceFile)
-            ?: path?.let { store.getWorkspaceFileByPath(normalizeRelativePath(it)) }
+            ?: path?.let { store.getWorkspaceFileByPath(WorkspaceFilePaths.normalizeRelativePath(it)) }
             ?: throw IllegalArgumentException("Workspace file not found")
 
     /**
@@ -197,6 +195,7 @@ class WorkspaceFileService(
      *
      * @param id Workspace file ID
      * @return true when a file was deleted
+     * @see docs/usecases/uc_0000024_manage_workspace_files.md
      */
     fun deleteFile(id: String): Boolean {
         val record = store.getWorkspaceFile(id) ?: return false
@@ -210,6 +209,7 @@ class WorkspaceFileService(
      * @param id Workspace file ID
      * @param requestedName New filename
      * @return Updated file record
+     * @see docs/usecases/uc_0000024_manage_workspace_files.md
      */
     fun renameFile(
         id: String,
@@ -217,16 +217,16 @@ class WorkspaceFileService(
     ): WorkspaceFileRecord {
         val current = store.getWorkspaceFile(id) ?: throw IllegalArgumentException("Workspace file not found")
         val source = resolveManagedPath(current.relativePath)
-        val safeName = safeFileName(requestedName)
-        val targetName = preserveExtensionIfMissing(source, safeName)
-        val destination = uniqueDestination(source.parent, targetName)
+        val safeName = WorkspaceFilePaths.safeFileName(requestedName)
+        val targetName = WorkspaceFilePaths.preserveExtensionIfMissing(source, safeName)
+        val destination = WorkspaceFilePaths.uniqueDestination(source.parent, targetName)
         Files.move(source, destination)
         val updated =
             current.copy(
-                relativePath = relativePath(destination),
-                mimeType = detectMimeType(destination),
+                relativePath = WorkspaceFilePaths.relativePath(destination),
+                mimeType = WorkspaceFilePaths.detectMimeType(destination),
                 sizeBytes = destination.fileSize(),
-                sha256 = sha256(destination),
+                sha256 = WorkspaceFilePaths.sha256(destination),
                 updatedAt = Instant.now(),
             )
         store.saveWorkspaceFile(updated)
@@ -235,17 +235,23 @@ class WorkspaceFileService(
 
     /**
      * Computes the current SHA-256 hash for a managed file.
+     *
+     * Use cases: UC-0000027.
      */
-    fun hash(record: WorkspaceFileRecord): String = sha256(resolveManagedPath(record.relativePath))
+    fun hash(record: WorkspaceFileRecord): String = WorkspaceFilePaths.sha256(resolveManagedPath(record.relativePath))
 
     /**
      * Reads bounded UTF-8 text from a managed file.
+     *
+     * Use cases: UC-0000027.
      */
     fun readText(record: WorkspaceFileRecord): String =
         resolveManagedPath(record.relativePath).readText(Charsets.UTF_8).take(MAX_TEXT_CHARS)
 
     /**
      * Extracts and caches text from a managed PDF.
+     *
+     * Use cases: UC-0000027.
      */
     fun extractPdfText(record: WorkspaceFileRecord): WorkspaceFileText {
         record.extractedText?.let { return WorkspaceFileText(it.take(MAX_TEXT_CHARS), cached = true) }
@@ -280,9 +286,9 @@ class WorkspaceFileService(
         return WorkspaceImageInfo(
             width = image.width.toInt(),
             height = image.height.toInt(),
-            mimeType = detectMimeType(path),
+            mimeType = WorkspaceFilePaths.detectMimeType(path),
             sizeBytes = path.fileSize(),
-            sha256 = sha256(path),
+            sha256 = WorkspaceFilePaths.sha256(path),
         )
     }
 
@@ -293,7 +299,7 @@ class WorkspaceFileService(
         val path = resolveManagedPath(record.relativePath)
         require(path.fileSize() <= MAX_BASE64_BYTES) { "Image is larger than ${MAX_BASE64_BYTES / 1024 / 1024} MB" }
         return WorkspaceImageBytes(
-            mimeType = detectMimeType(path),
+            mimeType = WorkspaceFilePaths.detectMimeType(path),
             base64 = Base64.getEncoder().encodeToString(path.readBytes()),
         )
     }
@@ -301,22 +307,7 @@ class WorkspaceFileService(
     /**
      * Resolves a workspace-relative path and guarantees it stays inside the managed workspace.
      */
-    fun resolveManagedPath(relativePath: String): Path {
-        val resolved = workspaceRoot().resolve(normalizeRelativePath(relativePath)).normalize()
-        require(resolved.startsWith(workspaceRoot())) { "Path escapes workspace root" }
-        require(resolved.exists() && resolved.isRegularFile()) { "Workspace file does not exist" }
-        return resolved
-    }
-
-    private fun normalizedDatabasePath(): Path {
-        val raw = AppConfig.instance.databasePath.removePrefix("jdbc:sqlite:")
-        val path = Path.of(raw.ifBlank { "./data/visual-agent.db" })
-        return if (path.isAbsolute) path.normalize() else Path.of(System.getProperty("user.dir")).resolve(path).normalize()
-    }
-
-    private fun relativePath(path: Path): String = workspaceRoot().relativize(path.toAbsolutePath().normalize()).toString()
-
-    private fun normalizeRelativePath(path: String): String = path.replace('\\', '/').trim().removePrefix("/")
+    fun resolveManagedPath(relativePath: String): Path = WorkspaceFilePaths.resolveManagedPath(relativePath)
 
     private fun searchRecord(
         record: WorkspaceFileRecord,
@@ -333,7 +324,7 @@ class WorkspaceFileService(
         val text =
             when {
                 record.mimeType == "application/pdf" -> runCatching { extractPdfText(record).text }.getOrNull()
-                record.mimeType.startsWith("text/") || path.extension.lowercase() in TEXT_EXTENSIONS ->
+                record.mimeType.startsWith("text/") || path.extension.lowercase() in WorkspaceFilePaths.TEXT_EXTENSIONS ->
                     runCatching { path.readText(Charsets.UTF_8).take(MAX_TEXT_CHARS) }.getOrNull()
                 else -> null
             } ?: return null
@@ -349,79 +340,15 @@ class WorkspaceFileService(
         val now = Instant.now()
         return WorkspaceFileRecord(
             id = UUID.randomUUID().toString(),
-            relativePath = relativePath(path),
-            originalName = safeFileName(originalName),
-            mimeType = detectMimeType(path),
+            relativePath = WorkspaceFilePaths.relativePath(path),
+            originalName = WorkspaceFilePaths.safeFileName(originalName),
+            mimeType = WorkspaceFilePaths.detectMimeType(path),
             sizeBytes = path.fileSize(),
-            sha256 = sha256(path),
+            sha256 = WorkspaceFilePaths.sha256(path),
             extractedText = null,
             importedAt = now,
             updatedAt = now,
         )
-    }
-
-    private fun safeDirectoryName(name: String): String =
-        safeFileName(name)
-            .replace(" ", "-")
-            .ifBlank { "generated" }
-
-    private fun uniqueDestination(
-        directory: Path,
-        requestedName: String,
-    ): Path {
-        val safeName = safeFileName(requestedName)
-        val base = safeName.substringBeforeLast('.', safeName)
-        val extension = safeName.substringAfterLast('.', "").let { if (it.isBlank() || it == safeName) "" else ".$it" }
-        var candidate = directory.resolve("$base$extension")
-        var index = 1
-        while (candidate.exists()) {
-            candidate = directory.resolve("$base-$index$extension")
-            index++
-        }
-        return candidate
-    }
-
-    private fun safeFileName(name: String): String =
-        Path
-            .of(name)
-            .fileName
-            .toString()
-            .ifBlank { "file" }
-            .replace(Regex("""[^\w.\- ]"""), "_")
-
-    private fun preserveExtensionIfMissing(
-        source: Path,
-        requestedName: String,
-    ): String =
-        if (Path.of(requestedName).extension.isBlank() && source.extension.isNotBlank()) {
-            "$requestedName.${source.extension}"
-        } else {
-            requestedName
-        }
-
-    private fun detectMimeType(path: Path): String =
-        Files.probeContentType(path)
-            ?: when (path.extension.lowercase()) {
-                "txt", "md", "csv", "json", "xml", "kt", "java", "log" -> "text/plain"
-                "draw", "jhd", "canvas" -> CANVAS_MIME_TYPE
-                "pdf" -> "application/pdf"
-                "png" -> "image/png"
-                "jpg", "jpeg" -> "image/jpeg"
-                "gif" -> "image/gif"
-                else -> "application/octet-stream"
-            }
-
-    private fun sha256(path: Path): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        Files.newInputStream(path).use { input ->
-            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-            while (true) {
-                val read = input.read(buffer)
-                if (read < 0) break
-                digest.update(buffer, 0, read)
-            }
-        }
-        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
     private companion object {
@@ -429,8 +356,6 @@ class WorkspaceFileService(
         const val MAX_BASE64_BYTES = 8L * 1024L * 1024L
         const val MAX_TEXT_CHARS = 120_000
         const val MAX_SEARCH_RESULTS = 50
-        const val CANVAS_MIME_TYPE = "application/vnd.visual-agent.canvas+xml"
-        val TEXT_EXTENSIONS = setOf("txt", "md", "csv", "json", "xml", "log", "kt", "java", "draw", "jhd", "canvas")
     }
 }
 
@@ -439,45 +364,3 @@ private fun String.snippet(index: Int): String {
     val end = (index + 160).coerceAtMost(length)
     return substring(start, end).replace(Regex("\\s+"), " ").trim()
 }
-
-/** Search result for workspace files. */
-data class WorkspaceSearchResult(
-    val query: String,
-    val matches: List<WorkspaceSearchMatch>,
-)
-
-/** One workspace search hit. */
-data class WorkspaceSearchMatch(
-    val record: WorkspaceFileRecord,
-    val matchType: String,
-    val snippet: String,
-)
-
-/** Filesystem/DB reconciliation report. */
-data class WorkspaceSyncResult(
-    val added: Int,
-    val updated: Int,
-    val removed: Int,
-    val total: Int,
-)
-
-/** Extracted text result with cache state. */
-data class WorkspaceFileText(
-    val text: String,
-    val cached: Boolean,
-)
-
-/** Image metadata returned to tools and UI consumers. */
-data class WorkspaceImageInfo(
-    val width: Int,
-    val height: Int,
-    val mimeType: String,
-    val sizeBytes: Long,
-    val sha256: String,
-)
-
-/** Bounded base64 image payload. */
-data class WorkspaceImageBytes(
-    val mimeType: String,
-    val base64: String,
-)
