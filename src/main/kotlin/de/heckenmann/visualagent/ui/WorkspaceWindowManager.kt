@@ -12,6 +12,11 @@ internal class WorkspaceWindowManager(
     private val entries = mutableListOf<WorkspaceWindowEntry>()
     private val entriesByPanel = LinkedHashMap<Node, WorkspaceWindowEntry>()
 
+    init {
+        desktop.widthProperty().addListener { _, _, _ -> keepWindowsInsideDesktop() }
+        desktop.heightProperty().addListener { _, _, _ -> keepWindowsInsideDesktop() }
+    }
+
     fun register(
         id: String,
         title: String,
@@ -37,7 +42,7 @@ internal class WorkspaceWindowManager(
             if (active) {
                 window.isVisible = true
                 window.isManaged = true
-                window.keepInside(desktop.width, desktop.height)
+                keepWindowInsideDesktop(window)
             }
             window.setActive(active)
             if (active) {
@@ -51,6 +56,7 @@ internal class WorkspaceWindowManager(
         entries.forEach { entry ->
             val state = statesById[entry.id] ?: return@forEach
             entry.window.place(state.x, state.y, state.width, state.height)
+            keepWindowInsideDesktop(entry.window)
             entry.window.isVisible = state.visible
             entry.window.isManaged = state.visible
         }
@@ -71,6 +77,16 @@ internal class WorkspaceWindowManager(
     fun windowFor(panel: Node): InternalWorkspaceWindow? = entriesByPanel[panel]?.window
 
     fun desktopSize(): Pair<Double, Double> = desktop.width to desktop.height
+
+    private fun keepWindowsInsideDesktop() {
+        entries.forEach { entry -> keepWindowInsideDesktop(entry.window) }
+    }
+
+    private fun keepWindowInsideDesktop(window: InternalWorkspaceWindow) {
+        if (desktop.width > 0.0 && desktop.height > 0.0) {
+            window.keepInside(desktop.width, desktop.height)
+        }
+    }
 }
 
 internal data class WindowPlacement(

@@ -47,8 +47,21 @@ class InternalWorkspaceWindowTest {
             manager.focus(panel)
 
             val window = manager.windowFor(panel)
-            assertEquals(240.0, window?.layoutX)
-            assertEquals(140.0, window?.layoutY)
+            assertEquals(80.0, window?.layoutX)
+            assertEquals(40.0, window?.layoutY)
+            assertEquals(420.0, window?.prefWidth)
+            assertEquals(320.0, window?.prefHeight)
+        }
+
+    @Test
+    fun `workspace window refuses sizes below content-safe minimum`() =
+        FxTestSupport.run {
+            val window = InternalWorkspaceWindow("Panel", "fas-copy", Label("Panel"))
+
+            window.place(0.0, 0.0, 120.0, 90.0)
+
+            assertEquals(420.0, window.prefWidth)
+            assertEquals(320.0, window.prefHeight)
         }
 
     @Test
@@ -81,6 +94,71 @@ class InternalWorkspaceWindowTest {
             assertEquals(55.0, window?.layoutY)
             assertEquals(500.0, window?.prefWidth)
             assertEquals(360.0, window?.prefHeight)
+            assertTrue(window?.isVisible == true)
+        }
+
+    @Test
+    fun `workspace manager clamps restored windows into smaller desktop`() =
+        FxTestSupport.run {
+            val desktop = Pane()
+            desktop.resize(500.0, 360.0)
+            val panel = Label("Panel")
+            val manager = WorkspaceWindowManager(desktop)
+
+            manager.register("panel", "Panel", "fas-copy", panel, WindowPlacement(12.0, 18.0, 420.0, 320.0))
+            manager.restore(
+                WorkspaceLayout(
+                    listOf(
+                        WorkspaceWindowState(
+                            id = "panel",
+                            x = 900.0,
+                            y = 650.0,
+                            width = 760.0,
+                            height = 520.0,
+                            visible = true,
+                            zIndex = 2,
+                        ),
+                    ),
+                ),
+            )
+
+            val window = manager.windowFor(panel)
+            assertEquals(0.0, window?.layoutX)
+            assertEquals(0.0, window?.layoutY)
+            assertEquals(500.0, window?.prefWidth)
+            assertEquals(360.0, window?.prefHeight)
+            assertTrue(window?.isVisible == true)
+        }
+
+    @Test
+    fun `workspace manager keeps restored hidden windows reachable after later focus`() =
+        FxTestSupport.run {
+            val desktop = Pane()
+            desktop.resize(500.0, 360.0)
+            val panel = Label("Panel")
+            val manager = WorkspaceWindowManager(desktop)
+
+            manager.register("panel", "Panel", "fas-copy", panel, WindowPlacement(12.0, 18.0, 420.0, 320.0))
+            manager.restore(
+                WorkspaceLayout(
+                    listOf(
+                        WorkspaceWindowState(
+                            id = "panel",
+                            x = 900.0,
+                            y = 650.0,
+                            width = 420.0,
+                            height = 320.0,
+                            visible = false,
+                            zIndex = 2,
+                        ),
+                    ),
+                ),
+            )
+            manager.focus(panel)
+
+            val window = manager.windowFor(panel)
+            assertEquals(80.0, window?.layoutX)
+            assertEquals(40.0, window?.layoutY)
             assertTrue(window?.isVisible == true)
         }
 

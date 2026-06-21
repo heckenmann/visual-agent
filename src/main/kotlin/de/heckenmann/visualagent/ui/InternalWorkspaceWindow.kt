@@ -60,8 +60,8 @@ internal class InternalWorkspaceWindow(
     ) {
         layoutX = x
         layoutY = y
-        prefWidth = width
-        prefHeight = height
+        prefWidth = width.coerceAtLeast(MIN_WIDTH)
+        prefHeight = height.coerceAtLeast(MIN_HEIGHT)
     }
 
     fun keepInside(
@@ -70,8 +70,22 @@ internal class InternalWorkspaceWindow(
     ) {
         val currentWidth = if (width > 0.0) width else prefWidth
         val currentHeight = if (height > 0.0) height else prefHeight
-        layoutX = clamp(layoutX, 0.0, max(0.0, desktopWidth - currentWidth))
-        layoutY = clamp(layoutY, 0.0, max(0.0, desktopHeight - currentHeight))
+        val boundedWidth =
+            if (desktopWidth > 0.0) {
+                currentWidth.coerceAtLeast(MIN_WIDTH).coerceAtMost(max(MIN_WIDTH, desktopWidth))
+            } else {
+                currentWidth.coerceAtLeast(MIN_WIDTH)
+            }
+        val boundedHeight =
+            if (desktopHeight > 0.0) {
+                currentHeight.coerceAtLeast(MIN_HEIGHT).coerceAtMost(max(MIN_HEIGHT, desktopHeight))
+            } else {
+                currentHeight.coerceAtLeast(MIN_HEIGHT)
+            }
+        prefWidth = boundedWidth
+        prefHeight = boundedHeight
+        layoutX = clamp(layoutX, 0.0, max(0.0, desktopWidth - boundedWidth))
+        layoutY = clamp(layoutY, 0.0, max(0.0, desktopHeight - boundedHeight))
     }
 
     private fun windowHeader(
@@ -165,7 +179,7 @@ internal class InternalWorkspaceWindow(
     ): Double = min(max(value, minValue), maxValue)
 
     private companion object {
-        const val MIN_WIDTH = 360.0
-        const val MIN_HEIGHT = 260.0
+        const val MIN_WIDTH = 420.0
+        const val MIN_HEIGHT = 320.0
     }
 }
