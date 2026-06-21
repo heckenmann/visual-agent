@@ -23,6 +23,20 @@ data/
 lib/
 src/main/resources/config/app.local.properties
 
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
+*.wal
+*.shm
+jdbc:sqlite:*
+
 # Local secrets
 .env
 .env.*
