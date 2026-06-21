@@ -10,6 +10,9 @@ import kotlinx.serialization.Serializable
  * This interface abstracts the underlying LLM provider (Ollama Local, Ollama Cloud, etc.)
  * and provides a unified API for interacting with language models.
  *
+ * Use cases: UC-0000002, UC-0000003, UC-0000007, UC-0000009, UC-0000010, UC-0000011,
+ * UC-0000012, UC-0000027.
+ *
  * @see OllamaClient for local Ollama implementation
  * @see OllamaCloudProvider for cloud implementation
  */
@@ -20,6 +23,7 @@ interface LLMProvider {
      * @param messages List of conversation messages with roles (system, user, assistant)
      * @return Complete chat response from the LLM
      * @throws Exception if the request fails or model is unavailable
+     * @see docs/usecases/uc_0000002_send_main_agent_message.md
      */
     suspend fun chat(messages: List<Message>): ChatResponse
 
@@ -29,6 +33,8 @@ interface LLMProvider {
      * @param request Complete request context for the provider
      * @return Complete chat response from the LLM
      * @throws Exception if the request fails or model is unavailable
+     * @see docs/usecases/uc_0000002_send_main_agent_message.md
+     * @see docs/usecases/uc_0000020_execute_tool_call.md
      */
     suspend fun chat(request: ChatRequestContext): ChatResponse = chat(request.messages)
 
@@ -37,6 +43,7 @@ interface LLMProvider {
      *
      * @param messages List of conversation messages
      * @return Flow of response chunks for real-time display
+     * @see docs/usecases/uc_0000003_stream_main_agent_response.md
      */
     suspend fun stream(messages: List<Message>): Flow<ChatResponse>
 
@@ -45,6 +52,8 @@ interface LLMProvider {
      *
      * @param request Complete request context for the provider
      * @return Flow of response chunks for real-time display
+     * @see docs/usecases/uc_0000003_stream_main_agent_response.md
+     * @see docs/usecases/uc_0000020_execute_tool_call.md
      */
     suspend fun stream(request: ChatRequestContext): Flow<ChatResponse> = stream(request.messages)
 
@@ -54,6 +63,7 @@ interface LLMProvider {
      * @param image Raw image bytes to analyze
      * @param prompt Text prompt for image analysis
      * @return Response describing the image content
+     * @see docs/usecases/uc_0000027_analyze_workspace_file_via_tool.md
      */
     suspend fun vision(
         image: ByteArray,
@@ -65,6 +75,7 @@ interface LLMProvider {
      *
      * @param text Text to generate embeddings for
      * @return List of embedding values
+     * @see docs/usecases/uc_0000010_chat_with_ollama_provider.md
      */
     suspend fun embeddings(text: String): List<Double>
 
@@ -72,6 +83,7 @@ interface LLMProvider {
      * Check if the provider is currently connected and available.
      *
      * @return true if connected, false otherwise
+     * @see docs/usecases/uc_0000012_check_provider_connectivity.md
      */
     fun isConnected(): Boolean
 
@@ -79,6 +91,7 @@ interface LLMProvider {
      * Perform an active connectivity check against the backing provider.
      *
      * @return true if the provider endpoint is reachable and responsive
+     * @see docs/usecases/uc_0000012_check_provider_connectivity.md
      */
     suspend fun checkConnection(): Boolean
 
@@ -86,6 +99,7 @@ interface LLMProvider {
      * Get the list of available model names.
      *
      * @return List of model names
+     * @see docs/usecases/uc_0000009_discover_available_models.md
      */
     suspend fun getModels(): List<String>
 
@@ -94,6 +108,7 @@ interface LLMProvider {
      *
      * @param providerId Provider profile identifier
      * @return Selectable model names
+     * @see docs/usecases/uc_0000009_discover_available_models.md
      */
     suspend fun getModels(providerId: String): List<String> = getModels()
 
@@ -102,6 +117,7 @@ interface LLMProvider {
      *
      * @param modelName Name of the model to get details for
      * @return ShowResponse containing model details
+     * @see docs/usecases/uc_0000009_discover_available_models.md
      */
     suspend fun getModelDetails(modelName: String): ShowResponse
 
@@ -111,6 +127,7 @@ interface LLMProvider {
      * @param providerId Provider profile identifier
      * @param modelName Provider-facing model identifier
      * @return Model details
+     * @see docs/usecases/uc_0000009_discover_available_models.md
      */
     suspend fun getModelDetails(
         providerId: String,
@@ -125,6 +142,9 @@ interface LLMProvider {
  * @property model Optional model override; defaults to the configured model when null
  * @property enabledTools Tool IDs that may be exposed to the model for this request
  * @property metadata Additional provider-neutral execution context
+ * @see docs/usecases/uc_0000002_send_main_agent_message.md
+ * @see docs/usecases/uc_0000007_configure_session_provider_and_model.md
+ * @see docs/usecases/uc_0000020_execute_tool_call.md
  */
 data class ChatRequestContext(
     val messages: List<Message>,
@@ -144,6 +164,8 @@ data class ChatRequestContext(
  * @property provider Optional provider override; null inherits the active session provider
  * @property model Optional model override; null inherits the selected provider model
  * @property parameters Sampling and output limits for this model call
+ * @see docs/usecases/uc_0000007_configure_session_provider_and_model.md
+ * @see docs/usecases/uc_0000008_manage_provider_profiles.md
  */
 data class ModelSelection(
     val provider: String? = null,
@@ -159,6 +181,7 @@ data class ModelSelection(
  * @property temperature Sampling temperature in the range 0.0 through 2.0
  * @property topP Nucleus sampling probability in the range 0.0 through 1.0
  * @property maxTokens Maximum number of generated tokens
+ * @see docs/usecases/uc_0000008_manage_provider_profiles.md
  */
 data class ModelParameters(
     val temperature: Double? = null,
@@ -176,6 +199,8 @@ data class ModelParameters(
  * Stable identifier for an application tool.
  *
  * @property value External tool ID such as `file:read` or `ui`
+ * @see docs/usecases/uc_0000019_configure_agent_tools.md
+ * @see docs/usecases/uc_0000020_execute_tool_call.md
  */
 @JvmInline
 value class ToolId(
@@ -189,6 +214,7 @@ value class ToolId(
  * @property name Provider-safe function name exposed to Spring AI
  * @property description Description used by the model to decide when to call the tool
  * @property inputSchema JSON schema for the tool input
+ * @see docs/usecases/uc_0000020_execute_tool_call.md
  */
 data class ToolDefinition(
     val id: ToolId,
@@ -204,6 +230,7 @@ data class ToolDefinition(
  * @property success Whether the tool completed successfully
  * @property content Human-readable result payload
  * @property error Optional error message when execution failed
+ * @see docs/usecases/uc_0000020_execute_tool_call.md
  */
 @Serializable
 data class ToolResult(
@@ -220,6 +247,9 @@ data class ToolResult(
  * @property content Text content of the message
  * @property metadata Optional JSON metadata payload for UI/system annotations
  * @property images Optional list of base64-encoded images (for vision)
+ * @see docs/usecases/uc_0000002_send_main_agent_message.md
+ * @see docs/usecases/uc_0000005_persist_and_reload_history.md
+ * @see docs/usecases/uc_0000032_capture_canvas_image_history.md
  */
 @Serializable
 data class Message(
@@ -236,6 +266,8 @@ data class Message(
  * @property messages List of conversation messages
  * @property stream Enable streaming responses
  * @property options Optional model-specific options
+ * @see docs/usecases/uc_0000002_send_main_agent_message.md
+ * @see docs/usecases/uc_0000003_stream_main_agent_response.md
  */
 @Serializable
 data class ChatRequest(
@@ -254,6 +286,8 @@ data class ChatRequest(
  * @property totalDuration Total processing time in nanoseconds
  * @property promptEvalCount Number of tokens in the prompt
  * @property evalCount Number of tokens in the response
+ * @see docs/usecases/uc_0000002_send_main_agent_message.md
+ * @see docs/usecases/uc_0000003_stream_main_agent_response.md
  */
 @Serializable
 data class ChatResponse(

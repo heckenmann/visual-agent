@@ -11,6 +11,8 @@ import mu.KotlinLogging
 /**
  * Wires sub-agent UI actions and runtime notifications.
  *
+ * Use cases: UC-0000015, UC-0000018, UC-0000050, UC-0000051, UC-0000052.
+ *
  * @property agentManager Main application orchestrator
  * @property subAgentsPanel Sub-agent list panel
  * @property chatPanel Conversation panel used for agent notifications
@@ -26,6 +28,8 @@ internal class MainWindowSubAgentWiring(
 
     /**
      * Registers sub-agent actions and initializes the panel from persisted state.
+     *
+     * Use cases: UC-0000018, UC-0000050, UC-0000051, UC-0000052.
      */
     fun register() {
         subAgentsPanel.agentActionCallback = { action, agentId -> handleAgentAction(action, agentId) }

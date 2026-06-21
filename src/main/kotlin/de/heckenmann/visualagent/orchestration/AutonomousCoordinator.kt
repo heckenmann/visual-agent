@@ -17,6 +17,8 @@ import kotlinx.coroutines.launch
 
 /**
  * Coordinates autonomous todo decomposition, assignment, and worker execution loops.
+ *
+ * Use cases: UC-0000014, UC-0000053, UC-0000054, UC-0000055, UC-0000057.
  */
 internal class AutonomousCoordinator(
     private val scope: CoroutineScope,
@@ -110,6 +112,8 @@ internal class AutonomousCoordinator(
 
     /**
      * Seeds standard UX-focused todos used for autonomous improvement loops.
+     *
+     * Use cases: UC-0000053.
      */
     fun seedUxTodos() {
         val tasks = UxSeedTasks.all()
@@ -120,6 +124,7 @@ internal class AutonomousCoordinator(
      * Starts autonomous processing loop.
      *
      * @param seed Whether standard UX todos should be seeded first
+     * @see docs/usecases/uc_0000054_run_autonomous_processing_loop.md
      */
     fun startAutonomousProcessing(seed: Boolean = true) {
         if (seed) seedUxTodos()
@@ -140,6 +145,7 @@ internal class AutonomousCoordinator(
      * Enqueues one goal and starts autonomous processing without seeding defaults.
      *
      * @param goal Objective text
+     * @see docs/usecases/uc_0000055_start_autonomous_goal.md
      */
     fun startAutonomousMode(goal: String) {
         if (goal.isNotBlank()) todoManager.add(goal.trim())

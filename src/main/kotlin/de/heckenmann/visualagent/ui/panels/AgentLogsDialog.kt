@@ -12,6 +12,8 @@ import javafx.scene.layout.VBox
 
 /**
  * Displays an agent's conversation history and current execution status.
+ *
+ * Use cases: UC-0000050.
  */
 class AgentLogsDialog {
     companion object {

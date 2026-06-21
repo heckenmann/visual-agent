@@ -13,6 +13,8 @@ import kotlinx.coroutines.withContext
 /**
  * Wires conversation panel callbacks to the agent manager.
  *
+ * Use cases: UC-0000002, UC-0000003, UC-0000045, UC-0000046, UC-0000047, UC-0000048.
+ *
  * @property agentManager Main application orchestrator
  * @property chatPanel Conversation UI panel
  * @property scope UI coroutine scope
@@ -29,6 +31,8 @@ internal class MainWindowChatWiring(
 
     /**
      * Registers chat send, clear, todo navigation, and history loading callbacks.
+     *
+     * Use cases: UC-0000002, UC-0000045, UC-0000046.
      */
     fun register() {
         chatPanel.setOnSendMessage { text -> sendMessage(text) }
@@ -41,6 +45,7 @@ internal class MainWindowChatWiring(
      * Stores the latest tool result preview used to repair empty/generic model responses.
      *
      * @param preview Compact tool result preview
+     * @see docs/usecases/uc_0000048_repair_empty_tool_only_response.md
      */
     fun updateToolPreview(preview: String?) {
         lastToolResultPreview = preview
@@ -151,6 +156,7 @@ internal class MainWindowChatWiring(
      *
      * @param response Raw assistant text
      * @return Parsed thinking blocks plus visible answer text
+     * @see docs/usecases/uc_0000047_display_model_thinking_blocks.md
      */
     private fun extractThinking(response: String): ParsedThinking {
         if (response.isBlank()) return ParsedThinking(emptyList(), response)

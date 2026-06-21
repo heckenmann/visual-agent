@@ -27,6 +27,7 @@ class AgentToolConfigServiceTest {
         assertTrue("file:read" in updated.tools)
         assertTrue("workspace:layout" in updated.tools)
         assertTrue("canvas" in updated.tools)
+        assertTrue("usecases" in updated.tools)
     }
 
     @Test

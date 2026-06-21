@@ -9,6 +9,8 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Tool that runs bounded, non-interactive shell commands in the workspace.
+ *
+ * Use cases: UC-0000021.
  */
 @Component
 class TerminalTool : VisualAgentTool {
@@ -53,6 +55,8 @@ class TerminalTool : VisualAgentTool {
 
 /**
  * Placeholder tool for browser automation when no browser backend is configured.
+ *
+ * Use cases: UC-0000044.
  */
 @Component
 class BrowserTool : VisualAgentTool {
@@ -72,6 +76,8 @@ class BrowserTool : VisualAgentTool {
 
 /**
  * Placeholder tool for web/search access when no search backend is configured.
+ *
+ * Use cases: UC-0000044.
  */
 @Component
 class SearchTool : VisualAgentTool {
@@ -91,6 +97,8 @@ class SearchTool : VisualAgentTool {
 
 /**
  * Tool that pauses execution for a bounded duration.
+ *
+ * Use cases: UC-0000043.
  */
 @Component
 class SleepTool : VisualAgentTool {

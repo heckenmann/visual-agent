@@ -17,6 +17,8 @@ import java.util.Base64
 
 /**
  * Tool that lets sub-agents inspect and edit the structured canvas.
+ *
+ * Use cases: UC-0000032, UC-0000033.
  */
 @Component
 class CanvasTool(

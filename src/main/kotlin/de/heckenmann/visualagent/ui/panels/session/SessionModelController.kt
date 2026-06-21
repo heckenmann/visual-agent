@@ -21,6 +21,8 @@ import mu.KotlinLogging
 
 /**
  * Handles model discovery, filtering, and favorites for the session panel.
+ *
+ * Use cases: UC-0000009, UC-0000064, UC-0000065.
  */
 internal class SessionModelController(
     private val modelSelector: ComboBox<String>,
@@ -95,6 +97,7 @@ internal class SessionModelController(
         }
     }
 
+    /** Loads and displays provider-specific details for one selected model. Use cases: UC-0000065. */
     fun refreshModelDetails(modelName: String) {
         val client = llmProvider ?: return
         modelInfoLabel.text = "Loading model details..."
@@ -132,6 +135,7 @@ internal class SessionModelController(
         openAiSettingsGroup.isManaged = !ollamaSelected
     }
 
+    /** Applies search and favorites-only filtering to the selectable model list. Use cases: UC-0000064. */
     fun applyModelFilter(selectPreferred: Boolean = false) {
         val query = modelSearchField.text.trim().lowercase()
         val favoritesOnly = favoritesOnlyToggle.isSelected
@@ -163,6 +167,7 @@ internal class SessionModelController(
         updateFavoriteButton(modelSelector.selectionModel.selectedItem)
     }
 
+    /** Toggles and persists favorite state for the currently selected model. Use cases: UC-0000064. */
     fun toggleFavoriteForSelectedModel() {
         val selected = modelSelector.selectionModel.selectedItem ?: return
         if (favoriteModels.contains(selected)) {

@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service
 
 /**
  * Resolves the tool set exposed to the main agent and each sub-agent role.
+ *
+ * Use cases: UC-0000019, UC-0000020, UC-0000033, UC-0000036, UC-0000067.
  */
 @Service
 class AgentToolConfigService(
@@ -25,6 +27,7 @@ class AgentToolConfigService(
      * The main agent is restricted to sub-agent control tools only.
      *
      * @return Set of tool IDs exposed to the main agent
+     * @see docs/usecases/uc_0000019_configure_agent_tools.md
      */
     fun mainAgentTools(): Set<ToolId> =
         setOf(
@@ -44,6 +47,7 @@ class AgentToolConfigService(
      *
      * @param agent Sub-agent requesting tools
      * @return Tool IDs configured for the agent role/name
+     * @see docs/usecases/uc_0000019_configure_agent_tools.md
      */
     fun toolsFor(agent: SubAgent): Set<ToolId> {
         val key =
@@ -63,6 +67,7 @@ class AgentToolConfigService(
      *
      * @param toolId Canonical tool ID
      * @return true when the tool is not globally disabled
+     * @see docs/usecases/uc_0000019_configure_agent_tools.md
      */
     fun isToolGloballyEnabled(toolId: String): Boolean = toolId !in disabledToolIds()
 
@@ -73,6 +78,7 @@ class AgentToolConfigService(
      *
      * @param toolId Canonical tool ID
      * @param enabled Whether the tool should be exposed to model requests
+     * @see docs/usecases/uc_0000019_configure_agent_tools.md
      */
     fun setToolGloballyEnabled(
         toolId: String,
@@ -89,6 +95,8 @@ class AgentToolConfigService(
 
     /**
      * Returns globally disabled tool IDs.
+     *
+     * Use cases: UC-0000019.
      */
     fun disabledToolIds(): Set<String> =
         preferenceStore
@@ -103,6 +111,7 @@ class AgentToolConfigService(
      * Persist a sub-agent tool configuration.
      *
      * @param config Configuration to save
+     * @see docs/usecases/uc_0000019_configure_agent_tools.md
      */
     fun save(config: SubAgentToolConfig) {
         configStore.saveSubAgentConfig(config)
@@ -143,6 +152,7 @@ class AgentToolConfigService(
                         "todos",
                         "history",
                         "manual",
+                        "usecases",
                         "sleep",
                         "workspace:layout",
                         "workspace:file",
@@ -167,6 +177,7 @@ class AgentToolConfigService(
                         "todos",
                         "history",
                         "manual",
+                        "usecases",
                         "sleep",
                         "workspace:layout",
                         "workspace:file",
@@ -189,6 +200,7 @@ class AgentToolConfigService(
                         "todos",
                         "history",
                         "manual",
+                        "usecases",
                         "sleep",
                         "workspace:layout",
                         "workspace:file",
@@ -211,6 +223,7 @@ private const val DISABLED_TOOLS_KEY = "tools.disabled.global"
  * @property tools Tool IDs allowed for this agent
  * @property maxTurns Maximum autonomous loop turns
  * @property enabled Whether this config can be used
+ * @see docs/usecases/uc_0000019_configure_agent_tools.md
  */
 data class SubAgentToolConfig(
     val id: String,

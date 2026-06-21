@@ -23,6 +23,8 @@ import org.springframework.stereotype.Component
 
 /**
  * Application-level settings panel for appearance, configuration import/export, and reset actions.
+ *
+ * Use cases: UC-0000037, UC-0000062, UC-0000063.
  */
 @Component
 @Lazy
@@ -69,6 +71,8 @@ class ApplicationSettingsPanel(
 
     /**
      * Wires controls to persisted application settings.
+     *
+     * Use cases: UC-0000037, UC-0000062, UC-0000063.
      */
     @FXML
     fun initialize() {

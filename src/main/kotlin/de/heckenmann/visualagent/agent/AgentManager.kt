@@ -25,6 +25,9 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Main orchestration facade for chat, history, todos, and sub-agent coordination.
+ *
+ * Use cases: UC-0000002, UC-0000003, UC-0000005, UC-0000006, UC-0000014, UC-0000015,
+ * UC-0000016, UC-0000017, UC-0000018, UC-0000040.
  */
 @Service
 class AgentManager
@@ -64,6 +67,8 @@ class AgentManager
              * Registers the UI callback that receives sub-agent lifecycle notifications.
              *
              * @param callback Callback invoked with agent ID and user-facing message
+             * @see docs/usecases/uc_0000017_queue_asynchronous_subagent_job.md
+             * @see docs/usecases/uc_0000018_display_subagent_status_and_jobs.md
              */
             fun setAgentCallback(callback: (String, String) -> Unit) {
                 globalAgentCallback = callback
@@ -133,36 +138,38 @@ class AgentManager
 
         /**
          * Releases tool listeners before bean destruction.
+         *
+         * Use cases: UC-0000001.
          */
         override fun destroy() {
             runCatching { toolEventListenerHandle.close() }
             scope.cancel()
         }
 
-        /** Returns the current in-memory sub-agent snapshot. */
+        /** Returns the current in-memory sub-agent snapshot. Use cases: UC-0000015, UC-0000018. */
         fun getSubAgents(): List<SubAgent> = lifecycleOps.getSubAgents()
 
-        /** Returns one sub-agent by its stable identifier. */
+        /** Returns one sub-agent by its stable identifier. Use cases: UC-0000015, UC-0000016, UC-0000017. */
         fun getSubAgent(id: String): SubAgent? = lifecycleOps.getSubAgent(id)
 
         internal fun saveSubAgent(agent: SubAgent) {
             lifecycleOps.saveAgentToDb(agent)
         }
 
-        /** Loads the authoritative todo list from persistence. */
+        /** Loads the authoritative todo list from persistence. Use cases: UC-0000013, UC-0000014. */
         fun getTodosFromDb(): List<Todo> = lifecycleOps.getTodosFromDb()
 
-        /** Returns authoritative todo counters from persistence. */
+        /** Returns authoritative todo counters from persistence. Use cases: UC-0000013, UC-0000014. */
         fun getTodoSummaryFromDb(): TodoSummary = lifecycleOps.getTodoSummaryFromDb()
 
-        /** Creates and persists a sub-agent from the requested template. */
+        /** Creates and persists a sub-agent from the requested template. Use cases: UC-0000015, UC-0000016, UC-0000017. */
         fun createAgent(
             name: String,
             role: String,
             templateName: String = "researcher",
         ): SubAgent = lifecycleOps.createAgent(name, role, templateName)
 
-        /** Updates mutable sub-agent metadata and configuration. */
+        /** Updates mutable sub-agent metadata and configuration. Use cases: UC-0000015, UC-0000019. */
         fun updateAgent(
             id: String,
             name: String? = null,
@@ -170,16 +177,16 @@ class AgentManager
             config: AgentConfig? = null,
         ): Boolean = lifecycleOps.updateAgent(id, name, role, config)
 
-        /** Deletes a sub-agent and its persisted tool configuration. */
+        /** Deletes a sub-agent and its persisted tool configuration. Use cases: UC-0000015. */
         fun deleteAgent(id: String): Boolean = lifecycleOps.deleteAgent(id)
 
-        /** Sends a conversational message directly to an existing sub-agent. */
+        /** Sends a conversational message directly to an existing sub-agent. Use cases: UC-0000015, UC-0000016. */
         suspend fun sendMessageToAgent(
             agentId: String,
             content: String,
         ): String = conversationOps.sendMessageToAgent(agentId, content)
 
-        /** Runs a synchronous job on an existing sub-agent under the concurrency limit. */
+        /** Runs a synchronous job on an existing sub-agent under the concurrency limit. Use cases: UC-0000016. */
         suspend fun runAgentJob(
             agentId: String,
             content: String,
@@ -188,7 +195,7 @@ class AgentManager
                 conversationOps.runAgentJob(agentId, content)
             }
 
-        /** Queues an asynchronous job for an existing sub-agent. */
+        /** Queues an asynchronous job for an existing sub-agent. Use cases: UC-0000017. */
         fun enqueueAgentJob(
             agentId: String,
             content: String,
@@ -198,7 +205,7 @@ class AgentManager
                 onFinished = conversationOps::notifyMainAgentOfJobCompletion,
             )
 
-        /** Creates a sub-agent and runs a synchronous job under the concurrency limit. */
+        /** Creates a sub-agent and runs a synchronous job under the concurrency limit. Use cases: UC-0000016. */
         suspend fun startAgentJob(
             name: String,
             role: String,
@@ -209,7 +216,7 @@ class AgentManager
                 conversationOps.startAgentJob(name, role, templateName, content)
             }
 
-        /** Queues creation and asynchronous execution of a sub-agent job. */
+        /** Queues creation and asynchronous execution of a sub-agent job. Use cases: UC-0000017. */
         fun enqueueAgentJob(
             name: String,
             role: String,
@@ -221,7 +228,7 @@ class AgentManager
                 onFinished = conversationOps::notifyMainAgentOfJobCompletion,
             )
 
-        /** Returns active and queued sub-agent job counts. */
+        /** Returns active and queued sub-agent job counts. Use cases: UC-0000017, UC-0000018. */
         fun getSubAgentJobQueueSnapshot(): SubAgentJobQueueSnapshot = subAgentJobScheduler.snapshot()
 
         /**
@@ -229,27 +236,28 @@ class AgentManager
          *
          * @param agentId Stable sub-agent identifier
          * @return Active execution count
+         * @see docs/usecases/uc_0000018_display_subagent_status_and_jobs.md
          */
         fun getActiveJobCount(agentId: String): Int = activeJobsByAgentId[agentId] ?: 0
 
-        /** Sends a message to the main agent and persists both conversation turns. */
+        /** Sends a message to the main agent and persists both conversation turns. Use cases: UC-0000002, UC-0000005. */
         suspend fun sendMessage(content: String): String = conversationOps.sendMessage(content)
 
-        /** Streams a main-agent response while persisting the completed turn. */
+        /** Streams a main-agent response while persisting the completed turn. Use cases: UC-0000003, UC-0000005. */
         suspend fun streamMessage(
             content: String,
             onChunk: (String) -> Unit,
         ): String = conversationOps.streamMessage(content, onChunk)
 
-        /** Deletes the main conversation history from memory and persistence. */
+        /** Deletes the main conversation history from memory and persistence. Use cases: UC-0000045. */
         fun clearHistory() {
             conversationOps.clearHistory()
         }
 
-        /** Generates and persists the post-reset welcome message. */
+        /** Generates and persists the post-reset welcome message. Use cases: UC-0000045. */
         suspend fun addWelcomeMessageAfterReset(): String = conversationOps.addWelcomeMessageAfterReset()
 
-        /** Returns the currently loaded main conversation history. */
+        /** Returns the currently loaded main conversation history. Use cases: UC-0000005, UC-0000046. */
         fun getHistory(): List<Message> = conversationOps.getHistory()
 
         /** Appends and persists a system message to the main conversation. */
@@ -262,7 +270,7 @@ class AgentManager
             conversationOps.recordToolCall(event)
         }
 
-        /** Loads an older page and prepends it to the in-memory history. */
+        /** Loads an older page and prepends it to the in-memory history. Use cases: UC-0000046. */
         fun loadOlderHistory(pageSize: Int = HISTORY_PAGE_SIZE): List<Message> = conversationOps.loadOlderHistory(pageSize)
 
         /** Loads all persisted sub-agent records. */
@@ -280,12 +288,12 @@ class AgentManager
         /** Assigns as many pending todos as current capacity permits. */
         fun assignAllPendingTodos(): Int = autonomyOps.assignAllPendingTodos()
 
-        /** Adds the predefined UX improvement tasks when they are absent. */
+        /** Adds the predefined UX improvement tasks when they are absent. Use cases: UC-0000053. */
         fun seedUxTodos() = autonomyOps.seedUxTodos()
 
-        /** Starts background autonomous todo processing. */
+        /** Starts background autonomous todo processing. Use cases: UC-0000054. */
         fun startAutonomousProcessing(seed: Boolean = true) = autonomyOps.startAutonomousProcessing(seed)
 
-        /** Starts autonomous processing for a newly created top-level goal. */
+        /** Starts autonomous processing for a newly created top-level goal. Use cases: UC-0000055. */
         fun startAutonomousMode(goal: String) = autonomyOps.startAutonomousMode(goal)
     }

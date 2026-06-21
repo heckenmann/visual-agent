@@ -22,6 +22,8 @@ import java.util.Base64
 
 /**
  * Creates JavaFX rows for conversation messages.
+ *
+ * Use cases: UC-0000004, UC-0000032, UC-0000049.
  */
 internal class ChatMessageRenderer(
     private val loadingToken: String,

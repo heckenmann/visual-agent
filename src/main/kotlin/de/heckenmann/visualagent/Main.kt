@@ -10,6 +10,8 @@ import org.springframework.context.ConfigurableApplicationContext
 
 /**
  * Main entry point for the Visual Agent application with Spring Boot integration.
+ *
+ * Use cases: UC-0000001.
  */
 class Main : Application() {
     private lateinit var springContext: ConfigurableApplicationContext
@@ -49,6 +51,8 @@ class Main : Application() {
 
         /**
          * Launches the JavaFX desktop application.
+         *
+         * Use cases: UC-0000001.
          */
         @JvmStatic
         fun main(args: Array<String>) {

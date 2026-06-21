@@ -39,6 +39,9 @@ import org.springframework.stereotype.Component
  * Primary JavaFX stage that hosts navigation, workspace panels, status indicators, and backend wiring.
  *
  * The bean is lazy so JavaFX controls are constructed on the JavaFX application thread.
+ *
+ * Use cases: UC-0000001, UC-0000002, UC-0000007, UC-0000012, UC-0000034, UC-0000035,
+ * UC-0000038, UC-0000039.
  */
 @Component
 @Lazy // delay instantiation until requested on the JavaFX Application thread
@@ -171,6 +174,8 @@ class MainWindow(
      *
      * The title model label, chat context, theme, and font size are derived from AppConfig
      * in one place so panels do not need to know who else depends on a changed setting.
+     *
+     * Use cases: UC-0000007, UC-0000037, UC-0000038.
      */
     private fun registerConfigObserver() {
         configListenerRegistration?.close()

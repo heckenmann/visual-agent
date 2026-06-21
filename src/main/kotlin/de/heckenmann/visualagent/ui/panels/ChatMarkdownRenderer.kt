@@ -30,6 +30,8 @@ import org.commonmark.node.Text as MarkdownText
  *
  * Parsing is delegated to `org.commonmark:commonmark`; this class only maps the parsed AST onto the existing
  * JavaFX chat styling.
+ *
+ * Use cases: UC-0000004.
  */
 internal object ChatMarkdownRenderer {
     private val parser = Parser.builder().extensions(listOf(AutolinkExtension.create())).build()
@@ -39,6 +41,7 @@ internal object ChatMarkdownRenderer {
      *
      * @param markdown Raw Markdown text from a chat message
      * @return JavaFX region containing rendered Markdown blocks
+     * @see docs/usecases/uc_0000004_render_markdown_conversation.md
      */
     fun render(markdown: String): Region {
         val root = VBox()

@@ -6,6 +6,8 @@ import java.time.Instant
 
 /**
  * Persisted conversation message exposed to agent and tool consumers.
+ *
+ * Use cases: UC-0000005, UC-0000041.
  */
 data class ConversationRecord(
     val id: String,
@@ -28,6 +30,8 @@ data class ConversationRecord(
 
 /**
  * Persisted metadata for one managed workspace file.
+ *
+ * Use cases: UC-0000023, UC-0000024, UC-0000025, UC-0000026, UC-0000027, UC-0000031.
  */
 data class WorkspaceFileRecord(
     val id: String,
@@ -43,6 +47,8 @@ data class WorkspaceFileRecord(
 
 /**
  * Persisted sub-agent state exposed to orchestration consumers.
+ *
+ * Use cases: UC-0000015, UC-0000016, UC-0000017, UC-0000018.
  */
 data class PersistedSubAgent(
     val id: String,
@@ -71,7 +77,7 @@ data class PersistedSubAgent(
         }
 }
 
-/** Stores and searches long-term memory records. */
+/** Stores and searches long-term memory records. Use cases: UC-0000002, UC-0000041. */
 interface MemoryStore {
     /** Persists free-form memory and returns its identifier. */
     fun saveMemory(
@@ -93,7 +99,7 @@ interface MemoryStore {
     ): List<Memory>
 }
 
-/** Stores application preferences by key. */
+/** Stores application preferences by key. Use cases: UC-0000030, UC-0000035, UC-0000037, UC-0000038. */
 interface PreferenceStore {
     /** Returns a stored preference or null when absent. */
     fun getPreference(key: String): String?
@@ -105,7 +111,7 @@ interface PreferenceStore {
     )
 }
 
-/** Stores, pages, searches, and deletes conversation messages. */
+/** Stores, pages, searches, and deletes conversation messages. Use cases: UC-0000005, UC-0000032, UC-0000041. */
 interface ConversationStore {
     /** Persists one conversation message and returns its identifier. */
     fun saveConversationMessage(
@@ -139,7 +145,7 @@ interface ConversationStore {
     fun deleteConversationMessages(sessionId: String): Int
 }
 
-/** Stores metadata for files imported into the managed workspace. */
+/** Stores metadata for files imported into the managed workspace. Use cases: UC-0000023, UC-0000024, UC-0000026, UC-0000031. */
 interface WorkspaceFileStore {
     /** Inserts or replaces one workspace file record. */
     fun saveWorkspaceFile(record: WorkspaceFileRecord)
@@ -157,7 +163,7 @@ interface WorkspaceFileStore {
     fun deleteWorkspaceFile(id: String): Boolean
 }
 
-/** Stores and retrieves todo domain objects. */
+/** Stores and retrieves todo domain objects. Use cases: UC-0000013, UC-0000014. */
 interface TodoStore {
     /** Inserts or replaces a todo. */
     fun saveTodo(todo: Todo)
@@ -172,7 +178,7 @@ interface TodoStore {
     fun clearTodos()
 }
 
-/** Stores and retrieves sub-agent runtime state. */
+/** Stores and retrieves sub-agent runtime state. Use cases: UC-0000015, UC-0000016, UC-0000017, UC-0000018. */
 interface SubAgentStore {
     /** Inserts or replaces sub-agent state. */
     fun saveAgent(agent: PersistedSubAgent): Boolean
@@ -194,7 +200,7 @@ interface SubAgentStore {
     ): Boolean
 }
 
-/** Stores and retrieves sub-agent tool configurations. */
+/** Stores and retrieves sub-agent tool configurations. Use cases: UC-0000015, UC-0000019. */
 interface SubAgentConfigStore {
     /** Inserts or replaces a sub-agent tool configuration. */
     fun saveSubAgentConfig(config: SubAgentToolConfig)
@@ -208,6 +214,8 @@ interface SubAgentConfigStore {
 
 /**
  * Groups all persistence capabilities for bootstrap and isolated integration-test wiring.
+ *
+ * Use cases: UC-0000001, UC-0000040.
  */
 interface PersistenceStores :
     MemoryStore,

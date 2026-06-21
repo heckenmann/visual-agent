@@ -263,6 +263,18 @@ interface LLMProvider {
 }
 ```
 
+## Use-Case Documentation
+
+Every newly implemented user-visible function must create or update a use-case document under `docs/usecases/`.
+
+This includes toolbar buttons, panel buttons, menu actions, command-palette actions, tool-call actions, autonomous workflows, and persisted behavior that changes user-visible state.
+
+Prefer one use case per button or action. If several buttons are variants of the same workflow, every button must still be explicitly named in that shared use-case document.
+
+Every use-case document must include a `## Tool Calls` section before `## Code Entry Points`. List canonical tool IDs and actions when a workflow can be invoked by a model tool call; otherwise write `- None.` explicitly.
+
+Use-case documents are packaged into the agent build and exposed to enabled sub-agents through the `usecases` tool (`list`, `show`, `search`). Use this tool to answer user questions about Visual Agent functions from maintained product documentation instead of stale prompt text.
+
 ## Development Philosophy
 
 **Write software you would be happy to use yourself.** Prioritize:

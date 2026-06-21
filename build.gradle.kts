@@ -211,6 +211,67 @@ val kotlinSourceRoots =
         rootDir.toPath().resolve("src/test/kotlin"),
     )
 
+val generatedUseCaseResources = layout.buildDirectory.dir("generated/usecase-resources")
+
+val generateUseCaseResources by tasks.registering {
+    group = "documentation"
+    description = "Packages documented Visual Agent use cases as runtime resources."
+    val sourceDir = layout.projectDirectory.dir("docs/usecases")
+    val outputDir = generatedUseCaseResources
+    inputs.dir(sourceDir)
+    outputs.dir(outputDir)
+    doLast {
+        val targetDir = outputDir.get().dir("usecases").asFile
+        targetDir.deleteRecursively()
+        targetDir.mkdirs()
+        val discoveredUseCaseFiles =
+            sourceDir.asFile.listFiles { file ->
+                file.isFile && Regex("""uc_\d{7}_[a-z0-9_]+\.md""").matches(file.name)
+            }
+        val useCaseFiles = discoveredUseCaseFiles?.sortedBy { it.name }.orEmpty()
+        useCaseFiles.forEach { file ->
+            file.copyTo(targetDir.resolve(file.name), overwrite = true)
+        }
+        targetDir.resolve("index.txt").writeText(useCaseFiles.joinToString("\n") { it.name })
+    }
+}
+
+tasks.processResources {
+    dependsOn(generateUseCaseResources)
+    from(generatedUseCaseResources)
+}
+
+tasks.register("useCaseDocumentationCheck") {
+    group = "verification"
+    description = "Checks that every use-case document includes required traceability sections."
+    doLast {
+        val useCaseRoot = rootDir.toPath().resolve("docs/usecases")
+        if (!Files.exists(useCaseRoot)) return@doLast
+        val violations = mutableListOf<String>()
+        Files.walk(useCaseRoot).use { stream ->
+            stream
+                .filter { Files.isRegularFile(it) && Regex("""uc_\d{7}_[a-z0-9_]+\.md""").matches(it.fileName.toString()) }
+                .forEach { file ->
+                    val content = Files.readString(file)
+                    if (!content.contains("\n## Tool Calls\n")) {
+                        violations += "${file.toAbsolutePath()} missing '## Tool Calls' section"
+                    }
+                    if (!Regex("""(?s)## Tool Calls\s+\n-.+?\n\n## Code Entry Points""").containsMatchIn(content)) {
+                        violations += "${file.toAbsolutePath()} missing documented tool-call bullet before code entry points"
+                    }
+                }
+        }
+        if (violations.isNotEmpty()) {
+            error(
+                buildString {
+                    appendLine("Use-case documentation check failed with ${violations.size} violation(s):")
+                    violations.forEach { appendLine(it) }
+                },
+            )
+        }
+    }
+}
+
 tasks.register("ktlintJavadocCheck") {
     group = "verification"
     description = "Checks that public Kotlin declarations have KDoc/Javadoc comments."
@@ -411,6 +472,7 @@ tasks.named("check") {
     dependsOn("locAndPackageSizeCheck")
     dependsOn("unusedCodeCheck")
     dependsOn("desktopApiUsageCheck")
+    dependsOn("useCaseDocumentationCheck")
     dependsOn("jacocoTestCoverageVerification")
 }
 

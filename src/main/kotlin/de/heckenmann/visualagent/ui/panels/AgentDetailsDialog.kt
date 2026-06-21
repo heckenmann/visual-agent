@@ -27,6 +27,8 @@ import javafx.scene.layout.VBox
 
 /**
  * Creates or edits a sub-agent with validated identity and template fields.
+ *
+ * Use cases: UC-0000015, UC-0000051.
  */
 class AgentDetailsDialog {
     companion object {

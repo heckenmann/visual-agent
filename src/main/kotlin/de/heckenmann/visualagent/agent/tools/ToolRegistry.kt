@@ -18,6 +18,8 @@ import org.springframework.ai.tool.definition.ToolDefinition as SpringToolDefini
 
 /**
  * Registry that converts application tools into request-scoped Spring AI callbacks.
+ *
+ * Use cases: UC-0000019, UC-0000020, UC-0000042, UC-0000043, UC-0000044.
  */
 @Service
 class ToolRegistry(
@@ -31,6 +33,7 @@ class ToolRegistry(
      * Return all registered application tool IDs.
      *
      * @return Tool IDs known by the registry
+     * @see docs/usecases/uc_0000019_configure_agent_tools.md
      */
     fun allToolIds(): Set<ToolId> = toolsById.keys
 
@@ -38,6 +41,7 @@ class ToolRegistry(
      * Return all registered tool definitions.
      *
      * @return Tool definitions known by the registry
+     * @see docs/usecases/uc_0000019_configure_agent_tools.md
      */
     fun toolDefinitions(): List<ToolDefinition> = toolsById.values.map { it.definition }.sortedBy { it.id.value }
 
@@ -46,6 +50,7 @@ class ToolRegistry(
      *
      * @param enabledTools Tool IDs requested for a model call
      * @return Matching registered tools in deterministic order
+     * @see docs/usecases/uc_0000020_execute_tool_call.md
      */
     fun resolve(enabledTools: Set<ToolId>): List<VisualAgentTool> =
         enabledTools.mapNotNull { toolsById[it] }.sortedBy { it.definition.name }
@@ -56,6 +61,7 @@ class ToolRegistry(
      * @param enabledTools Tool IDs requested for a model call
      * @param context Request-scoped execution metadata passed to each tool
      * @return Tool callbacks that can be attached to Spring AI options
+     * @see docs/usecases/uc_0000020_execute_tool_call.md
      */
     fun functionCallbacks(
         enabledTools: Set<ToolId>,
@@ -65,6 +71,8 @@ class ToolRegistry(
             val definition = tool.definition
             /**
              * Spring AI callback wrapper that emits lifecycle events around one Visual Agent tool.
+             *
+             * Use cases: UC-0000020.
              */
             object : ToolCallback {
                 override fun getToolDefinition(): SpringToolDefinition =

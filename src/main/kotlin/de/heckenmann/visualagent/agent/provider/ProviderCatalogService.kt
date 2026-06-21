@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service
  * Stores provider profiles, model catalogs, and active selection in SQLite.
  *
  * Legacy Ollama/OpenAI preferences are migrated into profiles when no catalog exists.
+ *
+ * Use cases: UC-0000007, UC-0000008, UC-0000009.
  */
 @Service
 class ProviderCatalogService(
@@ -25,21 +27,29 @@ class ProviderCatalogService(
 
     /**
      * Returns every configured provider profile.
+     *
+     * Use cases: UC-0000007, UC-0000008.
      */
     fun listProviders(): List<ProviderProfile> = load().providers.sortedBy(ProviderProfile::name)
 
     /**
      * Returns enabled provider profiles.
+     *
+     * Use cases: UC-0000007, UC-0000008.
      */
     fun enabledProviders(): List<ProviderProfile> = listProviders().filter(ProviderProfile::enabled)
 
     /**
      * Returns one provider profile.
+     *
+     * Use cases: UC-0000008.
      */
     fun getProvider(id: String): ProviderProfile? = listProviders().firstOrNull { it.id == id }
 
     /**
      * Inserts or replaces a provider profile.
+     *
+     * Use cases: UC-0000008.
      */
     fun saveProvider(profile: ProviderProfile) {
         val state = load()
@@ -51,6 +61,7 @@ class ProviderCatalogService(
      * Deletes a provider profile when at least one other enabled profile remains.
      *
      * @return `true` when the profile was removed
+     * @see docs/usecases/uc_0000008_manage_provider_profiles.md
      */
     fun deleteProvider(providerId: String): Boolean {
         val state = load()
@@ -69,6 +80,8 @@ class ProviderCatalogService(
 
     /**
      * Replaces discovered models while preserving configured model metadata and options.
+     *
+     * Use cases: UC-0000008, UC-0000009.
      */
     fun updateDiscoveredModels(
         providerId: String,
@@ -85,6 +98,8 @@ class ProviderCatalogService(
 
     /**
      * Returns models that may be selected by the user.
+     *
+     * Use cases: UC-0000007, UC-0000009.
      */
     fun selectableModels(providerId: String): List<ProviderModelConfig> {
         val profile = getProvider(providerId) ?: return emptyList()
@@ -97,11 +112,15 @@ class ProviderCatalogService(
 
     /**
      * Returns the active provider identifier.
+     *
+     * Use cases: UC-0000007.
      */
     fun activeProviderId(): String = load().activeProviderId
 
     /**
      * Persists the active provider identifier.
+     *
+     * Use cases: UC-0000007.
      */
     fun setActiveProvider(providerId: String) {
         require(getProvider(providerId)?.enabled == true) { "Provider is missing or disabled: $providerId" }
@@ -112,6 +131,8 @@ class ProviderCatalogService(
 
     /**
      * Resolves one provider/model reference and merges options by specificity.
+     *
+     * Use cases: UC-0000007, UC-0000008.
      */
     fun resolve(
         providerId: String?,

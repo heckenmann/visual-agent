@@ -31,6 +31,8 @@ import java.time.format.DateTimeFormatter
 
 /**
  * Workspace file management panel for imported user files.
+ *
+ * Use cases: UC-0000023, UC-0000024, UC-0000025, UC-0000026, UC-0000031.
  */
 @Component
 @Lazy
@@ -52,17 +54,17 @@ class FilesPanel(
         refresh()
     }
 
-    /** Registers a callback invoked after files are imported through this panel. */
+    /** Registers a callback invoked after files are imported through this panel. Use cases: UC-0000023. */
     fun setOnFilesImported(callback: (List<WorkspaceFileRecord>) -> Unit) {
         onFilesImported = callback
     }
 
-    /** Registers a callback invoked after an image is inserted into the canvas. */
+    /** Registers a callback invoked after an image or canvas document is opened in the canvas. Use cases: UC-0000024, UC-0000031. */
     fun setOnCanvasOpened(callback: () -> Unit) {
         onCanvasOpened = callback
     }
 
-    /** Opens a file chooser and imports the selected files. */
+    /** Opens a file chooser and imports the selected files. Use cases: UC-0000023. */
     fun importWithDialog(): List<WorkspaceFileRecord> {
         val files =
             FileChooser()
@@ -97,7 +99,7 @@ class FilesPanel(
         return imported
     }
 
-    /** Refreshes the file list from persisted metadata. */
+    /** Refreshes the file list from persisted metadata. Use cases: UC-0000024. */
     fun refresh() {
         val query = searchField.text.orEmpty().trim()
         if (query.isBlank()) {
@@ -108,14 +110,14 @@ class FilesPanel(
         }
     }
 
-    /** Searches managed workspace files and displays matching records. */
+    /** Searches managed workspace files and displays matching records. Use cases: UC-0000025. */
     fun search(query: String) {
         val result = workspaceFiles.searchFiles(query)
         table.items.setAll(result.matches.map { it.record })
         statusLabel.text = "${result.matches.size} matches for \"$query\""
     }
 
-    /** Reconciles workspace metadata with files on disk and refreshes the panel. */
+    /** Reconciles workspace metadata with files on disk and refreshes the panel. Use cases: UC-0000026. */
     fun syncWorkspace() {
         val report = workspaceFiles.syncMetadataWithFilesystem()
         searchField.clear()

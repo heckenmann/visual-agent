@@ -2,6 +2,8 @@ package de.heckenmann.visualagent.orchestration
 
 /**
  * Canonical autonomous UX seed tasks for the Visual Agent backlog.
+ *
+ * Use cases: UC-0000053.
  */
 internal object UxSeedTasks {
     /**

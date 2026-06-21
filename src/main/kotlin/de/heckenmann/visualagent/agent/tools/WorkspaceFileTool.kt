@@ -16,6 +16,8 @@ import java.util.Base64
 
 /**
  * Tool that lets sub-agents inspect and analyze files imported into the managed workspace.
+ *
+ * Use cases: UC-0000025, UC-0000026, UC-0000027.
  */
 @Component
 class WorkspaceFileTool(

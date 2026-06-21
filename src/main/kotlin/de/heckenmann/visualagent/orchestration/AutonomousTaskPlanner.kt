@@ -12,6 +12,8 @@ import de.heckenmann.visualagent.todo.TodoStatus
 
 /**
  * Decomposes complex todos, selects suitable workers, and reviews worker output.
+ *
+ * Use cases: UC-0000056, UC-0000057.
  */
 internal class AutonomousTaskPlanner(
     private val todoManager: TodoManager,

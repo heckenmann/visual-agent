@@ -11,6 +11,8 @@ import org.springframework.stereotype.Component
  * Supported actions:
  * - `list`: list all documented entries.
  * - `show`: render one manual page by topic.
+ *
+ * Use cases: UC-0000058.
  */
 @Component
 class ManualTool(
@@ -32,6 +34,7 @@ class ManualTool(
      * @param inputJson JSON payload with `action` and optional `topic`
      * @param context Request metadata, not used by this tool
      * @return Manual output or an error with available topics
+     * @see docs/usecases/uc_0000058_get_builtin_manual.md
      */
     override fun execute(
         inputJson: String,

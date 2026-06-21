@@ -17,6 +17,8 @@ import org.springframework.stereotype.Component
  *
  * API keys are reported only as configured/not configured and are never included
  * in the returned content.
+ *
+ * Use cases: UC-0000061.
  */
 @Component
 class UiTool(
@@ -73,6 +75,8 @@ class UiTool(
 
 /**
  * Tool that returns the workspace root used for file and terminal operations.
+ *
+ * Use cases: UC-0000060.
  */
 @Component
 class PwdTool : VisualAgentTool {
@@ -92,6 +96,8 @@ class PwdTool : VisualAgentTool {
 
 /**
  * Tool that summarizes request metadata, workspace state, and active provider selection.
+ *
+ * Use cases: UC-0000059.
  */
 @Component
 class ContextTool(

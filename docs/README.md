@@ -9,6 +9,7 @@ Visual Agent now uses Spring Data JPA on SQLite with Flyway migrations for persi
 - [API Reference](api.md) - `LLMProvider`, Spring AI integration, tool-calling contracts
 - [Database Schema](database.md) - SQLite schema, indexes, persistence behavior
 - [SubAgents](subagents.md) - Autonomous/sub-agent model and UI integration
+- [Development Conventions](conventions.md) - Use-case traceability and documentation rules
 
 ## Quick Start
 

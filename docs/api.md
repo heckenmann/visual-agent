@@ -98,6 +98,7 @@ Current tool IDs:
 
 - `ui`
 - `manual` (built-in tool/manual pages, including markdown format reference)
+- `usecases` (packaged product use-case catalog)
 - `history`
 - `todos`
 - `canvas`
@@ -164,6 +165,18 @@ Supported actions:
 
 Imported files are not injected into model context automatically. The model must request content explicitly through this tool.
 Saved canvas documents are regular managed workspace files with MIME type `application/vnd.visual-agent.canvas+xml`, so they can be listed, searched, hashed, renamed, deleted, read, and reopened like other workspace files.
+
+### Use Cases Tool
+
+The `usecases` tool is available to sub-agents. It exposes the packaged `docs/usecases/*.md` catalog from runtime resources, with a filesystem fallback during local development.
+
+Supported actions:
+
+- `list`: returns use-case IDs, titles, and packaged file names.
+- `show`: requires `id` or `file`; returns one use-case document.
+- `search`: requires `query`; searches IDs, titles, and document content.
+
+Use this tool when the user asks whether Visual Agent supports a function, where a button is documented, or how an implemented workflow is expected to behave.
 
 ## Event Surfaces
 
