@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Visual Agent Dracula theme application icon">
+  <defs>
+    <radialGradient id="tile" cx="50%" cy="45%" r="70%">
+      <stop offset="0" stop-color="#44475a"/>
+      <stop offset="0.58" stop-color="#282a36"/>
+      <stop offset="1" stop-color="#191a21"/>
+    </radialGradient>
+    <radialGradient id="iris" cx="45%" cy="42%" r="62%">
+      <stop offset="0" stop-color="#f8f8f2"/>
+      <stop offset="0.28" stop-color="#8be9fd"/>
+      <stop offset="0.66" stop-color="#6272a4"/>
+      <stop offset="1" stop-color="#282a36"/>
+    </radialGradient>
+    <linearGradient id="northWestArc" x1="68" y1="256" x2="256" y2="68">
+      <stop offset="0" stop-color="#bd93f9"/>
+      <stop offset="0.45" stop-color="#f8f8f2"/>
+      <stop offset="1" stop-color="#bd93f9"/>
+    </linearGradient>
+    <linearGradient id="northEastArc" x1="256" y1="68" x2="444" y2="256">
+      <stop offset="0" stop-color="#f8f8f2"/>
+      <stop offset="0.52" stop-color="#8be9fd"/>
+      <stop offset="1" stop-color="#6272a4"/>
+    </linearGradient>
+    <linearGradient id="southArc" x1="70" y1="256" x2="442" y2="442">
+      <stop offset="0" stop-color="#8be9fd"/>
+      <stop offset="0.4" stop-color="#6272a4"/>
+      <stop offset="1" stop-color="#f8f8f2"/>
+    </linearGradient>
+    <filter id="softShadow" x="-35%" y="-35%" width="170%" height="170%">
+      <feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#000000" flood-opacity="0.32"/>
+    </filter>
+    <filter id="cyanGlow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" fill="none"/>
+  <rect x="34" y="34" width="444" height="444" rx="104" fill="#191a21" opacity="0.96" filter="url(#softShadow)"/>
+  <rect x="44" y="44" width="424" height="424" rx="94" fill="url(#tile)"/>
+  <rect x="50" y="50" width="412" height="412" rx="88" fill="none" stroke="#6272a4" stroke-width="3" opacity="0.55"/>
+
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="256" cy="256" r="166" stroke="#6272a4" stroke-width="2" opacity="0.38"/>
+    <circle cx="256" cy="256" r="124" stroke="#bd93f9" stroke-width="2" opacity="0.28"/>
+    <circle cx="256" cy="256" r="84" stroke="#8be9fd" stroke-width="2" opacity="0.26"/>
+
+    <path d="M92 256h76M344 256h76M256 92v76M256 344v76" stroke="#ff79c6" stroke-width="2" opacity="0.5"/>
+    <path d="M112 168h48l26 26M400 168h-48l-26 26M112 344h48l26-26M400 344h-48l-26-26"
+          stroke="#8be9fd" stroke-width="2" opacity="0.48"/>
+  </g>
+
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M256 70C226 154 154 226 70 256" stroke="#282a36" stroke-width="31"/>
+    <path d="M256 70C226 154 154 226 70 256" stroke="url(#northWestArc)" stroke-width="21"/>
+    <path d="M256 70C286 154 358 226 442 256" stroke="#282a36" stroke-width="31"/>
+    <path d="M256 70C286 154 358 226 442 256" stroke="url(#northEastArc)" stroke-width="21"/>
+    <path d="M70 256C154 286 226 356 256 442" stroke="#282a36" stroke-width="31"/>
+    <path d="M70 256C154 286 226 356 256 442" stroke="url(#southArc)" stroke-width="21"/>
+    <path d="M442 256C358 286 286 356 256 442" stroke="#282a36" stroke-width="31"/>
+    <path d="M442 256C358 286 286 356 256 442" stroke="#f8f8f2" stroke-width="13" opacity="0.74"/>
+    <path d="M442 256C358 286 286 356 256 442" stroke="#44475a" stroke-width="8" opacity="0.8"/>
+  </g>
+
+  <g filter="url(#cyanGlow)">
+    <circle cx="256" cy="256" r="80" fill="none" stroke="#8be9fd" stroke-width="4"/>
+    <circle cx="256" cy="256" r="51" fill="none" stroke="#f8f8f2" stroke-width="3" opacity="0.86"/>
+    <circle cx="256" cy="256" r="46" fill="#6272a4" opacity="0.78"/>
+    <circle cx="256" cy="256" r="33" fill="url(#iris)"/>
+    <circle cx="256" cy="256" r="16" fill="#191a21"/>
+    <circle cx="244" cy="244" r="6" fill="#f8f8f2" opacity="0.9"/>
+  </g>
+
+  <g fill="none" stroke-linecap="round">
+    <path d="M172 256h168M256 172v168" stroke="#ffb86c" stroke-width="4" opacity="0.7"/>
+    <path d="M256 92v328M92 256h328" stroke="#ff79c6" stroke-width="1.4" opacity="0.26"/>
+  </g>
+
+  <g>
+    <circle cx="256" cy="70" r="15" fill="#8be9fd" stroke="#f8f8f2" stroke-width="3"/>
+    <circle cx="256" cy="442" r="15" fill="#8be9fd" stroke="#f8f8f2" stroke-width="3"/>
+    <circle cx="70" cy="256" r="15" fill="#8be9fd" stroke="#f8f8f2" stroke-width="3"/>
+    <circle cx="442" cy="256" r="15" fill="#8be9fd" stroke="#f8f8f2" stroke-width="3"/>
+    <circle cx="144" cy="144" r="9" fill="#ffb86c" stroke="#f8f8f2" stroke-width="2"/>
+    <circle cx="368" cy="144" r="9" fill="#ffb86c" stroke="#f8f8f2" stroke-width="2"/>
+    <circle cx="144" cy="368" r="9" fill="#ffb86c" stroke="#f8f8f2" stroke-width="2"/>
+    <circle cx="368" cy="368" r="9" fill="#ffb86c" stroke="#f8f8f2" stroke-width="2"/>
+  </g>
+</svg>
