@@ -1,13 +1,7 @@
 package de.heckenmann.visualagent.ui.panels.canvas
 
-import de.heckenmann.visualagent.image.PngEncoder
 import de.heckenmann.visualagent.knowledge.PreferenceStore
 import javafx.animation.PauseTransition
-import javafx.geometry.Point2D
-import javafx.scene.SnapshotParameters
-import javafx.scene.control.TextInputDialog
-import javafx.scene.input.MouseButton
-import javafx.scene.input.MouseEvent
 import javafx.scene.layout.BorderPane
 import javafx.scene.layout.Region
 import javafx.scene.layout.StackPane
@@ -25,13 +19,14 @@ import org.jhotdraw8.draw.undo.DrawingModelUndoAdapter
 import org.springframework.context.annotation.Lazy
 import org.springframework.stereotype.Component
 import java.io.File
-import java.nio.file.Files
 
 /**
  * Hosts the JHotDraw-based structured drawing editor.
  *
  * Figures remain editable after insertion and participate in JHotDraw selection,
  * resize, rotation, zoom, grid, and undo/redo behavior.
+ *
+ * Use cases: UC-0000028, UC-0000029, UC-0000030, UC-0000031, UC-0000033.
  */
 @Component
 @Lazy
@@ -58,12 +53,10 @@ class CanvasPanel(
     private var activeDrawing = SimpleLayeredDrawing()
     private var activeLayer = LayerFigure()
     private var restoringDocument = false
-    private var pendingStroke: MutableList<Point2D>? = null
     private var activeTool = CanvasTool.SELECT
-    private var canvasWidth = loadCanvasDimension(CANVAS_WIDTH_KEY, DEFAULT_CANVAS_WIDTH)
-    private var canvasHeight = loadCanvasDimension(CANVAS_HEIGHT_KEY, DEFAULT_CANVAS_HEIGHT)
     private var onSaveWorkspace: (() -> Unit)? = null
     private var onOpenWorkspace: (() -> Unit)? = null
+    private val sizeController = CanvasSurfaceSizeController(preferenceStore, editorViewport, drawingView)
     private val toolbar =
         CanvasToolbar(
             onSelect = { selectTool(CanvasTool.SELECT) },
@@ -79,8 +72,16 @@ class CanvasPanel(
             onClear = ::clearCanvas,
             onSaveWorkspace = { onSaveWorkspace?.invoke() },
             onOpenWorkspace = { onOpenWorkspace?.invoke() },
-            onCanvasSize = ::promptCanvasSize,
+            onCanvasSize = sizeController::promptCanvasSize,
             onExport = ::exportPng,
+        )
+    private val penInputController =
+        CanvasPenInputController(
+            editorViewport = editorViewport,
+            drawingView = drawingView,
+            strokePreview = strokePreview,
+            activeTool = { activeTool },
+            addStroke = { points -> addFigure(CanvasFigureFactory.stroke(points)) },
         )
     private val selectionDeletionController =
         CanvasSelectionDeletionController(
@@ -97,7 +98,7 @@ class CanvasPanel(
     init {
         configureEditor()
         setupUI()
-        installPenInput()
+        penInputController.install()
         selectionDeletionController.install()
         updateHistoryActions()
     }
@@ -143,28 +144,8 @@ class CanvasPanel(
         minHeight = 100.0
         prefHeight = 600.0
         maxHeight = Double.MAX_VALUE
-        applyCanvasSize()
+        sizeController.applyCanvasSize()
         selectTool(CanvasTool.SELECT)
-    }
-
-    private fun installPenInput() {
-        editorViewport.addEventFilter(MouseEvent.MOUSE_PRESSED) { event ->
-            if (activeTool != CanvasTool.PEN || event.button != MouseButton.PRIMARY) return@addEventFilter
-            pendingStroke = mutableListOf(worldPoint(event))
-            strokePreview.points.setAll(event.x, event.y)
-            event.consume()
-        }
-        editorViewport.addEventFilter(MouseEvent.MOUSE_DRAGGED) { event ->
-            val points = pendingStroke ?: return@addEventFilter
-            points += worldPoint(event)
-            strokePreview.points.addAll(event.x, event.y)
-            event.consume()
-        }
-        editorViewport.addEventFilter(MouseEvent.MOUSE_RELEASED) { event ->
-            if (event.button != MouseButton.PRIMARY || pendingStroke == null) return@addEventFilter
-            commitPendingStroke()
-            event.consume()
-        }
     }
 
     /** Removes all figures from the drawing as one undoable operation. */
@@ -300,16 +281,10 @@ class CanvasPanel(
     fun setCanvasSize(
         width: Double,
         height: Double,
-    ) {
-        canvasWidth = width.coerceIn(MIN_CANVAS_SIZE, MAX_CANVAS_SIZE)
-        canvasHeight = height.coerceIn(MIN_CANVAS_SIZE, MAX_CANVAS_SIZE)
-        preferenceStore.setPreference(CANVAS_WIDTH_KEY, canvasWidth.toInt().toString())
-        preferenceStore.setPreference(CANVAS_HEIGHT_KEY, canvasHeight.toInt().toString())
-        applyCanvasSize()
-    }
+    ) = sizeController.setCanvasSize(width, height)
 
     /** Returns the configured editable canvas work-surface size. */
-    fun canvasSize(): Pair<Double, Double> = canvasWidth to canvasHeight
+    fun canvasSize(): Pair<Double, Double> = sizeController.canvasSize()
 
     /**
      * Deletes all currently selected figures that can be removed from the drawing.
@@ -346,19 +321,6 @@ class CanvasPanel(
     private fun addFigure(figure: Figure) {
         drawingView.model.insertChildAt(figure, activeLayer, activeLayer.children.size)
         updateHistoryActions()
-    }
-
-    private fun commitPendingStroke() {
-        val points = pendingStroke.orEmpty()
-        pendingStroke = null
-        strokePreview.points.clear()
-        if (points.size < 2) return
-        addFigure(CanvasFigureFactory.stroke(points))
-    }
-
-    private fun worldPoint(event: MouseEvent): Point2D {
-        val viewPoint = drawingView.node.sceneToLocal(event.sceneX, event.sceneY)
-        return drawingView.viewToWorld(viewPoint)
     }
 
     private fun selectTool(tool: CanvasTool) {
@@ -404,67 +366,10 @@ class CanvasPanel(
         toolbar.updateHistoryActions(drawingEditor.undoManager.canUndo(), drawingEditor.undoManager.canRedo())
     }
 
-    private fun promptCanvasSize() {
-        val result =
-            TextInputDialog("${canvasWidth.toInt()}x${canvasHeight.toInt()}")
-                .apply {
-                    title = "Canvas size"
-                    headerText = "Set editable canvas size"
-                    contentText = "Width x Height"
-                }.showAndWait()
-        if (result.isEmpty) return
-        val parts =
-            result
-                .get()
-                .lowercase()
-                .split("x", ",", " ")
-                .filter(String::isNotBlank)
-        if (parts.size < 2) return
-        setCanvasSize(parts[0].toDoubleOrNull() ?: canvasWidth, parts[1].toDoubleOrNull() ?: canvasHeight)
-    }
-
-    private fun applyCanvasSize() {
-        editorViewport.minWidth = canvasWidth
-        editorViewport.minHeight = canvasHeight
-        editorViewport.prefWidth = canvasWidth
-        editorViewport.prefHeight = canvasHeight
-        if (drawingView.node is Region) {
-            val surface = drawingView.node as Region
-            surface.minWidth = canvasWidth
-            surface.minHeight = canvasHeight
-            surface.prefWidth = canvasWidth
-            surface.prefHeight = canvasHeight
-        }
-    }
-
-    private fun loadCanvasDimension(
-        key: String,
-        fallback: Double,
-    ): Double =
-        preferenceStore
-            .getPreference(key)
-            ?.toDoubleOrNull()
-            ?.coerceIn(MIN_CANVAS_SIZE, MAX_CANVAS_SIZE)
-            ?: fallback
-
     @GeneratedUiGlue
-    private fun exportPng() {
-        val file = CanvasFileDialogs.showPngSaveDialog(scene?.window) ?: return
-        drawingView.clearSelection()
-        val snapshot = drawingView.node.snapshot(SnapshotParameters(), null)
-        Files.write(file.toPath(), PngEncoder.encode(snapshot))
-    }
+    private fun exportPng() = CanvasPngExporter.export(drawingView)
 
     override fun layoutChildren() {
         rootBorderPane.resizeRelocate(0.0, 0.0, width, height)
-    }
-
-    private companion object {
-        const val CANVAS_WIDTH_KEY = "canvas.surface.width"
-        const val CANVAS_HEIGHT_KEY = "canvas.surface.height"
-        const val DEFAULT_CANVAS_WIDTH = 1200.0
-        const val DEFAULT_CANVAS_HEIGHT = 800.0
-        const val MIN_CANVAS_SIZE = 100.0
-        const val MAX_CANVAS_SIZE = 10_000.0
     }
 }
