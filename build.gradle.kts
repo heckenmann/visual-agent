@@ -117,7 +117,7 @@ dependencies {
     implementation("org.apache.pdfbox:pdfbox:3.0.5")
 
     // AtlantaFX themes
-    implementation("io.github.mkpaz:atlantafx-base:2.0.1")
+    implementation("io.github.mkpaz:atlantafx-base:2.1.0")
 
     // Ikonli icons
     implementation("org.kordamp.ikonli:ikonli-javafx:12.4.0")
