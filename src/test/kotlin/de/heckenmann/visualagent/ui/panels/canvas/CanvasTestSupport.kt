@@ -9,6 +9,7 @@ import javafx.scene.Parent
 import javafx.scene.input.MouseButton
 import javafx.scene.input.MouseEvent
 import javafx.scene.input.PickResult
+import javafx.scene.layout.Region
 import org.jhotdraw8.draw.SimpleDrawingView
 import org.jhotdraw8.draw.figure.Figure
 import org.jhotdraw8.draw.tool.SelectionTool
@@ -16,6 +17,12 @@ import org.jhotdraw8.draw.tool.SelectionTool
 internal fun CanvasPanel.figures(): List<Figure> {
     val drawingView = field<SimpleDrawingView>("drawingView")
     return requireNotNull(drawingView.drawing).children.flatMap { it.children }
+}
+
+internal fun SimpleDrawingView.canvasRegion(): Region {
+    val field = SimpleDrawingView::class.java.getDeclaredField("background")
+    field.isAccessible = true
+    return field.get(this) as Region
 }
 
 internal val Bounds.center: Point2D

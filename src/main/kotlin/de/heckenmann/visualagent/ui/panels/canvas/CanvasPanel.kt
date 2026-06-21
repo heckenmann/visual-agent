@@ -125,6 +125,7 @@ class CanvasPanel(
     private fun restoreDrawing() {
         restoringDocument = true
         activeDrawing = runCatching(persistence::load).getOrNull() ?: SimpleLayeredDrawing()
+        sizeController.applyDrawingSize(activeDrawing)
         activeLayer =
             activeDrawing.children.filterIsInstance<LayerFigure>().firstOrNull()
                 ?: LayerFigure().also(activeDrawing::addChild)
@@ -141,7 +142,8 @@ class CanvasPanel(
         editorViewport.isFocusTraversable = true
         drawingView.node.styleClass.add("canvas-surface")
         children.add(rootBorderPane)
-        minHeight = 100.0
+        minWidth = 840.0
+        minHeight = 420.0
         prefHeight = 600.0
         maxHeight = Double.MAX_VALUE
         sizeController.applyCanvasSize()
@@ -152,6 +154,7 @@ class CanvasPanel(
     fun clearCanvas() {
         drawingView.selectedFigures.clear()
         activeDrawing = SimpleLayeredDrawing()
+        sizeController.applyDrawingSize(activeDrawing)
         activeLayer = LayerFigure()
         activeDrawing.addChild(activeLayer)
         drawingView.model.setRoot(activeDrawing)
@@ -263,6 +266,7 @@ class CanvasPanel(
         val drawing = persistence.readDrawing(file.readText(Charsets.UTF_8)) ?: return false
         restoringDocument = true
         activeDrawing = drawing
+        sizeController.applyDrawingSize(activeDrawing)
         activeLayer =
             activeDrawing.children.filterIsInstance<LayerFigure>().firstOrNull()
                 ?: LayerFigure().also(activeDrawing::addChild)

@@ -31,10 +31,12 @@ Window resizing does not move drawings into inaccessible space or blur the struc
 
 - `de.heckenmann.visualagent.ui.panels.canvas.CanvasPanel`
 - `de.heckenmann.visualagent.ui.panels.canvas.CanvasToolbar`
+- `de.heckenmann.visualagent.ui.panels.canvas.CanvasSurfaceSizeController`
 - `de.heckenmann.visualagent.ui.panels.canvas.CanvasEditorDefaults`
 
 ## Acceptance Criteria
 
 - Increasing window height does not cause canvas jitter.
+- The editable canvas surface starts at the viewport origin and is not centered inside a larger blank area.
 - Canvas size is user-controlled and survives restart.
 - Zoom reset is available through an icon-only toolbar button with tooltip.

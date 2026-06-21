@@ -22,6 +22,7 @@ import org.jhotdraw8.draw.tool.SimpleDragTracker
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import java.nio.file.Files
+import kotlin.math.abs
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
@@ -146,6 +147,25 @@ class CanvasPanelInteractionTest {
                 assertSame(figure, panel.figures().single())
                 assertSame(drawingView, panel.field("drawingView"))
             }
+        }
+
+    @Test
+    fun `configured canvas surface starts at viewport origin`() =
+        FxTestSupport.run {
+            val panel = panel()
+            Scene(panel, 900.0, 620.0)
+            panel.resize(900.0, 620.0)
+            panel.applyCss()
+            panel.layout()
+            val drawingView = panel.field<SimpleDrawingView>("drawingView")
+            val canvasRegion = drawingView.canvasRegion()
+            val viewportBounds = drawingView.node.localToScene(drawingView.node.boundsInLocal)
+            val canvasBounds = canvasRegion.localToScene(canvasRegion.boundsInLocal)
+
+            assertEquals(viewportBounds.minX, canvasBounds.minX, 0.001)
+            assertTrue(abs(viewportBounds.minY - canvasBounds.minY) <= 1.0)
+            assertEquals(1200.0, canvasBounds.width, 0.001)
+            assertEquals(800.0, canvasBounds.height, 0.001)
         }
 
     @Test
