@@ -7,7 +7,6 @@ import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfig
-import de.heckenmann.visualagent.ui.StatusBar
 import de.heckenmann.visualagent.ui.panels.ApplicationSettingsPanel
 import de.heckenmann.visualagent.ui.panels.ChatPanel
 import de.heckenmann.visualagent.ui.panels.FilesPanel
@@ -154,7 +153,6 @@ class MainWindow(
         chatWiring.register()
         chatPanel.setConversationHistory(agentManager.getHistory())
         registerEventObservers()
-        statusBar.setOnReconnect { checkConnection() }
         refreshTodoSummary()
 
         focusPanel(chatPanel, conversationBtn)

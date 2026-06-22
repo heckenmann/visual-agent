@@ -122,7 +122,7 @@ class AutonomousTaskPlannerTest {
     fun `ux seeds remain complete and ordered`() {
         val seeds = UxSeedTasks.all()
 
-        assertEquals(20, seeds.size)
+        assertEquals(19, seeds.size)
         assertTrue(seeds.first().startsWith("ChatPanel"))
         assertTrue(seeds.last().contains("accessibility"))
     }

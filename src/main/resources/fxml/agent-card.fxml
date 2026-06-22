@@ -4,6 +4,7 @@
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.Tooltip?>
 <?import javafx.scene.layout.Priority?>
 <?import javafx.scene.layout.Region?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
@@ -22,14 +23,22 @@
   </VBox>
   <Separator />
   <HBox spacing="8.0" alignment="CENTER_LEFT">
-    <Button fx:id="btnRun" text="Run next todo" styleClass="accent">
+    <Button fx:id="btnRun" styleClass="button-icon, accent">
       <graphic><FontIcon iconLiteral="fas-play" iconSize="10"/></graphic>
+      <tooltip><Tooltip text="Run next todo"/></tooltip>
     </Button>
-    <Button fx:id="btnConfigure" text="Configure" />
-    <Button fx:id="btnLogs" text="Logs" />
+    <Button fx:id="btnConfigure" styleClass="button-icon">
+      <graphic><FontIcon iconLiteral="fas-cog" iconSize="10"/></graphic>
+      <tooltip><Tooltip text="Configure agent"/></tooltip>
+    </Button>
+    <Button fx:id="btnLogs" styleClass="button-icon">
+      <graphic><FontIcon iconLiteral="fas-list-alt" iconSize="10"/></graphic>
+      <tooltip><Tooltip text="View agent logs"/></tooltip>
+    </Button>
     <Region HBox.hgrow="ALWAYS"/>
     <Button fx:id="btnDelete" styleClass="button-icon, danger-button">
       <graphic><FontIcon iconLiteral="fas-trash-alt" iconSize="10"/></graphic>
+      <tooltip><Tooltip text="Delete agent"/></tooltip>
     </Button>
   </HBox>
 </VBox>

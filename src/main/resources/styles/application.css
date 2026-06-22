@@ -836,7 +836,7 @@
 /* Custom UI Elements */
 .icon-rail {
     -fx-background-color: -color-bg-default;
-    -fx-padding: 16px 10px 12px 10px;
+    -fx-padding: 16px 8px 12px 8px;
     -fx-spacing: 5px;
     -fx-border-color: -color-border-default;
     -fx-border-width: 0px 1px 0px 0px;
@@ -844,21 +844,21 @@
 
 .nav-section-label {
     -fx-text-fill: -color-fg-muted;
-    -fx-font-size: 10px;
+    -fx-font-size: 0px;
     -fx-font-weight: bold;
-    -fx-padding: 8px 10px 5px 10px;
+    -fx-padding: 8px 0px 5px 0px;
 }
 
 .icon-rail-button {
     -fx-background-color: transparent;
     -fx-background-radius: 7px;
-    -fx-min-width: 162px;
-    -fx-pref-width: 162px;
+    -fx-min-width: 46px;
+    -fx-pref-width: 46px;
     -fx-min-height: 38px;
-    -fx-alignment: center-left;
-    -fx-content-display: left;
-    -fx-graphic-text-gap: 12px;
-    -fx-padding: 0 12px;
+    -fx-alignment: center;
+    -fx-content-display: graphic-only;
+    -fx-graphic-text-gap: 0px;
+    -fx-padding: 0;
     -fx-text-fill: -color-fg-muted;
 }
 
@@ -1042,25 +1042,6 @@
 
 .status-dot-connected { -fx-background-color: -color-success-emphasis; }
 .status-dot-disconnected { -fx-background-color: -color-danger-emphasis; }
-
-.status-action-button {
-    -fx-background-color: -color-bg-subtle;
-    -fx-border-color: -color-border-default;
-    -fx-border-radius: 6px;
-    -fx-background-radius: 6px;
-    -fx-padding: 4px 10px;
-    -fx-min-height: 26px;
-    -fx-pref-height: 26px;
-    -fx-font-size: 11px;
-}
-
-.status-action-button:hover {
-    -fx-background-color: -color-bg-default;
-}
-
-.status-action-secondary {
-    -fx-background-color: transparent;
-}
 
 .agent-status-indicator { -fx-min-width: 10px; -fx-min-height: 10px; -fx-background-radius: 5px; }
 .agent-status-idle { -fx-background-color: -color-success-emphasis; }

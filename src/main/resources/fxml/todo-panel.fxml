@@ -5,6 +5,7 @@
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.Tooltip?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Priority?>
@@ -22,25 +23,29 @@
                     <Label text="Tasks shared by the user, main agent, and sub-agents." styleClass="page-subtitle"/>
                 </VBox>
                 <Region HBox.hgrow="ALWAYS"/>
-                <Button fx:id="addButton" text="New todo" styleClass="accent, primary-action">
+                <Button fx:id="addButton" styleClass="button-icon, accent">
                     <graphic>
                         <FontIcon iconLiteral="fas-plus" iconSize="11"/>
                     </graphic>
+                    <tooltip><Tooltip text="New todo"/></tooltip>
                 </Button>
-                <Button fx:id="editButton" text="Edit">
+                <Button fx:id="editButton" styleClass="button-icon">
                     <graphic>
                         <FontIcon iconLiteral="fas-pen" iconSize="11"/>
                     </graphic>
+                    <tooltip><Tooltip text="Edit todo"/></tooltip>
                 </Button>
-                <Button fx:id="completeAllButton" text="Complete all">
+                <Button fx:id="completeAllButton" styleClass="button-icon">
                     <graphic>
                         <FontIcon iconLiteral="fas-check-double" iconSize="11"/>
                     </graphic>
+                    <tooltip><Tooltip text="Complete all todos"/></tooltip>
                 </Button>
-                <Button fx:id="deleteCompletedButton" text="Delete done">
+                <Button fx:id="deleteCompletedButton" styleClass="button-icon">
                     <graphic>
                         <FontIcon iconLiteral="fas-trash" iconSize="11"/>
                     </graphic>
+                    <tooltip><Tooltip text="Delete completed todos"/></tooltip>
                 </Button>
             </HBox>
             <HBox alignment="CENTER_LEFT" spacing="8.0" styleClass="todo-summary-row">
@@ -74,10 +79,11 @@
                 <FontIcon iconLiteral="fas-clipboard-list" iconSize="28" styleClass="empty-state-icon"/>
                 <Label fx:id="todoEmptyTitleLabel" text="No todos yet" styleClass="empty-state-title"/>
                 <Label fx:id="todoEmptyDescriptionLabel" text="Create a task yourself or let an agent create one." styleClass="empty-state-description"/>
-                <Button fx:id="emptyAddButton" text="Create first todo" styleClass="accent, primary-action">
+                <Button fx:id="emptyAddButton" styleClass="button-icon, accent">
                     <graphic>
                         <FontIcon iconLiteral="fas-plus" iconSize="11"/>
                     </graphic>
+                    <tooltip><Tooltip text="Create first todo"/></tooltip>
                 </Button>
             </VBox>
         </StackPane>

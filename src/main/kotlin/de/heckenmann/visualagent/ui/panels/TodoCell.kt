@@ -8,6 +8,7 @@ import javafx.scene.control.Button
 import javafx.scene.control.CheckBox
 import javafx.scene.control.Label
 import javafx.scene.control.ListCell
+import javafx.scene.control.Tooltip
 import javafx.scene.layout.HBox
 import javafx.scene.layout.Priority
 import javafx.scene.layout.Region
@@ -51,6 +52,7 @@ internal class TodoCell(
         agentBadge.styleClass.addAll("badge", "todo-agent-badge")
         deleteButton.styleClass.addAll("button-icon", "todo-delete-button")
         deleteButton.graphic = FontIcon(FontAwesomeSolid.TRASH_ALT)
+        deleteButton.tooltip = Tooltip("Delete todo")
         deleteButton.isFocusTraversable = false
         titleRow.alignment = Pos.TOP_LEFT
         titleRow.children.addAll(descriptionLabel, spacer, deleteButton)

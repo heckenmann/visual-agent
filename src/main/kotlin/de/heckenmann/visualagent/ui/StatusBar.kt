@@ -1,14 +1,13 @@
 package de.heckenmann.visualagent.ui
 
 import javafx.geometry.Pos
-import javafx.scene.control.Button
 import javafx.scene.control.Label
 import javafx.scene.layout.BorderPane
 import javafx.scene.layout.HBox
 import javafx.scene.layout.Region
 
 /**
- * Fixed-height footer that shows workspace persistence, agent activity, and reconnect controls.
+ * Fixed-height footer that shows workspace persistence and agent activity.
  */
 class StatusBar : Region() {
     companion object {
@@ -17,8 +16,6 @@ class StatusBar : Region() {
 
     private val rootBorderPane = BorderPane()
     private val agentsLabel = Label("0 of 0 agents active")
-    private val reconnectButton = Button("Reconnect")
-    private var onReconnect: (() -> Unit)? = null
 
     init {
         setupUI()
@@ -27,9 +24,6 @@ class StatusBar : Region() {
     private fun setupUI() {
         rootBorderPane.styleClass.add("status-bar")
 
-        reconnectButton.isFocusTraversable = false
-        reconnectButton.setOnAction { onReconnect?.invoke() }
-        reconnectButton.styleClass.addAll("status-action-button")
         agentsLabel.styleClass.add("status-bar-muted")
         val workspaceLabel =
             Label("Workspace changes are saved automatically").apply {
@@ -43,7 +37,7 @@ class StatusBar : Region() {
             }
 
         val rightGroup =
-            HBox(agentsChip, reconnectButton).apply {
+            HBox(agentsChip).apply {
                 styleClass.add("status-group")
                 alignment = Pos.CENTER_RIGHT
                 spacing = 8.0
@@ -69,15 +63,6 @@ class StatusBar : Region() {
         total: Int,
     ) {
         agentsLabel.text = "$active of $total agents active"
-    }
-
-    /**
-     * Registers the action invoked when the user clicks the reconnect button.
-     *
-     * @param callback Reconnection callback owned by the main window
-     */
-    fun setOnReconnect(callback: () -> Unit) {
-        onReconnect = callback
     }
 
     override fun computeMinHeight(width: Double): Double = HEIGHT

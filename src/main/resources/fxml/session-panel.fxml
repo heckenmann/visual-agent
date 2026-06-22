@@ -44,9 +44,18 @@
                         <Label text="Provider" styleClass="field-label"/>
                         <ComboBox fx:id="providerSelector" prefWidth="210.0" maxWidth="Infinity"/>
                         <HBox spacing="6.0">
-                            <Button fx:id="addProviderButton" text="Add"/>
-                            <Button fx:id="editProviderButton" text="Edit"/>
-                            <Button fx:id="deleteProviderButton" text="Delete"/>
+                            <Button fx:id="addProviderButton" styleClass="button-icon">
+                                <graphic><FontIcon iconLiteral="fas-plus" iconSize="10"/></graphic>
+                                <tooltip><Tooltip text="Add provider"/></tooltip>
+                            </Button>
+                            <Button fx:id="editProviderButton" styleClass="button-icon">
+                                <graphic><FontIcon iconLiteral="fas-pen" iconSize="10"/></graphic>
+                                <tooltip><Tooltip text="Edit provider"/></tooltip>
+                            </Button>
+                            <Button fx:id="deleteProviderButton" styleClass="button-icon">
+                                <graphic><FontIcon iconLiteral="fas-trash" iconSize="10"/></graphic>
+                                <tooltip><Tooltip text="Delete provider"/></tooltip>
+                            </Button>
                         </HBox>
                     </VBox>
                     <VBox fx:id="ollamaSettingsGroup" spacing="12.0" GridPane.columnIndex="1" GridPane.rowIndex="0">
@@ -82,7 +91,10 @@
                     <HBox spacing="8.0" alignment="CENTER_LEFT">
                         <ComboBox fx:id="modelSelector" maxWidth="Infinity" HBox.hgrow="ALWAYS"
                                   promptText="Select a model"/>
-                        <Button fx:id="favoriteButton" text="☆" styleClass="button-icon"/>
+                        <Button fx:id="favoriteButton" styleClass="button-icon">
+                            <graphic><FontIcon iconLiteral="fas-star" iconSize="10"/></graphic>
+                            <tooltip><Tooltip text="Add to favorites"/></tooltip>
+                        </Button>
                         <Button fx:id="refreshModelsButton" styleClass="button-icon">
                             <graphic><FontIcon iconLiteral="fas-sync-alt" iconSize="10"/></graphic>
                             <tooltip><Tooltip text="Refresh available models"/></tooltip>

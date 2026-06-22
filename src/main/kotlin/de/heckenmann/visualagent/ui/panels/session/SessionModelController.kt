@@ -11,6 +11,7 @@ import javafx.scene.control.CheckBox
 import javafx.scene.control.ComboBox
 import javafx.scene.control.Label
 import javafx.scene.control.TextField
+import javafx.scene.control.Tooltip
 import javafx.scene.layout.VBox
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -18,6 +19,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mu.KotlinLogging
+import org.kordamp.ikonli.fontawesome5.FontAwesomeSolid
+import org.kordamp.ikonli.javafx.FontIcon
 
 /**
  * Handles model discovery, filtering, and favorites for the session panel.
@@ -183,8 +186,10 @@ internal class SessionModelController(
 
     fun updateFavoriteButton(selected: String?) {
         val isFavorite = selected != null && favoriteModels.contains(selected)
-        favoriteButton.text = if (isFavorite) "★" else "☆"
+        favoriteButton.text = null
+        (favoriteButton.graphic as? FontIcon)?.iconCode = FontAwesomeSolid.STAR
+        favoriteButton.opacity = if (isFavorite) 1.0 else 0.55
         favoriteButton.isDisable = selected == null
-        favoriteButton.tooltip = javafx.scene.control.Tooltip(if (isFavorite) "Remove from favorites" else "Add to favorites")
+        favoriteButton.tooltip = Tooltip(if (isFavorite) "Remove from favorites" else "Add to favorites")
     }
 }

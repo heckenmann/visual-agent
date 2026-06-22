@@ -8,6 +8,7 @@
 <?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.Spinner?>
+<?import javafx.scene.control.Tooltip?>
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Priority?>
@@ -73,10 +74,19 @@
                 </HBox>
                 <Separator/>
                 <HBox spacing="10.0" alignment="CENTER_LEFT">
-                    <Button fx:id="importConfigButton" text="Import configuration"/>
-                    <Button fx:id="exportConfigButton" text="Export configuration" styleClass="accent"/>
+                    <Button fx:id="importConfigButton" styleClass="button-icon">
+                        <graphic><FontIcon iconLiteral="fas-file-import" iconSize="11"/></graphic>
+                        <tooltip><Tooltip text="Import configuration"/></tooltip>
+                    </Button>
+                    <Button fx:id="exportConfigButton" styleClass="button-icon, accent">
+                        <graphic><FontIcon iconLiteral="fas-file-export" iconSize="11"/></graphic>
+                        <tooltip><Tooltip text="Export configuration"/></tooltip>
+                    </Button>
                     <Region HBox.hgrow="ALWAYS"/>
-                    <Button fx:id="resetDefaultsButton" text="Reset defaults" styleClass="danger-outline"/>
+                    <Button fx:id="resetDefaultsButton" styleClass="button-icon, danger-outline">
+                        <graphic><FontIcon iconLiteral="fas-undo" iconSize="11"/></graphic>
+                        <tooltip><Tooltip text="Reset defaults"/></tooltip>
+                    </Button>
                 </HBox>
             </VBox>
 

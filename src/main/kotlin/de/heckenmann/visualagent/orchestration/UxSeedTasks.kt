@@ -20,7 +20,6 @@ internal object UxSeedTasks {
             "ChatPanel: accessibility pass (focus, labels, contrast)",
             "MainWindow: persistent left navigation with active state and tooltips",
             "MainWindow: command palette (Cmd/Ctrl+K) to switch panels/search",
-            "StatusBar: actionable controls (Retry, Reconnect)",
             "SessionPanel: model search, filter, favorites and quick actions",
             "SessionPanel: improve loading/error states for model info",
             "TodoPanel: inline create/edit without modal",

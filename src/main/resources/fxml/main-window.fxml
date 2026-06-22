@@ -41,9 +41,9 @@
         </HBox>
     </top>
     <left>
-        <VBox fx:id="iconRail" styleClass="icon-rail" alignment="TOP_LEFT" prefWidth="184.0" minWidth="184.0">
+        <VBox fx:id="iconRail" styleClass="icon-rail" alignment="TOP_CENTER" prefWidth="64.0" minWidth="64.0">
             <Label text="WORKSPACE" styleClass="nav-section-label"/>
-            <Button fx:id="conversationBtn" text="Conversation" styleClass="icon-rail-button">
+            <Button fx:id="conversationBtn" styleClass="icon-rail-button">
                 <graphic>
                     <FontIcon iconLiteral="fas-comments" iconSize="16"/>
                 </graphic>
@@ -51,7 +51,7 @@
                     <Tooltip text="Conversation"/>
                 </tooltip>
             </Button>
-            <Button fx:id="sessionBtn" text="Session" styleClass="icon-rail-button">
+            <Button fx:id="sessionBtn" styleClass="icon-rail-button">
                 <graphic>
                     <FontIcon iconLiteral="fas-bars" iconSize="16"/>
                 </graphic>
@@ -59,7 +59,7 @@
                     <Tooltip text="Session"/>
                 </tooltip>
             </Button>
-            <Button fx:id="agentsBtn" text="Agents" styleClass="icon-rail-button">
+            <Button fx:id="agentsBtn" styleClass="icon-rail-button">
                 <graphic>
                     <FontIcon iconLiteral="fas-users" iconSize="16"/>
                 </graphic>
@@ -67,7 +67,7 @@
                     <Tooltip text="Agents"/>
                 </tooltip>
             </Button>
-            <Button fx:id="planBtn" text="Todos" styleClass="icon-rail-button">
+            <Button fx:id="planBtn" styleClass="icon-rail-button">
                 <graphic>
                     <FontIcon iconLiteral="fas-copy" iconSize="16"/>
                 </graphic>
@@ -75,7 +75,7 @@
                     <Tooltip text="Todos"/>
                 </tooltip>
             </Button>
-            <Button fx:id="canvasBtn" text="Canvas" styleClass="icon-rail-button">
+            <Button fx:id="canvasBtn" styleClass="icon-rail-button">
                 <graphic>
                     <FontIcon iconLiteral="fas-palette" iconSize="16"/>
                 </graphic>
@@ -83,7 +83,7 @@
                     <Tooltip text="Canvas"/>
                 </tooltip>
             </Button>
-            <Button fx:id="filesBtn" text="Files" styleClass="icon-rail-button">
+            <Button fx:id="filesBtn" styleClass="icon-rail-button">
                 <graphic>
                     <FontIcon iconLiteral="fas-folder-open" iconSize="16"/>
                 </graphic>
@@ -93,7 +93,7 @@
             </Button>
             <Region VBox.vgrow="ALWAYS"/>
             <Label text="SYSTEM" styleClass="nav-section-label"/>
-            <Button fx:id="settingsBtn" text="Settings" styleClass="icon-rail-button">
+            <Button fx:id="settingsBtn" styleClass="icon-rail-button">
                 <graphic>
                     <FontIcon iconLiteral="fas-cog" iconSize="16"/>
                 </graphic>
