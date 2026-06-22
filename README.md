@@ -1,5 +1,9 @@
 # Visual Agent
 
+<p align="center">
+  <img src="src/main/resources/icons/visual-agent.svg" alt="Visual Agent icon" width="160">
+</p>
+
 Visual Agent is a Kotlin desktop coding agent with JavaFX UI, Spring Boot/Spring AI, and Spring Data JPA on SQLite.
 
 > **Development notice:** This project was written entirely with LLM assistance and is still under active development.
