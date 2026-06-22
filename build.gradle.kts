@@ -99,7 +99,7 @@ dependencies {
     implementation("ch.randelshofer:org.jhotdraw8.draw:0.5")
 
     // SQLite JDBC
-    implementation("org.xerial:sqlite-jdbc:3.45.0.0")
+    implementation("org.xerial:sqlite-jdbc:3.53.2.0")
 
     // Kotlinx Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
