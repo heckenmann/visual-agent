@@ -9,6 +9,7 @@ permissions:
 
 env:
   GRADLE_OPTS: -Dorg.gradle.daemon=false
+  NO_AT_BRIDGE: "1"
 
 jobs:
   test:
@@ -32,6 +33,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: "9.3.0"
+          cache-disabled: true
 
       - name: Run tests
         run: xvfb-run -a gradle --no-daemon test

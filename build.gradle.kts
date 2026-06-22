@@ -153,6 +153,7 @@ configurations.configureEach {
 tasks.test {
     useJUnitPlatform()
     systemProperty("visualagent.ollama.smoke", System.getProperty("visualagent.ollama.smoke", "false"))
+    jvmArgs("-Xshare:off")
     finalizedBy(tasks.jacocoTestReport)
 }
 
