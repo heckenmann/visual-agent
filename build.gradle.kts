@@ -110,8 +110,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
 
     // Markdown parsing
-    implementation("org.commonmark:commonmark:0.21.0")
-    implementation("org.commonmark:commonmark-ext-autolink:0.21.0")
+    implementation("org.commonmark:commonmark:0.29.0")
+    implementation("org.commonmark:commonmark-ext-autolink:0.29.0")
 
     // Workspace document analysis
     implementation("org.apache.pdfbox:pdfbox:3.0.5")
