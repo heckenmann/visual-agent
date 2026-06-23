@@ -3,7 +3,7 @@ import kotlin.io.path.extension
 
 plugins {
     kotlin("jvm") version "2.2.21"
-    kotlin("plugin.jpa") version "2.2.21"
+    kotlin("plugin.jpa") version "2.4.0"
     kotlin("plugin.serialization") version "2.4.0"
     kotlin("plugin.spring") version "2.4.0"
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
