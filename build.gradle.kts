@@ -114,7 +114,7 @@ dependencies {
     implementation("org.commonmark:commonmark-ext-autolink:0.29.0")
 
     // Workspace document analysis
-    implementation("org.apache.pdfbox:pdfbox:3.0.5")
+    implementation("org.apache.pdfbox:pdfbox:3.0.7")
 
     // AtlantaFX themes
     implementation("io.github.mkpaz:atlantafx-base:2.1.0")
