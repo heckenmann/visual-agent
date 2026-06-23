@@ -1,10 +1,12 @@
 package de.heckenmann.visualagent.ui
 
 import javafx.geometry.Pos
+import javafx.scene.CacheHint
 import javafx.scene.Cursor
 import javafx.scene.Node
 import javafx.scene.control.Button
 import javafx.scene.control.Label
+import javafx.scene.input.MouseEvent
 import javafx.scene.layout.BorderPane
 import javafx.scene.layout.HBox
 import javafx.scene.layout.Pane
@@ -30,6 +32,7 @@ internal class InternalWorkspaceWindow(
     private var dragStartSceneY = 0.0
     private var dragStartLayoutX = 0.0
     private var dragStartLayoutY = 0.0
+    private var dragging = false
     private var resizeStartSceneX = 0.0
     private var resizeStartSceneY = 0.0
     private var resizeStartWidth = 0.0
@@ -71,14 +74,17 @@ internal class InternalWorkspaceWindow(
         updateMinimumSize()
         layoutX = x
         layoutY = y
-        prefWidth = width.coerceAtLeast(requiredMinWidth())
-        prefHeight = height.coerceAtLeast(requiredMinHeight())
+        setWindowSize(
+            width.coerceAtLeast(requiredMinWidth()),
+            height.coerceAtLeast(requiredMinHeight()),
+        )
     }
 
     fun keepInside(
         desktopWidth: Double,
         desktopHeight: Double,
     ) {
+        commitDragTranslation()
         updateMinimumSize()
         val minWindowWidth = requiredMinWidth()
         val minWindowHeight = requiredMinHeight()
@@ -96,10 +102,18 @@ internal class InternalWorkspaceWindow(
             } else {
                 currentHeight.coerceAtLeast(minWindowHeight)
             }
-        prefWidth = boundedWidth
-        prefHeight = boundedHeight
+        setWindowSize(boundedWidth, boundedHeight)
         layoutX = clamp(layoutX, 0.0, max(0.0, desktopWidth - boundedWidth))
         layoutY = clamp(layoutY, 0.0, max(0.0, desktopHeight - boundedHeight))
+    }
+
+    fun visualLayoutX(): Double = layoutX + translateX
+
+    fun visualLayoutY(): Double = layoutY + translateY
+
+    fun close() {
+        isVisible = false
+        isManaged = false
     }
 
     private fun windowHeader(
@@ -124,22 +138,70 @@ internal class InternalWorkspaceWindow(
         )
         header.cursor = Cursor.MOVE
         header.setOnMousePressed { event ->
-            toFront()
-            dragStartSceneX = event.sceneX
-            dragStartSceneY = event.sceneY
-            dragStartLayoutX = layoutX
-            dragStartLayoutY = layoutY
+            beginDrag(event)
             event.consume()
         }
         header.setOnMouseDragged { event ->
-            val parentPane = parent as? Pane
-            val maxX = (parentPane?.width ?: Double.MAX_VALUE) - width
-            val maxY = (parentPane?.height ?: Double.MAX_VALUE) - height
-            layoutX = clamp(dragStartLayoutX + event.sceneX - dragStartSceneX, 0.0, max(0.0, maxX))
-            layoutY = clamp(dragStartLayoutY + event.sceneY - dragStartSceneY, 0.0, max(0.0, maxY))
+            dragTo(event)
+            event.consume()
+        }
+        header.setOnMouseReleased { event ->
+            finishDrag()
             event.consume()
         }
         return header
+    }
+
+    private fun beginDrag(event: MouseEvent) {
+        toFront()
+        commitDragTranslation()
+        dragging = true
+        if (!styleClass.contains(DRAGGING_STYLE_CLASS)) {
+            styleClass.add(DRAGGING_STYLE_CLASS)
+        }
+        isCache = true
+        contentContainer.isCache = true
+        cacheHint = CacheHint.SPEED
+        contentContainer.cacheHint = CacheHint.SPEED
+        dragStartSceneX = event.sceneX
+        dragStartSceneY = event.sceneY
+        dragStartLayoutX = layoutX
+        dragStartLayoutY = layoutY
+    }
+
+    private fun dragTo(event: MouseEvent) {
+        if (!dragging) {
+            beginDrag(event)
+        }
+        val parentPane = parent as? Pane
+        val maxX = (parentPane?.width ?: Double.MAX_VALUE) - width
+        val maxY = (parentPane?.height ?: Double.MAX_VALUE) - height
+        val nextX = clamp(dragStartLayoutX + event.sceneX - dragStartSceneX, 0.0, max(0.0, maxX))
+        val nextY = clamp(dragStartLayoutY + event.sceneY - dragStartSceneY, 0.0, max(0.0, maxY))
+        translateX = nextX - layoutX
+        translateY = nextY - layoutY
+    }
+
+    private fun finishDrag() {
+        if (!dragging) {
+            return
+        }
+        commitDragTranslation()
+        dragging = false
+        styleClass.remove(DRAGGING_STYLE_CLASS)
+        cacheHint = CacheHint.DEFAULT
+        contentContainer.cacheHint = CacheHint.DEFAULT
+        isCache = false
+        contentContainer.isCache = false
+    }
+
+    private fun commitDragTranslation() {
+        if (translateX != 0.0 || translateY != 0.0) {
+            layoutX += translateX
+            layoutY += translateY
+            translateX = 0.0
+            translateY = 0.0
+        }
     }
 
     private fun closeButton(): Button =
@@ -152,8 +214,7 @@ internal class InternalWorkspaceWindow(
             styleClass.add("workspace-window-close")
             isFocusTraversable = false
             setOnAction {
-                this@InternalWorkspaceWindow.isVisible = false
-                this@InternalWorkspaceWindow.isManaged = false
+                this@InternalWorkspaceWindow.close()
             }
         }
 
@@ -182,11 +243,22 @@ internal class InternalWorkspaceWindow(
             val minWindowHeight = requiredMinHeight()
             val maxWidth = max(minWindowWidth, (parentPane?.width ?: Double.MAX_VALUE) - layoutX)
             val maxHeight = max(minWindowHeight, (parentPane?.height ?: Double.MAX_VALUE) - layoutY)
-            prefWidth = clamp(resizeStartWidth + event.sceneX - resizeStartSceneX, minWindowWidth, maxWidth)
-            prefHeight = clamp(resizeStartHeight + event.sceneY - resizeStartSceneY, minWindowHeight, maxHeight)
+            setWindowSize(
+                clamp(resizeStartWidth + event.sceneX - resizeStartSceneX, minWindowWidth, maxWidth),
+                clamp(resizeStartHeight + event.sceneY - resizeStartSceneY, minWindowHeight, maxHeight),
+            )
             event.consume()
         }
         return handle
+    }
+
+    private fun setWindowSize(
+        width: Double,
+        height: Double,
+    ) {
+        prefWidth = width
+        prefHeight = height
+        resize(width, height)
     }
 
     private fun updateMinimumSize() {
@@ -226,5 +298,6 @@ internal class InternalWorkspaceWindow(
         const val MIN_HEIGHT = 320.0
         const val HEADER_MIN_HEIGHT = 36.0
         const val RESIZE_HANDLE_MIN_HEIGHT = 22.0
+        const val DRAGGING_STYLE_CLASS = "workspace-window-dragging"
     }
 }

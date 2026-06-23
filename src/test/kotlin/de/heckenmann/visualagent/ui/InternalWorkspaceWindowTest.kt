@@ -1,8 +1,13 @@
 package de.heckenmann.visualagent.ui
 
 import de.heckenmann.visualagent.ui.panels.FxTestSupport
+import javafx.event.EventType
 import javafx.scene.control.Button
 import javafx.scene.control.Label
+import javafx.scene.input.MouseButton
+import javafx.scene.input.MouseEvent
+import javafx.scene.input.PickResult
+import javafx.scene.layout.HBox
 import javafx.scene.layout.Pane
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
@@ -23,16 +28,19 @@ class InternalWorkspaceWindowTest {
             assertTrue(manager.windowFor(panel)?.isVisible == false)
             manager.focus(panel)
 
-            val window = manager.windowFor(panel)
+            val window = requireNotNull(manager.windowFor(panel))
             assertEquals(1, desktop.children.size)
             assertSame(window, desktop.children.single())
-            assertTrue((window?.center as Pane).children.contains(panel))
-            assertEquals(12.0, window?.layoutX)
-            assertEquals(18.0, window?.layoutY)
-            assertEquals(420.0, window?.prefWidth)
-            assertEquals(320.0, window?.prefHeight)
-            assertTrue(window?.isVisible == true)
-            assertTrue(window?.styleClass?.contains("workspace-window-active") == true)
+            assertTrue((window.center as Pane).children.contains(panel))
+            assertEquals(12.0, window.layoutX)
+            assertEquals(18.0, window.layoutY)
+            assertEquals(420.0, window.prefWidth)
+            assertEquals(320.0, window.prefHeight)
+            assertEquals(420.0, window.width)
+            assertEquals(320.0, window.height)
+            assertTrue(window.isVisible)
+            assertTrue(!window.isManaged)
+            assertTrue(window.styleClass.contains("workspace-window-active"))
         }
 
     @Test
@@ -109,12 +117,15 @@ class InternalWorkspaceWindowTest {
                 ),
             )
 
-            val window = manager.windowFor(panel)
-            assertEquals(44.0, window?.layoutX)
-            assertEquals(55.0, window?.layoutY)
-            assertEquals(500.0, window?.prefWidth)
-            assertEquals(360.0, window?.prefHeight)
-            assertTrue(window?.isVisible == true)
+            val window = requireNotNull(manager.windowFor(panel))
+            assertEquals(44.0, window.layoutX)
+            assertEquals(55.0, window.layoutY)
+            assertEquals(500.0, window.prefWidth)
+            assertEquals(360.0, window.prefHeight)
+            assertEquals(500.0, window.width)
+            assertEquals(360.0, window.height)
+            assertTrue(window.isVisible)
+            assertTrue(!window.isManaged)
         }
 
     @Test
@@ -142,12 +153,13 @@ class InternalWorkspaceWindowTest {
                 ),
             )
 
-            val window = manager.windowFor(panel)
-            assertEquals(0.0, window?.layoutX)
-            assertEquals(0.0, window?.layoutY)
-            assertEquals(500.0, window?.prefWidth)
-            assertEquals(360.0, window?.prefHeight)
-            assertTrue(window?.isVisible == true)
+            val window = requireNotNull(manager.windowFor(panel))
+            assertEquals(0.0, window.layoutX)
+            assertEquals(0.0, window.layoutY)
+            assertEquals(500.0, window.prefWidth)
+            assertEquals(360.0, window.prefHeight)
+            assertTrue(window.isVisible)
+            assertTrue(!window.isManaged)
         }
 
     @Test
@@ -176,10 +188,11 @@ class InternalWorkspaceWindowTest {
             )
             manager.focus(panel)
 
-            val window = manager.windowFor(panel)
-            assertEquals(80.0, window?.layoutX)
-            assertEquals(40.0, window?.layoutY)
-            assertTrue(window?.isVisible == true)
+            val window = requireNotNull(manager.windowFor(panel))
+            assertEquals(80.0, window.layoutX)
+            assertEquals(40.0, window.layoutY)
+            assertTrue(window.isVisible)
+            assertTrue(!window.isManaged)
         }
 
     @Test
@@ -207,6 +220,46 @@ class InternalWorkspaceWindowTest {
         }
 
     @Test
+    fun `workspace window drags with transforms and commits layout on release`() =
+        FxTestSupport.run {
+            val desktop = Pane()
+            desktop.resize(900.0, 700.0)
+            val panel = Label("Panel")
+            val manager = WorkspaceWindowManager(desktop)
+
+            manager.register("panel", "Panel", "fas-copy", panel, WindowPlacement(10.0, 20.0, 420.0, 320.0))
+            manager.focus(panel)
+
+            val window = requireNotNull(manager.windowFor(panel))
+            window.resize(420.0, 320.0)
+            val header = window.lookup(".workspace-window-header") as HBox
+
+            header.fireEvent(mouseEvent(header, MouseEvent.MOUSE_PRESSED, 100.0, 100.0))
+            header.fireEvent(mouseEvent(header, MouseEvent.MOUSE_DRAGGED, 160.0, 145.0))
+
+            assertEquals(10.0, window.layoutX)
+            assertEquals(20.0, window.layoutY)
+            assertEquals(60.0, window.translateX)
+            assertEquals(45.0, window.translateY)
+            assertTrue(window.isCache)
+            assertTrue(window.styleClass.contains("workspace-window-dragging"))
+            assertTrue((window.center as Pane).isCache)
+            val draggedState = manager.snapshot().windows.single()
+            assertEquals(70.0, draggedState.x)
+            assertEquals(65.0, draggedState.y)
+
+            header.fireEvent(mouseEvent(header, MouseEvent.MOUSE_RELEASED, 160.0, 145.0, primaryDown = false))
+
+            assertEquals(70.0, window.layoutX)
+            assertEquals(65.0, window.layoutY)
+            assertEquals(0.0, window.translateX)
+            assertEquals(0.0, window.translateY)
+            assertTrue(!window.isCache)
+            assertTrue(!window.styleClass.contains("workspace-window-dragging"))
+            assertTrue(!(window.center as Pane).isCache)
+        }
+
+    @Test
     fun `close button hides the internal window without removing the hosted panel`() =
         FxTestSupport.run {
             val panel = Label("Panel")
@@ -228,3 +281,31 @@ class InternalWorkspaceWindowTest {
         fun startToolkit() = FxTestSupport.startToolkit()
     }
 }
+
+private fun mouseEvent(
+    target: HBox,
+    type: EventType<MouseEvent>,
+    sceneX: Double,
+    sceneY: Double,
+    primaryDown: Boolean = true,
+): MouseEvent =
+    MouseEvent(
+        type,
+        sceneX,
+        sceneY,
+        sceneX,
+        sceneY,
+        MouseButton.PRIMARY,
+        1,
+        false,
+        false,
+        false,
+        false,
+        primaryDown,
+        false,
+        false,
+        false,
+        false,
+        false,
+        PickResult(target, sceneX, sceneY),
+    )

@@ -41,7 +41,6 @@ internal class WorkspaceWindowManager(
             val active = registeredPanel === panel
             if (active) {
                 window.isVisible = true
-                window.isManaged = true
                 keepWindowInsideDesktop(window)
             }
             window.setActive(active)
@@ -58,7 +57,7 @@ internal class WorkspaceWindowManager(
             entry.window.place(state.x, state.y, state.width, state.height)
             keepWindowInsideDesktop(entry.window)
             entry.window.isVisible = state.visible
-            entry.window.isManaged = state.visible
+            entry.window.isManaged = false
         }
         layout.windows.sortedBy(WorkspaceWindowState::zIndex).forEach { state ->
             entries.find { it.id == state.id }?.window?.toFront()
@@ -108,8 +107,8 @@ private fun InternalWorkspaceWindow.toState(
 ): WorkspaceWindowState =
     WorkspaceWindowState(
         id = id,
-        x = layoutX,
-        y = layoutY,
+        x = visualLayoutX(),
+        y = visualLayoutY(),
         width = if (width > 0.0) width else prefWidth,
         height = if (height > 0.0) height else prefHeight,
         visible = isVisible,
