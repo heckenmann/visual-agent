@@ -17,6 +17,10 @@ class MainWindowFxmlLayoutTest {
             "main-window.fxml must expose the internal window desktop",
         )
         assertTrue(res != null && res.contains("fx:id=\"appIconImage\""), "main-window.fxml must show the application icon in the header")
+        assertTrue(
+            res != null && res.contains("fx:id=\"closeApplicationBtn\"") && res.contains("Close application"),
+            "main-window.fxml must expose an icon-only rail action for closing the application",
+        )
         assertTrue(res != null && !res.contains("minimizeButton"), "main-window.fxml must rely on native minimize controls")
         assertTrue(res != null && !res.contains("maximizeButton"), "main-window.fxml must rely on native maximize controls")
         assertTrue(res != null && !res.contains("closeButton"), "main-window.fxml must rely on native close controls")

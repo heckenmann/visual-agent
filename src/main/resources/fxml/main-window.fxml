@@ -92,6 +92,14 @@
                 </tooltip>
             </Button>
             <Region VBox.vgrow="ALWAYS"/>
+            <Button fx:id="closeApplicationBtn" styleClass="icon-rail-button icon-rail-danger-button">
+                <graphic>
+                    <FontIcon iconLiteral="fas-times" iconSize="16"/>
+                </graphic>
+                <tooltip>
+                    <Tooltip text="Close application"/>
+                </tooltip>
+            </Button>
             <Label text="SYSTEM" styleClass="nav-section-label"/>
             <Button fx:id="settingsBtn" styleClass="icon-rail-button">
                 <graphic>

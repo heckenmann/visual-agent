@@ -252,7 +252,6 @@
 
 .canvas-surface {
     -fx-cursor: crosshair;
-    -fx-effect: dropshadow(gaussian, rgba(15, 23, 42, 0.12), 14, 0.1, 0, 3);
 }
 
 /* Conversation */
@@ -592,7 +591,6 @@
 
 .chat-image-preview {
     -fx-background-radius: 10px;
-    -fx-effect: dropshadow(gaussian, rgba(31, 35, 40, 0.16), 14, 0.16, 0, 4);
 }
 
 .files-panel,
@@ -881,6 +879,14 @@
     -fx-icon-color: -color-accent-fg;
 }
 
+.icon-rail-danger-button:hover {
+    -fx-background-color: -color-danger-muted;
+}
+
+.icon-rail-danger-button:hover .ikonli-font-icon {
+    -fx-icon-color: -color-danger-emphasis;
+}
+
 .title-bar {
     -fx-background-color: -color-bg-default;
     -fx-padding: 10px 14px;
@@ -933,12 +939,12 @@
     -fx-background-radius: 12px;
     -fx-border-color: -color-border-muted;
     -fx-border-radius: 12px;
-    -fx-effect: dropshadow(gaussian, rgba(31, 35, 40, 0.18), 18, 0.18, 0, 6);
+    -fx-border-width: 1px;
 }
 
 .workspace-window-active {
     -fx-border-color: -color-accent-emphasis;
-    -fx-effect: dropshadow(gaussian, rgba(9, 105, 218, 0.24), 24, 0.22, 0, 8);
+    -fx-border-width: 1.5px;
 }
 
 .workspace-window-header {

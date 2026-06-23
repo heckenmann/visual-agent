@@ -40,7 +40,7 @@ import org.springframework.stereotype.Component
  * The bean is lazy so JavaFX controls are constructed on the JavaFX application thread.
  *
  * Use cases: UC-0000001, UC-0000002, UC-0000007, UC-0000012, UC-0000034, UC-0000035,
- * UC-0000038, UC-0000039.
+ * UC-0000038, UC-0000039, UC-0000070.
  */
 @Component
 @Lazy // delay instantiation until requested on the JavaFX Application thread
@@ -99,6 +99,9 @@ class MainWindow(
     private lateinit var filesBtn: Button
 
     @FXML
+    private lateinit var closeApplicationBtn: Button
+
+    @FXML
     private lateinit var settingsBtn: Button
 
     private val panelByButton = LinkedHashMap<Button, Node>()
@@ -147,6 +150,7 @@ class MainWindow(
             ) { panel, button -> focusPanel(panel, button) },
         )
         registerWorkspaceWindows()
+        closeApplicationBtn.setOnAction { closeApplication() }
 
         MainWindowSubAgentWiring(agentManager, subAgentsPanel, chatPanel) { updateAgentCountUi() }.register()
         registerFilesPanelCallbacks()
@@ -256,6 +260,11 @@ class MainWindow(
             button.styleClass.add("active")
         }
         activeButton = button
+    }
+
+    private fun closeApplication() {
+        close()
+        Platform.exit()
     }
 
     private fun loadStyles() {
