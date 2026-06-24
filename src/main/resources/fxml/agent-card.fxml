@@ -24,20 +24,20 @@
   <Separator />
   <HBox spacing="8.0" alignment="CENTER_LEFT">
     <Button fx:id="btnRun" styleClass="button-icon, accent">
-      <graphic><FontIcon iconLiteral="fas-play" iconSize="10"/></graphic>
+      <graphic><FontIcon iconLiteral="fas-play"/></graphic>
       <tooltip><Tooltip text="Run next todo"/></tooltip>
     </Button>
     <Button fx:id="btnConfigure" styleClass="button-icon">
-      <graphic><FontIcon iconLiteral="fas-cog" iconSize="10"/></graphic>
+      <graphic><FontIcon iconLiteral="fas-cog"/></graphic>
       <tooltip><Tooltip text="Configure agent"/></tooltip>
     </Button>
     <Button fx:id="btnLogs" styleClass="button-icon">
-      <graphic><FontIcon iconLiteral="fas-list-alt" iconSize="10"/></graphic>
+      <graphic><FontIcon iconLiteral="fas-list-alt"/></graphic>
       <tooltip><Tooltip text="View agent logs"/></tooltip>
     </Button>
     <Region HBox.hgrow="ALWAYS"/>
     <Button fx:id="btnDelete" styleClass="button-icon, danger-button">
-      <graphic><FontIcon iconLiteral="fas-trash-alt" iconSize="10"/></graphic>
+      <graphic><FontIcon iconLiteral="fas-trash-alt"/></graphic>
       <tooltip><Tooltip text="Delete agent"/></tooltip>
     </Button>
   </HBox>

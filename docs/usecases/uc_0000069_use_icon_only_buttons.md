@@ -39,5 +39,6 @@ Users interact with compact action buttons that show only an icon. Hovering over
 ## Acceptance Criteria
 - User action buttons in maintained FXML layouts do not define visible `text` labels.
 - Every icon-only button has a tooltip that states the action.
+- Canvas toolbar buttons and toggle actions, including grid visibility, are icon-only and describe their action through tooltips.
 - The left navigation rail uses icon-only buttons with hover tooltips.
 - Dialog-provided standard buttons are allowed to keep text labels.

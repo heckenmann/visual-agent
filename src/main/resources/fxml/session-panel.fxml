@@ -32,7 +32,7 @@
         <VBox spacing="16.0" styleClass="page-content">
             <VBox spacing="14.0" styleClass="settings-card">
                 <HBox alignment="CENTER_LEFT" spacing="10.0">
-                    <FontIcon iconLiteral="fas-microchip" iconSize="14" styleClass="card-icon"/>
+                    <FontIcon iconLiteral="fas-microchip" styleClass="card-icon"/>
                     <VBox spacing="1.0">
                         <Label text="Model Provider" styleClass="card-title"/>
                         <Label text="Select the service and model used for new requests." styleClass="card-description"/>
@@ -45,15 +45,15 @@
                         <ComboBox fx:id="providerSelector" prefWidth="210.0" maxWidth="Infinity"/>
                         <HBox spacing="6.0">
                             <Button fx:id="addProviderButton" styleClass="button-icon">
-                                <graphic><FontIcon iconLiteral="fas-plus" iconSize="10"/></graphic>
+                                <graphic><FontIcon iconLiteral="fas-plus"/></graphic>
                                 <tooltip><Tooltip text="Add provider"/></tooltip>
                             </Button>
                             <Button fx:id="editProviderButton" styleClass="button-icon">
-                                <graphic><FontIcon iconLiteral="fas-pen" iconSize="10"/></graphic>
+                                <graphic><FontIcon iconLiteral="fas-pen"/></graphic>
                                 <tooltip><Tooltip text="Edit provider"/></tooltip>
                             </Button>
                             <Button fx:id="deleteProviderButton" styleClass="button-icon">
-                                <graphic><FontIcon iconLiteral="fas-trash" iconSize="10"/></graphic>
+                                <graphic><FontIcon iconLiteral="fas-trash"/></graphic>
                                 <tooltip><Tooltip text="Delete provider"/></tooltip>
                             </Button>
                         </HBox>
@@ -92,11 +92,11 @@
                         <ComboBox fx:id="modelSelector" maxWidth="Infinity" HBox.hgrow="ALWAYS"
                                   promptText="Select a model"/>
                         <Button fx:id="favoriteButton" styleClass="button-icon">
-                            <graphic><FontIcon iconLiteral="fas-star" iconSize="10"/></graphic>
+                            <graphic><FontIcon iconLiteral="fas-star"/></graphic>
                             <tooltip><Tooltip text="Add to favorites"/></tooltip>
                         </Button>
                         <Button fx:id="refreshModelsButton" styleClass="button-icon">
-                            <graphic><FontIcon iconLiteral="fas-sync-alt" iconSize="10"/></graphic>
+                            <graphic><FontIcon iconLiteral="fas-sync-alt"/></graphic>
                             <tooltip><Tooltip text="Refresh available models"/></tooltip>
                         </Button>
                     </HBox>
@@ -107,7 +107,7 @@
 
             <VBox spacing="14.0" styleClass="settings-card">
                 <HBox alignment="CENTER_LEFT" spacing="10.0">
-                    <FontIcon iconLiteral="fas-sliders-h" iconSize="14" styleClass="card-icon"/>
+                    <FontIcon iconLiteral="fas-sliders-h" styleClass="card-icon"/>
                     <VBox spacing="1.0">
                         <Label text="Execution" styleClass="card-title"/>
                         <Label text="Control context capacity, concurrency, and request limits." styleClass="card-description"/>
@@ -148,7 +148,7 @@
 
             <VBox spacing="14.0" styleClass="settings-card">
                 <HBox alignment="CENTER_LEFT" spacing="10.0">
-                    <FontIcon iconLiteral="fas-cog" iconSize="14" styleClass="card-icon"/>
+                    <FontIcon iconLiteral="fas-cog" styleClass="card-icon"/>
                     <VBox spacing="1.0">
                         <Label text="Response Behavior" styleClass="card-title"/>
                         <Label text="Choose how responses are generated and displayed." styleClass="card-description"/>
@@ -173,7 +173,7 @@
 
             <VBox spacing="12.0" styleClass="settings-card">
                 <HBox alignment="CENTER_LEFT" spacing="10.0">
-                    <FontIcon iconLiteral="fas-comment-dots" iconSize="14" styleClass="card-icon"/>
+                    <FontIcon iconLiteral="fas-comment-dots" styleClass="card-icon"/>
                     <VBox spacing="1.0">
                         <Label text="Model Instruction" styleClass="card-title"/>
                         <Label text="Add persistent preferences to every model request." styleClass="card-description"/>

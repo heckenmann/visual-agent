@@ -25,17 +25,17 @@
             <Region HBox.hgrow="ALWAYS"/>
             <Label fx:id="connectionStatus" text="Standby" styleClass="shell-status-chip">
                 <graphic>
-                    <FontIcon iconLiteral="fas-circle" iconSize="6" styleClass="status-connected"/>
+                    <FontIcon iconLiteral="fas-circle" styleClass="status-connected"/>
                 </graphic>
             </Label>
             <Label fx:id="agentsLabel" text="0 agents" styleClass="shell-status-chip">
                 <graphic>
-                    <FontIcon iconLiteral="fas-robot" iconSize="10"/>
+                    <FontIcon iconLiteral="fas-robot"/>
                 </graphic>
             </Label>
             <Label fx:id="selectedModelLabel" text="No model" styleClass="shell-model-chip">
                 <graphic>
-                    <FontIcon iconLiteral="fas-microchip" iconSize="10"/>
+                    <FontIcon iconLiteral="fas-microchip"/>
                 </graphic>
             </Label>
         </HBox>
@@ -45,7 +45,7 @@
             <Label text="WORKSPACE" styleClass="nav-section-label"/>
             <Button fx:id="conversationBtn" styleClass="icon-rail-button">
                 <graphic>
-                    <FontIcon iconLiteral="fas-comments" iconSize="16"/>
+                    <FontIcon iconLiteral="fas-comments"/>
                 </graphic>
                 <tooltip>
                     <Tooltip text="Conversation"/>
@@ -53,7 +53,7 @@
             </Button>
             <Button fx:id="sessionBtn" styleClass="icon-rail-button">
                 <graphic>
-                    <FontIcon iconLiteral="fas-bars" iconSize="16"/>
+                    <FontIcon iconLiteral="fas-bars"/>
                 </graphic>
                 <tooltip>
                     <Tooltip text="Session"/>
@@ -61,7 +61,7 @@
             </Button>
             <Button fx:id="agentsBtn" styleClass="icon-rail-button">
                 <graphic>
-                    <FontIcon iconLiteral="fas-users" iconSize="16"/>
+                    <FontIcon iconLiteral="fas-users"/>
                 </graphic>
                 <tooltip>
                     <Tooltip text="Agents"/>
@@ -69,7 +69,7 @@
             </Button>
             <Button fx:id="planBtn" styleClass="icon-rail-button">
                 <graphic>
-                    <FontIcon iconLiteral="fas-copy" iconSize="16"/>
+                    <FontIcon iconLiteral="fas-copy"/>
                 </graphic>
                 <tooltip>
                     <Tooltip text="Todos"/>
@@ -77,7 +77,7 @@
             </Button>
             <Button fx:id="canvasBtn" styleClass="icon-rail-button">
                 <graphic>
-                    <FontIcon iconLiteral="fas-palette" iconSize="16"/>
+                    <FontIcon iconLiteral="fas-palette"/>
                 </graphic>
                 <tooltip>
                     <Tooltip text="Canvas"/>
@@ -85,7 +85,7 @@
             </Button>
             <Button fx:id="filesBtn" styleClass="icon-rail-button">
                 <graphic>
-                    <FontIcon iconLiteral="fas-folder-open" iconSize="16"/>
+                    <FontIcon iconLiteral="fas-folder-open"/>
                 </graphic>
                 <tooltip>
                     <Tooltip text="Files"/>
@@ -94,7 +94,7 @@
             <Region VBox.vgrow="ALWAYS"/>
             <Button fx:id="closeApplicationBtn" styleClass="icon-rail-button icon-rail-danger-button">
                 <graphic>
-                    <FontIcon iconLiteral="fas-times" iconSize="16"/>
+                    <FontIcon iconLiteral="fas-times"/>
                 </graphic>
                 <tooltip>
                     <Tooltip text="Close application"/>
@@ -103,7 +103,7 @@
             <Label text="SYSTEM" styleClass="nav-section-label"/>
             <Button fx:id="settingsBtn" styleClass="icon-rail-button">
                 <graphic>
-                    <FontIcon iconLiteral="fas-cog" iconSize="16"/>
+                    <FontIcon iconLiteral="fas-cog"/>
                 </graphic>
                 <tooltip>
                     <Tooltip text="Settings"/>

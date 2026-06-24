@@ -21,7 +21,7 @@
         <Region HBox.hgrow="ALWAYS"/>
         <Button fx:id="btnAddAgent" styleClass="button-icon, accent">
             <graphic>
-                <FontIcon iconLiteral="fas-plus" iconSize="11"/>
+                <FontIcon iconLiteral="fas-plus"/>
             </graphic>
             <tooltip><Tooltip text="New agent"/></tooltip>
         </Button>
@@ -40,12 +40,12 @@
                 </padding>
             </VBox>
             <VBox fx:id="emptyState" alignment="CENTER" spacing="8.0" styleClass="empty-state" visible="false" managed="false">
-                <FontIcon iconLiteral="fas-users" iconSize="28" styleClass="empty-state-icon"/>
+                <FontIcon iconLiteral="fas-users" styleClass="empty-state-icon"/>
                 <Label text="No agents configured" styleClass="empty-state-title"/>
                 <Label text="Create an agent to delegate specialized work." styleClass="empty-state-description"/>
                 <Button fx:id="emptyCreateAgentButton" styleClass="button-icon, accent">
                     <graphic>
-                        <FontIcon iconLiteral="fas-plus" iconSize="11"/>
+                        <FontIcon iconLiteral="fas-plus"/>
                     </graphic>
                     <tooltip><Tooltip text="Create first agent"/></tooltip>
                 </Button>

@@ -25,25 +25,25 @@
                 <Region HBox.hgrow="ALWAYS"/>
                 <Button fx:id="addButton" styleClass="button-icon, accent">
                     <graphic>
-                        <FontIcon iconLiteral="fas-plus" iconSize="11"/>
+                        <FontIcon iconLiteral="fas-plus"/>
                     </graphic>
                     <tooltip><Tooltip text="New todo"/></tooltip>
                 </Button>
                 <Button fx:id="editButton" styleClass="button-icon">
                     <graphic>
-                        <FontIcon iconLiteral="fas-pen" iconSize="11"/>
+                        <FontIcon iconLiteral="fas-pen"/>
                     </graphic>
                     <tooltip><Tooltip text="Edit todo"/></tooltip>
                 </Button>
                 <Button fx:id="completeAllButton" styleClass="button-icon">
                     <graphic>
-                        <FontIcon iconLiteral="fas-check-double" iconSize="11"/>
+                        <FontIcon iconLiteral="fas-check-double"/>
                     </graphic>
                     <tooltip><Tooltip text="Complete all todos"/></tooltip>
                 </Button>
                 <Button fx:id="deleteCompletedButton" styleClass="button-icon">
                     <graphic>
-                        <FontIcon iconLiteral="fas-trash" iconSize="11"/>
+                        <FontIcon iconLiteral="fas-trash"/>
                     </graphic>
                     <tooltip><Tooltip text="Delete completed todos"/></tooltip>
                 </Button>
@@ -76,12 +76,12 @@
             <ListView fx:id="todoListView" styleClass="todo-list">
             </ListView>
             <VBox fx:id="todoEmptyState" alignment="CENTER" spacing="8.0" styleClass="empty-state" visible="false" managed="false">
-                <FontIcon iconLiteral="fas-clipboard-list" iconSize="28" styleClass="empty-state-icon"/>
+                <FontIcon iconLiteral="fas-clipboard-list" styleClass="empty-state-icon"/>
                 <Label fx:id="todoEmptyTitleLabel" text="No todos yet" styleClass="empty-state-title"/>
                 <Label fx:id="todoEmptyDescriptionLabel" text="Create a task yourself or let an agent create one." styleClass="empty-state-description"/>
                 <Button fx:id="emptyAddButton" styleClass="button-icon, accent">
                     <graphic>
-                        <FontIcon iconLiteral="fas-plus" iconSize="11"/>
+                        <FontIcon iconLiteral="fas-plus"/>
                     </graphic>
                     <tooltip><Tooltip text="Create first todo"/></tooltip>
                 </Button>
