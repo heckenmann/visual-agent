@@ -1,11 +1,10 @@
 package de.heckenmann.visualagent.ui.panels.canvas
 
-import javafx.geometry.Insets
 import javafx.geometry.Orientation
 import javafx.scene.control.Button
-import javafx.scene.control.CheckBox
 import javafx.scene.control.Label
 import javafx.scene.control.Separator
+import javafx.scene.control.ToggleButton
 import javafx.scene.control.Tooltip
 import javafx.scene.layout.HBox
 import javafx.scene.layout.Priority
@@ -44,20 +43,23 @@ internal class CanvasToolbar(
     private val undoButton = toolButton("Undo", FontAwesomeSolid.UNDO, onUndo)
     private val redoButton = toolButton("Redo", FontAwesomeSolid.REDO, onRedo)
     private val zoomResetButton = toolButton("Reset zoom (100%)", FontAwesomeSolid.SEARCH, onZoomReset)
+    private val gridToggleButton =
+        ToggleButton(null, FontIcon(FontAwesomeSolid.TH)).apply {
+            styleClass.addAll("canvas-tool-button", "active")
+            isFocusTraversable = false
+            isSelected = true
+            tooltip = Tooltip("Toggle grid")
+            selectedProperty().addListener { _, _, selected ->
+                updateGridToggleState(selected)
+                onGridChanged(selected)
+            }
+        }
 
     init {
         styleClass.add("canvas-toolbar")
-        padding = Insets(10.0, 18.0, 10.0, 18.0)
 
         val title = Label("Canvas").apply { styleClass.add("page-title") }
         val subtitle = Label("Sketch ideas and spatially organize project context.").apply { styleClass.add("page-subtitle") }
-        val gridToggle =
-            CheckBox("Grid").apply {
-                graphic = FontIcon(FontAwesomeSolid.TH)
-                graphicTextGap = 6.0
-                isSelected = true
-                setOnAction { onGridChanged(isSelected) }
-            }
         val exportButton =
             toolButton("Export PNG", FontAwesomeSolid.FILE_EXPORT, onExport).apply {
                 styleClass.addAll("accent", "canvas-export-button")
@@ -78,7 +80,7 @@ internal class CanvasToolbar(
                 toolButton("Zoom out", FontAwesomeSolid.SEARCH_MINUS, onZoomOut),
                 zoomResetButton,
                 toolButton("Zoom in", FontAwesomeSolid.SEARCH_PLUS, onZoomIn),
-                gridToggle,
+                gridToggleButton,
                 Region().apply { HBox.setHgrow(this, Priority.ALWAYS) },
                 toolButton("Set canvas size", FontAwesomeSolid.EXPAND_ARROWS_ALT, onCanvasSize),
                 toolButton("Save canvas to workspace", FontAwesomeSolid.SAVE, onSaveWorkspace),
@@ -130,6 +132,16 @@ internal class CanvasToolbar(
             tooltip = Tooltip(text)
             setOnAction { action() }
         }
+
+    private fun updateGridToggleState(selected: Boolean) {
+        if (selected) {
+            if (!gridToggleButton.styleClass.contains("active")) {
+                gridToggleButton.styleClass.add("active")
+            }
+        } else {
+            gridToggleButton.styleClass.remove("active")
+        }
+    }
 }
 
 internal enum class CanvasTool {

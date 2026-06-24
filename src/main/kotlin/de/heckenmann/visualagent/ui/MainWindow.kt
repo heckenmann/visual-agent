@@ -210,7 +210,8 @@ class MainWindow(
     private fun applyConfigToUi() {
         val provider = providerCatalog.getProvider(providerCatalog.activeProviderId())
         selectedModelLabel.text = "${provider?.name ?: providerCatalog.activeProviderId()} · ${provider?.defaultModel.orEmpty()}"
-        scene?.root?.style = "-fx-font-size: ${AppConfig.instance.fontSize}px;"
+        scene?.root?.styleClass?.removeIf { it.startsWith(UI_FONT_CLASS_PREFIX) }
+        scene?.root?.styleClass?.add("$UI_FONT_CLASS_PREFIX${AppConfig.instance.fontSize.coerceIn(MIN_UI_FONT_SIZE, MAX_UI_FONT_SIZE)}")
         Application.setUserAgentStylesheet(AppConfig.instance.getThemeStylesheet())
     }
 
@@ -334,5 +335,11 @@ class MainWindow(
             completed = summary.completed,
             cancelled = summary.cancelled,
         )
+    }
+
+    private companion object {
+        const val UI_FONT_CLASS_PREFIX = "ui-font-"
+        const val MIN_UI_FONT_SIZE = 10
+        const val MAX_UI_FONT_SIZE = 24
     }
 }

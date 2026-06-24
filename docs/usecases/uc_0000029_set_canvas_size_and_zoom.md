@@ -14,7 +14,7 @@ Desktop user.
 
 ## Main Flow
 
-1. The user opens canvas size controls or zoom controls.
+1. The user opens canvas size controls, zoom controls, or grid visibility controls from the icon-only canvas toolbar.
 2. The canvas surface dimensions or zoom value are updated.
 3. The drawing view keeps existing figure coordinates stable.
 4. Preferences persist size and related canvas settings.
@@ -40,3 +40,4 @@ Window resizing does not move drawings into inaccessible space or blur the struc
 - The editable canvas surface starts at the viewport origin and is not centered inside a larger blank area.
 - Canvas size is user-controlled and survives restart.
 - Zoom reset is available through an icon-only toolbar button with tooltip.
+- Grid visibility is available through an icon-only toggle button with tooltip.

@@ -4,6 +4,7 @@ import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.config.AppConfig
 import de.heckenmann.visualagent.ui.FxmlLoader
+import javafx.application.Application
 import javafx.fxml.FXML
 import javafx.scene.control.Alert
 import javafx.scene.control.Button
@@ -82,6 +83,7 @@ class ApplicationSettingsPanel(
             if (selected != null) {
                 AppConfig.instance.theme = selected
                 AppConfig.instance.save()
+                applyTheme()
             }
         }
 
@@ -137,6 +139,7 @@ class ApplicationSettingsPanel(
         AppConfig.instance.theme = "Dracula"
         AppConfig.instance.fontSize = 14
         AppConfig.instance.save()
+        applyTheme()
         syncControlsFromConfig()
     }
 
@@ -144,6 +147,21 @@ class ApplicationSettingsPanel(
         themeSelector.selectionModel.select(AppConfig.instance.theme)
         fontSizeSpinner.valueFactory.value = AppConfig.instance.fontSize.coerceIn(10, 24)
         refreshToolToggles()
+    }
+
+    private fun applyTheme() {
+        val thread = Thread.currentThread()
+        val previousLoader = thread.contextClassLoader
+        if (previousLoader == null) {
+            thread.contextClassLoader = ApplicationSettingsPanel::class.java.classLoader
+        }
+        try {
+            Application.setUserAgentStylesheet(AppConfig.instance.getThemeStylesheet())
+        } finally {
+            if (previousLoader == null) {
+                thread.contextClassLoader = null
+            }
+        }
     }
 
     private fun refreshToolToggles() {

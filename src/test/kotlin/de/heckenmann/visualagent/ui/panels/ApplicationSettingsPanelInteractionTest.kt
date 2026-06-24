@@ -9,10 +9,12 @@ import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.agent.tools.VisualAgentTool
 import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.config.AppThemeStylesheets
 import de.heckenmann.visualagent.knowledge.PreferenceStore
 import de.heckenmann.visualagent.knowledge.SubAgentConfigStore
 import de.heckenmann.visualagent.ui.panels.ApplicationSettingsPanel
 import de.heckenmann.visualagent.ui.panels.FxTestSupport
+import javafx.application.Application
 import javafx.application.Platform
 import javafx.scene.control.Button
 import javafx.scene.control.CheckBox
@@ -32,14 +34,17 @@ class ApplicationSettingsPanelInteractionTest {
         FxTestSupport.run {
             val previousTheme = AppConfig.instance.theme
             val previousFontSize = AppConfig.instance.fontSize
+            val previousContextLoader = Thread.currentThread().contextClassLoader
             try {
                 val panel = ApplicationSettingsPanel()
                 val theme = panel.field<ComboBox<String>>("themeSelector")
                 val fontSize = panel.field<Spinner<Int>>("fontSizeSpinner")
 
+                Thread.currentThread().contextClassLoader = null
                 theme.selectionModel.select("Primer Light")
                 fontSize.valueFactory.value = 18
                 assertEquals("Primer Light", AppConfig.instance.theme)
+                assertEquals(AppThemeStylesheets.stylesheetFor("Primer Light"), Application.getUserAgentStylesheet())
                 assertEquals(18, AppConfig.instance.fontSize)
 
                 Platform.runLater {
@@ -57,6 +62,7 @@ class ApplicationSettingsPanelInteractionTest {
                 }
                 panel.field<Button>("resetDefaultsButton").fire()
                 assertEquals("Dracula", theme.value)
+                assertEquals(AppThemeStylesheets.stylesheetFor("Dracula"), Application.getUserAgentStylesheet())
                 assertEquals(14, fontSize.value)
 
                 panel.resize(720.0, 520.0)
@@ -67,6 +73,10 @@ class ApplicationSettingsPanelInteractionTest {
                 AppConfig.instance.theme = previousTheme
                 AppConfig.instance.fontSize = previousFontSize
                 AppConfig.instance.save()
+                Thread.currentThread().contextClassLoader = previousContextLoader
+                runCatching {
+                    Application.setUserAgentStylesheet(AppThemeStylesheets.stylesheetFor(previousTheme))
+                }
             }
         }
 

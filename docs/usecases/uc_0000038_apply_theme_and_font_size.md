@@ -16,7 +16,7 @@ Desktop user.
 ## Main Flow
 
 1. The user selects a theme or font size.
-2. The application resolves the related stylesheet or style setting.
+2. The application resolves the related theme stylesheet or supported root font-size CSS class.
 3. The main window applies the visual change.
 4. The preference is persisted for future launches.
 
@@ -38,3 +38,4 @@ The UI reflects user-selected visual preferences.
 
 - Theme changes do not require manual source edits.
 - Font size changes are persisted.
+- Font size changes are applied through maintained CSS classes, not inline root styles.

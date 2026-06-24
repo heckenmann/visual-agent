@@ -5,7 +5,7 @@ import de.heckenmann.visualagent.ui.panels.FxTestSupport
 import javafx.scene.Parent
 import javafx.scene.Scene
 import javafx.scene.control.Button
-import javafx.scene.control.CheckBox
+import javafx.scene.control.ToggleButton
 import javafx.scene.input.MouseEvent
 import javafx.scene.layout.StackPane
 import org.jhotdraw8.draw.SimpleDrawingEditor
@@ -105,7 +105,7 @@ class CanvasPanelInteractionTest {
             assertTrue(buttonByTooltip(toolbar, "Select").styleClass.contains("active"))
             assertTrue(editor.activeTool != null)
 
-            descendants(toolbar).filterIsInstance<CheckBox>().single().fire()
+            toggleButtonByTooltip(toolbar, "Toggle grid").fire()
             assertFalse(grid.drawGridProperty().get())
         }
 
@@ -312,7 +312,7 @@ class CanvasPanelInteractionTest {
             assertFalse(buttonByTooltip(toolbar, "Delete selection").isDisable)
             assertEquals("Reset zoom (125%)", buttonByTooltip(toolbar, "Reset zoom (125%)").tooltip.text)
             buttons.filterNot(Button::isDisable).forEach(Button::fire)
-            descendants(toolbar).filterIsInstance<CheckBox>().single().fire()
+            toggleButtonByTooltip(toolbar, "Toggle grid").fire()
 
             assertTrue(actions.containsAll(listOf("select", "pen", "image", "delete", "redo", "out", "reset", "in", "clear", "export")))
             assertTrue(actions.any { it.startsWith("grid:") })
@@ -324,6 +324,11 @@ class CanvasPanelInteractionTest {
         root: Parent,
         tooltip: String,
     ): Button = descendants(root).filterIsInstance<Button>().first { it.tooltip?.text == tooltip }
+
+    private fun toggleButtonByTooltip(
+        root: Parent,
+        tooltip: String,
+    ): ToggleButton = descendants(root).filterIsInstance<ToggleButton>().first { it.tooltip?.text == tooltip }
 
     companion object {
         @JvmStatic
