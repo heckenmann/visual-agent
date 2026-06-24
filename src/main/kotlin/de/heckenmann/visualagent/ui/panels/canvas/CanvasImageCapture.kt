@@ -2,17 +2,16 @@ package de.heckenmann.visualagent.ui.panels.canvas
 
 import de.heckenmann.visualagent.image.PngEncoder
 import javafx.scene.Node
-import javafx.scene.SnapshotParameters
 
 /**
  * Encodes JavaFX canvas nodes into immutable image snapshots.
  */
 internal object CanvasImageCapture {
     /**
-     * Renders a node to PNG or JPG bytes.
+     * Renders a node to PNG bytes.
      *
      * @param node JavaFX node to snapshot
-     * @param requestedFormat Requested output format, `png`, `jpg`, or `jpeg`
+     * @param requestedFormat Requested output format, currently `png`
      * @return Encoded immutable image snapshot
      */
     fun capture(
@@ -20,7 +19,7 @@ internal object CanvasImageCapture {
         requestedFormat: String,
     ): CanvasImageSnapshot {
         val format = normalizeImageFormat(requestedFormat)
-        val snapshot = node.snapshot(SnapshotParameters(), null)
+        val snapshot = CanvasSnapshotRenderer.snapshot(node)
         val bytes = PngEncoder.encode(snapshot)
         return CanvasImageSnapshot(
             format = format,

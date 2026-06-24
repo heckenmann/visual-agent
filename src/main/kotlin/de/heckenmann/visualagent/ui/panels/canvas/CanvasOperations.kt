@@ -82,7 +82,7 @@ interface CanvasOperations {
     /**
      * Renders the current canvas as immutable image bytes.
      *
-     * @param format Image format, either `png` or `jpg`
+     * @param format Image format, currently `png`
      * @return Rendered image snapshot
      */
     fun captureImage(format: String): CanvasImageSnapshot
@@ -127,7 +127,7 @@ data class CanvasFigureSnapshot(
 /**
  * Immutable rendered image snapshot of the current canvas.
  *
- * @property format Encoded image format such as `png` or `jpg`
+ * @property format Encoded image format such as `png`
  * @property mimeType MIME type for displaying the image
  * @property bytes Encoded image bytes
  * @property width Rendered image width in pixels

@@ -7,6 +7,7 @@ import org.springframework.beans.BeansException
 import org.springframework.beans.factory.ObjectProvider
 import java.util.stream.Stream
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class CanvasServiceTest {
@@ -55,6 +56,22 @@ class CanvasServiceTest {
             assertTrue(snapshot.bytes.isNotEmpty())
             assertTrue(snapshot.width > 0)
             assertTrue(snapshot.height > 0)
+        }
+
+    @Test
+    fun `service rejects unsupported canvas image formats`() =
+        FxTestSupport.run {
+            val panel = CanvasPanel(InMemoryPreferenceStore())
+            panel.resize(320.0, 240.0)
+            panel.layout()
+            val service = CanvasService(SingleObjectProvider(panel))
+
+            val error =
+                assertFailsWith<IllegalArgumentException> {
+                    service.captureImage("jpg")
+                }
+
+            assertEquals("Unsupported canvas image format: jpg", error.message)
         }
 
     @Test

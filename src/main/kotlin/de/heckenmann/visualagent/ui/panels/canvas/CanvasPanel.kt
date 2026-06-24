@@ -315,9 +315,9 @@ class CanvasPanel(
     }
 
     /**
-     * Renders the current canvas to immutable PNG or JPG bytes.
+     * Renders the current canvas to immutable PNG bytes.
      *
-     * @param requestedFormat Requested output format, `png` or `jpg`
+     * @param requestedFormat Requested output format, currently `png`
      * @return Encoded canvas image
      */
     fun captureImage(requestedFormat: String): CanvasImageSnapshot = CanvasImageCapture.capture(drawingView.node, requestedFormat)

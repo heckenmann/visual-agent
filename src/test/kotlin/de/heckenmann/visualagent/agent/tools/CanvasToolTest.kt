@@ -99,6 +99,16 @@ class CanvasToolTest {
         assertTrue(saved.metadata.orEmpty().contains(""""immutable":true"""))
     }
 
+    @Test
+    fun `capture image reports unsupported formats as tool failure`() {
+        val tool = CanvasTool(FakeCanvasOperations(), FakeConversationStore())
+
+        val result = tool.execute("""{"action":"captureImage","format":"jpg"}""")
+
+        assertFalse(result.success)
+        assertEquals("Unsupported canvas image format: jpg", result.error)
+    }
+
     private class FakeCanvasOperations : CanvasOperations {
         val actions = mutableListOf<String>()
         private var figures = emptyList<CanvasFigureSnapshot>()
@@ -166,10 +176,11 @@ class CanvasToolTest {
         }
 
         override fun captureImage(format: String): CanvasImageSnapshot {
+            require(format == "png") { "Unsupported canvas image format: $format" }
             actions += "captureImage:$format"
             return CanvasImageSnapshot(
-                format = if (format == "jpg" || format == "jpeg") "jpg" else "png",
-                mimeType = if (format == "jpg" || format == "jpeg") "image/jpeg" else "image/png",
+                format = "png",
+                mimeType = "image/png",
                 bytes = byteArrayOf(1, 2, 3),
                 width = 2,
                 height = 1,

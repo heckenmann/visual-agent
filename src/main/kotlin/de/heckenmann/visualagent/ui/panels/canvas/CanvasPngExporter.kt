@@ -1,7 +1,6 @@
 package de.heckenmann.visualagent.ui.panels.canvas
 
 import de.heckenmann.visualagent.image.PngEncoder
-import javafx.scene.SnapshotParameters
 import org.jhotdraw8.draw.SimpleDrawingView
 import java.nio.file.Files
 
@@ -15,7 +14,7 @@ internal object CanvasPngExporter {
     fun export(drawingView: SimpleDrawingView) {
         val file = CanvasFileDialogs.showPngSaveDialog(drawingView.node.scene?.window) ?: return
         drawingView.clearSelection()
-        val snapshot = drawingView.node.snapshot(SnapshotParameters(), null)
+        val snapshot = CanvasSnapshotRenderer.snapshot(drawingView.node)
         Files.write(file.toPath(), PngEncoder.encode(snapshot))
     }
 }
