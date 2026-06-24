@@ -19,6 +19,8 @@ import org.kordamp.ikonli.javafx.FontIcon
 import java.io.ByteArrayInputStream
 import java.time.format.DateTimeFormatter
 import java.util.Base64
+import kotlin.math.max
+import kotlin.math.min
 
 /**
  * Creates JavaFX rows for conversation messages.
@@ -158,17 +160,29 @@ internal class ChatMessageRenderer(
         imageData: ImageMessageData,
     ): Region {
         val image = Image(ByteArrayInputStream(imageData.bytes()))
+        val previewWidth = min(MAX_IMAGE_PREVIEW_WIDTH, image.width)
         val imageView =
             ImageView(image).apply {
                 isPreserveRatio = true
-                fitWidth = 520.0
+                isSmooth = true
+                fitWidth = previewWidth
                 styleClass.add("chat-image-preview")
             }
         val titleLabel =
             Label("$title · ${imageData.width}x${imageData.height}").apply {
                 styleClass.add("chat-image-title")
             }
-        return VBox(titleLabel, imageView).apply { styleClass.add("chat-image-body") }
+        return VBox(titleLabel, imageView).apply {
+            styleClass.add("chat-image-body")
+            isFillWidth = true
+            maxWidth = Double.MAX_VALUE
+            widthProperty().addListener { _, _, width ->
+                val availableWidth = width.toDouble() - IMAGE_BODY_HORIZONTAL_PADDING
+                if (availableWidth > 0.0) {
+                    imageView.fitWidth = min(previewWidth, max(MIN_IMAGE_PREVIEW_WIDTH, availableWidth))
+                }
+            }
+        }
     }
 
     private fun createToolEventBody(item: ChatMessage): Region {
@@ -241,4 +255,10 @@ internal class ChatMessageRenderer(
         Base64
             .getDecoder()
             .decode(dataUrl.substringAfter("base64,"))
+
+    private companion object {
+        const val MAX_IMAGE_PREVIEW_WIDTH = 520.0
+        const val MIN_IMAGE_PREVIEW_WIDTH = 1.0
+        const val IMAGE_BODY_HORIZONTAL_PADDING = 20.0
+    }
 }

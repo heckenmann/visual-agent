@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.ui.panels.tests
 
+import de.heckenmann.visualagent.testsupport.TestPng
 import de.heckenmann.visualagent.ui.panels.FxTestSupport
 import de.heckenmann.visualagent.ui.panels.chat.ChatMessage
 import de.heckenmann.visualagent.ui.panels.chat.ChatMessageRenderer
@@ -10,10 +11,13 @@ import javafx.scene.control.Button
 import javafx.scene.control.Label
 import javafx.scene.image.ImageView
 import javafx.scene.layout.HBox
+import javafx.scene.layout.VBox
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
+import java.nio.file.Files
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Base64
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -99,6 +103,37 @@ class ChatMessageRendererTest {
             assertTrue(descendants(row).filterIsInstance<Label>().any { it.text == "Canvas snapshot (PNG) · 1x1" })
         }
 
+    @Test
+    fun `image history preview shrinks to available row width`() =
+        FxTestSupport.run {
+            val renderer =
+                ChatMessageRenderer(
+                    loadingToken = LOADING,
+                    timeFormatter = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault()),
+                    previousRole = { null },
+                    retryAtRow = {},
+                )
+            val imageData = wideImageData()
+
+            val row =
+                renderer.createMessageRow(
+                    ChatMessage(
+                        role = "assistant",
+                        content = "Canvas snapshot (PNG)",
+                        imageData = imageData,
+                    ),
+                    0,
+                )
+            val imageBody = descendants(row).filterIsInstance<VBox>().first { it.styleClass.contains("chat-image-body") }
+            val imageView = descendants(row).filterIsInstance<ImageView>().single()
+
+            assertTrue(imageBody.isFillWidth)
+            assertEquals(Double.MAX_VALUE, imageBody.maxWidth)
+            assertEquals(520.0, imageView.fitWidth, 0.001)
+            imageBody.resize(240.0, 120.0)
+            assertEquals(220.0, imageView.fitWidth, 0.001)
+        }
+
     private fun descendants(root: Parent): List<javafx.scene.Node> =
         root.childrenUnmodifiable.flatMap { child ->
             listOf(child) + if (child is Parent) descendants(child) else emptyList()
@@ -119,5 +154,21 @@ class ChatMessageRendererTest {
         @JvmStatic
         @BeforeAll
         fun startToolkit() = FxTestSupport.startToolkit()
+
+        private fun wideImageData(): ImageMessageData {
+            val file = Files.createTempFile("visual-agent-chat-preview", ".png")
+            return try {
+                TestPng.write(file, 900, 120)
+                val encoded = Base64.getEncoder().encodeToString(Files.readAllBytes(file))
+                ImageMessageData(
+                    mimeType = "image/png",
+                    dataUrl = "data:image/png;base64,$encoded",
+                    width = 900,
+                    height = 120,
+                )
+            } finally {
+                Files.deleteIfExists(file)
+            }
+        }
     }
 }
