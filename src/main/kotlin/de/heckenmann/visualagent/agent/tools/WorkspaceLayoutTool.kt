@@ -3,8 +3,8 @@ package de.heckenmann.visualagent.agent.tools
 import de.heckenmann.visualagent.agent.ToolDefinition
 import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.agent.ToolResult
-import de.heckenmann.visualagent.ui.WorkspaceLayoutService
-import de.heckenmann.visualagent.ui.WorkspaceWindowState
+import de.heckenmann.visualagent.workspace.layout.WorkspaceLayoutService
+import de.heckenmann.visualagent.workspace.layout.WorkspaceWindowState
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
