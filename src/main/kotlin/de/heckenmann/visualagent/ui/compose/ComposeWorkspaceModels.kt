@@ -4,7 +4,7 @@ import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.canvas.CanvasOperations
 import de.heckenmann.visualagent.config.AppConfig
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
-import kotlin.math.ceil
+import de.heckenmann.visualagent.workspace.layout.WorkspaceWindowState
 import kotlin.math.max
 
 /**
@@ -88,7 +88,7 @@ data class ComposeWorkspaceWindowBounds(
 }
 
 /**
- * Available workspace dimensions for Compose internal-window calculations.
+ * Available workspace dimensions for Compose workspace panel calculations.
  */
 data class ComposeWorkspaceViewport(
     val width: Int,
@@ -108,11 +108,93 @@ data class ComposeWorkspaceWindow(
 )
 
 /**
- * Calculates deterministic split-panel bounds for all visible workspace panels.
+ * Direction for moving a workspace panel within the user-defined panel order.
+ */
+enum class ComposePanelMoveDirection {
+    /** Move the panel closer to the primary stage position. */
+    Earlier,
+
+    /** Move the panel farther away from the primary stage position. */
+    Later,
+}
+
+/**
+ * Restores persisted visibility and ordering onto the current workspace panel descriptors.
  *
- * The Compose desktop runtime does not provide a native split-window desktop. Using
- * split slots avoids overlap, drag jitter, and impossible resize states while
- * keeping the toolkit-neutral layout tool able to report concrete panel bounds.
+ * Missing persisted IDs are ignored, and new default panels are appended in their default order.
+ *
+ * @param defaults Current panel descriptors shipped by the application
+ * @param persisted Persisted panel states from the workspace layout service
+ * @return Panels ordered and marked visible according to persisted state where available
+ */
+fun restoreWorkspaceWindows(
+    defaults: List<ComposeWorkspaceWindow>,
+    persisted: List<WorkspaceWindowState>,
+): List<ComposeWorkspaceWindow> {
+    if (persisted.isEmpty()) return defaults
+    val persistedById = persisted.associateBy { it.id }
+    return defaults
+        .mapIndexed { defaultIndex, window ->
+            val persistedState = persistedById[window.id]
+            val restoredBounds =
+                persistedState?.let {
+                    ComposeWorkspaceWindowBounds(
+                        x = it.x.toInt(),
+                        y = it.y.toInt(),
+                        width = it.width.toInt(),
+                        height = it.height.toInt(),
+                    )
+                } ?: window.bounds
+            window.copy(
+                bounds = restoredBounds,
+                visible = persistedState?.visible ?: window.visible,
+            ) to
+                PanelSortKey(
+                    persistedOrder = persistedState?.zIndex ?: (Int.MAX_VALUE - defaults.size + defaultIndex),
+                    defaultOrder = defaultIndex,
+                )
+        }.sortedWith(compareBy({ it.second.persistedOrder }, { it.second.defaultOrder }))
+        .map { it.first }
+}
+
+private data class PanelSortKey(
+    val persistedOrder: Int,
+    val defaultOrder: Int,
+)
+
+/**
+ * Moves a workspace panel earlier or later in the user-defined panel order.
+ *
+ * @param windows Current panel order
+ * @param id Panel ID to move
+ * @param direction Direction to move
+ * @return Updated panel order, or the original order when movement is not possible
+ */
+fun moveWorkspacePanel(
+    windows: List<ComposeWorkspaceWindow>,
+    id: String,
+    direction: ComposePanelMoveDirection,
+): List<ComposeWorkspaceWindow> {
+    val index = windows.indexOfFirst { it.id == id }
+    val targetIndex =
+        when (direction) {
+            ComposePanelMoveDirection.Earlier -> index - 1
+            ComposePanelMoveDirection.Later -> index + 1
+        }
+    if (index !in windows.indices || targetIndex !in windows.indices) return windows
+    return windows.toMutableList().also { mutable ->
+        val panel = mutable.removeAt(index)
+        mutable.add(targetIndex, panel)
+    }
+}
+
+/**
+ * Calculates deterministic designer-curated panel bounds for all visible workspace panels.
+ *
+ * The layout is intentionally semantic instead of count-based: the first visible
+ * panel in the user-defined order receives the largest primary stage, supporting
+ * panels are placed in an inspector column, and overflow panels move into a bottom
+ * deck. This keeps the workspace stable without making all panels equally important.
  *
  * @param windows Workspace panels in their visual order
  * @param viewport Available workspace dimensions
@@ -126,71 +208,141 @@ fun splitWorkspaceBounds(
     if (visibleWindows.isEmpty()) return emptyMap()
     val safeWidth = viewport.width.coerceAtLeast(1)
     val safeHeight = viewport.height.coerceAtLeast(1)
+    val primary = visibleWindows.first()
+    val supporting = visibleWindows.drop(1)
 
-    return when (visibleWindows.size) {
-        1 ->
+    return when (supporting.size) {
+        0 ->
             mapOf(
-                visibleWindows.single().id to
+                primary.id to
                     ComposeWorkspaceWindowBounds(x = 0, y = 0, width = safeWidth, height = safeHeight),
             )
-        2 -> splitTwo(visibleWindows, safeWidth, safeHeight)
-        3 -> splitThree(visibleWindows, safeWidth, safeHeight)
-        else -> splitGrid(visibleWindows, safeWidth, safeHeight)
+        1 ->
+            splitStageWithInspector(
+                primary = primary,
+                inspectorPanels = supporting,
+                width = safeWidth,
+                height = safeHeight,
+            )
+        2, 3 ->
+            splitStageWithInspector(
+                primary = primary,
+                inspectorPanels = supporting,
+                width = safeWidth,
+                height = safeHeight,
+            )
+        else ->
+            splitStageInspectorAndDeck(
+                primary = primary,
+                supporting = supporting,
+                width = safeWidth,
+                height = safeHeight,
+            )
     }
 }
 
-private fun splitTwo(
-    windows: List<ComposeWorkspaceWindow>,
+private fun splitStageWithInspector(
+    primary: ComposeWorkspaceWindow,
+    inspectorPanels: List<ComposeWorkspaceWindow>,
     width: Int,
     height: Int,
 ): Map<String, ComposeWorkspaceWindowBounds> {
-    val leftWidth = width / 2
-    return mapOf(
-        windows[0].id to ComposeWorkspaceWindowBounds(x = 0, y = 0, width = leftWidth, height = height),
-        windows[1].id to ComposeWorkspaceWindowBounds(x = leftWidth, y = 0, width = width - leftWidth, height = height),
-    )
+    val inspectorWidth = inspectorWidth(width)
+    val stageWidth = (width - WORKSPACE_PANEL_GAP - inspectorWidth).coerceAtLeast(1)
+    val result =
+        mutableMapOf(
+            primary.id to ComposeWorkspaceWindowBounds(x = 0, y = 0, width = stageWidth, height = height),
+        )
+    result += stackVertically(inspectorPanels, x = stageWidth + WORKSPACE_PANEL_GAP, y = 0, width = inspectorWidth, height = height)
+    return result
 }
 
-private fun splitThree(
-    windows: List<ComposeWorkspaceWindow>,
+private fun splitStageInspectorAndDeck(
+    primary: ComposeWorkspaceWindow,
+    supporting: List<ComposeWorkspaceWindow>,
     width: Int,
     height: Int,
 ): Map<String, ComposeWorkspaceWindowBounds> {
-    val leftWidth = width / 2
-    val topHeight = height / 2
-    return mapOf(
-        windows[0].id to ComposeWorkspaceWindowBounds(x = 0, y = 0, width = leftWidth, height = height),
-        windows[1].id to ComposeWorkspaceWindowBounds(x = leftWidth, y = 0, width = width - leftWidth, height = topHeight),
-        windows[2].id to
-            ComposeWorkspaceWindowBounds(
-                x = leftWidth,
-                y = topHeight,
-                width = width - leftWidth,
-                height = height - topHeight,
-            ),
-    )
+    val deckHeight = (height * 0.28f).toInt().coerceIn(180, max(180, height / 2))
+    val topHeight = (height - WORKSPACE_PANEL_GAP - deckHeight).coerceAtLeast(1)
+    val inspectorWidth = inspectorWidth(width)
+    val stageWidth = (width - WORKSPACE_PANEL_GAP - inspectorWidth).coerceAtLeast(1)
+    val inspectorPanels = supporting.take(3)
+    val deckPanels = supporting.drop(3)
+    val result =
+        mutableMapOf(
+            primary.id to ComposeWorkspaceWindowBounds(x = 0, y = 0, width = stageWidth, height = topHeight),
+        )
+    result += stackVertically(inspectorPanels, x = stageWidth + WORKSPACE_PANEL_GAP, y = 0, width = inspectorWidth, height = topHeight)
+    result += splitHorizontally(deckPanels, x = 0, y = topHeight + WORKSPACE_PANEL_GAP, width = width, height = deckHeight)
+    return result
 }
 
-private fun splitGrid(
+private fun stackVertically(
     windows: List<ComposeWorkspaceWindow>,
+    x: Int,
+    y: Int,
     width: Int,
     height: Int,
+): Map<String, ComposeWorkspaceWindowBounds> = splitLinear(windows, x, y, width, height, vertical = true)
+
+private fun splitHorizontally(
+    windows: List<ComposeWorkspaceWindow>,
+    x: Int,
+    y: Int,
+    width: Int,
+    height: Int,
+): Map<String, ComposeWorkspaceWindowBounds> = splitLinear(windows, x, y, width, height, vertical = false)
+
+private fun splitLinear(
+    windows: List<ComposeWorkspaceWindow>,
+    x: Int,
+    y: Int,
+    width: Int,
+    height: Int,
+    vertical: Boolean,
 ): Map<String, ComposeWorkspaceWindowBounds> {
-    val columns = 2
-    val rows = ceil(windows.size.toDouble() / columns.toDouble()).toInt().coerceAtLeast(1)
-    val columnWidth = width / columns
-    val rowHeight = height / rows
+    if (windows.isEmpty()) return emptyMap()
+    val gapTotal = WORKSPACE_PANEL_GAP * (windows.size - 1)
+    val available = ((if (vertical) height else width) - gapTotal).coerceAtLeast(windows.size)
+    val baseSize = (available / windows.size).coerceAtLeast(1)
     return windows
         .mapIndexed { index, window ->
-            val column = index % columns
-            val row = index / columns
-            val x = column * columnWidth
-            val y = row * rowHeight
-            val cellWidth = if (column == columns - 1) width - x else columnWidth
-            val cellHeight = if (row == rows - 1) height - y else rowHeight
-            window.id to ComposeWorkspaceWindowBounds(x = x, y = y, width = cellWidth, height = cellHeight)
+            val offset = (baseSize + WORKSPACE_PANEL_GAP) * index
+            val isLast = index == windows.lastIndex
+            val cellWidth =
+                if (vertical) {
+                    width
+                } else if (isLast) {
+                    width - offset
+                } else {
+                    baseSize
+                }
+            val cellHeight =
+                if (vertical) {
+                    if (isLast) height - offset else baseSize
+                } else {
+                    height
+                }
+            window.id to
+                ComposeWorkspaceWindowBounds(
+                    x = if (vertical) x else x + offset,
+                    y = if (vertical) y + offset else y,
+                    width = cellWidth.coerceAtLeast(1),
+                    height = cellHeight.coerceAtLeast(1),
+                )
         }.toMap()
 }
+
+private fun inspectorWidth(width: Int): Int =
+    (width * 0.32f)
+        .toInt()
+        .coerceIn(320, max(320, width - WORKSPACE_PANEL_GAP - 520))
+
+/**
+ * Gap used by the semantic workspace layout.
+ */
+const val WORKSPACE_PANEL_GAP: Int = 16
 
 /**
  * Spring-backed services required by Compose panels.

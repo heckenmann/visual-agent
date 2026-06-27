@@ -87,7 +87,7 @@ private fun VisualAgentComposeApp(
     workspaceLayoutService: WorkspaceLayoutService,
     onCloseApplication: () -> Unit,
 ) {
-    var windows by remember { mutableStateOf(defaultWindows()) }
+    var windows by remember { mutableStateOf(restoreWorkspaceWindows(defaultWindows(), workspaceLayoutService.report().windows)) }
     var modal by remember { mutableStateOf<ComposeConfirmationModal?>(null) }
     var commandPaletteVisible by remember { mutableStateOf(false) }
     val workspaceFocusRequester = remember { FocusRequester() }
@@ -106,6 +106,12 @@ private fun VisualAgentComposeApp(
     }
     val activateWindow: (String) -> Unit = { id ->
         windows = windows.map { window -> if (window.id == id) window.copy(visible = true) else window }
+    }
+    val moveWindowEarlier: (String) -> Unit = { id ->
+        windows = moveWorkspacePanel(windows, id, ComposePanelMoveDirection.Earlier)
+    }
+    val moveWindowLater: (String) -> Unit = { id ->
+        windows = moveWorkspacePanel(windows, id, ComposePanelMoveDirection.Later)
     }
     val commands =
         windows.map { window ->
@@ -163,16 +169,29 @@ private fun VisualAgentComposeApp(
                                 height = maxHeight.value.roundToInt(),
                             )
                         val splitBounds = splitWorkspaceBounds(windows, viewport)
+                        val workspaceStates =
+                            windows.mapIndexed {
+                                index,
+                                window,
+                                ->
+                                window.toWorkspaceWindowState(viewport, splitBounds[window.id], index)
+                            }
                         workspaceLayoutService.bind(
                             stage = StageState(width = viewport.width.toDouble(), height = viewport.height.toDouble()),
                             desktop = DesktopState(width = viewport.width.toDouble(), height = viewport.height.toDouble()),
-                            windows = windows.map { it.toWorkspaceWindowState(viewport, splitBounds[it.id]) },
+                            windows = workspaceStates,
                         )
+                        LaunchedEffect(workspaceStates) {
+                            workspaceLayoutService.applyWindowStates(workspaceStates)
+                        }
                         Column(modifier = Modifier.fillMaxSize()) {
                             ComposeWorkspaceHeader(config, springContext.beanDefinitionCount)
                             ComposeSplitWorkspace(
                                 windows = windows,
                                 panelServices = panelServices,
+                                onToggleWindow = toggleWindow,
+                                onMoveWindowEarlier = moveWindowEarlier,
+                                onMoveWindowLater = moveWindowLater,
                                 modifier =
                                     Modifier
                                         .weight(1f)
@@ -255,6 +274,7 @@ private fun defaultWindows(): List<ComposeWorkspaceWindow> =
 private fun ComposeWorkspaceWindow.toWorkspaceWindowState(
     viewport: ComposeWorkspaceViewport,
     splitBounds: ComposeWorkspaceWindowBounds?,
+    orderIndex: Int,
 ): WorkspaceWindowState {
     val coercedBounds = splitBounds ?: bounds.coerceIn(viewport)
     return WorkspaceWindowState(
@@ -264,7 +284,7 @@ private fun ComposeWorkspaceWindow.toWorkspaceWindowState(
         width = coercedBounds.width.toDouble(),
         height = coercedBounds.height.toDouble(),
         visible = visible,
-        zIndex = 0,
+        zIndex = orderIndex,
     )
 }
 
