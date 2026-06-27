@@ -150,7 +150,7 @@ Example:
 
 ### Workspace Layout Tool
 
-The `workspace:layout` tool is available to sub-agents, not to the main orchestration agent. It lets model calls inspect screens, the main window, the internal desktop, and deterministic workspace panel slots.
+The `workspace:layout` tool is available to sub-agents, not to the main orchestration agent. It lets model calls inspect screens, the main window, the internal desktop, and semantic workspace panel slots derived from the persisted user-defined panel order.
 
 ### Workspace File Tool
 

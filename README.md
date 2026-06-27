@@ -11,7 +11,7 @@ Visual Agent is a Kotlin desktop coding agent with Compose Multiplatform UI, Spr
 
 ## Current Status
 
-The Compose migration branch keeps the Spring/agent backend functional and replaces the desktop runtime with Compose Multiplatform. The current UI is a Compose shell with a left rail, deterministic split workspace panels, rebuilt feature panels, internal modals, command palette, workspace files, and editable canvas support.
+The Compose migration branch keeps the Spring/agent backend functional and replaces the desktop runtime with Compose Multiplatform. The current UI is a Compose shell with a left rail, semantic workspace panels, rebuilt feature panels, internal modals, command palette, workspace files, and editable canvas support.
 
 | Feature | UI | Backend | Wired |
 |---------|----|---------|-------|
@@ -22,7 +22,7 @@ The Compose migration branch keeps the Spring/agent backend functional and repla
 | Settings | Compose settings panel | `AppConfig` + DB-backed runtime usage | Yes |
 | Files | Compose files panel with FileKit picker | `WorkspaceFileService` + `WorkspaceFileTool` | Yes |
 | Canvas | Compose-native editable canvas with workspace save/open | `CanvasOperations` + `CanvasTool` | Yes |
-| Workspace Panels | Compose split/tiled workspace shell | `WorkspaceLayoutService` + `WorkspaceLayoutTool` | Yes |
+| Workspace Panels | Compose semantic stage/inspector/deck workspace shell | `WorkspaceLayoutService` + `WorkspaceLayoutTool` | Yes |
 | Command Palette | Internal Compose overlay opened with `Cmd/Ctrl+K` | Workspace command metadata | Yes |
 | Tool Calling | Tool events, minimized tool entries, per-agent tool toggles, sub-agent canvas/workspace/use-case tools | Spring AI `ToolCallback` path | Yes |
 | Use Cases | Packaged product use-case catalog available to agents | `docs/usecases/` + `UseCaseTool` | Yes |
@@ -106,7 +106,7 @@ src/main/kotlin/de/heckenmann/visualagent/
 │   └── layout/                 # Toolkit-neutral workspace panel layout persistence/tool state
 └── ui/
     └── compose/
-        ├── VisualAgentComposeApplication.kt # Compose desktop shell and split workspace panels
+        ├── VisualAgentComposeApplication.kt # Compose desktop shell and semantic workspace panels
         └── ComposeWorkspaceModels.kt        # Internal-window geometry model
 ```
 
@@ -198,7 +198,9 @@ The previous visual canvas editor has been removed with the desktop toolkit migr
 
 ## Internal Workspace Panels
 
-Primary panels are hosted as deterministic split/tiled panels inside the workspace. Panel visibility is restored on restart, and visible panels are placed into valid workspace slots without overlap or pointer-driven resize states.
+Primary panels are hosted as deterministic semantic panels inside the workspace. The first visible panel in the user-defined order gets a dominant stage, supporting panels are placed in an inspector stack, and overflow panels move into a bottom deck. Panel visibility and order are restored on restart, and visible panels are placed into valid workspace slots without overlap or pointer-driven resize states.
+
+Users can change panel order through icon-only actions in each panel header. Panels can be hidden from either the left rail or the panel header.
 
 Agents can query the visible workspace panel slots through the workspace layout tool when that tool is enabled.
 
@@ -210,7 +212,7 @@ The app now uses a Spring Data JPA persistence layer backed by SQLite and Flyway
 - Hibernate validates the mapped entities; it does not create or mutate tables in production.
 - The existing SQLite data file remains the source of truth for local desktop usage.
 - Managed workspace file metadata is stored in SQLite; file bytes are stored under `./data/workspace/` by default.
-- Internal workspace panel visibility and layout state are persisted in user preferences.
+- Internal workspace panel visibility, order, and layout state are persisted in user preferences.
 - Conversation search still uses SQLite FTS5 with a fallback `LIKE` query for invalid FTS input.
 - The old JDBC `KnowledgeDb` facade has been replaced by typed stores such as `ConversationStore`, `TodoStore`, `SubAgentStore`, and `PreferenceStore`.
 

@@ -71,7 +71,7 @@ Current tool set:
 
 ## UI Architecture Notes
 
-- Main shell: `VisualAgentComposeApplication` with a left rail and deterministic split workspace panels.
+- Main shell: `VisualAgentComposeApplication` with a left rail and semantic workspace panels whose visibility and user-defined order are persisted.
 - Conversation, session, todo, files, sub-agent, settings, and visual canvas panels are being rebuilt as Compose components.
 - Backend services and model tool contracts remain available while UI parity is restored.
 - Workspace layout persistence is toolkit-neutral under `workspace/layout`.

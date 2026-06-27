@@ -80,7 +80,7 @@ Use `./gradlew run` first; the project config applies required Compose Multiplat
 
 ### Compose Multiplatform rendering performance
 
-Compose Multiplatform uses its desktop rendering stack through the Compose Gradle plugin. Keep performance-sensitive UI state hoisted and avoid expensive repaint work inside split workspace panels.
+Compose Multiplatform uses its desktop rendering stack through the Compose Gradle plugin. Keep performance-sensitive UI state hoisted and avoid expensive repaint work inside semantic workspace panels.
 
 ### Ollama not reachable
 

@@ -101,7 +101,7 @@ src/main/kotlin/de/heckenmann/visualagent/
 │   └── layout/                # Toolkit-neutral internal-window layout persistence/tool state
 └── ui/
     └── compose/
-        ├── VisualAgentComposeApplication.kt # Compose desktop shell and internal windows
+        ├── VisualAgentComposeApplication.kt # Compose desktop shell and semantic workspace panels
         └── ComposeWorkspaceModels.kt        # Internal-window geometry model
 ```
 
@@ -128,7 +128,7 @@ src/main/kotlin/de/heckenmann/visualagent/
 - **Compose runtime**: Desktop UI starts from `runVisualAgentComposeApplication()`
 - **State hoisting**: UI state belongs in explicit state holders or Spring-backed services, not hidden component globals
 - **Panel migration**: Rebuild panels as composable functions backed by existing Spring services
-- **Internal windows**: Keep draggable/resizable workspace state in toolkit-neutral `workspace/layout` models
+- **Workspace panels**: Keep semantic panel visibility, order, and computed slot state in toolkit-neutral `workspace/layout` models
 - **Styling**: Use Compose theme tokens and modifiers; do not reintroduce stylesheet-based desktop UI styling
 - **No legacy desktop toolkit**: Do not add dependencies or imports for the removed desktop toolkit, legacy drawing framework, or legacy markup loader
 - **Provider integration**: SessionPanel calls `getModels()` and `getModelDetails()` through the primary `LLMProvider`

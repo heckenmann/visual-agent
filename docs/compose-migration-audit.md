@@ -25,7 +25,7 @@ The migration replaces the Visual Agent desktop UI toolkit. It does not implemen
 | Full JavaFX removal via Compose is feasible | Complete | Production entry point uses Compose; legacy JavaFX/FXML sources and resources are removed from the build path; `desktopApiUsageCheck` is enabled. |
 | Compare Compose with Swing/FlatLaf path from issue 46 | Complete | Issue 48 documents Compose vs Swing/FlatLaf tradeoffs and recommends Compose for the Kotlin-first UI. |
 | No JavaFX dependencies remain | Complete | `build.gradle.kts` contains Compose dependencies and no JavaFX, AtlantaFX, Ikonli JavaFX, or JHotDraw dependencies. |
-| Split workspace panels | Complete | `ComposeSplitWorkspace`, `splitWorkspaceBounds`, and `workspace/layout` services provide deterministic panel slots without overlap or pointer-driven resize states. |
+| Semantic workspace panels | Complete | `ComposeSplitWorkspace`, `splitWorkspaceBounds`, and `workspace/layout` services provide user-ordered stage, inspector, and deck panel slots without overlap or pointer-driven resize states. |
 | Large panels scroll without old chrome repaint costs | Complete | Compose panels use Compose scroll containers and cheap window chrome; previous JavaFX CSS/shadow effects are removed. |
 | Theme and visual language | Complete | `ComposeWorkspaceTheme` provides Dracula-style Compose theme tokens and runtime settings remain DB-backed. |
 | Canvas replacement | Complete | `CanvasOperations`, `InMemoryCanvasService`, `CanvasDocumentCodec`, `CanvasPngRenderer`, and `ComposeCanvasPanel` provide editable figures, selection, move, resize, delete, PNG capture, persistence, workspace save/open, and tool calls. |
@@ -52,4 +52,4 @@ Compose Desktop itself uses the JVM `java.desktop` stack internally. Visual Agen
 
 ## Final Recommendation
 
-Use Compose Multiplatform as the Visual Agent desktop UI toolkit. The branch demonstrates that the main window, split workspace panels, file import, canvas editing/persistence, internal modals, command palette, and model-facing tool contracts can run without the former JavaFX/JHotDraw UI stack.
+Use Compose Multiplatform as the Visual Agent desktop UI toolkit. The branch demonstrates that the main window, semantic workspace panels, file import, canvas editing/persistence, internal modals, command palette, and model-facing tool contracts can run without the former JavaFX/JHotDraw UI stack.

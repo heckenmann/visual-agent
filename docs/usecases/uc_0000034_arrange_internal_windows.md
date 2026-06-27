@@ -2,7 +2,7 @@
 
 ## Goal
 
-Let users arrange application panels in a deterministic split workspace inside the main application window.
+Let users arrange application panels in a deterministic, designer-curated workspace inside the main application window.
 
 ## Primary Actor
 
@@ -16,13 +16,15 @@ Desktop user.
 ## Main Flow
 
 1. The user opens a panel from navigation.
-2. The panel appears in the split workspace.
+2. The panel appears in the workspace.
 3. The Compose shell recalculates visible panel slots deterministically.
-4. One visible panel fills the workspace.
-5. Two visible panels are shown side by side.
-6. Three visible panels use one large left slot and two stacked right slots.
-7. Four or more visible panels are shown in a two-column grid.
-8. The Compose shell exposes the calculated slot bounds through the workspace layout service.
+4. The first visible panel in the user-defined order becomes the primary stage.
+5. Supporting panels are placed in a right-side inspector stack.
+6. Additional supporting panels are placed in a bottom deck.
+7. The user can move a panel earlier or later through icon-only buttons in the panel header.
+8. The user can hide a panel from either the left rail or the panel header hide button.
+9. Panel cards use consistent spacing, rounded chrome, subtle borders, and compact headers.
+10. The Compose shell exposes the calculated slot bounds through the workspace layout service.
 
 ## Result
 
@@ -42,7 +44,9 @@ The user can keep multiple panels visible without overlap, drag jitter, or inval
 
 - Workspace panels stay inside usable workspace bounds.
 - Each registered panel can be opened through navigation.
+- Each visible panel can be hidden from its own panel header.
+- Panel header order controls update the user-defined panel order.
 - Visible panels do not overlap.
-- The split layout avoids pointer-driven drag and resize work.
+- The semantic layout avoids pointer-driven drag and resize work.
 - Large panel contents remain scrollable without expensive desktop chrome effects being recalculated.
-- Panel cards remain visually separable through borders and header contrast.
+- Panel cards remain visually separable through spacing, borders, header contrast, and clear primary/secondary hierarchy.
