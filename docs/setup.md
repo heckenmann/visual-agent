@@ -74,23 +74,13 @@ Leaving the key blank omits the `Authorization` header. Profile URL and key chan
 
 ## Troubleshooting
 
-### JavaFX module/runtime issues
+### Compose Multiplatform module/runtime issues
 
-Use `./gradlew run` first; the project config applies required JavaFX args.
+Use `./gradlew run` first; the project config applies required Compose Multiplatform args.
 
-### JavaFX rendering performance
+### Compose Multiplatform rendering performance
 
-The Gradle launcher prefers hardware-accelerated JavaFX Prism pipelines and keeps the software renderer as fallback:
-
-- macOS: `es2,sw`
-- Windows: `d3d,es2,sw`
-- Linux/other: `es2,sw`
-
-Vertical sync is enabled through `-Dprism.vsync=true`. To verify the selected pipeline during startup, run:
-
-```bash
-./gradlew run -PvisualagentPrismVerbose=true
-```
+Compose Multiplatform uses its desktop rendering stack through the Compose Gradle plugin. Keep performance-sensitive UI state hoisted and avoid expensive repaint work inside split workspace panels.
 
 ### Ollama not reachable
 

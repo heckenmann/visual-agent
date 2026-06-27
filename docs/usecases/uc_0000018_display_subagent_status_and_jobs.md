@@ -30,8 +30,8 @@ The user can see which agents are idle, busy, or running multiple jobs.
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.panels.SubAgentsPanel`
-- `de.heckenmann.visualagent.ui.panels.SubAgentCardView`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
 - `de.heckenmann.visualagent.agent.AgentManager.getActiveJobCount`
 
 ## Acceptance Criteria

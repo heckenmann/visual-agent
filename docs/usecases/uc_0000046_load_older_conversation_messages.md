@@ -30,7 +30,7 @@ Long conversations can be reviewed incrementally without loading all history on 
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.MainWindowChatWiring`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
 - `de.heckenmann.visualagent.agent.AgentManager.loadOlderHistory`
 - `de.heckenmann.visualagent.knowledge.ConversationStore.getConversationMessagesPage`
 

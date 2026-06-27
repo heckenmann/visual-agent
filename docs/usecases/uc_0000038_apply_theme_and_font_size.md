@@ -2,7 +2,7 @@
 
 ## Goal
 
-Apply user-selected visual theme and font sizing to the JavaFX UI.
+Apply user-selected visual theme and font sizing to the Compose Multiplatform UI.
 
 ## Primary Actor
 
@@ -31,8 +31,8 @@ The UI reflects user-selected visual preferences.
 ## Code Entry Points
 
 - `de.heckenmann.visualagent.config.AppThemeStylesheets`
-- `de.heckenmann.visualagent.ui.MainWindow`
-- `de.heckenmann.visualagent.ui.panels.ApplicationSettingsPanel`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
 
 ## Acceptance Criteria
 

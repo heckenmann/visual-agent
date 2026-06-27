@@ -31,8 +31,8 @@ Each sub-agent can use an appropriate role and model configuration.
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.panels.AgentDetailsDialog`
-- `de.heckenmann.visualagent.ui.panels.AgentDetailsDialogSupport`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
 - `de.heckenmann.visualagent.agent.AgentManager.updateAgent`
 
 ## Acceptance Criteria

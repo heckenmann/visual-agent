@@ -31,8 +31,8 @@ Main-agent requests use the user-selected provider and model unless an agent-spe
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.panels.SessionPanel`
-- `de.heckenmann.visualagent.ui.panels.session.SessionModelController`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
 - `de.heckenmann.visualagent.agent.provider.ProviderCatalogService`
 - `de.heckenmann.visualagent.agent.ConfiguredLLMProvider`
 

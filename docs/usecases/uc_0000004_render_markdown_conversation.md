@@ -17,7 +17,7 @@ Desktop user.
 
 1. A message is mapped to the UI model.
 2. The renderer passes message content directly to the CommonMark parser.
-3. Markdown nodes are converted into JavaFX UI nodes.
+3. Markdown nodes are converted into Compose Multiplatform UI nodes.
 4. The message row is inserted into the chat list.
 
 ## Result
@@ -30,9 +30,9 @@ Markdown formatting is displayed in the conversation while preserving the origin
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.panels.ChatMarkdownRenderer`
-- `de.heckenmann.visualagent.ui.panels.ChatMessageRenderer`
-- `de.heckenmann.visualagent.ui.panels.ChatMessageMapper`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
 
 ## Acceptance Criteria
 

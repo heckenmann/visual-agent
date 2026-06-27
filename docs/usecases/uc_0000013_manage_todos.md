@@ -17,9 +17,10 @@ Desktop user.
 
 1. The user opens the todo panel.
 2. The user creates or edits a todo with priority/status metadata.
-3. The todo manager records the change.
-4. The todo store persists the authoritative state.
-5. Agent prompts and tools read current todo summaries from persistence.
+3. For delete actions, the UI shows an internal confirmation modal before removing the todo.
+4. The todo manager records the change.
+5. The todo store persists the authoritative state.
+6. Agent prompts and tools read current todo summaries from persistence.
 
 ## Result
 
@@ -32,7 +33,8 @@ Todos stay synchronized between UI, database, and agent context.
 ## Code Entry Points
 
 - `de.heckenmann.visualagent.todo.TodoManager`
-- `de.heckenmann.visualagent.ui.panels.TodoPanel`
+- `de.heckenmann.visualagent.ui.compose.TodoPanel`
+- `de.heckenmann.visualagent.ui.compose.ComposeModalHost`
 - `de.heckenmann.visualagent.agent.tools.TodosTool`
 - `de.heckenmann.visualagent.knowledge.TodoStore`
 
@@ -41,3 +43,4 @@ Todos stay synchronized between UI, database, and agent context.
 - Todo changes survive restart.
 - Main-agent context includes authoritative todo counters.
 - UI and tool calls reflect the same persisted state.
+- UI delete actions require internal modal confirmation.

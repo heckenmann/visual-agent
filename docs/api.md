@@ -114,7 +114,7 @@ Current tool IDs:
 
 ### Canvas Tool
 
-The `canvas` tool is available to sub-agents, not to the main orchestration agent. It lets model calls inspect and mutate the editable JHotDraw canvas through JavaFX-safe service calls.
+The `canvas` tool is available to sub-agents, not to the main orchestration agent. It lets model calls inspect and mutate the editable JVM canvas model canvas through Compose Multiplatform-safe service calls.
 
 Supported actions:
 
@@ -125,7 +125,14 @@ Supported actions:
 - `drawLine`: requires `x1`, `y1`, `x2`, and `y2`; optional `color`, `width`.
 - `drawCircle`: requires `centerX`, `centerY`, and `radius`; optional `fillColor`.
 - `insertImage`: requires a workspace-relative `path`; paths outside the workspace are rejected.
-- `captureImage`: optional `format` (`png`, `jpg`, or `jpeg`); renders the current canvas and stores an immutable image entry in persisted conversation history.
+- `select`: optional `index`; selects one figure or clears selection when omitted.
+- `selectAt`: requires `x` and `y`; selects the top-most figure at the coordinate.
+- `moveFigure`: requires `index`, `deltaX`, and `deltaY`; moves one figure.
+- `resizeFigure`: requires `index`, `width`, and `height`; resizes one figure.
+- `deleteFigure`: requires `index`; deletes one figure and reindexes remaining figures.
+- `saveDocument`: optional `name`; serializes the editable canvas as a managed `.canvas` workspace file.
+- `openDocument`: requires `id` or `path`; loads a managed `.canvas` workspace file into the editable canvas.
+- `captureImage`: optional `format` (`png`); renders the current canvas and stores an immutable image entry in persisted conversation history.
 
 Example:
 
@@ -143,7 +150,7 @@ Example:
 
 ### Workspace Layout Tool
 
-The `workspace:layout` tool is available to sub-agents, not to the main orchestration agent. It lets model calls inspect screens, the main window, the internal desktop, and internal workspace windows. It can also reposition or resize internal windows by ID.
+The `workspace:layout` tool is available to sub-agents, not to the main orchestration agent. It lets model calls inspect screens, the main window, the internal desktop, and deterministic workspace panel slots.
 
 ### Workspace File Tool
 
@@ -158,7 +165,7 @@ Supported actions:
 - `hash`: requires `id` or `path`; computes the current SHA-256 hash from file bytes.
 - `readText`: requires `id` or `path`; reads bounded UTF-8 text content.
 - `extractPdfText`: requires `id` or `path`; extracts bounded PDF text and caches it.
-- `renderPdfPage`: currently returns a clear failure until a non-desktop PDF renderer is integrated.
+- `renderPdfPage`: requires `id` or `path` and optional `page`; renders extracted page text into a generated PNG preview under the managed workspace.
 - `imageInfo`: requires `id` or `path`; returns dimensions, MIME type, size, and hash.
 - `imageBytes`: requires `id` or `path`; returns bounded base64 image bytes.
 - `analyzeImage`: requires `id` or `path` plus `prompt`; sends the image to the active provider vision path.

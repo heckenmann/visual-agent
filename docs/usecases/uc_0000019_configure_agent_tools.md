@@ -33,8 +33,8 @@ Agents receive only the tools allowed by persisted configuration.
 
 - `de.heckenmann.visualagent.agent.AgentToolConfigService`
 - `de.heckenmann.visualagent.agent.tools.ToolRegistry`
-- `de.heckenmann.visualagent.ui.panels.ApplicationSettingsPanel`
-- `de.heckenmann.visualagent.ui.panels.AgentDetailsDialog`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
 
 ## Acceptance Criteria
 

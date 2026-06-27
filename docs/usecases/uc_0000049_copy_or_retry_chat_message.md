@@ -30,8 +30,8 @@ Conversation content can be reused quickly and assistant responses can be retrie
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.panels.ChatMessageRenderer`
-- `de.heckenmann.visualagent.ui.panels.ChatPanel`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
 
 ## Acceptance Criteria
 

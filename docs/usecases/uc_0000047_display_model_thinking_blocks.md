@@ -30,8 +30,8 @@ The user can inspect model thinking output without polluting the final answer te
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.MainWindowChatWiring`
-- `de.heckenmann.visualagent.ui.panels.ChatPanel`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
 - `de.heckenmann.visualagent.config.AppConfig.thinkingEnabled`
 
 ## Acceptance Criteria

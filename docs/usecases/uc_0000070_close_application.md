@@ -12,24 +12,24 @@ Users close the entire Visual Agent desktop application from the left navigation
 ## Main Flow
 1. The user clicks the rail close button.
 2. The application runs the normal stage close path.
-3. The current internal window layout is persisted by the existing close handler.
-4. JavaFX exits and the Spring application context is shut down by the application stop hook.
+3. The current workspace panel layout is persisted by the existing close handler.
+4. Compose Multiplatform exits and the Spring application context is shut down by the application stop hook.
 
 ## Alternative Flows
 - If the close request is consumed by a future confirmation flow, the application remains open.
-- If no internal workspace window is active, the button still closes the application.
+- If no workspace panel is active, the button still closes the application.
 
 ## Tool Calls
 
 - None.
 
 ## Code Entry Points
-- `src/main/resources/fxml/main-window.fxml`
-- `de.heckenmann.visualagent.ui.MainWindow`
+- `src/main/kotlin/de/heckenmann/visualagent/ui/compose/VisualAgentComposeApplication.kt`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
 - `de.heckenmann.visualagent.Main`
 
 ## Acceptance Criteria
 - The left rail contains an icon-only close button with a tooltip.
-- Clicking the button closes the entire application, not only the active internal window.
-- The existing stage close handler persists the workspace window layout.
+- Clicking the button closes the entire application, not only the active workspace panel.
+- The existing stage close handler persists the workspace panel layout.
 - The application stop hook closes the Spring context.

@@ -30,7 +30,7 @@ The user can make informed model-selection decisions.
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.panels.session.SessionModelController`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
 - `de.heckenmann.visualagent.agent.LLMProvider.getModelDetails`
 
 ## Acceptance Criteria

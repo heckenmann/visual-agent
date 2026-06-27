@@ -2,12 +2,12 @@
 
 ## Overview
 
-Visual Agent is a JavaFX desktop application with Spring-managed services.  
+Visual Agent is a Compose Multiplatform desktop application with Spring-managed services.  
 The runtime uses Spring AI for model interaction and tool-calling, and Spring Data JPA on SQLite as the persistent state source.
 
 ## Runtime Layers
 
-1. Presentation: JavaFX `MainWindow` + panel controllers.
+1. Presentation: Compose Multiplatform shell in `VisualAgentComposeApplication`.
 2. Application: `AgentManager` orchestrates chat, streaming, history, todos, and sub-agents.
 3. Provider: `ConfiguredLLMProvider` routes to the Ollama or OpenAI implementation.
 4. Tools: `ToolRegistry` + `VisualAgentTool` implementations + `ToolEventBus`.
@@ -15,8 +15,8 @@ The runtime uses Spring AI for model interaction and tool-calling, and Spring Da
 
 ## Current Implemented Flow
 
-1. User sends message in `ChatPanel`.
-2. `MainWindow` forwards to `AgentManager` (`sendMessage` or `streamMessage`).
+1. The Compose shell starts with the Spring application context.
+2. Compose panels will call `AgentManager` (`sendMessage` or `streamMessage`) as they are rebuilt.
 3. `AgentManager` builds a `ChatRequestContext` with:
    - recent persisted history (paged),
    - active model and runtime metadata,
@@ -71,30 +71,19 @@ Current tool set:
 
 ## UI Architecture Notes
 
-- Main shell: `MainWindow` (FXML) with panel switching and keyboard shortcuts.
-- Conversation UI:
-  - markdown rendering,
-  - streaming updates,
-  - tool call entries,
-  - persisted history with paged loading.
-- Session UI drives model selection and session preferences.
-- Todo panel and conversation both reflect persisted todo state.
-- Files panel imports, searches, reconciles, renames, deletes, and opens managed workspace files. It can also save the current editable canvas as a managed workspace document and reopen saved canvas documents.
+- Main shell: `VisualAgentComposeApplication` with a left rail and deterministic split workspace panels.
+- Conversation, session, todo, files, sub-agent, settings, and visual canvas panels are being rebuilt as Compose components.
+- Backend services and model tool contracts remain available while UI parity is restored.
+- Workspace layout persistence is toolkit-neutral under `workspace/layout`.
 
 ### Canvas Editor
 
-The canvas uses JHotDraw 8 as its structured drawing engine:
+The previous visual canvas editor has been removed with the desktop toolkit migration. The current branch keeps the model-facing canvas contract in toolkit-neutral code:
 
-- `SimpleDrawingView` renders editable figures without rasterizing the document during resize.
-- `SimpleDrawingEditor` and `DrawingModelUndoAdapter` provide selection and undo/redo.
-- `GridConstrainer` provides the visible grid independently from drawing content.
-- Shapes, text, freehand paths, and imported images remain selectable and transformable JHotDraw figures.
-- Drawing model changes are serialized as JHotDraw XML into the preference store after a short debounce and restored when the canvas is created.
-- Users can set a fixed editable canvas surface size; the configured width and height are stored in preferences and are independent from the surrounding window size.
-- Canvas documents can be saved as managed workspace files under `workspace/canvas/` and reopened from the Files panel.
-- `CanvasService` exposes JavaFX-thread-safe model operations for tool calls while resolving the lazy `CanvasPanel` only when the tool is actually used.
+- `CanvasOperations` defines the stable model-facing canvas API.
+- `InMemoryCanvasService` provides temporary backend behavior for tool calls while the Compose visual editor is rebuilt.
 - `CanvasTool` lets sub-agents inspect the canvas and add text, rectangles, lines, circles, and workspace-local images.
-- The application pins JavaFX to version 21 and uses `org.jhotdraw8.color:0.4` because JHotDraw 0.5 did not publish the referenced color module version.
+- Canvas persistence, editable selection, image manipulation, export fidelity, and visual editing are migration follow-up work.
 
 The main orchestration agent does not receive direct canvas tools. It must create or message a sub-agent, and that sub-agent can use the `canvas` tool when its configured tool set allows it.
 
@@ -103,8 +92,6 @@ The main orchestration agent does not receive direct canvas tools. It must creat
 The following source files still exceed the 300 LOC target and are marked for modularization:
 
 - `agent/AgentManager.kt`
-- `ui/panels/ChatPanel.kt`
-- `ui/MainWindow.kt`
 - `agent/OllamaClient.kt`
 
 The build now includes automated LOC/package-size checks during `check`; violations are currently reported as warnings (non-blocking) until the modularization work is completed.

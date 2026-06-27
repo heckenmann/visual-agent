@@ -34,7 +34,7 @@ The user sees progress during longer responses and the final completed message i
 - `de.heckenmann.visualagent.agent.LLMProvider.stream`
 - `de.heckenmann.visualagent.agent.AgentManager.streamMessage`
 - `de.heckenmann.visualagent.agent.text.AgentResponseCoordinator`
-- `de.heckenmann.visualagent.ui.panels.ChatPanel`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
 
 ## Acceptance Criteria
 

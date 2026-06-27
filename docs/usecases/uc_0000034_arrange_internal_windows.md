@@ -1,8 +1,8 @@
-# UC-0000034: Arrange Internal Windows
+# UC-0000034: Arrange Workspace Panels
 
 ## Goal
 
-Let users arrange application panels as draggable internal windows inside the main workspace.
+Let users arrange application panels in a deterministic split workspace inside the main application window.
 
 ## Primary Actor
 
@@ -10,22 +10,23 @@ Desktop user.
 
 ## Preconditions
 
-- The main window workspace is initialized.
-- Panels are registered with the workspace window manager.
+- The Compose workspace is initialized.
+- Workspace panel descriptors are available to the Compose shell.
 
 ## Main Flow
 
 1. The user opens a panel from navigation.
-2. The panel appears as an internal workspace window.
-3. The user drags or resizes the window.
-4. During dragging, the window moves smoothly without forcing full panel layout on every pointer event.
-5. Large panel contents remain scrollable without expensive desktop chrome effects being recalculated.
-6. Window borders, header contrast, and active header gradients keep overlapping windows visually distinguishable.
-7. Window manager commits final bounds and z-order when the drag completes.
+2. The panel appears in the split workspace.
+3. The Compose shell recalculates visible panel slots deterministically.
+4. One visible panel fills the workspace.
+5. Two visible panels are shown side by side.
+6. Three visible panels use one large left slot and two stacked right slots.
+7. Four or more visible panels are shown in a two-column grid.
+8. The Compose shell exposes the calculated slot bounds through the workspace layout service.
 
 ## Result
 
-The user can build a custom workspace layout inside the application.
+The user can keep multiple panels visible without overlap, drag jitter, or invalid resize states.
 
 ## Tool Calls
 
@@ -33,14 +34,15 @@ The user can build a custom workspace layout inside the application.
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.InternalWorkspaceWindow`
-- `de.heckenmann.visualagent.ui.WorkspaceWindowManager`
-- `de.heckenmann.visualagent.ui.MainWindowWorkspace`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.compose.ComposeWorkspaceComponents`
+- `de.heckenmann.visualagent.ui.compose.ComposeWorkspaceModels`
 
 ## Acceptance Criteria
 
-- Internal windows stay inside usable workspace bounds.
+- Workspace panels stay inside usable workspace bounds.
 - Each registered panel can be opened through navigation.
-- Dragging remains responsive for windows containing heavier panels such as canvas or file tables.
-- Workspace window chrome avoids JavaFX `-fx-effect` styling so scrolling large panels does not repaint expensive shadows.
-- Internal windows remain visually separable through cheap CSS borders, header contrast, and active-window header gradients.
+- Visible panels do not overlap.
+- The split layout avoids pointer-driven drag and resize work.
+- Large panel contents remain scrollable without expensive desktop chrome effects being recalculated.
+- Panel cards remain visually separable through borders and header contrast.

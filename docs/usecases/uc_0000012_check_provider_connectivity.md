@@ -31,7 +31,7 @@ The user can distinguish configuration/network problems from model-response prob
 
 - `de.heckenmann.visualagent.agent.LLMProvider.checkConnection`
 - `de.heckenmann.visualagent.agent.ConfiguredLLMProvider`
-- `de.heckenmann.visualagent.ui.panels.ChatRuntimeStatusController`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
 
 ## Acceptance Criteria
 

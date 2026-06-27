@@ -86,6 +86,9 @@ src/main/kotlin/de/heckenmann/visualagent/
 │       ├── RuntimeTools.kt    # terminal/browser/search tools
 │       ├── ToolRegistry.kt    # Tool registration + Spring AI callback mapping
 │       └── ToolSupport.kt     # Shared parsing/path/schema helpers
+├── canvas/
+│   ├── CanvasOperations.kt    # Toolkit-neutral model-facing canvas contract
+│   └── InMemoryCanvasService.kt # Temporary Compose-migration canvas backend
 ├── config/
 │   └── AppConfig.kt           # Singleton loaded from app.properties
 ├── knowledge/
@@ -94,48 +97,40 @@ src/main/kotlin/de/heckenmann/visualagent/
 │   └── PersistenceStores.kt   # Typed persistence service interfaces/implementations
 ├── todo/
 │   └── Todo.kt                # Todo, Priority, Status models
+├── workspace/
+│   └── layout/                # Toolkit-neutral internal-window layout persistence/tool state
 └── ui/
-    ├── MainWindow.kt          # FXML-based, panel switching, shortcuts/command palette, window controls, wires backend to UI
-    ├── FxmlLoader.kt          # Type-safe FXML loading utility
-    ├── StatusBar.kt           # Legacy status component (currently not wired in MainWindow)
-    └── panels/
-        ├── SessionPanel.kt         # FXML-based provider/model/session settings panel
-        ├── ChatPanel.kt            # FXML-backed conversation panel and send callback surface
-        ├── TodoPanel.kt            # FXML-based, Add dialog, Delete, checkbox toggle, priority badges
-        ├── SubAgentsPanel.kt       # FXML-backed agent list with code-built cards
-        ├── canvas/                 # Drawing canvas panel, toolbar, and resize support
-        └── ApplicationSettingsPanel.kt  # FXML-based, theme selector, font size spinner
+    └── compose/
+        ├── VisualAgentComposeApplication.kt # Compose desktop shell and internal windows
+        └── ComposeWorkspaceModels.kt        # Internal-window geometry model
 ```
 
 ## Tech Stack
 
 | Component | Version |
 |-----------|---------|
-| Kotlin | 2.2.21 |
-| Kotlinx Serialization JSON | 1.8.1 |
-| JavaFX | 21.0.2 |
+| Kotlin | 2.4.0 |
+| Kotlinx Serialization JSON | 1.11.0 |
+| Compose Multiplatform | 1.11.1 |
 | Spring Boot | 4.1.0 |
 | Spring AI | 2.0.0 |
 | HTTP | Spring `RestClient` / `WebClient` |
-| Kotlinx Coroutines | 1.7.3 |
-| SQLite JDBC | 3.45.0.0 |
-| Logback | 1.5.18 |
-| AtlantaFX | 2.0.1 |
-| Gradle | 9.4.1 (Kotlin DSL) |
+| Kotlinx Coroutines | 1.11.0 |
+| SQLite JDBC | 3.53.2.0 |
+| Logback | 1.5.34 |
+| Gradle | 9.6.0 (Kotlin DSL) |
 
 ## Key Patterns
 
 - **AppConfig**: Singleton loaded from `src/main/resources/config/app.properties`
 - **LLMProvider**: Interface for Ollama/OpenAI providers in `agent/LLMProvider.kt` — includes `chat`, `stream`, `vision`, `embeddings`, `getModels`, `getModelDetails`
 - **ConfiguredLLMProvider**: Primary `LLMProvider` bean; routes calls to Ollama or OpenAI based on `AppConfig.instance.llmProvider`
-- **Region inheritance**: UI panels extend `javafx.scene.layout.Region`
-- **VBox orientation**: VBox is always vertical in JavaFX — no `.orientation` property
-- **FXML loading**: Panels use `FxmlLoader.load(controller, "file.fxml")` — sets controller before loading, no `fx:controller` attribute in FXML (MainWindow, SessionPanel, TodoPanel, ApplicationSettingsPanel)
-- **Panel composition**: ChatPanel and SubAgentsPanel use FXML shells; message rows and agent cards are built by their controllers
-- **Panel switching**: Navigation buttons in MainWindow swap `chatArea.center` between panels
-- **Keyboard navigation**: MainWindow supports `Cmd/Ctrl+1..6` for panel switching and `Cmd/Ctrl+K` command palette
-- **CSS classes**: All styling via CSS classes (`application.css`), no inline `setStyle()` calls
-- **Callback wiring**: ChatPanel sends messages via `setOnSendMessage` callback wired to `AgentManager.sendMessage()` in MainWindow
+- **Compose runtime**: Desktop UI starts from `runVisualAgentComposeApplication()`
+- **State hoisting**: UI state belongs in explicit state holders or Spring-backed services, not hidden component globals
+- **Panel migration**: Rebuild panels as composable functions backed by existing Spring services
+- **Internal windows**: Keep draggable/resizable workspace state in toolkit-neutral `workspace/layout` models
+- **Styling**: Use Compose theme tokens and modifiers; do not reintroduce stylesheet-based desktop UI styling
+- **No legacy desktop toolkit**: Do not add dependencies or imports for the removed desktop toolkit, legacy drawing framework, or legacy markup loader
 - **Provider integration**: SessionPanel calls `getModels()` and `getModelDetails()` through the primary `LLMProvider`
 - **Spring AI tool-calling**: `LLMProvider.chat/stream(ChatRequestContext)` carries enabled tool IDs + metadata; provider builds request-scoped callbacks
 - **Tool event flow**: all tool calls emit STARTED/FINISHED events; UI and persistence consume these events
@@ -200,36 +195,19 @@ The model does not receive arbitrary global state. It receives a request-scoped 
 
 ## Gotchas
 
-1. JavaFX modules require JVM args for modular JDK:
-   ```kotlin
-   "--add-modules", "javafx.controls,javafx.fxml,javafx.web,javafx.graphics,javafx.media,javafx.swing,javafx.base"
-   ```
+1. `ollama serve` must be running before `gradle run` when using local Ollama.
 
-2. JavaFX rendering is configured through Prism JVM args in `build.gradle.kts`:
-   - macOS: `-Dprism.order=es2,sw`
-   - Windows: `-Dprism.order=d3d,es2,sw`
-   - Linux/other: `-Dprism.order=es2,sw`
-   - all platforms: `-Dprism.vsync=true`
+2. Dependencies copied to `lib/` via `gradle copyAllDependencies`.
 
-   To print the selected pipeline at startup:
-   ```bash
-   ./gradlew run -PvisualagentPrismVerbose=true
-   ```
+3. Kotlinx Serialization requires explicit `@Serializable` annotation on data classes used with `Json.encodeToString/decodeFromString`.
 
-3. `ollama serve` must be running before `gradle run`
+4. `json.parseToJsonElement()` returns `JsonElement` — use `.jsonObject`, `.jsonArray`, `.jsonPrimitive` extensions.
 
-4. Dependencies copied to `lib/` via `gradle copyAllDependencies`
+5. **Main class is `de.heckenmann.visualagent.Main`**.
 
-5. Kotlinx Serialization requires explicit `@Serializable` annotation on data classes used with `Json.encodeToString/decodeFromString`
+6. **`PRAGMA busy_timeout=5000`** in KnowledgeDb — if stale WAL/SHM files from a crashed process cause `SQLITE_BUSY`, delete `data/visual-agent.db-wal` and `data/visual-agent.db-shm` before restarting.
 
-6. `json.parseToJsonElement()` returns `JsonElement` — use `.jsonObject`, `.jsonArray`, `.jsonPrimitive` extensions
-
-7. **JavaFX `--module-path`** must point to `lib/` — without it you get "JavaFX Runtime components missing"
-
-8. **Main class is `de.heckenmann.visualagent.Main`** (not `MainKt`) — because `Main` extends `Application`
-
-9. **`PRAGMA busy_timeout=5000`** in KnowledgeDb — if stale WAL/SHM files from a crashed process cause `SQLITE_BUSY`, delete `data/visual-agent.db-wal` and `data/visual-agent.db-shm` before restarting
-10. **Current LOC policy** — file LOC target is 300; package LOC target is 3000. `locAndPackageSizeCheck` reports violations as warnings (non-blocking).
+7. **Current LOC policy** — file LOC target is 300; package LOC target is 3000. `locAndPackageSizeCheck` reports violations as warnings (non-blocking).
 
 ## Documentation Language
 

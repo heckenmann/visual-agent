@@ -22,5 +22,5 @@ Visual Agent now uses Spring Data JPA on SQLite with Flyway migrations for persi
 
 - [Spring AI Tools](https://docs.spring.io/spring-ai/reference/api/tools.html)
 - [Ollama Documentation](https://docs.ollama.com)
-- [JavaFX Documentation](https://openjfx.io)
+- [Compose Multiplatform Documentation](https://openjfx.io)
 - [Kotlin Documentation](https://kotlinlang.org/docs/home.html)

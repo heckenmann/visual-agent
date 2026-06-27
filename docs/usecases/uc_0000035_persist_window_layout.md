@@ -1,8 +1,8 @@
-# UC-0000035: Persist Window Layout
+# UC-0000035: Persist Workspace Panel Layout
 
 ## Goal
 
-Save internal window arrangement when the application exits and restore it on startup.
+Save workspace panel visibility and layout state when the application exits and restore it on startup.
 
 ## Primary Actor
 
@@ -11,19 +11,19 @@ Desktop user.
 ## Preconditions
 
 - Workspace layout persistence is available.
-- Internal windows have stable IDs.
+- Workspace panels have stable IDs.
 
 ## Main Flow
 
-1. The user arranges internal windows.
-2. Bounds and visibility state are captured.
+1. The user opens or closes workspace panels.
+2. Visibility state and the current calculated split slots are captured.
 3. Layout state is persisted.
-4. On startup, stored window layout is loaded.
-5. Internal windows are restored to their previous positions and sizes.
+4. On startup, stored workspace layout is loaded.
+5. Workspace panels are restored to their previous visibility state and placed into valid split slots.
 
 ## Result
 
-The user's preferred workspace layout survives restart.
+The user's preferred panel set survives restart.
 
 ## Tool Calls
 
@@ -31,11 +31,11 @@ The user's preferred workspace layout survives restart.
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.WorkspaceLayoutPersistence`
-- `de.heckenmann.visualagent.ui.WorkspaceWindowManager`
-- `de.heckenmann.visualagent.ui.MainWindowWorkspace`
+- `de.heckenmann.visualagent.workspace.layout.WorkspaceLayoutPersistence`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
 
 ## Acceptance Criteria
 
-- Restored windows use persisted IDs and bounds.
-- Missing panels or invalid bounds do not prevent startup.
+- Restored panels use persisted IDs.
+- Missing panels or invalid stored bounds do not prevent startup.
+- Restored panels are always placed inside the visible split workspace.

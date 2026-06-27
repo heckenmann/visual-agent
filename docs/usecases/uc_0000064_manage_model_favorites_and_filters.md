@@ -31,7 +31,7 @@ Large model catalogs are easier to navigate.
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.panels.session.SessionModelController`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
 - `de.heckenmann.visualagent.config.AppConfig.favoriteModels`
 
 ## Acceptance Criteria

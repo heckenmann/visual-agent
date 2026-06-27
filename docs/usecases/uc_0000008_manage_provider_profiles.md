@@ -32,7 +32,7 @@ Different agents and sessions can use different providers and model parameters.
 
 - `de.heckenmann.visualagent.agent.provider.ProviderProfile`
 - `de.heckenmann.visualagent.agent.provider.ProviderCatalogService`
-- `de.heckenmann.visualagent.ui.panels.session.ProviderProfileDialog`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
 
 ## Acceptance Criteria
 

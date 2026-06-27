@@ -16,10 +16,11 @@ Desktop user.
 ## Main Flow
 
 1. The user activates the clear conversation action.
-2. The UI shows assistant loading state.
-3. The agent manager deletes main-session history from memory and persistence.
-4. A post-reset welcome message is generated and persisted.
-5. The chat panel renders the new welcome message.
+2. The UI shows an internal confirmation modal.
+3. If confirmed, the UI shows reset state.
+4. The agent manager deletes main-session history from memory and persistence.
+5. A post-reset welcome message is generated and persisted.
+6. The chat panel renders the new welcome message.
 
 ## Result
 
@@ -31,7 +32,8 @@ The main conversation is reset without requiring an application restart.
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.MainWindowChatWiring`
+- `de.heckenmann.visualagent.ui.compose.ConversationPanel`
+- `de.heckenmann.visualagent.ui.compose.ComposeModalHost`
 - `de.heckenmann.visualagent.agent.AgentManager.clearHistory`
 - `de.heckenmann.visualagent.agent.AgentManager.addWelcomeMessageAfterReset`
 
@@ -40,3 +42,4 @@ The main conversation is reset without requiring an application restart.
 - Old main-session messages are removed.
 - A new persisted welcome message is shown after reset.
 - UI does not leave the user in a loading state.
+- Cancelling the internal confirmation modal leaves conversation history unchanged.

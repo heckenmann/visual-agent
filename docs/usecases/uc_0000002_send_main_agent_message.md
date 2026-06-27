@@ -34,8 +34,8 @@ The user receives a complete response and the conversation survives application 
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.panels.ChatPanel`
-- `de.heckenmann.visualagent.ui.MainWindowChatWiring`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
 - `de.heckenmann.visualagent.agent.AgentManager`
 - `de.heckenmann.visualagent.agent.conversation.AgentManagerConversationOps`
 

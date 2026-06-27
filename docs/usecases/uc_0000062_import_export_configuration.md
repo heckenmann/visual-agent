@@ -31,7 +31,7 @@ Configuration can be backed up or restored without exposing secrets.
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.panels.ApplicationSettingsPanel`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
 - `de.heckenmann.visualagent.config.AppConfig.exportTo`
 - `de.heckenmann.visualagent.config.AppConfig.importFrom`
 

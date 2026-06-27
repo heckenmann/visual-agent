@@ -30,9 +30,9 @@ Sub-agent behavior can be inspected without switching to raw database or log fil
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.panels.SubAgentCardView`
-- `de.heckenmann.visualagent.ui.panels.AgentLogsDialog`
-- `de.heckenmann.visualagent.ui.MainWindowSubAgentWiring`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
 
 ## Acceptance Criteria
 

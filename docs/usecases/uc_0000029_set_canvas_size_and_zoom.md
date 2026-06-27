@@ -29,10 +29,10 @@ Window resizing does not move drawings into inaccessible space or blur the struc
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.panels.canvas.CanvasPanel`
-- `de.heckenmann.visualagent.ui.panels.canvas.CanvasToolbar`
-- `de.heckenmann.visualagent.ui.panels.canvas.CanvasSurfaceSizeController`
-- `de.heckenmann.visualagent.ui.panels.canvas.CanvasEditorDefaults`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
 
 ## Acceptance Criteria
 

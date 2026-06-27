@@ -90,7 +90,7 @@ Legacy provider entries are migrated into the catalog when no catalog exists. AP
 
 Canvas-related entries include:
 
-- `canvas.document.xml`: serialized JHotDraw document containing layers, editable figures, image references, and transforms
+- `canvas.document.xml`: serialized JVM canvas model document containing layers, editable figures, image references, and transforms
 
 The canvas document is updated after model changes and restored when the canvas panel is created.
 

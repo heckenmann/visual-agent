@@ -30,8 +30,8 @@ The user can run targeted work on a specific sub-agent without waiting for auton
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.panels.SubAgentCardView`
-- `de.heckenmann.visualagent.ui.MainWindowSubAgentWiring`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
 - `de.heckenmann.visualagent.agent.AgentManager.runAgentJob`
 
 ## Acceptance Criteria
