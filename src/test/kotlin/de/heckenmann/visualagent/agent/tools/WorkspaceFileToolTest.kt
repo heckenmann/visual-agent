@@ -62,7 +62,7 @@ class WorkspaceFileToolTest {
     }
 
     @Test
-    fun `workspace file tool extracts pdf reports page render failure and handles invalid actions`() {
+    fun `workspace file tool extracts pdf renders page preview and handles invalid actions`() {
         val previous = AppConfig.instance.databasePath
         try {
             AppConfig.instance.databasePath = tempDir().resolve("data/visual-agent.db").toString()
@@ -74,13 +74,13 @@ class WorkspaceFileToolTest {
 
             val info = tool.execute("""{"action":"info","id":"${pdf.id}"}""")
             val text = tool.execute("""{"action":"extractPdfText","path":"${pdf.relativePath}"}""")
-            val page = tool.execute("""{"action":"renderPdfPage","id":"${pdf.id}","page":1}""")
+            val page = Json.parseToJsonElement(tool.execute("""{"action":"renderPdfPage","id":"${pdf.id}","page":1}""").content).jsonObject
             val unsupported = tool.execute("""{"action":"missing"}""")
 
             assertTrue(info.content.contains("application/pdf"))
             assertTrue(text.content.contains("Tool PDF"))
-            assertFalse(page.success)
-            assertTrue(page.error.orEmpty().contains("non-desktop renderer"))
+            assertEquals("generated/sample-page-1.png", page["path"]!!.jsonPrimitive.content)
+            assertEquals("image/png", page["mimeType"]!!.jsonPrimitive.content)
             assertFalse(unsupported.success)
         } finally {
             AppConfig.instance.databasePath = previous

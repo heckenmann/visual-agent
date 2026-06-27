@@ -1,10 +1,20 @@
-package de.heckenmann.visualagent.agent.tools
+package de.heckenmann.visualagent.agent.tools.canvas
 
 import de.heckenmann.visualagent.agent.ToolDefinition
 import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.agent.ToolResult
+import de.heckenmann.visualagent.agent.tools.PathResolution
+import de.heckenmann.visualagent.agent.tools.STRING_SCHEMA
+import de.heckenmann.visualagent.agent.tools.VisualAgentTool
+import de.heckenmann.visualagent.agent.tools.failure
+import de.heckenmann.visualagent.agent.tools.parseObject
+import de.heckenmann.visualagent.agent.tools.requiredString
+import de.heckenmann.visualagent.agent.tools.resolveWorkspacePathOrFailure
+import de.heckenmann.visualagent.agent.tools.string
+import de.heckenmann.visualagent.agent.tools.success
+import de.heckenmann.visualagent.agent.tools.toFunctionName
+import de.heckenmann.visualagent.canvas.CanvasOperations
 import de.heckenmann.visualagent.knowledge.ConversationStore
-import de.heckenmann.visualagent.ui.panels.canvas.CanvasOperations
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -30,8 +40,10 @@ class CanvasTool(
             id = ToolId(TOOL_ID),
             name = ToolId(TOOL_ID).toFunctionName(),
             description =
-                "Inspect or edit the canvas. Actions: get, clear, drawText, drawRect, drawLine, drawCircle, insertImage, captureImage. " +
-                    "Coordinates are canvas coordinates. Use get before making layout-sensitive changes.",
+                "Inspect or edit the canvas. Actions: get, clear, drawText, drawRect, drawLine, drawCircle, insertImage, " +
+                    "select, selectAt, moveFigure, resizeFigure, deleteFigure, saveDocument, openDocument, captureImage. " +
+                    "Coordinates are canvas coordinates. " +
+                    "Use get before making layout-sensitive changes.",
             inputSchema = STRING_SCHEMA,
         )
 
@@ -49,6 +61,13 @@ class CanvasTool(
                 "drawLine" -> drawLine(input)
                 "drawCircle" -> drawCircle(input)
                 "insertImage" -> insertImage(input)
+                "select" -> select(input)
+                "selectAt" -> selectAt(input)
+                "moveFigure" -> moveFigure(input)
+                "resizeFigure" -> resizeFigure(input)
+                "deleteFigure" -> deleteFigure(input)
+                "saveDocument" -> saveDocument(input)
+                "openDocument" -> openDocument(input)
                 "captureImage" -> captureImage(input, context)
                 else -> failure(TOOL_ID, "Unsupported canvas action")
             }
@@ -127,6 +146,69 @@ class CanvasTool(
         }
     }
 
+    private fun select(input: JsonObject): ToolResult {
+        val index = input.int("index")
+        return success(TOOL_ID, json.encodeToString(canvas.selectFigure(index)))
+    }
+
+    private fun selectAt(input: JsonObject): ToolResult =
+        success(
+            TOOL_ID,
+            json.encodeToString(
+                canvas.selectAt(
+                    x = input.requiredDouble("x"),
+                    y = input.requiredDouble("y"),
+                ),
+            ),
+        )
+
+    private fun moveFigure(input: JsonObject): ToolResult =
+        success(
+            TOOL_ID,
+            json.encodeToString(
+                canvas.moveFigure(
+                    index = input.requiredInt("index"),
+                    deltaX = input.requiredDouble("deltaX"),
+                    deltaY = input.requiredDouble("deltaY"),
+                ),
+            ),
+        )
+
+    private fun resizeFigure(input: JsonObject): ToolResult =
+        success(
+            TOOL_ID,
+            json.encodeToString(
+                canvas.resizeFigure(
+                    index = input.requiredInt("index"),
+                    width = input.requiredDouble("width"),
+                    height = input.requiredDouble("height"),
+                ),
+            ),
+        )
+
+    private fun deleteFigure(input: JsonObject): ToolResult =
+        success(
+            TOOL_ID,
+            json.encodeToString(canvas.deleteFigure(input.requiredInt("index"))),
+        )
+
+    private fun saveDocument(input: JsonObject): ToolResult =
+        success(
+            TOOL_ID,
+            json.encodeToString(canvas.saveDocument(input.string("name") ?: DEFAULT_DOCUMENT_NAME)),
+        )
+
+    private fun openDocument(input: JsonObject): ToolResult =
+        success(
+            TOOL_ID,
+            json.encodeToString(
+                canvas.openDocument(
+                    id = input.string("id"),
+                    path = input.string("path"),
+                ),
+            ),
+        )
+
     private fun captureImage(
         input: JsonObject,
         context: Map<String, Any>,
@@ -163,6 +245,10 @@ class CanvasTool(
 
     private fun JsonObject.double(key: String): Double? = this[key]?.jsonPrimitive?.doubleOrNull
 
+    private fun JsonObject.requiredInt(key: String): Int = int(key) ?: throw IllegalArgumentException("Missing required field '$key'")
+
+    private fun JsonObject.int(key: String): Int? = this[key]?.jsonPrimitive?.content?.toIntOrNull()
+
     private companion object {
         const val TOOL_ID = "canvas"
         const val MAIN_SESSION_ID = "main"
@@ -170,6 +256,7 @@ class CanvasTool(
         const val DEFAULT_FILL_COLOR = "#ffffff"
         const val DEFAULT_STROKE_COLOR = "#1f6feb"
         const val DEFAULT_STROKE_WIDTH = 2.0
+        const val DEFAULT_DOCUMENT_NAME = "canvas.canvas"
         val json =
             Json {
                 encodeDefaults = true

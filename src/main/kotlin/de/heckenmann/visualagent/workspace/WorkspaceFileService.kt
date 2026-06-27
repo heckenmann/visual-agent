@@ -2,7 +2,6 @@ package de.heckenmann.visualagent.workspace
 
 import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
 import de.heckenmann.visualagent.knowledge.WorkspaceFileStore
-import javafx.scene.image.Image
 import org.apache.pdfbox.Loader
 import org.apache.pdfbox.text.PDFTextStripper
 import org.springframework.stereotype.Service
@@ -265,15 +264,34 @@ class WorkspaceFileService(
     }
 
     /**
-     * Reports that PDF page rendering needs a non-desktop renderer integration.
+     * Renders one PDF page into a toolkit-neutral PNG preview and records it as a generated workspace file.
+     *
+     * Use cases: UC-0000027.
      */
     fun renderPdfPage(
         record: WorkspaceFileRecord,
         page: Int,
     ): WorkspaceFileRecord {
         require(page >= 1) { "PDF page must be >= 1" }
-        requireFile(record.id, null)
-        throw UnsupportedOperationException("PDF page rendering is unavailable without a non-desktop renderer")
+        val current = requireFile(record.id, null)
+        val path = resolveManagedPath(current.relativePath)
+        val pageText =
+            Loader.loadPDF(path.toFile()).use { document ->
+                require(page <= document.numberOfPages) { "PDF page must be <= ${document.numberOfPages}" }
+                PDFTextStripper()
+                    .apply {
+                        startPage = page
+                        endPage = page
+                    }.getText(document)
+                    .trim()
+            }
+        val requestedName = "${path.name.substringBeforeLast('.', path.name)}-page-$page.png"
+        return createManagedFile(
+            directoryName = "generated",
+            requestedName = requestedName,
+            bytes = PdfPagePreviewRenderer.render(path.name, page, pageText),
+            mimeType = "image/png",
+        )
     }
 
     /**
@@ -281,11 +299,10 @@ class WorkspaceFileService(
      */
     fun imageInfo(record: WorkspaceFileRecord): WorkspaceImageInfo {
         val path = resolveManagedPath(record.relativePath)
-        val image = Files.newInputStream(path).use(::Image)
-        require(!image.isError && image.width > 0.0 && image.height > 0.0) { "Unsupported image file" }
+        val dimensions = ImageHeaderReader.dimensions(path)
         return WorkspaceImageInfo(
-            width = image.width.toInt(),
-            height = image.height.toInt(),
+            width = dimensions.width,
+            height = dimensions.height,
             mimeType = WorkspaceFilePaths.detectMimeType(path),
             sizeBytes = path.fileSize(),
             sha256 = WorkspaceFilePaths.sha256(path),
