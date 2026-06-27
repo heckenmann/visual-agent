@@ -10,7 +10,7 @@ import org.springframework.boot.runApplication
 class VisualAgentApplication
 
 /**
- * Starts the non-JavaFX Spring Boot entry point used by tests and tooling.
+ * Starts the non-UI Spring Boot entry point used by tests and tooling.
  */
 fun main(args: Array<String>) {
     runApplication<VisualAgentApplication>(*args)

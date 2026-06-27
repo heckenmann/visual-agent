@@ -6,10 +6,11 @@ plugins {
     kotlin("plugin.jpa") version "2.4.0"
     kotlin("plugin.serialization") version "2.4.0"
     kotlin("plugin.spring") version "2.4.0"
+    kotlin("plugin.compose") version "2.4.0"
+    id("org.jetbrains.compose") version "1.11.1"
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
     id("org.springframework.boot") version "4.1.0"
     id("io.spring.dependency-management") version "1.1.7"
-    application
     jacoco
 }
 
@@ -17,6 +18,7 @@ group = "de.heckenmann.visualagent"
 version = "0.1.0"
 
 repositories {
+    google()
     mavenCentral()
     maven { url = uri("https://repo.spring.io/milestone") }
     maven { url = uri("https://jitpack.io") }
@@ -32,35 +34,12 @@ val platform =
         else -> "linux"
     }
 
-val javafxVersion = "21.0.2"
-val javafxModuleArgs =
-    listOf(
-        "--module-path",
-        rootDir.resolve("lib").toString(),
-        "--add-modules",
-        "javafx.controls,javafx.fxml,javafx.web,javafx.graphics,javafx.media,javafx.base",
-    )
 val applicationIdentityArgs =
     listOf(
         "-Dcom.apple.mrj.application.apple.menu.about.name=Visual Agent",
-        "-Djavafx.application.name=Visual Agent",
+        // Compose Desktop runs on the JVM desktop stack and fails in headless mode during screen-density discovery.
+        "-Djava.awt.headless=false",
     )
-val javafxRenderingArgs =
-    listOf(
-        "-Dprism.order=${
-            when {
-                System.getProperty("os.name").contains("Mac", ignoreCase = true) -> "es2,sw"
-                System.getProperty("os.name").contains("Windows", ignoreCase = true) -> "d3d,es2,sw"
-                else -> "es2,sw"
-            }
-        }",
-        "-Dprism.vsync=true",
-    ) +
-        if (providers.gradleProperty("visualagentPrismVerbose").map(String::toBoolean).getOrElse(false)) {
-            listOf("-Dprism.verbose=true")
-        } else {
-            emptyList()
-        }
 val macApplicationArgs =
     if (
         System.getProperty("os.name").contains("Mac", ignoreCase = true)
@@ -86,24 +65,17 @@ dependencies {
     implementation("org.hibernate.orm:hibernate-community-dialects")
     implementation("org.springframework.boot:spring-boot-starter-flyway")
 
-    // JavaFX 21
-    implementation("org.openjfx:javafx-base:$javafxVersion:$platform")
-    implementation("org.openjfx:javafx-controls:$javafxVersion:$platform")
-    implementation("org.openjfx:javafx-fxml:$javafxVersion:$platform")
-    implementation("org.openjfx:javafx-graphics:$javafxVersion:$platform")
-    implementation("org.openjfx:javafx-media:$javafxVersion:$platform")
-    implementation("org.openjfx:javafx-web:$javafxVersion:$platform")
-    implementation("org.openjfx:javafx-swing:$javafxVersion:$platform")
-
-    // Structured drawing editor
-    implementation("ch.randelshofer:org.jhotdraw8.draw:0.5")
+    // Compose Multiplatform desktop UI
+    implementation(compose.desktop.currentOs)
+    implementation("org.jetbrains.compose.material3:material3:1.9.0")
+    implementation("org.jetbrains.compose.material:material-icons-extended:1.7.3")
+    implementation("io.github.vinceglb:filekit-dialogs-compose:0.14.2")
 
     // SQLite JDBC
     implementation("org.xerial:sqlite-jdbc:3.53.2.0")
 
     // Kotlinx Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-javafx:1.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.11.0") // Needed for Spring AI Flux to Flow
 
     // JSON Serialization
@@ -115,13 +87,6 @@ dependencies {
 
     // Workspace document analysis
     implementation("org.apache.pdfbox:pdfbox:3.0.7")
-
-    // AtlantaFX themes
-    implementation("io.github.mkpaz:atlantafx-base:2.1.0")
-
-    // Ikonli icons
-    implementation("org.kordamp.ikonli:ikonli-javafx:12.4.0")
-    implementation("org.kordamp.ikonli:ikonli-fontawesome5-pack:12.4.0")
 
     // Kotlin logging (wrapper for SLF4J)
     implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
@@ -137,19 +102,6 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
 }
 
-configurations.configureEach {
-    resolutionStrategy.eachDependency {
-        if (requested.group == "org.openjfx") {
-            useVersion(javafxVersion)
-            because("The application targets JavaFX 21; JHotDraw's used APIs are compatible with that baseline.")
-        }
-        if (requested.group == "ch.randelshofer" && requested.name == "org.jhotdraw8.color" && requested.version == "0.5") {
-            useVersion("0.4")
-            because("JHotDraw 0.5 references a color module version that was not published to Maven Central.")
-        }
-    }
-}
-
 tasks.test {
     useJUnitPlatform()
     systemProperty("visualagent.ollama.smoke", System.getProperty("visualagent.ollama.smoke", "false"))
@@ -157,8 +109,22 @@ tasks.test {
     finalizedBy(tasks.jacocoTestReport)
 }
 
+val jacocoExcludedClasses =
+    listOf(
+        "**/ui/compose/*Kt*",
+    )
+
 tasks.jacocoTestReport {
     dependsOn(tasks.test)
+    classDirectories.setFrom(
+        files(
+            classDirectories.files.map {
+                fileTree(it) {
+                    exclude(jacocoExcludedClasses)
+                }
+            },
+        ),
+    )
     reports {
         xml.required.set(true)
         html.required.set(true)
@@ -167,6 +133,15 @@ tasks.jacocoTestReport {
 
 tasks.jacocoTestCoverageVerification {
     dependsOn(tasks.test)
+    classDirectories.setFrom(
+        files(
+            classDirectories.files.map {
+                fileTree(it) {
+                    exclude(jacocoExcludedClasses)
+                }
+            },
+        ),
+    )
     violationRules {
         rule {
             limit {
@@ -178,14 +153,23 @@ tasks.jacocoTestCoverageVerification {
     }
 }
 
-application {
-    mainClass.set("de.heckenmann.visualagent.Main")
+compose.desktop {
+    application {
+        mainClass = "de.heckenmann.visualagent.Main"
+        jvmArgs += applicationIdentityArgs + macApplicationArgs
+        nativeDistributions {
+            packageName = "Visual Agent"
+            packageVersion = project.version.toString()
+        }
+    }
+}
 
-    applicationDefaultJvmArgs = javafxModuleArgs + applicationIdentityArgs + javafxRenderingArgs + macApplicationArgs
+springBoot {
+    mainClass.set("de.heckenmann.visualagent.Main")
 }
 
 tasks.withType<JavaExec>().configureEach {
-    jvmArgs(javafxModuleArgs + applicationIdentityArgs + javafxRenderingArgs + macApplicationArgs)
+    jvmArgs(applicationIdentityArgs + macApplicationArgs)
 }
 
 kotlin {
@@ -214,30 +198,31 @@ val kotlinSourceRoots =
 
 val generatedUseCaseResources = layout.buildDirectory.dir("generated/usecase-resources")
 
-val generateUseCaseResources by tasks.registering {
-    group = "documentation"
-    description = "Packages documented Visual Agent use cases as runtime resources."
-    val sourceDir = layout.projectDirectory.dir("docs/usecases")
-    val outputDir = generatedUseCaseResources
-    inputs.dir(sourceDir)
-    outputs.dir(outputDir)
-    doLast {
-        val targetDir = outputDir.get().dir("usecases").asFile
-        targetDir.deleteRecursively()
-        targetDir.mkdirs()
-        val discoveredUseCaseFiles =
-            sourceDir.asFile.listFiles { file ->
-                file.isFile && Regex("""uc_\d{7}_[a-z0-9_]+\.md""").matches(file.name)
+val generateUseCaseResources =
+    tasks.register("generateUseCaseResources") {
+        group = "documentation"
+        description = "Packages documented Visual Agent use cases as runtime resources."
+        val sourceDir = layout.projectDirectory.dir("docs/usecases")
+        val outputDir = generatedUseCaseResources
+        inputs.dir(sourceDir)
+        outputs.dir(outputDir)
+        doLast {
+            val targetDir = outputDir.get().dir("usecases").asFile
+            targetDir.deleteRecursively()
+            targetDir.mkdirs()
+            val discoveredUseCaseFiles =
+                sourceDir.asFile.listFiles { file ->
+                    file.isFile && Regex("""uc_\d{7}_[a-z0-9_]+\.md""").matches(file.name)
+                }
+            val useCaseFiles = discoveredUseCaseFiles?.sortedBy { it.name }.orEmpty()
+            useCaseFiles.forEach { file ->
+                file.copyTo(targetDir.resolve(file.name), overwrite = true)
             }
-        val useCaseFiles = discoveredUseCaseFiles?.sortedBy { it.name }.orEmpty()
-        useCaseFiles.forEach { file ->
-            file.copyTo(targetDir.resolve(file.name), overwrite = true)
+            targetDir.resolve("index.txt").writeText(useCaseFiles.joinToString("\n") { it.name })
         }
-        targetDir.resolve("index.txt").writeText(useCaseFiles.joinToString("\n") { it.name })
     }
-}
 
-tasks.processResources {
+tasks.named<ProcessResources>("processResources") {
     dependsOn(generateUseCaseResources)
     from(generatedUseCaseResources)
 }
@@ -489,7 +474,7 @@ tasks.register("desktopApiUsageCheck") {
                 "bufferedimage",
                 "imageio",
                 "pdfbox." + "rendering",
-                "javafx." + "swing",
+                "java" + "fx",
                 "apple." + "aw" + "t",
             )
         val violations = mutableListOf<String>()
@@ -499,7 +484,7 @@ tasks.register("desktopApiUsageCheck") {
                 Files.walk(root).use { stream ->
                     stream
                         .filter { Files.isRegularFile(it) }
-                        .filter { it.extension in setOf("kt", "java", "fxml", "properties", "md") }
+                        .filter { it.extension in setOf("kt", "java", "properties", "md") }
                         .forEach { file ->
                             Files.readAllLines(file).forEachIndexed { index, line ->
                                 val lower = line.lowercase()
@@ -547,11 +532,6 @@ tasks.register("unusedCodeCheck") {
                             lines.forEachIndexed { index, line ->
                                 val match = privateDeclarationRegex.find(line) ?: return@forEachIndexed
                                 val name = match.groupValues[2]
-                                val hasFxmlAnnotationNearby =
-                                    (index downTo maxOf(0, index - 3)).any { lookback ->
-                                        lines[lookback].contains("@FXML")
-                                    }
-                                if (hasFxmlAnnotationNearby) return@forEachIndexed
                                 val hasSuppressUnusedNearby =
                                     (index downTo maxOf(0, index - 3)).any { lookback ->
                                         suppressUnusedRegex.containsMatchIn(lines[lookback])

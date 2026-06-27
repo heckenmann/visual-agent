@@ -9,15 +9,12 @@ class AppIdentityTest {
     @Test
     fun `process properties use visual agent display name`() {
         val previousAboutName = System.getProperty("com.apple.mrj.application.apple.menu.about.name")
-        val previousJavaFxName = System.getProperty("javafx.application.name")
         try {
             AppIdentity.configureProcessProperties()
 
             assertEquals(AppIdentity.DISPLAY_NAME, System.getProperty(AppIdentity.MAC_ABOUT_NAME_PROPERTY))
-            assertEquals(AppIdentity.DISPLAY_NAME, System.getProperty(AppIdentity.JAVAFX_APPLICATION_NAME_PROPERTY))
         } finally {
             restoreProperty(AppIdentity.MAC_ABOUT_NAME_PROPERTY, previousAboutName)
-            restoreProperty(AppIdentity.JAVAFX_APPLICATION_NAME_PROPERTY, previousJavaFxName)
         }
     }
 

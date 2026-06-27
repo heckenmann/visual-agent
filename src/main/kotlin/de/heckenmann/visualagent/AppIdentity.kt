@@ -1,10 +1,9 @@
 package de.heckenmann.visualagent
 
-import javafx.scene.image.Image
 import java.net.URL
 
 /**
- * Central application identity used by JavaFX, macOS desktop integration, and build-time launch settings.
+ * Central application identity used by Compose Desktop, macOS desktop integration, and build-time launch settings.
  *
  * Keeping the display name and icon path in one place avoids the common macOS fallback where the menu bar and
  * Dock show the generic JVM identity instead of the actual application name.
@@ -26,11 +25,6 @@ object AppIdentity {
     const val MAC_ABOUT_NAME_PROPERTY: String = "com.apple.mrj.application.apple.menu.about.name"
 
     /**
-     * JavaFX application name property used by launchers that honor JavaFX-specific metadata.
-     */
-    const val JAVAFX_APPLICATION_NAME_PROPERTY: String = "javafx.application.name"
-
-    /**
      * Resolve the classpath URL for the configured application icon.
      *
      * @return Icon URL, or null when the resource is missing from the classpath
@@ -38,20 +32,12 @@ object AppIdentity {
     fun iconUrl(): URL? = AppIdentity::class.java.getResource(ICON_RESOURCE)
 
     /**
-     * Create a JavaFX image for Stage icon registration.
-     *
-     * @return JavaFX image when the icon resource is available, otherwise null
-     */
-    fun javaFxIcon(): Image? = iconUrl()?.toExternalForm()?.let(::Image)
-
-    /**
-     * Set JVM desktop identity properties before JavaFX initializes native desktop integration.
+     * Set JVM desktop identity properties before Compose initializes native desktop integration.
      *
      * This is intentionally safe to call more than once.
      */
     fun configureProcessProperties() {
         System.setProperty(MAC_ABOUT_NAME_PROPERTY, DISPLAY_NAME)
-        System.setProperty(JAVAFX_APPLICATION_NAME_PROPERTY, DISPLAY_NAME)
     }
 
     /**

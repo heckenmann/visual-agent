@@ -1,0 +1,285 @@
+@file:Suppress("FunctionName")
+
+package de.heckenmann.visualagent.ui.compose
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.application
+import androidx.compose.ui.window.rememberWindowState
+import de.heckenmann.visualagent.AppIdentity
+import de.heckenmann.visualagent.VisualAgentApplication
+import de.heckenmann.visualagent.agent.AgentManager
+import de.heckenmann.visualagent.canvas.CanvasOperations
+import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.workspace.WorkspaceFileService
+import de.heckenmann.visualagent.workspace.layout.DesktopState
+import de.heckenmann.visualagent.workspace.layout.StageState
+import de.heckenmann.visualagent.workspace.layout.WorkspaceLayoutService
+import de.heckenmann.visualagent.workspace.layout.WorkspaceWindowState
+import org.springframework.boot.WebApplicationType
+import org.springframework.boot.builder.SpringApplicationBuilder
+import org.springframework.context.ConfigurableApplicationContext
+import kotlin.math.roundToInt
+
+/**
+ * Runs the Compose Multiplatform Visual Agent desktop application.
+ */
+fun runVisualAgentComposeApplication() {
+    AppIdentity.configureProcessProperties()
+    val springContext =
+        SpringApplicationBuilder(VisualAgentApplication::class.java)
+            .web(WebApplicationType.NONE)
+            .run()
+
+    application {
+        Window(
+            onCloseRequest = {
+                springContext.close()
+                exitApplication()
+            },
+            title = AppIdentity.DISPLAY_NAME,
+            state = rememberWindowState(width = 1280.dp, height = 820.dp),
+        ) {
+            VisualAgentComposeApp(
+                config = AppConfig.instance,
+                springContext = springContext,
+                workspaceLayoutService = springContext.getBean(WorkspaceLayoutService::class.java),
+                onCloseApplication = {
+                    springContext.close()
+                    exitApplication()
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun VisualAgentComposeApp(
+    config: AppConfig,
+    springContext: ConfigurableApplicationContext,
+    workspaceLayoutService: WorkspaceLayoutService,
+    onCloseApplication: () -> Unit,
+) {
+    var windows by remember { mutableStateOf(defaultWindows()) }
+    var modal by remember { mutableStateOf<ComposeConfirmationModal?>(null) }
+    var commandPaletteVisible by remember { mutableStateOf(false) }
+    val workspaceFocusRequester = remember { FocusRequester() }
+    val panelServices =
+        remember {
+            ComposePanelServices(
+                config = config,
+                agentManager = springContext.getBean(AgentManager::class.java),
+                workspaceFileService = springContext.getBean(WorkspaceFileService::class.java),
+                canvasOperations = springContext.getBean(CanvasOperations::class.java),
+                modalRequester = ComposeModalRequester { requested -> modal = requested },
+            )
+        }
+    val toggleWindow: (String) -> Unit = { id ->
+        windows = windows.map { window -> if (window.id == id) window.copy(visible = !window.visible) else window }
+    }
+    val activateWindow: (String) -> Unit = { id ->
+        windows = windows.map { window -> if (window.id == id) window.copy(visible = true) else window }
+    }
+    val commands =
+        windows.map { window ->
+            ComposeCommand(
+                id = "open-${window.id}",
+                title = "Open ${window.title}",
+                description = window.subtitle,
+            ) {
+                activateWindow(window.id)
+            }
+        } +
+            ComposeCommand(
+                id = "close-application",
+                title = "Close application",
+                description = "Close Visual Agent and persist workspace state",
+                action = onCloseApplication,
+            )
+    LaunchedEffect(Unit) {
+        workspaceFocusRequester.requestFocus()
+    }
+
+    MaterialTheme(colorScheme = draculaColorScheme()) {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .focusRequester(workspaceFocusRequester)
+                            .onPreviewKeyEvent { event ->
+                                when {
+                                    event.isCommandPaletteShortcut() -> {
+                                        commandPaletteVisible = true
+                                        true
+                                    }
+                                    event.workspaceShortcutDigit() != null -> {
+                                        panelIdForShortcutDigit(event.workspaceShortcutDigit()!!)?.let(activateWindow)
+                                        true
+                                    }
+                                    else -> false
+                                }
+                            }.focusable()
+                            .background(backgroundBrush()),
+                ) {
+                    ComposeRail(windows = windows, onToggleWindow = toggleWindow, onCloseApplication = onCloseApplication)
+                    BoxWithConstraints(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .padding(20.dp),
+                    ) {
+                        val viewport =
+                            ComposeWorkspaceViewport(
+                                width = maxWidth.value.roundToInt(),
+                                height = maxHeight.value.roundToInt(),
+                            )
+                        val splitBounds = splitWorkspaceBounds(windows, viewport)
+                        workspaceLayoutService.bind(
+                            stage = StageState(width = viewport.width.toDouble(), height = viewport.height.toDouble()),
+                            desktop = DesktopState(width = viewport.width.toDouble(), height = viewport.height.toDouble()),
+                            windows = windows.map { it.toWorkspaceWindowState(viewport, splitBounds[it.id]) },
+                        )
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            ComposeWorkspaceHeader(config, springContext.beanDefinitionCount)
+                            ComposeSplitWorkspace(
+                                windows = windows,
+                                panelServices = panelServices,
+                                modifier =
+                                    Modifier
+                                        .weight(1f)
+                                        .fillMaxWidth()
+                                        .padding(top = 18.dp),
+                            )
+                        }
+                    }
+                }
+                ComposeModalHost(modal = modal, onDismiss = { modal = null })
+                ComposeCommandPaletteHost(
+                    visible = commandPaletteVisible,
+                    commands = commands,
+                    onDismiss = { commandPaletteVisible = false },
+                )
+            }
+        }
+    }
+}
+
+private fun defaultWindows(): List<ComposeWorkspaceWindow> =
+    workspacePanelShortcutIds.map { id ->
+        when (id) {
+            "chat" ->
+                ComposeWorkspaceWindow(
+                    id = "chat",
+                    icon = "C",
+                    title = "Conversation",
+                    subtitle = "Main agent conversation and history",
+                    bounds = ComposeWorkspaceWindowBounds(x = 24, y = 92, width = 520, height = 460),
+                )
+            "todos" ->
+                ComposeWorkspaceWindow(
+                    id = "todos",
+                    icon = "T",
+                    title = "Todos",
+                    subtitle = "DB-backed task management",
+                    bounds = ComposeWorkspaceWindowBounds(x = 570, y = 92, width = 420, height = 420),
+                )
+            "files" ->
+                ComposeWorkspaceWindow(
+                    id = "files",
+                    icon = "F",
+                    title = "Files",
+                    subtitle = "Workspace import, sync, rename, delete",
+                    bounds = ComposeWorkspaceWindowBounds(x = 120, y = 570, width = 540, height = 340),
+                    visible = false,
+                )
+            "agents" ->
+                ComposeWorkspaceWindow(
+                    id = "agents",
+                    icon = "A",
+                    title = "Subagents",
+                    subtitle = "Worker creation and live job counts",
+                    bounds = ComposeWorkspaceWindowBounds(x = 690, y = 540, width = 460, height = 350),
+                    visible = false,
+                )
+            "settings" ->
+                ComposeWorkspaceWindow(
+                    id = "settings",
+                    icon = "S",
+                    title = "Settings",
+                    subtitle = "Provider, model, theme, font size",
+                    bounds = ComposeWorkspaceWindowBounds(x = 760, y = 140, width = 420, height = 360),
+                    visible = false,
+                )
+            "canvas" ->
+                ComposeWorkspaceWindow(
+                    id = "canvas",
+                    icon = "D",
+                    title = "Canvas",
+                    subtitle = "Structured drawing and capture",
+                    bounds = ComposeWorkspaceWindowBounds(x = 260, y = 170, width = 620, height = 460),
+                    visible = false,
+                )
+            else -> error("Unsupported workspace panel id: $id")
+        }
+    }
+
+private fun ComposeWorkspaceWindow.toWorkspaceWindowState(
+    viewport: ComposeWorkspaceViewport,
+    splitBounds: ComposeWorkspaceWindowBounds?,
+): WorkspaceWindowState {
+    val coercedBounds = splitBounds ?: bounds.coerceIn(viewport)
+    return WorkspaceWindowState(
+        id = id,
+        x = coercedBounds.x.toDouble(),
+        y = coercedBounds.y.toDouble(),
+        width = coercedBounds.width.toDouble(),
+        height = coercedBounds.height.toDouble(),
+        visible = visible,
+        zIndex = 0,
+    )
+}
+
+private fun androidx.compose.ui.input.key.KeyEvent.workspaceShortcutDigit(): Int? {
+    if (type != KeyEventType.KeyDown || (!isMetaPressed && !isCtrlPressed)) return null
+    return when (key) {
+        Key.One -> 1
+        Key.Two -> 2
+        Key.Three -> 3
+        Key.Four -> 4
+        Key.Five -> 5
+        Key.Six -> 6
+        else -> null
+    }
+}
+
+private fun androidx.compose.ui.input.key.KeyEvent.isCommandPaletteShortcut(): Boolean =
+    type == KeyEventType.KeyDown && (isMetaPressed || isCtrlPressed) && key == Key.K
