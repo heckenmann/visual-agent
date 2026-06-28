@@ -34,5 +34,8 @@ jobs:
         with:
           cache-disabled: true
 
+      - name: Generate Gradle wrapper
+        run: gradle wrapper --gradle-version 9.6.0 --no-daemon
+
       - name: Run tests
         run: xvfb-run -a ./gradlew --no-daemon test
