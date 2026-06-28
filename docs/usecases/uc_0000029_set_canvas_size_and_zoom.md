@@ -1,8 +1,8 @@
-# UC-0000029: Set Canvas Size And Zoom
+# UC-0000029: Maintain Canvas Viewport And Figure Sizing
 
 ## Goal
 
-Let the user control the fixed editable canvas surface size and viewport zoom independently from the application window size.
+Keep the editable canvas coordinate surface stable while the user resizes the canvas panel or individual figures.
 
 ## Primary Actor
 
@@ -14,14 +14,15 @@ Desktop user.
 
 ## Main Flow
 
-1. The user opens canvas size controls, zoom controls, or grid visibility controls from the icon-only canvas toolbar.
-2. The canvas surface dimensions or zoom value are updated.
-3. The drawing view keeps existing figure coordinates stable.
-4. Preferences persist size and related canvas settings.
+1. The user opens the canvas panel.
+2. The user resizes the workspace panel or drags a selected figure resize handle.
+3. The Compose canvas surface keeps existing figure coordinates stable.
+4. Figure resize operations update the selected figure dimensions through the canvas service.
+5. Saved canvas documents preserve figure dimensions, zoom metadata, and grid metadata from the toolkit-neutral canvas model.
 
 ## Result
 
-Window resizing does not move drawings into inaccessible space or blur the structured canvas.
+Workspace panel resizing does not move drawings into inaccessible space or blur the structured canvas.
 
 ## Tool Calls
 
@@ -29,15 +30,14 @@ Window resizing does not move drawings into inaccessible space or blur the struc
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
-- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
-- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
-- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.compose.CanvasPanel`
+- `de.heckenmann.visualagent.ui.compose.ComposeSplitWorkspace`
+- `de.heckenmann.visualagent.canvas.InMemoryCanvasService`
+- `de.heckenmann.visualagent.canvas.CanvasOperations`
 
 ## Acceptance Criteria
 
-- Increasing window height does not cause canvas jitter.
+- Resizing the workspace panel does not cause canvas jitter.
 - The editable canvas surface starts at the viewport origin and is not centered inside a larger blank area.
-- Canvas size is user-controlled and survives restart.
-- Zoom reset is available through an icon-only toolbar button with tooltip.
-- Grid visibility is available through an icon-only toggle button with tooltip.
+- Selected figures can be resized from the Compose canvas surface.
+- Saved canvas documents preserve zoom and grid metadata even though dedicated zoom/grid toolbar controls are not part of this migrated panel yet.

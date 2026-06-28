@@ -31,8 +31,8 @@ Markdown formatting is displayed in the conversation while preserving the origin
 ## Code Entry Points
 
 - `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
-- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
-- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.compose.ConversationPanel`
+- `de.heckenmann.visualagent.ui.compose.ComposeMarkdown`
 
 ## Acceptance Criteria
 

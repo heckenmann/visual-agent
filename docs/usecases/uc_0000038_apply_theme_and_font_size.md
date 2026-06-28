@@ -10,13 +10,13 @@ Desktop user.
 
 ## Preconditions
 
-- Theme stylesheets are available.
+- Compose theme tokens are available.
 - Settings can be read from configuration or preferences.
 
 ## Main Flow
 
 1. The user selects a theme or font size.
-2. The application resolves the related theme stylesheet or supported root font-size CSS class.
+2. The application resolves the supported Compose theme and font-size settings.
 3. The main window applies the visual change.
 4. The preference is persisted for future launches.
 
@@ -30,12 +30,12 @@ The UI reflects user-selected visual preferences.
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.config.AppThemeStylesheets`
-- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.compose.ComposeTheme`
+- `de.heckenmann.visualagent.ui.compose.SettingsPanel`
 - `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
 
 ## Acceptance Criteria
 
 - Theme changes do not require manual source edits.
 - Font size changes are persisted.
-- Font size changes are applied through maintained CSS classes, not inline root styles.
+- Font size changes are applied through maintained Compose settings instead of stylesheet classes.

@@ -469,16 +469,41 @@ tasks.register("desktopApiUsageCheck") {
         val forbidden =
             listOf(
                 "java." + "aw" + "t",
-                "javax." + "imageio",
-                "swingfxutils",
-                "bufferedimage",
-                "imageio",
+                "javax." + "swing",
+                "swing" + "utilities",
+                "j" + "frame",
+                "j" + "panel",
+                "j" + "component",
+                "javax." + "image" + "io",
+                "swing" + "fxutils",
+                "buffered" + "image",
+                "image" + "io",
                 "pdfbox." + "rendering",
+                "org." + "open" + "jfx",
+                "java" + "fx-controls",
+                "java" + "fx-fxml",
+                "java" + "fx-graphics",
+                "java" + "fx-base",
+                "java" + "fx-swing",
+                "open" + "jfx",
                 "java" + "fx",
                 "apple." + "aw" + "t",
             )
         val violations = mutableListOf<String>()
-        listOf(rootDir.toPath().resolve("src/main"), rootDir.toPath().resolve("src/test"))
+        val checkedRoots =
+            listOf(
+                rootDir.toPath().resolve("src/main"),
+                rootDir.toPath().resolve("src/test"),
+            )
+        val checkedFiles =
+            listOf(
+                rootDir.toPath().resolve("build.gradle.kts"),
+                rootDir.toPath().resolve("settings.gradle.kts"),
+            )
+
+        fun isAllowedBuildConfigurationLine(line: String): Boolean = line.contains("-Djava.awt.headless=false")
+
+        checkedRoots
             .filter { Files.exists(it) }
             .forEach { root ->
                 Files.walk(root).use { stream ->
@@ -494,6 +519,19 @@ tasks.register("desktopApiUsageCheck") {
                                         violations += "${file.toAbsolutePath()}:${index + 1} forbidden token '$token'"
                                     }
                             }
+                        }
+                }
+            }
+        checkedFiles
+            .filter { Files.exists(it) }
+            .forEach { file ->
+                Files.readAllLines(file).forEachIndexed { index, line ->
+                    if (isAllowedBuildConfigurationLine(line)) return@forEachIndexed
+                    val lower = line.lowercase()
+                    forbidden
+                        .filter(lower::contains)
+                        .forEach { token ->
+                            violations += "${file.toAbsolutePath()}:${index + 1} forbidden token '$token'"
                         }
                 }
             }

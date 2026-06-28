@@ -2,6 +2,7 @@ package de.heckenmann.visualagent.workspace.layout
 
 import kotlinx.serialization.Serializable
 import org.springframework.stereotype.Service
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Provides live or persisted workspace window state to UI code and model tools.
@@ -18,6 +19,8 @@ class WorkspaceLayoutService(
 
     @Volatile
     private var liveWindows: List<WorkspaceWindowState>? = null
+
+    private val listeners = CopyOnWriteArrayList<(List<WorkspaceWindowState>) -> Unit>()
 
     /** Registers the live Compose workspace geometry for runtime layout reads. */
     fun bind(
@@ -39,12 +42,35 @@ class WorkspaceLayoutService(
             windows = liveWindows ?: persistence.load().windows,
         )
 
-    /** Applies window states to the live workspace when present and persists the requested layout. */
-    fun applyWindowStates(states: List<WorkspaceWindowState>): WorkspaceLayout {
+    /**
+     * Applies window states to the live workspace and persists the requested layout.
+     *
+     * @param states Complete workspace window state list
+     * @param notifyListeners Whether registered live UI listeners should be notified
+     * @return Persisted workspace layout
+     */
+    fun applyWindowStates(
+        states: List<WorkspaceWindowState>,
+        notifyListeners: Boolean = true,
+    ): WorkspaceLayout {
         val layout = WorkspaceLayout(states)
         liveWindows = states
         persistence.save(layout)
+        if (notifyListeners) {
+            listeners.forEach { listener -> listener(states) }
+        }
         return layout
+    }
+
+    /**
+     * Registers a listener for workspace state changes applied by UI code or model tools.
+     *
+     * @param listener Callback receiving the complete current workspace window state list
+     * @return Handle that unregisters the listener when closed
+     */
+    fun addWindowStateListener(listener: (List<WorkspaceWindowState>) -> Unit): AutoCloseable {
+        listeners += listener
+        return AutoCloseable { listeners -= listener }
     }
 }
 

@@ -34,9 +34,10 @@ The user sees progress during longer responses and the final completed message i
 - `de.heckenmann.visualagent.agent.LLMProvider.stream`
 - `de.heckenmann.visualagent.agent.AgentManager.streamMessage`
 - `de.heckenmann.visualagent.agent.text.AgentResponseCoordinator`
-- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.compose.ConversationPanel`
 
 ## Acceptance Criteria
 
 - Partial chunks are visible before completion.
 - The persisted conversation contains the final complete assistant response, not partial duplicates.
+- The Compose chat panel displays a temporary assistant turn while chunks arrive, then reloads the persisted final history.

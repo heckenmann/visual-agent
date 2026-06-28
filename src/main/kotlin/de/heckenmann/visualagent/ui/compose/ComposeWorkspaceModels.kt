@@ -1,6 +1,8 @@
 package de.heckenmann.visualagent.ui.compose
 
 import de.heckenmann.visualagent.agent.AgentManager
+import de.heckenmann.visualagent.agent.config.AgentToolConfigService
+import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.canvas.CanvasOperations
 import de.heckenmann.visualagent.config.AppConfig
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
@@ -189,6 +191,34 @@ fun moveWorkspacePanel(
 }
 
 /**
+ * Resizes a workspace panel preference while keeping the requested size within the viewport.
+ *
+ * The semantic split layout uses these stored sizes as proportions for visible panels,
+ * and the workspace layout tool persists the same values for model-driven changes.
+ *
+ * @param windows Current panels
+ * @param id Panel ID to resize
+ * @param deltaWidth Requested width delta
+ * @param deltaHeight Requested height delta
+ * @param viewport Available workspace dimensions
+ * @return Updated panels, or the original list when the ID is unknown
+ */
+fun resizeWorkspacePanel(
+    windows: List<ComposeWorkspaceWindow>,
+    id: String,
+    deltaWidth: Int,
+    deltaHeight: Int,
+    viewport: ComposeWorkspaceViewport,
+): List<ComposeWorkspaceWindow> =
+    windows.map { window ->
+        if (window.id == id) {
+            window.copy(bounds = window.bounds.resizeBy(deltaWidth, deltaHeight, viewport))
+        } else {
+            window
+        }
+    }
+
+/**
  * Calculates deterministic designer-curated panel bounds for all visible workspace panels.
  *
  * The layout is intentionally semantic instead of count-based: the first visible
@@ -247,7 +277,7 @@ private fun splitStageWithInspector(
     width: Int,
     height: Int,
 ): Map<String, ComposeWorkspaceWindowBounds> {
-    val inspectorWidth = inspectorWidth(width)
+    val inspectorWidth = inspectorWidth(width, primary, inspectorPanels)
     val stageWidth = (width - WORKSPACE_PANEL_GAP - inspectorWidth).coerceAtLeast(1)
     val result =
         mutableMapOf(
@@ -263,12 +293,12 @@ private fun splitStageInspectorAndDeck(
     width: Int,
     height: Int,
 ): Map<String, ComposeWorkspaceWindowBounds> {
-    val deckHeight = (height * 0.28f).toInt().coerceIn(180, max(180, height / 2))
+    val deckPanels = supporting.drop(3)
+    val deckHeight = deckHeight(height, deckPanels)
     val topHeight = (height - WORKSPACE_PANEL_GAP - deckHeight).coerceAtLeast(1)
-    val inspectorWidth = inspectorWidth(width)
+    val inspectorWidth = inspectorWidth(width, primary, supporting.take(3))
     val stageWidth = (width - WORKSPACE_PANEL_GAP - inspectorWidth).coerceAtLeast(1)
     val inspectorPanels = supporting.take(3)
-    val deckPanels = supporting.drop(3)
     val result =
         mutableMapOf(
             primary.id to ComposeWorkspaceWindowBounds(x = 0, y = 0, width = stageWidth, height = topHeight),
@@ -305,10 +335,27 @@ private fun splitLinear(
     if (windows.isEmpty()) return emptyMap()
     val gapTotal = WORKSPACE_PANEL_GAP * (windows.size - 1)
     val available = ((if (vertical) height else width) - gapTotal).coerceAtLeast(windows.size)
-    val baseSize = (available / windows.size).coerceAtLeast(1)
+    val preferredSizes =
+        windows.map { window ->
+            if (vertical) {
+                window.bounds.height.takeIf {
+                    it >= ComposeWorkspaceWindowBounds.MIN_HEIGHT
+                }
+            } else {
+                window.bounds.width.takeIf {
+                    it >= ComposeWorkspaceWindowBounds.MIN_WIDTH
+                }
+            }
+        }
+    val resolvedSizes =
+        if (preferredSizes.all { it != null }) {
+            proportionalSizes(preferredSizes.filterNotNull(), available)
+        } else {
+            equalSizes(windows.size, available)
+        }
     return windows
         .mapIndexed { index, window ->
-            val offset = (baseSize + WORKSPACE_PANEL_GAP) * index
+            val offset = resolvedSizes.take(index).sum() + (WORKSPACE_PANEL_GAP * index)
             val isLast = index == windows.lastIndex
             val cellWidth =
                 if (vertical) {
@@ -316,11 +363,11 @@ private fun splitLinear(
                 } else if (isLast) {
                     width - offset
                 } else {
-                    baseSize
+                    resolvedSizes[index]
                 }
             val cellHeight =
                 if (vertical) {
-                    if (isLast) height - offset else baseSize
+                    if (isLast) height - offset else resolvedSizes[index]
                 } else {
                     height
                 }
@@ -334,10 +381,62 @@ private fun splitLinear(
         }.toMap()
 }
 
-private fun inspectorWidth(width: Int): Int =
-    (width * 0.32f)
-        .toInt()
+private fun inspectorWidth(
+    width: Int,
+    primary: ComposeWorkspaceWindow,
+    inspectorPanels: List<ComposeWorkspaceWindow>,
+): Int {
+    val available = (width - WORKSPACE_PANEL_GAP).coerceAtLeast(1)
+    val preferredPrimaryWidth = primary.bounds.width.takeIf { it >= ComposeWorkspaceWindowBounds.MIN_WIDTH }
+    val preferredInspectorWidth =
+        inspectorPanels
+            .mapNotNull { panel ->
+                panel.bounds.width.takeIf { value ->
+                    value >= ComposeWorkspaceWindowBounds.MIN_WIDTH
+                }
+            }.maxOrNull()
+    val requested =
+        when {
+            preferredPrimaryWidth != null && preferredInspectorWidth != null ->
+                ((available.toDouble() * preferredInspectorWidth) / (preferredPrimaryWidth + preferredInspectorWidth)).toInt()
+            preferredPrimaryWidth != null -> available - preferredPrimaryWidth
+            preferredInspectorWidth != null -> preferredInspectorWidth
+            else -> (width * 0.32f).toInt()
+        }
+    return requested
         .coerceIn(320, max(320, width - WORKSPACE_PANEL_GAP - 520))
+}
+
+private fun deckHeight(
+    height: Int,
+    deckPanels: List<ComposeWorkspaceWindow>,
+): Int {
+    val preferredDeckHeight =
+        deckPanels
+            .mapNotNull { panel ->
+                panel.bounds.height.takeIf { value ->
+                    value >= ComposeWorkspaceWindowBounds.MIN_HEIGHT
+                }
+            }.maxOrNull()
+    return (preferredDeckHeight ?: (height * 0.28f).toInt()).coerceIn(180, max(180, height / 2))
+}
+
+private fun equalSizes(
+    count: Int,
+    available: Int,
+): List<Int> {
+    val baseSize = (available / count).coerceAtLeast(1)
+    return List(count) { baseSize }
+}
+
+private fun proportionalSizes(
+    preferredSizes: List<Int>,
+    available: Int,
+): List<Int> {
+    val total = preferredSizes.sum().coerceAtLeast(1)
+    val minimum = if (preferredSizes.size == 1) available else 1
+    return preferredSizes.map { size -> ((available.toDouble() * size) / total).toInt().coerceAtLeast(minimum) }
+}
 
 /**
  * Gap used by the semantic workspace layout.
@@ -352,6 +451,8 @@ const val WORKSPACE_PANEL_GAP: Int = 16
 data class ComposePanelServices(
     val config: AppConfig,
     val agentManager: AgentManager,
+    val agentToolConfigService: AgentToolConfigService,
+    val toolRegistry: ToolRegistry,
     val workspaceFileService: WorkspaceFileService,
     val canvasOperations: CanvasOperations,
     val modalRequester: ComposeModalRequester,

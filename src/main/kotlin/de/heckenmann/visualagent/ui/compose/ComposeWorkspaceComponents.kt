@@ -4,6 +4,7 @@ package de.heckenmann.visualagent.ui.compose
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -19,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DividerDefaults
@@ -32,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -44,6 +47,7 @@ internal fun ComposeSplitWorkspace(
     onToggleWindow: (String) -> Unit,
     onMoveWindowEarlier: (String) -> Unit,
     onMoveWindowLater: (String) -> Unit,
+    onResizeWindow: (String, Int, Int, ComposeWorkspaceViewport) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val visibleWindows = windows.filter { it.visible }
@@ -71,6 +75,7 @@ internal fun ComposeSplitWorkspace(
                         onMoveEarlier = { onMoveWindowEarlier(window.id) },
                         onMoveLater = { onMoveWindowLater(window.id) },
                         onHide = { onToggleWindow(window.id) },
+                        onResize = { deltaWidth, deltaHeight -> onResizeWindow(window.id, deltaWidth, deltaHeight, viewport) },
                         modifier =
                             Modifier
                                 .offset(x = bounds.x.dp, y = bounds.y.dp)
@@ -115,6 +120,7 @@ private fun SplitPanel(
     onMoveEarlier: () -> Unit,
     onMoveLater: () -> Unit,
     onHide: () -> Unit,
+    onResize: (Int, Int) -> Unit,
     modifier: Modifier,
 ) {
     val shape = RoundedCornerShape(if (primary) 28.dp else 22.dp)
@@ -150,7 +156,40 @@ private fun SplitPanel(
                         .padding(16.dp),
             ) {
                 WindowBody(window, panelServices)
+                ResizeHandle(window.title, onResize, Modifier.align(Alignment.BottomEnd))
             }
+        }
+    }
+}
+
+@Composable
+private fun ResizeHandle(
+    title: String,
+    onResize: (Int, Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    ActionTooltip(description = "Resize $title panel") {
+        Box(
+            modifier =
+                modifier
+                    .size(28.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0x33282A36))
+                    .border(1.dp, Color(0x448BE9FD), RoundedCornerShape(10.dp))
+                    .pointerInput(title) {
+                        detectDragGestures { change, dragAmount ->
+                            change.consume()
+                            onResize(dragAmount.x.roundToInt(), dragAmount.y.roundToInt())
+                        }
+                    },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.OpenInFull,
+                contentDescription = null,
+                tint = Color(0xFF8BE9FD),
+                modifier = Modifier.size(14.dp),
+            )
         }
     }
 }
@@ -258,7 +297,13 @@ private fun WindowBody(
         "chat" -> ConversationPanel(panelServices.agentManager, panelServices.modalRequester)
         "todos" -> TodoPanel(panelServices.agentManager, panelServices.modalRequester)
         "files" -> FilesPanel(panelServices.workspaceFileService, panelServices.canvasOperations, panelServices.modalRequester)
-        "agents" -> SubAgentsPanel(panelServices.agentManager, panelServices.modalRequester)
+        "agents" ->
+            SubAgentsPanel(
+                agentManager = panelServices.agentManager,
+                agentToolConfigService = panelServices.agentToolConfigService,
+                toolRegistry = panelServices.toolRegistry,
+                modalRequester = panelServices.modalRequester,
+            )
         "settings" -> SettingsPanel(panelServices.config)
         "canvas" -> CanvasPanel(panelServices.canvasOperations, panelServices.workspaceFileService, panelServices.modalRequester)
     }

@@ -18,6 +18,7 @@ import kotlinx.serialization.Serializable
  * @property maxTokens Optional maximum generated token count
  * @property variant Optional model variant name configured in the provider catalog
  * @property options Provider-specific request options merged at execution time
+ * @property tools Optional per-agent tool override; null keeps template/default tool selection
  */
 @Serializable
 data class AgentConfig(
@@ -31,6 +32,7 @@ data class AgentConfig(
     val maxTokens: Int? = null,
     val variant: String? = null,
     val options: Map<String, String> = emptyMap(),
+    val tools: List<String>? = null,
 ) {
     /**
      * Converts the agent-specific model overrides into a provider request selection.

@@ -11,13 +11,13 @@ Desktop user.
 ## Preconditions
 
 - Provider catalog data is available.
-- The session panel is visible.
+- The settings panel is visible.
 
 ## Main Flow
 
-1. The user opens session settings.
-2. The UI lists configured providers and selectable models.
-3. The user selects a provider/model or updates provider settings.
+1. The user opens the settings panel.
+2. The UI shows editable provider and model fields.
+3. The user enters the desired provider/model values or updates related provider settings.
 4. The settings are persisted.
 5. Later model requests resolve against the selected provider/model.
 
@@ -31,13 +31,12 @@ Main-agent requests use the user-selected provider and model unless an agent-spe
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
-- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
-- `de.heckenmann.visualagent.agent.provider.ProviderCatalogService`
+- `de.heckenmann.visualagent.ui.compose.SettingsPanel`
+- `de.heckenmann.visualagent.config.AppConfig`
 - `de.heckenmann.visualagent.agent.ConfiguredLLMProvider`
 
 ## Acceptance Criteria
 
-- Disabled or unsupported models are not selected accidentally.
+- Empty provider/model values fall back to safe defaults.
 - Provider/model changes persist across restart.
 - Credentials are not exposed to model context or logs.

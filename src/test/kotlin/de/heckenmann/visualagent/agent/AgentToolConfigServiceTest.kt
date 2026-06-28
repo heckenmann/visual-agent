@@ -44,6 +44,25 @@ class AgentToolConfigServiceTest {
         assertTrue("file:write" in service.disabledToolIds())
     }
 
+    @Test
+    fun `per agent tool overrides are resolved before template defaults`() {
+        val store = MapSubAgentConfigStore()
+        val service = AgentToolConfigService(store)
+        val agent =
+            SubAgent(
+                id = "coder",
+                name = "Coder",
+                role = "code",
+                config = AgentConfig(tools = listOf("canvas", "file:write")),
+            )
+
+        service.setToolGloballyEnabled("file:write", false)
+
+        assertTrue(ToolId("canvas") in service.toolsFor(agent))
+        assertFalse(ToolId("file:read") in service.toolsFor(agent))
+        assertFalse(ToolId("file:write") in service.toolsFor(agent))
+    }
+
     private class MapSubAgentConfigStore :
         SubAgentConfigStore,
         PreferenceStore {

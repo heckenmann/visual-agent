@@ -50,6 +50,9 @@ class AgentToolConfigService(
      * @see docs/usecases/uc_0000019_configure_agent_tools.md
      */
     fun toolsFor(agent: SubAgent): Set<ToolId> {
+        agent.config.tools?.let { configured ->
+            return filterEnabledTools(configured).map(::ToolId).toSet()
+        }
         val key =
             when {
                 agent.name.contains("coder", ignoreCase = true) -> "coder"

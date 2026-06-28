@@ -16,8 +16,8 @@ Desktop user.
 ## Main Flow
 
 1. The user opens logs for a sub-agent.
-2. The UI collects agent history and current runtime metadata.
-3. A modal log dialog displays the information.
+2. The UI collects the current status, active job count, current task, current todo, and recent chat history.
+3. A modal log dialog displays the information in a scrollable read-only view.
 4. The user closes the dialog without mutating agent state.
 
 ## Result
@@ -30,9 +30,10 @@ Sub-agent behavior can be inspected without switching to raw database or log fil
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
-- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
-- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.compose.SubAgentsPanel`
+- `de.heckenmann.visualagent.ui.compose.ComposeInfoModal`
+- `de.heckenmann.visualagent.agent.AgentManager`
+- `de.heckenmann.visualagent.ui.compose.ComposeModalHost`
 
 ## Acceptance Criteria
 

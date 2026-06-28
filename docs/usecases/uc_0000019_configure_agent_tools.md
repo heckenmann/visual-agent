@@ -15,11 +15,11 @@ Desktop user.
 
 ## Main Flow
 
-1. The user opens agent or application tool settings.
-2. The UI lists available tools with toggles.
-3. The user enables or disables tools for an agent.
-4. The configuration is persisted.
-5. Future request contexts expose only enabled tools to that agent.
+1. The user opens a sub-agent's details dialog.
+2. The UI lists registered tools with toggles.
+3. The user enables or disables tools for that agent.
+4. The agent configuration is persisted.
+5. Future request contexts expose only enabled tools to that agent, after global policy filtering.
 
 ## Result
 
@@ -32,12 +32,14 @@ Agents receive only the tools allowed by persisted configuration.
 ## Code Entry Points
 
 - `de.heckenmann.visualagent.agent.AgentToolConfigService`
+- `de.heckenmann.visualagent.agent.AgentConfig`
 - `de.heckenmann.visualagent.agent.tools.ToolRegistry`
-- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
-- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.compose.SubAgentsPanel`
+- `de.heckenmann.visualagent.ui.compose.ComposeContentModal`
 
 ## Acceptance Criteria
 
 - The main agent is limited to orchestration tools by policy.
 - Sub-agent tool sets can include task-specific tools like canvas or workspace files.
 - Disabled tools are not exposed in provider callbacks.
+- Per-agent tool overrides are resolved before template defaults and are still filtered by globally disabled tools.

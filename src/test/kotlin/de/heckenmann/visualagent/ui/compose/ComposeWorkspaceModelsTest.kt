@@ -101,6 +101,34 @@ class ComposeWorkspaceModelsTest {
     }
 
     @Test
+    fun `split workspace uses stored panel sizes as resize preferences`() {
+        val windows =
+            listOf(
+                testWindow("chat", width = 620, height = 500),
+                testWindow("todos", width = 360, height = 500),
+                testWindow("files", width = 360, height = 260),
+            )
+
+        val bounds = splitWorkspaceBounds(windows, ComposeWorkspaceViewport(width = 1000, height = 700))
+
+        assertEquals(ComposeWorkspaceWindowBounds(x = 0, y = 0, width = 623, height = 700), bounds["chat"])
+        assertEquals(ComposeWorkspaceWindowBounds(x = 639, y = 0, width = 361, height = 450), bounds["todos"])
+        assertEquals(ComposeWorkspaceWindowBounds(x = 639, y = 466, width = 361, height = 234), bounds["files"])
+    }
+
+    @Test
+    fun `resize workspace panel stores bounded size preference`() {
+        val windows = listOf(testWindow("chat", width = 500, height = 400), testWindow("todos"))
+
+        val resized = resizeWorkspacePanel(windows, "chat", 300, 300, ComposeWorkspaceViewport(width = 640, height = 480))
+        val unchanged = resizeWorkspacePanel(windows, "missing", 300, 300, ComposeWorkspaceViewport(width = 640, height = 480))
+
+        assertEquals(640, resized.first { it.id == "chat" }.bounds.width)
+        assertEquals(480, resized.first { it.id == "chat" }.bounds.height)
+        assertEquals(windows, unchanged)
+    }
+
+    @Test
     fun `move workspace panel changes order within bounds`() {
         val windows = listOf("chat", "todos", "files").map(::testWindow)
 
@@ -135,13 +163,15 @@ class ComposeWorkspaceModelsTest {
     private fun testWindow(
         id: String,
         visible: Boolean = true,
+        width: Int = 100,
+        height: Int = 100,
     ): ComposeWorkspaceWindow =
         ComposeWorkspaceWindow(
             id = id,
             icon = id.take(1),
             title = id,
             subtitle = id,
-            bounds = ComposeWorkspaceWindowBounds(x = 0, y = 0, width = 100, height = 100),
+            bounds = ComposeWorkspaceWindowBounds(x = 0, y = 0, width = width, height = height),
             visible = visible,
         )
 

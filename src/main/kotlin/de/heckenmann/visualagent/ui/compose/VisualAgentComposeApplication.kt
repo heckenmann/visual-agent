@@ -14,10 +14,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -36,6 +38,8 @@ import androidx.compose.ui.window.rememberWindowState
 import de.heckenmann.visualagent.AppIdentity
 import de.heckenmann.visualagent.VisualAgentApplication
 import de.heckenmann.visualagent.agent.AgentManager
+import de.heckenmann.visualagent.agent.config.AgentToolConfigService
+import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.canvas.CanvasOperations
 import de.heckenmann.visualagent.config.AppConfig
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
@@ -43,6 +47,7 @@ import de.heckenmann.visualagent.workspace.layout.DesktopState
 import de.heckenmann.visualagent.workspace.layout.StageState
 import de.heckenmann.visualagent.workspace.layout.WorkspaceLayoutService
 import de.heckenmann.visualagent.workspace.layout.WorkspaceWindowState
+import kotlinx.coroutines.launch
 import org.springframework.boot.WebApplicationType
 import org.springframework.boot.builder.SpringApplicationBuilder
 import org.springframework.context.ConfigurableApplicationContext
@@ -88,14 +93,17 @@ private fun VisualAgentComposeApp(
     onCloseApplication: () -> Unit,
 ) {
     var windows by remember { mutableStateOf(restoreWorkspaceWindows(defaultWindows(), workspaceLayoutService.report().windows)) }
-    var modal by remember { mutableStateOf<ComposeConfirmationModal?>(null) }
+    var modal by remember { mutableStateOf<ComposeModal?>(null) }
     var commandPaletteVisible by remember { mutableStateOf(false) }
     val workspaceFocusRequester = remember { FocusRequester() }
+    val composeScope = rememberCoroutineScope()
     val panelServices =
         remember {
             ComposePanelServices(
                 config = config,
                 agentManager = springContext.getBean(AgentManager::class.java),
+                agentToolConfigService = springContext.getBean(AgentToolConfigService::class.java),
+                toolRegistry = springContext.getBean(ToolRegistry::class.java),
                 workspaceFileService = springContext.getBean(WorkspaceFileService::class.java),
                 canvasOperations = springContext.getBean(CanvasOperations::class.java),
                 modalRequester = ComposeModalRequester { requested -> modal = requested },
@@ -112,6 +120,9 @@ private fun VisualAgentComposeApp(
     }
     val moveWindowLater: (String) -> Unit = { id ->
         windows = moveWorkspacePanel(windows, id, ComposePanelMoveDirection.Later)
+    }
+    val resizeWindow: (String, Int, Int, ComposeWorkspaceViewport) -> Unit = { id, deltaWidth, deltaHeight, viewport ->
+        windows = resizeWorkspacePanel(windows, id, deltaWidth, deltaHeight, viewport)
     }
     val commands =
         windows.map { window ->
@@ -131,6 +142,15 @@ private fun VisualAgentComposeApp(
             )
     LaunchedEffect(Unit) {
         workspaceFocusRequester.requestFocus()
+    }
+    DisposableEffect(workspaceLayoutService) {
+        val handle =
+            workspaceLayoutService.addWindowStateListener { states ->
+                composeScope.launch {
+                    windows = restoreWorkspaceWindows(windows, states)
+                }
+            }
+        onDispose { handle.close() }
     }
 
     MaterialTheme(colorScheme = draculaColorScheme()) {
@@ -182,7 +202,7 @@ private fun VisualAgentComposeApp(
                             windows = workspaceStates,
                         )
                         LaunchedEffect(workspaceStates) {
-                            workspaceLayoutService.applyWindowStates(workspaceStates)
+                            workspaceLayoutService.applyWindowStates(workspaceStates, notifyListeners = false)
                         }
                         Column(modifier = Modifier.fillMaxSize()) {
                             ComposeWorkspaceHeader(config, springContext.beanDefinitionCount)
@@ -192,6 +212,7 @@ private fun VisualAgentComposeApp(
                                 onToggleWindow = toggleWindow,
                                 onMoveWindowEarlier = moveWindowEarlier,
                                 onMoveWindowLater = moveWindowLater,
+                                onResizeWindow = resizeWindow,
                                 modifier =
                                     Modifier
                                         .weight(1f)

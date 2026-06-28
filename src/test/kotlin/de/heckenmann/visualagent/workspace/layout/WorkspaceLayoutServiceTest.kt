@@ -86,6 +86,55 @@ class WorkspaceLayoutServiceTest {
         assertEquals(states, persistence.load().windows)
     }
 
+    @Test
+    fun `apply window states notifies registered listeners`() {
+        val service = WorkspaceLayoutService(WorkspaceLayoutPersistence(MapPreferenceStore()))
+        val states =
+            listOf(
+                WorkspaceWindowState(
+                    id = "chat",
+                    x = 0.0,
+                    y = 0.0,
+                    width = 720.0,
+                    height = 520.0,
+                    visible = true,
+                    zIndex = 0,
+                ),
+            )
+        var observed: List<WorkspaceWindowState> = emptyList()
+
+        val handle = service.addWindowStateListener { observed = it }
+        service.applyWindowStates(states)
+        handle.close()
+        service.applyWindowStates(states.map { it.copy(width = 800.0) })
+
+        assertEquals(states, observed)
+    }
+
+    @Test
+    fun `apply window states can persist without notifying listeners`() {
+        val service = WorkspaceLayoutService(WorkspaceLayoutPersistence(MapPreferenceStore()))
+        val states =
+            listOf(
+                WorkspaceWindowState(
+                    id = "chat",
+                    x = 0.0,
+                    y = 0.0,
+                    width = 720.0,
+                    height = 520.0,
+                    visible = true,
+                    zIndex = 0,
+                ),
+            )
+        var notifications = 0
+
+        service.addWindowStateListener { notifications += 1 }
+        service.applyWindowStates(states, notifyListeners = false)
+
+        assertEquals(0, notifications)
+        assertEquals(states, service.report().windows)
+    }
+
     private class MapPreferenceStore : PreferenceStore {
         private val values = linkedMapOf<String, String>()
 

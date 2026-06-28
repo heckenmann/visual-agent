@@ -28,7 +28,7 @@ class WorkspaceLayoutTool(
             description =
                 "Inspect or arrange internal UI windows. Actions: get, set. " +
                     "get returns screens, main window size, desktop size, and all window positions. " +
-                    "set input: {\"action\":\"set\",\"windows\":[{\"id\":\"conversation\",\"x\":0,\"y\":0,\"width\":640,\"height\":480,\"visible\":true}]}",
+                    "set input: {\"action\":\"set\",\"windows\":[{\"id\":\"chat\",\"x\":0,\"y\":0,\"width\":640,\"height\":480,\"visible\":true}]}",
             inputSchema = STRING_SCHEMA,
         )
 

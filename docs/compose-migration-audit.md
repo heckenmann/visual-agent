@@ -15,7 +15,7 @@ The migration replaces the Visual Agent desktop UI toolkit. It does not implemen
 - `Main.kt` starts the Compose desktop application.
 - `build.gradle.kts` uses Compose Multiplatform dependencies and no OpenJFX, AtlantaFX, Ikonli JavaFX, or JHotDraw dependencies.
 - `desktopApiUsageCheck` is part of `check` and rejects legacy desktop image/toolkit API usage below `src/main` and `src/test`.
-- `./gradlew ktlintCheck --no-daemon`, `./gradlew check --no-daemon`, and `./gradlew build --no-daemon` pass locally.
+- `gradle --no-daemon test` passes locally after the latest UX/layout documentation updates.
 - `./gradlew run --no-daemon` starts the Spring context and Compose desktop runtime locally.
 
 ## Requirement Audit
@@ -25,16 +25,20 @@ The migration replaces the Visual Agent desktop UI toolkit. It does not implemen
 | Full JavaFX removal via Compose is feasible | Complete | Production entry point uses Compose; legacy JavaFX/FXML sources and resources are removed from the build path; `desktopApiUsageCheck` is enabled. |
 | Compare Compose with Swing/FlatLaf path from issue 46 | Complete | Issue 48 documents Compose vs Swing/FlatLaf tradeoffs and recommends Compose for the Kotlin-first UI. |
 | No JavaFX dependencies remain | Complete | `build.gradle.kts` contains Compose dependencies and no JavaFX, AtlantaFX, Ikonli JavaFX, or JHotDraw dependencies. |
-| Semantic workspace panels | Complete | `ComposeSplitWorkspace`, `splitWorkspaceBounds`, and `workspace/layout` services provide user-ordered stage, inspector, and deck panel slots without overlap or pointer-driven resize states. |
+| Semantic workspace panels | Complete | `ComposeSplitWorkspace`, `splitWorkspaceBounds`, and `workspace/layout` services provide user-ordered stage, inspector, and deck panel slots without overlap. |
+| User- and model-adjustable panel sizing | Complete | Panel resize handles update stored size preferences; `workspace:layout set` persists model-requested sizes and notifies the live Compose workspace. |
 | Large panels scroll without old chrome repaint costs | Complete | Compose panels use Compose scroll containers and cheap window chrome; previous JavaFX CSS/shadow effects are removed. |
 | Theme and visual language | Complete | `ComposeWorkspaceTheme` provides Dracula-style Compose theme tokens and runtime settings remain DB-backed. |
 | Canvas replacement | Complete | `CanvasOperations`, `InMemoryCanvasService`, `CanvasDocumentCodec`, `CanvasPngRenderer`, and `ComposeCanvasPanel` provide editable figures, selection, move, resize, delete, PNG capture, persistence, workspace save/open, and tool calls. |
 | Workspace files and canvas objects open/save through UI and tools | Complete | Files panel imports/syncs/renames/deletes files and opens canvas documents; `canvas.saveDocument`, `canvas.openDocument`, and `workspace:file` actions cover tool-call paths. |
 | Model/tool APIs can query/manipulate layout and canvas | Complete | `workspace:layout` and `canvas` tools remain toolkit-neutral and are tested. |
 | Keyboard navigation and command palette | Complete | `Cmd/Ctrl+1..6` opens panels; `Cmd/Ctrl+K` opens the internal command palette; `Esc` closes it. |
-| Internal modal behavior | Complete | `ComposeModalHost` provides internal confirmation modals for destructive UI actions. |
+| Internal modal behavior | Complete | `ComposeModalHost` provides internal confirmation and information modals for workspace UI actions. |
 | File picker | Complete | Files panel uses FileKit's Compose file picker and keeps typed-path import as fallback. |
 | Markdown rendering | Complete | Conversation messages are rendered through CommonMark-backed Compose rendering without pre-normalizing parser input. |
+| Conversation keyboard send | Complete | `ConversationPanel` sends with Enter, keeps Shift+Enter for new lines, keeps focus on the input, and disables duplicate sends while a request is running. |
+| Conversation streaming | Complete | `ConversationPanel` calls `AgentManager.streamMessage`, renders a temporary assistant turn while chunks arrive, and reloads the persisted final history after completion. |
+| Sub-agent details and tool controls | Complete | `SubAgentsPanel` opens an internal details modal with identity, template, model override, parameter, option, runtime, and per-agent tool toggles persisted through `AgentManager.updateAgent`. |
 | PDF/image processing without desktop image APIs | Complete | PDF page previews and canvas/image metadata paths use toolkit-neutral renderers/header readers. |
 | Automated tests remain feasible | Complete | Compose migration uses unit tests for models, tools, parsers, layout, workspace files, image readers, and canvas service/tool behavior. |
 | Native packaging remains compatible | Complete | Compose native distribution configuration remains in `build.gradle.kts`; packaging-specific release automation is tracked separately. |
@@ -49,6 +53,10 @@ Compose Desktop itself uses the JVM `java.desktop` stack internally. Visual Agen
 - Full browser and web-search backend implementation: issues #16 and #40.
 - Packaging/release automation for native installers: tracked separately.
 - Additional GUI integration/screenshot coverage can be added after the migration branch stabilizes.
+
+## Use-Case Coverage Gaps Found After Migration
+
+No remaining Compose migration coverage gaps are known in the audited use-case documents. Browser and web-search backend work remains tracked in issues #16 and #40.
 
 ## Final Recommendation
 
