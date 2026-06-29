@@ -8,10 +8,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -25,14 +23,6 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuAnchorType
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
@@ -49,7 +39,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.ShowResponse
@@ -181,12 +170,12 @@ internal fun SettingsPanel(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
     ) {
-        SettingsSection(title = "Provider and model") {
+        PanelSection(title = "Provider and model") {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                SessionDropdownField(
+                PanelDropdownField(
                     label = "Provider",
                     selectedValue = providerId,
-                    options = providers.map { option -> SessionSelectOption(option.id, option.providerDisplayName()) },
+                    options = providers.map { option -> PanelSelectOption(option.id, option.providerDisplayName()) },
                     onSelected = { selected -> refreshProviderState(selected) },
                     modifier = Modifier.weight(1f),
                 )
@@ -293,15 +282,15 @@ internal fun SettingsPanel(
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                 )
-                LabeledCheckbox(label = "Favorites", checked = favoritesOnly, onCheckedChange = { favoritesOnly = it })
+                PanelCheckbox(label = "Favorites", checked = favoritesOnly, onCheckedChange = { favoritesOnly = it })
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                SessionDropdownField(
+                PanelDropdownField(
                     label = "Model",
                     selectedValue = modelSelection,
                     options =
-                        filteredModels.map { model -> SessionSelectOption(model.id, model.modelDisplayName()) } +
-                            SessionSelectOption(CUSTOM_MODEL_ID, "Custom model ID"),
+                        filteredModels.map { model -> PanelSelectOption(model.id, model.modelDisplayName()) } +
+                            PanelSelectOption(CUSTOM_MODEL_ID, "Custom model ID"),
                     onSelected = { selected ->
                         if (selected == CUSTOM_MODEL_ID) {
                             modelId = customModelId
@@ -350,10 +339,10 @@ internal fun SettingsPanel(
                 enabled = !loadingDetails && resolvedModel.isNotBlank(),
                 onClick = { refreshModelDetails() },
             )
-            ModelDetailsBox(modelDetails)
+            PanelInfoBox(modelDetails)
         }
 
-        SettingsSection(title = "Execution") {
+        PanelSection(title = "Execution") {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text("Context length", color = Color(0xFFF8F8F2), fontWeight = FontWeight.SemiBold)
@@ -370,19 +359,19 @@ internal fun SettingsPanel(
                 Text("$contextLength", color = Color(0xFFBD93F9), modifier = Modifier.width(72.dp))
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                NumericSettingsField(
+                NumericPanelField(
                     label = "Startup history",
                     value = loadLimit,
                     onValueChange = { loadLimit = it },
                     modifier = Modifier.weight(1f),
                 )
-                NumericSettingsField(
+                NumericPanelField(
                     label = "Parallel agents",
                     value = maxParallelSubAgents,
                     onValueChange = { maxParallelSubAgents = it },
                     modifier = Modifier.weight(1f),
                 )
-                NumericSettingsField(
+                NumericPanelField(
                     label = "Timeout sec",
                     value = timeoutSeconds,
                     onValueChange = { timeoutSeconds = it },
@@ -390,9 +379,9 @@ internal fun SettingsPanel(
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                LabeledCheckbox(label = "Stream", checked = streamingEnabled, onCheckedChange = { streamingEnabled = it })
-                LabeledCheckbox(label = "Reasoning", checked = thinkingEnabled, onCheckedChange = { thinkingEnabled = it })
-                LabeledCheckbox(label = "Compaction", checked = autoCompactionEnabled, onCheckedChange = { autoCompactionEnabled = it })
+                PanelCheckbox(label = "Stream", checked = streamingEnabled, onCheckedChange = { streamingEnabled = it })
+                PanelCheckbox(label = "Reasoning", checked = thinkingEnabled, onCheckedChange = { thinkingEnabled = it })
+                PanelCheckbox(label = "Compaction", checked = autoCompactionEnabled, onCheckedChange = { autoCompactionEnabled = it })
             }
             OutlinedTextField(
                 value = userInstruction,
@@ -404,11 +393,11 @@ internal fun SettingsPanel(
             )
         }
 
-        SettingsSection(title = "Appearance") {
-            SessionDropdownField(
+        PanelSection(title = "Appearance") {
+            PanelDropdownField(
                 label = "Theme",
                 selectedValue = theme,
-                options = SUPPORTED_SETTINGS_THEMES.map { SessionSelectOption(it, it) },
+                options = SUPPORTED_SETTINGS_THEMES.map { PanelSelectOption(it, it) },
                 onSelected = { theme = it },
             )
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -499,10 +488,10 @@ private fun ProviderProfileEditor(
                 modifier = Modifier.weight(1f),
             )
         }
-        SessionDropdownField(
+        PanelDropdownField(
             label = "Adapter",
             selectedValue = state.adapter.name,
-            options = ProviderAdapter.entries.map { SessionSelectOption(it.name, it.name) },
+            options = ProviderAdapter.entries.map { PanelSelectOption(it.name, it.name) },
             onSelected = { state = state.copy(adapter = ProviderAdapter.valueOf(it)) },
         )
         OutlinedTextField(
@@ -535,7 +524,7 @@ private fun ProviderProfileEditor(
                 singleLine = true,
                 modifier = Modifier.weight(1f),
             )
-            LabeledCheckbox(
+            PanelCheckbox(
                 label = "Enabled",
                 checked = state.enabled,
                 enabled = canDisable,
@@ -588,118 +577,6 @@ private fun ProviderProfileEditor(
         }
     }
 }
-
-@Composable
-private fun SettingsSection(
-    title: String,
-    content: @Composable () -> Unit,
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color(0x33282A36)),
-        shape = RoundedCornerShape(8.dp),
-    ) {
-        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, color = Color(0xFFF8F8F2), fontWeight = FontWeight.SemiBold)
-            content()
-        }
-    }
-}
-
-@Composable
-private fun ModelDetailsBox(details: String) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color(0x22282A36)),
-        shape = RoundedCornerShape(8.dp),
-    ) {
-        Text(
-            text = details,
-            color = Color(0xFFD8D4E8),
-            style = MaterialTheme.typography.bodySmall,
-            maxLines = 8,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(8.dp),
-        )
-    }
-}
-
-@Composable
-private fun NumericSettingsField(
-    label: String,
-    value: String,
-    onValueChange: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = { next -> onValueChange(next.filter(Char::isDigit)) },
-        label = { Text(label) },
-        singleLine = true,
-        modifier = modifier,
-    )
-}
-
-@Composable
-private fun LabeledCheckbox(
-    label: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-) {
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        Checkbox(checked = checked, enabled = enabled, onCheckedChange = onCheckedChange)
-        Text(label, color = Color(0xFFF8F8F2), maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SessionDropdownField(
-    label: String,
-    selectedValue: String,
-    options: List<SessionSelectOption>,
-    onSelected: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val selectedLabel = options.firstOrNull { it.value == selectedValue }?.label ?: selectedValue
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { expanded = it && options.isNotEmpty() },
-        modifier = modifier.fillMaxWidth(),
-    ) {
-        OutlinedTextField(
-            value = selectedLabel,
-            onValueChange = {},
-            readOnly = true,
-            singleLine = true,
-            label = { Text(label) },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier =
-                Modifier
-                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled = options.isNotEmpty())
-                    .fillMaxWidth(),
-        )
-        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            options.forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(option.label) },
-                    onClick = {
-                        onSelected(option.value)
-                        expanded = false
-                    },
-                )
-            }
-        }
-    }
-}
-
-private data class SessionSelectOption(
-    val value: String,
-    val label: String,
-)
 
 private fun ProviderProfile.providerDisplayName(): String = "$name ($id)"
 
