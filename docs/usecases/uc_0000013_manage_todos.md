@@ -16,11 +16,13 @@ Desktop user.
 ## Main Flow
 
 1. The user opens the todo panel.
-2. The user creates or edits a todo with priority/status metadata.
-3. For delete actions, the UI shows an internal confirmation modal before removing the todo.
-4. The todo manager records the change.
-5. The todo store persists the authoritative state.
-6. Agent prompts and tools read current todo summaries from persistence.
+2. The user creates a todo with a priority selected from the priority dropdown.
+3. The user filters the visible list by status when they need a narrower view.
+4. The user changes status from the row status dropdown or opens the edit dialog to update description, priority, and status together.
+5. For delete actions, the UI shows an internal confirmation modal before removing the todo.
+6. The todo manager records the change.
+7. The todo store persists the authoritative state.
+8. Agent prompts and tools read current todo summaries from persistence.
 
 ## Result
 
@@ -44,3 +46,4 @@ Todos stay synchronized between UI, database, and agent context.
 - Main-agent context includes authoritative todo counters.
 - UI and tool calls reflect the same persisted state.
 - UI delete actions require internal modal confirmation.
+- Priority and status are edited through bounded dropdown choices, not free text.

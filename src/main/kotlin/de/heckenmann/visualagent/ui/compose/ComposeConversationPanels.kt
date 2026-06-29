@@ -10,19 +10,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,7 +36,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
@@ -106,7 +105,7 @@ internal fun ConversationPanel(
             val visibleHistory = history.takeLast(40)
             val visibleOffset = history.size - visibleHistory.size
             if (visibleHistory.isEmpty()) {
-                EmptyPanelState(
+                PanelEmptyState(
                     title = "No conversation yet",
                     body = "Send a message to start the main agent session.",
                 )
@@ -193,42 +192,39 @@ private fun MessageRow(
     onRetry: () -> Unit,
 ) {
     val clipboard = LocalClipboardManager.current
-    Card(
+    PanelContentCard(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .padding(bottom = 7.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0x55282A36)),
-        shape = RoundedCornerShape(8.dp),
     ) {
-        Column(modifier = Modifier.padding(8.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = message.role.uppercase(),
-                    color = if (message.role == "user") Color(0xFFFFB86C) else Color(0xFF8BE9FD),
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f),
-                )
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = message.role.uppercase(),
+                color = if (message.role == "user") MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.tertiary,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
+            ActionIconButton(
+                icon = Icons.Filled.ContentCopy,
+                description = "Copy ${message.role} message",
+                modifier = Modifier.size(28.dp),
+                onClick = {
+                    clipboard.setText(AnnotatedString(message.content))
+                    onCopied()
+                },
+            )
+            if (canRetry) {
                 ActionIconButton(
-                    icon = Icons.Filled.ContentCopy,
-                    description = "Copy ${message.role} message",
+                    icon = Icons.Filled.Refresh,
+                    description = "Retry from previous user message",
                     modifier = Modifier.size(28.dp),
-                    onClick = {
-                        clipboard.setText(AnnotatedString(message.content))
-                        onCopied()
-                    },
+                    onClick = onRetry,
                 )
-                if (canRetry) {
-                    ActionIconButton(
-                        icon = Icons.Filled.Refresh,
-                        description = "Retry from previous user message",
-                        modifier = Modifier.size(28.dp),
-                        onClick = onRetry,
-                    )
-                }
             }
-            ComposeMarkdown(message.content)
         }
+        ComposeMarkdown(message.content)
     }
 }
 
@@ -239,9 +235,15 @@ internal fun TodoPanel(
 ) {
     var todos by remember { mutableStateOf(agentManager.getTodosFromDb()) }
     var description by remember { mutableStateOf("") }
+    var priority by remember { mutableStateOf(TodoPriority.MEDIUM) }
+    var statusFilter by remember { mutableStateOf(ALL_TODO_STATUSES) }
     val refresh = {
         todos = agentManager.getTodosFromDb()
     }
+    val visibleTodos =
+        todos.filter { todo ->
+            statusFilter == ALL_TODO_STATUSES || todo.status.name == statusFilter
+        }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
@@ -255,7 +257,7 @@ internal fun TodoPanel(
                         onClick = {
                             val text = description.trim()
                             if (text.isNotBlank()) {
-                                agentManager.todoManager.add(text, TodoPriority.MEDIUM)
+                                agentManager.todoManager.add(text, priority)
                                 description = ""
                                 refresh()
                             }
@@ -266,12 +268,32 @@ internal fun TodoPanel(
                 },
                 modifier = Modifier.weight(1f),
             )
+            PanelDropdownField(
+                label = "Priority",
+                selectedValue = priority.name,
+                options = TodoPriority.entries.map { PanelSelectOption(it.name, it.name.labelizeEnumName()) },
+                onSelected = { priority = TodoPriority.valueOf(it) },
+                modifier = Modifier.weight(0.45f),
+            )
         }
+        PanelDropdownField(
+            label = "Status filter",
+            selectedValue = statusFilter,
+            options =
+                listOf(PanelSelectOption(ALL_TODO_STATUSES, "All statuses")) +
+                    TodoStatus.entries.map { PanelSelectOption(it.name, it.name.labelizeEnumName()) },
+            onSelected = { statusFilter = it },
+        )
+        Text(
+            text = "Total ${todos.size} · showing ${visibleTodos.size}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            if (todos.isEmpty()) {
-                EmptyPanelState(title = "No todos", body = "Add a task or let the agent create todos during planning.")
+            if (visibleTodos.isEmpty()) {
+                PanelEmptyState(title = "No todos", body = "Add a task or change the status filter.")
             } else {
-                todos.forEach { todo ->
+                visibleTodos.forEach { todo ->
                     TodoRow(todo, agentManager, modalRequester, refresh)
                 }
             }
@@ -286,65 +308,127 @@ private fun TodoRow(
     modalRequester: ComposeModalRequester,
     refresh: () -> Unit,
 ) {
-    Card(
+    PanelContentCard(
         modifier = Modifier.fillMaxWidth().padding(bottom = 7.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0x55282A36)),
-        shape = RoundedCornerShape(8.dp),
     ) {
-        Column(modifier = Modifier.padding(8.dp)) {
-            Text(todo.description, color = Color(0xFFF8F8F2), fontWeight = FontWeight.SemiBold)
-            Text("${todo.priority} · ${todo.status}", color = Color(0xFFBD93F9))
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                ActionIconButton(
-                    icon = Icons.Filled.PlayArrow,
-                    description = "Start todo",
-                    onClick = {
-                        agentManager.todoManager.updateStatus(todo.id, TodoStatus.IN_PROGRESS)
-                        refresh()
-                    },
-                )
-                ActionIconButton(
-                    icon = Icons.Filled.Done,
-                    description = "Complete todo",
-                    onClick = {
-                        agentManager.todoManager.updateStatus(todo.id, TodoStatus.COMPLETED)
-                        refresh()
-                    },
-                )
-                ActionIconButton(
-                    icon = Icons.Filled.Delete,
-                    description = "Delete todo",
-                    onClick = {
-                        modalRequester.requestConfirmation(
-                            ComposeConfirmationModal(
-                                title = "Delete todo?",
-                                message = "Delete '${todo.description}' from the persisted todo list.",
-                                confirmDescription = "Delete todo",
-                            ) {
-                                agentManager.todoManager.remove(todo.id)
-                                refresh()
-                            },
-                        )
-                    },
-                )
-            }
+        Text(todo.description, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+        Text(
+            "${todo.priority.name.labelizeEnumName()} · ${todo.status.name.labelizeEnumName()}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.tertiary,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            PanelDropdownField(
+                label = "Status",
+                selectedValue = todo.status.name,
+                options = TodoStatus.entries.map { PanelSelectOption(it.name, it.name.labelizeEnumName()) },
+                onSelected = {
+                    agentManager.todoManager.updateStatus(todo.id, TodoStatus.valueOf(it))
+                    refresh()
+                },
+                modifier = Modifier.weight(1f),
+            )
+            ActionIconButton(
+                icon = Icons.Filled.Edit,
+                description = "Edit todo",
+                onClick = {
+                    modalRequester.request(
+                        ComposeContentModal(title = "Edit todo") { dismiss ->
+                            TodoEditor(
+                                todo = todo,
+                                onCancel = dismiss,
+                                onSave = { updatedDescription, updatedPriority, updatedStatus ->
+                                    agentManager.todoManager.update(todo.id, updatedDescription, updatedPriority)
+                                    agentManager.todoManager.updateStatus(todo.id, updatedStatus)
+                                    refresh()
+                                    dismiss()
+                                },
+                            )
+                        },
+                    )
+                },
+            )
+            ActionIconButton(
+                icon = Icons.Filled.PlayArrow,
+                description = "Start todo",
+                enabled = todo.status != TodoStatus.IN_PROGRESS,
+                onClick = {
+                    agentManager.todoManager.updateStatus(todo.id, TodoStatus.IN_PROGRESS)
+                    refresh()
+                },
+            )
+            ActionIconButton(
+                icon = Icons.Filled.Done,
+                description = "Complete todo",
+                enabled = todo.status != TodoStatus.COMPLETED,
+                onClick = {
+                    agentManager.todoManager.updateStatus(todo.id, TodoStatus.COMPLETED)
+                    refresh()
+                },
+            )
+            ActionIconButton(
+                icon = Icons.Filled.Delete,
+                description = "Delete todo",
+                onClick = {
+                    modalRequester.requestConfirmation(
+                        ComposeConfirmationModal(
+                            title = "Delete todo?",
+                            message = "Delete '${todo.description}' from the persisted todo list.",
+                            confirmDescription = "Delete todo",
+                        ) {
+                            agentManager.todoManager.remove(todo.id)
+                            refresh()
+                        },
+                    )
+                },
+            )
         }
     }
 }
 
 @Composable
-private fun EmptyPanelState(
-    title: String,
-    body: String,
+private fun TodoEditor(
+    todo: Todo,
+    onCancel: () -> Unit,
+    onSave: (String, TodoPriority, TodoStatus) -> Unit,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0x33282A36)),
-        shape = RoundedCornerShape(8.dp),
-    ) {
-        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(title, color = Color(0xFFF8F8F2), fontWeight = FontWeight.SemiBold)
-            Text(body, color = Color(0xFFBFBBD0))
+    var description by remember(todo.id) { mutableStateOf(todo.description) }
+    var priority by remember(todo.id) { mutableStateOf(todo.priority) }
+    var status by remember(todo.id) { mutableStateOf(todo.status) }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            value = description,
+            onValueChange = { description = it },
+            label = { Text("Description") },
+            minLines = 2,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            PanelDropdownField(
+                label = "Priority",
+                selectedValue = priority.name,
+                options = TodoPriority.entries.map { PanelSelectOption(it.name, it.name.labelizeEnumName()) },
+                onSelected = { priority = TodoPriority.valueOf(it) },
+                modifier = Modifier.weight(1f),
+            )
+            PanelDropdownField(
+                label = "Status",
+                selectedValue = status.name,
+                options = TodoStatus.entries.map { PanelSelectOption(it.name, it.name.labelizeEnumName()) },
+                onSelected = { status = TodoStatus.valueOf(it) },
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End), modifier = Modifier.fillMaxWidth()) {
+            ActionIconButton(icon = Icons.Filled.Close, description = "Cancel edit", onClick = onCancel)
+            ActionIconButton(
+                icon = Icons.Filled.Done,
+                description = "Save todo",
+                enabled = description.isNotBlank(),
+                onClick = { onSave(description.trim(), priority, status) },
+            )
         }
     }
 }
+
+private const val ALL_TODO_STATUSES = "__all__"
