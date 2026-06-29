@@ -16,7 +16,7 @@ Desktop user.
 ## Main Flow
 
 1. The user opens a sub-agent's details dialog.
-2. The UI lists registered tools with toggles.
+2. The UI shows model/runtime controls and lists registered tools with toggles.
 3. The user enables or disables tools for that agent.
 4. The agent configuration is persisted.
 5. Future request contexts expose only enabled tools to that agent, after global policy filtering.
@@ -43,3 +43,4 @@ Agents receive only the tools allowed by persisted configuration.
 - Sub-agent tool sets can include task-specific tools like canvas or workspace files.
 - Disabled tools are not exposed in provider callbacks.
 - Per-agent tool overrides are resolved before template defaults and are still filtered by globally disabled tools.
+- Tool toggles remain separate from provider/model dropdowns so capability changes are explicit.

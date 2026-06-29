@@ -16,10 +16,12 @@ Desktop user and main orchestration agent.
 ## Main Flow
 
 1. A user or tool requests create, update, or delete.
-2. For user-triggered delete actions, the UI shows an internal confirmation modal before deletion.
-3. The agent manager validates and applies the lifecycle change.
-4. Sub-agent metadata and configuration are persisted.
-5. UI cards refresh from the updated state.
+2. For user-created sub-agents, the UI captures name, role, and a template selected from the template dropdown.
+3. For updates, the details dialog exposes bounded dropdowns for template, provider override, and model override while leaving custom variant/options fields explicit.
+4. For user-triggered delete actions, the UI shows an internal confirmation modal before deletion.
+5. The agent manager validates and applies the lifecycle change.
+6. Sub-agent metadata and configuration are persisted.
+7. UI cards refresh from the updated state.
 
 ## Result
 
@@ -46,3 +48,4 @@ The available sub-agent pool can be shaped for the current workspace needs.
 - Deleted agents are removed from persisted tool configuration.
 - UI reflects changes without restart.
 - UI delete actions require internal modal confirmation.
+- Provider and model overrides are selected from the active provider catalog when possible.

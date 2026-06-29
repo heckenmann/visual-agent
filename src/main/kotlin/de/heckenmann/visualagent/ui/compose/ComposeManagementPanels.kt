@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -19,9 +18,8 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Save
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,7 +30,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -40,6 +37,7 @@ import de.heckenmann.visualagent.agent.AgentConfig
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
+import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import kotlinx.coroutines.launch
 
@@ -48,11 +46,13 @@ internal fun SubAgentsPanel(
     agentManager: AgentManager,
     agentToolConfigService: AgentToolConfigService,
     toolRegistry: ToolRegistry,
+    providerCatalogService: ProviderCatalogService,
     modalRequester: ComposeModalRequester,
 ) {
     var agents by remember { mutableStateOf(agentManager.getSubAgents()) }
     var name by remember { mutableStateOf("") }
     var role by remember { mutableStateOf("") }
+    var templateName by remember { mutableStateOf(DEFAULT_AGENT_TEMPLATE) }
     var task by remember { mutableStateOf("") }
     var runningAgentIds by remember { mutableStateOf(emptySet<String>()) }
     var status by remember { mutableStateOf("Ready") }
@@ -66,24 +66,38 @@ internal fun SubAgentsPanel(
                 value = name,
                 onValueChange = { name = it },
                 label = { Text("Name") },
-                modifier = Modifier.weight(0.7f),
+                singleLine = true,
+                modifier = Modifier.weight(1f),
             )
+            PanelDropdownField(
+                label = "Template",
+                selectedValue = templateName,
+                options =
+                    AgentConfig.TEMPLATES.keys
+                        .sorted()
+                        .map { PanelSelectOption(it, it.labelizeEnumName()) },
+                onSelected = { templateName = it },
+                modifier = Modifier.weight(0.75f),
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 value = role,
                 onValueChange = { role = it },
                 label = { Text("Role") },
+                singleLine = true,
                 modifier = Modifier.weight(1f),
             )
             ActionIconButton(
                 icon = Icons.Filled.Add,
                 description = "Create sub-agent",
+                enabled = name.isNotBlank() && role.isNotBlank(),
                 onClick = {
-                    if (name.isNotBlank() && role.isNotBlank()) {
-                        agentManager.createAgent(name.trim(), role.trim())
-                        name = ""
-                        role = ""
-                        refresh()
-                    }
+                    agentManager.createAgent(name.trim(), role.trim(), templateName)
+                    name = ""
+                    role = ""
+                    refresh()
+                    status = "Created sub-agent"
                 },
             )
         }
@@ -91,25 +105,27 @@ internal fun SubAgentsPanel(
             value = task,
             onValueChange = { task = it },
             label = { Text("Task for selected sub-agent") },
+            minLines = 2,
+            maxLines = 4,
             modifier = Modifier.fillMaxWidth(),
         )
         Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             if (agents.isEmpty()) {
-                ManagementEmptyState(
+                PanelEmptyState(
                     title = "No sub-agents",
                     body = "Create a named role to delegate focused work from the main session.",
                 )
             } else {
                 agents.forEach { agent ->
-                    val activeJobCount = agentManager.getActiveJobCount(agent.id)
                     SubAgentRow(
                         agent = agent,
-                        activeJobCount = activeJobCount,
+                        activeJobCount = agentManager.getActiveJobCount(agent.id),
                         task = task,
                         running = agent.id in runningAgentIds,
                         agentManager = agentManager,
                         agentToolConfigService = agentToolConfigService,
                         toolRegistry = toolRegistry,
+                        providerCatalogService = providerCatalogService,
                         modalRequester = modalRequester,
                         onRunningChanged = { running ->
                             runningAgentIds =
@@ -135,95 +151,95 @@ private fun SubAgentRow(
     agentManager: AgentManager,
     agentToolConfigService: AgentToolConfigService,
     toolRegistry: ToolRegistry,
+    providerCatalogService: ProviderCatalogService,
     modalRequester: ComposeModalRequester,
     onRunningChanged: (Boolean) -> Unit,
     onStatusChanged: (String) -> Unit,
     refresh: () -> Unit,
     scope: kotlinx.coroutines.CoroutineScope,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 7.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0x55282A36)),
-        shape = RoundedCornerShape(8.dp),
-    ) {
-        Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(agent.name, color = Color(0xFFF8F8F2), fontWeight = FontWeight.SemiBold)
-            Text("${agent.status} · active jobs $activeJobCount", color = Color(0xFFBD93F9))
-            Text(agent.role, color = Color(0xFFE6E6E6), maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                ActionIconButton(
-                    icon = Icons.Filled.PlayArrow,
-                    description = "Run sub-agent",
-                    enabled = task.isNotBlank() && !running,
-                    onClick = {
-                        val requestedTask = task.trim()
-                        if (requestedTask.isBlank()) return@ActionIconButton
-                        onRunningChanged(true)
-                        onStatusChanged("Running ${agent.name}...")
-                        scope.launch {
-                            runCatching { agentManager.runAgentJob(agent.id, requestedTask) }
-                                .onSuccess { result ->
-                                    onStatusChanged("${result.agentName}: ${result.content.take(120)}")
-                                    refresh()
-                                }.onFailure { error ->
-                                    onStatusChanged("Run failed for ${agent.name}: ${error.message}")
-                                    refresh()
-                                }.also {
-                                    onRunningChanged(false)
-                                }
-                        }
-                    },
-                )
-                ActionIconButton(
-                    icon = Icons.Filled.History,
-                    description = "View sub-agent logs",
-                    onClick = {
-                        modalRequester.requestInfo(
-                            ComposeInfoModal(
-                                title = "${agent.name} logs",
-                                message = subAgentLogSummary(agent, activeJobCount),
-                            ),
-                        )
-                    },
-                )
-                ActionIconButton(
-                    icon = Icons.Filled.Edit,
-                    description = "Configure sub-agent details",
-                    onClick = {
-                        modalRequester.request(
-                            ComposeContentModal(title = "Configure ${agent.name}") { dismiss ->
-                                SubAgentDetailsEditor(
-                                    agent = agent,
-                                    agentManager = agentManager,
-                                    agentToolConfigService = agentToolConfigService,
-                                    toolRegistry = toolRegistry,
-                                    onSaved = {
-                                        refresh()
-                                        onStatusChanged("Saved ${it.name}")
-                                        dismiss()
-                                    },
-                                )
-                            },
-                        )
-                    },
-                )
-                ActionIconButton(
-                    icon = Icons.Filled.Delete,
-                    description = "Delete sub-agent",
-                    onClick = {
-                        modalRequester.requestConfirmation(
-                            ComposeConfirmationModal(
-                                title = "Delete sub-agent?",
-                                message = "Delete '${agent.name}' and its persisted configuration.",
-                                confirmDescription = "Delete sub-agent",
-                            ) {
-                                agentManager.deleteAgent(agent.id)
+    PanelContentCard(modifier = Modifier.fillMaxWidth().padding(bottom = 7.dp)) {
+        Text(agent.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+        Text(
+            "${agent.status.name.labelizeEnumName()} · active jobs $activeJobCount",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.tertiary,
+        )
+        Text(agent.role, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ActionIconButton(
+                icon = Icons.Filled.PlayArrow,
+                description = "Run sub-agent",
+                enabled = task.isNotBlank() && !running,
+                onClick = {
+                    val requestedTask = task.trim()
+                    if (requestedTask.isBlank()) return@ActionIconButton
+                    onRunningChanged(true)
+                    onStatusChanged("Running ${agent.name}...")
+                    scope.launch {
+                        runCatching { agentManager.runAgentJob(agent.id, requestedTask) }
+                            .onSuccess { result ->
+                                onStatusChanged("${result.agentName}: ${result.content.take(120)}")
                                 refresh()
-                            },
-                        )
-                    },
-                )
-            }
+                            }.onFailure { error ->
+                                onStatusChanged("Run failed for ${agent.name}: ${error.message}")
+                                refresh()
+                            }.also {
+                                onRunningChanged(false)
+                            }
+                    }
+                },
+            )
+            ActionIconButton(
+                icon = Icons.Filled.History,
+                description = "View sub-agent logs",
+                onClick = {
+                    modalRequester.requestInfo(
+                        ComposeInfoModal(
+                            title = "${agent.name} logs",
+                            message = subAgentLogSummary(agent, activeJobCount),
+                        ),
+                    )
+                },
+            )
+            ActionIconButton(
+                icon = Icons.Filled.Edit,
+                description = "Configure sub-agent details",
+                onClick = {
+                    modalRequester.request(
+                        ComposeContentModal(title = "Configure ${agent.name}") { dismiss ->
+                            SubAgentDetailsEditor(
+                                agent = agent,
+                                agentManager = agentManager,
+                                agentToolConfigService = agentToolConfigService,
+                                toolRegistry = toolRegistry,
+                                providerCatalogService = providerCatalogService,
+                                onSaved = {
+                                    refresh()
+                                    onStatusChanged("Saved ${it.name}")
+                                    dismiss()
+                                },
+                            )
+                        },
+                    )
+                },
+            )
+            ActionIconButton(
+                icon = Icons.Filled.Delete,
+                description = "Delete sub-agent",
+                onClick = {
+                    modalRequester.requestConfirmation(
+                        ComposeConfirmationModal(
+                            title = "Delete sub-agent?",
+                            message = "Delete '${agent.name}' and its persisted configuration.",
+                            confirmDescription = "Delete sub-agent",
+                        ) {
+                            agentManager.deleteAgent(agent.id)
+                            refresh()
+                        },
+                    )
+                },
+            )
         }
     }
 }
@@ -234,6 +250,7 @@ private fun SubAgentDetailsEditor(
     agentManager: AgentManager,
     agentToolConfigService: AgentToolConfigService,
     toolRegistry: ToolRegistry,
+    providerCatalogService: ProviderCatalogService,
     onSaved: (SubAgent) -> Unit,
 ) {
     var name by remember { mutableStateOf(agent.name) }
@@ -273,6 +290,24 @@ private fun SubAgentDetailsEditor(
         )
     }
     val toolDefinitions = remember(toolRegistry) { toolRegistry.toolDefinitions() }
+    val providerOptions =
+        remember(providerCatalogService) {
+            listOf(PanelSelectOption(INHERIT_SELECTION, "Inherit session provider")) +
+                providerCatalogService.enabledProviders().map { PanelSelectOption(it.id, "${it.name} (${it.id})") }
+        }
+    val modelOptions =
+        remember(provider, model, providerCatalogService) {
+            if (provider.isBlank()) {
+                listOf(PanelSelectOption(INHERIT_SELECTION, "Inherit session model"))
+            } else {
+                val catalogModels = providerCatalogService.selectableModels(provider).map { PanelSelectOption(it.id, it.name) }
+                val customModel =
+                    model
+                        .takeIf { current -> current.isNotBlank() && catalogModels.none { it.value == current } }
+                        ?.let { PanelSelectOption(it, "Custom: $it") }
+                listOf(PanelSelectOption(INHERIT_SELECTION, "Inherit provider default")) + catalogModels + listOfNotNull(customModel)
+            }
+        }
     val numericFieldsAreValid =
         timeout.toIntOrNull()?.let { it > 0 } == true &&
             maxRetries.toIntOrNull()?.let { it >= 0 } == true &&
@@ -286,7 +321,7 @@ private fun SubAgentDetailsEditor(
     Column(
         modifier =
             Modifier
-                .heightIn(max = 520.dp)
+                .heightIn(max = 560.dp)
                 .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -295,12 +330,18 @@ private fun SubAgentDetailsEditor(
                 value = name,
                 onValueChange = { name = it },
                 label = { Text("Name") },
+                singleLine = true,
                 modifier = Modifier.weight(1f),
             )
-            OutlinedTextField(
-                value = templateName,
-                onValueChange = { templateName = it },
-                label = { Text("Template") },
+            PanelDropdownField(
+                label = "Template",
+                selectedValue = templateName.ifBlank { KEEP_AGENT_CONFIG },
+                options =
+                    listOf(PanelSelectOption(KEEP_AGENT_CONFIG, "Keep current")) +
+                        AgentConfig.TEMPLATES.keys
+                            .sorted()
+                            .map { PanelSelectOption(it, it.labelizeEnumName()) },
+                onSelected = { selected -> templateName = selected.takeUnless { it == KEEP_AGENT_CONFIG }.orEmpty() },
                 modifier = Modifier.weight(1f),
             )
         }
@@ -308,19 +349,25 @@ private fun SubAgentDetailsEditor(
             value = role,
             onValueChange = { role = it },
             label = { Text("Role") },
+            minLines = 2,
             modifier = Modifier.fillMaxWidth(),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = provider,
-                onValueChange = { provider = it },
-                label = { Text("Provider override") },
+            PanelDropdownField(
+                label = "Provider",
+                selectedValue = provider.ifBlank { INHERIT_SELECTION },
+                options = providerOptions,
+                onSelected = { selected ->
+                    provider = selected.takeUnless { it == INHERIT_SELECTION }.orEmpty()
+                    model = ""
+                },
                 modifier = Modifier.weight(1f),
             )
-            OutlinedTextField(
-                value = model,
-                onValueChange = { model = it },
-                label = { Text("Model override") },
+            PanelDropdownField(
+                label = "Model",
+                selectedValue = model.ifBlank { INHERIT_SELECTION },
+                options = modelOptions,
+                onSelected = { selected -> model = selected.takeUnless { it == INHERIT_SELECTION }.orEmpty() },
                 modifier = Modifier.weight(1f),
             )
         }
@@ -328,6 +375,7 @@ private fun SubAgentDetailsEditor(
             value = variant,
             onValueChange = { variant = it },
             label = { Text("Variant") },
+            singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -335,38 +383,40 @@ private fun SubAgentDetailsEditor(
                 value = temperature,
                 onValueChange = { temperature = it },
                 label = { Text("Temperature") },
+                singleLine = true,
                 modifier = Modifier.weight(1f),
             )
             OutlinedTextField(
                 value = topP,
                 onValueChange = { topP = it },
                 label = { Text("Top P") },
+                singleLine = true,
                 modifier = Modifier.weight(1f),
             )
-            OutlinedTextField(
+            NumericPanelField(
                 value = maxTokens,
                 onValueChange = { maxTokens = it },
-                label = { Text("Max tokens") },
+                label = "Max tokens",
                 modifier = Modifier.weight(1f),
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
+            NumericPanelField(
                 value = timeout,
                 onValueChange = { timeout = it },
-                label = { Text("Timeout") },
+                label = "Timeout",
                 modifier = Modifier.weight(1f),
             )
-            OutlinedTextField(
+            NumericPanelField(
                 value = maxRetries,
                 onValueChange = { maxRetries = it },
-                label = { Text("Retries") },
+                label = "Retries",
                 modifier = Modifier.weight(1f),
             )
-            OutlinedTextField(
+            NumericPanelField(
                 value = memoryLimitMb,
                 onValueChange = { memoryLimitMb = it },
-                label = { Text("Memory MB") },
+                label = "Memory MB",
                 modifier = Modifier.weight(1f),
             )
         }
@@ -374,9 +424,18 @@ private fun SubAgentDetailsEditor(
             value = optionsText,
             onValueChange = { optionsText = it },
             label = { Text("Options key=value") },
+            minLines = 2,
+            maxLines = 4,
             modifier = Modifier.fillMaxWidth(),
         )
-        Text("Tools", color = Color(0xFFF8F8F2), fontWeight = FontWeight.SemiBold)
+        if (!numericFieldsAreValid) {
+            Text(
+                "Check numeric values and options format.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.secondary,
+            )
+        }
+        Text("Tools", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
         toolDefinitions.forEach { definition ->
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Checkbox(
@@ -391,8 +450,14 @@ private fun SubAgentDetailsEditor(
                     },
                 )
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(definition.id.value, color = Color(0xFFF8F8F2), fontWeight = FontWeight.SemiBold)
-                    Text(definition.description, color = Color(0xFFE6E6E6), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(definition.id.value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        definition.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
         }
@@ -401,7 +466,7 @@ private fun SubAgentDetailsEditor(
             description = "Save sub-agent details",
             enabled = canSave,
             onClick = {
-                val baseConfig = templateName.trim().takeIf(String::isNotEmpty)?.let(AgentConfig::fromTemplate) ?: agent.config
+                val baseConfig = templateName.takeIf(String::isNotBlank)?.let(AgentConfig::fromTemplate) ?: agent.config
                 val config =
                     baseConfig.copy(
                         timeout = timeout.toInt(),
@@ -477,19 +542,6 @@ private fun String.optionalDoubleIsValid(): Boolean = isBlank() || toDoubleOrNul
 
 private fun String.optionalIntIsValid(): Boolean = isBlank() || toIntOrNull() != null
 
-@Composable
-private fun ManagementEmptyState(
-    title: String,
-    body: String,
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0x33282A36)),
-        shape = RoundedCornerShape(8.dp),
-    ) {
-        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(title, color = Color(0xFFF8F8F2), fontWeight = FontWeight.SemiBold)
-            Text(body, color = Color(0xFFBFBBD0))
-        }
-    }
-}
+private const val DEFAULT_AGENT_TEMPLATE = "researcher"
+private const val KEEP_AGENT_CONFIG = "__keep__"
+private const val INHERIT_SELECTION = "__inherit__"

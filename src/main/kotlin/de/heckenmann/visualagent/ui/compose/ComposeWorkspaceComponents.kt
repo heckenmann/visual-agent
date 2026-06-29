@@ -278,6 +278,7 @@ private fun WindowBody(
                 agentManager = panelServices.agentManager,
                 agentToolConfigService = panelServices.agentToolConfigService,
                 toolRegistry = panelServices.toolRegistry,
+                providerCatalogService = panelServices.providerCatalogService,
                 modalRequester = panelServices.modalRequester,
             )
         "settings" ->
