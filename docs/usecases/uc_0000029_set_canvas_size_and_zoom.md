@@ -15,9 +15,9 @@ Desktop user.
 ## Main Flow
 
 1. The user opens the canvas panel.
-2. The user resizes the workspace panel or drags a selected figure resize handle.
-3. The Compose canvas surface keeps existing figure coordinates stable.
-4. Figure resize operations update the selected figure dimensions through the canvas service.
+2. The user pans or zooms the InfiniteCanvas-backed surface, resizes the workspace panel, drags a figure node, or drags a selected figure resize handle.
+3. The Compose canvas surface keeps existing figure coordinates stable while InfiniteCanvas handles viewport pan/zoom and node dragging.
+4. Figure move and resize operations are written back through the canvas service.
 5. Saved canvas documents preserve figure dimensions, zoom metadata, and grid metadata from the toolkit-neutral canvas model.
 
 ## Result
@@ -34,10 +34,12 @@ Workspace panel resizing does not move drawings into inaccessible space or blur 
 - `de.heckenmann.visualagent.ui.compose.ComposeSplitWorkspace`
 - `de.heckenmann.visualagent.canvas.InMemoryCanvasService`
 - `de.heckenmann.visualagent.canvas.CanvasOperations`
+- `io.github.xingray.compose.infinitecanvas.InfiniteCanvas`
 
 ## Acceptance Criteria
 
 - Resizing the workspace panel does not cause canvas jitter.
-- The editable canvas surface starts at the viewport origin and is not centered inside a larger blank area.
+- The editable canvas surface supports pan and zoom through the InfiniteCanvas viewport controls.
+- Figures can be moved by dragging their canvas nodes.
 - Selected figures can be resized from the Compose canvas surface.
-- Saved canvas documents preserve zoom and grid metadata even though dedicated zoom/grid toolbar controls are not part of this migrated panel yet.
+- Saved canvas documents preserve zoom and grid metadata from the canvas model.

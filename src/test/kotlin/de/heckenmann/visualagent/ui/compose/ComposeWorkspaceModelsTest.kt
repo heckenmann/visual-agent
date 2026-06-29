@@ -74,18 +74,18 @@ class ComposeWorkspaceModelsTest {
     }
 
     @Test
-    fun `split workspace lays out larger panel sets as stage inspector and deck`() {
+    fun `split workspace lays out larger panel sets as balanced columns`() {
         val windows = listOf("chat", "todos", "files", "agents", "settings", "canvas").map(::testWindow)
 
         val bounds = splitWorkspaceBounds(windows, ComposeWorkspaceViewport(width = 1200, height = 800))
 
         assertEquals(6, bounds.size)
-        assertEquals(ComposeWorkspaceWindowBounds(x = 0, y = 0, width = 800, height = 560), bounds["chat"])
-        assertEquals(ComposeWorkspaceWindowBounds(x = 816, y = 0, width = 384, height = 176), bounds["todos"])
-        assertEquals(ComposeWorkspaceWindowBounds(x = 816, y = 192, width = 384, height = 176), bounds["files"])
-        assertEquals(ComposeWorkspaceWindowBounds(x = 816, y = 384, width = 384, height = 176), bounds["agents"])
-        assertEquals(ComposeWorkspaceWindowBounds(x = 0, y = 576, width = 592, height = 224), bounds["settings"])
-        assertEquals(ComposeWorkspaceWindowBounds(x = 608, y = 576, width = 592, height = 224), bounds["canvas"])
+        assertEquals(ComposeWorkspaceWindowBounds(x = 0, y = 0, width = 592, height = 256), bounds["chat"])
+        assertEquals(ComposeWorkspaceWindowBounds(x = 0, y = 272, width = 592, height = 256), bounds["todos"])
+        assertEquals(ComposeWorkspaceWindowBounds(x = 0, y = 544, width = 592, height = 256), bounds["files"])
+        assertEquals(ComposeWorkspaceWindowBounds(x = 608, y = 0, width = 592, height = 256), bounds["agents"])
+        assertEquals(ComposeWorkspaceWindowBounds(x = 608, y = 272, width = 592, height = 256), bounds["settings"])
+        assertEquals(ComposeWorkspaceWindowBounds(x = 608, y = 544, width = 592, height = 256), bounds["canvas"])
         assertFalse(bounds.containsKey("unknown"))
     }
 

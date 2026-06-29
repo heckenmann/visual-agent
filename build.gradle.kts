@@ -21,18 +21,7 @@ repositories {
     google()
     mavenCentral()
     maven { url = uri("https://repo.spring.io/milestone") }
-    maven { url = uri("https://jitpack.io") }
 }
-
-val platform =
-    when {
-        System.getProperty("os.name").contains("Mac") &&
-            System.getProperty("os.arch").contains("aarch64") -> "mac-aarch64"
-        System.getProperty("os.name").contains("Mac") -> "mac"
-        System.getProperty("os.name").contains("Linux") -> "linux"
-        System.getProperty("os.name").contains("Windows") -> "win"
-        else -> "linux"
-    }
 
 val applicationIdentityArgs =
     listOf(
@@ -69,6 +58,8 @@ dependencies {
     implementation(compose.desktop.currentOs)
     implementation("org.jetbrains.compose.material3:material3:1.9.0")
     implementation("org.jetbrains.compose.material:material-icons-extended:1.7.3")
+    implementation("com.cheonjaeung.compose.grid:grid:2.7.4")
+    implementation("io.github.xingray:compose-infinite-canvas-core:0.2.0")
     implementation("io.github.vinceglb:filekit-dialogs-compose:0.14.2")
 
     // SQLite JDBC
@@ -90,10 +81,6 @@ dependencies {
 
     // Kotlin logging (wrapper for SLF4J)
     implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
-
-    // Ensure compatible Logback is available at runtime (Spring Boot logging expects it)
-    implementation("ch.qos.logback:logback-classic:1.5.34")
-    implementation("ch.qos.logback:logback-core:1.5.34")
 
     // Test
     testImplementation(kotlin("test"))

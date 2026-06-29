@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -38,6 +37,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.cheonjaeung.compose.grid.BoxGrid
+import com.cheonjaeung.compose.grid.BoxGridItemSpan
+import com.cheonjaeung.compose.grid.SimpleGridCells
 import kotlin.math.roundToInt
 
 @Composable
@@ -64,23 +66,34 @@ internal fun ComposeSplitWorkspace(
             if (visibleWindows.isEmpty()) {
                 EmptyWorkspace()
             } else {
-                visibleWindows.forEach { window ->
-                    val bounds = boundsByPanel.getValue(window.id)
-                    SplitPanel(
-                        window = window,
-                        panelServices = panelServices,
-                        primary = primaryPanelId == window.id,
-                        canMoveEarlier = windows.indexOfFirst { it.id == window.id } > 0,
-                        canMoveLater = windows.indexOfFirst { it.id == window.id } < windows.lastIndex,
-                        onMoveEarlier = { onMoveWindowEarlier(window.id) },
-                        onMoveLater = { onMoveWindowLater(window.id) },
-                        onHide = { onToggleWindow(window.id) },
-                        onResize = { deltaWidth, deltaHeight -> onResizeWindow(window.id, deltaWidth, deltaHeight, viewport) },
-                        modifier =
-                            Modifier
-                                .offset(x = bounds.x.dp, y = bounds.y.dp)
-                                .size(bounds.width.dp, bounds.height.dp),
-                    )
+                BoxGrid(
+                    rows = SimpleGridCells.Fixed(viewport.height),
+                    columns = SimpleGridCells.Fixed(viewport.width),
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    visibleWindows.forEach { window ->
+                        val bounds = boundsByPanel.getValue(window.id)
+                        SplitPanel(
+                            window = window,
+                            panelServices = panelServices,
+                            primary = primaryPanelId == window.id,
+                            canMoveEarlier = windows.indexOfFirst { it.id == window.id } > 0,
+                            canMoveLater = windows.indexOfFirst { it.id == window.id } < windows.lastIndex,
+                            onMoveEarlier = { onMoveWindowEarlier(window.id) },
+                            onMoveLater = { onMoveWindowLater(window.id) },
+                            onHide = { onToggleWindow(window.id) },
+                            onResize = { deltaWidth, deltaHeight -> onResizeWindow(window.id, deltaWidth, deltaHeight, viewport) },
+                            modifier =
+                                Modifier
+                                    .position(row = bounds.y, column = bounds.x)
+                                    .span {
+                                        BoxGridItemSpan(
+                                            row = bounds.height,
+                                            column = bounds.width,
+                                        )
+                                    },
+                        )
+                    }
                 }
             }
         }
