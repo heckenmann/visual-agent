@@ -10,13 +10,13 @@ Desktop user.
 
 ## Preconditions
 
-- Session panel is visible.
+- Compose settings panel is visible.
 - Model list has been loaded or restored from catalog data.
 
 ## Main Flow
 
 1. The user searches the model list or enables favorites-only mode.
-2. The session model controller filters selectable models.
+2. The settings panel filters selectable models.
 3. The user toggles favorite status for the selected model.
 4. Favorite IDs are persisted.
 5. The favorite button updates to reflect current state.
@@ -31,11 +31,11 @@ Large model catalogs are easier to navigate.
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.compose.SettingsPanel`
 - `de.heckenmann.visualagent.config.AppConfig.favoriteModels`
 
 ## Acceptance Criteria
 
 - Favorite changes persist across restart.
-- Empty filters show a clear user message.
+- Favorites-only mode uses the persisted favorite model IDs.
 - Current selected model is preserved when still visible.

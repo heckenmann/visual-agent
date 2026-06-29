@@ -280,7 +280,14 @@ private fun WindowBody(
                 toolRegistry = panelServices.toolRegistry,
                 modalRequester = panelServices.modalRequester,
             )
-        "settings" -> SettingsPanel(panelServices.config)
+        "settings" ->
+            SettingsPanel(
+                config = panelServices.config,
+                llmProvider = panelServices.llmProvider,
+                providerCatalogService = panelServices.providerCatalogService,
+                modalRequester = panelServices.modalRequester,
+                onSettingsChanged = panelServices.onSettingsChanged,
+            )
         "canvas" -> CanvasPanel(panelServices.canvasOperations, panelServices.workspaceFileService, panelServices.modalRequester)
     }
 }

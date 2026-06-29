@@ -35,7 +35,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import de.heckenmann.visualagent.config.AppConfig
 
 @Composable
 internal fun ComposeRail(
@@ -100,7 +99,8 @@ internal fun ComposeWorkspaceWindow.railIcon(): ImageVector =
 
 @Composable
 internal fun ComposeWorkspaceHeader(
-    config: AppConfig,
+    providerName: String,
+    modelName: String,
     beanDefinitionCount: Int,
 ) {
     Row(
@@ -124,8 +124,8 @@ internal fun ComposeWorkspaceHeader(
                 style = MaterialTheme.typography.bodySmall,
             )
         }
-        HeaderChip("Provider", config.normalizedProvider())
-        HeaderChip("Model", config.activeModel())
+        HeaderChip("Provider", providerName)
+        HeaderChip("Model", modelName)
         HeaderChip("Beans", beanDefinitionCount.toString())
     }
 }

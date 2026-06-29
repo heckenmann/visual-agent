@@ -38,7 +38,9 @@ import androidx.compose.ui.window.rememberWindowState
 import de.heckenmann.visualagent.AppIdentity
 import de.heckenmann.visualagent.VisualAgentApplication
 import de.heckenmann.visualagent.agent.AgentManager
+import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
+import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.canvas.CanvasOperations
 import de.heckenmann.visualagent.config.AppConfig
@@ -95,6 +97,8 @@ private fun VisualAgentComposeApp(
     var windows by remember { mutableStateOf(restoreWorkspaceWindows(defaultWindows(), workspaceLayoutService.report().windows)) }
     var modal by remember { mutableStateOf<ComposeModal?>(null) }
     var commandPaletteVisible by remember { mutableStateOf(false) }
+    var uiFontSize by remember { mutableStateOf(config.fontSize) }
+    var settingsRevision by remember { mutableStateOf(0) }
     val workspaceFocusRequester = remember { FocusRequester() }
     val composeScope = rememberCoroutineScope()
     val panelServices =
@@ -102,11 +106,17 @@ private fun VisualAgentComposeApp(
             ComposePanelServices(
                 config = config,
                 agentManager = springContext.getBean(AgentManager::class.java),
+                llmProvider = springContext.getBean(LLMProvider::class.java),
+                providerCatalogService = springContext.getBean(ProviderCatalogService::class.java),
                 agentToolConfigService = springContext.getBean(AgentToolConfigService::class.java),
                 toolRegistry = springContext.getBean(ToolRegistry::class.java),
                 workspaceFileService = springContext.getBean(WorkspaceFileService::class.java),
                 canvasOperations = springContext.getBean(CanvasOperations::class.java),
                 modalRequester = ComposeModalRequester { requested -> modal = requested },
+                onSettingsChanged = {
+                    uiFontSize = config.fontSize
+                    settingsRevision += 1
+                },
             )
         }
     val toggleWindow: (String) -> Unit = { id ->
@@ -150,7 +160,7 @@ private fun VisualAgentComposeApp(
         onDispose { handle.close() }
     }
 
-    MaterialTheme(colorScheme = draculaColorScheme()) {
+    MaterialTheme(colorScheme = draculaColorScheme(), typography = visualAgentTypography(uiFontSize)) {
         Surface(modifier = Modifier.fillMaxSize()) {
             Box(modifier = Modifier.fillMaxSize()) {
                 Row(
@@ -201,8 +211,16 @@ private fun VisualAgentComposeApp(
                         LaunchedEffect(workspaceStates) {
                             workspaceLayoutService.applyWindowStates(workspaceStates, notifyListeners = false)
                         }
+                        val activeProvider =
+                            remember(settingsRevision) {
+                                panelServices.providerCatalogService.getProvider(panelServices.providerCatalogService.activeProviderId())
+                            }
                         Column(modifier = Modifier.fillMaxSize()) {
-                            ComposeWorkspaceHeader(config, springContext.beanDefinitionCount)
+                            ComposeWorkspaceHeader(
+                                providerName = activeProvider?.id ?: config.llmProvider,
+                                modelName = activeProvider?.defaultModel.orEmpty().ifBlank { config.activeModel() },
+                                beanDefinitionCount = springContext.beanDefinitionCount,
+                            )
                             ComposeSplitWorkspace(
                                 windows = windows,
                                 panelServices = panelServices,

@@ -1,7 +1,9 @@
 package de.heckenmann.visualagent.ui.compose
 
 import de.heckenmann.visualagent.agent.AgentManager
+import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
+import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.canvas.CanvasOperations
 import de.heckenmann.visualagent.config.AppConfig
@@ -456,9 +458,12 @@ const val WORKSPACE_PANEL_GAP: Int = 16
 data class ComposePanelServices(
     val config: AppConfig,
     val agentManager: AgentManager,
+    val llmProvider: LLMProvider,
+    val providerCatalogService: ProviderCatalogService,
     val agentToolConfigService: AgentToolConfigService,
     val toolRegistry: ToolRegistry,
     val workspaceFileService: WorkspaceFileService,
     val canvasOperations: CanvasOperations,
     val modalRequester: ComposeModalRequester,
+    val onSettingsChanged: () -> Unit,
 )

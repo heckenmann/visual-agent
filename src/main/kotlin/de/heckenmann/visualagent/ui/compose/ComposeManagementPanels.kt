@@ -41,7 +41,6 @@ import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
-import de.heckenmann.visualagent.config.AppConfig
 import kotlinx.coroutines.launch
 
 @Composable
@@ -492,43 +491,5 @@ private fun ManagementEmptyState(
             Text(title, color = Color(0xFFF8F8F2), fontWeight = FontWeight.SemiBold)
             Text(body, color = Color(0xFFBFBBD0))
         }
-    }
-}
-
-@Composable
-internal fun SettingsPanel(config: AppConfig) {
-    var provider by remember { mutableStateOf(config.normalizedProvider()) }
-    var model by remember { mutableStateOf(config.activeModel()) }
-    var theme by remember { mutableStateOf(config.theme) }
-    var fontSize by remember { mutableStateOf(config.fontSize.toString()) }
-    var status by remember { mutableStateOf("Settings are DB-backed after startup") }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        OutlinedTextField(
-            value = provider,
-            onValueChange = { provider = it },
-            label = { Text("Provider") },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        OutlinedTextField(value = model, onValueChange = { model = it }, label = { Text("Model") }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(value = theme, onValueChange = { theme = it }, label = { Text("Theme") }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(
-            value = fontSize,
-            onValueChange = { fontSize = it },
-            label = { Text("Font size") },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        ActionIconButton(
-            icon = Icons.Filled.Save,
-            description = "Save settings",
-            onClick = {
-                config.llmProvider = provider.trim().ifBlank { "ollama" }
-                config.setActiveModel(model.trim().ifBlank { config.activeModel() })
-                config.theme = theme.trim().ifBlank { "Dracula" }
-                config.fontSize = fontSize.toIntOrNull()?.coerceIn(10, 28) ?: config.fontSize
-                config.save()
-                status = "Saved provider=${config.normalizedProvider()} model=${config.activeModel()}"
-            },
-        )
-        PanelStatus(status)
     }
 }
