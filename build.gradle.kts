@@ -127,8 +127,8 @@ dependencies {
     implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
 
     // Ensure compatible Logback is available at runtime (Spring Boot logging expects it)
-    implementation("ch.qos.logback:logback-classic:1.5.36")
-    implementation("ch.qos.logback:logback-core:1.5.36")
+    implementation("ch.qos.logback:logback-classic:1.5.37")
+    implementation("ch.qos.logback:logback-core:1.5.37")
 
     // Test
     testImplementation(kotlin("test"))
