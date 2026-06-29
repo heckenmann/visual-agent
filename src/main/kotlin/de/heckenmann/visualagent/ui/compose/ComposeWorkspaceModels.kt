@@ -191,6 +191,25 @@ fun moveWorkspacePanel(
 }
 
 /**
+ * Toggles the visible state of a workspace panel.
+ *
+ * @param windows Current panels
+ * @param id Panel ID to toggle
+ * @return Updated panels, or the original list when the ID is unknown
+ */
+fun toggleWorkspacePanel(
+    windows: List<ComposeWorkspaceWindow>,
+    id: String,
+): List<ComposeWorkspaceWindow> =
+    windows.map { window ->
+        if (window.id == id) {
+            window.copy(visible = !window.visible)
+        } else {
+            window
+        }
+    }
+
+/**
  * Resizes a workspace panel preference while keeping the requested size within the viewport.
  *
  * The semantic split layout uses these stored sizes as proportions for visible panels,

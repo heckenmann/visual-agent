@@ -4,6 +4,7 @@ import de.heckenmann.visualagent.workspace.layout.WorkspaceWindowState
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class ComposeWorkspaceModelsTest {
     @Test
@@ -139,6 +140,19 @@ class ComposeWorkspaceModelsTest {
         assertEquals(listOf("chat", "files", "todos"), movedEarlier.map { it.id })
         assertEquals(windows.map { it.id }, movedLater.map { it.id })
         assertEquals(windows, unchanged)
+    }
+
+    @Test
+    fun `toggle workspace panel switches visibility without changing order`() {
+        val windows = listOf(testWindow("chat", visible = true), testWindow("todos", visible = false))
+
+        val chatHidden = toggleWorkspacePanel(windows, "chat")
+        val todosVisible = toggleWorkspacePanel(chatHidden, "todos")
+
+        assertEquals(listOf("chat", "todos"), todosVisible.map { it.id })
+        assertFalse(chatHidden.first { it.id == "chat" }.visible)
+        assertTrue(todosVisible.first { it.id == "todos" }.visible)
+        assertEquals(windows, toggleWorkspacePanel(windows, "missing"))
     }
 
     @Test

@@ -110,7 +110,7 @@ private fun VisualAgentComposeApp(
             )
         }
     val toggleWindow: (String) -> Unit = { id ->
-        windows = windows.map { window -> if (window.id == id) window.copy(visible = !window.visible) else window }
+        windows = toggleWorkspacePanel(windows, id)
     }
     val activateWindow: (String) -> Unit = { id ->
         windows = windows.map { window -> if (window.id == id) window.copy(visible = true) else window }
@@ -168,7 +168,7 @@ private fun VisualAgentComposeApp(
                                         true
                                     }
                                     event.workspaceShortcutDigit() != null -> {
-                                        panelIdForShortcutDigit(event.workspaceShortcutDigit()!!)?.let(activateWindow)
+                                        panelIdForShortcutDigit(event.workspaceShortcutDigit()!!)?.let(toggleWindow)
                                         true
                                     }
                                     else -> false

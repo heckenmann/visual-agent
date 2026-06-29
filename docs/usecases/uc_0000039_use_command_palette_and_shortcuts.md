@@ -17,7 +17,7 @@ Desktop user.
 
 1. The user presses a panel shortcut or command palette shortcut.
 2. The main window resolves the target command.
-3. For `Cmd/Ctrl+1..6`, the requested internal panel is made visible.
+3. For `Cmd/Ctrl+1..6`, the requested internal panel toggles between visible and hidden.
 4. For `Cmd/Ctrl+K`, the internal command palette opens above the workspace.
 5. The user filters commands by typing.
 6. The user clicks a command or presses `Enter` to run the first matching command.
@@ -39,7 +39,7 @@ The user can navigate without relying only on mouse interactions.
 
 ## Acceptance Criteria
 
-- `Cmd/Ctrl+1..6` opens the Conversation, Todos, Files, Subagents, Settings, and Canvas panels in that order.
+- `Cmd/Ctrl+1..6` toggles the Conversation, Todos, Files, Subagents, Settings, and Canvas panels in that order.
 - The panel shortcut mapping is stable and covered by unit tests.
 - `Cmd/Ctrl+K` opens an internal command palette, not a native dialog.
 - The command palette can filter commands and run a selected command.
