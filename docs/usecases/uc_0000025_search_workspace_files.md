@@ -16,9 +16,10 @@ Desktop user and enabled sub-agent.
 ## Main Flow
 
 1. The user or model provides a search query.
-2. Workspace file metadata is searched case-insensitively.
-3. Text files and cached/extractable PDF text are searched within configured limits.
-4. Matching records are returned with compact snippets.
+2. The files panel applies a local visible-list filter for quick metadata narrowing, or the model invokes the workspace file search tool for persisted search results.
+3. Workspace file metadata is searched case-insensitively.
+4. Text files and cached/extractable PDF text are searched within configured limits when using the service/tool search path.
+5. Matching records are returned with compact snippets.
 
 ## Result
 
@@ -39,3 +40,4 @@ Users and agents can find relevant workspace files without loading all file cont
 - Search does not read unbounded file content.
 - Results identify match type and file metadata.
 - Empty queries are rejected.
+- The files panel filter is non-mutating and can be cleared without changing workspace metadata.

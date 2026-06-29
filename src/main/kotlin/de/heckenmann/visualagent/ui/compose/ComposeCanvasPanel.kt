@@ -5,6 +5,7 @@ package de.heckenmann.visualagent.ui.compose
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
@@ -15,6 +16,8 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,6 +37,8 @@ internal fun CanvasPanel(
 ) {
     var snapshot by remember { mutableStateOf(canvasOperations.snapshot()) }
     var status by remember { mutableStateOf("Figures: ${snapshot.figureCount}") }
+    var documentName by remember { mutableStateOf("canvas.canvas") }
+    var captureName by remember { mutableStateOf("canvas-capture.png") }
     val update: (CanvasSnapshot) -> Unit = { next ->
         snapshot = next
         status =
@@ -45,7 +50,17 @@ internal fun CanvasPanel(
     }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            CanvasToolbar(canvasOperations, workspaceFileService, modalRequester, snapshot, update) { status = it }
+            CanvasDrawingToolbar(canvasOperations, modalRequester, snapshot, update)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            CanvasPersistenceToolbar(
+                canvasOperations = canvasOperations,
+                workspaceFileService = workspaceFileService,
+                documentName = documentName,
+                onDocumentNameChange = { documentName = it },
+                captureName = captureName,
+                onCaptureNameChange = { captureName = it },
+            ) { status = it }
         }
         CanvasSurface(
             snapshot = snapshot,
@@ -58,13 +73,11 @@ internal fun CanvasPanel(
 }
 
 @Composable
-private fun CanvasToolbar(
+private fun CanvasDrawingToolbar(
     canvasOperations: CanvasOperations,
-    workspaceFileService: WorkspaceFileService,
     modalRequester: ComposeModalRequester,
     snapshot: CanvasSnapshot,
     update: (CanvasSnapshot) -> Unit,
-    setStatus: (String) -> Unit,
 ) {
     ActionIconButton(
         icon = Icons.Filled.AddBox,
@@ -114,27 +127,55 @@ private fun CanvasToolbar(
             }
         },
     )
+}
+
+@Composable
+private fun RowScope.CanvasPersistenceToolbar(
+    canvasOperations: CanvasOperations,
+    workspaceFileService: WorkspaceFileService,
+    documentName: String,
+    onDocumentNameChange: (String) -> Unit,
+    captureName: String,
+    onCaptureNameChange: (String) -> Unit,
+    setStatus: (String) -> Unit,
+) {
+    OutlinedTextField(
+        value = documentName,
+        onValueChange = onDocumentNameChange,
+        label = { Text("Document") },
+        singleLine = true,
+        modifier = Modifier.weight(1f),
+    )
+    ActionIconButton(
+        icon = Icons.Filled.Save,
+        description = "Save canvas document",
+        enabled = documentName.isNotBlank(),
+        onClick = {
+            runCatching { canvasOperations.saveDocument(documentName.trim()) }
+                .onSuccess { setStatus("Saved ${it.relativePath}") }
+                .onFailure { setStatus("Save failed: ${it.message}") }
+        },
+    )
+    OutlinedTextField(
+        value = captureName,
+        onValueChange = onCaptureNameChange,
+        label = { Text("PNG") },
+        singleLine = true,
+        modifier = Modifier.weight(1f),
+    )
     ActionIconButton(
         icon = Icons.Filled.CameraAlt,
         description = "Capture canvas",
+        enabled = captureName.isNotBlank(),
         onClick = {
             runCatching {
                 val image = canvasOperations.captureImage("png")
-                workspaceFileService.createManagedFile("canvas", "canvas-capture.png", image.bytes, image.mimeType)
+                workspaceFileService.createManagedFile("canvas", captureName.trim(), image.bytes, image.mimeType)
             }.onSuccess {
                 setStatus("Saved ${it.relativePath}")
             }.onFailure {
                 setStatus("Capture failed: ${it.message}")
             }
-        },
-    )
-    ActionIconButton(
-        icon = Icons.Filled.Save,
-        description = "Save canvas document",
-        onClick = {
-            runCatching { canvasOperations.saveDocument("canvas.canvas") }
-                .onSuccess { setStatus("Saved ${it.relativePath}") }
-                .onFailure { setStatus("Save failed: ${it.message}") }
         },
     )
 }

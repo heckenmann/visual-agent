@@ -15,10 +15,11 @@ Desktop user.
 
 ## Main Flow
 
-1. The user clicks the canvas capture action.
-2. The current toolkit-neutral canvas state is rendered to PNG bytes.
-3. The PNG is saved as a managed workspace file.
-4. The files panel can list the generated PNG after refresh.
+1. The user enters or accepts a PNG filename in the canvas panel.
+2. The user clicks the canvas capture action.
+3. The current toolkit-neutral canvas state is rendered to PNG bytes.
+4. The PNG is saved as a managed workspace file.
+5. The files panel can list the generated PNG after refresh.
 
 ## Result
 
@@ -41,3 +42,4 @@ The current canvas can be inspected and reused as a PNG image in the managed wor
 - The capture action writes a managed PNG workspace file.
 - The written file is valid PNG bytes.
 - The capture is rendered from toolkit-neutral canvas data instead of UI chrome or selection handles.
+- The UI capture action is disabled until a non-blank PNG filename is available.
