@@ -15,8 +15,8 @@ Desktop user.
 
 ## Main Flow
 
-1. The user opens, hides, reorders, or resizes workspace panels.
-2. Visibility state, user-defined order, preferred panel sizes, and the current calculated workspace slots are captured.
+1. The user opens, hides, or reorders workspace panels.
+2. Visibility state, user-defined order, preferred panel sizes from existing layout state, and the current calculated workspace slots are captured.
 3. Layout state is persisted through the workspace layout service.
 4. When the application exits, the latest workspace state has been saved.
 5. On startup, stored workspace layout is loaded.
@@ -25,7 +25,7 @@ Desktop user.
 
 ## Result
 
-The user's preferred panel set, panel order, and panel sizing survive restart.
+The user's preferred panel set, panel order, and persisted panel sizing survive restart.
 
 ## Tool Calls
 

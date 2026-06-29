@@ -4,7 +4,6 @@ package de.heckenmann.visualagent.ui.compose
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -19,7 +18,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DividerDefaults
@@ -33,7 +31,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -49,7 +46,6 @@ internal fun ComposeSplitWorkspace(
     onToggleWindow: (String) -> Unit,
     onMoveWindowEarlier: (String) -> Unit,
     onMoveWindowLater: (String) -> Unit,
-    onResizeWindow: (String, Int, Int, ComposeWorkspaceViewport) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val visibleWindows = windows.filter { it.visible }
@@ -82,7 +78,6 @@ internal fun ComposeSplitWorkspace(
                             onMoveEarlier = { onMoveWindowEarlier(window.id) },
                             onMoveLater = { onMoveWindowLater(window.id) },
                             onHide = { onToggleWindow(window.id) },
-                            onResize = { deltaWidth, deltaHeight -> onResizeWindow(window.id, deltaWidth, deltaHeight, viewport) },
                             modifier =
                                 Modifier
                                     .position(row = bounds.y, column = bounds.x)
@@ -134,7 +129,6 @@ private fun SplitPanel(
     onMoveEarlier: () -> Unit,
     onMoveLater: () -> Unit,
     onHide: () -> Unit,
-    onResize: (Int, Int) -> Unit,
     modifier: Modifier,
 ) {
     val shape = RoundedCornerShape(8.dp)
@@ -170,41 +164,6 @@ private fun SplitPanel(
                         .padding(10.dp),
             ) {
                 WindowBody(window, panelServices)
-                ResizeHandle(window.title, onResize, Modifier.align(Alignment.BottomEnd))
-            }
-        }
-    }
-}
-
-@Composable
-private fun ResizeHandle(
-    title: String,
-    onResize: (Int, Int) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Box(modifier = modifier) {
-        ActionTooltip(description = "Resize $title panel") {
-            Box(
-                modifier =
-                    Modifier
-                        .size(22.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Color(0x26282A36))
-                        .border(1.dp, Color(0x338BE9FD), RoundedCornerShape(6.dp))
-                        .pointerInput(title) {
-                            detectDragGestures { change, dragAmount ->
-                                change.consume()
-                                onResize(dragAmount.x.roundToInt(), dragAmount.y.roundToInt())
-                            }
-                        },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.OpenInFull,
-                    contentDescription = null,
-                    tint = Color(0xFF8BE9FD),
-                    modifier = Modifier.size(12.dp),
-                )
             }
         }
     }

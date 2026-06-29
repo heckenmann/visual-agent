@@ -15,7 +15,7 @@ Desktop user.
 ## Main Flow
 
 1. The user opens the canvas panel.
-2. The user pans or zooms the InfiniteCanvas-backed surface, resizes the workspace panel, drags a figure node, or drags a selected figure resize handle.
+2. The user pans or zooms the InfiniteCanvas-backed surface, drags a figure node, or drags a selected figure resize handle.
 3. The Compose canvas surface keeps existing figure coordinates stable while InfiniteCanvas handles viewport pan/zoom and node dragging.
 4. Figure move and resize operations are written back through the canvas service.
 5. Saved canvas documents preserve figure dimensions, zoom metadata, and grid metadata from the toolkit-neutral canvas model.
@@ -38,7 +38,7 @@ Workspace panel resizing does not move drawings into inaccessible space or blur 
 
 ## Acceptance Criteria
 
-- Resizing the workspace panel does not cause canvas jitter.
+- Workspace layout changes do not cause canvas jitter.
 - The editable canvas surface supports pan and zoom through the InfiniteCanvas viewport controls.
 - Figures can be moved by dragging their canvas nodes.
 - Selected figures can be resized from the Compose canvas surface.

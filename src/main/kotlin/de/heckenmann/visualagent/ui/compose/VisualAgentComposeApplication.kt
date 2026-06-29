@@ -121,9 +121,6 @@ private fun VisualAgentComposeApp(
     val moveWindowLater: (String) -> Unit = { id ->
         windows = moveWorkspacePanel(windows, id, ComposePanelMoveDirection.Later)
     }
-    val resizeWindow: (String, Int, Int, ComposeWorkspaceViewport) -> Unit = { id, deltaWidth, deltaHeight, viewport ->
-        windows = resizeWorkspacePanel(windows, id, deltaWidth, deltaHeight, viewport)
-    }
     val commands =
         windows.map { window ->
             ComposeCommand(
@@ -212,7 +209,6 @@ private fun VisualAgentComposeApp(
                                 onToggleWindow = toggleWindow,
                                 onMoveWindowEarlier = moveWindowEarlier,
                                 onMoveWindowLater = moveWindowLater,
-                                onResizeWindow = resizeWindow,
                                 modifier =
                                     Modifier
                                         .weight(1f)

@@ -42,5 +42,4 @@ Users interact with compact action buttons that show only an icon. Hovering over
 - Canvas toolbar buttons are icon-only and describe their action through tooltips.
 - The left navigation rail uses icon-only buttons with hover tooltips.
 - Workspace panel headers include panel icons and icon-only actions for moving or hiding the panel.
-- Workspace panel resize handles are icon-only and expose a resize tooltip.
 - Dialog-provided standard buttons are allowed to keep text labels.
