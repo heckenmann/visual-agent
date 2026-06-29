@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -18,6 +19,8 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -58,8 +61,8 @@ internal fun SubAgentsPanel(
     val refresh = {
         agents = agentManager.getSubAgents()
     }
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxSize()) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
@@ -92,90 +95,137 @@ internal fun SubAgentsPanel(
             modifier = Modifier.fillMaxWidth(),
         )
         Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            agents.forEach { agent ->
-                val activeJobCount = agentManager.getActiveJobCount(agent.id)
-                Column(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
-                    Text(agent.name, color = Color(0xFFF8F8F2), fontWeight = FontWeight.SemiBold)
-                    Text("${agent.status} · active jobs $activeJobCount", color = Color(0xFFBD93F9))
-                    Text(agent.role, color = Color(0xFFE6E6E6), maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ActionIconButton(
-                            icon = Icons.Filled.PlayArrow,
-                            description = "Run sub-agent",
-                            enabled = task.isNotBlank() && agent.id !in runningAgentIds,
-                            onClick = {
-                                val requestedTask = task.trim()
-                                if (requestedTask.isBlank()) return@ActionIconButton
-                                runningAgentIds += agent.id
-                                status = "Running ${agent.name}..."
-                                scope.launch {
-                                    runCatching { agentManager.runAgentJob(agent.id, requestedTask) }
-                                        .onSuccess { result ->
-                                            status = "${result.agentName}: ${result.content.take(120)}"
-                                            refresh()
-                                        }.onFailure { error ->
-                                            status = "Run failed for ${agent.name}: ${error.message}"
-                                            refresh()
-                                        }.also {
-                                            runningAgentIds -= agent.id
-                                        }
-                                }
-                            },
-                        )
-                        ActionIconButton(
-                            icon = Icons.Filled.History,
-                            description = "View sub-agent logs",
-                            onClick = {
-                                modalRequester.requestInfo(
-                                    ComposeInfoModal(
-                                        title = "${agent.name} logs",
-                                        message = subAgentLogSummary(agent, activeJobCount),
-                                    ),
-                                )
-                            },
-                        )
-                        ActionIconButton(
-                            icon = Icons.Filled.Edit,
-                            description = "Configure sub-agent details",
-                            onClick = {
-                                modalRequester.request(
-                                    ComposeContentModal(title = "Configure ${agent.name}") { dismiss ->
-                                        SubAgentDetailsEditor(
-                                            agent = agent,
-                                            agentManager = agentManager,
-                                            agentToolConfigService = agentToolConfigService,
-                                            toolRegistry = toolRegistry,
-                                            onSaved = {
-                                                refresh()
-                                                status = "Saved ${it.name}"
-                                                dismiss()
-                                            },
-                                        )
-                                    },
-                                )
-                            },
-                        )
-                        ActionIconButton(
-                            icon = Icons.Filled.Delete,
-                            description = "Delete sub-agent",
-                            onClick = {
-                                modalRequester.requestConfirmation(
-                                    ComposeConfirmationModal(
-                                        title = "Delete sub-agent?",
-                                        message = "Delete '${agent.name}' and its persisted configuration.",
-                                        confirmDescription = "Delete sub-agent",
-                                    ) {
-                                        agentManager.deleteAgent(agent.id)
-                                        refresh()
-                                    },
-                                )
-                            },
-                        )
-                    }
+            if (agents.isEmpty()) {
+                ManagementEmptyState(
+                    title = "No sub-agents",
+                    body = "Create a named role to delegate focused work from the main session.",
+                )
+            } else {
+                agents.forEach { agent ->
+                    val activeJobCount = agentManager.getActiveJobCount(agent.id)
+                    SubAgentRow(
+                        agent = agent,
+                        activeJobCount = activeJobCount,
+                        task = task,
+                        running = agent.id in runningAgentIds,
+                        agentManager = agentManager,
+                        agentToolConfigService = agentToolConfigService,
+                        toolRegistry = toolRegistry,
+                        modalRequester = modalRequester,
+                        onRunningChanged = { running ->
+                            runningAgentIds =
+                                if (running) runningAgentIds + agent.id else runningAgentIds - agent.id
+                        },
+                        onStatusChanged = { status = it },
+                        refresh = refresh,
+                        scope = scope,
+                    )
                 }
             }
         }
         PanelStatus(status)
+    }
+}
+
+@Composable
+private fun SubAgentRow(
+    agent: SubAgent,
+    activeJobCount: Int,
+    task: String,
+    running: Boolean,
+    agentManager: AgentManager,
+    agentToolConfigService: AgentToolConfigService,
+    toolRegistry: ToolRegistry,
+    modalRequester: ComposeModalRequester,
+    onRunningChanged: (Boolean) -> Unit,
+    onStatusChanged: (String) -> Unit,
+    refresh: () -> Unit,
+    scope: kotlinx.coroutines.CoroutineScope,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 7.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0x55282A36)),
+        shape = RoundedCornerShape(8.dp),
+    ) {
+        Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(agent.name, color = Color(0xFFF8F8F2), fontWeight = FontWeight.SemiBold)
+            Text("${agent.status} · active jobs $activeJobCount", color = Color(0xFFBD93F9))
+            Text(agent.role, color = Color(0xFFE6E6E6), maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                ActionIconButton(
+                    icon = Icons.Filled.PlayArrow,
+                    description = "Run sub-agent",
+                    enabled = task.isNotBlank() && !running,
+                    onClick = {
+                        val requestedTask = task.trim()
+                        if (requestedTask.isBlank()) return@ActionIconButton
+                        onRunningChanged(true)
+                        onStatusChanged("Running ${agent.name}...")
+                        scope.launch {
+                            runCatching { agentManager.runAgentJob(agent.id, requestedTask) }
+                                .onSuccess { result ->
+                                    onStatusChanged("${result.agentName}: ${result.content.take(120)}")
+                                    refresh()
+                                }.onFailure { error ->
+                                    onStatusChanged("Run failed for ${agent.name}: ${error.message}")
+                                    refresh()
+                                }.also {
+                                    onRunningChanged(false)
+                                }
+                        }
+                    },
+                )
+                ActionIconButton(
+                    icon = Icons.Filled.History,
+                    description = "View sub-agent logs",
+                    onClick = {
+                        modalRequester.requestInfo(
+                            ComposeInfoModal(
+                                title = "${agent.name} logs",
+                                message = subAgentLogSummary(agent, activeJobCount),
+                            ),
+                        )
+                    },
+                )
+                ActionIconButton(
+                    icon = Icons.Filled.Edit,
+                    description = "Configure sub-agent details",
+                    onClick = {
+                        modalRequester.request(
+                            ComposeContentModal(title = "Configure ${agent.name}") { dismiss ->
+                                SubAgentDetailsEditor(
+                                    agent = agent,
+                                    agentManager = agentManager,
+                                    agentToolConfigService = agentToolConfigService,
+                                    toolRegistry = toolRegistry,
+                                    onSaved = {
+                                        refresh()
+                                        onStatusChanged("Saved ${it.name}")
+                                        dismiss()
+                                    },
+                                )
+                            },
+                        )
+                    },
+                )
+                ActionIconButton(
+                    icon = Icons.Filled.Delete,
+                    description = "Delete sub-agent",
+                    onClick = {
+                        modalRequester.requestConfirmation(
+                            ComposeConfirmationModal(
+                                title = "Delete sub-agent?",
+                                message = "Delete '${agent.name}' and its persisted configuration.",
+                                confirmDescription = "Delete sub-agent",
+                            ) {
+                                agentManager.deleteAgent(agent.id)
+                                refresh()
+                            },
+                        )
+                    },
+                )
+            }
+        }
     }
 }
 
@@ -239,9 +289,9 @@ private fun SubAgentDetailsEditor(
             Modifier
                 .heightIn(max = 520.dp)
                 .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
@@ -261,7 +311,7 @@ private fun SubAgentDetailsEditor(
             label = { Text("Role") },
             modifier = Modifier.fillMaxWidth(),
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 value = provider,
                 onValueChange = { provider = it },
@@ -281,7 +331,7 @@ private fun SubAgentDetailsEditor(
             label = { Text("Variant") },
             modifier = Modifier.fillMaxWidth(),
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 value = temperature,
                 onValueChange = { temperature = it },
@@ -301,7 +351,7 @@ private fun SubAgentDetailsEditor(
                 modifier = Modifier.weight(1f),
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 value = timeout,
                 onValueChange = { timeout = it },
@@ -429,13 +479,30 @@ private fun String.optionalDoubleIsValid(): Boolean = isBlank() || toDoubleOrNul
 private fun String.optionalIntIsValid(): Boolean = isBlank() || toIntOrNull() != null
 
 @Composable
+private fun ManagementEmptyState(
+    title: String,
+    body: String,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0x33282A36)),
+        shape = RoundedCornerShape(8.dp),
+    ) {
+        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(title, color = Color(0xFFF8F8F2), fontWeight = FontWeight.SemiBold)
+            Text(body, color = Color(0xFFBFBBD0))
+        }
+    }
+}
+
+@Composable
 internal fun SettingsPanel(config: AppConfig) {
     var provider by remember { mutableStateOf(config.normalizedProvider()) }
     var model by remember { mutableStateOf(config.activeModel()) }
     var theme by remember { mutableStateOf(config.theme) }
     var fontSize by remember { mutableStateOf(config.fontSize.toString()) }
     var status by remember { mutableStateOf("Settings are DB-backed after startup") }
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         OutlinedTextField(
             value = provider,
             onValueChange = { provider = it },

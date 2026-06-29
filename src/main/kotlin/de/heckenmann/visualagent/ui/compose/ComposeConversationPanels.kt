@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -20,6 +21,8 @@ import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -98,32 +101,49 @@ internal fun ConversationPanel(
     LaunchedEffect(Unit) {
         inputFocusRequester.requestFocus()
     }
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxSize()) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             val visibleHistory = history.takeLast(40)
             val visibleOffset = history.size - visibleHistory.size
-            visibleHistory.forEachIndexed { visibleIndex, message ->
-                MessageRow(
-                    message = message,
-                    canRetry = message.role == "assistant" && !sending,
-                    onCopied = { status = "Copied ${message.role} message" },
-                    onRetry = {
-                        val absoluteIndex = visibleOffset + visibleIndex
-                        val previousUserMessage = history.take(absoluteIndex).lastOrNull { it.role == "user" }
-                        if (previousUserMessage == null) {
-                            status = "No previous user message to retry"
-                        } else {
-                            status = "Retrying previous user message..."
-                            sendContent(previousUserMessage.content)
-                        }
-                    },
+            if (visibleHistory.isEmpty()) {
+                EmptyPanelState(
+                    title = "No conversation yet",
+                    body = "Send a message to start the main agent session.",
                 )
+            } else {
+                visibleHistory.forEachIndexed { visibleIndex, message ->
+                    MessageRow(
+                        message = message,
+                        canRetry = message.role == "assistant" && !sending,
+                        onCopied = { status = "Copied ${message.role} message" },
+                        onRetry = {
+                            val absoluteIndex = visibleOffset + visibleIndex
+                            val previousUserMessage = history.take(absoluteIndex).lastOrNull { it.role == "user" }
+                            if (previousUserMessage == null) {
+                                status = "No previous user message to retry"
+                            } else {
+                                status = "Retrying previous user message..."
+                                sendContent(previousUserMessage.content)
+                            }
+                        },
+                    )
+                }
             }
         }
         OutlinedTextField(
             value = input,
             onValueChange = { input = it },
             label = { Text("Message") },
+            minLines = 2,
+            trailingIcon = {
+                ActionIconButton(
+                    icon = Icons.AutoMirrored.Filled.Send,
+                    description = "Send message",
+                    onClick = sendCurrentInput,
+                    enabled = !sending && input.isNotBlank(),
+                    modifier = Modifier.size(32.dp),
+                )
+            },
             modifier =
                 Modifier
                     .fillMaxWidth()
@@ -137,13 +157,7 @@ internal fun ConversationPanel(
                         }
                     },
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ActionIconButton(
-                icon = Icons.AutoMirrored.Filled.Send,
-                description = "Send message",
-                onClick = sendCurrentInput,
-                enabled = !sending,
-            )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             ActionIconButton(
                 icon = Icons.Filled.History,
                 description = "Load older history",
@@ -179,38 +193,42 @@ private fun MessageRow(
     onRetry: () -> Unit,
 ) {
     val clipboard = LocalClipboardManager.current
-    Column(
+    Card(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(bottom = 10.dp),
+                .padding(bottom = 7.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0x55282A36)),
+        shape = RoundedCornerShape(8.dp),
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = message.role.uppercase(),
-                color = Color(0xFFFFB86C),
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f),
-            )
-            ActionIconButton(
-                icon = Icons.Filled.ContentCopy,
-                description = "Copy ${message.role} message",
-                modifier = Modifier.size(32.dp),
-                onClick = {
-                    clipboard.setText(AnnotatedString(message.content))
-                    onCopied()
-                },
-            )
-            if (canRetry) {
-                ActionIconButton(
-                    icon = Icons.Filled.Refresh,
-                    description = "Retry from previous user message",
-                    modifier = Modifier.size(32.dp),
-                    onClick = onRetry,
+        Column(modifier = Modifier.padding(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = message.role.uppercase(),
+                    color = if (message.role == "user") Color(0xFFFFB86C) else Color(0xFF8BE9FD),
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
                 )
+                ActionIconButton(
+                    icon = Icons.Filled.ContentCopy,
+                    description = "Copy ${message.role} message",
+                    modifier = Modifier.size(28.dp),
+                    onClick = {
+                        clipboard.setText(AnnotatedString(message.content))
+                        onCopied()
+                    },
+                )
+                if (canRetry) {
+                    ActionIconButton(
+                        icon = Icons.Filled.Refresh,
+                        description = "Retry from previous user message",
+                        modifier = Modifier.size(28.dp),
+                        onClick = onRetry,
+                    )
+                }
             }
+            ComposeMarkdown(message.content)
         }
-        ComposeMarkdown(message.content)
     }
 }
 
@@ -224,30 +242,38 @@ internal fun TodoPanel(
     val refresh = {
         todos = agentManager.getTodosFromDb()
     }
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxSize()) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 value = description,
                 onValueChange = { description = it },
                 label = { Text("New todo") },
-                modifier = Modifier.weight(1f),
-            )
-            ActionIconButton(
-                icon = Icons.Filled.Add,
-                description = "Add todo",
-                onClick = {
-                    val text = description.trim()
-                    if (text.isNotBlank()) {
-                        agentManager.todoManager.add(text, TodoPriority.MEDIUM)
-                        description = ""
-                        refresh()
-                    }
+                trailingIcon = {
+                    ActionIconButton(
+                        icon = Icons.Filled.Add,
+                        description = "Add todo",
+                        onClick = {
+                            val text = description.trim()
+                            if (text.isNotBlank()) {
+                                agentManager.todoManager.add(text, TodoPriority.MEDIUM)
+                                description = ""
+                                refresh()
+                            }
+                        },
+                        enabled = description.isNotBlank(),
+                        modifier = Modifier.size(32.dp),
+                    )
                 },
+                modifier = Modifier.weight(1f),
             )
         }
         Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            todos.forEach { todo ->
-                TodoRow(todo, agentManager, modalRequester, refresh)
+            if (todos.isEmpty()) {
+                EmptyPanelState(title = "No todos", body = "Add a task or let the agent create todos during planning.")
+            } else {
+                todos.forEach { todo ->
+                    TodoRow(todo, agentManager, modalRequester, refresh)
+                }
             }
         }
     }
@@ -260,42 +286,65 @@ private fun TodoRow(
     modalRequester: ComposeModalRequester,
     refresh: () -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
-        Text(todo.description, color = Color(0xFFF8F8F2), fontWeight = FontWeight.SemiBold)
-        Text("${todo.priority} · ${todo.status}", color = Color(0xFFBD93F9))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ActionIconButton(
-                icon = Icons.Filled.PlayArrow,
-                description = "Start todo",
-                onClick = {
-                    agentManager.todoManager.updateStatus(todo.id, TodoStatus.IN_PROGRESS)
-                    refresh()
-                },
-            )
-            ActionIconButton(
-                icon = Icons.Filled.Done,
-                description = "Complete todo",
-                onClick = {
-                    agentManager.todoManager.updateStatus(todo.id, TodoStatus.COMPLETED)
-                    refresh()
-                },
-            )
-            ActionIconButton(
-                icon = Icons.Filled.Delete,
-                description = "Delete todo",
-                onClick = {
-                    modalRequester.requestConfirmation(
-                        ComposeConfirmationModal(
-                            title = "Delete todo?",
-                            message = "Delete '${todo.description}' from the persisted todo list.",
-                            confirmDescription = "Delete todo",
-                        ) {
-                            agentManager.todoManager.remove(todo.id)
-                            refresh()
-                        },
-                    )
-                },
-            )
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 7.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0x55282A36)),
+        shape = RoundedCornerShape(8.dp),
+    ) {
+        Column(modifier = Modifier.padding(8.dp)) {
+            Text(todo.description, color = Color(0xFFF8F8F2), fontWeight = FontWeight.SemiBold)
+            Text("${todo.priority} · ${todo.status}", color = Color(0xFFBD93F9))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                ActionIconButton(
+                    icon = Icons.Filled.PlayArrow,
+                    description = "Start todo",
+                    onClick = {
+                        agentManager.todoManager.updateStatus(todo.id, TodoStatus.IN_PROGRESS)
+                        refresh()
+                    },
+                )
+                ActionIconButton(
+                    icon = Icons.Filled.Done,
+                    description = "Complete todo",
+                    onClick = {
+                        agentManager.todoManager.updateStatus(todo.id, TodoStatus.COMPLETED)
+                        refresh()
+                    },
+                )
+                ActionIconButton(
+                    icon = Icons.Filled.Delete,
+                    description = "Delete todo",
+                    onClick = {
+                        modalRequester.requestConfirmation(
+                            ComposeConfirmationModal(
+                                title = "Delete todo?",
+                                message = "Delete '${todo.description}' from the persisted todo list.",
+                                confirmDescription = "Delete todo",
+                            ) {
+                                agentManager.todoManager.remove(todo.id)
+                                refresh()
+                            },
+                        )
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyPanelState(
+    title: String,
+    body: String,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0x33282A36)),
+        shape = RoundedCornerShape(8.dp),
+    ) {
+        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(title, color = Color(0xFFF8F8F2), fontWeight = FontWeight.SemiBold)
+            Text(body, color = Color(0xFFBFBBD0))
         }
     }
 }

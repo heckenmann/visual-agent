@@ -102,13 +102,14 @@ internal fun ComposeSplitWorkspace(
 
 @Composable
 private fun WorkspaceBackdrop() {
+    val shape = RoundedCornerShape(8.dp)
     Box(
         modifier =
             Modifier
                 .fillMaxSize()
-                .clip(RoundedCornerShape(28.dp))
+                .clip(shape)
                 .background(Color(0x55191A21))
-                .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(28.dp)),
+                .border(1.dp, Color(0x1AFFFFFF), shape),
     )
 }
 
@@ -116,7 +117,7 @@ private fun WorkspaceBackdrop() {
 private fun EmptyWorkspace() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(
-            text = "No panels are open. Use the rail or press Cmd/Ctrl+1-6 to open a panel.",
+            text = "No panels are open. Use the rail to choose a workspace panel.",
             color = Color(0xFF8BE9FD),
             style = MaterialTheme.typography.bodyMedium,
         )
@@ -136,7 +137,7 @@ private fun SplitPanel(
     onResize: (Int, Int) -> Unit,
     modifier: Modifier,
 ) {
-    val shape = RoundedCornerShape(if (primary) 28.dp else 22.dp)
+    val shape = RoundedCornerShape(8.dp)
     Card(
         modifier =
             modifier
@@ -147,8 +148,8 @@ private fun SplitPanel(
                     shape = shape,
                 ),
         shape = shape,
-        colors = CardDefaults.cardColors(containerColor = if (primary) Color(0xF0282A36) else Color(0xE6242631)),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (primary) 10.dp else 4.dp),
+        colors = CardDefaults.cardColors(containerColor = if (primary) Color(0xEE252734) else Color(0xE321232D)),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (primary) 2.dp else 1.dp),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             SplitPanelHeader(
@@ -166,7 +167,7 @@ private fun SplitPanel(
                     Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .padding(16.dp),
+                        .padding(10.dp),
             ) {
                 WindowBody(window, panelServices)
                 ResizeHandle(window.title, onResize, Modifier.align(Alignment.BottomEnd))
@@ -181,28 +182,30 @@ private fun ResizeHandle(
     onResize: (Int, Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    ActionTooltip(description = "Resize $title panel") {
-        Box(
-            modifier =
-                modifier
-                    .size(28.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0x33282A36))
-                    .border(1.dp, Color(0x448BE9FD), RoundedCornerShape(10.dp))
-                    .pointerInput(title) {
-                        detectDragGestures { change, dragAmount ->
-                            change.consume()
-                            onResize(dragAmount.x.roundToInt(), dragAmount.y.roundToInt())
-                        }
-                    },
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Filled.OpenInFull,
-                contentDescription = null,
-                tint = Color(0xFF8BE9FD),
-                modifier = Modifier.size(14.dp),
-            )
+    Box(modifier = modifier) {
+        ActionTooltip(description = "Resize $title panel") {
+            Box(
+                modifier =
+                    Modifier
+                        .size(22.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(0x26282A36))
+                        .border(1.dp, Color(0x338BE9FD), RoundedCornerShape(6.dp))
+                        .pointerInput(title) {
+                            detectDragGestures { change, dragAmount ->
+                                change.consume()
+                                onResize(dragAmount.x.roundToInt(), dragAmount.y.roundToInt())
+                            }
+                        },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.OpenInFull,
+                    contentDescription = null,
+                    tint = Color(0xFF8BE9FD),
+                    modifier = Modifier.size(12.dp),
+                )
+            }
         }
     }
 }
@@ -221,25 +224,25 @@ private fun SplitPanelHeader(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .background(if (primary) Color(0xFF343746) else Color(0xFF2C2F3B))
-                .padding(horizontal = 16.dp, vertical = if (primary) 14.dp else 11.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                .background(if (primary) Color(0xFF2A2D39) else Color(0xFF262832))
+                .padding(horizontal = 10.dp, vertical = if (primary) 8.dp else 7.dp),
+        horizontalArrangement = Arrangement.spacedBy(9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             modifier =
                 Modifier
-                    .size(if (primary) 34.dp else 30.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(if (primary) Color(0x334FFFA1) else Color(0x263BD8FF))
-                    .border(1.dp, if (primary) Color(0x7750FA7B) else Color(0x448BE9FD), RoundedCornerShape(12.dp)),
+                    .size(if (primary) 28.dp else 26.dp)
+                    .clip(RoundedCornerShape(7.dp))
+                    .background(if (primary) Color(0x244FFFA1) else Color(0x1F3BD8FF))
+                    .border(1.dp, if (primary) Color(0x6650FA7B) else Color(0x338BE9FD), RoundedCornerShape(7.dp)),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = window.railIcon(),
                 contentDescription = null,
                 tint = if (primary) Color(0xFF50FA7B) else Color(0xFF8BE9FD),
-                modifier = Modifier.size(if (primary) 20.dp else 18.dp),
+                modifier = Modifier.size(if (primary) 17.dp else 16.dp),
             )
         }
         Column(modifier = Modifier.weight(1f)) {
@@ -295,9 +298,10 @@ private fun HeaderActionButton(
         enabled = enabled,
         modifier =
             Modifier
-                .size(32.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(Color(0x1AFFFFFF)),
+                .size(28.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color(0x14FFFFFF)),
+        iconSize = 15.dp,
     )
 }
 

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -17,6 +18,8 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -63,26 +66,29 @@ internal fun FilesPanel(
         rememberFilePickerLauncher { selected: PlatformFile? ->
             selected?.file?.let(importFile)
         }
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxSize()) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 value = path,
                 onValueChange = { path = it },
                 label = { Text("Import path") },
+                trailingIcon = {
+                    ActionIconButton(
+                        icon = Icons.Filled.Add,
+                        description = "Import typed path",
+                        onClick = {
+                            val typedPath = path.trim()
+                            if (typedPath.isNotBlank()) importFile(File(typedPath))
+                        },
+                        enabled = path.isNotBlank(),
+                    )
+                },
                 modifier = Modifier.weight(1f),
             )
             ActionIconButton(
                 icon = Icons.Filled.FolderOpen,
                 description = "Open file picker",
                 onClick = { picker.launch() },
-            )
-            ActionIconButton(
-                icon = Icons.Filled.Add,
-                description = "Import typed path",
-                onClick = {
-                    val typedPath = path.trim()
-                    if (typedPath.isNotBlank()) importFile(File(typedPath))
-                },
             )
             ActionIconButton(
                 icon = Icons.Filled.Refresh,
@@ -95,8 +101,12 @@ internal fun FilesPanel(
             )
         }
         Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            files.forEach { file ->
-                WorkspaceFileRow(file, workspaceFileService, canvasOperations, modalRequester, refresh) { status = it }
+            if (files.isEmpty()) {
+                FilesEmptyState()
+            } else {
+                files.forEach { file ->
+                    WorkspaceFileRow(file, workspaceFileService, canvasOperations, modalRequester, refresh) { status = it }
+                }
             }
         }
         PanelStatus(status)
@@ -113,59 +123,82 @@ private fun WorkspaceFileRow(
     setStatus: (String) -> Unit,
 ) {
     var newName by remember(file.id) { mutableStateOf("") }
-    Column(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
-        Text(file.relativePath, color = Color(0xFFF8F8F2), fontWeight = FontWeight.SemiBold)
-        Text("${file.mimeType} · ${file.sizeBytes} bytes · ${file.sha256.take(12)}", color = Color(0xFFBD93F9))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = newName,
-                onValueChange = { newName = it },
-                label = { Text("Rename") },
-                modifier = Modifier.weight(1f),
-            )
-            ActionIconButton(
-                icon = Icons.Filled.Edit,
-                description = "Rename workspace file",
-                onClick = {
-                    val name = newName.trim()
-                    if (name.isNotBlank()) {
-                        runCatching { workspaceFileService.renameFile(file.id, name) }
-                            .onSuccess {
-                                setStatus("Renamed to ${it.relativePath}")
-                                newName = ""
-                                refresh()
-                            }.onFailure { setStatus("Rename failed: ${it.message}") }
-                    }
-                },
-            )
-            if (file.mimeType == WorkspaceFilePaths.CANVAS_MIME_TYPE) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 7.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0x55282A36)),
+        shape = RoundedCornerShape(8.dp),
+    ) {
+        Column(modifier = Modifier.padding(8.dp)) {
+            Text(file.relativePath, color = Color(0xFFF8F8F2), fontWeight = FontWeight.SemiBold)
+            Text("${file.mimeType} · ${file.sizeBytes} bytes · ${file.sha256.take(12)}", color = Color(0xFFBD93F9))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    label = { Text("Rename") },
+                    trailingIcon = {
+                        ActionIconButton(
+                            icon = Icons.Filled.Edit,
+                            description = "Rename workspace file",
+                            onClick = {
+                                val name = newName.trim()
+                                if (name.isNotBlank()) {
+                                    runCatching { workspaceFileService.renameFile(file.id, name) }
+                                        .onSuccess {
+                                            setStatus("Renamed to ${it.relativePath}")
+                                            newName = ""
+                                            refresh()
+                                        }.onFailure { setStatus("Rename failed: ${it.message}") }
+                                }
+                            },
+                            enabled = newName.isNotBlank(),
+                        )
+                    },
+                    modifier = Modifier.weight(1f),
+                )
+                if (file.mimeType == WorkspaceFilePaths.CANVAS_MIME_TYPE) {
+                    ActionIconButton(
+                        icon = Icons.Filled.FileOpen,
+                        description = "Open canvas document",
+                        onClick = {
+                            runCatching { canvasOperations.openDocument(file.id, null) }
+                                .onSuccess { setStatus("Opened ${file.relativePath}") }
+                                .onFailure { setStatus("Open failed: ${it.message}") }
+                        },
+                    )
+                }
                 ActionIconButton(
-                    icon = Icons.Filled.FileOpen,
-                    description = "Open canvas document",
+                    icon = Icons.Filled.Delete,
+                    description = "Delete workspace file",
                     onClick = {
-                        runCatching { canvasOperations.openDocument(file.id, null) }
-                            .onSuccess { setStatus("Opened ${file.relativePath}") }
-                            .onFailure { setStatus("Open failed: ${it.message}") }
+                        modalRequester.requestConfirmation(
+                            ComposeConfirmationModal(
+                                title = "Delete workspace file?",
+                                message = "Delete '${file.relativePath}' from the managed workspace and metadata store.",
+                                confirmDescription = "Delete workspace file",
+                            ) {
+                                workspaceFileService.deleteFile(file.id)
+                                setStatus("Deleted ${file.relativePath}")
+                                refresh()
+                            },
+                        )
                     },
                 )
             }
-            ActionIconButton(
-                icon = Icons.Filled.Delete,
-                description = "Delete workspace file",
-                onClick = {
-                    modalRequester.requestConfirmation(
-                        ComposeConfirmationModal(
-                            title = "Delete workspace file?",
-                            message = "Delete '${file.relativePath}' from the managed workspace and metadata store.",
-                            confirmDescription = "Delete workspace file",
-                        ) {
-                            workspaceFileService.deleteFile(file.id)
-                            setStatus("Deleted ${file.relativePath}")
-                            refresh()
-                        },
-                    )
-                },
-            )
+        }
+    }
+}
+
+@Composable
+private fun FilesEmptyState() {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0x33282A36)),
+        shape = RoundedCornerShape(8.dp),
+    ) {
+        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text("No workspace files", color = Color(0xFFF8F8F2), fontWeight = FontWeight.SemiBold)
+            Text("Import a file or sync the workspace directory to populate this panel.", color = Color(0xFFBFBBD0))
         }
     }
 }

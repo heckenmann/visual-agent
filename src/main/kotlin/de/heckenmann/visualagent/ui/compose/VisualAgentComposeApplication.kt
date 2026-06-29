@@ -181,7 +181,7 @@ private fun VisualAgentComposeApp(
                         modifier =
                             Modifier
                                 .fillMaxSize()
-                                .padding(20.dp),
+                                .padding(14.dp),
                     ) {
                         val viewport =
                             ComposeWorkspaceViewport(
@@ -217,7 +217,7 @@ private fun VisualAgentComposeApp(
                                     Modifier
                                         .weight(1f)
                                         .fillMaxWidth()
-                                        .padding(top = 18.dp),
+                                        .padding(top = 12.dp),
                             )
                         }
                     }
