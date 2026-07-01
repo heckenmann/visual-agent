@@ -4,25 +4,26 @@
   <img src="src/main/resources/icons/visual-agent.svg" alt="Visual Agent icon" width="160">
 </p>
 
-Visual Agent is a Kotlin desktop coding agent with JavaFX UI, Spring Boot/Spring AI, and Spring Data JPA on SQLite.
+Visual Agent is a Kotlin desktop coding agent with Compose Multiplatform UI, Spring Boot/Spring AI, and Spring Data JPA on SQLite.
 
 > **Development notice:** This project was written entirely with LLM assistance and is still under active development.
 > Expect rapid changes, incomplete features, and rough edges until the project reaches a stable release.
 
 ## Current Status
 
-The app is functional end-to-end with persistent chat/todos/settings, Spring AI tool-calling, streaming responses, persisted tool-call history, managed workspace files, and draggable internal workspace windows.
+The Compose migration branch keeps the Spring/agent backend functional and replaces the desktop runtime with Compose Multiplatform. The current UI is a Compose shell with a left rail, semantic workspace panels, rebuilt feature panels, internal modals, command palette, workspace files, and editable canvas support.
 
 | Feature | UI | Backend | Wired |
 |---------|----|---------|-------|
-| Chat | Modernized conversation panel, markdown rendering, streaming indicator, tool call timeline | `AgentManager.sendMessage()/streamMessage()` | Yes |
-| SubAgents | Card-based panel with create/edit/delete/run/logs and per-agent provider/model parameters | Persistent sub-agent configs and statuses | Yes |
-| Todos | Panel + tool integration + count/list/update flows | Persisted via Spring Data JPA stores | Yes |
-| Session | Dynamic provider profiles, filtered model catalogs, credentials/base URLs, runtime toggles, user instruction | `ProviderCatalogService` + runtime adapters | Yes |
-| Settings | Theme/font/model/session options | `AppConfig` + DB-backed runtime usage | Yes |
-| Files | Managed workspace import/search/rename/delete/sync, image/canvas handoff | `WorkspaceFileService` + `WorkspaceFileTool` | Yes |
-| Canvas | Persistent editable shapes, freehand paths, image import, fixed surface size, zoom/grid/export, model-readable snapshots | JHotDraw 8 drawing model, undo manager, JavaFX-safe canvas service | Yes |
-| Internal Windows | Draggable/resizable panels, persisted layout, model-facing arrangement tool | `WorkspaceWindowManager` + `WorkspaceLayoutTool` | Yes |
+| Chat | Compose conversation panel | `AgentManager.sendMessage()/streamMessage()` | Yes |
+| SubAgents | Compose sub-agent panel | Persistent sub-agent configs and statuses | Yes |
+| Todos | Compose todo panel | Persisted via Spring Data JPA stores | Yes |
+| Session | Compose settings surface | `ProviderCatalogService` + runtime adapters | Partial |
+| Settings | Compose settings panel | `AppConfig` + DB-backed runtime usage | Yes |
+| Files | Compose files panel with FileKit picker | `WorkspaceFileService` + `WorkspaceFileTool` | Yes |
+| Canvas | Compose-native editable canvas with workspace save/open | `CanvasOperations` + `CanvasTool` | Yes |
+| Workspace Panels | Compose semantic stage/inspector/deck workspace shell | `WorkspaceLayoutService` + `WorkspaceLayoutTool` | Yes |
+| Command Palette | Internal Compose overlay opened with `Cmd/Ctrl+K` | Workspace command metadata | Yes |
 | Tool Calling | Tool events, minimized tool entries, per-agent tool toggles, sub-agent canvas/workspace/use-case tools | Spring AI `ToolCallback` path | Yes |
 | Use Cases | Packaged product use-case catalog available to agents | `docs/usecases/` + `UseCaseTool` | Yes |
 | Persistence | Conversation, todos, tools, agents, preferences, history search, workspace metadata | SQLite + JPA + Flyway + FTS5 | Yes |
@@ -31,16 +32,16 @@ The app is functional end-to-end with persistent chat/todos/settings, Spring AI 
 
 | Component | Version |
 |-----------|---------|
-| Language | Kotlin 2.2.21 |
-| Build System | Gradle 9.4.1 (Kotlin DSL) |
+| Language | Kotlin 2.4.0 |
+| Build System | Gradle 9.6.0 (Kotlin DSL) |
 | Application Framework | Spring Boot 4.1.0 |
 | AI Integration | Spring AI 2.0.0 |
-| UI Framework | JavaFX 21.0.2 |
-| Drawing Framework | JHotDraw 8 version 0.5 |
-| Database | SQLite 3.45.0.0 (embedded, via JPA/Flyway) |
+| UI Framework | Compose Multiplatform 1.11.1 |
+| Drawing Framework | Toolkit-neutral canvas operations with Compose editor |
+| Database | SQLite 3.53.2.0 (embedded, via JPA/Flyway) |
 | HTTP Client | Spring `RestClient` / `WebClient` |
-| Serialization | Kotlinx Serialization JSON 1.8.1 |
-| Coroutines | Kotlinx Coroutines 1.7.3 |
+| Serialization | Kotlinx Serialization JSON 1.11.0 |
+| Coroutines | Kotlinx Coroutines 1.11.0 |
 | Logging | Logback 1.5.x |
 | LLM Provider | Spring AI + Ollama/OpenAI (`ChatModel`) |
 | Linter | ktlint |
@@ -50,10 +51,10 @@ The app is functional end-to-end with persistent chat/todos/settings, Spring AI 
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     MAIN WINDOW (JavaFX)                    │
+│                     MAIN WINDOW (Compose Multiplatform)                    │
 ├──────────────┬──────────────────────────────────────────────┤
-│ LEFT RAIL    │ INTERNAL WORKSPACE DESKTOP                   │
-│ navigation   │ draggable/resizable windows                  │
+│ LEFT RAIL    │ SPLIT WORKSPACE PANELS                       │
+│ navigation   │ deterministic tiled panel slots              │
 │              │ chat, session, agents, todos, canvas, files  │
 │              │ settings                                     │
 ├──────────────┴──────────────────────────────────────────────┤
@@ -96,23 +97,17 @@ src/main/kotlin/de/heckenmann/visualagent/
 │   ├── WorkspaceFileModels.kt  # Workspace file records and search/sync models
 │   ├── WorkspaceFilePaths.kt   # Managed workspace root/path handling
 │   └── WorkspaceFileService.kt # Import/search/hash/read/PDF/image operations
+├── canvas/
+│   ├── CanvasOperations.kt     # Toolkit-neutral model-facing canvas contract
+│   ├── CanvasDocumentCodec.kt  # Versioned editable .canvas document serialization
+│   ├── CanvasPngRenderer.kt    # Toolkit-neutral canvas PNG rendering
+│   └── InMemoryCanvasService.kt # Compose-migration canvas service with workspace persistence
+├── workspace/
+│   └── layout/                 # Toolkit-neutral workspace panel layout persistence/tool state
 └── ui/
-    ├── MainWindow.kt          # FXML-based shell, shortcuts, command palette, workspace windows
-    ├── MainWindow*Wiring.kt   # Chat/sub-agent/tool event wiring modules
-    ├── InternalWorkspaceWindow.kt # Draggable/resizable internal window container
-    ├── WorkspaceWindowManager.kt  # Registration, focus, bounds, and layout snapshots
-    ├── WorkspaceLayout*.kt        # Layout persistence and model-facing layout service
-    ├── FxmlLoader.kt          # Type-safe FXML loading utility
-    ├── StatusBar.kt           # Footer component for persistence/activity/reconnect status
-    └── panels/
-        ├── SessionPanel.kt         # FXML-based, model/session settings panel
-        ├── ChatPanel.kt            # Conversation panel shell
-        ├── ChatMessage*.kt         # Message rendering/list/runtime status controllers
-        ├── TodoPanel.kt            # FXML-based, Add dialog, Delete, checkbox toggle, priority badges
-        ├── SubAgentsPanel.kt       # Agent list built in code, CSS classes (no inline styles)
-        ├── canvas/                 # JHotDraw editor panel, toolbar, and model-facing canvas operations
-        ├── FilesPanel.kt           # Managed workspace file import/search/edit/sync panel
-        └── ApplicationSettingsPanel.kt  # FXML-based, theme selector, font size spinner
+    └── compose/
+        ├── VisualAgentComposeApplication.kt # Compose desktop shell and semantic workspace panels
+        └── ComposeWorkspaceModels.kt        # Internal-window geometry model
 ```
 
 ## Prerequisites
@@ -133,6 +128,10 @@ gradle run
 # Copy dependencies to lib/
 gradle copyAllDependencies
 ```
+
+Compose Desktop must run in non-headless JVM desktop mode. The Gradle application tasks set `java.awt.headless=false` because Compose Desktop uses the JVM `java.desktop` stack internally to discover screen density, even though Visual Agent source code does not use AWT/Swing APIs.
+
+The detailed Compose migration decision and requirement audit is documented in [`docs/compose-migration-audit.md`](docs/compose-migration-audit.md).
 
 ## Provider Setup
 
@@ -179,32 +178,31 @@ Imported user files are copied into a managed workspace directory next to the co
 ./data/workspace/
 ```
 
-The Files panel supports:
+The workspace file backend supports:
 
-- import through a JavaFX file chooser
 - list, inspect, rename, delete, refresh, search, and filesystem/DB sync
-- copy managed relative paths and SHA-256 hashes
-- open supported images and editable canvas documents in the Canvas panel
+- managed relative paths and SHA-256 hashes
+- image metadata without desktop UI image APIs
 
 External source paths are not persisted. Workspace metadata is stored in SQLite, while file bytes remain under the managed workspace folder. Generated files, such as rendered PDF pages, are written under the managed workspace and recorded with metadata and hashes.
 
 ## Canvas
 
-The Canvas panel uses JHotDraw 8 for editable figures and persists the current drawing document. It supports:
+The previous visual canvas editor has been removed with the desktop toolkit migration. The current branch uses a toolkit-neutral canvas model rendered and edited through Compose. Current support includes:
 
-- fixed user-configurable canvas surface size independent of window size
-- freehand pen, selectable/editable figures, image import, delete selection, undo/redo
-- zoom, grid, PNG export, and immutable model-readable PNG/JPG captures
-- save/open of editable canvas documents through the managed workspace
-- model-facing canvas tool calls for reading and modifying the canvas
+- `get`, `clear`, `drawText`, `drawRect`, `drawLine`, `drawCircle`, `insertImage`, `select`, `selectAt`, `moveFigure`, `resizeFigure`, `deleteFigure`, `saveDocument`, `openDocument`, and `captureImage`
+- Compose canvas selection, drag-to-move, corner drag-to-resize, and selected-figure deletion
+- editable `.canvas` JSON documents persisted under the managed workspace and reopenable from the Files panel or canvas tool calls
+- immutable PNG captures rendered from the current toolkit-neutral canvas figures
+- no desktop toolkit dependency
 
-The internal Canvas window has content-aware minimum sizing and scrollable content so the toolbar and drawing viewport stay inside the window frame.
+## Internal Workspace Panels
 
-## Internal Workspace Windows
+Primary panels are hosted as deterministic semantic panels inside the workspace. The first visible panel in the user-defined order gets a dominant stage, supporting panels are placed in an inspector stack, and overflow panels move into a bottom deck. Panel visibility and order are restored on restart, and visible panels are placed into valid workspace slots without overlap or pointer-driven resize states.
 
-Primary panels are hosted as draggable and resizable internal windows on the workspace desktop. Window position, size, visibility, and z-order are persisted and restored on restart. Restored windows are clamped into the visible desktop and respect content minimum sizes.
+Users can change panel order through icon-only actions in each panel header. Panels can be hidden from either the left rail or the panel header.
 
-Agents can query and arrange the internal windows through the workspace layout tool when that tool is enabled.
+Agents can query the visible workspace panel slots through the workspace layout tool when that tool is enabled.
 
 ## Persistence
 
@@ -214,7 +212,7 @@ The app now uses a Spring Data JPA persistence layer backed by SQLite and Flyway
 - Hibernate validates the mapped entities; it does not create or mutate tables in production.
 - The existing SQLite data file remains the source of truth for local desktop usage.
 - Managed workspace file metadata is stored in SQLite; file bytes are stored under `./data/workspace/` by default.
-- Internal workspace window layout is persisted in user preferences.
+- Internal workspace panel visibility, order, and layout state are persisted in user preferences.
 - Conversation search still uses SQLite FTS5 with a fallback `LIKE` query for invalid FTS input.
 - The old JDBC `KnowledgeDb` facade has been replaced by typed stores such as `ConversationStore`, `TodoStore`, `SubAgentStore`, and `PreferenceStore`.
 
@@ -244,7 +242,7 @@ Implemented tool families include:
 - `workspace:file` for managed imported files, hashes, text/PDF/image operations, rendering, search, and sync
 - `canvas` for model-facing canvas inspection, mutation, and image capture
 - sub-agent lifecycle/execution/todo assignment tools
-- `workspace:layout` for internal window size/position inspection and arrangement
+- `workspace:layout` for workspace panel slot inspection
 - `usecases` for listing, showing, and searching packaged use-case documents
 
 External browser/search tools currently return explicit unavailable responses unless a real backend is wired.
@@ -280,7 +278,7 @@ Each use-case document includes a `## Tool Calls` section. If a workflow has no 
 - [x] OpenAI/OpenAI-compatible provider support with provider-specific model selection
 - [x] Optional bearer authentication for secured Ollama endpoints
 - [x] Managed workspace files with Files panel and workspace file tool calls
-- [x] JHotDraw-based editable canvas with persistence, workspace save/open, export, and model-facing canvas tools
+- [x] JVM canvas model-based editable canvas with persistence, workspace save/open, export, and model-facing canvas tools
 - [x] Draggable/resizable internal workspace windows with persisted layout
 - [x] Packaged use-case documentation catalog and model-facing query tool
 

@@ -17,7 +17,11 @@ Desktop user.
 
 1. The user presses a panel shortcut or command palette shortcut.
 2. The main window resolves the target command.
-3. The requested panel or command is activated.
+3. For `Cmd/Ctrl+1..6`, the requested internal panel toggles between visible and hidden.
+4. For `Cmd/Ctrl+K`, the internal command palette opens above the workspace.
+5. The user filters commands by typing.
+6. The user clicks a command or presses `Enter` to run the first matching command.
+7. The user presses `Esc` or the close icon to dismiss the palette without running a command.
 
 ## Result
 
@@ -29,10 +33,14 @@ The user can navigate without relying only on mouse interactions.
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.MainWindow`
-- `de.heckenmann.visualagent.ui.MainWindowNavigation`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.compose.ComposeWorkspaceShortcuts`
+- `de.heckenmann.visualagent.ui.compose.ComposeCommandPaletteHost`
 
 ## Acceptance Criteria
 
-- `Cmd/Ctrl+1..6` can switch panels.
-- `Cmd/Ctrl+K` opens command palette behavior where implemented.
+- `Cmd/Ctrl+1..6` toggles the Conversation, Todos, Files, Subagents, Settings, and Canvas panels in that order.
+- The panel shortcut mapping is stable and covered by unit tests.
+- `Cmd/Ctrl+K` opens an internal command palette, not a native dialog.
+- The command palette can filter commands and run a selected command.
+- `Esc` closes the command palette without executing a command.

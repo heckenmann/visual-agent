@@ -37,5 +37,6 @@ Agents can adjust safe runtime preferences without accessing raw credentials.
 ## Acceptance Criteria
 
 - Raw API keys are never returned.
+- Provider Base URLs and model identifiers may be returned, but credentials are omitted.
 - Font size is clamped to the supported range.
 - Unsupported actions return a clear failure.

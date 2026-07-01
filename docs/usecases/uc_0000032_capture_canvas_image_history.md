@@ -16,7 +16,7 @@ Enabled sub-agent.
 ## Main Flow
 
 1. The model calls the canvas capture action with a requested format.
-2. The current canvas is rendered to image bytes using the current JavaFX window render scale.
+2. The current toolkit-neutral canvas state is rendered to PNG image bytes.
 3. The image is stored as an immutable history entry.
 4. Later canvas edits do not modify the stored image.
 
@@ -30,15 +30,15 @@ The conversation contains a durable visual snapshot that can be persisted and re
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.agent.tools.CanvasTool`
-- `de.heckenmann.visualagent.ui.panels.canvas.CanvasImageCapture`
-- `de.heckenmann.visualagent.ui.panels.canvas.CanvasSnapshotRenderer`
-- `de.heckenmann.visualagent.ui.panels.ChatMessageRenderer`
+- `de.heckenmann.visualagent.agent.tools.canvas.CanvasTool`
+- `de.heckenmann.visualagent.canvas.InMemoryCanvasService`
+- `de.heckenmann.visualagent.canvas.CanvasPngRenderer`
+- `de.heckenmann.visualagent.image.RgbaPngEncoder`
 
 ## Acceptance Criteria
 
 - PNG format is accepted in this version; unsupported formats return a clear tool failure.
 - Captured image history entries survive restart.
 - Later canvas mutations do not change existing history images.
-- On high-DPI displays, captured images use the JavaFX render scale instead of forcing a logical 1x snapshot.
-- History image previews shrink to the available conversation row width instead of overflowing narrow internal windows.
+- Captured images are rendered from toolkit-neutral canvas data instead of a JavaFX or Compose node snapshot.
+- History image previews shrink to the available conversation row width instead of overflowing narrow workspace panels.

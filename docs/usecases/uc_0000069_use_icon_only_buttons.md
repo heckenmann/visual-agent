@@ -17,7 +17,7 @@ Users interact with compact action buttons that show only an icon. Hovering over
 4. The user clicks the button to execute that action.
 
 ## Alternative Flows
-- If a button is disabled, it still remains icon-only and its tooltip explains the action when JavaFX displays disabled-node tooltips.
+- If a button is disabled, it still remains icon-only and its tooltip explains the action when Compose Multiplatform displays disabled-node tooltips.
 - Platform dialog buttons such as OK, Cancel, and Close may retain native text labels to preserve operating-system conventions.
 
 ## Tool Calls
@@ -25,20 +25,21 @@ Users interact with compact action buttons that show only an icon. Hovering over
 - None.
 
 ## Code Entry Points
-- `src/main/resources/fxml/main-window.fxml`
-- `src/main/resources/fxml/session-panel.fxml`
-- `src/main/resources/fxml/todo-panel.fxml`
-- `src/main/resources/fxml/sub-agents-panel.fxml`
-- `src/main/resources/fxml/agent-card.fxml`
-- `src/main/resources/fxml/application-settings.fxml`
-- `de.heckenmann.visualagent.ui.panels.ChatPanelInitializer`
-- `de.heckenmann.visualagent.ui.panels.FilesPanel`
-- `de.heckenmann.visualagent.ui.panels.canvas.CanvasToolbar`
-- `de.heckenmann.visualagent.ui.panels.ChatMessageRenderer`
+- `de.heckenmann.visualagent.ui.compose.ActionIconButton`
+- `de.heckenmann.visualagent.ui.compose.ActionTooltip`
+- `de.heckenmann.visualagent.ui.compose.ComposeRail`
+- `de.heckenmann.visualagent.ui.compose.ComposeSplitWorkspace`
+- `de.heckenmann.visualagent.ui.compose.ConversationPanel`
+- `de.heckenmann.visualagent.ui.compose.TodoPanel`
+- `de.heckenmann.visualagent.ui.compose.FilesPanel`
+- `de.heckenmann.visualagent.ui.compose.SubAgentsPanel`
+- `de.heckenmann.visualagent.ui.compose.SettingsPanel`
+- `de.heckenmann.visualagent.ui.compose.CanvasPanel`
 
 ## Acceptance Criteria
-- User action buttons in maintained FXML layouts do not define visible `text` labels.
+- User action buttons in maintained Compose layouts do not define visible `text` labels.
 - Every icon-only button has a tooltip that states the action.
-- Canvas toolbar buttons and toggle actions, including grid visibility, are icon-only and describe their action through tooltips.
+- Canvas toolbar buttons are icon-only and describe their action through tooltips.
 - The left navigation rail uses icon-only buttons with hover tooltips.
+- Workspace panel headers include panel icons and icon-only actions for moving or hiding the panel.
 - Dialog-provided standard buttons are allowed to keep text labels.

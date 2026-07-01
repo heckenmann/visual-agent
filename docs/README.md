@@ -4,11 +4,12 @@ Visual Agent now uses Spring Data JPA on SQLite with Flyway migrations for persi
 
 ## Table of Contents
 
-- [Architecture](architecture.md) - System architecture, runtime flow, and current constraints
+- [Architecture](architecture.md) - System architecture, runtime flow, in-flight indicator, current constraints
 - [Setup Guide](setup.md) - Installation, prerequisites, run/test commands, troubleshooting
-- [API Reference](api.md) - `LLMProvider`, Spring AI integration, tool-calling contracts
+- [API Reference](api.md) - `LLMProvider`, Spring AI integration, tool-calling contracts, activity surface
 - [Database Schema](database.md) - SQLite schema, indexes, persistence behavior
-- [SubAgents](subagents.md) - Autonomous/sub-agent model and UI integration
+- [SubAgents](subagents.md) - Autonomous/sub-agent model, tool sets, autonomous loop
+- [Compose Migration Audit](compose-migration-audit.md) - Per-requirement evidence for the JavaFX to Compose Multiplatform decision
 - [Development Conventions](conventions.md) - Use-case traceability and documentation rules
 
 ## Quick Start
@@ -22,5 +23,5 @@ Visual Agent now uses Spring Data JPA on SQLite with Flyway migrations for persi
 
 - [Spring AI Tools](https://docs.spring.io/spring-ai/reference/api/tools.html)
 - [Ollama Documentation](https://docs.ollama.com)
-- [JavaFX Documentation](https://openjfx.io)
+- [Compose Multiplatform Documentation](https://www.jetbrains.com/lp/compose-multiplatform/)
 - [Kotlin Documentation](https://kotlinlang.org/docs/home.html)

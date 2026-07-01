@@ -1,8 +1,8 @@
-# UC-0000066: Export Canvas PNG
+# UC-0000066: Capture Canvas PNG
 
 ## Goal
 
-Let the user export the current editable canvas view to a PNG file.
+Let the user capture the current editable canvas as a managed PNG workspace file.
 
 ## Primary Actor
 
@@ -11,19 +11,19 @@ Desktop user.
 ## Preconditions
 
 - Canvas panel is visible.
-- The user can choose a destination file.
+- Workspace file persistence is available.
 
 ## Main Flow
 
-1. The user clicks the canvas export action.
-2. A PNG save dialog is shown.
-3. Selection handles are cleared.
-4. The canvas node is snapshotted using the current JavaFX window render scale.
-5. Snapshot bytes are encoded as PNG and written to disk.
+1. The user enters or accepts a PNG filename in the canvas panel.
+2. The user clicks the canvas capture action.
+3. The current toolkit-neutral canvas state is rendered to PNG bytes.
+4. The PNG is saved as a managed workspace file.
+5. The files panel can list the generated PNG after refresh.
 
 ## Result
 
-The current canvas can be shared outside the managed workspace as a PNG image.
+The current canvas can be inspected and reused as a PNG image in the managed workspace.
 
 ## Tool Calls
 
@@ -31,14 +31,15 @@ The current canvas can be shared outside the managed workspace as a PNG image.
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.panels.canvas.CanvasPngExporter`
-- `de.heckenmann.visualagent.ui.panels.canvas.CanvasSnapshotRenderer`
-- `de.heckenmann.visualagent.image.PngEncoder`
-- `de.heckenmann.visualagent.ui.panels.canvas.CanvasFileDialogs`
+- `de.heckenmann.visualagent.ui.compose.CanvasPanel`
+- `de.heckenmann.visualagent.canvas.InMemoryCanvasService`
+- `de.heckenmann.visualagent.canvas.CanvasPngRenderer`
+- `de.heckenmann.visualagent.image.RgbaPngEncoder`
+- `de.heckenmann.visualagent.workspace.WorkspaceFileService`
 
 ## Acceptance Criteria
 
-- Cancelling the file dialog writes no file.
-- The export excludes selection handles.
+- The capture action writes a managed PNG workspace file.
 - The written file is valid PNG bytes.
-- On high-DPI displays, exported PNG dimensions use the JavaFX render scale instead of forcing a logical 1x snapshot.
+- The capture is rendered from toolkit-neutral canvas data instead of UI chrome or selection handles.
+- The UI capture action is disabled until a non-blank PNG filename is available.

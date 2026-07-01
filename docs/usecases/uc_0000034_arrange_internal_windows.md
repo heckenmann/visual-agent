@@ -1,8 +1,8 @@
-# UC-0000034: Arrange Internal Windows
+# UC-0000034: Arrange Workspace Panels
 
 ## Goal
 
-Let users arrange application panels as draggable internal windows inside the main workspace.
+Let users arrange application panels in a deterministic, designer-curated workspace inside the main application window.
 
 ## Primary Actor
 
@@ -10,22 +10,26 @@ Desktop user.
 
 ## Preconditions
 
-- The main window workspace is initialized.
-- Panels are registered with the workspace window manager.
+- The Compose workspace is initialized.
+- Workspace panel descriptors are available to the Compose shell.
 
 ## Main Flow
 
 1. The user opens a panel from navigation.
-2. The panel appears as an internal workspace window.
-3. The user drags or resizes the window.
-4. During dragging, the window moves smoothly without forcing full panel layout on every pointer event.
-5. Large panel contents remain scrollable without expensive desktop chrome effects being recalculated.
-6. Window borders, header contrast, and active header gradients keep overlapping windows visually distinguishable.
-7. Window manager commits final bounds and z-order when the drag completes.
+2. The panel appears in the workspace.
+3. The Compose shell recalculates visible panel slots deterministically.
+4. The slot bounds are rendered through the GridLayout for Compose `BoxGrid` rather than hand-written offset placement.
+5. The first visible panel in the user-defined order becomes the primary stage.
+6. Supporting panels are placed in a right-side inspector stack.
+7. Additional supporting panels are placed in a bottom deck.
+8. The user can move a panel earlier or later through icon-only buttons in the panel header.
+9. The user can hide a panel from either the left rail or the panel header hide button.
+10. Panel cards use consistent spacing, rounded chrome, subtle borders, and compact headers.
+11. The Compose shell exposes the calculated slot bounds through the workspace layout service.
 
 ## Result
 
-The user can build a custom workspace layout inside the application.
+The user can keep multiple panels visible and ordered for the current task without overlap.
 
 ## Tool Calls
 
@@ -33,14 +37,18 @@ The user can build a custom workspace layout inside the application.
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.InternalWorkspaceWindow`
-- `de.heckenmann.visualagent.ui.WorkspaceWindowManager`
-- `de.heckenmann.visualagent.ui.MainWindowWorkspace`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.compose.ComposeWorkspaceComponents`
+- `de.heckenmann.visualagent.ui.compose.ComposeWorkspaceModels`
+- `com.cheonjaeung.compose.grid.BoxGrid`
 
 ## Acceptance Criteria
 
-- Internal windows stay inside usable workspace bounds.
+- Workspace panels stay inside usable workspace bounds.
 - Each registered panel can be opened through navigation.
-- Dragging remains responsive for windows containing heavier panels such as canvas or file tables.
-- Workspace window chrome avoids JavaFX `-fx-effect` styling so scrolling large panels does not repaint expensive shadows.
-- Internal windows remain visually separable through cheap CSS borders, header contrast, and active-window header gradients.
+- Each visible panel can be hidden from its own panel header.
+- Panel header order controls update the user-defined panel order.
+- Visible panels do not overlap.
+- Grid placement is delegated to GridLayout for Compose while Visual Agent retains the domain-specific slot calculation.
+- Large panel contents remain scrollable without expensive desktop chrome effects being recalculated.
+- Panel cards remain visually separable through spacing, borders, header contrast, and clear primary/secondary hierarchy.

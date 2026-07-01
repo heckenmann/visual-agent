@@ -32,8 +32,10 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
         with:
-          gradle-version: "9.3.0"
           cache-disabled: true
 
+      - name: Generate Gradle wrapper
+        run: gradle wrapper --gradle-version 9.6.0 --no-daemon
+
       - name: Run tests
-        run: xvfb-run -a gradle --no-daemon test
+        run: xvfb-run -a ./gradlew --no-daemon test

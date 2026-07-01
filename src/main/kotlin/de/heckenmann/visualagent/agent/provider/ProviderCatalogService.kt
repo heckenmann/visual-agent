@@ -144,18 +144,22 @@ class ProviderCatalogService(
         val provider =
             getProvider(selectedProviderId)?.takeIf(ProviderProfile::enabled)
                 ?: error("Provider is missing or disabled: $selectedProviderId")
-        val selectedModelId =
-            modelId?.takeIf(String::isNotBlank)
-                ?: provider.defaultModel.takeIf(String::isNotBlank)
-                ?: selectableModels(provider.id).firstOrNull()?.id
-                ?: error("Provider ${provider.id} has no selectable model")
+        val selectable = selectableModels(provider.id)
+        val explicitModelId = modelId?.takeIf(String::isNotBlank)
+        val resolvedModelId =
+            when {
+                explicitModelId != null -> explicitModelId
+                provider.defaultModel.isNotBlank() && selectable.any { it.id == provider.defaultModel } ->
+                    provider.defaultModel
+                else -> selectable.firstOrNull()?.id
+            } ?: error("Provider ${provider.id} has no selectable model")
         val model =
-            selectableModels(provider.id).firstOrNull { it.id == selectedModelId }
-                ?: ProviderModelConfig(id = selectedModelId).takeIf {
-                    selectedModelId !in provider.modelBlacklist &&
-                        (provider.modelWhitelist.isEmpty() || selectedModelId in provider.modelWhitelist)
+            selectable.firstOrNull { it.id == resolvedModelId }
+                ?: ProviderModelConfig(id = resolvedModelId).takeIf {
+                    resolvedModelId !in provider.modelBlacklist &&
+                        (provider.modelWhitelist.isEmpty() || resolvedModelId in provider.modelWhitelist)
                 }
-                ?: error("Model is missing, disabled, or filtered: ${provider.id}/$selectedModelId")
+                ?: error("Model is missing, disabled, or filtered: ${provider.id}/$resolvedModelId")
         val modelDefaults =
             if (model.outputLimit != null) {
                 mapOf("maxTokens" to model.outputLimit.toString()) + model.options

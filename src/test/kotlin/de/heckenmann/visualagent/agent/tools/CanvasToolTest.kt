@@ -1,11 +1,14 @@
 package de.heckenmann.visualagent.agent.tools
 
+import de.heckenmann.visualagent.agent.tools.canvas.CanvasTool
+import de.heckenmann.visualagent.canvas.CanvasDocumentReference
+import de.heckenmann.visualagent.canvas.CanvasFigureSnapshot
+import de.heckenmann.visualagent.canvas.CanvasImageSnapshot
+import de.heckenmann.visualagent.canvas.CanvasOperations
+import de.heckenmann.visualagent.canvas.CanvasPoint
+import de.heckenmann.visualagent.canvas.CanvasSnapshot
 import de.heckenmann.visualagent.knowledge.ConversationRecord
 import de.heckenmann.visualagent.knowledge.ConversationStore
-import de.heckenmann.visualagent.ui.panels.canvas.CanvasFigureSnapshot
-import de.heckenmann.visualagent.ui.panels.canvas.CanvasImageSnapshot
-import de.heckenmann.visualagent.ui.panels.canvas.CanvasOperations
-import de.heckenmann.visualagent.ui.panels.canvas.CanvasSnapshot
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -40,6 +43,68 @@ class CanvasToolTest {
         assertTrue(result.success)
         assertEquals(listOf("drawText", "drawLine", "drawCircle", "drawRect"), canvas.actions)
         assertEquals("1", content["figureCount"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun `drawStroke action delegates to canvas operations`() {
+        val canvas = FakeCanvasOperations()
+        val tool = CanvasTool(canvas, FakeConversationStore())
+
+        val result =
+            tool.execute(
+                """{"action":"drawStroke","points":[{"x":0,"y":0},{"x":10,"y":5},{"x":20,"y":12}],"color":"#ff00ff","width":3.0}""",
+            )
+
+        assertTrue(result.success)
+        assertEquals(listOf("drawStroke"), canvas.actions)
+        val figure = canvas.lastFigure
+        assertEquals("stroke", figure.type)
+        assertEquals("#ff00ff", figure.color)
+        assertEquals(3.0, figure.strokeWidth)
+        assertEquals(3, figure.points.size)
+    }
+
+    @Test
+    fun `drawStroke rejects fewer than two points`() {
+        val tool = CanvasTool(FakeCanvasOperations(), FakeConversationStore())
+
+        val result = tool.execute("""{"action":"drawStroke","points":[{"x":0,"y":0}]}""")
+
+        assertFalse(result.success)
+        assertTrue(result.error.orEmpty().contains("points"))
+    }
+
+    @Test
+    fun `selection mutation actions delegate to canvas operations`() {
+        val canvas = FakeCanvasOperations()
+        val tool = CanvasTool(canvas, FakeConversationStore())
+
+        tool.execute("""{"action":"drawRect","x":10,"y":20,"width":100,"height":50}""")
+        val selected = tool.execute("""{"action":"selectAt","x":15,"y":25}""")
+        tool.execute("""{"action":"moveFigure","index":0,"deltaX":5,"deltaY":6}""")
+        tool.execute("""{"action":"resizeFigure","index":0,"width":80,"height":40}""")
+        val deleted = tool.execute("""{"action":"deleteFigure","index":0}""")
+
+        assertTrue(selected.success)
+        assertTrue(deleted.success)
+        assertEquals(
+            listOf("drawRect", "selectAt", "moveFigure", "resizeFigure", "deleteFigure"),
+            canvas.actions,
+        )
+    }
+
+    @Test
+    fun `save and open document actions delegate to canvas operations`() {
+        val canvas = FakeCanvasOperations()
+        val tool = CanvasTool(canvas, FakeConversationStore())
+
+        val saved = tool.execute("""{"action":"saveDocument","name":"diagram"}""")
+        val opened = tool.execute("""{"action":"openDocument","id":"canvas-1"}""")
+
+        assertTrue(saved.success)
+        assertTrue(opened.success)
+        assertEquals(listOf("saveDocument:diagram", "openDocument:canvas-1:null"), canvas.actions)
+        assertTrue(saved.content.contains("canvas/diagram.canvas"))
     }
 
     @Test
@@ -113,6 +178,9 @@ class CanvasToolTest {
         val actions = mutableListOf<String>()
         private var figures = emptyList<CanvasFigureSnapshot>()
 
+        val lastFigure: CanvasFigureSnapshot
+            get() = figures.last()
+
         override fun snapshot(): CanvasSnapshot = snapshotOf(figures)
 
         override fun clear(): CanvasSnapshot {
@@ -175,6 +243,97 @@ class CanvasToolTest {
             return snapshot()
         }
 
+        override fun drawStroke(
+            points: List<CanvasPoint>,
+            color: String,
+            width: Double,
+        ): CanvasSnapshot {
+            actions += "drawStroke"
+            require(points.size >= 2) { "drawStroke requires at least two points" }
+            val first = points.first()
+            val last = points.last()
+            figures =
+                listOf(
+                    CanvasFigureSnapshot(
+                        index = 0,
+                        type = "stroke",
+                        x = first.x,
+                        y = first.y,
+                        width = last.x - first.x,
+                        height = last.y - first.y,
+                        content = "",
+                        color = color,
+                        strokeWidth = width,
+                        points = points,
+                    ),
+                )
+            return snapshot()
+        }
+
+        override fun selectFigure(index: Int?): CanvasSnapshot {
+            actions += "select"
+            return snapshot()
+        }
+
+        override fun selectAt(
+            x: Double,
+            y: Double,
+        ): CanvasSnapshot {
+            actions += "selectAt"
+            return snapshot()
+        }
+
+        override fun moveFigure(
+            index: Int,
+            deltaX: Double,
+            deltaY: Double,
+        ): CanvasSnapshot {
+            actions += "moveFigure"
+            figures =
+                figures.mapIndexed { figureIndex, figure ->
+                    if (figureIndex == index) figure.copy(x = figure.x + deltaX, y = figure.y + deltaY) else figure
+                }
+            return snapshot()
+        }
+
+        override fun resizeFigure(
+            index: Int,
+            width: Double,
+            height: Double,
+        ): CanvasSnapshot {
+            actions += "resizeFigure"
+            figures =
+                figures.mapIndexed { figureIndex, figure ->
+                    if (figureIndex == index) figure.copy(width = width, height = height) else figure
+                }
+            return snapshot()
+        }
+
+        override fun deleteFigure(index: Int): CanvasSnapshot {
+            actions += "deleteFigure"
+            figures = figures.filterIndexed { figureIndex, _ -> figureIndex != index }
+            return snapshot()
+        }
+
+        override fun saveDocument(requestedName: String): CanvasDocumentReference {
+            actions += "saveDocument:$requestedName"
+            return CanvasDocumentReference(
+                id = "canvas-1",
+                relativePath = "canvas/$requestedName.canvas",
+                mimeType = "application/vnd.visual-agent.canvas+xml",
+                sha256 = "abc123",
+            )
+        }
+
+        override fun openDocument(
+            id: String?,
+            path: String?,
+        ): CanvasSnapshot {
+            actions += "openDocument:$id:$path"
+            figures = listOf(CanvasFigureSnapshot(0, "rectangle", 1.0, 2.0, 3.0, 4.0))
+            return snapshot()
+        }
+
         override fun captureImage(format: String): CanvasImageSnapshot {
             require(format == "png") { "Unsupported canvas image format: $format" }
             actions += "captureImage:$format"
@@ -192,6 +351,7 @@ class CanvasToolTest {
                 figureCount = figures.size,
                 zoomPercent = 100,
                 gridVisible = true,
+                selectedFigureIndex = null,
                 figures = figures,
             )
     }

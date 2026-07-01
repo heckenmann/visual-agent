@@ -88,11 +88,16 @@ Provider-related entries include:
 
 Legacy provider entries are migrated into the catalog when no catalog exists. API keys are currently stored as plaintext by product decision. They are excluded from file-based configuration exports and must not be exposed to model context, tool output, or logs.
 
-Canvas-related entries include:
-
-- `canvas.document.xml`: serialized JHotDraw document containing layers, editable figures, image references, and transforms
-
-The canvas document is updated after model changes and restored when the canvas panel is created.
+Canvas documents are stored as regular managed workspace files
+under `data/workspace/canvas/` with MIME type
+`application/vnd.visual-agent.canvas+xml` (see
+`workspace/WorkspaceFilePaths.kt` `CANVAS_MIME_TYPE`). The default
+auto-saved document is `current.canvas`; explicit saves use
+`canvas.saveDocument(name)` and produce a separate managed file that
+shows up in the Files panel and is queryable through `workspace:file`.
+The document format is a versioned JSON document (see
+`canvas/CanvasDocumentCodec.kt`) and is updated on every mutation by
+`InMemoryCanvasService` while the canvas is in use.
 
 ## Search/Index Notes
 

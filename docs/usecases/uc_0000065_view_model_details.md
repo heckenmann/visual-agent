@@ -16,8 +16,8 @@ Desktop user.
 ## Main Flow
 
 1. The user selects a model.
-2. The session model controller requests details from the provider.
-3. Provider details are formatted for the session panel.
+2. The settings panel requests details from the provider.
+3. Provider details are formatted for the settings panel.
 4. Errors are converted to user-facing messages.
 
 ## Result
@@ -30,7 +30,7 @@ The user can make informed model-selection decisions.
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.panels.session.SessionModelController`
+- `de.heckenmann.visualagent.ui.compose.SettingsPanel`
 - `de.heckenmann.visualagent.agent.LLMProvider.getModelDetails`
 
 ## Acceptance Criteria

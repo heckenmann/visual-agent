@@ -30,8 +30,8 @@ The user sees useful feedback even when the model fails to summarize tool-only w
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.MainWindowChatWiring`
-- `de.heckenmann.visualagent.ui.MainWindowToolWiring`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
 
 ## Acceptance Criteria
 

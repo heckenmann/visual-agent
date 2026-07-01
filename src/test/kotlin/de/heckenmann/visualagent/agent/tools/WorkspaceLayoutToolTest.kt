@@ -1,10 +1,10 @@
 package de.heckenmann.visualagent.agent.tools
 
 import de.heckenmann.visualagent.knowledge.PreferenceStore
-import de.heckenmann.visualagent.ui.WorkspaceLayout
-import de.heckenmann.visualagent.ui.WorkspaceLayoutPersistence
-import de.heckenmann.visualagent.ui.WorkspaceLayoutService
-import de.heckenmann.visualagent.ui.WorkspaceWindowState
+import de.heckenmann.visualagent.workspace.layout.WorkspaceLayout
+import de.heckenmann.visualagent.workspace.layout.WorkspaceLayoutPersistence
+import de.heckenmann.visualagent.workspace.layout.WorkspaceLayoutService
+import de.heckenmann.visualagent.workspace.layout.WorkspaceWindowState
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.double

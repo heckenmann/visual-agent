@@ -16,7 +16,7 @@ Desktop user.
 ## Main Flow
 
 1. The user opens the agent details dialog.
-2. The dialog displays identity, model, parameter, and option fields.
+2. The dialog displays identity, template, provider/model override, parameter, option, runtime limit, and tool fields.
 3. The user edits values.
 4. Validation prevents invalid provider/model/option settings.
 5. Saved changes update persisted sub-agent state.
@@ -31,12 +31,15 @@ Each sub-agent can use an appropriate role and model configuration.
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.panels.AgentDetailsDialog`
-- `de.heckenmann.visualagent.ui.panels.AgentDetailsDialogSupport`
+- `de.heckenmann.visualagent.ui.compose.SubAgentsPanel`
+- `de.heckenmann.visualagent.ui.compose.ComposeContentModal`
+- `de.heckenmann.visualagent.ui.compose.ComposeModalHost`
 - `de.heckenmann.visualagent.agent.AgentManager.updateAgent`
+- `de.heckenmann.visualagent.agent.AgentConfig`
 
 ## Acceptance Criteria
 
 - Invalid dialog input disables save.
 - Agent-specific model configuration is persisted.
 - Existing values are preserved when fields are left unchanged.
+- Agent-specific tool selections are persisted with the sub-agent configuration.

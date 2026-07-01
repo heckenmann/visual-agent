@@ -99,7 +99,7 @@ class AppConfig private constructor() {
     }
 
     /**
-     * Gets the AtlantaFX theme stylesheet for the current theme setting.
+     * Gets the normalized Compose theme identifier for the current theme setting.
      *
      * @return The fully qualified path to the theme stylesheet, or Dracula as default
      */

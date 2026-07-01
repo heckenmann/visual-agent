@@ -1,8 +1,8 @@
-# UC-0000036: Arrange Windows Via Tool
+# UC-0000036: Arrange Workspace Layout Via Tool
 
 ## Goal
 
-Allow enabled sub-agents to inspect screens, main window dimensions, internal workspace dimensions, and arrange internal windows.
+Allow enabled sub-agents to inspect and update workspace panel visibility, order, and preferred sizes.
 
 ## Primary Actor
 
@@ -15,26 +15,33 @@ Enabled sub-agent.
 
 ## Main Flow
 
-1. The model calls the workspace layout tool.
-2. The tool requests the current layout report or a move/resize operation.
-3. The service returns screen, stage, desktop, and internal window state.
-4. For mutations, requested bounds are applied to the target internal window.
+1. The model calls the workspace layout tool with `get`.
+2. The tool requests the current layout report.
+3. The service returns stage, desktop, and workspace panel slot state.
+4. The model uses the reported slots to reason about visible panels and available screen space.
+5. When an enabled model needs a layout change, it calls `workspace:layout` with `set` and a bounded window patch.
+6. The service persists the requested state and notifies the live Compose workspace.
+7. The Compose workspace restores the patched visibility, order, and preferred sizes into the semantic split layout.
 
 ## Result
 
-The agent can reason about and organize the visible workspace layout.
+The agent can reason about and adjust the visible workspace layout without relying on fragile free-floating window coordinates.
 
 ## Tool Calls
 
-- `workspace:layout` actions inspect screens/window bounds and move or resize internal windows.
+- `workspace:layout` action `get`: inspects screens, main-window bounds, desktop bounds, and visible workspace panel slots.
+- `workspace:layout` action `set`: updates panel visibility, z-order, and preferred bounds such as width and height.
 
 ## Code Entry Points
 
 - `de.heckenmann.visualagent.agent.tools.WorkspaceLayoutTool`
-- `de.heckenmann.visualagent.ui.WorkspaceLayoutService`
-- `de.heckenmann.visualagent.ui.WorkspaceWindowManager`
+- `de.heckenmann.visualagent.workspace.layout.WorkspaceLayoutService`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
 
 ## Acceptance Criteria
 
-- The tool reports available screens and current window positions.
-- Invalid window IDs or bounds return clear tool failures.
+- The tool reports current workspace and panel slot positions.
+- Hidden panels are reported as hidden.
+- The tool can persist model-requested panel size changes.
+- Live Compose workspaces are notified when the tool applies updated window states.
+- Invalid requests return clear tool failures.

@@ -2,7 +2,7 @@
 
 ## Goal
 
-Start Visual Agent as a JavaFX desktop application with the Spring application context, persisted settings, database-backed stores, and the main workspace window available to the user.
+Start Visual Agent as a Compose Multiplatform desktop application with the Spring application context, persisted settings, database-backed stores, and the main workspace window available to the user.
 
 ## Primary Actor
 
@@ -17,9 +17,9 @@ Desktop user.
 ## Main Flow
 
 1. The user starts the application.
-2. The JavaFX launcher creates the Spring Boot application context.
+2. The Compose Multiplatform launcher creates the Spring Boot application context.
 3. Configuration and persistence services initialize.
-4. The main window is loaded from FXML.
+4. The main window is loaded from Compose.
 5. UI panels and backend services are wired.
 6. The primary stage is shown.
 
@@ -35,10 +35,10 @@ The user sees the Visual Agent main window and can interact with chat, session s
 
 - `de.heckenmann.visualagent.Main`
 - `de.heckenmann.visualagent.VisualAgentApplication`
-- `de.heckenmann.visualagent.ui.MainWindow`
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
 
 ## Acceptance Criteria
 
 - Starting via `gradle run` opens the main window.
-- Spring-managed services are available to JavaFX controllers.
+- Spring-managed services are available to Compose Multiplatform controllers.
 - Startup does not lose persisted runtime state.

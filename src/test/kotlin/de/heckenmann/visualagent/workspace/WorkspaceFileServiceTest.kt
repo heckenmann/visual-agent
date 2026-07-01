@@ -14,6 +14,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
 import kotlin.io.path.deleteIfExists
+import kotlin.io.path.isRegularFile
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
 import kotlin.test.assertEquals
@@ -51,7 +52,7 @@ class WorkspaceFileServiceTest {
         }
 
     @Test
-    fun `pdf text extraction works and page rendering is unavailable without a non desktop renderer`() =
+    fun `pdf text extraction and page preview rendering create generated workspace image`() =
         withDatabasePath(tempDir().resolve("data/visual-agent.db").toString()) {
             val service = WorkspaceFileService(FakeWorkspaceFileStore())
             val pdf = tempDir().resolve("sample.pdf")
@@ -59,10 +60,15 @@ class WorkspaceFileServiceTest {
             val imported = service.importFile(pdf.toFile())
 
             val text = service.extractPdfText(imported)
-            val error = kotlin.test.assertFailsWith<UnsupportedOperationException> { service.renderPdfPage(imported, 1) }
+            val preview = service.renderPdfPage(imported, 1)
+            val info = service.imageInfo(preview)
 
             assertTrue(text.text.contains("Hello PDF"))
-            assertTrue(error.message.orEmpty().contains("non-desktop renderer"))
+            assertEquals("generated/sample-page-1.png", preview.relativePath)
+            assertEquals("image/png", preview.mimeType)
+            assertEquals(1200, info.width)
+            assertEquals(1600, info.height)
+            assertTrue(service.resolveManagedPath(preview.relativePath).isRegularFile())
         }
 
     @Test
