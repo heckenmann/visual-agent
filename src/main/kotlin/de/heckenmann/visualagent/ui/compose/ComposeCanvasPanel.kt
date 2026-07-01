@@ -13,6 +13,8 @@ import androidx.compose.material.icons.filled.AddBox
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.ClearAll
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Gesture
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.TextFields
@@ -28,6 +30,11 @@ import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.canvas.CanvasOperations
 import de.heckenmann.visualagent.canvas.CanvasSnapshot
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
+import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
+import java.nio.file.Path
+import kotlin.io.path.isRegularFile
+import kotlin.io.path.readBytes
 
 @Composable
 internal fun CanvasPanel(
@@ -39,6 +46,7 @@ internal fun CanvasPanel(
     var status by remember { mutableStateOf("Figures: ${snapshot.figureCount}") }
     var documentName by remember { mutableStateOf("canvas.canvas") }
     var captureName by remember { mutableStateOf("canvas-capture.png") }
+    var mode by remember { mutableStateOf(CanvasInteractionMode.Select) }
     val update: (CanvasSnapshot) -> Unit = { next ->
         snapshot = next
         status =
@@ -48,9 +56,32 @@ internal fun CanvasPanel(
                 "Figures: ${next.figureCount} · selected ${next.selectedFigureIndex}"
             }
     }
+    val imagePicker =
+        rememberFilePickerLauncher { selected: PlatformFile? ->
+            selected?.file?.let { file ->
+                runCatching {
+                    val imported = workspaceFileService.importFile(file)
+                    canvasOperations.insertImage(imported.relativePath)
+                }.onSuccess { update(it) }
+                    .onFailure { status = "Image import failed: ${it.message}" }
+            }
+        }
+    val imageBytesForPath: (String) -> ByteArray? = { path ->
+        runCatching { workspaceFileService.resolveManagedPath(path).readBytes() }
+            .recoverCatching { Path.of(path).takeIf { it.isRegularFile() }?.readBytes() ?: throw it }
+            .getOrNull()
+    }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            CanvasDrawingToolbar(canvasOperations, modalRequester, snapshot, update)
+            CanvasDrawingToolbar(
+                canvasOperations = canvasOperations,
+                modalRequester = modalRequester,
+                snapshot = snapshot,
+                mode = mode,
+                onModeChange = { mode = it },
+                onImportImage = { imagePicker.launch() },
+                update = update,
+            )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             CanvasPersistenceToolbar(
@@ -65,6 +96,8 @@ internal fun CanvasPanel(
         CanvasSurface(
             snapshot = snapshot,
             canvasOperations = canvasOperations,
+            mode = mode,
+            imageBytesForPath = imageBytesForPath,
             onSnapshotChanged = update,
             modifier = Modifier.weight(1f).fillMaxWidth(),
         )
@@ -77,8 +110,24 @@ private fun CanvasDrawingToolbar(
     canvasOperations: CanvasOperations,
     modalRequester: ComposeModalRequester,
     snapshot: CanvasSnapshot,
+    mode: CanvasInteractionMode,
+    onModeChange: (CanvasInteractionMode) -> Unit,
+    onImportImage: () -> Unit,
     update: (CanvasSnapshot) -> Unit,
 ) {
+    ActionIconButton(
+        icon = Icons.Filled.Gesture,
+        description = if (mode == CanvasInteractionMode.Pen) "Switch to select mode" else "Switch to pen mode",
+        onClick = {
+            onModeChange(
+                if (mode == CanvasInteractionMode.Pen) {
+                    CanvasInteractionMode.Select
+                } else {
+                    CanvasInteractionMode.Pen
+                },
+            )
+        },
+    )
     ActionIconButton(
         icon = Icons.Filled.AddBox,
         description = "Add rectangle",
@@ -93,6 +142,11 @@ private fun CanvasDrawingToolbar(
         icon = Icons.Filled.TextFields,
         description = "Add text",
         onClick = { update(canvasOperations.drawText("Visual Agent", 70.0, 220.0, "#F8F8F2")) },
+    )
+    ActionIconButton(
+        icon = Icons.Filled.Image,
+        description = "Import image",
+        onClick = onImportImage,
     )
     ActionIconButton(
         icon = Icons.Filled.ClearAll,

@@ -14,12 +14,15 @@ import de.heckenmann.visualagent.agent.tools.string
 import de.heckenmann.visualagent.agent.tools.success
 import de.heckenmann.visualagent.agent.tools.toFunctionName
 import de.heckenmann.visualagent.canvas.CanvasOperations
+import de.heckenmann.visualagent.canvas.CanvasPoint
 import de.heckenmann.visualagent.knowledge.ConversationStore
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.springframework.stereotype.Component
@@ -40,7 +43,7 @@ class CanvasTool(
             id = ToolId(TOOL_ID),
             name = ToolId(TOOL_ID).toFunctionName(),
             description =
-                "Inspect or edit the canvas. Actions: get, clear, drawText, drawRect, drawLine, drawCircle, insertImage, " +
+                "Inspect or edit the canvas. Actions: get, clear, drawText, drawRect, drawLine, drawStroke, drawCircle, insertImage, " +
                     "select, selectAt, moveFigure, resizeFigure, deleteFigure, saveDocument, openDocument, captureImage. " +
                     "Coordinates are canvas coordinates. " +
                     "Use get before making layout-sensitive changes.",
@@ -59,6 +62,7 @@ class CanvasTool(
                 "drawText" -> drawText(input)
                 "drawRect" -> drawRect(input)
                 "drawLine" -> drawLine(input)
+                "drawStroke" -> drawStroke(input)
                 "drawCircle" -> drawCircle(input)
                 "insertImage" -> insertImage(input)
                 "select" -> select(input)
@@ -115,6 +119,18 @@ class CanvasTool(
                     y1 = input.requiredDouble("y1"),
                     x2 = input.requiredDouble("x2"),
                     y2 = input.requiredDouble("y2"),
+                    color = input.string("color") ?: DEFAULT_STROKE_COLOR,
+                    width = input.double("width") ?: DEFAULT_STROKE_WIDTH,
+                ),
+            ),
+        )
+
+    private fun drawStroke(input: JsonObject): ToolResult =
+        success(
+            TOOL_ID,
+            json.encodeToString(
+                canvas.drawStroke(
+                    points = input.requiredPoints("points"),
                     color = input.string("color") ?: DEFAULT_STROKE_COLOR,
                     width = input.double("width") ?: DEFAULT_STROKE_WIDTH,
                 ),
@@ -248,6 +264,17 @@ class CanvasTool(
     private fun JsonObject.requiredInt(key: String): Int = int(key) ?: throw IllegalArgumentException("Missing required field '$key'")
 
     private fun JsonObject.int(key: String): Int? = this[key]?.jsonPrimitive?.content?.toIntOrNull()
+
+    private fun JsonObject.requiredPoints(key: String): List<CanvasPoint> {
+        val points = this[key]?.jsonArray ?: throw IllegalArgumentException("Missing required field '$key'")
+        return points.map { element ->
+            val point = element.jsonObject
+            CanvasPoint(
+                x = point.requiredDouble("x"),
+                y = point.requiredDouble("y"),
+            )
+        }
+    }
 
     private companion object {
         const val TOOL_ID = "canvas"

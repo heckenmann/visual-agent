@@ -43,7 +43,7 @@ class InMemoryCanvasService(
         color: String,
     ): CanvasSnapshot =
         synchronized(lock) {
-            addFigure(type = "text", x = x, y = y, width = max(80.0, text.length * 8.0), height = 24.0)
+            addFigure(type = "text", x = x, y = y, width = max(80.0, text.length * 8.0), height = 24.0, content = text, color = color)
             toSnapshot().also { persistDefaultDocument(it) }
         }
 
@@ -56,7 +56,7 @@ class InMemoryCanvasService(
         strokeColor: String?,
     ): CanvasSnapshot =
         synchronized(lock) {
-            addFigure(type = "rectangle", x = x, y = y, width = width, height = height)
+            addFigure(type = "rectangle", x = x, y = y, width = width, height = height, color = fillColor)
             toSnapshot().also { persistDefaultDocument(it) }
         }
 
@@ -75,6 +75,33 @@ class InMemoryCanvasService(
                 y = minOf(y1, y2),
                 width = kotlin.math.abs(x2 - x1).coerceAtLeast(width),
                 height = kotlin.math.abs(y2 - y1).coerceAtLeast(width),
+                color = color,
+                strokeWidth = width,
+            )
+            toSnapshot().also { persistDefaultDocument(it) }
+        }
+
+    override fun drawStroke(
+        points: List<CanvasPoint>,
+        color: String,
+        width: Double,
+    ): CanvasSnapshot =
+        synchronized(lock) {
+            val normalizedPoints = points.distinctAdjacent().take(MAX_STROKE_POINTS)
+            require(normalizedPoints.size >= 2) { "A freehand stroke requires at least two points" }
+            val minX = normalizedPoints.minOf(CanvasPoint::x)
+            val minY = normalizedPoints.minOf(CanvasPoint::y)
+            val maxX = normalizedPoints.maxOf(CanvasPoint::x)
+            val maxY = normalizedPoints.maxOf(CanvasPoint::y)
+            addFigure(
+                type = "stroke",
+                x = minX,
+                y = minY,
+                width = (maxX - minX).coerceAtLeast(width),
+                height = (maxY - minY).coerceAtLeast(width),
+                color = color,
+                strokeWidth = width,
+                points = normalizedPoints.map { CanvasPoint(it.x - minX, it.y - minY) },
             )
             toSnapshot().also { persistDefaultDocument(it) }
         }
@@ -98,7 +125,7 @@ class InMemoryCanvasService(
 
     override fun insertImage(path: String): CanvasSnapshot =
         synchronized(lock) {
-            addFigure(type = "image", x = 0.0, y = 0.0, width = 320.0, height = 240.0)
+            addFigure(type = "image", x = 0.0, y = 0.0, width = 320.0, height = 240.0, content = path)
             toSnapshot().also { persistDefaultDocument(it) }
         }
 
@@ -215,6 +242,10 @@ class InMemoryCanvasService(
         y: Double,
         width: Double,
         height: Double,
+        content: String = "",
+        color: String = "",
+        strokeWidth: Double = 1.0,
+        points: List<CanvasPoint> = emptyList(),
     ) {
         figures +=
             CanvasFigureSnapshot(
@@ -224,6 +255,10 @@ class InMemoryCanvasService(
                 y = y,
                 width = width,
                 height = height,
+                content = content,
+                color = color,
+                strokeWidth = strokeWidth,
+                points = points,
             )
         selectedFigureIndex = figures.lastIndex
     }
@@ -281,7 +316,16 @@ class InMemoryCanvasService(
         const val DEFAULT_DOCUMENT_NAME = "current.canvas"
         const val DEFAULT_EXPLICIT_DOCUMENT_NAME = "canvas.canvas"
         const val MIN_FIGURE_SIZE = 8.0
+        const val MAX_STROKE_POINTS = 2000
     }
 }
 
 private fun String.withCanvasExtension(): String = if (endsWith(".canvas", ignoreCase = true)) this else "$this.canvas"
+
+private fun List<CanvasPoint>.distinctAdjacent(): List<CanvasPoint> {
+    val result = mutableListOf<CanvasPoint>()
+    forEach { point ->
+        if (result.lastOrNull() != point) result += point
+    }
+    return result
+}

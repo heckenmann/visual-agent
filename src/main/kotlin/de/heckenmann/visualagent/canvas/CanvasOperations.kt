@@ -61,6 +61,17 @@ interface CanvasOperations {
     ): CanvasSnapshot
 
     /**
+     * Adds an editable freehand stroke to the canvas.
+     *
+     * @return Snapshot after insertion
+     */
+    fun drawStroke(
+        points: List<CanvasPoint>,
+        color: String,
+        width: Double,
+    ): CanvasSnapshot
+
+    /**
      * Adds an editable circle to the canvas.
      *
      * @return Snapshot after insertion
@@ -199,7 +210,42 @@ data class CanvasFigureSnapshot(
     val y: Double,
     val width: Double,
     val height: Double,
+    val content: String = "",
+    val color: String = "",
+    val strokeWidth: Double = 1.0,
+    val points: List<CanvasPoint> = emptyList(),
 )
+
+/**
+ * Serializable point used by freehand stroke figures.
+ *
+ * @property x Canvas X coordinate
+ * @property y Canvas Y coordinate
+ */
+@Serializable
+data class CanvasPoint(
+    val x: Double,
+    val y: Double,
+)
+
+/**
+ * Parses a `#RRGGBB`, `RRGGBB`, `#AARRGGBB`, or `AARRGGBB` string into a packed ARGB `Int`.
+ *
+ * Returns `null` for empty input, malformed hex, or any other length so callers can fall back
+ * to a default. Used by the Compose surface and the PNG renderer to keep one parser in sync.
+ *
+ * @return ARGB int with full alpha when only RGB is provided, or `null` if the input is invalid
+ */
+fun parseHexColor(hex: String): Int? {
+    if (hex.isEmpty()) return null
+    val stripped = hex.removePrefix("#")
+    val value = stripped.toLongOrNull(16) ?: return null
+    return when (stripped.length) {
+        6 -> (0xFF000000L or value).toInt()
+        8 -> value.toInt()
+        else -> null
+    }
+}
 
 /**
  * Persisted canvas document reference in the managed workspace.

@@ -4,6 +4,7 @@ package de.heckenmann.visualagent.ui.compose
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,11 +28,16 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -40,6 +46,8 @@ import androidx.compose.ui.unit.dp
 internal fun ComposeRail(
     windows: List<ComposeWorkspaceWindow>,
     onToggleWindow: (String) -> Unit,
+    onMoveWindowEarlier: (String) -> Unit,
+    onMoveWindowLater: (String) -> Unit,
     onCloseApplication: () -> Unit,
 ) {
     Column(
@@ -59,6 +67,8 @@ internal fun ComposeRail(
                 icon = window.railIcon(),
                 description = "Toggle ${window.title}",
                 selected = window.visible,
+                onMoveEarlier = { onMoveWindowEarlier(window.id) },
+                onMoveLater = { onMoveWindowLater(window.id) },
                 onClick = { onToggleWindow(window.id) },
             )
         }
@@ -70,8 +80,11 @@ private fun RailButton(
     icon: ImageVector,
     description: String,
     selected: Boolean,
+    onMoveEarlier: (() -> Unit)? = null,
+    onMoveLater: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
+    var dragOffset by remember { mutableFloatStateOf(0f) }
     ActionIconButton(
         icon = icon,
         description = description,
@@ -81,7 +94,27 @@ private fun RailButton(
                 .size(36.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .background(if (selected) Color(0xFF333644) else Color(0xFF23252F))
-                .border(1.dp, if (selected) Color(0xCC50FA7B) else Color(0x2AFFFFFF), RoundedCornerShape(8.dp)),
+                .border(1.dp, if (selected) Color(0xCC50FA7B) else Color(0x2AFFFFFF), RoundedCornerShape(8.dp))
+                .pointerInput(onMoveEarlier, onMoveLater) {
+                    if (onMoveEarlier == null || onMoveLater == null) return@pointerInput
+                    detectDragGestures(
+                        onDragEnd = { dragOffset = 0f },
+                        onDragCancel = { dragOffset = 0f },
+                    ) { change, dragAmount ->
+                        change.consume()
+                        dragOffset += dragAmount.y
+                        when {
+                            dragOffset <= -RAIL_REORDER_THRESHOLD_PX -> {
+                                onMoveEarlier()
+                                dragOffset = 0f
+                            }
+                            dragOffset >= RAIL_REORDER_THRESHOLD_PX -> {
+                                onMoveLater()
+                                dragOffset = 0f
+                            }
+                        }
+                    }
+                },
         iconSize = 18.dp,
     )
 }
@@ -129,6 +162,8 @@ internal fun ComposeWorkspaceHeader(
         HeaderChip("Beans", beanDefinitionCount.toString())
     }
 }
+
+private const val RAIL_REORDER_THRESHOLD_PX = 34f
 
 @Composable
 internal fun PanelStatus(status: String) {

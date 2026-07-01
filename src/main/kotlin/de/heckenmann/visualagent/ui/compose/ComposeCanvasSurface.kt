@@ -1,9 +1,11 @@
-@file:Suppress("FunctionName")
+@file:Suppress("FunctionName", "ktlint:standard:import-ordering")
 
 package de.heckenmann.visualagent.ui.compose
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,29 +30,37 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.canvas.CanvasFigureSnapshot
 import de.heckenmann.visualagent.canvas.CanvasOperations
+import de.heckenmann.visualagent.canvas.CanvasPoint
 import de.heckenmann.visualagent.canvas.CanvasSnapshot
+import de.heckenmann.visualagent.canvas.parseHexColor
 import io.github.xingray.compose.infinitecanvas.CanvasNode
 import io.github.xingray.compose.infinitecanvas.CanvasNodeState
 import io.github.xingray.compose.infinitecanvas.InfiniteCanvas
 import io.github.xingray.compose.infinitecanvas.InfiniteCanvasConfig
 import io.github.xingray.compose.infinitecanvas.rememberInfiniteCanvasState
 import kotlinx.coroutines.flow.collectLatest
+import org.jetbrains.skia.Image as SkiaImage
 import kotlin.math.abs
 
 @Composable
 internal fun CanvasSurface(
     snapshot: CanvasSnapshot,
     canvasOperations: CanvasOperations,
+    mode: CanvasInteractionMode,
+    imageBytesForPath: (String) -> ByteArray?,
     onSnapshotChanged: (CanvasSnapshot) -> Unit,
     modifier: Modifier,
 ) {
     val canvasState = rememberInfiniteCanvasState()
     val nodeStates = remember { mutableStateMapOf<Int, CanvasNodeState>() }
+    var strokePoints by remember { mutableStateOf(emptyList<CanvasPoint>()) }
     syncNodeStates(snapshot, nodeStates)
 
     LaunchedEffect(canvasState, snapshot.selectedFigureIndex) {
@@ -71,28 +81,81 @@ internal fun CanvasSurface(
             }
     }
 
-    InfiniteCanvas(
-        modifier =
-            modifier
-                .clip(RoundedCornerShape(8.dp))
-                .border(1.dp, Color(0x33444A65), RoundedCornerShape(8.dp)),
-        state = canvasState,
-        config =
-            InfiniteCanvasConfig(
-                showGrid = true,
-                gridSize = 48f,
-                gridColor = Color(0x33444A65),
-                backgroundColor = Color(0xFF191A21),
-                showBottomControls = true,
-            ),
-        nodes = canvasNodes(snapshot, nodeStates, canvasOperations, onSnapshotChanged),
-    )
+    Box(modifier = modifier.clip(RoundedCornerShape(8.dp))) {
+        InfiniteCanvas(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .border(1.dp, Color(0x33444A65), RoundedCornerShape(8.dp)),
+            state = canvasState,
+            config =
+                InfiniteCanvasConfig(
+                    showGrid = true,
+                    gridSize = 48f,
+                    gridColor = Color(0x33444A65),
+                    backgroundColor = Color(0xFF191A21),
+                    showBottomControls = true,
+                ),
+            nodes = canvasNodes(snapshot, nodeStates, canvasOperations, imageBytesForPath, onSnapshotChanged),
+        )
+        if (mode == CanvasInteractionMode.Pen) {
+            Canvas(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            detectDragGestures(
+                                onDragStart = { offset ->
+                                    val worldPos = canvasState.viewport.screenToWorld(offset)
+                                    strokePoints = listOf(CanvasPoint(worldPos.x.toDouble(), worldPos.y.toDouble()))
+                                },
+                                onDragEnd = {
+                                    if (strokePoints.size >= 2) {
+                                        onSnapshotChanged(canvasOperations.drawStroke(strokePoints, "#F8F8F2", 3.0))
+                                    }
+                                    strokePoints = emptyList()
+                                },
+                                onDragCancel = { strokePoints = emptyList() },
+                            ) { change, _ ->
+                                change.consume()
+                                val worldPos = canvasState.viewport.screenToWorld(change.position)
+                                strokePoints = strokePoints + CanvasPoint(worldPos.x.toDouble(), worldPos.y.toDouble())
+                            }
+                        },
+            ) {
+                strokePoints.zipWithNext().forEach { (start, end) ->
+                    val startScreen =
+                        canvasState.viewport.worldToScreen(
+                            androidx.compose.ui.geometry.Offset(
+                                start.x.toFloat(),
+                                start.y.toFloat(),
+                            ),
+                        )
+                    val endScreen =
+                        canvasState.viewport.worldToScreen(
+                            androidx.compose.ui.geometry.Offset(
+                                end.x.toFloat(),
+                                end.y.toFloat(),
+                            ),
+                        )
+                    drawLine(
+                        color = Color(0xFFF8F8F2),
+                        start = startScreen,
+                        end = endScreen,
+                        strokeWidth = 3f,
+                        cap = StrokeCap.Round,
+                    )
+                }
+            }
+        }
+    }
 }
 
 private fun canvasNodes(
     snapshot: CanvasSnapshot,
     nodeStates: SnapshotStateMap<Int, CanvasNodeState>,
     canvasOperations: CanvasOperations,
+    imageBytesForPath: (String) -> ByteArray?,
     onSnapshotChanged: (CanvasSnapshot) -> Unit,
 ): List<CanvasNode> =
     snapshot.figures.map { figure ->
@@ -107,6 +170,7 @@ private fun canvasNodes(
                 FigureNode(
                     figure = figure,
                     selected = figure.index == snapshot.selectedFigureIndex,
+                    imageBytesForPath = imageBytesForPath,
                     onResize = { width, height ->
                         onSnapshotChanged(canvasOperations.resizeFigure(figure.index, width, height))
                     },
@@ -119,6 +183,7 @@ private fun canvasNodes(
 private fun FigureNode(
     figure: CanvasFigureSnapshot,
     selected: Boolean,
+    imageBytesForPath: (String) -> ByteArray?,
     onResize: (Double, Double) -> Unit,
 ) {
     val shape: Shape = if (figure.type == "circle") CircleShape else RoundedCornerShape(8.dp)
@@ -132,13 +197,16 @@ private fun FigureNode(
                 .padding(6.dp),
         contentAlignment = Alignment.Center,
     ) {
-        if (figure.type == "text") {
-            Text(
-                text = "Text",
-                color = Color(0xFF191A21),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+        when (figure.type) {
+            "text" ->
+                Text(
+                    text = figure.content.ifBlank { "Text" },
+                    color = Color(0xFF191A21),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            "stroke" -> StrokeFigure(figure)
+            "image" -> ImageFigure(figure, imageBytesForPath)
         }
         if (selected) {
             FigureResizeHandle(
@@ -174,6 +242,51 @@ private fun FigureResizeHandle(
                     }
                 },
     )
+}
+
+@Composable
+private fun StrokeFigure(figure: CanvasFigureSnapshot) {
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        figure.points.zipWithNext().forEach { (start, end) ->
+            drawLine(
+                color = figure.color.toComposeColor(Color(0xFFF8F8F2)),
+                start =
+                    androidx.compose.ui.geometry.Offset(
+                        start.x.toFloat(),
+                        start.y.toFloat(),
+                    ),
+                end =
+                    androidx.compose.ui.geometry.Offset(
+                        end.x.toFloat(),
+                        end.y.toFloat(),
+                    ),
+                strokeWidth = figure.strokeWidth.toFloat().coerceAtLeast(1f),
+                cap = StrokeCap.Round,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ImageFigure(
+    figure: CanvasFigureSnapshot,
+    imageBytesForPath: (String) -> ByteArray?,
+) {
+    val imageBitmap =
+        remember(figure.content) {
+            imageBytesForPath(figure.content)
+                ?.let { bytes -> runCatching { SkiaImage.makeFromEncoded(bytes).toComposeImageBitmap() }.getOrNull() }
+        }
+    if (imageBitmap == null) {
+        Text(
+            text = "Image",
+            color = Color(0xFF191A21),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    } else {
+        Image(bitmap = imageBitmap, contentDescription = null, modifier = Modifier.fillMaxSize())
+    }
 }
 
 private data class CanvasNodePosition(
@@ -214,8 +327,20 @@ private fun CanvasNodePosition.isMovedFrom(figures: List<CanvasFigureSnapshot>):
 
 private fun figureColor(figure: CanvasFigureSnapshot): Color =
     when (figure.type) {
-        "circle" -> Color(0xFFFF79C6)
-        "line" -> Color(0xFF8BE9FD)
-        "text" -> Color(0xFFFFB86C)
-        else -> Color(0xFF50FA7B)
+        "circle" -> figure.color.toComposeColor(Color(0xFFFF79C6))
+        "line" -> figure.color.toComposeColor(Color(0xFF8BE9FD))
+        "stroke" -> Color.Transparent
+        "text" -> figure.color.toComposeColor(Color(0xFFFFB86C))
+        "image" -> Color(0xFFBD93F9)
+        else -> figure.color.toComposeColor(Color(0xFF50FA7B))
     }
+
+internal enum class CanvasInteractionMode {
+    Select,
+    Pen,
+}
+
+private fun String.toComposeColor(defaultColor: Color): Color {
+    val argb = parseHexColor(this) ?: return defaultColor
+    return Color(argb)
+}

@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.canvas.CanvasDocumentReference
 import de.heckenmann.visualagent.canvas.CanvasFigureSnapshot
 import de.heckenmann.visualagent.canvas.CanvasImageSnapshot
 import de.heckenmann.visualagent.canvas.CanvasOperations
+import de.heckenmann.visualagent.canvas.CanvasPoint
 import de.heckenmann.visualagent.canvas.CanvasSnapshot
 import de.heckenmann.visualagent.knowledge.ConversationRecord
 import de.heckenmann.visualagent.knowledge.ConversationStore
@@ -42,6 +43,35 @@ class CanvasToolTest {
         assertTrue(result.success)
         assertEquals(listOf("drawText", "drawLine", "drawCircle", "drawRect"), canvas.actions)
         assertEquals("1", content["figureCount"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun `drawStroke action delegates to canvas operations`() {
+        val canvas = FakeCanvasOperations()
+        val tool = CanvasTool(canvas, FakeConversationStore())
+
+        val result =
+            tool.execute(
+                """{"action":"drawStroke","points":[{"x":0,"y":0},{"x":10,"y":5},{"x":20,"y":12}],"color":"#ff00ff","width":3.0}""",
+            )
+
+        assertTrue(result.success)
+        assertEquals(listOf("drawStroke"), canvas.actions)
+        val figure = canvas.lastFigure
+        assertEquals("stroke", figure.type)
+        assertEquals("#ff00ff", figure.color)
+        assertEquals(3.0, figure.strokeWidth)
+        assertEquals(3, figure.points.size)
+    }
+
+    @Test
+    fun `drawStroke rejects fewer than two points`() {
+        val tool = CanvasTool(FakeCanvasOperations(), FakeConversationStore())
+
+        val result = tool.execute("""{"action":"drawStroke","points":[{"x":0,"y":0}]}""")
+
+        assertFalse(result.success)
+        assertTrue(result.error.orEmpty().contains("points"))
     }
 
     @Test
@@ -148,6 +178,9 @@ class CanvasToolTest {
         val actions = mutableListOf<String>()
         private var figures = emptyList<CanvasFigureSnapshot>()
 
+        val lastFigure: CanvasFigureSnapshot
+            get() = figures.last()
+
         override fun snapshot(): CanvasSnapshot = snapshotOf(figures)
 
         override fun clear(): CanvasSnapshot {
@@ -207,6 +240,33 @@ class CanvasToolTest {
         override fun insertImage(path: String): CanvasSnapshot {
             actions += "insertImage"
             figures = listOf(CanvasFigureSnapshot(0, "image", 40.0, 40.0, 100.0, 100.0))
+            return snapshot()
+        }
+
+        override fun drawStroke(
+            points: List<CanvasPoint>,
+            color: String,
+            width: Double,
+        ): CanvasSnapshot {
+            actions += "drawStroke"
+            require(points.size >= 2) { "drawStroke requires at least two points" }
+            val first = points.first()
+            val last = points.last()
+            figures =
+                listOf(
+                    CanvasFigureSnapshot(
+                        index = 0,
+                        type = "stroke",
+                        x = first.x,
+                        y = first.y,
+                        width = last.x - first.x,
+                        height = last.y - first.y,
+                        content = "",
+                        color = color,
+                        strokeWidth = width,
+                        points = points,
+                    ),
+                )
             return snapshot()
         }
 

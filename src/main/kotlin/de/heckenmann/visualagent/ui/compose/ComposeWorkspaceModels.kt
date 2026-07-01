@@ -193,6 +193,30 @@ fun moveWorkspacePanel(
 }
 
 /**
+ * Moves one workspace panel to the position of another panel.
+ *
+ * @param windows Current panel order
+ * @param draggedId Panel being dragged
+ * @param targetId Panel currently used as the drop/reorder target
+ * @return Updated panel order, or the original list when either ID is unknown
+ */
+fun reorderWorkspacePanel(
+    windows: List<ComposeWorkspaceWindow>,
+    draggedId: String,
+    targetId: String,
+): List<ComposeWorkspaceWindow> {
+    if (draggedId == targetId) return windows
+    val fromIndex = windows.indexOfFirst { it.id == draggedId }
+    val targetIndex = windows.indexOfFirst { it.id == targetId }
+    if (fromIndex !in windows.indices || targetIndex !in windows.indices) return windows
+    return windows.toMutableList().also { mutable ->
+        val dragged = mutable.removeAt(fromIndex)
+        val insertionIndex = targetIndex.coerceIn(0, mutable.size)
+        mutable.add(insertionIndex, dragged)
+    }
+}
+
+/**
  * Toggles the visible state of a workspace panel.
  *
  * @param windows Current panels

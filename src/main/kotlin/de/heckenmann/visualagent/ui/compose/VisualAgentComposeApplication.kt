@@ -31,6 +31,7 @@ import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
@@ -72,6 +73,7 @@ fun runVisualAgentComposeApplication() {
                 exitApplication()
             },
             title = AppIdentity.DISPLAY_NAME,
+            icon = painterResource("icons/visual-agent.png"),
             state = rememberWindowState(width = 1280.dp, height = 820.dp),
         ) {
             VisualAgentComposeApp(
@@ -183,7 +185,13 @@ private fun VisualAgentComposeApp(
                             }.focusable()
                             .background(backgroundBrush()),
                 ) {
-                    ComposeRail(windows = windows, onToggleWindow = toggleWindow, onCloseApplication = onCloseApplication)
+                    ComposeRail(
+                        windows = windows,
+                        onToggleWindow = toggleWindow,
+                        onMoveWindowEarlier = moveWindowEarlier,
+                        onMoveWindowLater = moveWindowLater,
+                        onCloseApplication = onCloseApplication,
+                    )
                     BoxWithConstraints(
                         modifier =
                             Modifier

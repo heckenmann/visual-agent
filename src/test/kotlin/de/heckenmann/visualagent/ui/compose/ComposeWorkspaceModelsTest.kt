@@ -156,6 +156,21 @@ class ComposeWorkspaceModelsTest {
     }
 
     @Test
+    fun `reorder workspace panel moves dragged panel to target slot`() {
+        val windows = listOf("chat", "todos", "files", "agents").map(::testWindow)
+
+        val reordered = reorderWorkspacePanel(windows, draggedId = "files", targetId = "chat")
+        val draggedOntoSelf = reorderWorkspacePanel(windows, draggedId = "chat", targetId = "chat")
+        val unknownTarget = reorderWorkspacePanel(windows, draggedId = "files", targetId = "missing")
+        val unknownDragged = reorderWorkspacePanel(windows, draggedId = "missing", targetId = "chat")
+
+        assertEquals(listOf("files", "chat", "todos", "agents"), reordered.map { it.id })
+        assertEquals(windows, draggedOntoSelf)
+        assertEquals(windows, unknownTarget)
+        assertEquals(windows, unknownDragged)
+    }
+
+    @Test
     fun `restore workspace windows applies persisted order visibility and bounds`() {
         val defaults = listOf("chat", "todos", "files").map(::testWindow)
         val persisted =
