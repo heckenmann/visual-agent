@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class ProviderCatalogServiceTest {
     @Test
@@ -85,6 +86,47 @@ class ProviderCatalogServiceTest {
 
         assertEquals(true, catalog.deleteProvider("openai"))
         assertFalse(catalog.activeProviderId() == "openai")
+    }
+
+    @Test
+    fun `resolve falls back to first selectable when default model is unavailable`() {
+        val catalog = ProviderCatalogService(MapPreferenceStore())
+        catalog.saveProvider(
+            ProviderProfile(
+                id = "stale",
+                name = "Stale",
+                adapter = ProviderAdapter.OLLAMA,
+                baseUrl = "http://localhost:11434",
+                defaultModel = "missing-on-server",
+                models = listOf(ProviderModelConfig("qwen3-coder-next:cloud"), ProviderModelConfig("mistral-large-3:675b-cloud")),
+            ),
+        )
+
+        val resolved = catalog.resolve(providerId = "stale", modelId = null)
+
+        assertEquals("qwen3-coder-next:cloud", resolved.model.id)
+    }
+
+    @Test
+    fun `resolve rejects explicit model that is blacklisted`() {
+        val catalog = ProviderCatalogService(MapPreferenceStore())
+        catalog.saveProvider(
+            ProviderProfile(
+                id = "explicit",
+                name = "Explicit",
+                adapter = ProviderAdapter.OLLAMA,
+                baseUrl = "http://localhost:11434",
+                defaultModel = "available",
+                models = listOf(ProviderModelConfig("available"), ProviderModelConfig("blocked")),
+                modelBlacklist = setOf("blocked"),
+            ),
+        )
+
+        val error =
+            runCatching { catalog.resolve(providerId = "explicit", modelId = "blocked") }
+                .exceptionOrNull()
+        assertNotNull(error)
+        assertTrue(error.message.orEmpty().contains("blocked"))
     }
 
     @Test
