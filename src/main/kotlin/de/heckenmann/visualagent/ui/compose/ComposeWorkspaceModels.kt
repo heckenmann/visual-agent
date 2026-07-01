@@ -490,4 +490,5 @@ data class ComposePanelServices(
     val canvasOperations: CanvasOperations,
     val modalRequester: ComposeModalRequester,
     val onSettingsChanged: () -> Unit,
+    val inFlight: InFlightStateHolder,
 )

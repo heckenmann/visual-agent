@@ -48,6 +48,7 @@ internal fun SubAgentsPanel(
     toolRegistry: ToolRegistry,
     providerCatalogService: ProviderCatalogService,
     modalRequester: ComposeModalRequester,
+    inFlight: InFlightStateHolder,
 ) {
     var agents by remember { mutableStateOf(agentManager.getSubAgents()) }
     var name by remember { mutableStateOf("") }
@@ -130,6 +131,7 @@ internal fun SubAgentsPanel(
                         onRunningChanged = { running ->
                             runningAgentIds =
                                 if (running) runningAgentIds + agent.id else runningAgentIds - agent.id
+                            if (running) inFlight.markAgentStart(agent.id) else inFlight.markAgentEnd(agent.id)
                         },
                         onStatusChanged = { status = it },
                         refresh = refresh,

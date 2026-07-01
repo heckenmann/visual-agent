@@ -303,7 +303,7 @@ private fun WindowBody(
     panelServices: ComposePanelServices,
 ) {
     when (window.id) {
-        "chat" -> ConversationPanel(panelServices.agentManager, panelServices.modalRequester)
+        "chat" -> ConversationPanel(panelServices.agentManager, panelServices.modalRequester, panelServices.inFlight)
         "todos" -> TodoPanel(panelServices.agentManager, panelServices.modalRequester)
         "files" -> FilesPanel(panelServices.workspaceFileService, panelServices.canvasOperations, panelServices.modalRequester)
         "agents" ->
@@ -313,6 +313,7 @@ private fun WindowBody(
                 toolRegistry = panelServices.toolRegistry,
                 providerCatalogService = panelServices.providerCatalogService,
                 modalRequester = panelServices.modalRequester,
+                inFlight = panelServices.inFlight,
             )
         "settings" ->
             SettingsPanel(
@@ -321,6 +322,7 @@ private fun WindowBody(
                 providerCatalogService = panelServices.providerCatalogService,
                 modalRequester = panelServices.modalRequester,
                 onSettingsChanged = panelServices.onSettingsChanged,
+                inFlight = panelServices.inFlight,
             )
         "canvas" -> CanvasPanel(panelServices.canvasOperations, panelServices.workspaceFileService, panelServices.modalRequester)
     }

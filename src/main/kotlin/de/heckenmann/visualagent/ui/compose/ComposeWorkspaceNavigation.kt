@@ -135,6 +135,7 @@ internal fun ComposeWorkspaceHeader(
     providerName: String,
     modelName: String,
     beanDefinitionCount: Int,
+    inFlight: InFlightState,
 ) {
     Row(
         modifier =
@@ -160,6 +161,7 @@ internal fun ComposeWorkspaceHeader(
         HeaderChip("Provider", providerName)
         HeaderChip("Model", modelName)
         HeaderChip("Beans", beanDefinitionCount.toString())
+        InFlightIndicator(state = inFlight)
     }
 }
 

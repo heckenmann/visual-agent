@@ -57,6 +57,7 @@ import kotlinx.coroutines.launch
 internal fun ConversationPanel(
     agentManager: AgentManager,
     modalRequester: ComposeModalRequester,
+    inFlight: InFlightStateHolder,
 ) {
     val scope = rememberCoroutineScope()
     val inputFocusRequester = remember { FocusRequester() }
@@ -71,6 +72,11 @@ internal fun ConversationPanel(
             sending = true
             status = "Streaming..."
             history = history + Message("user", content) + Message("assistant", "")
+            val streamRequestId =
+                java.util.UUID
+                    .randomUUID()
+                    .toString()
+            inFlight.markStreamStart(streamRequestId)
             scope.launch {
                 val streamedContent = StringBuilder()
                 val result =
@@ -88,6 +94,7 @@ internal fun ConversationPanel(
                         history = agentManager.getHistory()
                         status = "Error: ${it.message}"
                     }.also {
+                        inFlight.markStreamEnd(streamRequestId)
                         sending = false
                         inputFocusRequester.requestFocus()
                     }

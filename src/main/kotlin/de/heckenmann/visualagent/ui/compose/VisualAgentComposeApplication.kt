@@ -103,6 +103,8 @@ private fun VisualAgentComposeApp(
     var settingsRevision by remember { mutableStateOf(0) }
     val workspaceFocusRequester = remember { FocusRequester() }
     val composeScope = rememberCoroutineScope()
+    val toolEventBus = remember { springContext.getBean(de.heckenmann.visualagent.agent.tools.ToolEventBus::class.java) }
+    val inFlight = rememberInFlightState(toolEventBus)
     val panelServices =
         remember {
             ComposePanelServices(
@@ -119,6 +121,7 @@ private fun VisualAgentComposeApp(
                     uiFontSize = config.fontSize
                     settingsRevision += 1
                 },
+                inFlight = inFlight,
             )
         }
     val toggleWindow: (String) -> Unit = { id ->
@@ -228,6 +231,7 @@ private fun VisualAgentComposeApp(
                                 providerName = activeProvider?.id ?: config.llmProvider,
                                 modelName = activeProvider?.defaultModel.orEmpty().ifBlank { config.activeModel() },
                                 beanDefinitionCount = springContext.beanDefinitionCount,
+                                inFlight = inFlight.state.value,
                             )
                             ComposeSplitWorkspace(
                                 windows = windows,

@@ -28,6 +28,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -58,6 +59,7 @@ internal fun SettingsPanel(
     providerCatalogService: ProviderCatalogService,
     modalRequester: ComposeModalRequester,
     onSettingsChanged: () -> Unit,
+    inFlight: InFlightStateHolder,
 ) {
     val scope = rememberCoroutineScope()
     var providers by remember { mutableStateOf(providerCatalogService.enabledProviders()) }
@@ -183,6 +185,10 @@ internal fun SettingsPanel(
         }
     }
 
+    val settingsLoading = loadingModels || loadingDetails
+    LaunchedEffect(settingsLoading) {
+        inFlight.setSettingsLoading(settingsLoading)
+    }
     Column(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
