@@ -114,6 +114,12 @@ internal fun SettingsPanel(
             maxParallelValue != null &&
             timeoutValue != null
 
+    /**
+     * Reloads the provider list and aligns the form state with the selected provider.
+     *
+     * @param selectedProviderId Provider ID to activate; falls back to the first enabled provider
+     *   when the requested ID is not present
+     */
     fun refreshProviderState(selectedProviderId: String = providerId) {
         providers = providerCatalogService.enabledProviders()
         providerId = selectedProviderId.takeIf { id -> providers.any { it.id == id } } ?: providers.firstOrNull()?.id.orEmpty()
@@ -125,6 +131,12 @@ internal fun SettingsPanel(
         apiKey = profile?.apiKey.orEmpty()
     }
 
+    /**
+     * Reloads the selectable model list from the active provider.
+     *
+     * Updates `selectableModels` and resets `modelId` if the previously selected model is no
+     * longer available. Safe to call when no provider is selected — returns immediately.
+     */
     fun refreshModels() {
         val requestedProviderId = providerId
         if (requestedProviderId.isBlank()) return
@@ -149,6 +161,11 @@ internal fun SettingsPanel(
         }
     }
 
+    /**
+     * Loads detailed metadata for the currently selected model.
+     *
+     * @param modelOverride Optional explicit model ID; falls back to the resolved model when blank
+     */
     fun refreshModelDetails(modelOverride: String? = null) {
         val requestedProviderId = providerId
         val requestedModel = modelOverride?.trim().orEmpty().ifBlank { resolvedModel }
