@@ -2,10 +2,10 @@
 
 ## Prerequisites
 
-- Java 21+
-- Gradle 9.4.1
-- Ollama running locally (`ollama serve`) or a reachable remote Ollama endpoint
-- SQLite is embedded and managed automatically through Spring Data JPA + Flyway
+- Java 21+ (the project auto-resolves the JDK 24 toolchain locally; CI uses JDK 21 so the Foojay toolchain resolver can fetch 24).
+- Gradle 9.6.x locally only if you need to regenerate the wrapper — the committed tree does not include `gradle/` or `gradlew`; the CI workflow regenerates them via `gradle wrapper --gradle-version 9.6.0 --no-daemon`.
+- Ollama running locally (`ollama serve`) or a reachable remote Ollama endpoint.
+- SQLite is embedded and managed automatically through Spring Data JPA + Flyway.
 
 ## Build and Run
 

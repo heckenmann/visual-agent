@@ -11,7 +11,7 @@ Desktop user.
 ## Preconditions
 
 - Canvas panel is visible.
-- JVM canvas model drawing components are initialized.
+- Toolkit-neutral canvas service and Compose canvas surface are initialized.
 
 ## Main Flow
 
