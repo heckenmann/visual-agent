@@ -101,6 +101,9 @@ data class ComposeWorkspaceViewport(
 
 /**
  * Describes one panel displayed by the Compose Multiplatform workspace.
+ *
+ * @property preferredWidth User-defined minimum width for the panel in the row layout.
+ *   Defaults to the panel's initial bounds width clamped to the minimum.
  */
 data class ComposeWorkspaceWindow(
     val id: String,
@@ -109,6 +112,7 @@ data class ComposeWorkspaceWindow(
     val subtitle: String,
     val bounds: ComposeWorkspaceWindowBounds,
     val visible: Boolean = true,
+    val preferredWidth: Int = bounds.width.coerceAtLeast(ComposeWorkspaceWindowBounds.MIN_WIDTH),
 )
 
 /**
@@ -140,6 +144,13 @@ fun restoreWorkspaceWindows(
     return defaults
         .mapIndexed { defaultIndex, window ->
             val persistedState = persistedById[window.id]
+            val restoredPreferredWidth =
+                persistedState
+                    ?.preferredWidth
+                    ?.takeIf { it > 0 }
+                    ?.toInt()
+                    ?.coerceAtLeast(ComposeWorkspaceWindowBounds.MIN_WIDTH)
+                    ?: window.preferredWidth
             val restoredBounds =
                 persistedState?.let {
                     ComposeWorkspaceWindowBounds(
@@ -152,6 +163,7 @@ fun restoreWorkspaceWindows(
             window.copy(
                 bounds = restoredBounds,
                 visible = persistedState?.visible ?: window.visible,
+                preferredWidth = restoredPreferredWidth,
             ) to
                 PanelSortKey(
                     persistedOrder = persistedState?.zIndex ?: (Int.MAX_VALUE - defaults.size + defaultIndex),
@@ -264,6 +276,40 @@ fun resizeWorkspacePanel(
     }
 
 /**
+ * Computes panel widths for a single horizontal row.
+ *
+ * Each visible panel uses its own [ComposeWorkspaceWindow.preferredWidth] clamped to
+ * the global minimum. The row becomes horizontally scrollable when the combined widths
+ * (plus gaps) exceed the viewport. Widths are attached to the panel identity, not to
+ * the position, so reordering does not change panel sizes.
+ *
+ * @param visibleWindows Visible panels in row order
+ * @return Width for each panel in row order
+ */
+fun rowPanelWidths(visibleWindows: List<ComposeWorkspaceWindow>): List<Int> =
+    visibleWindows.map { it.preferredWidth.coerceAtLeast(ComposeWorkspaceWindowBounds.MIN_WIDTH) }
+
+/**
+ * Computes a new preferred width for a panel after a resizer drag.
+ *
+ * The delta is applied to the current width and clamped to the allowed range.
+ * Unlike the previous adjacent-panel resize, this does not shrink the neighbour;
+ * it only changes the resized panel, so all panels to the right are pushed right.
+ *
+ * @param currentWidth Current panel width in pixels
+ * @param deltaWidth Horizontal delta in pixels
+ * @param minPanelWidth Minimum width the panel must keep
+ * @param maxPanelWidth Maximum width the panel may reach
+ * @return Clamped new width
+ */
+fun resizePanelWidth(
+    currentWidth: Int,
+    deltaWidth: Int,
+    minPanelWidth: Int,
+    maxPanelWidth: Int,
+): Int = (currentWidth + deltaWidth).coerceIn(minPanelWidth, maxPanelWidth)
+
+/**
  * Calculates deterministic designer-curated panel bounds for all visible workspace panels.
  *
  * The layout is intentionally semantic instead of count-based: the first visible
@@ -272,11 +318,13 @@ fun resizeWorkspacePanel(
  *
  * @param windows Workspace panels in their visual order
  * @param viewport Available workspace dimensions
+ * @param minPanelWidth Minimum width each visible panel must keep
  * @return Bounds keyed by panel ID for visible panels only
  */
 fun splitWorkspaceBounds(
     windows: List<ComposeWorkspaceWindow>,
     viewport: ComposeWorkspaceViewport,
+    minPanelWidth: Int,
 ): Map<String, ComposeWorkspaceWindowBounds> {
     val visibleWindows = windows.filter { it.visible }
     if (visibleWindows.isEmpty()) return emptyMap()
@@ -297,6 +345,7 @@ fun splitWorkspaceBounds(
                 inspectorPanels = supporting,
                 width = safeWidth,
                 height = safeHeight,
+                minPanelWidth = minPanelWidth,
             )
         2, 3 ->
             splitStageWithInspector(
@@ -304,12 +353,14 @@ fun splitWorkspaceBounds(
                 inspectorPanels = supporting,
                 width = safeWidth,
                 height = safeHeight,
+                minPanelWidth = minPanelWidth,
             )
         else ->
             splitBalancedColumns(
                 windows = visibleWindows,
                 width = safeWidth,
                 height = safeHeight,
+                minPanelWidth = minPanelWidth,
             )
     }
 }
@@ -319,9 +370,10 @@ private fun splitStageWithInspector(
     inspectorPanels: List<ComposeWorkspaceWindow>,
     width: Int,
     height: Int,
+    minPanelWidth: Int,
 ): Map<String, ComposeWorkspaceWindowBounds> {
-    val inspectorWidth = inspectorWidth(width, primary, inspectorPanels)
-    val stageWidth = (width - WORKSPACE_PANEL_GAP - inspectorWidth).coerceAtLeast(1)
+    val inspectorWidth = inspectorWidth(width, primary, inspectorPanels, minPanelWidth)
+    val stageWidth = (width - WORKSPACE_PANEL_GAP - inspectorWidth).coerceAtLeast(minPanelWidth)
     val result =
         mutableMapOf(
             primary.id to ComposeWorkspaceWindowBounds(x = 0, y = 0, width = stageWidth, height = height),
@@ -334,12 +386,14 @@ private fun splitBalancedColumns(
     windows: List<ComposeWorkspaceWindow>,
     width: Int,
     height: Int,
+    minPanelWidth: Int,
 ): Map<String, ComposeWorkspaceWindowBounds> {
     val leftCount = (windows.size + 1) / 2
     val leftPanels = windows.take(leftCount)
     val rightPanels = windows.drop(leftCount)
-    val leftWidth = ((width - WORKSPACE_PANEL_GAP) / 2).coerceAtLeast(1)
-    val rightWidth = (width - WORKSPACE_PANEL_GAP - leftWidth).coerceAtLeast(1)
+    val half = (width - WORKSPACE_PANEL_GAP) / 2
+    val leftWidth = half.coerceAtLeast(minPanelWidth)
+    val rightWidth = (width - WORKSPACE_PANEL_GAP - leftWidth).coerceAtLeast(minPanelWidth)
     val result = mutableMapOf<String, ComposeWorkspaceWindowBounds>()
     result += stackVertically(leftPanels, x = 0, y = 0, width = leftWidth, height = height, preferStoredSizes = false)
     result +=
@@ -430,14 +484,15 @@ private fun inspectorWidth(
     width: Int,
     primary: ComposeWorkspaceWindow,
     inspectorPanels: List<ComposeWorkspaceWindow>,
+    minPanelWidth: Int,
 ): Int {
-    val available = (width - WORKSPACE_PANEL_GAP).coerceAtLeast(1)
-    val preferredPrimaryWidth = primary.bounds.width.takeIf { it >= ComposeWorkspaceWindowBounds.MIN_WIDTH }
+    val available = (width - WORKSPACE_PANEL_GAP).coerceAtLeast(minPanelWidth)
+    val preferredPrimaryWidth = primary.preferredWidth.takeIf { it >= minPanelWidth }
     val preferredInspectorWidth =
         inspectorPanels
             .mapNotNull { panel ->
-                panel.bounds.width.takeIf { value ->
-                    value >= ComposeWorkspaceWindowBounds.MIN_WIDTH
+                panel.preferredWidth.takeIf { value ->
+                    value >= minPanelWidth
                 }
             }.maxOrNull()
     val requested =
@@ -449,7 +504,7 @@ private fun inspectorWidth(
             else -> (width * 0.32f).toInt()
         }
     return requested
-        .coerceIn(320, max(320, width - WORKSPACE_PANEL_GAP - 520))
+        .coerceIn(minPanelWidth, max(minPanelWidth, width - WORKSPACE_PANEL_GAP - minPanelWidth))
 }
 
 private fun equalSizes(

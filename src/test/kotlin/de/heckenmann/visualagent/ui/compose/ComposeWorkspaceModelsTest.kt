@@ -7,17 +7,112 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ComposeWorkspaceModelsTest {
+    private val testMinWidth = ComposeWorkspaceWindowBounds.MIN_WIDTH
+
     @Test
-    fun `move clamps window into viewport`() {
-        val viewport = ComposeWorkspaceViewport(width = 800, height = 600)
-        val bounds = ComposeWorkspaceWindowBounds(x = 700, y = 500, width = 240, height = 140)
+    fun `split workspace ignores hidden panels`() {
+        val windows =
+            listOf(
+                testWindow("chat", visible = true),
+                testWindow("todos", visible = false),
+            )
 
-        val moved = bounds.moveBy(120, 120, viewport)
+        val bounds = splitWorkspaceBounds(windows, ComposeWorkspaceViewport(width = 800, height = 600), testMinWidth)
 
-        assertEquals(520, moved.x)
-        assertEquals(420, moved.y)
-        assertEquals(280, moved.width)
-        assertEquals(180, moved.height)
+        assertEquals(setOf("chat"), bounds.keys)
+        assertEquals(ComposeWorkspaceWindowBounds(x = 0, y = 0, width = 800, height = 600), bounds["chat"])
+    }
+
+    @Test
+    fun `split workspace lays out three panels as stage with inspector stack`() {
+        val windows = listOf(testWindow("chat"), testWindow("todos"), testWindow("files"))
+
+        val bounds = splitWorkspaceBounds(windows, ComposeWorkspaceViewport(width = 1000, height = 700), testMinWidth)
+
+        assertEquals(ComposeWorkspaceWindowBounds(x = 0, y = 0, width = 492, height = 700), bounds["chat"])
+        assertEquals(ComposeWorkspaceWindowBounds(x = 508, y = 0, width = 492, height = 342), bounds["todos"])
+        assertEquals(ComposeWorkspaceWindowBounds(x = 508, y = 358, width = 492, height = 342), bounds["files"])
+    }
+
+    @Test
+    fun `split workspace lays out larger panel sets as balanced columns`() {
+        val windows = listOf("chat", "todos", "files", "agents", "settings", "canvas").map(::testWindow)
+
+        val bounds = splitWorkspaceBounds(windows, ComposeWorkspaceViewport(width = 1200, height = 800), testMinWidth)
+
+        assertEquals(6, bounds.size)
+        assertEquals(ComposeWorkspaceWindowBounds(x = 0, y = 0, width = 592, height = 256), bounds["chat"])
+        assertEquals(ComposeWorkspaceWindowBounds(x = 0, y = 272, width = 592, height = 256), bounds["todos"])
+        assertEquals(ComposeWorkspaceWindowBounds(x = 0, y = 544, width = 592, height = 256), bounds["files"])
+        assertEquals(ComposeWorkspaceWindowBounds(x = 608, y = 0, width = 592, height = 256), bounds["agents"])
+        assertEquals(ComposeWorkspaceWindowBounds(x = 608, y = 272, width = 592, height = 256), bounds["settings"])
+        assertEquals(ComposeWorkspaceWindowBounds(x = 608, y = 544, width = 592, height = 256), bounds["canvas"])
+        assertFalse(bounds.containsKey("unknown"))
+    }
+
+    @Test
+    fun `split workspace uses user-defined order for primary stage`() {
+        val windows = listOf("canvas", "chat", "todos").map(::testWindow)
+
+        val bounds = splitWorkspaceBounds(windows, ComposeWorkspaceViewport(width = 1000, height = 700), testMinWidth)
+
+        assertEquals(ComposeWorkspaceWindowBounds(x = 0, y = 0, width = 492, height = 700), bounds["canvas"])
+        assertEquals(ComposeWorkspaceWindowBounds(x = 508, y = 0, width = 492, height = 342), bounds["chat"])
+        assertEquals(ComposeWorkspaceWindowBounds(x = 508, y = 358, width = 492, height = 342), bounds["todos"])
+    }
+
+    @Test
+    fun `split workspace uses stored panel sizes as resize preferences`() {
+        val windows =
+            listOf(
+                testWindow("chat", width = 620, height = 500),
+                testWindow("todos", width = 360, height = 500),
+                testWindow("files", width = 360, height = 260),
+            )
+
+        val bounds = splitWorkspaceBounds(windows, ComposeWorkspaceViewport(width = 1000, height = 700), testMinWidth)
+
+        assertEquals(ComposeWorkspaceWindowBounds(x = 0, y = 0, width = 623, height = 700), bounds["chat"])
+        assertEquals(ComposeWorkspaceWindowBounds(x = 639, y = 0, width = 361, height = 450), bounds["todos"])
+        assertEquals(ComposeWorkspaceWindowBounds(x = 639, y = 466, width = 361, height = 234), bounds["files"])
+    }
+
+    @Test
+    fun `row panel widths returns preferred widths attached to panel identity`() {
+        val chat = testWindow("chat", preferredWidth = 320)
+        val todos = testWindow("todos", preferredWidth = 340)
+        val files = testWindow("files", preferredWidth = 400)
+
+        val widths = rowPanelWidths(listOf(chat, todos, files))
+
+        assertEquals(listOf(320, 340, 400), widths)
+    }
+
+    @Test
+    fun `row panel widths clamps widths below minimum`() {
+        val windows = listOf(testWindow("chat", preferredWidth = 100), testWindow("todos", preferredWidth = 500))
+
+        val widths = rowPanelWidths(windows)
+
+        assertEquals(listOf(testMinWidth, 500), widths)
+    }
+
+    @Test
+    fun `row panel widths preserves panel widths after reordering`() {
+        val chat = testWindow("chat", preferredWidth = 320)
+        val todos = testWindow("todos", preferredWidth = 340)
+        val files = testWindow("files", preferredWidth = 400)
+
+        val reordered = rowPanelWidths(listOf(files, chat, todos))
+
+        assertEquals(listOf(400, 320, 340), reordered)
+    }
+
+    @Test
+    fun `resize panel width applies delta and clamps`() {
+        assertEquals(500, resizePanelWidth(400, 100, minPanelWidth = 280, maxPanelWidth = 800))
+        assertEquals(280, resizePanelWidth(400, -200, minPanelWidth = 280, maxPanelWidth = 800))
+        assertEquals(800, resizePanelWidth(700, 200, minPanelWidth = 280, maxPanelWidth = 800))
     }
 
     @Test
@@ -47,74 +142,6 @@ class ComposeWorkspaceModelsTest {
         assertEquals(0, coerced.y)
         assertEquals(280, coerced.width)
         assertEquals(180, coerced.height)
-    }
-
-    @Test
-    fun `split workspace ignores hidden panels`() {
-        val windows =
-            listOf(
-                testWindow("chat", visible = true),
-                testWindow("todos", visible = false),
-            )
-
-        val bounds = splitWorkspaceBounds(windows, ComposeWorkspaceViewport(width = 800, height = 600))
-
-        assertEquals(setOf("chat"), bounds.keys)
-        assertEquals(ComposeWorkspaceWindowBounds(x = 0, y = 0, width = 800, height = 600), bounds["chat"])
-    }
-
-    @Test
-    fun `split workspace lays out three panels as stage with inspector stack`() {
-        val windows = listOf(testWindow("chat"), testWindow("todos"), testWindow("files"))
-
-        val bounds = splitWorkspaceBounds(windows, ComposeWorkspaceViewport(width = 1000, height = 700))
-
-        assertEquals(ComposeWorkspaceWindowBounds(x = 0, y = 0, width = 664, height = 700), bounds["chat"])
-        assertEquals(ComposeWorkspaceWindowBounds(x = 680, y = 0, width = 320, height = 342), bounds["todos"])
-        assertEquals(ComposeWorkspaceWindowBounds(x = 680, y = 358, width = 320, height = 342), bounds["files"])
-    }
-
-    @Test
-    fun `split workspace lays out larger panel sets as balanced columns`() {
-        val windows = listOf("chat", "todos", "files", "agents", "settings", "canvas").map(::testWindow)
-
-        val bounds = splitWorkspaceBounds(windows, ComposeWorkspaceViewport(width = 1200, height = 800))
-
-        assertEquals(6, bounds.size)
-        assertEquals(ComposeWorkspaceWindowBounds(x = 0, y = 0, width = 592, height = 256), bounds["chat"])
-        assertEquals(ComposeWorkspaceWindowBounds(x = 0, y = 272, width = 592, height = 256), bounds["todos"])
-        assertEquals(ComposeWorkspaceWindowBounds(x = 0, y = 544, width = 592, height = 256), bounds["files"])
-        assertEquals(ComposeWorkspaceWindowBounds(x = 608, y = 0, width = 592, height = 256), bounds["agents"])
-        assertEquals(ComposeWorkspaceWindowBounds(x = 608, y = 272, width = 592, height = 256), bounds["settings"])
-        assertEquals(ComposeWorkspaceWindowBounds(x = 608, y = 544, width = 592, height = 256), bounds["canvas"])
-        assertFalse(bounds.containsKey("unknown"))
-    }
-
-    @Test
-    fun `split workspace uses user-defined order for primary stage`() {
-        val windows = listOf("canvas", "chat", "todos").map(::testWindow)
-
-        val bounds = splitWorkspaceBounds(windows, ComposeWorkspaceViewport(width = 1000, height = 700))
-
-        assertEquals(ComposeWorkspaceWindowBounds(x = 0, y = 0, width = 664, height = 700), bounds["canvas"])
-        assertEquals(ComposeWorkspaceWindowBounds(x = 680, y = 0, width = 320, height = 342), bounds["chat"])
-        assertEquals(ComposeWorkspaceWindowBounds(x = 680, y = 358, width = 320, height = 342), bounds["todos"])
-    }
-
-    @Test
-    fun `split workspace uses stored panel sizes as resize preferences`() {
-        val windows =
-            listOf(
-                testWindow("chat", width = 620, height = 500),
-                testWindow("todos", width = 360, height = 500),
-                testWindow("files", width = 360, height = 260),
-            )
-
-        val bounds = splitWorkspaceBounds(windows, ComposeWorkspaceViewport(width = 1000, height = 700))
-
-        assertEquals(ComposeWorkspaceWindowBounds(x = 0, y = 0, width = 623, height = 700), bounds["chat"])
-        assertEquals(ComposeWorkspaceWindowBounds(x = 639, y = 0, width = 361, height = 450), bounds["todos"])
-        assertEquals(ComposeWorkspaceWindowBounds(x = 639, y = 466, width = 361, height = 234), bounds["files"])
     }
 
     @Test
@@ -194,6 +221,7 @@ class ComposeWorkspaceModelsTest {
         visible: Boolean = true,
         width: Int = 100,
         height: Int = 100,
+        preferredWidth: Int = width.coerceAtLeast(ComposeWorkspaceWindowBounds.MIN_WIDTH),
     ): ComposeWorkspaceWindow =
         ComposeWorkspaceWindow(
             id = id,
@@ -202,6 +230,7 @@ class ComposeWorkspaceModelsTest {
             subtitle = id,
             bounds = ComposeWorkspaceWindowBounds(x = 0, y = 0, width = width, height = height),
             visible = visible,
+            preferredWidth = preferredWidth,
         )
 
     private fun persistedWindow(

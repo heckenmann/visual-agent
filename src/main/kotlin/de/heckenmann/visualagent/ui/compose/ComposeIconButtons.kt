@@ -2,7 +2,7 @@
 
 package de.heckenmann.visualagent.ui.compose
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.size
@@ -52,6 +52,7 @@ internal fun ActionIconButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     iconSize: Dp = 17.dp,
+    onLongClick: (() -> Unit)? = null,
 ) {
     ActionTooltip(description = description) {
         Box(
@@ -59,7 +60,12 @@ internal fun ActionIconButton(
                 modifier
                     .defaultMinSize(minWidth = 32.dp, minHeight = 32.dp)
                     .alpha(if (enabled) 1f else 0.38f)
-                    .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
+                    .combinedClickable(
+                        enabled = enabled,
+                        role = Role.Button,
+                        onClick = onClick,
+                        onLongClick = onLongClick,
+                    ),
             contentAlignment = Alignment.Center,
         ) {
             Icon(imageVector = icon, contentDescription = description, modifier = Modifier.size(iconSize))
