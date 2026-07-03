@@ -6,11 +6,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -76,14 +80,17 @@ internal fun ConversationPanel(
 ) {
     val scope = rememberCoroutineScope()
     val inputFocusRequester = remember { FocusRequester() }
-    val scrollState = rememberScrollState()
+    val listState = rememberLazyListState()
     var history by remember { mutableStateOf(agentManager.getHistory()) }
     var input by remember { mutableStateOf("") }
     var status by remember { mutableStateOf("Ready") }
     var sending by remember { mutableStateOf(false) }
-    val isAtBottom by remember(scrollState) {
+    var editingId by remember { mutableStateOf<String?>(null) }
+    val isAtBottom by remember {
         derivedStateOf {
-            scrollState.maxValue == 0 || scrollState.value >= scrollState.maxValue - SCROLL_BOTTOM_TOLERANCE
+            val info = listState.layoutInfo
+            val last = info.visibleItemsInfo.lastOrNull()
+            last == null || last.index >= info.totalItemsCount - 2
         }
     }
     val sendContent: (String) -> Unit = { rawContent ->
@@ -92,7 +99,7 @@ internal fun ConversationPanel(
             input = ""
             sending = true
             status = "Streaming..."
-            history = history + Message("user", content) + Message("assistant", "")
+            history = history + Message("user", content)
             val streamRequestId =
                 java.util.UUID
                     .randomUUID()
@@ -118,47 +125,49 @@ internal fun ConversationPanel(
                         inFlight.markStreamEnd(streamRequestId)
                         sending = false
                         inputFocusRequester.requestFocus()
-                        scrollState.scrollTo(scrollState.maxValue)
                     }
             }
         }
     }
-    val sendCurrentInput = {
-        sendContent(input)
-    }
+    val sendCurrentInput = { sendContent(input) }
     LaunchedEffect(Unit) {
         inputFocusRequester.requestFocus()
-        scrollState.scrollTo(scrollState.maxValue)
     }
     LaunchedEffect(history.size) {
-        if (isAtBottom) {
-            scrollState.scrollTo(scrollState.maxValue)
-        }
-    }
-    LaunchedEffect(scrollState.maxValue) {
-        if (isAtBottom) {
-            scrollState.scrollTo(scrollState.maxValue)
+        if (isAtBottom && history.isNotEmpty()) {
+            listState.animateScrollToItem(history.lastIndex)
         }
     }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.weight(1f)) {
-            Column(modifier = Modifier.fillMaxSize().verticalScroll(scrollState)) {
-                val visibleHistory = history.takeLast(40)
-                val visibleOffset = history.size - visibleHistory.size
-                if (visibleHistory.isEmpty()) {
-                    PanelEmptyState(
-                        title = "No conversation yet",
-                        body = "Send a message to start the main agent session.",
-                    )
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                if (history.isEmpty()) {
+                    item {
+                        PanelEmptyState(
+                            title = "No conversation yet",
+                            body = "Send a message to start the main agent session.",
+                        )
+                    }
                 } else {
-                    visibleHistory.forEachIndexed { visibleIndex, message ->
+                    itemsIndexed(history, key = { index, message -> message.id ?: "temp-$index" }) { index, message ->
+                        val previousRole = history.getOrNull(index - 1)?.role
+                        val isStreamingPlaceholder =
+                            message.role == "assistant" && message.content.isBlank() && sending && index == history.lastIndex
+                        val topPadding = if (previousRole == message.role) 2.dp else 10.dp
                         MessageRow(
                             message = message,
-                            canRetry = message.role == "assistant" && !sending,
+                            isStreamingPlaceholder = isStreamingPlaceholder,
+                            canRetry = message.role == "assistant" && !sending && !isStreamingPlaceholder,
+                            canEdit = message.role == "user" && !sending,
+                            canDelete = message.role != "system",
                             onCopied = { status = "Copied ${message.role} message" },
                             onRetry = {
-                                val absoluteIndex = visibleOffset + visibleIndex
-                                val previousUserMessage = history.take(absoluteIndex).lastOrNull { it.role == "user" }
+                                val previousUserMessage = history.take(index).lastOrNull { it.role == "user" }
                                 if (previousUserMessage == null) {
                                     status = "No previous user message to retry"
                                 } else {
@@ -166,7 +175,21 @@ internal fun ConversationPanel(
                                     sendContent(previousUserMessage.content)
                                 }
                             },
+                            onEdit = { editingId = message.id },
+                            onDelete = {
+                                message.id?.let { id ->
+                                    agentManager.deleteMessageById(id)
+                                    history = agentManager.getHistory()
+                                    status = "Message deleted"
+                                }
+                            },
+                            modifier = Modifier.padding(top = topPadding),
                         )
+                    }
+                    if (sending && (history.lastOrNull()?.role != "assistant" || history.lastOrNull()?.content?.isNotBlank() == true)) {
+                        item {
+                            StreamingIndicator(modifier = Modifier.padding(top = 10.dp))
+                        }
                     }
                 }
             }
@@ -177,7 +200,7 @@ internal fun ConversationPanel(
                     horizontalAlignment = Alignment.End,
                 ) {
                     ScrollToBottomButton(
-                        onClick = { scope.launch { scrollState.animateScrollTo(scrollState.maxValue) } },
+                        onClick = { scope.launch { listState.animateScrollToItem(history.lastIndex.coerceAtLeast(0)) } },
                         modifier = Modifier.padding(end = 12.dp, bottom = 12.dp),
                     )
                 }
@@ -236,6 +259,22 @@ internal fun ConversationPanel(
         }
         PanelStatus(status)
     }
+    if (editingId != null) {
+        val message = history.find { it.id == editingId }
+        if (message != null) {
+            EditMessageModal(
+                content = message.content,
+                onDismiss = { editingId = null },
+                onSave = { newContent ->
+                    editingId?.let { id ->
+                        agentManager.updateMessageContentById(id, newContent)
+                        history = agentManager.getHistory()
+                    }
+                    editingId = null
+                },
+            )
+        }
+    }
 }
 
 @Composable
@@ -257,46 +296,126 @@ private fun ScrollToBottomButton(
 }
 
 @Composable
+private fun StreamingIndicator(modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.Start),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "● ● ●",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
+@Composable
 private fun MessageRow(
     message: Message,
+    isStreamingPlaceholder: Boolean,
     canRetry: Boolean,
+    canEdit: Boolean,
+    canDelete: Boolean,
     onCopied: () -> Unit,
     onRetry: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val clipboard = LocalClipboardManager.current
-    PanelContentCard(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(bottom = 7.dp),
+    val isUser = message.role == "user"
+    val backgroundColor = if (isUser) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
+    Box(
+        modifier = modifier.fillMaxWidth(),
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = message.role.uppercase(),
-                color = if (message.role == "user") MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.tertiary,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f),
-            )
-            ActionIconButton(
-                icon = Icons.Filled.ContentCopy,
-                description = "Copy ${message.role} message",
-                modifier = Modifier.size(28.dp),
-                onClick = {
-                    clipboard.setText(AnnotatedString(message.content))
-                    onCopied()
-                },
-            )
-            if (canRetry) {
+        PanelContentCard(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = backgroundColor,
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = message.role.uppercase(),
+                    color = if (isUser) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.tertiary,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                )
                 ActionIconButton(
-                    icon = Icons.Filled.Refresh,
-                    description = "Retry from previous user message",
+                    icon = Icons.Filled.ContentCopy,
+                    description = "Copy ${message.role} message",
                     modifier = Modifier.size(28.dp),
-                    onClick = onRetry,
+                    onClick = {
+                        clipboard.setText(AnnotatedString(message.content))
+                        onCopied()
+                    },
+                )
+                if (canEdit) {
+                    ActionIconButton(
+                        icon = Icons.Filled.Edit,
+                        description = "Edit ${message.role} message",
+                        modifier = Modifier.size(28.dp),
+                        onClick = onEdit,
+                    )
+                }
+                if (canDelete) {
+                    ActionIconButton(
+                        icon = Icons.Filled.Delete,
+                        description = "Delete ${message.role} message",
+                        modifier = Modifier.size(28.dp),
+                        onClick = onDelete,
+                    )
+                }
+                if (canRetry) {
+                    ActionIconButton(
+                        icon = Icons.Filled.Refresh,
+                        description = "Retry from previous user message",
+                        modifier = Modifier.size(28.dp),
+                        onClick = onRetry,
+                    )
+                }
+            }
+            if (isStreamingPlaceholder) {
+                Text(
+                    text = "Thinking…",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            } else {
+                ComposeMarkdown(message.content)
+            }
+        }
+    }
+}
+
+@Composable
+private fun EditMessageModal(
+    content: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit,
+) {
+    var edited by remember { mutableStateOf(content) }
+    ComposeContentModal(title = "Edit message") { dismiss ->
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(16.dp)) {
+            OutlinedTextField(
+                value = edited,
+                onValueChange = { edited = it },
+                label = { Text("Content") },
+                minLines = 3,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End), modifier = Modifier.fillMaxWidth()) {
+                ActionIconButton(icon = Icons.Filled.Close, description = "Cancel edit", onClick = dismiss)
+                ActionIconButton(
+                    icon = Icons.Filled.Done,
+                    description = "Save message",
+                    enabled = edited.isNotBlank(),
+                    onClick = { onSave(edited) },
                 )
             }
         }
-        ComposeMarkdown(message.content)
     }
 }
 
@@ -512,4 +631,3 @@ private fun TodoEditor(
 }
 
 private const val ALL_TODO_STATUSES = "__all__"
-private const val SCROLL_BOTTOM_TOLERANCE = 80

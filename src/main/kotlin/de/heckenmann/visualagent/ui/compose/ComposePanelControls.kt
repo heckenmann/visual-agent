@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -61,11 +62,12 @@ internal fun PanelSection(
 @Composable
 internal fun PanelContentCard(
     modifier: Modifier = Modifier,
+    backgroundColor: Color? = null,
     content: @Composable () -> Unit,
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.14f)),
+        colors = CardDefaults.cardColors(containerColor = backgroundColor ?: MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.14f)),
         shape = RoundedCornerShape(8.dp),
     ) {
         Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
