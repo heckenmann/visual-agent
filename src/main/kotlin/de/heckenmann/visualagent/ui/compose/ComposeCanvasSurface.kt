@@ -93,7 +93,7 @@ internal fun CanvasSurface(
                     showGrid = true,
                     gridSize = 48f,
                     gridColor = Color(0x33444A65),
-                    backgroundColor = Color(0xFF191A21),
+                    backgroundColor = CANVAS_BACKGROUND_COLOR,
                     showBottomControls = true,
                 ),
             nodes = canvasNodes(snapshot, nodeStates, canvasOperations, imageBytesForPath, onSnapshotChanged),
@@ -182,8 +182,10 @@ private fun canvasNodes(
 /**
  * Renders a single canvas figure.
  *
- * Selected figures are indicated by a thin accent border; the figure keeps its
- * natural background so surrounding figures remain visible.
+ * Selected figures are indicated by a thin accent border. The library paints a
+ * hard-coded white background behind every node, so figure backgrounds that
+ * should reveal the canvas use [CANVAS_BACKGROUND_COLOR] as the closest
+ * possible approximation to transparency.
  *
  * @param figure Figure snapshot to render
  * @param selected True when this figure is the currently selected one
@@ -212,7 +214,7 @@ private fun FigureNode(
             "text" ->
                 Text(
                     text = figure.content.ifBlank { "Text" },
-                    color = Color(0xFF191A21),
+                    color = Color(0xFFF8F8F2),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -338,11 +340,14 @@ private fun CanvasNodePosition.isMovedFrom(figures: List<CanvasFigureSnapshot>):
 
 private fun figureColor(figure: CanvasFigureSnapshot): Color =
     when (figure.type) {
+        // The library paints a hard-coded white background behind every node.
+        // For shapes that should reveal the canvas, we match the canvas color
+        // because true transparency is not possible without forking the library.
         "circle" -> figure.color.toComposeColor(Color(0xFFFF79C6))
-        "line" -> figure.color.toComposeColor(Color(0xFF8BE9FD))
-        "stroke" -> Color.Transparent
+        "line" -> CANVAS_BACKGROUND_COLOR
+        "stroke" -> CANVAS_BACKGROUND_COLOR
         "text" -> figure.color.toComposeColor(Color(0xFFFFB86C))
-        "image" -> Color(0xFFBD93F9)
+        "image" -> CANVAS_BACKGROUND_COLOR
         else -> figure.color.toComposeColor(Color(0xFF50FA7B))
     }
 
@@ -350,6 +355,8 @@ internal enum class CanvasInteractionMode {
     Select,
     Pen,
 }
+
+private val CANVAS_BACKGROUND_COLOR = Color(0xFF191A21)
 
 private fun String.toComposeColor(defaultColor: Color): Color {
     val argb = parseHexColor(this) ?: return defaultColor
