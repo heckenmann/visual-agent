@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DividerDefaults
@@ -141,6 +142,7 @@ internal fun ComposeSplitWorkspace(
                                 width = widths.getOrElse(index) { minPanelWidth },
                                 hasResizer = index < visibleWindows.lastIndex,
                                 onWidthChanged = { next -> resizeUpdatedState.value.invoke(window.id, next) },
+                                onCloseWindow = { onToggleWindow(window.id) },
                                 minPanelWidth = minPanelWidth,
                                 rowHeight = viewport.height,
                             )
@@ -211,6 +213,7 @@ private fun ReorderableRowScope.SplitPanelItem(
     width: Int,
     hasResizer: Boolean,
     onWidthChanged: (Int) -> Unit,
+    onCloseWindow: () -> Unit,
     minPanelWidth: Int,
     rowHeight: Int,
 ) {
@@ -221,6 +224,7 @@ private fun ReorderableRowScope.SplitPanelItem(
                 panelServices = panelServices,
                 isDragging = isDragging,
                 width = width,
+                onCloseWindow = onCloseWindow,
                 minPanelWidth = minPanelWidth,
                 modifier = Modifier.height(rowHeight.dp),
             )
@@ -241,6 +245,7 @@ private fun ReorderableListItemScope.SplitPanelContent(
     panelServices: ComposePanelServices,
     isDragging: Boolean,
     width: Int,
+    onCloseWindow: () -> Unit,
     minPanelWidth: Int,
     modifier: Modifier,
 ) {
@@ -285,6 +290,7 @@ private fun ReorderableListItemScope.SplitPanelContent(
             SplitPanelHeader(
                 window = window,
                 primary = primary,
+                onClose = onCloseWindow,
             )
             HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
             Box(
@@ -304,6 +310,7 @@ private fun ReorderableListItemScope.SplitPanelContent(
 private fun ReorderableListItemScope.SplitPanelHeader(
     window: ComposeWorkspaceWindow,
     primary: Boolean,
+    onClose: () -> Unit,
 ) {
     Row(
         modifier =
@@ -347,6 +354,13 @@ private fun ReorderableListItemScope.SplitPanelHeader(
                 overflow = TextOverflow.Ellipsis,
             )
         }
+        ActionIconButton(
+            icon = Icons.Filled.Close,
+            description = "Close ${window.title} panel",
+            onClick = onClose,
+            modifier = Modifier.size(if (primary) 28.dp else 26.dp),
+            iconSize = if (primary) 18.dp else 16.dp,
+        )
     }
 }
 

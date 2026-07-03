@@ -23,7 +23,7 @@ Desktop user.
 6. The user drags the resizer between two panels to change the width of the left panel; all panels to the right shift right, and the row becomes scrollable if needed. The resizer shows a visible three-bar grip.
 7. The user long-presses or right-clicks a rail button and chooses "Set width…" to adjust a panel's preferred width with a slider.
 8. The user can move a panel earlier or later through vertical drag gestures on the rail button.
-9. The user can hide a panel from either the left rail or the panel header close button.
+9. The user can hide a panel from either the left rail or the panel header close icon button.
 10. When the combined panel widths exceed the viewport, the user can scroll horizontally with a horizontal mouse wheel, the on-screen scroll arrows, or the horizontal scrollbar.
 11. Panel cards use consistent spacing, rounded chrome, subtle borders, and compact headers.
 12. The Compose shell exposes panel order, visibility, and preferred width through the workspace layout service.
