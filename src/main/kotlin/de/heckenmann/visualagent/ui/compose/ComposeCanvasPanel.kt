@@ -180,17 +180,7 @@ private fun CanvasDrawingToolbar(
         enabled = selectedCount > 0,
         onClick = {
             if (selectedCount > 0) {
-                modalRequester.requestConfirmation(
-                    ComposeConfirmationModal(
-                        title = "Delete selected figures?",
-                        message =
-                            "Remove $selectedCount selected figure${if (selectedCount == 1) "" else "s"} " +
-                                "from the current editable canvas.",
-                        confirmDescription = "Delete selected figures",
-                    ) {
-                        update(canvasOperations.deleteSelectedFigures())
-                    },
-                )
+                update(canvasOperations.deleteSelectedFigures())
             }
         },
     )

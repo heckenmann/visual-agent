@@ -21,8 +21,8 @@ Desktop user.
 4. The canvas model stores structured figures rather than raster-only pixels.
 5. UI controls reflect current selection and zoom state.
 6. Selected figures are shown with a thin, unobtrusive border instead of a large bright background so the figure and surrounding content remain visible.
-7. Toolbar clear/delete actions show an internal confirmation modal before mutating the canvas.
-8. The user can press `Delete` or `Backspace` while the canvas has focus to remove all selected figures without showing a confirmation modal.
+7. The toolbar clear action shows an internal confirmation modal before removing all figures.
+8. The toolbar delete action and the `Delete`/`Backspace` keys remove all selected figures immediately without showing a confirmation modal.
 
 ## Result
 
@@ -46,7 +46,7 @@ The canvas remains editable during resize and after object insertion.
 - Figures can be selected, moved, and resized from the Compose canvas surface.
 - Multiple figures can be selected at the same time; each selected figure is highlighted by a thin colored border.
 - Selected figure backgrounds stay transparent or use their natural color.
-- The delete toolbar button is enabled whenever at least one figure is selected and removes all selected figures after internal modal confirmation.
+- The delete toolbar button is enabled whenever at least one figure is selected and removes all selected figures immediately without confirmation.
 - The clear toolbar button clears all figures only after internal modal confirmation.
 - `Delete` and `Backspace` remove all selected figures when the Compose canvas surface has focus.
 - Toolbar buttons are icon-only with tooltips; the active Select/Pen mode button is highlighted.
