@@ -43,6 +43,8 @@ class WorkspaceLayoutPersistence(
 data class WorkspaceLayout(
     /** Persisted states of workspace windows. */
     val windows: List<WorkspaceWindowState> = emptyList(),
+    /** Persisted main application window size. */
+    val stage: StageState? = null,
 )
 
 /**
@@ -64,4 +66,6 @@ data class WorkspaceWindowState(
     val visible: Boolean,
     /** Relative z-order index, larger values are closer to the front. */
     val zIndex: Int,
+    /** User-defined preferred panel width in the row layout. */
+    val preferredWidth: Double = 0.0,
 )

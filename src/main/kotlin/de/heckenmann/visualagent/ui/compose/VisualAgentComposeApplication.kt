@@ -65,22 +65,39 @@ fun runVisualAgentComposeApplication() {
         SpringApplicationBuilder(VisualAgentApplication::class.java)
             .web(WebApplicationType.NONE)
             .run()
+    val workspaceLayoutService = springContext.getBean(WorkspaceLayoutService::class.java)
+    val persistedStage = workspaceLayoutService.report().stage
+    val defaultWidth = 1280.dp
+    val defaultHeight = 820.dp
 
     application {
+        val windowState =
+            rememberWindowState(
+                width = persistedStage?.width?.dp ?: defaultWidth,
+                height = persistedStage?.height?.dp ?: defaultHeight,
+            )
+        val saveStageOnExit = {
+            val size = windowState.size
+            val stageWidth = size.width.value.toDouble()
+            val stageHeight = size.height.value.toDouble()
+            workspaceLayoutService.saveStage(StageState(width = stageWidth, height = stageHeight))
+        }
         Window(
             onCloseRequest = {
+                saveStageOnExit()
                 springContext.close()
                 exitApplication()
             },
             title = AppIdentity.DISPLAY_NAME,
             icon = painterResource("icons/visual-agent.png"),
-            state = rememberWindowState(width = 1280.dp, height = 820.dp),
+            state = windowState,
         ) {
             VisualAgentComposeApp(
                 config = AppConfig.instance,
                 springContext = springContext,
-                workspaceLayoutService = springContext.getBean(WorkspaceLayoutService::class.java),
+                workspaceLayoutService = workspaceLayoutService,
                 onCloseApplication = {
+                    saveStageOnExit()
                     springContext.close()
                     exitApplication()
                 },
@@ -136,6 +153,22 @@ private fun VisualAgentComposeApp(
     val moveWindowLater: (String) -> Unit = { id ->
         windows = moveWorkspacePanel(windows, id, ComposePanelMoveDirection.Later)
     }
+    val resizeWindow: (String, Int) -> Unit = { id, width ->
+        windows =
+            windows.map { window ->
+                if (window.id == id) window.copy(preferredWidth = width) else window
+            }
+    }
+    val reorderWindows: (List<ComposeWorkspaceWindow>) -> Unit = { visibleOrder ->
+        val visibleIds = visibleOrder.map { it.id }.toSet()
+        val visiblePanels = visibleOrder.mapNotNull { window -> windows.find { it.id == window.id } }
+        val hiddenPanels = windows.filter { it.id !in visibleIds }
+        val next = visiblePanels + hiddenPanels
+        if (next != windows) {
+            windows = next
+        }
+    }
+    val updatePanelWidth: (String, Int) -> Unit = resizeWindow
     val commands =
         windows.map { window ->
             ComposeCommand(
@@ -193,7 +226,9 @@ private fun VisualAgentComposeApp(
                         onToggleWindow = toggleWindow,
                         onMoveWindowEarlier = moveWindowEarlier,
                         onMoveWindowLater = moveWindowLater,
+                        onPanelWidthChanged = updatePanelWidth,
                         onCloseApplication = onCloseApplication,
+                        modalRequester = panelServices.modalRequester,
                     )
                     BoxWithConstraints(
                         modifier =
@@ -206,7 +241,8 @@ private fun VisualAgentComposeApp(
                                 width = maxWidth.value.roundToInt(),
                                 height = maxHeight.value.roundToInt(),
                             )
-                        val splitBounds = splitWorkspaceBounds(windows, viewport)
+                        val minPanelWidth = ComposeWorkspaceWindowBounds.MIN_WIDTH
+                        val splitBounds = splitWorkspaceBounds(windows, viewport, minPanelWidth)
                         val workspaceStates =
                             windows.mapIndexed {
                                 index,
@@ -237,8 +273,10 @@ private fun VisualAgentComposeApp(
                                 windows = windows,
                                 panelServices = panelServices,
                                 onToggleWindow = toggleWindow,
-                                onMoveWindowEarlier = moveWindowEarlier,
-                                onMoveWindowLater = moveWindowLater,
+                                onReorderWindows = reorderWindows,
+                                onResizeWindow = resizeWindow,
+                                minPanelWidth = minPanelWidth,
+                                viewport = viewport,
                                 modifier =
                                     Modifier
                                         .weight(1f)
@@ -332,6 +370,7 @@ private fun ComposeWorkspaceWindow.toWorkspaceWindowState(
         height = coercedBounds.height.toDouble(),
         visible = visible,
         zIndex = orderIndex,
+        preferredWidth = preferredWidth.toDouble(),
     )
 }
 

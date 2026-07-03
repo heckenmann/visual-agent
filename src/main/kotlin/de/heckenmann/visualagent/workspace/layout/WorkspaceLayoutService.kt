@@ -34,13 +34,15 @@ class WorkspaceLayoutService(
     }
 
     /** Returns the live layout report, or persisted window state when the UI is not active. */
-    fun report(): WorkspaceLayoutReport =
-        WorkspaceLayoutReport(
-            stage = stage,
+    fun report(): WorkspaceLayoutReport {
+        val persisted = persistence.load()
+        return WorkspaceLayoutReport(
+            stage = stage ?: persisted.stage,
             desktop = desktop,
             screens = emptyList(),
-            windows = liveWindows ?: persistence.load().windows,
+            windows = liveWindows ?: persisted.windows,
         )
+    }
 
     /**
      * Applies window states to the live workspace and persists the requested layout.
@@ -53,13 +55,23 @@ class WorkspaceLayoutService(
         states: List<WorkspaceWindowState>,
         notifyListeners: Boolean = true,
     ): WorkspaceLayout {
-        val layout = WorkspaceLayout(states)
+        val layout = WorkspaceLayout(states, persistence.load().stage)
         liveWindows = states
         persistence.save(layout)
         if (notifyListeners) {
             listeners.forEach { listener -> listener(states) }
         }
         return layout
+    }
+
+    /**
+     * Persists the main application window size without changing internal panel states.
+     *
+     * @param stage Main window width and height in pixels
+     */
+    fun saveStage(stage: StageState) {
+        val current = persistence.load()
+        persistence.save(current.copy(stage = stage))
     }
 
     /**
