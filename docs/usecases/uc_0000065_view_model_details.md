@@ -31,6 +31,7 @@ The user can make informed model-selection decisions.
 ## Code Entry Points
 
 - `de.heckenmann.visualagent.ui.compose.SettingsPanel`
+- `de.heckenmann.visualagent.ui.compose.ActionIconButton`
 - `de.heckenmann.visualagent.agent.LLMProvider.getModelDetails`
 
 ## Acceptance Criteria

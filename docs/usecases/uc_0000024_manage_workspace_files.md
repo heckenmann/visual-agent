@@ -18,7 +18,7 @@ Desktop user.
 1. The user opens the files panel.
 2. The panel lists managed files with key metadata.
 3. The user filters the visible list by search query and file type when needed.
-4. The user selects an action such as rename, delete, refresh, copy metadata, or open in canvas.
+4. The user selects an action such as rename, delete, sync, copy metadata, or open in canvas.
 5. Rename opens an internal dialog instead of showing inline rename fields on every row.
 6. Copy metadata places path, MIME type, size, and SHA-256 on the clipboard.
 7. For canvas files, the user can open the document into the current editable canvas.
@@ -38,6 +38,7 @@ Workspace files can be managed without leaving the application.
 
 - `de.heckenmann.visualagent.ui.compose.FilesPanel`
 - `de.heckenmann.visualagent.ui.compose.ComposeModalHost`
+- `de.heckenmann.visualagent.ui.compose.ActionIconButton`
 - `de.heckenmann.visualagent.workspace.WorkspaceFileService`
 - `de.heckenmann.visualagent.knowledge.WorkspaceFileStore`
 

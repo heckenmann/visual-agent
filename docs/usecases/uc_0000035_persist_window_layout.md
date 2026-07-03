@@ -35,6 +35,10 @@ The user's preferred main window size, panel set, panel order, and persisted pan
 
 ## Code Entry Points
 
+- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.compose.ComposeSplitWorkspace`
+- `de.heckenmann.visualagent.ui.compose.ComposeWorkspaceModels`
+- `de.heckenmann.visualagent.workspace.layout.WorkspaceLayoutService`
 - `de.heckenmann.visualagent.workspace.layout.WorkspaceLayoutPersistence`
 - `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
 

@@ -33,6 +33,7 @@ User preferences survive restart and affect the application consistently.
 
 - `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
 - `de.heckenmann.visualagent.ui.compose.SettingsPanel`
+- `de.heckenmann.visualagent.ui.compose.ActionIconButton`
 - `de.heckenmann.visualagent.config.AppConfig`
 - `de.heckenmann.visualagent.knowledge.PreferenceStore`
 

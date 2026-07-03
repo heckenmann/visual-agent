@@ -29,12 +29,15 @@ Users interact with compact action buttons that show only an icon. Hovering over
 - `de.heckenmann.visualagent.ui.compose.ActionTooltip`
 - `de.heckenmann.visualagent.ui.compose.ComposeRail`
 - `de.heckenmann.visualagent.ui.compose.ComposeSplitWorkspace`
+- `de.heckenmann.visualagent.ui.compose.ScrollArrow`
+- `de.heckenmann.visualagent.ui.compose.PanelResizer`
 - `de.heckenmann.visualagent.ui.compose.ConversationPanel`
 - `de.heckenmann.visualagent.ui.compose.TodoPanel`
 - `de.heckenmann.visualagent.ui.compose.FilesPanel`
 - `de.heckenmann.visualagent.ui.compose.SubAgentsPanel`
 - `de.heckenmann.visualagent.ui.compose.SettingsPanel`
 - `de.heckenmann.visualagent.ui.compose.CanvasPanel`
+- `de.heckenmann.visualagent.ui.compose.ComposeModalHost`
 
 ## Acceptance Criteria
 - User action buttons in maintained Compose layouts do not define visible `text` labels.

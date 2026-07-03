@@ -34,6 +34,7 @@ Different agents and sessions can use different providers and model parameters.
 - `de.heckenmann.visualagent.agent.provider.ProviderCatalogService`
 - `de.heckenmann.visualagent.ui.compose.SettingsPanel`
 - `de.heckenmann.visualagent.ui.compose.ComposeSettingsPanelSupport`
+- `de.heckenmann.visualagent.ui.compose.ActionIconButton`
 
 ## Acceptance Criteria
 

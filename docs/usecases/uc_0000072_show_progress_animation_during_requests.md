@@ -52,6 +52,7 @@ text. The indicator never occupies layout space when nothing is in flight.
 - `de.heckenmann.visualagent.ui.compose.ConversationPanel`
 - `de.heckenmann.visualagent.ui.compose.SubAgentsPanel`
 - `de.heckenmann.visualagent.ui.compose.SettingsPanel`
+- `de.heckenmann.visualagent.ui.compose.ActionIconButton`
 - `de.heckenmann.visualagent.agent.tools.ToolEventBus`
 
 ## Acceptance Criteria

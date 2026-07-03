@@ -35,6 +35,7 @@ The canvas remains editable during resize and after object insertion.
 - `de.heckenmann.visualagent.ui.compose.CanvasPanel`
 - `de.heckenmann.visualagent.ui.compose.CanvasSurface`
 - `de.heckenmann.visualagent.ui.compose.ComposeModalHost`
+- `de.heckenmann.visualagent.ui.compose.ActionIconButton`
 - `de.heckenmann.visualagent.canvas.CanvasOperations`
 - `de.heckenmann.visualagent.canvas.InMemoryCanvasService`
 

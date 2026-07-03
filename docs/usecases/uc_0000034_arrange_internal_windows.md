@@ -40,10 +40,13 @@ The user can keep multiple panels visible and ordered for the current task witho
 ## Code Entry Points
 
 - `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.compose.ComposeSplitWorkspace`
 - `de.heckenmann.visualagent.ui.compose.ComposeWorkspaceComponents`
 - `de.heckenmann.visualagent.ui.compose.ComposeWorkspaceModels`
 - `de.heckenmann.visualagent.ui.compose.ComposeWorkspaceNavigation`
 - `de.heckenmann.visualagent.ui.compose.PanelDragHandle`
+- `de.heckenmann.visualagent.ui.compose.ActionIconButton`
+- `de.heckenmann.visualagent.workspace.layout.WorkspaceLayoutService`
 - `sh.calvin.reorderable.ReorderableRow`
 
 ## Acceptance Criteria
