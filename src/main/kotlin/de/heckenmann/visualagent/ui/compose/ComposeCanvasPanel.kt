@@ -36,6 +36,16 @@ import java.nio.file.Path
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.readBytes
 
+/**
+ * Canvas panel for drawing figures, importing images, and saving captures.
+ *
+ * Use cases: UC-0000028, UC-0000029, UC-0000030, UC-0000031, UC-0000032,
+ * UC-0000033, UC-0000066, UC-0000071.
+ *
+ * @param canvasOperations Canvas mutation and persistence operations
+ * @param workspaceFileService Workspace file import and managed-file creation
+ * @param modalRequester Modal requester used for destructive confirmations
+ */
 @Composable
 internal fun CanvasPanel(
     canvasOperations: CanvasOperations,

@@ -41,6 +41,20 @@ import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import kotlinx.coroutines.launch
 
+/**
+ * Sub-agent management panel for creating, running, configuring, and deleting
+ * worker agents.
+ *
+ * Use cases: UC-0000015, UC-0000016, UC-0000018, UC-0000051, UC-0000052,
+ * UC-0000071.
+ *
+ * @param agentManager Source of sub-agent lifecycle and job execution
+ * @param agentToolConfigService Tool configuration service for sub-agents
+ * @param toolRegistry Registry of available tools for configuration
+ * @param providerCatalogService Provider catalog for inherited provider/model
+ * @param modalRequester Modal requester used for destructive confirmations
+ * @param inFlight In-flight state holder for running sub-agent jobs
+ */
 @Composable
 internal fun SubAgentsPanel(
     agentManager: AgentManager,

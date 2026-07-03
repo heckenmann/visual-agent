@@ -30,6 +30,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
+/**
+ * Modal host that renders confirmation, content, and info dialogs.
+ *
+ * Use cases: UC-0000071.
+ *
+ * @param modal Current modal request or null when no modal is visible
+ * @param onDismiss Callback invoked when the modal is dismissed
+ */
 @Composable
 internal fun ComposeModalHost(
     modal: ComposeModal?,

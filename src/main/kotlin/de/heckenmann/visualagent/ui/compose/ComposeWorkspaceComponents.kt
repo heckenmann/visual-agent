@@ -75,6 +75,8 @@ import sh.calvin.reorderable.ReorderableRowScope
  * @param minPanelWidth Minimum width for each panel in pixels
  * @param viewport Available workspace dimensions used by resizer math
  * @param modifier Modifier applied to the workspace root
+ *
+ * Use cases: UC-0000034, UC-0000035, UC-0000036.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable

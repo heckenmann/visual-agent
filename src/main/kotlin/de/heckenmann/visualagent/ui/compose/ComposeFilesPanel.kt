@@ -42,6 +42,16 @@ import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import java.io.File
 
+/**
+ * Workspace files panel for importing, searching, syncing, and deleting files.
+ *
+ * Use cases: UC-0000023, UC-0000024, UC-0000025, UC-0000026, UC-0000031,
+ * UC-0000071.
+ *
+ * @param workspaceFileService Workspace file import, sync, and metadata
+ * @param canvasOperations Canvas document opener for `.canvas` files
+ * @param modalRequester Modal requester used for destructive confirmations
+ */
 @Composable
 internal fun FilesPanel(
     workspaceFileService: WorkspaceFileService,

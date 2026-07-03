@@ -52,6 +52,20 @@ import de.heckenmann.visualagent.config.AppConfig
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
+/**
+ * Application settings panel for provider/model configuration, appearance, and
+ * runtime preferences.
+ *
+ * Use cases: UC-0000007, UC-0000008, UC-0000009, UC-0000037, UC-0000038,
+ * UC-0000062, UC-0000063, UC-0000064, UC-0000065, UC-0000071.
+ *
+ * @param config Mutable application configuration
+ * @param llmProvider Provider used to refresh model lists and details
+ * @param providerCatalogService Provider profile catalog
+ * @param modalRequester Modal requester used for destructive confirmations
+ * @param onSettingsChanged Callback invoked when provider/theme/font changed
+ * @param inFlight In-flight state holder for model refresh indicators
+ */
 @Composable
 internal fun SettingsPanel(
     config: AppConfig,

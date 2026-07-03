@@ -58,6 +58,16 @@ import de.heckenmann.visualagent.todo.TodoPriority
 import de.heckenmann.visualagent.todo.TodoStatus
 import kotlinx.coroutines.launch
 
+/**
+ * Conversation panel with message history, streaming input, and todo actions.
+ *
+ * Use cases: UC-0000002, UC-0000003, UC-0000004, UC-0000045, UC-0000046,
+ * UC-0000049, UC-0000071.
+ *
+ * @param agentManager Source of conversation history and message streaming
+ * @param modalRequester Modal requester used for destructive confirmations
+ * @param inFlight In-flight state holder for the active stream indicator
+ */
 @Composable
 internal fun ConversationPanel(
     agentManager: AgentManager,
@@ -290,6 +300,14 @@ private fun MessageRow(
     }
 }
 
+/**
+ * Todo panel for creating, editing, and managing persisted todos.
+ *
+ * Use cases: UC-0000013, UC-0000071.
+ *
+ * @param agentManager Source of todo persistence and updates
+ * @param modalRequester Modal requester used for destructive confirmations
+ */
 @Composable
 internal fun TodoPanel(
     agentManager: AgentManager,

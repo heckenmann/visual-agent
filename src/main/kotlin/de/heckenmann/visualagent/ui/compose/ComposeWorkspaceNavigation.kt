@@ -61,6 +61,8 @@ import androidx.compose.ui.unit.dp
  * @param onPanelWidthChanged Callback that receives a new preferred width for a panel
  * @param onCloseApplication Callback that closes the application
  * @param modalRequester Modal requester used to show the panel width slider dialog
+ *
+ * Use cases: UC-0000034, UC-0000035, UC-0000036, UC-0000070.
  */
 @Composable
 internal fun ComposeRail(

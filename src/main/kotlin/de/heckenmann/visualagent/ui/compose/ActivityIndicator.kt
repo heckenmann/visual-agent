@@ -209,6 +209,8 @@ fun rememberInFlightState(toolEventBus: ToolEventBus): InFlightStateHolder {
  *
  * @param state Aggregated in-flight state
  * @param modifier Modifier applied to the indicator row
+ *
+ * Use cases: UC-0000072.
  */
 @Composable
 internal fun InFlightIndicator(
