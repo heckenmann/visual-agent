@@ -87,6 +87,16 @@ internal class AgentConversationHistoryOps(
     fun resumeInterruptedConversationIfNeeded() {
         if (owner.pendingResumeMessage == null) return
         owner.scope.launch {
+            if (!owner.llmProvider.checkConnection()) {
+                persist(
+                    Message(
+                        "assistant",
+                        "I could not resume the previous request automatically. The configured provider is currently unreachable.",
+                    ),
+                )
+                owner.pendingResumeMessage = null
+                return@launch
+            }
             runCatching {
                 val instruction =
                     Message(

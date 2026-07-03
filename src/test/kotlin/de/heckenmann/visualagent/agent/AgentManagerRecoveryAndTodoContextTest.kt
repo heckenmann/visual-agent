@@ -64,6 +64,7 @@ class AgentManagerRecoveryAndTodoContextTest {
             db.saveConversationMessage("main", "user", "Please continue after restart")
 
             val provider = mockk<LLMProvider>(relaxed = true)
+            coEvery { provider.checkConnection() } returns true
             coEvery { provider.chat(any<ChatRequestContext>()) } returns
                 ChatResponse(
                     model = "test",
@@ -88,6 +89,7 @@ class AgentManagerRecoveryAndTodoContextTest {
             db.saveConversationMessage("main", "user", "Please continue after restart")
 
             val provider = mockk<LLMProvider>(relaxed = true)
+            coEvery { provider.checkConnection() } returns true
             coEvery { provider.chat(any<ChatRequestContext>()) } throws IllegalStateException("401 invalid api key")
             AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
 
