@@ -129,6 +129,30 @@ gradle run
 gradle copyAllDependencies
 ```
 
+## GitHub Packages Artifact
+
+Every successful push to `master` builds the application JAR and publishes it to the repository's GitHub Packages Maven registry. The published version uses the format `0.1.0-master-<short-sha>` (snapshot versions are published unchanged).
+
+Add the package registry to your Gradle build:
+
+```kotlin
+repositories {
+    maven {
+        url = uri("https://maven.pkg.github.com/heckenmann/visual-agent")
+        credentials {
+            username = providers.gradleProperty("gpr.user").orElse(System.getenv("GITHUB_ACTOR")).get()
+            password = providers.gradleProperty("gpr.key").orElse(System.getenv("GITHUB_TOKEN")).get()
+        }
+    }
+}
+
+dependencies {
+    implementation("de.heckenmann.visualagent:visual-agent:0.1.0-master-SNAPSHOT")
+}
+```
+
+To use a published artifact you need a GitHub personal access token with `read:packages` scope (or the `GITHUB_TOKEN` secret inside a GitHub Actions workflow).
+
 Compose Desktop must run in non-headless JVM desktop mode. The Gradle application tasks set `java.awt.headless=false` because Compose Desktop uses the JVM `java.desktop` stack internally to discover screen density, even though Visual Agent source code does not use AWT/Swing APIs.
 
 The detailed Compose migration decision and requirement audit is documented in [`docs/compose-migration-audit.md`](docs/compose-migration-audit.md).

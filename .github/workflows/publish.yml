@@ -1,0 +1,48 @@
+name: Publish master JAR to GitHub Packages
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  GRADLE_OPTS: -Dorg.gradle.daemon=false
+  NO_AT_BRIDGE: "1"
+
+jobs:
+  publish:
+    name: Build and publish master JAR
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          lfs: true
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-disabled: true
+
+      - name: Generate Gradle wrapper
+        run: gradle wrapper --gradle-version 9.6.0 --no-daemon
+
+      - name: Build and verify
+        run: xvfb-run -a ./gradlew --no-daemon build
+
+      - name: Publish to GitHub Packages
+        run: xvfb-run -a ./gradlew --no-daemon publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
