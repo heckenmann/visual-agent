@@ -16,13 +16,13 @@ Desktop user.
 ## Main Flow
 
 1. The user opens, hides, or reorders workspace panels, or resizes the main application window.
-2. The main window size, visibility state, user-defined order, preferred panel sizes from existing layout state, and the current calculated workspace slots are captured.
+2. The main window size, panel visibility, user-defined order, and preferred panel widths are captured.
 3. Layout state is persisted through the workspace layout service.
 4. When the application exits, the latest workspace state and window size have been saved.
 5. On startup, the stored main window size and workspace layout are loaded.
 6. The main window opens with the previously saved size.
-7. Workspace panels are restored to their previous visibility state, user-defined order, and preferred sizes.
-8. Restored panels are placed into valid semantic workspace slots.
+7. Workspace panels are restored to their previous visibility state, user-defined order, and preferred widths.
+8. Restored panels are placed side by side in the horizontal workspace row.
 
 ## Result
 
@@ -30,7 +30,8 @@ The user's preferred main window size, panel set, panel order, and persisted pan
 
 ## Tool Calls
 
-- None.
+- `workspace:layout get` returns persisted panel order, visibility, and preferred width plus the saved main window size.
+- `workspace:layout set` persists model-requested changes to panel order, visibility, and preferred width.
 
 ## Code Entry Points
 
@@ -45,4 +46,4 @@ The user's preferred main window size, panel set, panel order, and persisted pan
 - Restored panels preserve user- or model-defined preferred sizes.
 - Panels hidden before shutdown stay hidden after restart.
 - Missing panels or invalid stored bounds do not prevent startup.
-- Restored panels are always placed inside the visible semantic workspace.
+- Restored panels are always placed inside the visible horizontal workspace row.
