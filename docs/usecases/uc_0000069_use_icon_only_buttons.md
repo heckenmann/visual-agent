@@ -39,6 +39,9 @@ Users interact with compact action buttons that show only an icon. Hovering over
 - `de.heckenmann.visualagent.ui.compose.CanvasPanel`
 - `de.heckenmann.visualagent.ui.compose.ComposeModalHost`
 
+## Notes
+- The `PanelDragHandle` composable was removed; the entire panel header now acts as the draggable reorder handle, except for interactive buttons.
+
 ## Acceptance Criteria
 - User action buttons in maintained Compose layouts do not define visible `text` labels.
 - Every icon-only button has a tooltip that states the action.

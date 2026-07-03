@@ -317,6 +317,7 @@ private fun ReorderableListItemScope.SplitPanelHeader(
             Modifier
                 .fillMaxWidth()
                 .background(if (primary) Color(0xFF2A2D39) else Color(0xFF262832))
+                .draggableHandle()
                 .padding(horizontal = 10.dp, vertical = if (primary) 8.dp else 7.dp),
         horizontalArrangement = Arrangement.spacedBy(9.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -337,7 +338,6 @@ private fun ReorderableListItemScope.SplitPanelHeader(
                 modifier = Modifier.size(if (primary) 17.dp else 16.dp),
             )
         }
-        PanelDragHandle(primary = primary)
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = window.title,

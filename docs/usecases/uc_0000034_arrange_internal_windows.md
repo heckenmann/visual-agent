@@ -19,7 +19,7 @@ Desktop user.
 2. The panel appears as a card in the horizontal workspace row.
 3. The Compose shell lays out visible panels in the user-defined order, each panel using its own stored preferred width.
 4. All visible panels are placed side by side in the user-defined order, each using its own stored preferred width.
-5. The user drags a panel by its header drag handle to reorder the row.
+5. The user drags a panel by its header to reorder the row.
 6. The user drags the resizer between two panels to change the width of the left panel; all panels to the right shift right, and the row becomes scrollable if needed. The resizer shows a visible three-bar grip.
 7. The user long-presses or right-clicks a rail button and chooses "Set width…" to adjust a panel's preferred width with a slider.
 8. The user can move a panel earlier or later through vertical drag gestures on the rail button.
@@ -44,7 +44,6 @@ The user can keep multiple panels visible and ordered for the current task witho
 - `de.heckenmann.visualagent.ui.compose.ComposeWorkspaceComponents`
 - `de.heckenmann.visualagent.ui.compose.ComposeWorkspaceModels`
 - `de.heckenmann.visualagent.ui.compose.ComposeWorkspaceNavigation`
-- `de.heckenmann.visualagent.ui.compose.PanelDragHandle`
 - `de.heckenmann.visualagent.ui.compose.ActionIconButton`
 - `de.heckenmann.visualagent.workspace.layout.WorkspaceLayoutService`
 - `sh.calvin.reorderable.ReorderableRow`
