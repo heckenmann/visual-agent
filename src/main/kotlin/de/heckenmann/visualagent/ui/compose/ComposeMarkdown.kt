@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,6 +25,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import org.commonmark.ext.autolink.AutolinkExtension
+import org.commonmark.ext.gfm.tables.TableBlock
+import org.commonmark.ext.gfm.tables.TableBody
+import org.commonmark.ext.gfm.tables.TableHead
+import org.commonmark.ext.gfm.tables.TableRow
+import org.commonmark.ext.gfm.tables.TablesExtension
 import org.commonmark.node.BulletList
 import org.commonmark.node.Code
 import org.commonmark.node.FencedCodeBlock
@@ -37,6 +43,7 @@ import org.commonmark.node.Paragraph
 import org.commonmark.node.SoftLineBreak
 import org.commonmark.node.StrongEmphasis
 import org.commonmark.parser.Parser
+import org.commonmark.ext.gfm.tables.TableCell as CommonMarkTableCell
 import org.commonmark.node.Node as MarkdownNode
 import org.commonmark.node.Text as MarkdownText
 
@@ -86,6 +93,69 @@ private fun MarkdownBlock(block: ComposeMarkdownBlock) {
                 color = Color(0xFFF8F8F2),
                 style = MaterialTheme.typography.bodySmall,
             )
+        is ComposeMarkdownBlock.Table -> MarkdownTable(block)
+    }
+}
+
+@Composable
+private fun MarkdownTable(block: ComposeMarkdownBlock.Table) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .border(1.dp, Color(0x33444A65), RoundedCornerShape(4.dp))
+                .padding(1.dp),
+    ) {
+        block.headerRow?.let { header ->
+            Row(
+                modifier = Modifier.fillMaxWidth().background(Color(0xFF191A21)),
+                horizontalArrangement = Arrangement.spacedBy(0.dp),
+            ) {
+                header.forEachIndexed { _, cell ->
+                    MarkdownTableCell(
+                        cell = cell,
+                        isHeader = true,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                }
+            }
+        }
+        block.rows.forEach { row ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(0.dp),
+            ) {
+                row.forEachIndexed { _, cell ->
+                    MarkdownTableCell(
+                        cell = cell,
+                        isHeader = false,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MarkdownTableCell(
+    cell: TableCell,
+    isHeader: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier =
+            modifier
+                .fillMaxHeight()
+                .border(0.5.dp, Color(0x22444A65))
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+    ) {
+        Text(
+            text = cell.inlines.toAnnotatedString(),
+            color = Color(0xFFF8F8F2),
+            fontWeight = if (isHeader) FontWeight.SemiBold else FontWeight.Normal,
+            style = MaterialTheme.typography.bodySmall,
+        )
     }
 }
 
@@ -127,7 +197,11 @@ private fun ComposeMarkdownInline.style(): SpanStyle =
     )
 
 internal object ComposeMarkdownParser {
-    private val parser = Parser.builder().extensions(listOf(AutolinkExtension.create())).build()
+    private val parser =
+        Parser
+            .builder()
+            .extensions(listOf(AutolinkExtension.create(), TablesExtension.create()))
+            .build()
 
     fun parse(markdown: String): List<ComposeMarkdownBlock> {
         val document = parser.parse(markdown)
@@ -155,8 +229,46 @@ internal object ComposeMarkdownParser {
             is IndentedCodeBlock -> ComposeMarkdownBlock.CodeBlock(node.literal)
             is OrderedList -> listBlock(node, ordered = true)
             is BulletList -> listBlock(node, ordered = false)
+            is TableBlock -> tableBlock(node)
             else -> ComposeMarkdownBlock.Paragraph(inlineNodes(node))
         }
+
+    private fun tableBlock(table: TableBlock): ComposeMarkdownBlock.Table {
+        val headerRow = mutableListOf<TableCell>()
+        val rows = mutableListOf<List<TableCell>>()
+        var child = table.firstChild
+        while (child != null) {
+            when (child) {
+                is TableHead -> headerRow += tableRowCells(child)
+                is TableBody -> {
+                    var rowChild = child.firstChild
+                    while (rowChild != null) {
+                        if (rowChild is TableRow) {
+                            rows += tableRowCells(rowChild)
+                        }
+                        rowChild = rowChild.next
+                    }
+                }
+            }
+            child = child.next
+        }
+        return ComposeMarkdownBlock.Table(
+            headerRow = headerRow.ifEmpty { null },
+            rows = rows,
+        )
+    }
+
+    private fun tableRowCells(row: MarkdownNode): List<TableCell> {
+        val cells = mutableListOf<TableCell>()
+        var child = row.firstChild
+        while (child != null) {
+            if (child is CommonMarkTableCell) {
+                cells += TableCell(inlineNodes(child))
+            }
+            child = child.next
+        }
+        return cells
+    }
 
     private fun listBlock(
         list: MarkdownNode,
@@ -222,7 +334,16 @@ internal sealed interface ComposeMarkdownBlock {
         val startNumber: Int,
         val items: List<List<ComposeMarkdownBlock>>,
     ) : ComposeMarkdownBlock
+
+    data class Table(
+        val headerRow: List<TableCell>?,
+        val rows: List<List<TableCell>>,
+    ) : ComposeMarkdownBlock
 }
+
+internal data class TableCell(
+    val inlines: List<ComposeMarkdownInline>,
+)
 
 internal data class ComposeMarkdownInline(
     val text: String,
