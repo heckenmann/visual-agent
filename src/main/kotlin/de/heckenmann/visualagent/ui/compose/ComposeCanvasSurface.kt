@@ -179,6 +179,17 @@ private fun canvasNodes(
         )
     }
 
+/**
+ * Renders a single canvas figure.
+ *
+ * Selected figures are indicated by a thin accent border; the figure keeps its
+ * natural background so surrounding figures remain visible.
+ *
+ * @param figure Figure snapshot to render
+ * @param selected True when this figure is the currently selected one
+ * @param imageBytesForPath Resolver for imported image bytes
+ * @param onResize Callback invoked from the resize handle when selected
+ */
 @Composable
 private fun FigureNode(
     figure: CanvasFigureSnapshot,
@@ -193,7 +204,7 @@ private fun FigureNode(
                 .fillMaxSize()
                 .clip(shape)
                 .background(figureColor(figure))
-                .border(2.dp, if (selected) Color(0xFFF8F8F2) else Color.Transparent, shape)
+                .border(if (selected) 1.5.dp else 0.dp, if (selected) Color(0xFF8BE9FD) else Color.Transparent, shape)
                 .padding(6.dp),
         contentAlignment = Alignment.Center,
     ) {
