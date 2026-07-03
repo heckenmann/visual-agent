@@ -58,7 +58,7 @@ dependencies {
     implementation(compose.desktop.currentOs)
     implementation("org.jetbrains.compose.material3:material3:1.9.0")
     implementation("org.jetbrains.compose.material:material-icons-extended:1.7.3")
-    implementation("com.cheonjaeung.compose.grid:grid:2.7.4")
+    implementation("sh.calvin.reorderable:reorderable:3.1.0")
     implementation("io.github.xingray:compose-infinite-canvas-core:0.2.0")
     implementation("io.github.vinceglb:filekit-dialogs-compose:0.14.2")
 
