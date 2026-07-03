@@ -16,7 +16,6 @@ permissions:
 
 env:
   GRADLE_OPTS: -Dorg.gradle.daemon=false
-  NO_AT_BRIDGE: "1"
 
 jobs:
   publish:
@@ -46,9 +45,9 @@ jobs:
         run: gradle wrapper --gradle-version 9.6.0 --no-daemon
 
       - name: Build JAR without tests
-        run: xvfb-run -a ./gradlew --no-daemon bootJar
+        run: ./gradlew --no-daemon bootJar
 
       - name: Publish to GitHub Packages
-        run: xvfb-run -a ./gradlew --no-daemon publish
+        run: ./gradlew --no-daemon publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
