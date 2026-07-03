@@ -182,7 +182,8 @@ publishing {
                 if (project.version.toString().endsWith("SNAPSHOT")) {
                     project.version.toString()
                 } else {
-                    "${project.version}-master-${System.getenv("GITHUB_SHA")?.take(8) ?: "local"}"
+                    val runNumber = System.getenv("GITHUB_RUN_NUMBER") ?: "0"
+                    "${project.version}-master-${System.getenv("GITHUB_SHA")?.take(8) ?: "local"}-$runNumber"
                 }
             artifact(tasks.bootJar)
         }

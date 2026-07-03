@@ -131,7 +131,7 @@ gradle copyAllDependencies
 
 ## GitHub Packages Artifact
 
-Every successful push to `master` first runs the `Tests` workflow. When that workflow succeeds, the `Publish master JAR to GitHub Packages` workflow builds the application JAR and publishes it to the repository's GitHub Packages Maven registry. The published version uses the format `0.1.0-master-<short-sha>` (snapshot versions are published unchanged).
+Every successful push to `master` first runs the `Tests` workflow. When that workflow succeeds, the `Publish master JAR to GitHub Packages` workflow builds the application JAR and publishes it to the repository's GitHub Packages Maven registry. The published version uses the format `0.1.0-master-<short-sha>-<run-number>` (snapshot versions are published unchanged).
 
 Add the package registry to your Gradle build:
 
