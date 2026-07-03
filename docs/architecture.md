@@ -3,6 +3,11 @@
 ## Overview
 
 Visual Agent is a Compose Multiplatform desktop application with Spring-managed services.
+Its long-term goal is to give the model as many tools as possible so it can visualize its
+own output. Today those surfaces include an editable canvas, managed workspace files, a
+todo/sub-agent system, and a conversation panel; future work will add more rendering and
+interaction surfaces.
+
 The runtime uses Spring AI for model interaction and tool-calling, and Spring Data JPA on SQLite as the persistent state source.
 The Compose Multiplatform shell is launched from `runVisualAgentComposeApplication()`
 in `ui/compose/VisualAgentComposeApplication.kt`; the
