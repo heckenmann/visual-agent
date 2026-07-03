@@ -26,9 +26,9 @@ class WorkspaceLayoutTool(
             id = ToolId("workspace:layout"),
             name = ToolId("workspace:layout").toFunctionName(),
             description =
-                "Inspect or arrange internal UI windows. Actions: get, set. " +
-                    "get returns screens, main window size, desktop size, and all window positions. " +
-                    "set input: {\"action\":\"set\",\"windows\":[{\"id\":\"chat\",\"x\":0,\"y\":0,\"width\":640,\"height\":480,\"visible\":true}]}",
+                "Inspect or arrange internal UI panels in the horizontal workspace row. Actions: get, set. " +
+                    "get returns screens, main window size, desktop size, and all panels with order, visible, and preferredWidth. " +
+                    "set input: {\"action\":\"set\",\"windows\":[{\"id\":\"chat\",\"order\":0,\"visible\":true,\"preferredWidth\":640}]}",
             inputSchema = STRING_SCHEMA,
         )
 
@@ -59,7 +59,7 @@ class WorkspaceLayoutTool(
                 .values
                 .map { existing -> patchedById[existing.id] ?: existing }
                 .plus(patchedById.filterKeys { it !in current }.values)
-                .sortedBy(WorkspaceWindowState::zIndex)
+                .sortedBy(WorkspaceWindowState::order)
         val applied = workspaceLayoutService.applyWindowStates(merged)
         return success("workspace:layout", json.encodeToString(applied))
     }
@@ -67,12 +67,9 @@ class WorkspaceLayoutTool(
     private fun JsonObject.toWindowState(existing: WorkspaceWindowState?): WorkspaceWindowState =
         WorkspaceWindowState(
             id = requiredString("id"),
-            x = double("x") ?: existing?.x ?: 0.0,
-            y = double("y") ?: existing?.y ?: 0.0,
-            width = double("width") ?: existing?.width ?: 640.0,
-            height = double("height") ?: existing?.height ?: 480.0,
+            order = int("order") ?: existing?.order ?: 0,
             visible = boolean("visible") ?: existing?.visible ?: true,
-            zIndex = int("zIndex") ?: existing?.zIndex ?: 0,
+            preferredWidth = double("preferredWidth") ?: existing?.preferredWidth ?: 0.0,
         )
 
     private fun JsonObject.double(key: String): Double? = this[key]?.jsonPrimitive?.doubleOrNull
