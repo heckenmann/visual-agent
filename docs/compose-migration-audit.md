@@ -13,7 +13,7 @@ The migration replaces the Visual Agent desktop UI toolkit. It does not implemen
 ## Current Evidence
 
 - `Main.kt` starts the Compose desktop application.
-- `build.gradle.kts` uses Compose Multiplatform, Material3, GridLayout for Compose, FileKit, and InfiniteCanvas dependencies with no OpenJFX, AtlantaFX, Ikonli JavaFX, or JHotDraw dependencies.
+- `build.gradle.kts` uses Compose Multiplatform, Material3, `sh.calvin.reorderable:reorderable`, FileKit, and InfiniteCanvas dependencies with no OpenJFX, AtlantaFX, Ikonli JavaFX, or JHotDraw dependencies.
 - `desktopApiUsageCheck` is part of `check` and rejects legacy desktop image/toolkit API usage below `src/main` and `src/test`.
 - `gradle --no-daemon test` passes locally after the latest UX/layout documentation updates.
 - `./gradlew run --no-daemon` starts the Spring context and Compose desktop runtime locally.
@@ -25,8 +25,8 @@ The migration replaces the Visual Agent desktop UI toolkit. It does not implemen
 | Full JavaFX removal via Compose is feasible | Complete | Production entry point uses Compose; legacy JavaFX/FXML sources and resources are removed from the build path; `desktopApiUsageCheck` is enabled. |
 | Compare Compose with Swing/FlatLaf path from issue 46 | Complete | Issue 48 documents Compose vs Swing/FlatLaf tradeoffs and recommends Compose for the Kotlin-first UI. |
 | No JavaFX dependencies remain | Complete | `build.gradle.kts` contains Compose dependencies and no JavaFX, AtlantaFX, Ikonli JavaFX, or JHotDraw dependencies. |
-| Semantic workspace panels | Complete | `ComposeSplitWorkspace`, GridLayout for Compose `BoxGrid`, `splitWorkspaceBounds`, and `workspace/layout` services provide user-ordered stage, inspector, and deck panel slots without overlap. |
-| User- and model-adjustable panel sizing | Complete | Panel resize handles update stored size preferences; `workspace:layout set` persists model-requested sizes and notifies the live Compose workspace. |
+| Semantic workspace panels | Complete | `ComposeSplitWorkspace` uses a single horizontal `ReorderableRow` of full-height panels. Each panel stores its own `preferredWidth`; drag-to-reorder and resizers are supported; the row scrolls horizontally when the total panel widths exceed the viewport. The `workspace:layout` tool exposes panel order, visibility, and width. |
+| User- and model-adjustable panel sizing | Complete | Panel resizers update each panel's stored `preferredWidth`; `workspace:layout set` persists model-requested order, visibility, and width and notifies the live Compose workspace. |
 | Large panels scroll without old chrome repaint costs | Complete | Compose panels use Compose scroll containers and cheap window chrome; previous JavaFX CSS/shadow effects are removed. |
 | Theme and visual language | Complete | Material3 and `ComposeWorkspaceTheme` provide Dracula-style Compose theme tokens and runtime settings remain DB-backed. |
 | Canvas replacement | Complete | `CanvasOperations`, `InMemoryCanvasService`, InfiniteCanvas, `CanvasDocumentCodec`, `CanvasPngRenderer`, and `ComposeCanvasPanel` provide editable figures, pan/zoom, selection, move, resize, delete, PNG capture, persistence, workspace save/open, and tool calls. |
@@ -60,4 +60,4 @@ No remaining Compose migration coverage gaps are known in the audited use-case d
 
 ## Final Recommendation
 
-Use Compose Multiplatform as the Visual Agent desktop UI toolkit. The branch demonstrates that the main window, semantic workspace panels, file import, canvas editing/persistence, internal modals, command palette, and model-facing tool contracts can run without the former JavaFX/JHotDraw UI stack while delegating flexible grid placement and canvas viewport behavior to Compose-native libraries.
+Use Compose Multiplatform as the Visual Agent desktop UI toolkit. The branch demonstrates that the main window, horizontal workspace panel row, file import, canvas editing/persistence, internal modals, command palette, and model-facing tool contracts can run without the former JavaFX/JHotDraw UI stack using Compose-native libraries.

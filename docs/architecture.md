@@ -167,15 +167,21 @@ that returns "not configured"), `search` (placeholder that returns
 
 - Main shell: `VisualAgentComposeApplication` with a left rail, a
   header that shows Provider, Model, Beans, and the in-flight
-  activity indicator, and semantic workspace panels whose visibility
-  and user-defined order are persisted.
+  activity indicator, and a single horizontal row of workspace
+  panels whose visibility, user-defined order, and individual
+  widths are persisted.
 - The six panels are Conversation, Todos, Files, Subagents, Settings,
   and Canvas. Each is rendered as a Compose `PanelSection` /
   `PanelContentCard` from the shared widgets in
   `ui/compose/ComposePanelControls.kt`.
-- `ComposeSplitWorkspace` lays out panels deterministically: 1
-  visible panel = full, 2–4 = primary stage with right-side inspector
-  stack, 5+ = balanced left/right columns. `WORKSPACE_PANEL_GAP = 16`.
+- `ComposeSplitWorkspace` lays out visible panels in one horizontally
+  scrollable `ReorderableRow`. Each panel keeps its own
+  `preferredWidth`; dragging a panel header reorders the row;
+  dragging the resizer between two panels changes only the left
+  panel's width and pushes all panels to the right. When the
+  combined widths exceed the viewport, the row scrolls horizontally
+  via mouse wheel, scroll arrows, or a horizontal scrollbar.
+  `WORKSPACE_PANEL_GAP = 16`.
 - `Cmd/Ctrl+1..6` focuses panels; `Cmd/Ctrl+K` opens the internal
   command palette; `Esc` closes the palette.
 - Internal modals (`ComposeModalHost` with `ComposeConfirmationModal`,
