@@ -8,6 +8,7 @@ import de.heckenmann.visualagent.workspace.layout.WorkspaceWindowState
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.double
+import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -17,11 +18,11 @@ import kotlin.test.assertTrue
 
 class WorkspaceLayoutToolTest {
     @Test
-    fun `get returns persisted window layout when live ui is unavailable`() {
+    fun `get returns persisted panel layout when live ui is unavailable`() {
         val persistence = WorkspaceLayoutPersistence(MapPreferenceStore())
         persistence.save(
             WorkspaceLayout(
-                listOf(WorkspaceWindowState("conversation", 10.0, 20.0, 640.0, 480.0, visible = true, zIndex = 1)),
+                listOf(WorkspaceWindowState("conversation", order = 1, visible = true, preferredWidth = 640.0)),
             ),
         )
         val tool = WorkspaceLayoutTool(WorkspaceLayoutService(persistence))
@@ -32,31 +33,30 @@ class WorkspaceLayoutToolTest {
 
         assertTrue(result.success)
         assertEquals("conversation", window["id"]!!.jsonPrimitive.content)
-        assertEquals(10.0, window["x"]!!.jsonPrimitive.double)
-        assertEquals(640.0, window["width"]!!.jsonPrimitive.double)
+        assertEquals(1, window["order"]!!.jsonPrimitive.int)
+        assertEquals(640.0, window["preferredWidth"]!!.jsonPrimitive.double)
         assertTrue(window["visible"]!!.jsonPrimitive.boolean)
     }
 
     @Test
-    fun `set merges partial window patch and persists layout`() {
+    fun `set merges partial panel patch and persists layout`() {
         val persistence = WorkspaceLayoutPersistence(MapPreferenceStore())
         persistence.save(
             WorkspaceLayout(
-                listOf(WorkspaceWindowState("conversation", 10.0, 20.0, 640.0, 480.0, visible = true, zIndex = 1)),
+                listOf(WorkspaceWindowState("conversation", order = 1, visible = true, preferredWidth = 640.0)),
             ),
         )
         val tool = WorkspaceLayoutTool(WorkspaceLayoutService(persistence))
 
         val result =
             tool.execute(
-                """{"action":"set","windows":[{"id":"conversation","x":30,"y":40,"visible":false}]}""",
+                """{"action":"set","windows":[{"id":"conversation","order":2,"visible":false,"preferredWidth":720}]}""",
             )
         val saved = persistence.load().windows.single()
 
         assertTrue(result.success)
-        assertEquals(30.0, saved.x)
-        assertEquals(40.0, saved.y)
-        assertEquals(640.0, saved.width)
+        assertEquals(2, saved.order)
+        assertEquals(720.0, saved.preferredWidth)
         assertEquals(false, saved.visible)
     }
 
