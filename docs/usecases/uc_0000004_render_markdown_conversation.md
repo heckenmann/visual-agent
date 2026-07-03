@@ -37,4 +37,4 @@ Markdown formatting is displayed in the conversation while preserving the origin
 ## Acceptance Criteria
 
 - Markdown input is not pre-normalized or heuristically rewritten.
-- Code blocks, lists, and regular paragraphs render consistently.
+- Code blocks, lists, tables (GFM pipe syntax), and regular paragraphs render consistently.
