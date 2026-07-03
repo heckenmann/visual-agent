@@ -256,7 +256,7 @@ internal fun ComposeWorkspaceHeader(
 private const val RAIL_REORDER_THRESHOLD_PX = 34f
 private const val RAIL_WIDTH_STEP_PX = 20f
 internal const val MIN_PANEL_WIDTH = 200
-internal const val MAX_PANEL_WIDTH = 800
+internal const val MAX_PANEL_WIDTH = 2400
 
 @Composable
 internal fun PanelStatus(status: String) {
