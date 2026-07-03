@@ -242,14 +242,7 @@ private fun VisualAgentComposeApp(
                                 height = maxHeight.value.roundToInt(),
                             )
                         val minPanelWidth = ComposeWorkspaceWindowBounds.MIN_WIDTH
-                        val splitBounds = splitWorkspaceBounds(windows, viewport, minPanelWidth)
-                        val workspaceStates =
-                            windows.mapIndexed {
-                                index,
-                                window,
-                                ->
-                                window.toWorkspaceWindowState(viewport, splitBounds[window.id], index)
-                            }
+                        val workspaceStates = windows.mapIndexed { index, window -> window.toWorkspaceWindowState(index) }
                         workspaceLayoutService.bind(
                             stage = StageState(width = viewport.width.toDouble(), height = viewport.height.toDouble()),
                             desktop = DesktopState(width = viewport.width.toDouble(), height = viewport.height.toDouble()),
@@ -356,23 +349,13 @@ private fun defaultWindows(): List<ComposeWorkspaceWindow> =
         }
     }
 
-private fun ComposeWorkspaceWindow.toWorkspaceWindowState(
-    viewport: ComposeWorkspaceViewport,
-    splitBounds: ComposeWorkspaceWindowBounds?,
-    orderIndex: Int,
-): WorkspaceWindowState {
-    val coercedBounds = splitBounds ?: bounds.coerceIn(viewport)
-    return WorkspaceWindowState(
+private fun ComposeWorkspaceWindow.toWorkspaceWindowState(orderIndex: Int): WorkspaceWindowState =
+    WorkspaceWindowState(
         id = id,
-        x = coercedBounds.x.toDouble(),
-        y = coercedBounds.y.toDouble(),
-        width = coercedBounds.width.toDouble(),
-        height = coercedBounds.height.toDouble(),
+        order = orderIndex,
         visible = visible,
-        zIndex = orderIndex,
         preferredWidth = preferredWidth.toDouble(),
     )
-}
 
 private fun androidx.compose.ui.input.key.KeyEvent.workspaceShortcutDigit(): Int? {
     if (type != KeyEventType.KeyDown || (!isMetaPressed && !isCtrlPressed)) return null

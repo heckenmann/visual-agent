@@ -49,23 +49,34 @@ data class WorkspaceLayout(
 
 /**
  * Serializable state for one internal workspace window.
+ *
+ * The Compose desktop shell renders panels in a single horizontal row, so the
+ * persisted geometry is reduced to order, visibility, and preferred width.
+ * Legacy `x`, `y`, `width`, `height`, and `zIndex` fields are ignored on load.
  */
 @Serializable
 data class WorkspaceWindowState(
     /** Stable workspace window identifier. */
     val id: String,
-    /** Window x-coordinate inside the desktop. */
-    val x: Double,
-    /** Window y-coordinate inside the desktop. */
-    val y: Double,
-    /** Window width in pixels. */
-    val width: Double,
-    /** Window height in pixels. */
-    val height: Double,
-    /** Whether the window was visible when the layout was saved. */
-    val visible: Boolean,
-    /** Relative z-order index, larger values are closer to the front. */
-    val zIndex: Int,
+    /** Panel position in the horizontal row, starting at 0. */
+    val order: Int = 0,
+    /** Whether the panel is visible in the row. */
+    val visible: Boolean = true,
     /** User-defined preferred panel width in the row layout. */
     val preferredWidth: Double = 0.0,
+    /** Obsolete window x-coordinate inside the desktop. */
+    @Deprecated("Horizontal row layout no longer uses coordinates")
+    val x: Double = 0.0,
+    /** Obsolete window y-coordinate inside the desktop. */
+    @Deprecated("Horizontal row layout no longer uses coordinates")
+    val y: Double = 0.0,
+    /** Obsolete window width in pixels. */
+    @Deprecated("Use preferredWidth instead")
+    val width: Double = 0.0,
+    /** Obsolete window height in pixels. */
+    @Deprecated("Horizontal row layout uses full row height")
+    val height: Double = 0.0,
+    /** Obsolete z-order index. */
+    @Deprecated("Use order instead")
+    val zIndex: Int = 0,
 )
