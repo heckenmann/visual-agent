@@ -257,6 +257,7 @@ data class Message(
     val content: String,
     val metadata: String? = null,
     val images: List<String>? = null,
+    val id: String? = null,
 )
 
 /**

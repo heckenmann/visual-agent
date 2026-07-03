@@ -270,6 +270,15 @@ class AgentManager
             conversationOps.recordToolCall(event)
         }
 
+        /** Deletes a single conversation message by id from memory and persistence. */
+        fun deleteMessageById(id: String) = conversationOps.deleteMessageById(id)
+
+        /** Updates the content of a single conversation message by id. */
+        fun updateMessageContentById(
+            id: String,
+            newContent: String,
+        ) = conversationOps.updateMessageContentById(id, newContent)
+
         /** Loads an older page and prepends it to the in-memory history. Use cases: UC-0000046. */
         fun loadOlderHistory(pageSize: Int = HISTORY_PAGE_SIZE): List<Message> = conversationOps.loadOlderHistory(pageSize)
 

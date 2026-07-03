@@ -143,6 +143,15 @@ interface ConversationStore {
 
     /** Deletes all messages for a session and returns the affected count. */
     fun deleteConversationMessages(sessionId: String): Int
+
+    /** Deletes a single message by id and returns the affected count. */
+    fun deleteConversationMessageById(id: String): Int
+
+    /** Updates the content of a single message by id and returns the affected count. */
+    fun updateConversationMessageContent(
+        id: String,
+        newContent: String,
+    ): Int
 }
 
 /** Stores metadata for files imported into the managed workspace. Use cases: UC-0000023, UC-0000024, UC-0000026, UC-0000031. */

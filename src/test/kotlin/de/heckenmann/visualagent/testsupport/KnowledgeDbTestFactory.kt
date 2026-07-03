@@ -105,6 +105,13 @@ class TestPersistence internal constructor(
 
     override fun deleteConversationMessages(sessionId: String): Int = conversationStore.deleteConversationMessages(sessionId)
 
+    override fun deleteConversationMessageById(id: String): Int = conversationStore.deleteConversationMessageById(id)
+
+    override fun updateConversationMessageContent(
+        id: String,
+        newContent: String,
+    ): Int = conversationStore.updateConversationMessageContent(id, newContent)
+
     override fun saveWorkspaceFile(record: WorkspaceFileRecord) = workspaceFileStore.saveWorkspaceFile(record)
 
     override fun listWorkspaceFiles(): List<WorkspaceFileRecord> = workspaceFileStore.listWorkspaceFiles()

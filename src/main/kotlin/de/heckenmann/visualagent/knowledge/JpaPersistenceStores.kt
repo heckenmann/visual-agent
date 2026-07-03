@@ -9,6 +9,7 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.springframework.data.domain.PageRequest
+import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
@@ -127,6 +128,23 @@ internal class JpaConversationStore(
 
     @Transactional
     override fun deleteConversationMessages(sessionId: String): Int = repository.deleteBySessionId(sessionId)
+
+    @Transactional
+    override fun deleteConversationMessageById(id: String): Int {
+        repository.deleteById(id)
+        return 1
+    }
+
+    @Transactional
+    override fun updateConversationMessageContent(
+        id: String,
+        newContent: String,
+    ): Int {
+        val entity = repository.findByIdOrNull(id) ?: return 0
+        entity.content = newContent
+        repository.save(entity)
+        return 1
+    }
 }
 
 @Service

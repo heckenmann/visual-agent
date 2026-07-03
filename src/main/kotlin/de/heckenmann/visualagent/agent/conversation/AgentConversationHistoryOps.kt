@@ -24,6 +24,26 @@ internal class AgentConversationHistoryOps(
 
     fun getHistory(): List<Message> = owner.conversationHistory.toList()
 
+    fun deleteMessageById(id: String) {
+        owner.conversationStore.deleteConversationMessageById(id)
+        val index = owner.conversationHistory.indexOfFirst { it.id == id }
+        if (index != -1) {
+            owner.conversationHistory.removeAt(index)
+        }
+    }
+
+    fun updateMessageContentById(
+        id: String,
+        newContent: String,
+    ) {
+        owner.conversationStore.updateConversationMessageContent(id, newContent)
+        val index = owner.conversationHistory.indexOfFirst { it.id == id }
+        if (index != -1) {
+            val existing = owner.conversationHistory[index]
+            owner.conversationHistory[index] = existing.copy(content = newContent)
+        }
+    }
+
     fun recordToolCall(event: ToolCallEvent) {
         val status = if (event.result.success) "ok" else "error"
         val firstDetailLine =
@@ -115,18 +135,19 @@ internal class AgentConversationHistoryOps(
         }
     }
 
-    private fun persist(message: Message) {
-        owner.conversationHistory.add(message)
-        owner.conversationStore.saveConversationMessage(
-            AgentManager.MAIN_SESSION_ID,
-            message.role,
-            message.content,
-            message.metadata,
-        )
+    internal fun persist(message: Message) {
+        val id =
+            owner.conversationStore.saveConversationMessage(
+                AgentManager.MAIN_SESSION_ID,
+                message.role,
+                message.content,
+                message.metadata,
+            )
+        owner.conversationHistory.add(message.copy(id = id))
     }
 
     private fun toMessage(row: ConversationRecord): Message? =
         row
             .takeIf { it.role.isNotBlank() && it.content.isNotBlank() }
-            ?.let { Message(it.role, it.content, it.metadata?.ifBlank { null }) }
+            ?.let { Message(it.role, it.content, it.metadata?.ifBlank { null }, id = it.id) }
 }

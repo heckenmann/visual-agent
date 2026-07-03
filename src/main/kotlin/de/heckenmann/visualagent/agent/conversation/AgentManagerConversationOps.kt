@@ -21,6 +21,19 @@ internal class AgentManagerConversationOps(
     private val logger = KotlinLogging.logger {}
     private val historyOps = AgentConversationHistoryOps(owner, ::buildMainRequest)
 
+    private fun persist(message: Message): Message {
+        val id =
+            owner.conversationStore.saveConversationMessage(
+                AgentManager.MAIN_SESSION_ID,
+                message.role,
+                message.content,
+                message.metadata,
+            )
+        val persisted = message.copy(id = id)
+        owner.conversationHistory.add(persisted)
+        return persisted
+    }
+
     suspend fun sendMessageToAgent(
         agentId: String,
         content: String,
@@ -66,38 +79,21 @@ internal class AgentManagerConversationOps(
         synchronized(owner.conversationHistory) {
             owner.conversationHistory.add(message)
         }
-        owner.conversationStore.saveConversationMessage(
-            AgentManager.MAIN_SESSION_ID,
-            message.role,
-            message.content,
-            message.metadata,
-        )
+        persist(message)
         val agentId = result.getOrNull()?.agentId ?: "main"
         AgentManager.notifyAgent(agentId, notification)
     }
 
     suspend fun sendMessage(content: String): String {
         val userMessage = Message("user", content)
-        owner.conversationHistory.add(userMessage)
-        owner.conversationStore.saveConversationMessage(
-            AgentManager.MAIN_SESSION_ID,
-            userMessage.role,
-            userMessage.content,
-            userMessage.metadata,
-        )
+        persist(userMessage)
         val requestId =
             java.util.UUID
                 .randomUUID()
                 .toString()
         val assistantContent = owner.responseCoordinator.generateAssistantContentWithRepetitionGuard(requestId)
         val assistantMessage = Message(role = "assistant", content = assistantContent)
-        owner.conversationHistory.add(assistantMessage)
-        owner.conversationStore.saveConversationMessage(
-            AgentManager.MAIN_SESSION_ID,
-            assistantMessage.role,
-            assistantMessage.content,
-            assistantMessage.metadata,
-        )
+        persist(assistantMessage)
         owner.finishedToolEventsByRequestId.remove(requestId)
         return assistantMessage.content
     }
@@ -107,13 +103,7 @@ internal class AgentManagerConversationOps(
         onChunk: (String) -> Unit,
     ): String {
         val userMessage = Message("user", content)
-        owner.conversationHistory.add(userMessage)
-        owner.conversationStore.saveConversationMessage(
-            AgentManager.MAIN_SESSION_ID,
-            userMessage.role,
-            userMessage.content,
-            userMessage.metadata,
-        )
+        persist(userMessage)
         val requestId =
             java.util.UUID
                 .randomUUID()
@@ -136,13 +126,7 @@ internal class AgentManagerConversationOps(
             assistantText = owner.responseCoordinator.completeToolOnlyTurnWithFollowup(requestId) ?: assistantText
         }
         val assistantMessage = Message("assistant", assistantText)
-        owner.conversationHistory.add(assistantMessage)
-        owner.conversationStore.saveConversationMessage(
-            AgentManager.MAIN_SESSION_ID,
-            assistantMessage.role,
-            assistantMessage.content,
-            assistantMessage.metadata,
-        )
+        persist(assistantMessage)
         owner.finishedToolEventsByRequestId.remove(requestId)
         return assistantText
     }
@@ -181,8 +165,7 @@ internal class AgentManagerConversationOps(
                 .trim()
         val welcome = generated.ifBlank { "Hello! I'm ready to help with your project tasks." }
         val message = Message(role = "assistant", content = welcome)
-        owner.conversationHistory.add(message)
-        owner.conversationStore.saveConversationMessage(AgentManager.MAIN_SESSION_ID, message.role, message.content, message.metadata)
+        persist(message)
         return welcome
     }
 
@@ -190,11 +173,17 @@ internal class AgentManagerConversationOps(
 
     fun appendSystemMessage(content: String) {
         val message = Message(role = "system", content = content)
-        owner.conversationHistory.add(message)
-        owner.conversationStore.saveConversationMessage(AgentManager.MAIN_SESSION_ID, message.role, message.content, message.metadata)
+        persist(message)
     }
 
     fun recordToolCall(event: ToolCallEvent) = historyOps.recordToolCall(event)
+
+    fun deleteMessageById(id: String) = historyOps.deleteMessageById(id)
+
+    fun updateMessageContentById(
+        id: String,
+        newContent: String,
+    ) = historyOps.updateMessageContentById(id, newContent)
 
     fun loadOlderHistory(pageSize: Int = AgentManager.HISTORY_PAGE_SIZE): List<Message> = historyOps.loadOlderHistory(pageSize)
 
