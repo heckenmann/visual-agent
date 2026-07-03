@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Gesture
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -60,10 +61,10 @@ internal fun CanvasPanel(
     val update: (CanvasSnapshot) -> Unit = { next ->
         snapshot = next
         status =
-            if (next.selectedFigureIndex == null) {
+            if (next.selectedFigureIndices.isEmpty()) {
                 "Figures: ${next.figureCount}"
             } else {
-                "Figures: ${next.figureCount} · selected ${next.selectedFigureIndex}"
+                "Figures: ${next.figureCount} · selected ${next.selectedFigureIndices.size}"
             }
     }
     val imagePicker =
@@ -173,19 +174,22 @@ private fun CanvasDrawingToolbar(
             )
         },
     )
+    val selectedCount = snapshot.selectedFigureIndices.size
     ActionIconButton(
         icon = Icons.Filled.Delete,
-        description = "Delete selected figure",
-        enabled = snapshot.selectedFigureIndex != null,
+        description = "Delete selected figures",
+        enabled = selectedCount > 0,
         onClick = {
-            snapshot.selectedFigureIndex?.let { selected ->
+            if (selectedCount > 0) {
                 modalRequester.requestConfirmation(
                     ComposeConfirmationModal(
-                        title = "Delete selected figure?",
-                        message = "Remove figure $selected from the current editable canvas.",
-                        confirmDescription = "Delete selected figure",
+                        title = "Delete selected figures?",
+                        message =
+                            "Remove $selectedCount selected figure${if (selectedCount == 1) "" else "s"} " +
+                                "from the current editable canvas.",
+                        confirmDescription = "Delete selected figures",
                     ) {
-                        update(canvasOperations.deleteFigure(selected))
+                        update(canvasOperations.deleteSelectedFigures())
                     },
                 )
             }
