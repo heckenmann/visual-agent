@@ -2,7 +2,9 @@
 
 package de.heckenmann.visualagent.ui.compose
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,6 +21,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandCircleDown
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
@@ -27,6 +30,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
@@ -61,10 +66,16 @@ internal fun ConversationPanel(
 ) {
     val scope = rememberCoroutineScope()
     val inputFocusRequester = remember { FocusRequester() }
+    val scrollState = rememberScrollState()
     var history by remember { mutableStateOf(agentManager.getHistory()) }
     var input by remember { mutableStateOf("") }
     var status by remember { mutableStateOf("Ready") }
     var sending by remember { mutableStateOf(false) }
+    val isAtBottom by remember(scrollState) {
+        derivedStateOf {
+            scrollState.maxValue == 0 || scrollState.value >= scrollState.maxValue - SCROLL_BOTTOM_TOLERANCE
+        }
+    }
     val sendContent: (String) -> Unit = { rawContent ->
         val content = rawContent.trim()
         if (content.isNotBlank() && !sending) {
@@ -97,6 +108,7 @@ internal fun ConversationPanel(
                         inFlight.markStreamEnd(streamRequestId)
                         sending = false
                         inputFocusRequester.requestFocus()
+                        scrollState.scrollTo(scrollState.maxValue)
                     }
             }
         }
@@ -106,32 +118,57 @@ internal fun ConversationPanel(
     }
     LaunchedEffect(Unit) {
         inputFocusRequester.requestFocus()
+        scrollState.scrollTo(scrollState.maxValue)
+    }
+    LaunchedEffect(history.size) {
+        if (isAtBottom) {
+            scrollState.scrollTo(scrollState.maxValue)
+        }
+    }
+    LaunchedEffect(scrollState.maxValue) {
+        if (isAtBottom) {
+            scrollState.scrollTo(scrollState.maxValue)
+        }
     }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            val visibleHistory = history.takeLast(40)
-            val visibleOffset = history.size - visibleHistory.size
-            if (visibleHistory.isEmpty()) {
-                PanelEmptyState(
-                    title = "No conversation yet",
-                    body = "Send a message to start the main agent session.",
-                )
-            } else {
-                visibleHistory.forEachIndexed { visibleIndex, message ->
-                    MessageRow(
-                        message = message,
-                        canRetry = message.role == "assistant" && !sending,
-                        onCopied = { status = "Copied ${message.role} message" },
-                        onRetry = {
-                            val absoluteIndex = visibleOffset + visibleIndex
-                            val previousUserMessage = history.take(absoluteIndex).lastOrNull { it.role == "user" }
-                            if (previousUserMessage == null) {
-                                status = "No previous user message to retry"
-                            } else {
-                                status = "Retrying previous user message..."
-                                sendContent(previousUserMessage.content)
-                            }
-                        },
+        Box(modifier = Modifier.weight(1f)) {
+            Column(modifier = Modifier.fillMaxSize().verticalScroll(scrollState)) {
+                val visibleHistory = history.takeLast(40)
+                val visibleOffset = history.size - visibleHistory.size
+                if (visibleHistory.isEmpty()) {
+                    PanelEmptyState(
+                        title = "No conversation yet",
+                        body = "Send a message to start the main agent session.",
+                    )
+                } else {
+                    visibleHistory.forEachIndexed { visibleIndex, message ->
+                        MessageRow(
+                            message = message,
+                            canRetry = message.role == "assistant" && !sending,
+                            onCopied = { status = "Copied ${message.role} message" },
+                            onRetry = {
+                                val absoluteIndex = visibleOffset + visibleIndex
+                                val previousUserMessage = history.take(absoluteIndex).lastOrNull { it.role == "user" }
+                                if (previousUserMessage == null) {
+                                    status = "No previous user message to retry"
+                                } else {
+                                    status = "Retrying previous user message..."
+                                    sendContent(previousUserMessage.content)
+                                }
+                            },
+                        )
+                    }
+                }
+            }
+            if (!isAtBottom) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.Bottom,
+                    horizontalAlignment = Alignment.End,
+                ) {
+                    ScrollToBottomButton(
+                        onClick = { scope.launch { scrollState.animateScrollTo(scrollState.maxValue) } },
+                        modifier = Modifier.padding(end = 12.dp, bottom = 12.dp),
                     )
                 }
             }
@@ -189,6 +226,24 @@ internal fun ConversationPanel(
         }
         PanelStatus(status)
     }
+}
+
+@Composable
+private fun ScrollToBottomButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    ActionIconButton(
+        icon = Icons.Filled.ExpandCircleDown,
+        description = "Scroll to latest message",
+        onClick = onClick,
+        modifier =
+            modifier
+                .size(44.dp)
+                .background(Color(0xFF23252F), shape = MaterialTheme.shapes.small)
+                .padding(8.dp),
+        iconSize = 26.dp,
+    )
 }
 
 @Composable
@@ -439,3 +494,4 @@ private fun TodoEditor(
 }
 
 private const val ALL_TODO_STATUSES = "__all__"
+private const val SCROLL_BOTTOM_TOLERANCE = 80
