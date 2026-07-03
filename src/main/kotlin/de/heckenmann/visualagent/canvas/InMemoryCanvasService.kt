@@ -22,7 +22,7 @@ class InMemoryCanvasService(
 ) : CanvasOperations {
     private val lock = Any()
     private val figures = mutableListOf<CanvasFigureSnapshot>().apply { addAll(loadDefaultDocument()) }
-    private var selectedFigureIndex: Int? = null
+    private val selectedFigureIndices = mutableSetOf<Int>()
 
     override fun snapshot(): CanvasSnapshot =
         synchronized(lock) {
@@ -32,7 +32,7 @@ class InMemoryCanvasService(
     override fun clear(): CanvasSnapshot =
         synchronized(lock) {
             figures.clear()
-            selectedFigureIndex = null
+            selectedFigureIndices.clear()
             toSnapshot().also { persistDefaultDocument(it) }
         }
 
@@ -129,11 +129,10 @@ class InMemoryCanvasService(
             toSnapshot().also { persistDefaultDocument(it) }
         }
 
-    override fun selectFigure(index: Int?): CanvasSnapshot =
+    override fun selectFigures(indices: Set<Int>): CanvasSnapshot =
         synchronized(lock) {
-            selectedFigureIndex =
-                index
-                    ?.takeIf { it in figures.indices }
+            selectedFigureIndices.clear()
+            selectedFigureIndices.addAll(indices.filter { it in figures.indices })
             toSnapshot()
         }
 
@@ -142,7 +141,12 @@ class InMemoryCanvasService(
         y: Double,
     ): CanvasSnapshot =
         synchronized(lock) {
-            selectedFigureIndex = figures.asReversed().firstOrNull { it.contains(x, y) }?.index
+            selectedFigureIndices.clear()
+            figures
+                .asReversed()
+                .firstOrNull { it.contains(x, y) }
+                ?.index
+                ?.let(selectedFigureIndices::add)
             toSnapshot()
         }
 
@@ -154,7 +158,8 @@ class InMemoryCanvasService(
         synchronized(lock) {
             val figure = requireFigure(index)
             figures[index] = figure.copy(x = figure.x + deltaX, y = figure.y + deltaY)
-            selectedFigureIndex = index
+            selectedFigureIndices.clear()
+            selectedFigureIndices.add(index)
             toSnapshot().also { persistDefaultDocument(it) }
         }
 
@@ -170,16 +175,21 @@ class InMemoryCanvasService(
                     width = width.coerceAtLeast(MIN_FIGURE_SIZE),
                     height = height.coerceAtLeast(MIN_FIGURE_SIZE),
                 )
-            selectedFigureIndex = index
+            selectedFigureIndices.clear()
+            selectedFigureIndices.add(index)
             toSnapshot().also { persistDefaultDocument(it) }
         }
 
-    override fun deleteFigure(index: Int): CanvasSnapshot =
+    override fun deleteSelectedFigures(): CanvasSnapshot =
         synchronized(lock) {
-            requireFigure(index)
-            figures.removeAt(index)
+            val sorted = selectedFigureIndices.sortedDescending()
+            for (index in sorted) {
+                if (index in figures.indices) {
+                    figures.removeAt(index)
+                }
+            }
             reindexFigures()
-            selectedFigureIndex = null
+            selectedFigureIndices.clear()
             toSnapshot().also { persistDefaultDocument(it) }
         }
 
@@ -209,7 +219,7 @@ class InMemoryCanvasService(
             val document = CanvasDocumentCodec.decode(workspaceFileService.resolveManagedPath(record.relativePath).readText(Charsets.UTF_8))
             figures.clear()
             figures.addAll(document.figures)
-            selectedFigureIndex = null
+            selectedFigureIndices.clear()
             toSnapshot().also { persistDefaultDocument(it) }
         }
 
@@ -260,7 +270,8 @@ class InMemoryCanvasService(
                 strokeWidth = strokeWidth,
                 points = points,
             )
-        selectedFigureIndex = figures.lastIndex
+        selectedFigureIndices.clear()
+        selectedFigureIndices.add(figures.lastIndex)
     }
 
     private fun requireFigure(index: Int): CanvasFigureSnapshot =
@@ -277,7 +288,7 @@ class InMemoryCanvasService(
             figureCount = figures.size,
             zoomPercent = 100,
             gridVisible = true,
-            selectedFigureIndex = selectedFigureIndex?.takeIf { it in figures.indices },
+            selectedFigureIndices = selectedFigureIndices.filter { it in figures.indices }.toSortedSet(),
             figures = figures.toList(),
         )
 

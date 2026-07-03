@@ -27,7 +27,7 @@ class InMemoryCanvasServiceTest {
             assertEquals(5, snapshot.figureCount)
             assertEquals(listOf("text", "rectangle", "line", "circle", "image"), snapshot.figures.map { it.type })
             assertEquals(listOf(0, 1, 2, 3, 4), snapshot.figures.map { it.index })
-            assertEquals(4, snapshot.selectedFigureIndex)
+            assertEquals(setOf(4), snapshot.selectedFigureIndices)
             assertEquals(88.0, snapshot.figures[3].x)
             assertEquals(24.0, snapshot.figures[3].width)
         }
@@ -42,7 +42,7 @@ class InMemoryCanvasServiceTest {
             assertEquals(0, snapshot.figureCount)
             assertEquals(100, snapshot.zoomPercent)
             assertTrue(snapshot.gridVisible)
-            assertEquals(null, snapshot.selectedFigureIndex)
+            assertEquals(emptySet<Int>(), snapshot.selectedFigureIndices)
         }
 
     @Test
@@ -54,9 +54,9 @@ class InMemoryCanvasServiceTest {
             val selected = service.selectAt(35.0, 45.0)
             val moved = service.moveFigure(0, deltaX = 10.0, deltaY = 12.0)
             val resized = service.resizeFigure(0, width = 90.0, height = 70.0)
-            val deleted = service.deleteFigure(0)
+            val deleted = service.deleteSelectedFigures()
 
-            assertEquals(0, selected.selectedFigureIndex)
+            assertEquals(setOf(0), selected.selectedFigureIndices)
             assertEquals(40.0, moved.figures[0].x)
             assertEquals(52.0, moved.figures[0].y)
             assertEquals(90.0, resized.figures[0].width)
@@ -64,6 +64,21 @@ class InMemoryCanvasServiceTest {
             assertEquals(1, deleted.figureCount)
             assertEquals(0, deleted.figures.single().index)
             assertEquals("circle", deleted.figures.single().type)
+        }
+
+    @Test
+    fun `multi-selection deletes all selected figures`() =
+        withCanvasService { service, _ ->
+            service.drawRect(x = 30.0, y = 40.0, width = 120.0, height = 80.0, fillColor = "#000", strokeColor = null)
+            service.drawCircle(centerX = 220.0, centerY = 100.0, radius = 20.0, fillColor = "#0f0")
+            service.drawText("Hello", x = 10.0, y = 20.0, color = "#fff")
+
+            service.selectFigures(setOf(0, 2))
+            val deleted = service.deleteSelectedFigures()
+
+            assertEquals(1, deleted.figureCount)
+            assertEquals("circle", deleted.figures.single().type)
+            assertEquals(emptySet<Int>(), deleted.selectedFigureIndices)
         }
 
     @Test

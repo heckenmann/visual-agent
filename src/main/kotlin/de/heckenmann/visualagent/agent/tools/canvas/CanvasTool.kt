@@ -44,7 +44,7 @@ class CanvasTool(
             name = ToolId(TOOL_ID).toFunctionName(),
             description =
                 "Inspect or edit the canvas. Actions: get, clear, drawText, drawRect, drawLine, drawStroke, drawCircle, insertImage, " +
-                    "select, selectAt, moveFigure, resizeFigure, deleteFigure, saveDocument, openDocument, captureImage. " +
+                    "select, selectAt, moveFigure, resizeFigure, deleteSelectedFigures, saveDocument, openDocument, captureImage. " +
                     "Coordinates are canvas coordinates. " +
                     "Use get before making layout-sensitive changes.",
             inputSchema = STRING_SCHEMA,
@@ -69,7 +69,7 @@ class CanvasTool(
                 "selectAt" -> selectAt(input)
                 "moveFigure" -> moveFigure(input)
                 "resizeFigure" -> resizeFigure(input)
-                "deleteFigure" -> deleteFigure(input)
+                "deleteSelectedFigures" -> deleteSelectedFigures()
                 "saveDocument" -> saveDocument(input)
                 "openDocument" -> openDocument(input)
                 "captureImage" -> captureImage(input, context)
@@ -163,8 +163,14 @@ class CanvasTool(
     }
 
     private fun select(input: JsonObject): ToolResult {
-        val index = input.int("index")
-        return success(TOOL_ID, json.encodeToString(canvas.selectFigure(index)))
+        val indices =
+            input["indices"]
+                ?.jsonArray
+                ?.mapNotNull { it.jsonPrimitive.content.toIntOrNull() }
+                ?.toSet()
+                ?: input.int("index")?.let { setOf(it) }
+                ?: emptySet()
+        return success(TOOL_ID, json.encodeToString(canvas.selectFigures(indices)))
     }
 
     private fun selectAt(input: JsonObject): ToolResult =
@@ -202,10 +208,10 @@ class CanvasTool(
             ),
         )
 
-    private fun deleteFigure(input: JsonObject): ToolResult =
+    private fun deleteSelectedFigures(): ToolResult =
         success(
             TOOL_ID,
-            json.encodeToString(canvas.deleteFigure(input.requiredInt("index"))),
+            json.encodeToString(canvas.deleteSelectedFigures()),
         )
 
     private fun saveDocument(input: JsonObject): ToolResult =

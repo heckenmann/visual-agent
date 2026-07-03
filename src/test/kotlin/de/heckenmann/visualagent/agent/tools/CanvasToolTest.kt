@@ -83,14 +83,25 @@ class CanvasToolTest {
         val selected = tool.execute("""{"action":"selectAt","x":15,"y":25}""")
         tool.execute("""{"action":"moveFigure","index":0,"deltaX":5,"deltaY":6}""")
         tool.execute("""{"action":"resizeFigure","index":0,"width":80,"height":40}""")
-        val deleted = tool.execute("""{"action":"deleteFigure","index":0}""")
+        val deleted = tool.execute("""{"action":"deleteSelectedFigures"}""")
 
         assertTrue(selected.success)
         assertTrue(deleted.success)
         assertEquals(
-            listOf("drawRect", "selectAt", "moveFigure", "resizeFigure", "deleteFigure"),
+            listOf("drawRect", "selectAt", "moveFigure", "resizeFigure", "deleteSelectedFigures"),
             canvas.actions,
         )
+    }
+
+    @Test
+    fun `select with index still works and select with indices supports multi-selection`() {
+        val canvas = FakeCanvasOperations()
+        val tool = CanvasTool(canvas, FakeConversationStore())
+
+        tool.execute("""{"action":"select","index":2}""")
+        tool.execute("""{"action":"select","indices":[1,3,5]}""")
+
+        assertEquals(listOf("select:[2]", "select:[1, 3, 5]"), canvas.actions)
     }
 
     @Test
@@ -270,8 +281,8 @@ class CanvasToolTest {
             return snapshot()
         }
 
-        override fun selectFigure(index: Int?): CanvasSnapshot {
-            actions += "select"
+        override fun selectFigures(indices: Set<Int>): CanvasSnapshot {
+            actions += "select:${indices.sorted()}"
             return snapshot()
         }
 
@@ -309,9 +320,9 @@ class CanvasToolTest {
             return snapshot()
         }
 
-        override fun deleteFigure(index: Int): CanvasSnapshot {
-            actions += "deleteFigure"
-            figures = figures.filterIndexed { figureIndex, _ -> figureIndex != index }
+        override fun deleteSelectedFigures(): CanvasSnapshot {
+            actions += "deleteSelectedFigures"
+            figures = emptyList()
             return snapshot()
         }
 
@@ -351,7 +362,7 @@ class CanvasToolTest {
                 figureCount = figures.size,
                 zoomPercent = 100,
                 gridVisible = true,
-                selectedFigureIndex = null,
+                selectedFigureIndices = emptySet(),
                 figures = figures,
             )
     }

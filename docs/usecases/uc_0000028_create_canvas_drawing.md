@@ -15,13 +15,14 @@ Desktop user.
 
 ## Main Flow
 
-1. The user selects a canvas tool.
-2. The user draws, inserts, selects, moves, resizes, or deletes figures.
-3. The canvas model stores structured figures rather than raster-only pixels.
-4. UI controls reflect current selection and zoom state.
-5. Selected figures are shown with a thin, unobtrusive border instead of a large bright background so the figure and surrounding content remain visible.
-5. Toolbar clear/delete actions show an internal confirmation modal before mutating the canvas.
-6. The user can press `Delete` or `Backspace` while the canvas has focus to remove the selected figure.
+1. The user selects a canvas tool from the drawing toolbar.
+2. The toolbar shows separate Select and Pen buttons; the active mode is highlighted so the user always knows which tool is selected.
+3. The user draws, inserts, selects, moves, resizes, or deletes figures.
+4. The canvas model stores structured figures rather than raster-only pixels.
+5. UI controls reflect current selection and zoom state.
+6. Selected figures are shown with a thin, unobtrusive border instead of a large bright background so the figure and surrounding content remain visible.
+7. Toolbar clear/delete actions show an internal confirmation modal before mutating the canvas.
+8. The user can press `Delete` or `Backspace` while the canvas has focus to remove all selected figures without showing a confirmation modal.
 
 ## Result
 
@@ -43,8 +44,9 @@ The canvas remains editable during resize and after object insertion.
 ## Acceptance Criteria
 
 - Figures can be selected, moved, and resized from the Compose canvas surface.
-- Selected figures are highlighted by a thin colored border; the figure background stays transparent or uses its natural color.
-- The delete toolbar button is enabled only when a figure is selected and removes the selected figure after internal modal confirmation.
+- Multiple figures can be selected at the same time; each selected figure is highlighted by a thin colored border.
+- Selected figure backgrounds stay transparent or use their natural color.
+- The delete toolbar button is enabled whenever at least one figure is selected and removes all selected figures after internal modal confirmation.
 - The clear toolbar button clears all figures only after internal modal confirmation.
-- `Delete` and `Backspace` remove the selected figure when the Compose canvas surface has focus.
-- Toolbar buttons are icon-only with tooltips.
+- `Delete` and `Backspace` remove all selected figures when the Compose canvas surface has focus.
+- Toolbar buttons are icon-only with tooltips; the active Select/Pen mode button is highlighted.

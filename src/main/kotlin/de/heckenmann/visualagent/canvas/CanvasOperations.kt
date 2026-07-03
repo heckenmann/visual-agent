@@ -91,15 +91,15 @@ interface CanvasOperations {
     fun insertImage(path: String): CanvasSnapshot
 
     /**
-     * Selects a figure by draw-order index.
+     * Replaces the current selection with a set of figure indices.
      *
-     * @param index Figure index, or null to clear the selection
+     * @param indices Figure indices to select; an empty set clears the selection
      * @return Snapshot after selection
      */
-    fun selectFigure(index: Int?): CanvasSnapshot
+    fun selectFigures(indices: Set<Int>): CanvasSnapshot
 
     /**
-     * Selects the top-most figure at a canvas coordinate.
+     * Selects the top-most figure at a canvas coordinate, replacing any existing selection.
      *
      * @param x Canvas X coordinate
      * @param y Canvas Y coordinate
@@ -111,7 +111,7 @@ interface CanvasOperations {
     ): CanvasSnapshot
 
     /**
-     * Moves one figure by a delta.
+     * Moves one figure by a delta and selects it.
      *
      * @param index Figure index
      * @param deltaX Horizontal movement
@@ -125,7 +125,7 @@ interface CanvasOperations {
     ): CanvasSnapshot
 
     /**
-     * Resizes one figure while keeping its top-left coordinate stable.
+     * Resizes one figure while keeping its top-left coordinate stable and selects it.
      *
      * @param index Figure index
      * @param width New width
@@ -139,12 +139,11 @@ interface CanvasOperations {
     ): CanvasSnapshot
 
     /**
-     * Deletes one figure by index.
+     * Deletes all currently selected figures.
      *
-     * @param index Figure index
      * @return Snapshot after deletion
      */
-    fun deleteFigure(index: Int): CanvasSnapshot
+    fun deleteSelectedFigures(): CanvasSnapshot
 
     /**
      * Saves the current editable canvas document into the managed workspace.
@@ -181,6 +180,7 @@ interface CanvasOperations {
  * @property figureCount Number of figures on the active layer
  * @property zoomPercent Current zoom level as an integer percent
  * @property gridVisible Whether the editing grid is visible
+ * @property selectedFigureIndices Draw-order indices of all selected figures
  * @property figures Ordered figure summaries
  */
 @Serializable
@@ -188,7 +188,7 @@ data class CanvasSnapshot(
     val figureCount: Int,
     val zoomPercent: Int,
     val gridVisible: Boolean,
-    val selectedFigureIndex: Int? = null,
+    val selectedFigureIndices: Set<Int> = emptySet(),
     val figures: List<CanvasFigureSnapshot>,
 )
 
