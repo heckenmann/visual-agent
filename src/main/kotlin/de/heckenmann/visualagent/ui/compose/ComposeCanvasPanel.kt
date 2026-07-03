@@ -127,17 +127,16 @@ private fun CanvasDrawingToolbar(
     update: (CanvasSnapshot) -> Unit,
 ) {
     ActionIconButton(
+        icon = Icons.Filled.SelectAll,
+        description = "Select mode",
+        selected = mode == CanvasInteractionMode.Select,
+        onClick = { onModeChange(CanvasInteractionMode.Select) },
+    )
+    ActionIconButton(
         icon = Icons.Filled.Gesture,
-        description = if (mode == CanvasInteractionMode.Pen) "Switch to select mode" else "Switch to pen mode",
-        onClick = {
-            onModeChange(
-                if (mode == CanvasInteractionMode.Pen) {
-                    CanvasInteractionMode.Select
-                } else {
-                    CanvasInteractionMode.Pen
-                },
-            )
-        },
+        description = "Pen mode",
+        selected = mode == CanvasInteractionMode.Pen,
+        onClick = { onModeChange(CanvasInteractionMode.Pen) },
     )
     ActionIconButton(
         icon = Icons.Filled.AddBox,

@@ -23,6 +23,9 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusTarget
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
@@ -32,6 +35,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.toComposeImageBitmap
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -61,14 +68,23 @@ internal fun CanvasSurface(
     val canvasState = rememberInfiniteCanvasState()
     val nodeStates = remember { mutableStateMapOf<Int, CanvasNodeState>() }
     var strokePoints by remember { mutableStateOf(emptyList<CanvasPoint>()) }
+    val focusRequester = remember { FocusRequester() }
     syncNodeStates(snapshot, nodeStates)
 
-    LaunchedEffect(canvasState, snapshot.selectedFigureIndex) {
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
+
+    LaunchedEffect(canvasState, snapshot.selectedFigureIndices) {
         snapshotFlow { canvasState.selectedNodeIds }
             .collectLatest { selectedIds ->
-                val selectedIndex = selectedIds.firstOrNull()?.removePrefix("figure-")?.toIntOrNull()
-                if (selectedIndex != snapshot.selectedFigureIndex) {
-                    onSnapshotChanged(canvasOperations.selectFigure(selectedIndex))
+                val selectedIndices =
+                    selectedIds
+                        .mapNotNull { it.removePrefix("figure-").toIntOrNull() }
+                        .filter { it in snapshot.figures.indices }
+                        .toSortedSet()
+                if (selectedIndices != snapshot.selectedFigureIndices) {
+                    onSnapshotChanged(canvasOperations.selectFigures(selectedIndices))
                 }
             }
     }
@@ -81,7 +97,26 @@ internal fun CanvasSurface(
             }
     }
 
-    Box(modifier = modifier.clip(RoundedCornerShape(8.dp))) {
+    Box(
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(8.dp))
+                .focusTarget()
+                .focusRequester(focusRequester)
+                .onPreviewKeyEvent { event ->
+                    if (event.key == Key.Delete || event.key == Key.Backspace) {
+                        val selected = snapshot.selectedFigureIndices
+                        if (selected.isNotEmpty()) {
+                            onSnapshotChanged(canvasOperations.deleteSelectedFigures())
+                            true
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                },
+    ) {
         InfiniteCanvas(
             modifier =
                 Modifier
@@ -110,10 +145,11 @@ internal fun CanvasSurface(
                                     strokePoints = listOf(CanvasPoint(worldPos.x.toDouble(), worldPos.y.toDouble()))
                                 },
                                 onDragEnd = {
-                                    if (strokePoints.size >= 2) {
-                                        onSnapshotChanged(canvasOperations.drawStroke(strokePoints, "#F8F8F2", 3.0))
-                                    }
+                                    val points = strokePoints
                                     strokePoints = emptyList()
+                                    if (points.size >= 2) {
+                                        onSnapshotChanged(canvasOperations.drawStroke(points, "#F8F8F2", 3.0))
+                                    }
                                 },
                                 onDragCancel = { strokePoints = emptyList() },
                             ) { change, _ ->
@@ -169,7 +205,7 @@ private fun canvasNodes(
             content = {
                 FigureNode(
                     figure = figure,
-                    selected = figure.index == snapshot.selectedFigureIndex,
+                    selected = figure.index in snapshot.selectedFigureIndices,
                     imageBytesForPath = imageBytesForPath,
                     onResize = { width, height ->
                         onSnapshotChanged(canvasOperations.resizeFigure(figure.index, width, height))
@@ -314,7 +350,7 @@ private fun syncNodeStates(
     nodeStates.keys.removeAll { it !in figureIndexes }
     snapshot.figures.forEach { figure ->
         val nodeState = nodeStates.getOrPut(figure.index) { CanvasNodeState(figure.x.toFloat(), figure.y.toFloat()) }
-        if (figure.index != snapshot.selectedFigureIndex) {
+        if (figure.index !in snapshot.selectedFigureIndices) {
             nodeState.x = figure.x.toFloat()
             nodeState.y = figure.y.toFloat()
         }
