@@ -28,7 +28,7 @@ class UiTool(
         ToolDefinition(
             id = ToolId("ui"),
             name = ToolId("ui").toFunctionName(),
-            description = "Read or update Visual Agent UI settings such as theme, font size, model, and session options.",
+            description = "Read or update Visual Agent UI settings such as font size, model, and session options.",
             inputSchema = STRING_SCHEMA,
         )
 
@@ -39,7 +39,6 @@ class UiTool(
         val input = parseObject(inputJson)
         when (input.string("action") ?: "get") {
             "set" -> {
-                input.string("theme")?.let { AppConfig.instance.theme = it }
                 input.int("fontSize")?.let { AppConfig.instance.fontSize = it.coerceIn(10, 24) }
                 input.string("provider")?.let(providerCatalog::setActiveProvider)
                 input.string("model")?.let { model ->
@@ -58,7 +57,6 @@ class UiTool(
             "ui",
             """
             Current UI Settings:
-              Theme: ${AppConfig.instance.theme}
               Font size: ${AppConfig.instance.fontSize}px
               Provider: ${providerCatalog.activeProviderId()}
               Model: ${providerCatalog.getProvider(providerCatalog.activeProviderId())?.defaultModel.orEmpty()}
@@ -66,7 +64,6 @@ class UiTool(
               OpenAI API key configured: ${AppConfig.instance.openAiApiKey.isNotBlank()}
               Streaming: ${AppConfig.instance.streamingEnabled}
               Thinking: ${AppConfig.instance.thinkingEnabled}
-            Available themes: Dracula, Primer Dark, Primer Light, Nord Dark, Nord Light, Cupertino Dark, Cupertino Light
             Font size range: 10-24
             """.trimIndent(),
         )
@@ -124,7 +121,6 @@ class ContextTool(
                 appendLine("Model: ${providerCatalog?.getProvider(activeProvider)?.defaultModel ?: AppConfig.instance.activeModel()}")
                 appendLine("OpenAI Base URL: ${AppConfig.instance.openAiBaseUrl}")
                 appendLine("OpenAI API key configured: ${AppConfig.instance.openAiApiKey.isNotBlank()}")
-                appendLine("Theme: ${AppConfig.instance.theme}")
                 context.entries.sortedBy { it.key }.forEach { (key, value) ->
                     appendLine("$key: $value")
                 }

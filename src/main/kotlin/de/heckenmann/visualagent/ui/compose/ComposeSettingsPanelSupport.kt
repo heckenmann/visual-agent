@@ -202,17 +202,6 @@ private fun Map<String, String>.toSettingsOptionText(separator: String): String 
         .sortedBy { it.key }
         .joinToString(separator) { (key, value) -> "$key=$value" }
 
-internal val SUPPORTED_SETTINGS_THEMES =
-    listOf(
-        "Dracula",
-        "Primer Dark",
-        "Primer Light",
-        "Nord Dark",
-        "Nord Light",
-        "Cupertino Dark",
-        "Cupertino Light",
-    )
-
 internal const val MIN_SETTINGS_FONT_SIZE = 10
 internal const val MAX_SETTINGS_FONT_SIZE = 24
 internal const val MIN_CONTEXT_LENGTH = 1024

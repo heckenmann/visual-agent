@@ -26,11 +26,11 @@ import de.heckenmann.visualagent.config.AppConfig
 import kotlinx.coroutines.launch
 
 /**
- * Application settings panel for provider/model configuration, appearance, and
- * runtime preferences.
+ * Application settings panel for provider/model configuration and runtime
+ * preferences.
  *
  * Use cases: UC-0000007, UC-0000008, UC-0000009, UC-0000037, UC-0000038,
- * UC-0000062, UC-0000063, UC-0000064, UC-0000065, UC-0000071.
+ * UC-0000061, UC-0000062, UC-0000064, UC-0000065, UC-0000071.
  *
  * @param config Mutable application configuration
  * @param llmProvider Provider used to refresh model lists and details
@@ -65,7 +65,6 @@ internal fun SettingsPanel(
     var modelDetails by remember { mutableStateOf("Select a model to load details.") }
     var loadingModels by remember { mutableStateOf(false) }
     var loadingDetails by remember { mutableStateOf(false) }
-    var theme by remember { mutableStateOf(config.theme.takeIf { it in SUPPORTED_SETTINGS_THEMES } ?: DEFAULT_SETTINGS_THEME) }
     var fontSize by remember { mutableStateOf(config.fontSize.clampFontSize()) }
     var contextLength by remember { mutableStateOf(config.contextLength.coerceIn(MIN_CONTEXT_LENGTH, MAX_CONTEXT_LENGTH)) }
     var loadLimit by remember { mutableStateOf(config.loadLimit.toString()) }
@@ -262,7 +261,6 @@ internal fun SettingsPanel(
             thinkingEnabled = thinkingEnabled,
             autoCompactionEnabled = autoCompactionEnabled,
             userInstruction = userInstruction,
-            theme = theme,
             fontSize = fontSize,
             onContextLengthChange = { contextLength = it },
             onLoadLimitChange = { loadLimit = it },
@@ -272,7 +270,6 @@ internal fun SettingsPanel(
             onThinkingChange = { thinkingEnabled = it },
             onCompactionChange = { autoCompactionEnabled = it },
             onUserInstructionChange = { userInstruction = it },
-            onThemeSelected = { theme = it },
             onFontSizeChange = { newSize ->
                 fontSize = newSize
                 config.fontSize = newSize
@@ -294,7 +291,6 @@ internal fun SettingsPanel(
                         baseUrl = baseUrl,
                         apiKey = apiKey,
                     )
-                    config.theme = theme
                     config.fontSize = fontSize.clampFontSize()
                     config.contextLength = contextLength.coerceIn(MIN_CONTEXT_LENGTH, MAX_CONTEXT_LENGTH)
                     config.loadLimit = loadLimitValue ?: config.loadLimit
@@ -318,5 +314,4 @@ internal fun SettingsPanel(
     }
 }
 
-internal const val DEFAULT_SETTINGS_THEME = "Dracula"
 internal const val CUSTOM_MODEL_ID = "__custom_model__"
