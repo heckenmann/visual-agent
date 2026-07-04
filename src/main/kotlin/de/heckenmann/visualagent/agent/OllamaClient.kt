@@ -92,7 +92,7 @@ class OllamaClient(
                         .asFlow()
                         .map { chunk ->
                             ChatResponse(
-                                model = chunk.metadata.model,
+                                model = chunk.metadata.model.takeIf { it.isNotBlank() } ?: selectedModel,
                                 message =
                                     Message(
                                         role = "assistant",

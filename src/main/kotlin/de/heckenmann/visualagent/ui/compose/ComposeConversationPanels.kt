@@ -226,7 +226,7 @@ internal fun ConversationPanel(
                                     isStreamingPlaceholder = isStreamingPlaceholder,
                                     canRetry = message.role == "assistant" && !sending && !isStreamingPlaceholder,
                                     canEdit = message.role == "user" && !sending,
-                                    canDelete = message.role != "system" && message.id !in deletingMessageIds,
+                                    canDelete = message.id != null && message.role != "system" && message.id !in deletingMessageIds,
                                     isDeleting = message.id in deletingMessageIds,
                                     onCopied = { status = "Copied ${message.role} message" },
                                     onRetry = {
@@ -568,12 +568,14 @@ private fun ToolMessageRow(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                ActionIconButton(
-                    icon = Icons.Filled.Delete,
-                    description = "Delete tool call",
-                    modifier = Modifier.size(28.dp),
-                    onClick = onDelete,
-                )
+                if (message.id != null) {
+                    ActionIconButton(
+                        icon = Icons.Filled.Delete,
+                        description = "Delete tool call",
+                        modifier = Modifier.size(28.dp),
+                        onClick = onDelete,
+                    )
+                }
                 ActionIconButton(
                     icon = Icons.Filled.ExpandCircleDown,
                     description = if (expanded) "Collapse tool details" else "Expand tool details",
@@ -663,12 +665,14 @@ private fun SubAgentMessageRow(
                     style = MaterialTheme.typography.labelSmall,
                     color = if (metadata.success) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
                 )
-                ActionIconButton(
-                    icon = Icons.Filled.Delete,
-                    description = "Delete sub-agent message",
-                    modifier = Modifier.size(28.dp),
-                    onClick = onDelete,
-                )
+                if (message.id != null) {
+                    ActionIconButton(
+                        icon = Icons.Filled.Delete,
+                        description = "Delete sub-agent message",
+                        modifier = Modifier.size(28.dp),
+                        onClick = onDelete,
+                    )
+                }
                 ActionIconButton(
                     icon = Icons.Filled.ExpandCircleDown,
                     description = if (expanded) "Collapse sub-agent details" else "Expand sub-agent details",

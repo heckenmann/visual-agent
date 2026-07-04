@@ -117,6 +117,30 @@ class ToolCallingLoopTest {
             assertEquals("chunk two", chunks[1].message.content)
         }
 
+    @Test
+    fun `runStream loops through multiple tool rounds before emitting final answer`() =
+        runTest {
+            val chatModel = mockk<ChatModel>()
+            val tool = CountingTool()
+            val prompt = Prompt(listOf(UserMessage("stream and chain tools")))
+            every { chatModel.stream(any<Prompt>()) } returns
+                reactor.core.publisher.Flux.just(
+                    springToolResponse("unit", toolName = "count_tool", arguments = "{}", callId = "stream-1"),
+                )
+            every { chatModel.call(any<Prompt>()) }
+                .returnsMany(
+                    springToolResponse("unit", toolName = "count_tool", arguments = "{}", callId = "follow-1"),
+                    springResponse("unit", "final after two tools"),
+                )
+
+            val chunks = ToolCallingLoop().runStream(chatModel, prompt, listOf(tool)).toList()
+
+            assertEquals(2, chunks.size)
+            assertEquals("", chunks[0].message.content)
+            assertEquals("final after two tools", chunks[1].message.content)
+            assertEquals(2, tool.callCount)
+        }
+
     private fun springResponse(
         model: String,
         content: String,

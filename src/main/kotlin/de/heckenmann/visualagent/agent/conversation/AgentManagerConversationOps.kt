@@ -88,9 +88,6 @@ internal class AgentManagerConversationOps(
                 put("agentName", completed?.agentName ?: "")
             }.toString()
         val message = Message(role = "sub_agent", content = notification, metadata = metadata)
-        synchronized(owner.conversationHistory) {
-            owner.conversationHistory.add(message)
-        }
         persist(message)
         val agentId = result.getOrNull()?.agentId ?: "main"
         AgentManager.notifyAgent(agentId, notification)

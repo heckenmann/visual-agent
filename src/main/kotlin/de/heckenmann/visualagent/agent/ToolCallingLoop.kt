@@ -98,8 +98,14 @@ internal class ToolCallingLoop(
         toolCallbacks: List<ToolCallback>,
     ): Flow<ChatResponse> =
         flow {
-            val springChunks = mutableListOf<SpringChatResponse>()
+            if (toolCallbacks.isEmpty()) {
+                chatModel.stream(initialPrompt).asFlow().collect { springResponse ->
+                    emit(springResponse.toVisualAgentResponse())
+                }
+                return@flow
+            }
             val toolCallingManager = buildToolCallingManager(toolCallbacks)
+            val springChunks = mutableListOf<SpringChatResponse>()
 
             chatModel.stream(initialPrompt).asFlow().collect { springResponse ->
                 springChunks += springResponse
@@ -118,9 +124,29 @@ internal class ToolCallingLoop(
                 return@flow
             }
 
-            val followUpPrompt = appendToolConversationHistory(initialPrompt, toolExecutionResult)
-            val finalResponse = chatModel.call(followUpPrompt)
-            emit(finalResponse.toVisualAgentResponse())
+            var prompt = appendToolConversationHistory(initialPrompt, toolExecutionResult)
+            var lastFinalResponse: SpringChatResponse? = null
+            repeat(maxRounds) { round ->
+                logger.debug { "Stream tool follow-up round ${round + 1}/$maxRounds" }
+                val finalResponse = chatModel.call(prompt)
+                lastFinalResponse = finalResponse
+
+                if (!finalResponse.hasToolCalls()) {
+                    emit(finalResponse.toVisualAgentResponse())
+                    return@flow
+                }
+
+                val nextToolResult = toolCallingManager.executeToolCalls(prompt, finalResponse)
+                if (nextToolResult.returnDirect()) {
+                    val direct = buildDirectResponse(finalResponse, nextToolResult)
+                    emit(direct)
+                    return@flow
+                }
+                prompt = appendToolConversationHistory(prompt, nextToolResult)
+            }
+
+            logger.warn { "Stream tool calling loop reached max rounds ($maxRounds); emitting last response" }
+            lastFinalResponse?.let { emit(it.toVisualAgentResponse()) }
         }
 
     private fun buildToolCallingManager(toolCallbacks: List<ToolCallback>): ToolCallingManager =
