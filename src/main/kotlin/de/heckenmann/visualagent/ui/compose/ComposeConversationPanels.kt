@@ -3,6 +3,7 @@
 package de.heckenmann.visualagent.ui.compose
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -180,7 +181,6 @@ internal fun ConversationPanel(
                             canRetry = message.role == "assistant" && !sending && !isStreamingPlaceholder,
                             canEdit = message.role == "user" && !sending,
                             canDelete = message.role != "system" && message.id !in deletingMessageIds,
-                            newlyAdded = index >= history.size - 2 && !sending && message.content.isNotBlank(),
                             isDeleting = message.id in deletingMessageIds,
                             onCopied = { status = "Copied ${message.role} message" },
                             onRetry = {
@@ -207,11 +207,6 @@ internal fun ConversationPanel(
                             },
                             modifier = Modifier.padding(top = topPadding),
                         )
-                    }
-                    if (sending && (history.lastOrNull()?.role != "assistant" || history.lastOrNull()?.content?.isNotBlank() == true)) {
-                        item {
-                            StreamingIndicator(modifier = Modifier.padding(top = 10.dp))
-                        }
                     }
                 }
             }
@@ -262,6 +257,7 @@ internal fun ConversationPanel(
                         }
                     },
         )
+        StreamingStatusLine(visible = sending)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             ActionIconButton(
                 icon = Icons.Filled.History,
@@ -337,11 +333,33 @@ private fun ScrollToBottomButton(
 }
 
 @Composable
-private fun StreamingIndicator(modifier: Modifier = Modifier) {
+private fun StreamingStatusLine(visible: Boolean) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(animationSpec = tween(180)),
+        exit = fadeOut(animationSpec = tween(180)),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.Start),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Thinking",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            PulsingDots()
+        }
+    }
+}
+
+@Composable
+private fun PulsingDots() {
     val transition = rememberInfiniteTransition(label = "streaming")
-    val dots = listOf(0, 1, 2)
+    val offsets = listOf(0, 160, 320)
     val alphas =
-        dots.map { delayMs ->
+        offsets.map { delayMs ->
             val animatedAlpha by transition.animateFloat(
                 initialValue = 0.25f,
                 targetValue = 1f,
@@ -351,29 +369,20 @@ private fun StreamingIndicator(modifier: Modifier = Modifier) {
                         repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
                         initialStartOffset =
                             androidx.compose.animation.core
-                                .StartOffset(offsetMillis = delayMs * 160),
+                                .StartOffset(offsetMillis = delayMs),
                     ),
                 label = "streaming-dot-$delayMs",
             )
             animatedAlpha
         }
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.Start),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = "Thinking",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        dots.forEachIndexed { index, _ ->
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        alphas.forEach { alpha ->
             Box(
                 modifier =
                     Modifier
                         .size(4.dp)
-                        .alpha(alphas[index])
-                        .background(MaterialTheme.colorScheme.primary, shape = androidx.compose.foundation.shape.CircleShape),
+                        .alpha(alpha)
+                        .background(MaterialTheme.colorScheme.primary, shape = CircleShape),
             )
         }
     }
@@ -386,7 +395,6 @@ private fun MessageRow(
     canRetry: Boolean,
     canEdit: Boolean,
     canDelete: Boolean,
-    newlyAdded: Boolean,
     isDeleting: Boolean,
     onCopied: () -> Unit,
     onRetry: () -> Unit,
@@ -399,15 +407,9 @@ private fun MessageRow(
     val backgroundColor = if (isUser) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
     AnimatedVisibility(
         visible = !isDeleting,
-        enter =
-            if (newlyAdded) {
-                fadeIn(animationSpec = tween(NEW_MESSAGE_ANIMATION_DURATION_MS)) +
-                    slideInVertically(initialOffsetY = { it / 2 })
-            } else {
-                fadeIn()
-            },
+        enter = fadeIn(),
         exit = fadeOut(animationSpec = tween(DELETE_ANIMATION_DURATION_MS)),
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().animateContentSize(),
     ) {
         PanelContentCard(
             modifier = Modifier.fillMaxWidth(),
@@ -711,5 +713,4 @@ private fun TodoEditor(
 
 private const val ALL_TODO_STATUSES = "__all__"
 private const val DELETE_ANIMATION_DURATION_MS = 220
-private const val NEW_MESSAGE_ANIMATION_DURATION_MS = 240
 private const val STREAMING_DOT_ANIMATION_CYCLE_MS = 700
