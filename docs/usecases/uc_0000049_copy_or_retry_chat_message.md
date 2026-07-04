@@ -25,7 +25,7 @@ Desktop user.
 
 ## Result
 
-Conversation content can be reused, edited, deleted, and retried quickly from the UI. New rows fade and slide into view, and the scroll-to-bottom button appears with a smooth animation.
+Conversation content can be reused, edited, deleted, and retried quickly from the UI. Deleted rows fade out, and the scroll-to-bottom button appears with a smooth animation.
 
 ## Tool Calls
 
