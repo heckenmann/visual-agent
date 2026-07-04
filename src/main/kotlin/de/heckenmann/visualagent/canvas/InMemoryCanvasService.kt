@@ -3,10 +3,7 @@ package de.heckenmann.visualagent.canvas
 import de.heckenmann.visualagent.workspace.WorkspaceFilePaths
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
 import org.springframework.stereotype.Service
-import kotlin.io.path.createDirectories
-import kotlin.io.path.exists
 import kotlin.io.path.readText
-import kotlin.io.path.writeText
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -18,11 +15,11 @@ import kotlin.math.roundToInt
  */
 @Service
 class InMemoryCanvasService(
-    private val workspaceFileService: WorkspaceFileService,
+    internal val workspaceFileService: WorkspaceFileService,
 ) : CanvasOperations {
     private val lock = Any()
-    private val figures = mutableListOf<CanvasFigureSnapshot>().apply { addAll(loadDefaultDocument()) }
-    private val selectedFigureIndices = mutableSetOf<Int>()
+    internal val figures = mutableListOf<CanvasFigureSnapshot>().apply { addAll(loadDefaultDocument()) }
+    internal val selectedFigureIndices = mutableSetOf<Int>()
 
     override fun snapshot(): CanvasSnapshot =
         synchronized(lock) {
@@ -246,97 +243,11 @@ class InMemoryCanvasService(
         )
     }
 
-    private fun addFigure(
-        type: String,
-        x: Double,
-        y: Double,
-        width: Double,
-        height: Double,
-        content: String = "",
-        color: String = "",
-        strokeWidth: Double = 1.0,
-        points: List<CanvasPoint> = emptyList(),
-    ) {
-        figures +=
-            CanvasFigureSnapshot(
-                index = figures.size,
-                type = type,
-                x = x,
-                y = y,
-                width = width,
-                height = height,
-                content = content,
-                color = color,
-                strokeWidth = strokeWidth,
-                points = points,
-            )
-        selectedFigureIndices.clear()
-        selectedFigureIndices.add(figures.lastIndex)
-    }
-
-    private fun requireFigure(index: Int): CanvasFigureSnapshot =
-        figures.getOrNull(index) ?: throw IllegalArgumentException("Canvas figure index does not exist: $index")
-
-    private fun reindexFigures() {
-        for (index in figures.indices) {
-            figures[index] = figures[index].copy(index = index)
-        }
-    }
-
-    private fun toSnapshot(): CanvasSnapshot =
-        CanvasSnapshot(
-            figureCount = figures.size,
-            zoomPercent = 100,
-            gridVisible = true,
-            selectedFigureIndices = selectedFigureIndices.filter { it in figures.indices }.toSortedSet(),
-            figures = figures.toList(),
-        )
-
-    private fun loadDefaultDocument(): List<CanvasFigureSnapshot> {
-        val path = defaultDocumentPath()
-        return if (path.exists()) {
-            runCatching { CanvasDocumentCodec.decode(path.readText(Charsets.UTF_8)).figures }.getOrDefault(emptyList())
-        } else {
-            emptyList()
-        }
-    }
-
-    private fun persistDefaultDocument(snapshot: CanvasSnapshot) {
-        val path = defaultDocumentPath()
-        path.parent.createDirectories()
-        path.writeText(CanvasDocumentCodec.encode(snapshot), Charsets.UTF_8)
-    }
-
-    private fun defaultDocumentPath() =
-        workspaceFileService
-            .workspaceRoot()
-            .resolve(CANVAS_DIRECTORY)
-            .resolve(DEFAULT_DOCUMENT_NAME)
-
-    private fun CanvasFigureSnapshot.contains(
-        pointX: Double,
-        pointY: Double,
-    ): Boolean =
-        pointX >= x &&
-            pointY >= y &&
-            pointX <= x + width &&
-            pointY <= y + height
-
-    private companion object {
+    internal companion object {
         const val CANVAS_DIRECTORY = "canvas"
         const val DEFAULT_DOCUMENT_NAME = "current.canvas"
         const val DEFAULT_EXPLICIT_DOCUMENT_NAME = "canvas.canvas"
         const val MIN_FIGURE_SIZE = 8.0
         const val MAX_STROKE_POINTS = 2000
     }
-}
-
-private fun String.withCanvasExtension(): String = if (endsWith(".canvas", ignoreCase = true)) this else "$this.canvas"
-
-private fun List<CanvasPoint>.distinctAdjacent(): List<CanvasPoint> {
-    val result = mutableListOf<CanvasPoint>()
-    forEach { point ->
-        if (result.lastOrNull() != point) result += point
-    }
-    return result
 }

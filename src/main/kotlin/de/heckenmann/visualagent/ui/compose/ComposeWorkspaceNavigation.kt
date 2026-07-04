@@ -44,7 +44,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 /**
@@ -300,28 +299,5 @@ private fun PanelWidthSlider(
                 },
             )
         }
-    }
-}
-
-@Composable
-private fun HeaderChip(
-    label: String,
-    value: String,
-) {
-    Box(
-        modifier =
-            Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFF242631))
-                .border(1.dp, Color(0x33444A65), RoundedCornerShape(8.dp))
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-    ) {
-        Text(
-            text = "$label $value",
-            color = Color(0xFFBD93F9),
-            style = MaterialTheme.typography.bodySmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
     }
 }
