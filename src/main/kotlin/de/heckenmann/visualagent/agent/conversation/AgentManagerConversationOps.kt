@@ -10,6 +10,8 @@ import de.heckenmann.visualagent.agent.text.ResponseRepetitionGuard
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import kotlinx.coroutines.flow.collect
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import mu.KotlinLogging
 
 /**
@@ -20,6 +22,19 @@ internal class AgentManagerConversationOps(
 ) {
     private val logger = KotlinLogging.logger {}
     private val historyOps = AgentConversationHistoryOps(owner, ::buildMainRequest)
+
+    private fun persist(message: Message): Message {
+        val id =
+            owner.conversationStore.saveConversationMessage(
+                AgentManager.MAIN_SESSION_ID,
+                message.role,
+                message.content,
+                message.metadata,
+            )
+        val persisted = message.copy(id = id)
+        owner.conversationHistory.add(persisted)
+        return persisted
+    }
 
     suspend fun sendMessageToAgent(
         agentId: String,
@@ -53,6 +68,7 @@ internal class AgentManagerConversationOps(
         jobId: String,
         result: Result<AgentJobResult>,
     ) {
+        val success = result.isSuccess
         val notification =
             result.fold(
                 onSuccess = { completed ->
@@ -62,42 +78,31 @@ internal class AgentManagerConversationOps(
                     "Sub-agent job $jobId failed: ${error.message ?: error::class.simpleName.orEmpty()}"
                 },
             )
-        val message = Message(role = "system", content = notification)
-        synchronized(owner.conversationHistory) {
-            owner.conversationHistory.add(message)
-        }
-        owner.conversationStore.saveConversationMessage(
-            AgentManager.MAIN_SESSION_ID,
-            message.role,
-            message.content,
-            message.metadata,
-        )
+        val metadata =
+            buildJsonObject {
+                put("type", "sub_agent")
+                put("jobId", jobId)
+                put("success", success)
+                val completed = result.getOrNull()
+                put("agentId", completed?.agentId ?: "")
+                put("agentName", completed?.agentName ?: "")
+            }.toString()
+        val message = Message(role = "sub_agent", content = notification, metadata = metadata)
+        persist(message)
         val agentId = result.getOrNull()?.agentId ?: "main"
         AgentManager.notifyAgent(agentId, notification)
     }
 
     suspend fun sendMessage(content: String): String {
         val userMessage = Message("user", content)
-        owner.conversationHistory.add(userMessage)
-        owner.conversationStore.saveConversationMessage(
-            AgentManager.MAIN_SESSION_ID,
-            userMessage.role,
-            userMessage.content,
-            userMessage.metadata,
-        )
+        persist(userMessage)
         val requestId =
             java.util.UUID
                 .randomUUID()
                 .toString()
         val assistantContent = owner.responseCoordinator.generateAssistantContentWithRepetitionGuard(requestId)
         val assistantMessage = Message(role = "assistant", content = assistantContent)
-        owner.conversationHistory.add(assistantMessage)
-        owner.conversationStore.saveConversationMessage(
-            AgentManager.MAIN_SESSION_ID,
-            assistantMessage.role,
-            assistantMessage.content,
-            assistantMessage.metadata,
-        )
+        persist(assistantMessage)
         owner.finishedToolEventsByRequestId.remove(requestId)
         return assistantMessage.content
     }
@@ -107,13 +112,7 @@ internal class AgentManagerConversationOps(
         onChunk: (String) -> Unit,
     ): String {
         val userMessage = Message("user", content)
-        owner.conversationHistory.add(userMessage)
-        owner.conversationStore.saveConversationMessage(
-            AgentManager.MAIN_SESSION_ID,
-            userMessage.role,
-            userMessage.content,
-            userMessage.metadata,
-        )
+        persist(userMessage)
         val requestId =
             java.util.UUID
                 .randomUUID()
@@ -136,13 +135,7 @@ internal class AgentManagerConversationOps(
             assistantText = owner.responseCoordinator.completeToolOnlyTurnWithFollowup(requestId) ?: assistantText
         }
         val assistantMessage = Message("assistant", assistantText)
-        owner.conversationHistory.add(assistantMessage)
-        owner.conversationStore.saveConversationMessage(
-            AgentManager.MAIN_SESSION_ID,
-            assistantMessage.role,
-            assistantMessage.content,
-            assistantMessage.metadata,
-        )
+        persist(assistantMessage)
         owner.finishedToolEventsByRequestId.remove(requestId)
         return assistantText
     }
@@ -181,8 +174,7 @@ internal class AgentManagerConversationOps(
                 .trim()
         val welcome = generated.ifBlank { "Hello! I'm ready to help with your project tasks." }
         val message = Message(role = "assistant", content = welcome)
-        owner.conversationHistory.add(message)
-        owner.conversationStore.saveConversationMessage(AgentManager.MAIN_SESSION_ID, message.role, message.content, message.metadata)
+        persist(message)
         return welcome
     }
 
@@ -190,11 +182,17 @@ internal class AgentManagerConversationOps(
 
     fun appendSystemMessage(content: String) {
         val message = Message(role = "system", content = content)
-        owner.conversationHistory.add(message)
-        owner.conversationStore.saveConversationMessage(AgentManager.MAIN_SESSION_ID, message.role, message.content, message.metadata)
+        persist(message)
     }
 
     fun recordToolCall(event: ToolCallEvent) = historyOps.recordToolCall(event)
+
+    fun deleteMessageById(id: String) = historyOps.deleteMessageById(id)
+
+    fun updateMessageContentById(
+        id: String,
+        newContent: String,
+    ) = historyOps.updateMessageContentById(id, newContent)
 
     fun loadOlderHistory(pageSize: Int = AgentManager.HISTORY_PAGE_SIZE): List<Message> = historyOps.loadOlderHistory(pageSize)
 
@@ -233,7 +231,7 @@ internal class AgentManagerConversationOps(
                     "User preferences and wishes for this session:\n$userInstruction",
                 )
         }
-        preparedMessages += history
+        preparedMessages += history.map(::normalizeHistoryRoleForProvider)
         val metadata =
             mutableMapOf<String, Any>(
                 "sessionId" to AgentManager.MAIN_SESSION_ID,
@@ -247,6 +245,23 @@ internal class AgentManagerConversationOps(
             metadata = metadata,
         )
     }
+
+    /**
+     * Map UI-only roles to provider-safe roles.
+     *
+     * `tool` records are converted to `assistant` so the model sees the
+     * result summary, and `sub_agent` notifications become `system`
+     * messages.
+     *
+     * @param message History message with any supported role
+     * @return Message with a role the configured LLM provider accepts
+     */
+    private fun normalizeHistoryRoleForProvider(message: Message): Message =
+        when (message.role) {
+            "tool" -> message.copy(role = "assistant")
+            "sub_agent" -> message.copy(role = "system")
+            else -> message
+        }
 
     fun buildMainSystemContextPrompt(): String {
         val todos = owner.todoStore.listTodos()

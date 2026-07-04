@@ -21,10 +21,11 @@ Main orchestration agent.
 3. The job runs on the selected or newly created sub-agent.
 4. Active job counters are updated while the job runs.
 5. The caller receives the final result.
+6. The result is persisted as a dedicated `sub_agent` message in the conversation history and shown in the chat panel.
 
 ## Result
 
-The main agent gets a completed sub-agent result without exceeding configured concurrency.
+The main agent gets a completed sub-agent result without exceeding configured concurrency; the result is visible as its own chat entry.
 
 ## Tool Calls
 

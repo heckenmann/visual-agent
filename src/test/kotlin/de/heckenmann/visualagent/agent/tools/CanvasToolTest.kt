@@ -398,6 +398,13 @@ class CanvasToolTest {
         ): List<ConversationRecord> = emptyList()
 
         override fun deleteConversationMessages(sessionId: String): Int = 0
+
+        override fun deleteConversationMessageById(id: String): Int = 0
+
+        override fun updateConversationMessageContent(
+            id: String,
+            newContent: String,
+        ): Int = 0
     }
 
     private data class SavedMessage(

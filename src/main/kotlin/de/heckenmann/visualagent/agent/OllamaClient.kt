@@ -4,6 +4,7 @@ import de.heckenmann.visualagent.agent.ollama.OllamaPromptFactory
 import de.heckenmann.visualagent.agent.ollama.OllamaToolRecovery
 import de.heckenmann.visualagent.agent.ollama.createOllamaApi
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
+import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.config.AppConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -29,6 +30,7 @@ class OllamaClient(
     private val ollamaApi: OllamaApi,
     private val promptFactory: OllamaPromptFactory,
     private val toolRecovery: OllamaToolRecovery,
+    private val toolRegistry: ToolRegistry,
 ) : LLMProvider {
     override suspend fun chat(messages: List<Message>): ChatResponse = chat(ChatRequestContext(messages = messages))
 
@@ -36,7 +38,20 @@ class OllamaClient(
         withContext(Dispatchers.IO) {
             val selectedModel = request.model ?: AppConfig.instance.ollamaModel
             val allowedFunctionNames = promptFactory.allowedFunctionNames(request, selectedModel)
-            val responseResult = runCatching { chatModelFor(request).call(promptFactory.buildPrompt(request, selectedModel)) }
+            val prompt = promptFactory.buildPrompt(request, selectedModel)
+            val model = chatModelFor(request)
+            val responseResult =
+                runCatching {
+                    ToolCallingLoop()
+                        .run(
+                            model,
+                            prompt,
+                            toolRegistry.functionCallbacks(
+                                request.enabledTools,
+                                request.metadata + mapOf("model" to selectedModel),
+                            ),
+                        )
+                }
             if (responseResult.isFailure) {
                 val error = responseResult.exceptionOrNull()
                 if (error != null && isMissingFunctionCallbackError(error)) {
@@ -50,33 +65,7 @@ class OllamaClient(
                 }
                 throw buildDetailedProviderError(error)
             }
-            val response = responseResult.getOrThrow()
-            val output =
-                response.result
-                    ?.output
-                    ?.text
-                    .orEmpty()
-
-            ChatResponse(
-                model = response.metadata?.model ?: selectedModel,
-                message =
-                    Message(
-                        role = "assistant",
-                        content = output,
-                    ),
-                done = true,
-                totalDuration = null,
-                promptEvalCount =
-                    response.metadata
-                        ?.usage
-                        ?.promptTokens
-                        ?.toInt(),
-                evalCount =
-                    response.metadata
-                        ?.usage
-                        ?.completionTokens
-                        ?.toInt(),
-            )
+            responseResult.getOrThrow()
         }
 
     override suspend fun stream(messages: List<Message>): Flow<ChatResponse> = stream(ChatRequestContext(messages = messages))
@@ -84,36 +73,41 @@ class OllamaClient(
     override suspend fun stream(request: ChatRequestContext): Flow<ChatResponse> {
         val selectedModel = request.model ?: AppConfig.instance.ollamaModel
         val allowedFunctionNames = promptFactory.allowedFunctionNames(request, selectedModel)
+        val prompt = promptFactory.buildPrompt(request, selectedModel)
+        val model = chatModelFor(request)
+        val toolCallbacks =
+            if (request.enabledTools.isEmpty()) {
+                emptyList()
+            } else {
+                toolRegistry.functionCallbacks(
+                    request.enabledTools,
+                    request.metadata + mapOf("model" to selectedModel),
+                )
+            }
         return flow {
             try {
-                chatModelFor(request)
-                    .stream(promptFactory.buildPrompt(request, selectedModel))
-                    .asFlow()
-                    .map { chunk ->
-                        ChatResponse(
-                            model = chunk.metadata?.model ?: selectedModel,
-                            message =
-                                Message(
-                                    role = "assistant",
-                                    content =
-                                        chunk.result
-                                            ?.output
-                                            ?.text
-                                            .orEmpty(),
-                                ),
-                            done = chunk.result?.metadata?.finishReason != null,
-                            promptEvalCount =
-                                chunk.metadata
-                                    ?.usage
-                                    ?.promptTokens
-                                    ?.toInt(),
-                            evalCount =
-                                chunk.metadata
-                                    ?.usage
-                                    ?.completionTokens
-                                    ?.toInt(),
-                        )
-                    }.collect { emit(it) }
+                if (toolCallbacks.isEmpty()) {
+                    model
+                        .stream(prompt)
+                        .asFlow()
+                        .map { chunk ->
+                            ChatResponse(
+                                model = chunk.metadata.model.takeIf { it.isNotBlank() } ?: selectedModel,
+                                message =
+                                    Message(
+                                        role = "assistant",
+                                        content = chunk.result?.let { it.output.text.orEmpty() }.orEmpty(),
+                                    ),
+                                done = chunk.result?.metadata?.finishReason != null,
+                                promptEvalCount = chunk.metadata.usage.promptTokens,
+                                evalCount = chunk.metadata.usage.completionTokens,
+                            )
+                        }.collect { emit(it) }
+                } else {
+                    ToolCallingLoop()
+                        .runStream(model, prompt, toolCallbacks)
+                        .collect { emit(it) }
+                }
             } catch (error: Throwable) {
                 if (!isMissingFunctionCallbackError(error)) throw buildDetailedProviderError(error)
                 val recovered = toolRecovery.runUnknownToolRecovery(request, selectedModel, allowedFunctionNames, error)
@@ -171,27 +165,15 @@ class OllamaClient(
                     ),
                 )
             ChatResponse(
-                model = response.metadata?.model ?: selectedModel,
+                model = response.metadata.model,
                 message =
                     Message(
                         role = "assistant",
-                        content =
-                            response.result
-                                ?.output
-                                ?.text
-                                .orEmpty(),
+                        content = response.result?.let { it.output.text.orEmpty() }.orEmpty(),
                     ),
                 done = true,
-                promptEvalCount =
-                    response.metadata
-                        ?.usage
-                        ?.promptTokens
-                        ?.toInt(),
-                evalCount =
-                    response.metadata
-                        ?.usage
-                        ?.completionTokens
-                        ?.toInt(),
+                promptEvalCount = response.metadata.usage.promptTokens,
+                evalCount = response.metadata.usage.completionTokens,
             )
         }
 
@@ -229,9 +211,8 @@ class OllamaClient(
                     ollamaApi
                         .listModels()
                         .models()
-                        ?.mapNotNull { model -> model.name() }
-                        ?.distinct()
-                        ?: emptyList()
+                        .mapNotNull { model -> model.name() }
+                        .distinct()
                 if (models.isEmpty()) listOf(configuredModel) else models
             } catch (_: Exception) {
                 listOf(configuredModel)
@@ -244,9 +225,8 @@ class OllamaClient(
                 createOllamaApi(profile)
                     .listModels()
                     .models()
-                    ?.mapNotNull { model -> model.name() }
-                    ?.distinct()
-                    .orEmpty()
+                    .mapNotNull { model -> model.name() }
+                    .distinct()
             if (models.isEmpty()) listOf(profile.defaultModel).filter(String::isNotBlank) else models
         }
 
@@ -261,10 +241,10 @@ class OllamaClient(
                 modifiedAt = "",
                 details =
                     ModelDetails(
-                        family = response.details()?.family(),
-                        format = response.details()?.format(),
-                        parameterSize = response.details()?.parameterSize(),
-                        quantizationLevel = response.details()?.quantizationLevel(),
+                        family = response.details().family(),
+                        format = response.details().format(),
+                        parameterSize = response.details().parameterSize(),
+                        quantizationLevel = response.details().quantizationLevel(),
                     ),
             )
         }
@@ -276,7 +256,7 @@ class OllamaClient(
                 val details = response.details()
                 ShowResponse(
                     model = modelName,
-                    modifiedAt = response.modifiedAt()?.toString().orEmpty(),
+                    modifiedAt = response.modifiedAt().toString(),
                     parameters = response.parameters(),
                     template = response.template(),
                     system = response.system(),

@@ -15,11 +15,12 @@ Desktop user.
 
 ## Main Flow
 
-1. User, assistant, and tool-call entries are recorded.
+1. User, assistant, tool-call and sub-agent entries are recorded.
 2. Records are stored in the database.
 3. On startup, recent conversation records are loaded.
-4. The chat panel renders the restored messages.
-5. Older history can be paged or searched when needed.
+4. The chat panel renders the restored messages, including tool and sub-agent rows.
+5. The chat panel scrolls to the most recent message so the user sees the current end of the conversation.
+6. Older history can be paged or searched when needed.
 
 ## Result
 

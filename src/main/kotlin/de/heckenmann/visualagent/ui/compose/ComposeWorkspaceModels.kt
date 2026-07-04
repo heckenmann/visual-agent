@@ -4,6 +4,7 @@ import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
+import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.canvas.CanvasOperations
 import de.heckenmann.visualagent.config.AppConfig
@@ -316,6 +317,7 @@ data class ComposePanelServices(
     val providerCatalogService: ProviderCatalogService,
     val agentToolConfigService: AgentToolConfigService,
     val toolRegistry: ToolRegistry,
+    val toolEventBus: ToolEventBus,
     val workspaceFileService: WorkspaceFileService,
     val canvasOperations: CanvasOperations,
     val modalRequester: ComposeModalRequester,

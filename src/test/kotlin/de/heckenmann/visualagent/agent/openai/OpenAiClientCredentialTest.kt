@@ -2,6 +2,8 @@ package de.heckenmann.visualagent.agent.openai
 
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
+import de.heckenmann.visualagent.agent.tools.ToolEventBus
+import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
@@ -14,7 +16,7 @@ class OpenAiClientCredentialTest {
     @Test
     fun `official openai endpoint requires an api key before model discovery`() =
         runTest {
-            val client = OpenAiClient(mockk(relaxed = true))
+            val client = OpenAiClient(mockk(relaxed = true), ToolRegistry(emptyList(), ToolEventBus()))
             val profile =
                 ProviderProfile(
                     id = "openai",

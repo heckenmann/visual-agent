@@ -302,7 +302,7 @@ class OllamaClientModelSelectionTest {
     ): OllamaClient {
         val promptFactory = OllamaPromptFactory(registry)
         val recovery = OllamaToolRecovery(chatModel, promptFactory)
-        return OllamaClient(chatModel, ollamaApi, promptFactory, recovery)
+        return OllamaClient(chatModel, ollamaApi, promptFactory, recovery, registry)
     }
 
     private class FakeTool(

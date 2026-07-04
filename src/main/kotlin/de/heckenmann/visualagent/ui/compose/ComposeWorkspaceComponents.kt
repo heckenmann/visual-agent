@@ -486,6 +486,7 @@ private fun WindowBody(
                 agentManager = panelServices.agentManager,
                 modalRequester = panelServices.modalRequester,
                 inFlight = panelServices.inFlight,
+                toolEventBus = panelServices.toolEventBus,
             )
         "todos" -> TodoPanel(panelServices.agentManager, panelServices.modalRequester)
         "files" -> FilesPanel(panelServices.workspaceFileService, panelServices.canvasOperations, panelServices.modalRequester)

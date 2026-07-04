@@ -243,13 +243,19 @@ data class ToolResult(
 /**
  * Single provider-neutral message in a conversation.
  *
- * @property role Message role (system, user, or assistant)
+ * Supported roles for the UI are `system`, `user`, `assistant`, `tool` and
+ * `sub_agent`. The provider adapters only send `system`, `user` and
+ * `assistant` to the LLM; `tool` and `sub_agent` messages are normalized
+ * before being added to the request context.
+ *
+ * @property role Message role (`system`, `user`, `assistant`, `tool` or `sub_agent`)
  * @property content Text content of the message
  * @property metadata Optional JSON metadata payload for UI/system annotations
  * @property images Optional list of base64-encoded images (for vision)
  * @see docs/usecases/uc_0000002_send_main_agent_message.md
  * @see docs/usecases/uc_0000005_persist_and_reload_history.md
  * @see docs/usecases/uc_0000032_capture_canvas_image_history.md
+ * @see docs/usecases/uc_0000020_execute_tool_call.md
  */
 @Serializable
 data class Message(
@@ -257,6 +263,7 @@ data class Message(
     val content: String,
     val metadata: String? = null,
     val images: List<String>? = null,
+    val id: String? = null,
 )
 
 /**
