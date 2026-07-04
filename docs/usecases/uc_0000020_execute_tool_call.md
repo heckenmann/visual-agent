@@ -21,10 +21,11 @@ LLM provider.
 4. The tool executes with timeout handling.
 5. Tool start and finish events are emitted.
 6. The structured result is returned to the provider flow.
+7. The provider loop sends the tool result back to the model and requests the final user-facing answer.
 
 ## Result
 
-Tool behavior is centralized, auditable, and visible in conversation history.
+Tool behavior is centralized, auditable, and shown as its own message in the chat history. Tool results are fed back to the model so the assistant can answer from them instead of showing "(No text response. See tool results above.)".
 
 ## Tool Calls
 
@@ -35,9 +36,11 @@ Tool behavior is centralized, auditable, and visible in conversation history.
 - `de.heckenmann.visualagent.agent.tools.ToolRegistry`
 - `de.heckenmann.visualagent.agent.tools.VisualAgentTool`
 - `de.heckenmann.visualagent.agent.tools.ToolEventBus`
+- `de.heckenmann.visualagent.agent.ToolCallingLoop`
 
 ## Acceptance Criteria
 
 - Only request-enabled tools are callable.
 - Tool events are persisted and rendered.
+- Tool results are sent back to the model to produce a real answer.
 - Unknown tool names get a controlled failure or recovery response.

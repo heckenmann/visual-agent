@@ -18,7 +18,7 @@ Main orchestration agent.
 1. The main agent requests an async sub-agent job.
 2. The scheduler records the job in a queue and immediately returns a job identifier.
 3. When capacity becomes available, the job executes.
-4. Completion emits a notification back into the main-agent flow.
+4. Completion is persisted as a dedicated `sub_agent` message in the conversation history and shown in the chat panel.
 5. Queue and active job counters are updated.
 
 ## Result
