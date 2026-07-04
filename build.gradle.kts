@@ -398,6 +398,10 @@ tasks.named("ktlintCheck") {
     dependsOn("unusedCodeCheck")
 }
 
+tasks.named("build") {
+    dependsOn("ktlintFormat")
+}
+
 tasks.register("locAndPackageSizeCheck") {
     group = "verification"
     description = "Checks per-file LOC and package size constraints."
