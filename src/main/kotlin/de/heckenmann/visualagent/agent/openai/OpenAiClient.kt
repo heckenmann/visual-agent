@@ -7,8 +7,10 @@ import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ModelDetails
 import de.heckenmann.visualagent.agent.ShowResponse
+import de.heckenmann.visualagent.agent.ToolCallingLoop
 import de.heckenmann.visualagent.agent.VisionSupport
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
+import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.config.AppConfig
 import io.micrometer.observation.ObservationRegistry
 import kotlinx.coroutines.Dispatchers
@@ -35,74 +37,70 @@ import java.time.Duration
 @Component
 class OpenAiClient(
     private val promptFactory: OpenAiPromptFactory,
+    private val toolRegistry: ToolRegistry,
 ) : LLMProvider {
     override suspend fun chat(messages: List<Message>): ChatResponse = chat(ChatRequestContext(messages = messages))
 
     override suspend fun chat(request: ChatRequestContext): ChatResponse =
         withContext(Dispatchers.IO) {
             val selectedModel = request.model ?: AppConfig.instance.openAiModel
-            val responseResult = runCatching { chatModel(request.providerProfile).call(promptFactory.buildPrompt(request, selectedModel)) }
+            val prompt = promptFactory.buildPrompt(request, selectedModel)
+            val model = chatModel(request.providerProfile)
+            val responseResult =
+                runCatching {
+                    ToolCallingLoop()
+                        .run(
+                            model,
+                            prompt,
+                            toolRegistry.functionCallbacks(
+                                request.enabledTools,
+                                request.metadata + mapOf("model" to selectedModel, "provider" to "openai"),
+                            ),
+                        )
+                }
             if (responseResult.isFailure) throw buildDetailedProviderError(responseResult.exceptionOrNull())
-            val response = responseResult.getOrThrow()
-            ChatResponse(
-                model = response.metadata?.model ?: selectedModel,
-                message =
-                    Message(
-                        role = "assistant",
-                        content =
-                            response.result
-                                ?.output
-                                ?.text
-                                .orEmpty(),
-                    ),
-                done = true,
-                promptEvalCount =
-                    response.metadata
-                        ?.usage
-                        ?.promptTokens
-                        ?.toInt(),
-                evalCount =
-                    response.metadata
-                        ?.usage
-                        ?.completionTokens
-                        ?.toInt(),
-            )
+            responseResult.getOrThrow()
         }
 
     override suspend fun stream(messages: List<Message>): Flow<ChatResponse> = stream(ChatRequestContext(messages = messages))
 
     override suspend fun stream(request: ChatRequestContext): Flow<ChatResponse> {
         val selectedModel = request.model ?: AppConfig.instance.openAiModel
+        val prompt = promptFactory.buildPrompt(request, selectedModel)
+        val model = chatModel(request.providerProfile)
+        val toolCallbacks =
+            if (request.enabledTools.isEmpty()) {
+                emptyList()
+            } else {
+                toolRegistry.functionCallbacks(
+                    request.enabledTools,
+                    request.metadata + mapOf("model" to selectedModel, "provider" to "openai"),
+                )
+            }
         return flow {
             try {
-                chatModel(request.providerProfile)
-                    .stream(promptFactory.buildPrompt(request, selectedModel))
-                    .asFlow()
-                    .map { chunk ->
-                        ChatResponse(
-                            model = chunk.metadata?.model ?: selectedModel,
-                            message =
-                                Message(
-                                    role = "assistant",
-                                    content =
-                                        chunk.result
-                                            ?.output
-                                            ?.text
-                                            .orEmpty(),
-                                ),
-                            done = chunk.result?.metadata?.finishReason != null,
-                            promptEvalCount =
-                                chunk.metadata
-                                    ?.usage
-                                    ?.promptTokens
-                                    ?.toInt(),
-                            evalCount =
-                                chunk.metadata
-                                    ?.usage
-                                    ?.completionTokens
-                                    ?.toInt(),
-                        )
-                    }.collect { emit(it) }
+                if (toolCallbacks.isEmpty()) {
+                    model
+                        .stream(prompt)
+                        .asFlow()
+                        .map { chunk ->
+                            ChatResponse(
+                                model = chunk.metadata.model,
+                                message =
+                                    Message(
+                                        role = "assistant",
+                                        content = chunk.result?.let { it.output.text.orEmpty() }.orEmpty(),
+                                    ),
+                                done = chunk.result?.metadata?.finishReason != null,
+                                promptEvalCount = chunk.metadata.usage.promptTokens,
+                                evalCount = chunk.metadata.usage.completionTokens,
+                            )
+                        }.collect { emit(it) }
+                } else {
+                    ToolCallingLoop()
+                        .runStream(model, prompt, toolCallbacks)
+                        .collect { emit(it) }
+                }
             } catch (error: Throwable) {
                 throw buildDetailedProviderError(error)
             }
@@ -130,27 +128,15 @@ class OpenAiClient(
                         ),
                     )
             ChatResponse(
-                model = response.metadata?.model ?: selectedModel,
+                model = response.metadata.model,
                 message =
                     Message(
                         role = "assistant",
-                        content =
-                            response.result
-                                ?.output
-                                ?.text
-                                .orEmpty(),
+                        content = response.result?.let { it.output.text.orEmpty() }.orEmpty(),
                     ),
                 done = true,
-                promptEvalCount =
-                    response.metadata
-                        ?.usage
-                        ?.promptTokens
-                        ?.toInt(),
-                evalCount =
-                    response.metadata
-                        ?.usage
-                        ?.completionTokens
-                        ?.toInt(),
+                promptEvalCount = response.metadata.usage.promptTokens,
+                evalCount = response.metadata.usage.completionTokens,
             )
         }
 

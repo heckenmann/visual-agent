@@ -70,7 +70,7 @@ internal class AgentConversationHistoryOps(
                 put("resultContent", event.result.content)
                 put("resultError", event.result.error ?: "")
             }.toString()
-        persist(Message(role = "assistant", content = compactText, metadata = metadata))
+        persist(Message(role = "tool", content = compactText, metadata = metadata))
     }
 
     fun loadOlderHistory(pageSize: Int): List<Message> {

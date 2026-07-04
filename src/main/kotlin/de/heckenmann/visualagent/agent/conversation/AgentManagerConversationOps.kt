@@ -10,6 +10,8 @@ import de.heckenmann.visualagent.agent.text.ResponseRepetitionGuard
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import kotlinx.coroutines.flow.collect
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import mu.KotlinLogging
 
 /**
@@ -66,6 +68,7 @@ internal class AgentManagerConversationOps(
         jobId: String,
         result: Result<AgentJobResult>,
     ) {
+        val success = result.isSuccess
         val notification =
             result.fold(
                 onSuccess = { completed ->
@@ -75,7 +78,16 @@ internal class AgentManagerConversationOps(
                     "Sub-agent job $jobId failed: ${error.message ?: error::class.simpleName.orEmpty()}"
                 },
             )
-        val message = Message(role = "system", content = notification)
+        val metadata =
+            buildJsonObject {
+                put("type", "sub_agent")
+                put("jobId", jobId)
+                put("success", success)
+                val completed = result.getOrNull()
+                put("agentId", completed?.agentId ?: "")
+                put("agentName", completed?.agentName ?: "")
+            }.toString()
+        val message = Message(role = "sub_agent", content = notification, metadata = metadata)
         synchronized(owner.conversationHistory) {
             owner.conversationHistory.add(message)
         }
@@ -222,7 +234,7 @@ internal class AgentManagerConversationOps(
                     "User preferences and wishes for this session:\n$userInstruction",
                 )
         }
-        preparedMessages += history
+        preparedMessages += history.map(::normalizeHistoryRoleForProvider)
         val metadata =
             mutableMapOf<String, Any>(
                 "sessionId" to AgentManager.MAIN_SESSION_ID,
@@ -236,6 +248,23 @@ internal class AgentManagerConversationOps(
             metadata = metadata,
         )
     }
+
+    /**
+     * Map UI-only roles to provider-safe roles.
+     *
+     * `tool` records are converted to `assistant` so the model sees the
+     * result summary, and `sub_agent` notifications become `system`
+     * messages.
+     *
+     * @param message History message with any supported role
+     * @return Message with a role the configured LLM provider accepts
+     */
+    private fun normalizeHistoryRoleForProvider(message: Message): Message =
+        when (message.role) {
+            "tool" -> message.copy(role = "assistant")
+            "sub_agent" -> message.copy(role = "system")
+            else -> message
+        }
 
     fun buildMainSystemContextPrompt(): String {
         val todos = owner.todoStore.listTodos()
