@@ -19,7 +19,8 @@ Desktop user.
 2. Records are stored in the database.
 3. On startup, recent conversation records are loaded.
 4. The chat panel renders the restored messages.
-5. Older history can be paged or searched when needed.
+5. The chat panel scrolls to the most recent message so the user sees the current end of the conversation.
+6. Older history can be paged or searched when needed.
 
 ## Result
 
