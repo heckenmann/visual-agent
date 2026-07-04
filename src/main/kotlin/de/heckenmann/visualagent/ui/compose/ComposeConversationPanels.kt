@@ -369,7 +369,7 @@ private fun ScrollToBottomButton(
 }
 
 @Composable
-private fun StreamingStatusLine(visible: Boolean) {
+internal fun StreamingStatusLine(visible: Boolean) {
     AnimatedVisibility(
         visible = visible,
         enter = fadeIn(animationSpec = tween(180)),
@@ -425,7 +425,7 @@ private fun PulsingDots() {
 }
 
 @Composable
-private fun MessageRow(
+internal fun MessageRow(
     message: Message,
     isStreamingPlaceholder: Boolean,
     canRetry: Boolean,
@@ -537,7 +537,7 @@ private fun EditMessageModal(
 }
 
 @Composable
-private fun ToolMessageRow(
+internal fun ToolMessageRow(
     message: Message,
     isDeleting: Boolean,
     onDelete: () -> Unit,
@@ -605,7 +605,7 @@ private fun ToolMessageRow(
     }
 }
 
-private data class ParsedToolMetadata(
+internal data class ParsedToolMetadata(
     val toolId: String,
     val status: String,
     val durationMillis: Long?,
@@ -614,7 +614,7 @@ private data class ParsedToolMetadata(
     val resultError: String?,
 )
 
-private fun parseToolMetadata(metadata: String?): ParsedToolMetadata {
+internal fun parseToolMetadata(metadata: String?): ParsedToolMetadata {
     val json =
         metadata
             ?.let {
@@ -634,7 +634,7 @@ private fun parseToolMetadata(metadata: String?): ParsedToolMetadata {
 }
 
 @Composable
-private fun SubAgentMessageRow(
+internal fun SubAgentMessageRow(
     message: Message,
     isDeleting: Boolean,
     onDelete: () -> Unit,
