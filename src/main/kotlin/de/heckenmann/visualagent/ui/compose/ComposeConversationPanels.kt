@@ -2,6 +2,15 @@
 
 package de.heckenmann.visualagent.ui.compose
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,6 +26,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -43,6 +53,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -61,6 +72,7 @@ import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoPriority
 import de.heckenmann.visualagent.todo.TodoStatus
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -87,6 +99,7 @@ internal fun ConversationPanel(
     var status by remember { mutableStateOf("Ready") }
     var sending by remember { mutableStateOf(false) }
     var editingId by remember { mutableStateOf<String?>(null) }
+    var deletingMessageIds by remember { mutableStateOf(setOf<String>()) }
     val isAtBottom by remember {
         derivedStateOf {
             val info = listState.layoutInfo
@@ -166,7 +179,9 @@ internal fun ConversationPanel(
                             isStreamingPlaceholder = isStreamingPlaceholder,
                             canRetry = message.role == "assistant" && !sending && !isStreamingPlaceholder,
                             canEdit = message.role == "user" && !sending,
-                            canDelete = message.role != "system",
+                            canDelete = message.role != "system" && message.id !in deletingMessageIds,
+                            newlyAdded = index >= history.size - 2 && !sending && message.content.isNotBlank(),
+                            isDeleting = message.id in deletingMessageIds,
                             onCopied = { status = "Copied ${message.role} message" },
                             onRetry = {
                                 val previousUserMessage = history.take(index).lastOrNull { it.role == "user" }
@@ -180,9 +195,14 @@ internal fun ConversationPanel(
                             onEdit = { editingId = message.id },
                             onDelete = {
                                 message.id?.let { id ->
-                                    agentManager.deleteMessageById(id)
-                                    history = agentManager.getHistory()
-                                    status = "Message deleted"
+                                    deletingMessageIds += id
+                                    scope.launch {
+                                        delay(DELETE_ANIMATION_DURATION_MS.toLong())
+                                        agentManager.deleteMessageById(id)
+                                        history = agentManager.getHistory()
+                                        deletingMessageIds -= id
+                                        status = "Message deleted"
+                                    }
                                 }
                             },
                             modifier = Modifier.padding(top = topPadding),
@@ -196,15 +216,22 @@ internal fun ConversationPanel(
                 }
             }
             if (!isAtBottom) {
-                Column(
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = !isAtBottom,
                     modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.Bottom,
-                    horizontalAlignment = Alignment.End,
+                    enter = fadeIn(animationSpec = tween(180)) + slideInVertically(initialOffsetY = { it / 2 }),
+                    exit = fadeOut(animationSpec = tween(180)) + slideOutVertically(targetOffsetY = { it / 2 }),
                 ) {
-                    ScrollToBottomButton(
-                        onClick = { scope.launch { listState.animateScrollToItem(history.lastIndex.coerceAtLeast(0)) } },
-                        modifier = Modifier.padding(end = 12.dp, bottom = 12.dp),
-                    )
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.Bottom,
+                        horizontalAlignment = Alignment.End,
+                    ) {
+                        ScrollToBottomButton(
+                            onClick = { scope.launch { listState.animateScrollToItem(history.lastIndex.coerceAtLeast(0)) } },
+                            modifier = Modifier.padding(end = 12.dp, bottom = 12.dp),
+                        )
+                    }
                 }
             }
         }
@@ -311,17 +338,44 @@ private fun ScrollToBottomButton(
 
 @Composable
 private fun StreamingIndicator(modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "streaming")
+    val dots = listOf(0, 1, 2)
+    val alphas =
+        dots.map { delayMs ->
+            val animatedAlpha by transition.animateFloat(
+                initialValue = 0.25f,
+                targetValue = 1f,
+                animationSpec =
+                    infiniteRepeatable(
+                        animation = tween(durationMillis = STREAMING_DOT_ANIMATION_CYCLE_MS),
+                        repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
+                        initialStartOffset =
+                            androidx.compose.animation.core
+                                .StartOffset(offsetMillis = delayMs * 160),
+                    ),
+                label = "streaming-dot-$delayMs",
+            )
+            animatedAlpha
+        }
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.Start),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = "● ● ●",
+            text = "Thinking",
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        dots.forEachIndexed { index, _ ->
+            Box(
+                modifier =
+                    Modifier
+                        .size(4.dp)
+                        .alpha(alphas[index])
+                        .background(MaterialTheme.colorScheme.primary, shape = androidx.compose.foundation.shape.CircleShape),
+            )
+        }
     }
 }
 
@@ -332,6 +386,8 @@ private fun MessageRow(
     canRetry: Boolean,
     canEdit: Boolean,
     canDelete: Boolean,
+    newlyAdded: Boolean,
+    isDeleting: Boolean,
     onCopied: () -> Unit,
     onRetry: () -> Unit,
     onEdit: () -> Unit,
@@ -341,7 +397,16 @@ private fun MessageRow(
     val clipboard = LocalClipboardManager.current
     val isUser = message.role == "user"
     val backgroundColor = if (isUser) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
-    Box(
+    AnimatedVisibility(
+        visible = !isDeleting,
+        enter =
+            if (newlyAdded) {
+                fadeIn(animationSpec = tween(NEW_MESSAGE_ANIMATION_DURATION_MS)) +
+                    slideInVertically(initialOffsetY = { it / 2 })
+            } else {
+                fadeIn()
+            },
+        exit = fadeOut(animationSpec = tween(DELETE_ANIMATION_DURATION_MS)),
         modifier = modifier.fillMaxWidth(),
     ) {
         PanelContentCard(
@@ -645,3 +710,6 @@ private fun TodoEditor(
 }
 
 private const val ALL_TODO_STATUSES = "__all__"
+private const val DELETE_ANIMATION_DURATION_MS = 220
+private const val NEW_MESSAGE_ANIMATION_DURATION_MS = 240
+private const val STREAMING_DOT_ANIMATION_CYCLE_MS = 700
