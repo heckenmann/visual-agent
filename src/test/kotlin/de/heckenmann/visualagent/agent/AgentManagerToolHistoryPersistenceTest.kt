@@ -38,7 +38,7 @@ class AgentManagerToolHistoryPersistenceTest {
 
         val historyRows = db.getConversationMessages("main", 50)
         val last = historyRows.last()
-        assertEquals("assistant", last.role)
+        assertEquals("tool", last.role)
         assertTrue(last.content.startsWith("Tool todos"))
         assertTrue(last.metadata.orEmpty().contains("\"type\":\"tool_call\""))
         db.close()

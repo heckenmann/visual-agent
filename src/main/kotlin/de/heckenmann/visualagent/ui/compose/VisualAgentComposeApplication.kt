@@ -42,6 +42,7 @@ import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
+import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.canvas.CanvasOperations
 import de.heckenmann.visualagent.config.AppConfig
@@ -120,7 +121,7 @@ private fun VisualAgentComposeApp(
     var settingsRevision by remember { mutableStateOf(0) }
     val workspaceFocusRequester = remember { FocusRequester() }
     val composeScope = rememberCoroutineScope()
-    val toolEventBus = remember { springContext.getBean(de.heckenmann.visualagent.agent.tools.ToolEventBus::class.java) }
+    val toolEventBus = remember { springContext.getBean(ToolEventBus::class.java) }
     val inFlight = rememberInFlightState(toolEventBus)
     val panelServices =
         remember {
@@ -131,6 +132,7 @@ private fun VisualAgentComposeApp(
                 providerCatalogService = springContext.getBean(ProviderCatalogService::class.java),
                 agentToolConfigService = springContext.getBean(AgentToolConfigService::class.java),
                 toolRegistry = springContext.getBean(ToolRegistry::class.java),
+                toolEventBus = springContext.getBean(ToolEventBus::class.java),
                 workspaceFileService = springContext.getBean(WorkspaceFileService::class.java),
                 canvasOperations = springContext.getBean(CanvasOperations::class.java),
                 modalRequester = ComposeModalRequester { requested -> modal = requested },
