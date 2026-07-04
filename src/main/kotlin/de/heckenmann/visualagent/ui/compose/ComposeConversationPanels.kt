@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -133,6 +134,7 @@ internal fun ConversationPanel(
     LaunchedEffect(Unit) {
         inputFocusRequester.requestFocus()
     }
+    ConversationStartupScrollEffect(history, listState)
     LaunchedEffect(history.size) {
         if (isAtBottom && history.isNotEmpty()) {
             listState.animateScrollToItem(history.lastIndex)
@@ -273,6 +275,18 @@ internal fun ConversationPanel(
                     editingId = null
                 },
             )
+        }
+    }
+}
+
+@Composable
+internal fun ConversationStartupScrollEffect(
+    history: List<Message>,
+    listState: LazyListState,
+) {
+    LaunchedEffect(Unit) {
+        if (history.isNotEmpty()) {
+            listState.scrollToItem(history.lastIndex)
         }
     }
 }

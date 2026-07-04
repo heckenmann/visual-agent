@@ -94,6 +94,8 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("io.mockk:mockk:1.14.11")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
+    testImplementation("org.jetbrains.compose.ui:ui-test-junit4-desktop:1.11.1")
+    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:5.12.0")
 }
 
 tasks.test {
