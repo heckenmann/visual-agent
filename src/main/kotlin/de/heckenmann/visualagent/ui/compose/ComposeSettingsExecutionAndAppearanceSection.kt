@@ -30,7 +30,6 @@ internal fun SettingsExecutionAndAppearanceSection(
     thinkingEnabled: Boolean,
     autoCompactionEnabled: Boolean,
     userInstruction: String,
-    theme: String,
     fontSize: Int,
     onContextLengthChange: (Int) -> Unit,
     onLoadLimitChange: (String) -> Unit,
@@ -40,7 +39,6 @@ internal fun SettingsExecutionAndAppearanceSection(
     onThinkingChange: (Boolean) -> Unit,
     onCompactionChange: (Boolean) -> Unit,
     onUserInstructionChange: (String) -> Unit,
-    onThemeSelected: (String) -> Unit,
     onFontSizeChange: (Int) -> Unit,
 ) {
     PanelSection(title = "Execution") {
@@ -95,12 +93,6 @@ internal fun SettingsExecutionAndAppearanceSection(
     }
 
     PanelSection(title = "Appearance") {
-        PanelDropdownField(
-            label = "Theme",
-            selectedValue = theme,
-            options = SUPPORTED_SETTINGS_THEMES.map { PanelSelectOption(it, it) },
-            onSelected = onThemeSelected,
-        )
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text("Font size", color = Color(0xFFF8F8F2), fontWeight = FontWeight.SemiBold)
