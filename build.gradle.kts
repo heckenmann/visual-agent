@@ -404,12 +404,11 @@ tasks.named("build") {
 
 tasks.register("locAndPackageSizeCheck") {
     group = "verification"
-    description = "Checks per-file LOC and package size constraints."
+    description = "Checks per-file LOC limits. Package size check intentionally disabled (see docs)."
     doLast {
         val maxLocPerFile = 300
-        val maxPackageLoc = 3000
         val fileViolations = mutableListOf<String>()
-        val packageLoc = linkedMapOf<String, Int>()
+        val fileGrandfathered = mutableListOf<String>()
 
         fun effectiveLoc(lines: List<String>): Int {
             var inBlockComment = false
@@ -439,6 +438,11 @@ tasks.register("locAndPackageSizeCheck") {
             return count
         }
 
+        fun isGrandfathered(lines: List<String>): Boolean =
+            lines.any { line ->
+                line.trim().startsWith("// TODO(size):")
+            }
+
         kotlinSourceRoots
             .filter { Files.exists(it) }
             .forEach { root ->
@@ -449,39 +453,40 @@ tasks.register("locAndPackageSizeCheck") {
                             val fileLines = Files.readAllLines(file)
                             val lines = effectiveLoc(fileLines)
                             if (lines > maxLocPerFile) {
-                                fileViolations += "${file.toAbsolutePath()}: $lines effective LOC (max $maxLocPerFile)"
+                                val msg = "${file.toAbsolutePath()}: $lines effective LOC (max $maxLocPerFile)"
+                                if (isGrandfathered(fileLines)) {
+                                    fileGrandfathered += msg
+                                } else {
+                                    fileViolations += msg
+                                }
                             }
-                            val pkg =
-                                fileLines
-                                    .firstOrNull { it.trim().startsWith("package ") }
-                                    ?.removePrefix("package ")
-                                    ?.trim()
-                                    ?: "(default)"
-                            packageLoc[pkg] = (packageLoc[pkg] ?: 0) + lines
                         }
                 }
             }
 
-        val packageViolations =
-            packageLoc.entries
-                .filter { it.value > maxPackageLoc }
-                .map { "${it.key}: ${it.value} LOC (max $maxPackageLoc)" }
-
-        if (fileViolations.isNotEmpty() || packageViolations.isNotEmpty()) {
-            logger.warn(
+        if (fileGrandfathered.isNotEmpty()) {
+            logger.lifecycle(
                 buildString {
-                    appendLine("LOC warnings (non-blocking):")
-                    if (fileViolations.isNotEmpty()) {
-                        appendLine("File LOC violations:")
-                        fileViolations.forEach { appendLine(it) }
-                    }
-                    if (packageViolations.isNotEmpty()) {
-                        appendLine("Package LOC violations:")
-                        packageViolations.forEach { appendLine(it) }
-                    }
+                    appendLine("LOC grandfathered (TODO(size) marker present, non-blocking):")
+                    fileGrandfathered.forEach { appendLine(it) }
                 },
             )
         }
+
+        if (fileViolations.isEmpty()) return@doLast
+
+        val report =
+            buildString {
+                appendLine("LOC violations (blocking):")
+                appendLine("File LOC violations:")
+                fileViolations.forEach { appendLine(it) }
+                appendLine()
+                appendLine("Add `// TODO(size): <reason>` on its own line at the top of the file to")
+                appendLine("grandfather an existing violation, or split the file to bring it under")
+                appendLine("the limit.")
+            }
+        logger.error(report)
+        throw GradleException("locAndPackageSizeCheck failed: ${fileViolations.size} file(s) exceed the $maxLocPerFile LOC limit.")
     }
 }
 

@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.ui.compose
 
+import de.heckenmann.visualagent.agent.ShowResponse
 import de.heckenmann.visualagent.agent.provider.ModelStatus
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
@@ -137,6 +138,18 @@ internal fun List<String>.toFavoriteModelText(): String =
         .joinToString(",")
 
 internal fun String.toFavoriteModelSet(): Set<String> = toCsvSet()
+
+internal fun ShowResponse.toModelDetailsText(): String =
+    buildString {
+        appendLine("Model: $model")
+        appendLine("Modified: ${modifiedAt.ifBlank { "unknown" }}")
+        details?.let { metadata ->
+            appendLine("Family: ${metadata.family ?: "unknown"}")
+            appendLine("Size: ${metadata.parameterSize ?: "unknown"}")
+            appendLine("Format: ${metadata.format ?: "unknown"}")
+            appendLine("Quantization: ${metadata.quantizationLevel ?: "unknown"}")
+        }
+    }.trimEnd()
 
 internal fun saveSessionSettings(
     config: AppConfig,
