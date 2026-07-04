@@ -18,8 +18,9 @@ Desktop user.
 1. The user hovers or focuses a message row.
 2. The row exposes an icon-only delete action (except for system messages).
 3. The user clicks the delete icon.
-4. The message is removed from the conversation history and from persistent storage.
-5. The conversation panel updates immediately.
+4. The row fades out while the deletion is pending.
+5. Once the fade-out finishes, the message is removed from the conversation history and from persistent storage.
+6. The conversation panel updates immediately.
 
 ## Result
 
@@ -38,5 +39,6 @@ Users can remove accidental or unwanted messages from the conversation.
 
 - Delete icon is visible on user and assistant rows.
 - Delete icon is hidden on system messages.
+- The message fades out before it is removed.
 - The message is removed from in-memory history and persisted storage.
 - UI updates without requiring a reload.
