@@ -118,8 +118,9 @@ internal fun parseToolMetadata(metadata: String?): ParsedToolMetadata {
                 runCatching {
                     kotlinx.serialization.json.Json
                         .parseToJsonElement(it)
+                        .jsonObject
                 }.getOrNull()
-            }?.jsonObject
+            }
     return ParsedToolMetadata(
         toolId = json?.get("toolId")?.jsonPrimitive?.content ?: "tool",
         status = json?.get("status")?.jsonPrimitive?.content ?: "ok",
