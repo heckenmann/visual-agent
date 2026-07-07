@@ -159,13 +159,51 @@ class ComposeWorkspaceModelsTest {
     }
 
     @Test
-    fun `restore workspace windows clamps persisted width to minimum`() {
+    fun `restore workspace windows returns defaults when persisted is empty`() {
         val defaults = listOf("chat", "todos").map(::testWindow)
-        val persisted = listOf(persistedWindow("chat", order = 0, visible = true, preferredWidth = 100.0))
 
-        val restored = restoreWorkspaceWindows(defaults, persisted)
+        val restored = restoreWorkspaceWindows(defaults, emptyList())
 
-        assertEquals(testMinWidth, restored.first { it.id == "chat" }.preferredWidth)
+        assertEquals(defaults, restored)
+    }
+
+    @Test
+    fun `moveBy clamps position inside viewport`() {
+        val viewport = ComposeWorkspaceViewport(width = 640, height = 480)
+        val bounds = ComposeWorkspaceWindowBounds(x = 100, y = 100, width = 500, height = 400)
+
+        val moved = bounds.moveBy(1000, 1000, viewport)
+
+        assertEquals(140, moved.x)
+        assertEquals(80, moved.y)
+        assertEquals(500, moved.width)
+        assertEquals(400, moved.height)
+    }
+
+    @Test
+    fun `workspace window stores preferred width from bounds`() {
+        val window = testWindow("chat", width = 300)
+
+        assertEquals(300, window.preferredWidth)
+    }
+
+    @Test
+    fun `workspace window coerces preferred width to minimum`() {
+        val window = testWindow("chat", width = 100)
+
+        assertEquals(testMinWidth, window.preferredWidth)
+    }
+
+    @Test
+    fun `row panel widths handles empty list`() {
+        assertEquals(emptyList(), rowPanelWidths(emptyList()))
+    }
+
+    @Test
+    fun `toggle returns original list for unknown id`() {
+        val windows = listOf(testWindow("chat"))
+
+        assertEquals(windows, toggleWorkspacePanel(windows, "missing"))
     }
 
     private fun testWindow(
