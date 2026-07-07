@@ -30,6 +30,13 @@ Always run, in this order:
 - One logical change per commit. Do not mix refactors, UI work, and docs unless tightly coupled.
 - Examples: `feat(ui): add canvas zoom controls`, `fix(todo): persist status updates`, `refactor(knowledge): move persistence to repository stores`, `docs: update agent UX docs`.
 
+## Pull Requests
+
+- Create one focused PR per logical branch/change; do not open mega-PRs.
+- Every manually created PR must be configured to **delete the source branch on merge** (`delete_branch_on_merge: true`).
+- Dependabot and other automated PRs are left to their own lifecycle.
+- Before creating a PR, verify the branch is not already merged into `master` and that no duplicate open PR exists for it.
+
 ### Security
 
 Never commit API keys, tokens, passwords, private keys, or user PII. Provider API keys (`ollama.api.key`, `openai.api.key`) are intentionally stored plaintext in SQLite by product decision; never expose them to model context, tool output, logs, or `AppConfig.exportTo()`.
