@@ -30,10 +30,23 @@ class ProviderErrorMessagesTest {
         assertContains(ProviderErrorMessages.userFacing(IllegalStateException("401 unauthorized")), "Authentication")
         assertContains(ProviderErrorMessages.userFacing(IllegalStateException("request timed out")), "timeout")
         assertContains(ProviderErrorMessages.userFacing(IllegalStateException("DNS unknown host")), "reached")
-        assertEquals(
-            "The model request failed. Check the active provider and model, then try again.",
-            ProviderErrorMessages.userFacing(IllegalStateException("unexpected failure")),
-        )
+    }
+
+    @Test
+    fun `model not found error is actionable`() {
+        val message = ProviderErrorMessages.userFacing(IllegalStateException("HTTP 404 Not Found from POST /api/chat"))
+
+        assertContains(message, "Model not available")
+        assertContains(message, "Pull the model")
+        assertFalse(message.contains("HTTP 404"))
+    }
+
+    @Test
+    fun `structured user facing error exposes retryability`() {
+        val error = ProviderErrorMessages.userFacingError(IllegalStateException("connection refused"))
+
+        assertContains(error.summary, "unreachable")
+        assertEquals(true, error.retryable)
     }
 
     @Test

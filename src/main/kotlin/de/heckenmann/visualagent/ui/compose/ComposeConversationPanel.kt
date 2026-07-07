@@ -35,6 +35,7 @@ import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
+import de.heckenmann.visualagent.error.ErrorMessageMapper
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -107,7 +108,8 @@ internal fun ConversationPanel(
                         status = "Ready"
                     }.onFailure {
                         history = agentManager.getHistory()
-                        status = "Error: ${it.message}"
+                        val userError = ErrorMessageMapper.map(it)
+                        status = "${userError.summary}: ${userError.detail}"
                     }.also {
                         inFlight.markStreamEnd(streamRequestId)
                         sending = false
