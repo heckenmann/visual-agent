@@ -66,19 +66,7 @@ internal fun FilesPanel(
     val refresh = {
         files = workspaceFileService.listFiles()
     }
-    val visibleFiles =
-        files.filter { file ->
-            val matchesQuery =
-                query.isBlank() ||
-                    file.relativePath.contains(query, ignoreCase = true) ||
-                    file.originalName.contains(query, ignoreCase = true) ||
-                    file.sha256.contains(query, ignoreCase = true)
-            val matchesType =
-                typeFilter == ALL_FILE_TYPES ||
-                    (typeFilter == CANVAS_FILE_TYPE && file.mimeType == WorkspaceFilePaths.CANVAS_MIME_TYPE) ||
-                    (typeFilter == OTHER_FILE_TYPE && file.mimeType != WorkspaceFilePaths.CANVAS_MIME_TYPE)
-            matchesQuery && matchesType
-        }
+    val visibleFiles = filterWorkspaceFiles(files, query, typeFilter)
     val importFile: (File) -> Unit = { file ->
         runCatching { workspaceFileService.importFile(file) }
             .onSuccess {
@@ -286,6 +274,32 @@ private fun WorkspaceFileRecord.toClipboardMetadata(): String =
         appendLine("sha256=$sha256")
     }.trimEnd()
 
-private const val ALL_FILE_TYPES = "__all__"
-private const val CANVAS_FILE_TYPE = "canvas"
-private const val OTHER_FILE_TYPE = "other"
+/**
+ * Filters workspace records by free-text query and type category.
+ *
+ * @param files All workspace records
+ * @param query Free-text query matched against path, original name, and SHA-256
+ * @param typeFilter One of [ALL_FILE_TYPES], [CANVAS_FILE_TYPE], or [OTHER_FILE_TYPE]
+ * @return Filtered list in the original order
+ */
+internal fun filterWorkspaceFiles(
+    files: List<WorkspaceFileRecord>,
+    query: String,
+    typeFilter: String,
+): List<WorkspaceFileRecord> =
+    files.filter { file ->
+        val matchesQuery =
+            query.isBlank() ||
+                file.relativePath.contains(query, ignoreCase = true) ||
+                file.originalName.contains(query, ignoreCase = true) ||
+                file.sha256.contains(query, ignoreCase = true)
+        val matchesType =
+            typeFilter == ALL_FILE_TYPES ||
+                (typeFilter == CANVAS_FILE_TYPE && file.mimeType == WorkspaceFilePaths.CANVAS_MIME_TYPE) ||
+                (typeFilter == OTHER_FILE_TYPE && file.mimeType != WorkspaceFilePaths.CANVAS_MIME_TYPE)
+        matchesQuery && matchesType
+    }
+
+internal const val ALL_FILE_TYPES = "__all__"
+internal const val CANVAS_FILE_TYPE = "canvas"
+internal const val OTHER_FILE_TYPE = "other"
