@@ -134,6 +134,51 @@ class ConfiguredLLMProviderTest {
             }
         }
 
+    @Test
+    fun `vision and embeddings delegate to active provider`() =
+        runTest {
+            val originalProvider = AppConfig.instance.llmProvider
+            try {
+                AppConfig.instance.llmProvider = "openai"
+                val ollama = mockk<OllamaClient>(relaxed = true)
+                val openAi = mockk<OpenAiClient>(relaxed = true)
+                coEvery { openAi.vision(any(), any()) } returns
+                    ChatResponse("gpt", Message("assistant", "image ok"), done = true)
+                coEvery { openAi.embeddings("text") } returns listOf(0.1, 0.2)
+                val router = ConfiguredLLMProvider(ollama, openAi, catalog())
+
+                assertEquals("image ok", router.vision(ByteArray(0), "describe").message.content)
+                assertEquals(listOf(0.1, 0.2), router.embeddings("text"))
+
+                coVerify(exactly = 1) { openAi.vision(any(), any()) }
+                coVerify(exactly = 1) { openAi.embeddings("text") }
+            } finally {
+                AppConfig.instance.llmProvider = originalProvider
+            }
+        }
+
+    @Test
+    fun `chat and stream with message list delegate to active provider`() =
+        runTest {
+            val originalProvider = AppConfig.instance.llmProvider
+            try {
+                AppConfig.instance.llmProvider = "ollama"
+                val ollama = mockk<OllamaClient>(relaxed = true)
+                val openAi = mockk<OpenAiClient>(relaxed = true)
+                coEvery { ollama.chat(any<List<Message>>()) } returns ChatResponse("llama", Message("assistant", "ok"), true)
+                coEvery { ollama.stream(any<List<Message>>()) } returns flowOf(ChatResponse("llama", Message("assistant", "c"), true))
+                val router = ConfiguredLLMProvider(ollama, openAi, catalog())
+
+                val chatResponse = router.chat(listOf(Message("user", "hi")))
+                assertEquals("ok", chatResponse.message.content)
+
+                val streamChunks = router.stream(listOf(Message("user", "hi"))).toList()
+                assertEquals("c", streamChunks.single().message.content)
+            } finally {
+                AppConfig.instance.llmProvider = originalProvider
+            }
+        }
+
     private fun catalog(): ProviderCatalogService =
         ProviderCatalogService(
             object : PreferenceStore {
