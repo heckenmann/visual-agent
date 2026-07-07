@@ -38,6 +38,13 @@ Always run, in this order:
 - Dependabot and other automated PRs are left to their own lifecycle.
 - Before creating a PR, verify the branch is not already merged into `master` and that no duplicate open PR exists for it.
 
+## Development Workflow
+
+- Before starting work on a problem, check whether a GitHub issue and a documented use case exist for it. Link both in the PR description and commit messages where applicable.
+- All changes must be developed on a topic branch (`codex/issue-<number>-short-description` or similar) and merged into `master` through a pull request. Never commit directly to `master`.
+- When moving files, use `git mv` so Git tracks the rename instead of treating it as a delete/add pair.
+- Project language is **English**. All code comments, documentation, commit messages, PR descriptions, issue comments, and use-case files must be written in English.
+
 ### Security
 
 Never commit API keys, tokens, passwords, private keys, or user PII. Provider API keys (`ollama.api.key`, `openai.api.key`) are intentionally stored plaintext in SQLite by product decision; never expose them to model context, tool output, logs, or `AppConfig.exportTo()`.
