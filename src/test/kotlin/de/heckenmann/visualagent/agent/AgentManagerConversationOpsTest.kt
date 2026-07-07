@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import io.mockk.coEvery
 import io.mockk.mockk
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import java.time.Instant
 import kotlin.test.Test
@@ -144,4 +145,89 @@ class AgentManagerConversationOpsTest {
         assertEquals("system", manager.getHistory().single().role)
         assertEquals("You are helpful.", manager.getHistory().single().content)
     }
+
+    @Test
+    fun `stream message emits chunks and persists assistant response`() =
+        runBlocking {
+            val db =
+                de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                    .create("jdbc:sqlite::memory:")
+            val provider = mockk<LLMProvider>(relaxed = true)
+            coEvery { provider.stream(any<ChatRequestContext>()) } returns
+                flowOf(
+                    ChatResponse(model = "test", message = Message("assistant", "Hello"), done = false),
+                    ChatResponse(model = "test", message = Message("assistant", " world"), done = true),
+                )
+            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
+            val chunks = mutableListOf<String>()
+
+            val result = manager.streamMessage("hi") { chunks += it }
+
+            assertEquals("Hello world", result)
+            assertEquals(listOf("Hello", " world"), chunks)
+            val history = manager.getHistory()
+            assertEquals("user", history.first().role)
+            assertEquals("assistant", history.last().role)
+        }
+
+    @Test
+    fun `start agent job creates agent and executes task`() =
+        runBlocking {
+            val db =
+                de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                    .create("jdbc:sqlite::memory:")
+            val provider = mockk<LLMProvider>(relaxed = true)
+            coEvery { provider.chat(any<ChatRequestContext>()) } returns
+                ChatResponse(model = "test", message = Message("assistant", "result"), done = true)
+            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
+
+            val jobResult = manager.startAgentJob("Worker", "Worker role", "coder", "write code")
+
+            assertEquals("result", jobResult.content)
+            assertEquals("Worker", jobResult.agentName)
+            assertTrue(jobResult.agentId.isNotBlank())
+        }
+
+    @Test
+    fun `run agent job executes task on existing agent`() =
+        runBlocking {
+            val db =
+                de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                    .create("jdbc:sqlite::memory:")
+            val provider = mockk<LLMProvider>(relaxed = true)
+            coEvery { provider.chat(any<ChatRequestContext>()) } returns
+                ChatResponse(model = "test", message = Message("assistant", "done"), done = true)
+            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
+            val agent = manager.createAgent("Worker", "Worker role")
+
+            val jobResult = manager.runAgentJob(agent.id, "task")
+
+            assertEquals("done", jobResult.content)
+            assertEquals(agent.id, jobResult.agentId)
+        }
+
+    @Test
+    fun `enqueue agent job returns job id and triggers completion callback`() =
+        runBlocking {
+            val db =
+                de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                    .create("jdbc:sqlite::memory:")
+            val provider = mockk<LLMProvider>(relaxed = true)
+            coEvery { provider.chat(any<ChatRequestContext>()) } returns
+                ChatResponse(model = "test", message = Message("assistant", "completed"), done = true)
+            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
+            val agent = manager.createAgent("Worker", "Worker role")
+            val finished = kotlinx.coroutines.CompletableDeferred<String>()
+            AgentManager.setAgentCallback { id, message ->
+                if (id == agent.id && message.startsWith("Sub-agent job")) {
+                    finished.complete(id)
+                }
+            }
+
+            val jobId = manager.enqueueAgentJob(agent.id, "task")
+            finished.await()
+
+            assertTrue(jobId.isNotBlank())
+            assertTrue(manager.getHistory().any { it.role == "sub_agent" })
+        }
 }

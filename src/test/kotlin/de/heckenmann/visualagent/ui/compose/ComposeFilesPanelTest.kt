@@ -4,6 +4,7 @@ package de.heckenmann.visualagent.ui.compose
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -141,6 +142,40 @@ class ComposeFilesPanelTest {
                 updatedAt = Instant.now(),
             ),
         )
+
+    @Test
+    fun `delete button requests confirmation for workspace file`() {
+        val workspace = mockWorkspaceService()
+        val canvas = mockk<CanvasOperations>()
+        every { canvas.snapshot() } returns CanvasSnapshot(figureCount = 0, zoomPercent = 100, gridVisible = true, figures = emptyList())
+        var requestedModal: ComposeModal? = null
+        val requester = ComposeModalRequester { requestedModal = it }
+
+        composeTestRule.setContent {
+            MaterialTheme {
+                FilesPanel(workspace, canvas, requester)
+            }
+        }
+
+        composeTestRule.onAllNodesWithContentDescription("Delete workspace file")[0].performClick()
+        assertTrue(requestedModal is ComposeConfirmationModal)
+    }
+
+    @Test
+    fun `open canvas button opens canvas document`() {
+        val workspace = mockWorkspaceService()
+        val canvas = mockk<CanvasOperations>(relaxed = true)
+        every { canvas.snapshot() } returns CanvasSnapshot(figureCount = 0, zoomPercent = 100, gridVisible = true, figures = emptyList())
+
+        composeTestRule.setContent {
+            MaterialTheme {
+                FilesPanel(workspace, canvas, ComposeModalRequester { })
+            }
+        }
+
+        composeTestRule.onAllNodesWithContentDescription("Open canvas document")[0].performClick()
+        composeTestRule.waitForIdle()
+    }
 
     private fun mockWorkspaceService(): WorkspaceFileService {
         val service = mockk<WorkspaceFileService>()

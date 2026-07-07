@@ -60,4 +60,14 @@ class ComposeMarkdownTest {
         composeTestRule.onNodeWithText("first").assertExists()
         composeTestRule.onNodeWithText("second").assertExists()
     }
+
+    @Test
+    fun `markdown renders link text`() {
+        composeTestRule.setContent {
+            MaterialTheme {
+                ComposeMarkdown("[link](https://example.com)")
+            }
+        }
+        composeTestRule.onNodeWithText("link").assertExists()
+    }
 }

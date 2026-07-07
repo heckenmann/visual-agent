@@ -48,4 +48,35 @@ class ComposeToolMessageRowParserTest {
         assertEquals("tool", parsed.toolId)
         assertEquals("ok", parsed.status)
     }
+
+    @Test
+    fun `parseSubAgentMetadata extracts all fields`() {
+        val metadata =
+            buildJsonObject {
+                put("jobId", "job-1")
+                put("success", true)
+                put("agentId", "agent-1")
+                put("agentName", "Worker")
+            }.toString()
+
+        val parsed = parseSubAgentMetadata(metadata)
+
+        assertEquals("job-1", parsed.jobId)
+        assertEquals(true, parsed.success)
+        assertEquals("agent-1", parsed.agentId)
+        assertEquals("Worker", parsed.agentName)
+    }
+
+    @Test
+    fun `parseSubAgentMetadata uses defaults for empty or invalid input`() {
+        val empty = parseSubAgentMetadata(null)
+        assertEquals("", empty.jobId)
+        assertEquals(false, empty.success)
+        assertNull(empty.agentId)
+        assertNull(empty.agentName)
+
+        val invalid = parseSubAgentMetadata("not-json")
+        assertEquals("", invalid.jobId)
+        assertEquals(false, invalid.success)
+    }
 }
