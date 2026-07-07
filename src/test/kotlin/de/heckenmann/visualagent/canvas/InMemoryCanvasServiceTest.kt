@@ -137,6 +137,135 @@ class InMemoryCanvasServiceTest {
             }
         }
 
+    @Test
+    fun `drawStroke requires at least two distinct points`() =
+        withCanvasService { service, _ ->
+            assertFailsWith<IllegalArgumentException> {
+                service.drawStroke(listOf(CanvasPoint(0.0, 0.0)), color = "#fff", width = 2.0)
+            }
+        }
+
+    @Test
+    fun `drawStroke normalizes and stores points relative to bounding box`() =
+        withCanvasService { service, _ ->
+            val points =
+                listOf(
+                    CanvasPoint(10.0, 10.0),
+                    CanvasPoint(10.0, 10.0),
+                    CanvasPoint(30.0, 25.0),
+                )
+
+            val snapshot = service.drawStroke(points, color = "#F8F8F2", width = 2.0)
+
+            val figure = snapshot.figures.single()
+            assertEquals("stroke", figure.type)
+            assertEquals(10.0, figure.x)
+            assertEquals(10.0, figure.y)
+            assertEquals(20.0, figure.width)
+            assertEquals(15.0, figure.height)
+            assertEquals(listOf(CanvasPoint(0.0, 0.0), CanvasPoint(20.0, 15.0)), figure.points)
+        }
+
+    @Test
+    fun `selectAt returns empty selection when no figure contains point`() =
+        withCanvasService { service, _ ->
+            service.drawRect(x = 0.0, y = 0.0, width = 10.0, height = 10.0, fillColor = "#000", strokeColor = null)
+
+            val snapshot = service.selectAt(100.0, 100.0)
+
+            assertEquals(emptySet<Int>(), snapshot.selectedFigureIndices)
+        }
+
+    @Test
+    fun `selectFigures filters out out-of-range indices`() =
+        withCanvasService { service, _ ->
+            service.drawText("A", x = 0.0, y = 0.0, color = "#fff")
+
+            val snapshot = service.selectFigures(setOf(0, 5, -1))
+
+            assertEquals(setOf(0), snapshot.selectedFigureIndices)
+        }
+
+    @Test
+    fun `moveFigure throws for invalid index`() =
+        withCanvasService { service, _ ->
+            assertFailsWith<IllegalArgumentException> {
+                service.moveFigure(5, deltaX = 1.0, deltaY = 1.0)
+            }
+        }
+
+    @Test
+    fun `resizeFigure enforces minimum figure size`() =
+        withCanvasService { service, _ ->
+            service.drawRect(x = 0.0, y = 0.0, width = 100.0, height = 100.0, fillColor = "#000", strokeColor = null)
+
+            val snapshot = service.resizeFigure(0, width = 2.0, height = 2.0)
+
+            assertEquals(InMemoryCanvasService.MIN_FIGURE_SIZE, snapshot.figures[0].width)
+            assertEquals(InMemoryCanvasService.MIN_FIGURE_SIZE, snapshot.figures[0].height)
+        }
+
+    @Test
+    fun `saveDocument appends canvas extension to blank name`() =
+        withCanvasService { service, workspace ->
+            service.drawText("A", x = 0.0, y = 0.0, color = "#fff")
+
+            val saved = service.saveDocument("")
+
+            assertTrue(saved.relativePath.endsWith("/${InMemoryCanvasService.DEFAULT_EXPLICIT_DOCUMENT_NAME}"))
+            assertEquals(WorkspaceFilePaths.CANVAS_MIME_TYPE, saved.mimeType)
+        }
+
+    @Test
+    fun `openDocument resolves by path when id is null`() =
+        withCanvasService { service, _ ->
+            service.drawCircle(centerX = 5.0, centerY = 5.0, radius = 3.0, fillColor = "#0f0")
+            val saved = service.saveDocument("round")
+            service.clear()
+
+            val opened = service.openDocument(null, saved.relativePath)
+
+            assertEquals(1, opened.figureCount)
+            assertEquals("circle", opened.figures.single().type)
+        }
+
+    @Test
+    fun `openDocument rejects non-canvas mimetype`() =
+        withCanvasService { service, workspace ->
+            val textRecord =
+                workspace.createManagedFile(
+                    directoryName = "canvas",
+                    requestedName = "notes.txt",
+                    bytes = "hello".toByteArray(Charsets.UTF_8),
+                )
+
+            assertFailsWith<IllegalArgumentException> {
+                service.openDocument(textRecord.id, null)
+            }
+        }
+
+    @Test
+    fun `clear removes persisted default document`() =
+        withCanvasService { service, workspace ->
+            service.drawText("A", x = 0.0, y = 0.0, color = "#fff")
+            service.clear()
+
+            val restored = InMemoryCanvasService(workspace).snapshot()
+            assertEquals(0, restored.figureCount)
+        }
+
+    @Test
+    fun `insertImage stores path as content with default size`() =
+        withCanvasService { service, _ ->
+            val snapshot = service.insertImage("workspace/example.png")
+
+            val figure = snapshot.figures.single()
+            assertEquals("image", figure.type)
+            assertEquals("workspace/example.png", figure.content)
+            assertEquals(320.0, figure.width)
+            assertEquals(240.0, figure.height)
+        }
+
     private fun withCanvasService(block: (InMemoryCanvasService, WorkspaceFileService) -> Unit) {
         val previous = AppConfig.instance.databasePath
         try {

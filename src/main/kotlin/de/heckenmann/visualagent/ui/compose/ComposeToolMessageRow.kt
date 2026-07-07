@@ -118,8 +118,9 @@ internal fun parseToolMetadata(metadata: String?): ParsedToolMetadata {
                 runCatching {
                     kotlinx.serialization.json.Json
                         .parseToJsonElement(it)
+                        .jsonObject
                 }.getOrNull()
-            }?.jsonObject
+            }
     return ParsedToolMetadata(
         toolId = json?.get("toolId")?.jsonPrimitive?.content ?: "tool",
         status = json?.get("status")?.jsonPrimitive?.content ?: "ok",
@@ -188,22 +189,23 @@ internal fun SubAgentMessageRow(
     }
 }
 
-private data class ParsedSubAgentMetadata(
+internal data class ParsedSubAgentMetadata(
     val jobId: String,
     val success: Boolean,
     val agentId: String?,
     val agentName: String?,
 )
 
-private fun parseSubAgentMetadata(metadata: String?): ParsedSubAgentMetadata {
+internal fun parseSubAgentMetadata(metadata: String?): ParsedSubAgentMetadata {
     val json =
         metadata
             ?.let {
                 runCatching {
                     kotlinx.serialization.json.Json
                         .parseToJsonElement(it)
+                        .jsonObject
                 }.getOrNull()
-            }?.jsonObject
+            }
     return ParsedSubAgentMetadata(
         jobId = json?.get("jobId")?.jsonPrimitive?.content ?: "",
         success = json?.get("success")?.jsonPrimitive?.booleanOrNull ?: false,

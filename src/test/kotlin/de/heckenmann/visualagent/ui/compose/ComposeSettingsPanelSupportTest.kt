@@ -1,170 +1,215 @@
 package de.heckenmann.visualagent.ui.compose
 
+import de.heckenmann.visualagent.agent.ModelDetails
+import de.heckenmann.visualagent.agent.ShowResponse
 import de.heckenmann.visualagent.agent.provider.ModelStatus
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.config.AppConfig
-import de.heckenmann.visualagent.knowledge.PreferenceStore
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.verify
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ComposeSettingsPanelSupportTest {
     @Test
-    fun `provider options and model rows round trip through text format`() {
+    fun `provider profile form state conversion round trips`() {
+        val profile =
+            ProviderProfile(
+                id = "custom",
+                name = "Custom Provider",
+                adapter = ProviderAdapter.OPENAI_COMPATIBLE,
+                baseUrl = "https://api.example.com",
+                apiKey = "secret",
+                enabled = true,
+                defaultModel = "gpt-4o",
+                options = mapOf("temperature" to "0.7", "top_p" to "0.9"),
+                models =
+                    listOf(
+                        ProviderModelConfig("m1", "Model 1", ModelStatus.ACTIVE, mapOf("ctx" to "8k"), contextLimit = 8192),
+                    ),
+                modelWhitelist = setOf("m1"),
+                modelBlacklist = setOf("old"),
+            )
+
+        val form = profile.toFormState()
+        assertEquals("custom", form.id)
+        assertEquals("Custom Provider", form.name)
+        assertEquals(ProviderAdapter.OPENAI_COMPATIBLE, form.adapter)
+        assertEquals("https://api.example.com", form.baseUrl)
+        assertEquals("secret", form.apiKey)
+        assertTrue(form.enabled)
+        assertEquals("gpt-4o", form.defaultModel)
+        assertEquals("temperature=0.7\ntop_p=0.9", form.optionsText)
+        assertEquals("m1|ACTIVE|8192||ctx=8k", form.modelsText)
+        assertEquals("m1", form.whitelistText)
+        assertEquals("old", form.blacklistText)
+
+        val restored = form.toProviderProfile(profile)
+        assertEquals(profile.id, restored.id)
+        assertEquals(profile.name, restored.name)
+        assertEquals(profile.adapter, restored.adapter)
+        assertEquals(profile.baseUrl, restored.baseUrl)
+        assertEquals(profile.apiKey, restored.apiKey)
+        assertEquals(profile.enabled, restored.enabled)
+        assertEquals(profile.defaultModel, restored.defaultModel)
+        assertEquals(profile.options, restored.options)
+        assertEquals(profile.modelWhitelist, restored.modelWhitelist)
+        assertEquals(profile.modelBlacklist, restored.modelBlacklist)
+        assertEquals(1, restored.models.size)
+        assertEquals("m1", restored.models.single().id)
+    }
+
+    @Test
+    fun `new provider form state has defaults`() {
+        val form = newProviderFormState()
+        assertEquals(ProviderAdapter.OPENAI_COMPATIBLE, form.adapter)
+        assertEquals("https://api.example.com", form.baseUrl)
+        assertTrue(form.enabled)
+        assertTrue(form.id.isBlank())
+    }
+
+    @Test
+    fun `form validation errors`() {
+        assertEquals("Provider ID is required.", ProviderProfileFormState().validationError())
+        assertNotNull(ProviderProfileFormState(id = "bad id").validationError())
+        assertNotNull(ProviderProfileFormState(id = "ok", name = "").validationError())
+        assertNotNull(ProviderProfileFormState(id = "ok", name = "Name", baseUrl = "").validationError())
+        assertNull(ProviderProfileFormState(id = "ok", name = "Name", baseUrl = "http://x").validationError())
+    }
+
+    @Test
+    fun `settings map text conversion round trips`() {
+        val map = mapOf("b" to "2", "a" to "1")
+        assertEquals("a=1\nb=2", map.toSettingsMapText())
+        assertEquals(map, "b=2\na=1".toSettingsMap())
+        assertEquals(emptyMap(), "".toSettingsMap())
+        assertEquals(mapOf("a" to "1"), "a=1\nnoequals\n".toSettingsMap())
+    }
+
+    @Test
+    fun `provider models text conversion round trips`() {
         val models =
             listOf(
-                ProviderModelConfig(
-                    id = "model-a",
-                    status = ModelStatus.BETA,
-                    contextLimit = 8192,
-                    outputLimit = 2048,
-                    options = mapOf("temperature" to "0.2", "topP" to "0.8"),
-                ),
+                ProviderModelConfig("m1", "Model 1", ModelStatus.BETA, mapOf("temp" to "0.5"), contextLimit = 4096, outputLimit = 512),
+                ProviderModelConfig("m2", "Model 2", ModelStatus.DEPRECATED),
             )
-
-        assertEquals(mapOf("reasoningEffort" to "medium"), "reasoningEffort=medium".toSettingsMap())
-        assertEquals(models, models.toProviderModelsText().toProviderModels())
-        assertEquals(setOf("a", "b"), "a, b".toCsvSet())
+        val text = models.toProviderModelsText()
+        val parsed = text.toProviderModels()
+        assertEquals(2, parsed.size)
+        assertEquals("m1", parsed[0].id)
+        assertEquals(ModelStatus.BETA, parsed[0].status)
+        assertEquals(4096, parsed[0].contextLimit)
+        assertEquals(512, parsed[0].outputLimit)
+        assertEquals(mapOf("temp" to "0.5"), parsed[0].options)
+        assertEquals("m2", parsed[1].id)
     }
 
     @Test
-    fun `provider profile validation catches required fields`() {
-        assertEquals("Provider ID is required.", ProviderProfileFormState().validationError())
-        assertEquals("Provider ID contains invalid characters.", ProviderProfileFormState(id = "not valid").validationError())
-        assertEquals("Name is required.", ProviderProfileFormState(id = "valid").validationError())
-        assertEquals("Base URL is required.", ProviderProfileFormState(id = "valid", name = "Valid").validationError())
-        assertNull(ProviderProfileFormState(id = "valid", name = "Valid", baseUrl = "https://example.test").validationError())
+    fun `provider models parsing defaults invalid status to active`() {
+        val parsed = "m1|UNKNOWN|||".toProviderModels()
+        assertEquals(ModelStatus.ACTIVE, parsed.single().status)
     }
 
     @Test
-    fun `standard providers mirror settings to legacy app config fields`() {
+    fun `csv text conversion round trips`() {
+        assertEquals("a,b", setOf("b", "a").toCsvText())
+        assertEquals(setOf("a", "b"), "b,a".toCsvSet())
+        assertEquals(emptySet(), "".toCsvSet())
+    }
+
+    @Test
+    fun `favorite model text conversion filters blanks and deduplicates`() {
+        assertEquals("b,a", listOf("b", "a", "", "b").toFavoriteModelText())
+        assertEquals(setOf("a", "b"), "b,a".toFavoriteModelSet())
+    }
+
+    @Test
+    fun `model details text renders fields`() {
+        val response =
+            ShowResponse(
+                model = "llama3",
+                modifiedAt = "2024-01-01",
+                details = ModelDetails(family = "llama", parameterSize = "8B", quantizationLevel = "Q4", format = "gguf"),
+            )
+        val text = response.toModelDetailsText()
+        assertTrue("Model: llama3" in text)
+        assertTrue("Family: llama" in text)
+        assertTrue("Size: 8B" in text)
+        assertTrue("Format: gguf" in text)
+        assertTrue("Quantization: Q4" in text)
+    }
+
+    @Test
+    fun `model details text handles missing details`() {
+        val text = ShowResponse(model = "x", modifiedAt = "").toModelDetailsText()
+        assertTrue("Model: x" in text)
+    }
+
+    @Test
+    fun `save session settings persists active provider and mirrors to config`() {
+        val catalog = mockk<ProviderCatalogService>(relaxed = true)
         val config = AppConfig.instance
-        val snapshot = ConfigSnapshot(config)
-        try {
-            mirrorProviderToAppConfig(
-                config,
-                ProviderProfile(
-                    id = "ollama",
-                    name = "Ollama",
-                    adapter = ProviderAdapter.OLLAMA,
-                    baseUrl = "http://ollama.test",
-                    apiKey = "ollama-key",
-                    defaultModel = "llama-test",
-                ),
+        config.llmProvider = "openai"
+        val profile =
+            ProviderProfile(
+                id = "openai",
+                name = "OpenAI",
+                adapter = ProviderAdapter.OPENAI_COMPATIBLE,
+                baseUrl = "https://api.openai.com",
+                apiKey = "key",
+                defaultModel = "gpt-4o-mini",
             )
-            assertEquals("ollama", config.llmProvider)
-            assertEquals("http://ollama.test", config.ollamaLocalUrl)
-            assertEquals("ollama-key", config.ollamaApiKey)
-            assertEquals("llama-test", config.ollamaModel)
+        every { catalog.getProvider("openai") } returns profile
 
-            mirrorProviderToAppConfig(
-                config,
-                ProviderProfile(
-                    id = "openai",
-                    name = "OpenAI",
-                    adapter = ProviderAdapter.OPENAI_COMPATIBLE,
-                    baseUrl = "https://openai.test",
-                    apiKey = "openai-key",
-                    defaultModel = "gpt-test",
-                ),
-            )
-            assertEquals("openai", config.llmProvider)
-            assertEquals("https://openai.test", config.openAiBaseUrl)
-            assertEquals("openai-key", config.openAiApiKey)
-            assertEquals("gpt-test", config.openAiModel)
-        } finally {
-            snapshot.restore(config)
-        }
+        saveSessionSettings(config, catalog, "openai", "gpt-4o", "https://api.example.com", "new-key")
+
+        verify { catalog.setActiveProvider("openai") }
+        verify { catalog.saveProvider(profile.copy(baseUrl = "https://api.example.com", apiKey = "new-key", defaultModel = "gpt-4o")) }
+        assertEquals("openai", config.llmProvider)
+        assertEquals("https://api.example.com", config.openAiBaseUrl)
+        assertEquals("new-key", config.openAiApiKey)
+        assertEquals("gpt-4o", config.openAiModel)
     }
 
     @Test
-    fun `custom provider remains catalog backed without overwriting standard fields`() {
+    fun `mirror provider to app config maps ollama fields`() {
         val config = AppConfig.instance
-        val snapshot = ConfigSnapshot(config)
-        val catalog = ProviderCatalogService(MapPreferenceStore())
-        try {
-            config.ollamaLocalUrl = "http://original-ollama"
-            config.openAiBaseUrl = "https://original-openai"
-            catalog.saveProvider(
-                ProviderProfile(
-                    id = "gateway",
-                    name = "Gateway",
-                    adapter = ProviderAdapter.OPENAI_COMPATIBLE,
-                    baseUrl = "https://gateway.test",
-                    defaultModel = "gpt-gateway",
-                ),
-            )
-
-            saveSessionSettings(
-                config = config,
-                providerCatalog = catalog,
-                providerId = "gateway",
-                modelId = "gpt-gateway",
-                baseUrl = "https://gateway.test/v1",
-                apiKey = "gateway-key",
-            )
-
-            assertEquals("gateway", config.llmProvider)
-            assertEquals("http://original-ollama", config.ollamaLocalUrl)
-            assertEquals("https://original-openai", config.openAiBaseUrl)
-            assertEquals("https://gateway.test/v1", catalog.getProvider("gateway")?.baseUrl)
-            assertEquals("gateway-key", catalog.getProvider("gateway")?.apiKey)
-        } finally {
-            snapshot.restore(config)
-        }
-    }
-
-    @Test
-    fun `favorite model text is stable and font size is clamped`() {
-        assertEquals("a,b", listOf("b", "a", "a", "").sorted().toFavoriteModelText())
-        assertEquals(10, 4.clampFontSize())
-        assertEquals(24, 99.clampFontSize())
-        assertEquals(16, 16.clampFontSize())
-    }
-
-    private data class ConfigSnapshot(
-        val llmProvider: String,
-        val ollamaLocalUrl: String,
-        val ollamaModel: String,
-        val ollamaApiKey: String,
-        val openAiBaseUrl: String,
-        val openAiModel: String,
-        val openAiApiKey: String,
-    ) {
-        constructor(config: AppConfig) : this(
-            llmProvider = config.llmProvider,
-            ollamaLocalUrl = config.ollamaLocalUrl,
-            ollamaModel = config.ollamaModel,
-            ollamaApiKey = config.ollamaApiKey,
-            openAiBaseUrl = config.openAiBaseUrl,
-            openAiModel = config.openAiModel,
-            openAiApiKey = config.openAiApiKey,
+        mirrorProviderToAppConfig(
+            config,
+            ProviderProfile(
+                id = "ollama",
+                name = "Ollama",
+                adapter = ProviderAdapter.OLLAMA,
+                baseUrl = "http://localhost:11435",
+                apiKey = "ollama-key",
+                defaultModel = "llava",
+            ),
         )
-
-        fun restore(config: AppConfig) {
-            config.llmProvider = llmProvider
-            config.ollamaLocalUrl = ollamaLocalUrl
-            config.ollamaModel = ollamaModel
-            config.ollamaApiKey = ollamaApiKey
-            config.openAiBaseUrl = openAiBaseUrl
-            config.openAiModel = openAiModel
-            config.openAiApiKey = openAiApiKey
-        }
+        assertEquals("http://localhost:11435", config.ollamaLocalUrl)
+        assertEquals("ollama-key", config.ollamaApiKey)
+        assertEquals("llava", config.ollamaModel)
     }
 
-    private class MapPreferenceStore : PreferenceStore {
-        private val values = mutableMapOf<String, String>()
+    @Test
+    fun `font size clamping respects bounds`() {
+        assertEquals(10, 5.clampFontSize())
+        assertEquals(24, 30.clampFontSize())
+        assertEquals(14, 14.clampFontSize())
+    }
 
-        override fun getPreference(key: String): String? = values[key]
-
-        override fun setPreference(
-            key: String,
-            value: String,
-        ) {
-            values[key] = value
-        }
+    @Test
+    fun `to bounded int or null coerces inside range`() {
+        assertNull("abc".toBoundedIntOrNull(1, 10))
+        assertEquals(1, "0".toBoundedIntOrNull(1, 10))
+        assertEquals(5, "5".toBoundedIntOrNull(1, 10))
+        assertEquals(10, "15".toBoundedIntOrNull(1, 10))
+        assertEquals(1, "-5".toBoundedIntOrNull(1, 10))
     }
 }

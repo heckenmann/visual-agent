@@ -105,10 +105,7 @@ tasks.test {
     finalizedBy(tasks.jacocoTestReport)
 }
 
-val jacocoExcludedClasses =
-    listOf(
-        "**/ui/compose/*Kt*",
-    )
+val jacocoExcludedClasses = emptyList<String>()
 
 tasks.jacocoTestReport {
     dependsOn(tasks.test)

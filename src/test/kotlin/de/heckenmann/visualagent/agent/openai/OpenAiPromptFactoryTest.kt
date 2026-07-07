@@ -45,6 +45,59 @@ class OpenAiPromptFactoryTest {
         )
     }
 
+    @Test
+    fun `prompt omits guard when no tools enabled`() {
+        val factory = OpenAiPromptFactory(ToolRegistry(emptyList(), ToolEventBus()))
+
+        val prompt = factory.buildPrompt(ChatRequestContext(messages = listOf(Message("user", "hi"))), "gpt-test")
+
+        assertTrue(prompt.instructions.none { it.text.orEmpty().contains("Tool calling strict mode") })
+    }
+
+    @Test
+    fun `allowedFunctionNames returns sorted enabled names`() {
+        val registry = ToolRegistry(listOf(FakeTool("terminal"), FakeTool("context")), ToolEventBus())
+        val factory = OpenAiPromptFactory(registry)
+
+        val names =
+            factory.allowedFunctionNames(
+                ChatRequestContext(
+                    messages = emptyList(),
+                    enabledTools = setOf(ToolId("terminal"), ToolId("context")),
+                ),
+                "gpt-test",
+            )
+
+        assertEquals(listOf("context", "terminal"), names)
+    }
+
+    @Test
+    fun `prompt applies sampling options`() {
+        val factory = OpenAiPromptFactory(ToolRegistry(emptyList(), ToolEventBus()))
+        val prompt =
+            factory.buildPrompt(
+                ChatRequestContext(
+                    messages = listOf(Message("user", "hi")),
+                    parameters =
+                        de.heckenmann.visualagent.agent.ModelParameters(
+                            temperature = 0.5,
+                            topP = 0.9,
+                            maxTokens = 100,
+                        ),
+                    options = mapOf("seed" to "42", "reasoningEffort" to "low", "verbosity" to "high"),
+                ),
+                "gpt-test",
+            )
+        val options = prompt.options as org.springframework.ai.openai.OpenAiChatOptions
+
+        assertEquals(0.5, options.temperature)
+        assertEquals(0.9, options.topP)
+        assertEquals(100, options.maxCompletionTokens)
+        assertEquals(42, options.seed)
+        assertEquals("low", options.reasoningEffort)
+        assertEquals("high", options.verbosity)
+    }
+
     private class FakeTool(
         id: String,
     ) : VisualAgentTool {

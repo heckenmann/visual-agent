@@ -28,7 +28,15 @@ Always run, in this order:
 
 - Conventional Commits: `type(scope): short imperative summary`. Recurring scopes: `ui`, `agent`, `todo`, `knowledge`, `workspace`, `canvas`, `orchestration`, `docs`, `build`, `ci`.
 - One logical change per commit. Do not mix refactors, UI work, and docs unless tightly coupled.
+- When moving files, use `git mv` so Git tracks the rename instead of treating it as a delete/add pair.
 - Examples: `feat(ui): add canvas zoom controls`, `fix(todo): persist status updates`, `refactor(knowledge): move persistence to repository stores`, `docs: update agent UX docs`.
+
+## Pull Requests
+
+- Create one focused PR per logical branch/change; do not open mega-PRs.
+- Every manually created PR must be configured to **delete the source branch on merge** (`delete_branch_on_merge: true`).
+- Dependabot and other automated PRs are left to their own lifecycle.
+- Before creating a PR, verify the branch is not already merged into `master` and that no duplicate open PR exists for it.
 
 ### Security
 
