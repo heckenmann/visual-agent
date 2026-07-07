@@ -6,6 +6,7 @@ import de.heckenmann.visualagent.agent.ollama.createOllamaApi
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.error.ErrorMessageMapper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -142,7 +143,8 @@ class OllamaClient(
      */
     private fun buildDetailedProviderError(throwable: Throwable?): Throwable {
         if (throwable == null) return IllegalStateException("Unknown chat model error")
-        return ProviderErrorDetailExtractor.toIllegalState("Unknown chat model error", throwable)
+        val userFacing = ErrorMessageMapper.map(throwable)
+        return IllegalStateException("${userFacing.summary}: ${userFacing.detail}", throwable)
     }
 
     override suspend fun vision(
