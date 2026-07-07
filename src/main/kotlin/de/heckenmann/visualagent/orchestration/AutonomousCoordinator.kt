@@ -113,11 +113,17 @@ internal class AutonomousCoordinator(
     /**
      * Seeds standard UX-focused todos used for autonomous improvement loops.
      *
+     * Missing tasks are added; existing tasks with the same description are skipped
+     * so repeated seeding does not create duplicates.
+     *
      * Use cases: UC-0000053.
      */
     fun seedUxTodos() {
-        val tasks = UxSeedTasks.all()
-        tasks.forEach { desc -> todoManager.add(desc) }
+        val existingDescriptions = getTodosFromDb().mapTo(mutableSetOf()) { it.description }
+        UxSeedTasks
+            .all()
+            .filterNot { it in existingDescriptions }
+            .forEach { desc -> todoManager.add(desc) }
     }
 
     /**
