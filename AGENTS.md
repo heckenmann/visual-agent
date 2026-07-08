@@ -168,6 +168,7 @@ This project is under active Compose migration on branch `codex/issue-48-compose
 ## Gotchas
 
 - Stale WAL/SHM: if a crashed process leaves `data/visual-agent.db-wal` / `data/visual-agent.db-shm` and you see `SQLITE_BUSY`, delete those two files before restarting.
+- GitHub CLI comment formatting: when posting issue/PR comments with `gh issue comment` / `gh pr comment`, use `--body-file path/to/file.md` (or pipe from stdin) instead of `--body "$(cat <<'EOF' ... EOF)"`. The latter double-escapes newlines and backticks, producing a single unformatted paragraph on GitHub.
 - Tool error text comes from `agent/provider/ProviderErrorMessages.kt` (matches `429`/`403`/`401`/`timeout`/`connection refused`); do not embed raw SDK exception messages in tool results.
 - `ProviderCatalogService` is the single source of truth for provider/model/variant at runtime; the legacy `AppConfig.ollama*` / `openai*` properties are still loaded but migrated into the catalog on first init.
 - Spring AI's `Flux` is bridged to coroutines via `kotlinx-coroutines-reactor`; any new streaming path must preserve the existing `Flux → Flow` conversion.
