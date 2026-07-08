@@ -13,6 +13,30 @@ import de.heckenmann.visualagent.workspace.layout.WorkspaceWindowState
 import kotlin.math.max
 
 /**
+ * Lifecycle state for the Compose desktop application.
+ *
+ * The single instance is owned by the application entry point and shared with panels through
+ * [ComposePanelServices]. Panels can read [closing] to skip side effects (coroutines, network calls,
+ * file writes) while the application is shutting down.
+ */
+class ApplicationLifecycle {
+    /**
+     * True once [beginShutdown] has been called. No new user-facing work should be started after
+     * this point.
+     */
+    @Volatile
+    var closing: Boolean = false
+        private set
+
+    /**
+     * Marks the application as shutting down. Must be called before tearing down Spring / Compose.
+     */
+    fun beginShutdown() {
+        closing = true
+    }
+}
+
+/**
  * Bounds for a workspace panel in the Compose Multiplatform workspace.
  *
  * Coordinates and sizes are expressed in density-independent units to keep the model
@@ -323,4 +347,5 @@ data class ComposePanelServices(
     val modalRequester: ComposeModalRequester,
     val onSettingsChanged: () -> Unit,
     val inFlight: InFlightStateHolder,
+    val lifecycle: ApplicationLifecycle,
 )

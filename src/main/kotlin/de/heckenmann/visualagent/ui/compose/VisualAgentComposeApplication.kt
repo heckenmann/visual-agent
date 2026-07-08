@@ -64,6 +64,7 @@ fun runVisualAgentComposeApplication() {
     val persistedStage = workspaceLayoutService.report().stage
     val defaultWidth = 1280.dp
     val defaultHeight = 820.dp
+    val lifecycle = ApplicationLifecycle()
 
     application {
         val windowState =
@@ -77,12 +78,14 @@ fun runVisualAgentComposeApplication() {
             val stageHeight = size.height.value.toDouble()
             workspaceLayoutService.saveStage(StageState(width = stageWidth, height = stageHeight))
         }
+        val closeApplication = {
+            lifecycle.beginShutdown()
+            saveStageOnExit()
+            springContext.close()
+            exitApplication()
+        }
         Window(
-            onCloseRequest = {
-                saveStageOnExit()
-                springContext.close()
-                exitApplication()
-            },
+            onCloseRequest = closeApplication,
             title = AppIdentity.DISPLAY_NAME,
             icon = painterResource("icons/visual-agent.png"),
             state = windowState,
@@ -91,11 +94,8 @@ fun runVisualAgentComposeApplication() {
                 config = AppConfig.instance,
                 springContext = springContext,
                 workspaceLayoutService = workspaceLayoutService,
-                onCloseApplication = {
-                    saveStageOnExit()
-                    springContext.close()
-                    exitApplication()
-                },
+                lifecycle = lifecycle,
+                onCloseApplication = closeApplication,
             )
         }
     }
@@ -106,6 +106,7 @@ private fun VisualAgentComposeApp(
     config: AppConfig,
     springContext: ConfigurableApplicationContext,
     workspaceLayoutService: WorkspaceLayoutService,
+    lifecycle: ApplicationLifecycle,
     onCloseApplication: () -> Unit,
 ) {
     var windows by remember { mutableStateOf(restoreWorkspaceWindows(defaultWindows(), workspaceLayoutService.report().windows)) }
@@ -135,6 +136,7 @@ private fun VisualAgentComposeApp(
                     settingsRevision += 1
                 },
                 inFlight = inFlight,
+                lifecycle = lifecycle,
             )
         }
     val toggleWindow: (String) -> Unit = { id ->

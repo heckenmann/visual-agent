@@ -42,6 +42,7 @@ class ComposeSplitWorkspaceTest {
                 modalRequester = ComposeModalRequester { },
                 onSettingsChanged = {},
                 inFlight = InFlightStateHolder(),
+                lifecycle = ApplicationLifecycle(),
             )
         val windows =
             listOf(
@@ -91,6 +92,7 @@ class ComposeSplitWorkspaceTest {
                 modalRequester = ComposeModalRequester { },
                 onSettingsChanged = {},
                 inFlight = InFlightStateHolder(),
+                lifecycle = ApplicationLifecycle(),
             )
         val windows =
             listOf(
