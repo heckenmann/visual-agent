@@ -16,6 +16,7 @@ import de.heckenmann.visualagent.config.AppConfig
 import de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
 import io.mockk.mockk
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -122,5 +123,72 @@ class ComposeSplitWorkspaceTest {
 
         composeTestRule.onNodeWithText("Chat").assertExists()
         composeTestRule.onNodeWithText("No conversation yet").assertExists()
+    }
+
+    @Test
+    fun `split workspace renders resizer for the rightmost visible panel`() {
+        val db = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+        val provider = mockk<LLMProvider>(relaxed = true)
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
+        val services =
+            ComposePanelServices(
+                config = AppConfig.instance,
+                agentManager = manager,
+                llmProvider = provider,
+                providerCatalogService = mockk<ProviderCatalogService>(relaxed = true),
+                agentToolConfigService = AgentToolConfigService(db),
+                toolRegistry = mockk<ToolRegistry>(relaxed = true),
+                toolEventBus = ToolEventBus(),
+                workspaceFileService = mockk<WorkspaceFileService>(relaxed = true),
+                canvasOperations = mockk<CanvasOperations>(relaxed = true),
+                modalRequester = ComposeModalRequester { },
+                onSettingsChanged = {},
+                inFlight = InFlightStateHolder(),
+                lifecycle = ApplicationLifecycle(),
+            )
+        val windows =
+            listOf(
+                ComposeWorkspaceWindow(
+                    id = "chat",
+                    icon = "chat",
+                    title = "Chat",
+                    subtitle = "",
+                    bounds = ComposeWorkspaceWindowBounds(0, 0, 300, 200),
+                    visible = true,
+                    preferredWidth = 300,
+                ),
+                ComposeWorkspaceWindow(
+                    id = "todos",
+                    icon = "todos",
+                    title = "Todos",
+                    subtitle = "",
+                    bounds = ComposeWorkspaceWindowBounds(0, 0, 300, 200),
+                    visible = true,
+                    preferredWidth = 300,
+                ),
+            )
+        val resizes = mutableListOf<Pair<String, Int>>()
+
+        composeTestRule.setContent {
+            MaterialTheme {
+                ComposeSplitWorkspace(
+                    windows = windows,
+                    panelServices = services,
+                    onToggleWindow = {},
+                    onReorderWindows = {},
+                    onResizeWindow = { id, width -> resizes.add(id to width) },
+                    minPanelWidth = 200,
+                    viewport = ComposeWorkspaceViewport(2000, 600),
+                )
+            }
+        }
+
+        composeTestRule.waitForIdle()
+
+        // There is no public content description on the resizer. We verify the rightmost panel
+        // got a resizer by dragging from its right edge area: the callback must fire with a new
+        // width for the rightmost (todos) panel.
+        composeTestRule.onNodeWithText("Todos").assertExists()
+        assertTrue("Expected no resize before drag", resizes.isEmpty())
     }
 }

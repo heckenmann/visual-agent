@@ -46,9 +46,10 @@ import sh.calvin.reorderable.ReorderableRowScope
 /**
  * Renders the visible workspace panels in a single horizontal row.
  *
- * Every visible panel gets a column that spans the full row height. Panels are
- * separated by draggable resizer handles. The panel order can be changed by
- * dragging the panel header grip thanks to `sh.calvin.reorderable`.
+ * Every visible panel gets a column that spans the full row height. Every panel,
+ * including the rightmost one, has a draggable resizer handle on its right edge
+ * so users can resize each panel independently. The panel order can be changed
+ * by dragging the panel header grip thanks to `sh.calvin.reorderable`.
  *
  * @param windows All workspace panels in persistent order
  * @param panelServices Services required by the individual panel bodies
@@ -123,7 +124,6 @@ internal fun ComposeSplitWorkspace(
                                 panelServices = panelServices,
                                 isDragging = isDragging,
                                 width = widths.getOrElse(index) { minPanelWidth },
-                                hasResizer = index < visibleWindows.lastIndex,
                                 onWidthChanged = { next -> resizeUpdatedState.value.invoke(window.id, next) },
                                 onCloseWindow = { onToggleWindow(window.id) },
                                 minPanelWidth = minPanelWidth,
@@ -196,7 +196,6 @@ private fun ReorderableRowScope.SplitPanelItem(
     panelServices: ComposePanelServices,
     isDragging: Boolean,
     width: Int,
-    hasResizer: Boolean,
     onWidthChanged: (Int) -> Unit,
     onCloseWindow: () -> Unit,
     minPanelWidth: Int,
@@ -213,13 +212,11 @@ private fun ReorderableRowScope.SplitPanelItem(
                 minPanelWidth = minPanelWidth,
                 modifier = Modifier.height(rowHeight.dp),
             )
-            if (hasResizer) {
-                PanelResizer(
-                    currentWidth = width,
-                    onWidthChanged = onWidthChanged,
-                    minPanelWidth = minPanelWidth,
-                )
-            }
+            PanelResizer(
+                currentWidth = width,
+                onWidthChanged = onWidthChanged,
+                minPanelWidth = minPanelWidth,
+            )
         }
     }
 }
