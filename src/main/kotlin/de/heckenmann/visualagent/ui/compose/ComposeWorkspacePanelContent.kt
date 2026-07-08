@@ -35,9 +35,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import de.heckenmann.visualagent.ui.compose.WORKSPACE_PANEL_RESIZER_WIDTH
 import sh.calvin.reorderable.ReorderableListItemScope
 
 @Composable
@@ -179,7 +182,8 @@ internal fun PanelResizer(
         modifier =
             Modifier
                 .fillMaxHeight()
-                .width(12.dp)
+                .width(WORKSPACE_PANEL_RESIZER_WIDTH.dp)
+                .semantics { contentDescription = "Resize panel" }
                 .pointerInput(Unit) {
                     detectDragGestures(
                         onDragEnd = { dragOffset.value = 0f },
@@ -209,10 +213,11 @@ internal fun PanelResizer(
         Box(
             modifier =
                 Modifier
-                    .width(2.dp)
+                    .width(8.dp)
                     .fillMaxHeight(0.4f)
-                    .clip(RoundedCornerShape(1.dp))
+                    .clip(RoundedCornerShape(4.dp))
                     .background(Color(0x5544475A)),
+            contentAlignment = Alignment.Center,
         ) {
             ResizerGrip()
         }

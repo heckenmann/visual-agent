@@ -5,7 +5,11 @@ package de.heckenmann.visualagent.ui.compose
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeRight
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -75,5 +79,33 @@ class ComposeWorkspaceComponentsTest {
             }
         }
         composeTestRule.onNodeWithText("Count").assertExists()
+    }
+
+    @Test
+    fun `panel resizer reports a new width when dragged right`() {
+        var resizedWidth = 0
+        composeTestRule.setContent {
+            MaterialTheme {
+                PanelResizer(
+                    currentWidth = 300,
+                    onWidthChanged = { resizedWidth = it },
+                    minPanelWidth = 200,
+                )
+            }
+        }
+
+        composeTestRule.waitForIdle()
+        // Drag far enough to cross the resizer threshold (10 px) at least once.
+        composeTestRule
+            .onNodeWithContentDescription("Resize panel")
+            .performTouchInput {
+                swipeRight(
+                    startX = centerX,
+                    endX = centerX + 100f,
+                )
+            }
+        composeTestRule.waitForIdle()
+
+        assertTrue("Expected resized width > 300 but was $resizedWidth", resizedWidth > 300)
     }
 }
