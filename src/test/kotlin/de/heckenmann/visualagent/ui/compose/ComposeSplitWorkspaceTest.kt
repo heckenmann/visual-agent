@@ -3,8 +3,11 @@
 package de.heckenmann.visualagent.ui.compose
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performTouchInput
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
@@ -185,10 +188,26 @@ class ComposeSplitWorkspaceTest {
 
         composeTestRule.waitForIdle()
 
-        // There is no public content description on the resizer. We verify the rightmost panel
-        // got a resizer by dragging from its right edge area: the callback must fire with a new
-        // width for the rightmost (todos) panel.
         composeTestRule.onNodeWithText("Todos").assertExists()
-        assertTrue("Expected no resize before drag", resizes.isEmpty())
+
+        // Every visible panel now renders a resizer. The rightmost one is reachable by its
+        // content description; dragging it must change the rightmost (todos) panel width.
+        val resizerNodes = composeTestRule.onAllNodesWithContentDescription("Resize panel")
+        assertTrue(
+            "Expected 2 resizers but was ${resizerNodes.fetchSemanticsNodes().size}",
+            resizerNodes.fetchSemanticsNodes().size == 2,
+        )
+        resizerNodes[1]
+            .performTouchInput {
+                down(center)
+                moveBy(Offset(x = 100f, y = 0f))
+                up()
+            }
+        composeTestRule.waitForIdle()
+
+        assertTrue(
+            "Expected a resize event for the rightmost panel but got $resizes",
+            resizes.any { it.first == "todos" && it.second > 300 },
+        )
     }
 }

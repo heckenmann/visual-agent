@@ -7,16 +7,17 @@ import androidx.compose.foundation.ScrollbarStyle
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -85,7 +86,10 @@ internal fun ComposeSplitWorkspace(
             EmptyWorkspace()
         } else {
             val widths = rowPanelWidths(visibleWindows)
-            val rowWidthPx = widths.sum() + ((visibleWindows.size - 1) * WORKSPACE_PANEL_GAP)
+            val rowWidthPx =
+                widths.sum() +
+                    (visibleWindows.size * WORKSPACE_PANEL_RESIZER_WIDTH) +
+                    ((visibleWindows.size - 1) * WORKSPACE_PANEL_GAP)
             val canScroll = rowWidthPx > viewport.width
             Column(modifier = Modifier.fillMaxSize()) {
                 Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
@@ -117,13 +121,13 @@ internal fun ComposeSplitWorkspace(
                                 onReorderWindows(reordered)
                             },
                             modifier = Modifier.fillMaxHeight(),
-                            horizontalArrangement = Arrangement.spacedBy(WORKSPACE_PANEL_GAP.dp),
                         ) { index, window, isDragging ->
                             SplitPanelItem(
                                 window = window,
                                 panelServices = panelServices,
                                 isDragging = isDragging,
                                 width = widths.getOrElse(index) { minPanelWidth },
+                                isLast = index == visibleWindows.lastIndex,
                                 onWidthChanged = { next -> resizeUpdatedState.value.invoke(window.id, next) },
                                 onCloseWindow = { onToggleWindow(window.id) },
                                 minPanelWidth = minPanelWidth,
@@ -196,6 +200,7 @@ private fun ReorderableRowScope.SplitPanelItem(
     panelServices: ComposePanelServices,
     isDragging: Boolean,
     width: Int,
+    isLast: Boolean,
     onWidthChanged: (Int) -> Unit,
     onCloseWindow: () -> Unit,
     minPanelWidth: Int,
@@ -217,6 +222,9 @@ private fun ReorderableRowScope.SplitPanelItem(
                 onWidthChanged = onWidthChanged,
                 minPanelWidth = minPanelWidth,
             )
+            if (!isLast) {
+                Spacer(modifier = Modifier.width(WORKSPACE_PANEL_GAP.dp))
+            }
         }
     }
 }

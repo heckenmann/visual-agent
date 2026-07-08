@@ -330,6 +330,14 @@ fun resizePanelWidth(
 const val WORKSPACE_PANEL_GAP: Int = 16
 
 /**
+ * Width of the draggable resizer handle rendered on the right edge of each panel.
+ *
+ * This value must stay in sync with the visual width used by [PanelResizer] so that
+ * scroll and layout math match the rendered content.
+ */
+const val WORKSPACE_PANEL_RESIZER_WIDTH: Int = 12
+
+/**
  * Spring-backed services required by Compose panels.
  *
  * Keeping this bundle explicit avoids hidden global lookups from individual composables.

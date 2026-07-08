@@ -40,6 +40,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import de.heckenmann.visualagent.ui.compose.WORKSPACE_PANEL_RESIZER_WIDTH
 import sh.calvin.reorderable.ReorderableListItemScope
 
 @Composable
@@ -181,7 +182,7 @@ internal fun PanelResizer(
         modifier =
             Modifier
                 .fillMaxHeight()
-                .width(12.dp)
+                .width(WORKSPACE_PANEL_RESIZER_WIDTH.dp)
                 .semantics { contentDescription = "Resize panel" }
                 .pointerInput(Unit) {
                     detectDragGestures(
