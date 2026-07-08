@@ -140,13 +140,13 @@ internal fun ComposeSplitWorkspace(
                             direction = -1,
                             scrollState = horizontalScrollState,
                             isClosing = { panelServices.lifecycle.closing },
-                            modifier = Modifier.align(Alignment.CenterStart),
+                            modifier = Modifier.align(Alignment.CenterStart).padding(start = 12.dp),
                         )
                         ScrollArrow(
                             direction = 1,
                             scrollState = horizontalScrollState,
                             isClosing = { panelServices.lifecycle.closing },
-                            modifier = Modifier.align(Alignment.CenterEnd),
+                            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 12.dp),
                         )
                     }
                 }

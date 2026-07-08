@@ -213,10 +213,11 @@ internal fun PanelResizer(
         Box(
             modifier =
                 Modifier
-                    .width(2.dp)
+                    .width(8.dp)
                     .fillMaxHeight(0.4f)
-                    .clip(RoundedCornerShape(1.dp))
+                    .clip(RoundedCornerShape(4.dp))
                     .background(Color(0x5544475A)),
+            contentAlignment = Alignment.Center,
         ) {
             ResizerGrip()
         }
