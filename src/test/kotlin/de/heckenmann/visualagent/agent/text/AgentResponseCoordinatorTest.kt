@@ -27,7 +27,7 @@ class AgentResponseCoordinatorTest {
             mainSessionId = "main",
             repetitionGuardRetryLimit = 1,
             finishedToolEventsByRequestId = events,
-            buildMainRequest = { history, requestId ->
+            buildMainRequest = { history, requestId, _ ->
                 ChatRequestContext(history, metadata = mapOf("requestId" to requestId.orEmpty())).also(requests::add)
             },
             buildMainSystemContextPrompt = { "system context" },

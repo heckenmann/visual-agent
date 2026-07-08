@@ -142,9 +142,11 @@ interface LLMProvider {
  * @property model Optional model override; defaults to the configured model when null
  * @property enabledTools Tool IDs that may be exposed to the model for this request
  * @property metadata Additional provider-neutral execution context
+ * @property cancellationToken Optional token the provider can consult to honour user cancellation
  * @see docs/usecases/uc_0000002_send_main_agent_message.md
  * @see docs/usecases/uc_0000007_configure_session_provider_and_model.md
  * @see docs/usecases/uc_0000020_execute_tool_call.md
+ * @see docs/usecases/uc_0000078_cancel_main_agent_response.md
  */
 data class ChatRequestContext(
     val messages: List<Message>,
@@ -156,6 +158,7 @@ data class ChatRequestContext(
     val enabledTools: Set<ToolId> = emptySet(),
     val metadata: Map<String, Any> = emptyMap(),
     val providerProfile: ProviderProfile? = null,
+    val cancellationToken: CancellationToken? = null,
 )
 
 /**

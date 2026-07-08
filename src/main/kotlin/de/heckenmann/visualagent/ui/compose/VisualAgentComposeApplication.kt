@@ -259,6 +259,11 @@ private fun VisualAgentComposeApp(
                                 modelName = activeProvider?.defaultModel.orEmpty().ifBlank { config.activeModel() },
                                 beanDefinitionCount = springContext.beanDefinitionCount,
                                 inFlight = inFlight.state.value,
+                                onStopAll = {
+                                    composeScope.launch {
+                                        panelServices.agentManager.cancelAllRunningActions()
+                                    }
+                                },
                             )
                             ComposeSplitWorkspace(
                                 windows = windows,

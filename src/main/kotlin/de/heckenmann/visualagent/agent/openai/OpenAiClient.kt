@@ -46,12 +46,14 @@ class OpenAiClient(
             val selectedModel = request.model ?: AppConfig.instance.openAiModel
             val prompt = promptFactory.buildPrompt(request, selectedModel)
             val model = chatModel(request.providerProfile)
+            request.cancellationToken?.throwIfCancelled()
             val responseResult =
                 runCatching {
                     ToolCallingLoop()
                         .run(
                             model,
                             prompt,
+                            request.cancellationToken,
                             toolRegistry.functionCallbacks(
                                 request.enabledTools,
                                 request.metadata + mapOf("model" to selectedModel, "provider" to "openai"),
@@ -79,6 +81,7 @@ class OpenAiClient(
             }
         return flow {
             try {
+                request.cancellationToken?.throwIfCancelled()
                 if (toolCallbacks.isEmpty()) {
                     model
                         .stream(prompt)
@@ -98,7 +101,7 @@ class OpenAiClient(
                         }.collect { emit(it) }
                 } else {
                     ToolCallingLoop()
-                        .runStream(model, prompt, toolCallbacks)
+                        .runStream(model, prompt, request.cancellationToken, toolCallbacks)
                         .collect { emit(it) }
                 }
             } catch (error: Throwable) {

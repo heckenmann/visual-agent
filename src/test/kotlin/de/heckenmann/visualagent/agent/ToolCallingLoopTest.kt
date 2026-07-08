@@ -29,7 +29,7 @@ class ToolCallingLoopTest {
         val prompt = Prompt(listOf(UserMessage("hello")))
         every { chatModel.call(prompt) } returns springResponse("unit", "direct answer")
 
-        val response = ToolCallingLoop().run(chatModel, prompt, emptyList())
+        val response = ToolCallingLoop().run(chatModel, prompt, null, emptyList())
 
         assertEquals("direct answer", response.message.content)
         assertEquals("unit", response.model)
@@ -46,7 +46,7 @@ class ToolCallingLoopTest {
                 springResponse("unit", "done after tool"),
             )
 
-        val response = ToolCallingLoop().run(chatModel, prompt, listOf(tool))
+        val response = ToolCallingLoop().run(chatModel, prompt, null, listOf(tool))
 
         assertEquals("done after tool", response.message.content)
         assertEquals(1, tool.callCount)
@@ -60,7 +60,7 @@ class ToolCallingLoopTest {
         every { chatModel.call(any<Prompt>()) } returns
             springToolResponse("unit", toolName = "direct_tool", arguments = "{}", callId = "call-1")
 
-        val response = ToolCallingLoop().run(chatModel, prompt, listOf(tool))
+        val response = ToolCallingLoop().run(chatModel, prompt, null, listOf(tool))
 
         assertTrue(response.message.content.contains("direct result"))
     }
@@ -73,7 +73,7 @@ class ToolCallingLoopTest {
         every { chatModel.call(any<Prompt>()) } returns
             springToolResponse("unit", toolName = "count_tool", arguments = "{}", callId = "loop")
 
-        val response = ToolCallingLoop(maxRounds = 3).run(chatModel, prompt, listOf(tool))
+        val response = ToolCallingLoop(maxRounds = 3).run(chatModel, prompt, null, listOf(tool))
 
         assertEquals("", response.message.content)
         assertEquals(3, tool.callCount)
@@ -91,7 +91,7 @@ class ToolCallingLoopTest {
                 )
             every { chatModel.call(any<Prompt>()) } returns springResponse("unit", "final stream answer")
 
-            val chunks = ToolCallingLoop().runStream(chatModel, prompt, listOf(tool)).toList()
+            val chunks = ToolCallingLoop().runStream(chatModel, prompt, null, listOf(tool)).toList()
 
             assertEquals(2, chunks.size)
             assertEquals("", chunks[0].message.content)
@@ -110,7 +110,7 @@ class ToolCallingLoopTest {
                     springResponse("unit", "chunk two"),
                 )
 
-            val chunks = ToolCallingLoop().runStream(chatModel, prompt, emptyList()).toList()
+            val chunks = ToolCallingLoop().runStream(chatModel, prompt, null, emptyList()).toList()
 
             assertEquals(2, chunks.size)
             assertEquals("chunk one", chunks[0].message.content)
@@ -133,7 +133,7 @@ class ToolCallingLoopTest {
                     springResponse("unit", "final after two tools"),
                 )
 
-            val chunks = ToolCallingLoop().runStream(chatModel, prompt, listOf(tool)).toList()
+            val chunks = ToolCallingLoop().runStream(chatModel, prompt, null, listOf(tool)).toList()
 
             assertEquals(2, chunks.size)
             assertEquals("", chunks[0].message.content)

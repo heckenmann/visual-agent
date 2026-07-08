@@ -55,6 +55,7 @@ class ComposeWorkspaceNavigationTest {
                     modelName = "llava",
                     beanDefinitionCount = 123,
                     inFlight = InFlightState(),
+                    onStopAll = {},
                 )
             }
         }

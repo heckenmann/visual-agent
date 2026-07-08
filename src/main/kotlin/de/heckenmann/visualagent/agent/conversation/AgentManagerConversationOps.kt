@@ -3,6 +3,7 @@ package de.heckenmann.visualagent.agent.conversation
 import de.heckenmann.visualagent.agent.AgentJobResult
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.AgentStatus
+import de.heckenmann.visualagent.agent.CancellationToken
 import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.SubAgent
@@ -93,14 +94,19 @@ internal class AgentManagerConversationOps(
         AgentManager.notifyAgent(agentId, notification)
     }
 
-    suspend fun sendMessage(content: String): String {
+    suspend fun sendMessage(
+        content: String,
+        token: CancellationToken? = null,
+    ): String {
         val userMessage = Message("user", content)
         persist(userMessage)
         val requestId =
             java.util.UUID
                 .randomUUID()
                 .toString()
-        val assistantContent = owner.responseCoordinator.generateAssistantContentWithRepetitionGuard(requestId)
+        token?.throwIfCancelled()
+        val assistantContent = owner.responseCoordinator.generateAssistantContentWithRepetitionGuard(requestId, token)
+        token?.throwIfCancelled()
         val assistantMessage = Message(role = "assistant", content = assistantContent)
         persist(assistantMessage)
         owner.finishedToolEventsByRequestId.remove(requestId)
@@ -109,6 +115,7 @@ internal class AgentManagerConversationOps(
 
     suspend fun streamMessage(
         content: String,
+        token: CancellationToken? = null,
         onChunk: (String) -> Unit,
     ): String {
         val userMessage = Message("user", content)
@@ -118,14 +125,28 @@ internal class AgentManagerConversationOps(
                 .randomUUID()
                 .toString()
         val collected = StringBuilder()
-        owner.llmProvider.stream(buildMainRequest(loadRecentHistoryFromDb(), requestId)).collect { chunk ->
-            val part = chunk.message.content
-            if (part.isNotBlank()) {
-                collected.append(part)
-                onChunk(part)
+        var cancelled = false
+        token?.throwIfCancelled()
+        try {
+            val request =
+                buildMainRequest(loadRecentHistoryFromDb(), requestId)
+                    .copy(cancellationToken = token)
+            owner.llmProvider.stream(request).collect { chunk ->
+                token?.throwIfCancelled()
+                val part = chunk.message.content
+                if (part.isNotBlank()) {
+                    collected.append(part)
+                    onChunk(part)
+                }
             }
+        } catch (_: kotlinx.coroutines.CancellationException) {
+            cancelled = true
+            logger.info { "Main agent request $requestId cancelled by user" }
         }
         var assistantText = collected.toString().trim()
+        if (cancelled && assistantText.isNotBlank()) {
+            assistantText += " (cancelled)"
+        }
         if (ResponseRepetitionGuard.isRunawayRepetition(assistantText)) {
             logger.warn { "Repetition guard detected runaway streaming output; retrying once" }
             assistantText = owner.responseCoordinator.retryAfterRepetition()
@@ -217,6 +238,7 @@ internal class AgentManagerConversationOps(
     fun buildMainRequest(
         history: List<Message>,
         requestId: String? = null,
+        token: CancellationToken? = null,
     ): ChatRequestContext {
         val contextPrompt = buildMainSystemContextPrompt()
         val preparedMessages = mutableListOf<Message>()
@@ -243,6 +265,7 @@ internal class AgentManagerConversationOps(
             messages = preparedMessages,
             enabledTools = owner.agentToolConfigService.mainAgentTools(),
             metadata = metadata,
+            cancellationToken = token,
         )
     }
 
