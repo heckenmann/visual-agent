@@ -32,6 +32,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.agent.AgentManager
+import de.heckenmann.visualagent.agent.CancellationToken
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
@@ -65,6 +66,7 @@ internal fun ConversationPanel(
     var sending by remember { mutableStateOf(false) }
     var editingId by remember { mutableStateOf<String?>(null) }
     var deletingMessageIds by remember { mutableStateOf(setOf<String>()) }
+    var activeToken by remember { mutableStateOf<CancellationToken?>(null) }
     val isAtBottom by remember {
         derivedStateOf {
             val info = listState.layoutInfo
@@ -92,12 +94,14 @@ internal fun ConversationPanel(
                 java.util.UUID
                     .randomUUID()
                     .toString()
+            val token = CancellationToken()
+            activeToken = token
             inFlight.markStreamStart(streamRequestId)
             scope.launch {
                 val streamedContent = StringBuilder()
                 val result =
                     runCatching {
-                        agentManager.streamMessage(content) { chunk ->
+                        agentManager.streamMessage(content, token) { chunk ->
                             streamedContent.append(chunk)
                             history = history.dropLast(1) + Message("assistant", streamedContent.toString())
                         }
@@ -113,10 +117,14 @@ internal fun ConversationPanel(
                     }.also {
                         inFlight.markStreamEnd(streamRequestId)
                         sending = false
+                        activeToken = null
                         inputFocusRequester.requestFocus()
                     }
             }
         }
+    }
+    val cancelCurrentRequest: () -> Unit = {
+        activeToken?.cancel()
     }
     val sendCurrentInput = { sendContent(input) }
     LaunchedEffect(Unit) {
@@ -228,6 +236,7 @@ internal fun ConversationPanel(
             status = status,
             onInputChange = { input = it },
             onSend = sendCurrentInput,
+            onCancel = cancelCurrentRequest,
             onHistoryReload = { history = agentManager.loadOlderHistory() },
             onClear = {
                 modalRequester.requestConfirmation(

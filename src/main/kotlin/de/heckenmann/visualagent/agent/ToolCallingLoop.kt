@@ -38,14 +38,17 @@ internal class ToolCallingLoop(
      *
      * @param chatModel Model to call (already configured with the correct options)
      * @param initialPrompt First prompt including history, system instructions, and tools
+     * @param token Optional cancellation token to honour between rounds
      * @param toolCallbacks Tool callbacks that can fulfil the model's tool calls
      * @return Final response after all tool rounds completed
      */
     fun run(
         chatModel: ChatModel,
         initialPrompt: Prompt,
+        token: CancellationToken?,
         toolCallbacks: List<ToolCallback>,
     ): ChatResponse {
+        token?.throwIfCancelled()
         if (toolCallbacks.isEmpty()) {
             return chatModel.call(initialPrompt).toVisualAgentResponse()
         }
@@ -54,6 +57,7 @@ internal class ToolCallingLoop(
         var lastResponse: SpringChatResponse? = null
 
         repeat(maxRounds) { round ->
+            token?.throwIfCancelled()
             logger.debug { "Tool calling round ${round + 1}/$maxRounds" }
             val response = chatModel.call(prompt)
             lastResponse = response
@@ -89,17 +93,21 @@ internal class ToolCallingLoop(
      *
      * @param chatModel Model to stream from
      * @param initialPrompt First prompt including history and tools
+     * @param token Optional cancellation token to honour during streaming and follow-up
      * @param toolCallbacks Tool callbacks that can fulfil the model's tool calls
      * @return Flow of response chunks, including the final answer after tool execution
      */
     fun runStream(
         chatModel: ChatModel,
         initialPrompt: Prompt,
+        token: CancellationToken?,
         toolCallbacks: List<ToolCallback>,
     ): Flow<ChatResponse> =
         flow {
+            token?.throwIfCancelled()
             if (toolCallbacks.isEmpty()) {
                 chatModel.stream(initialPrompt).asFlow().collect { springResponse ->
+                    token?.throwIfCancelled()
                     emit(springResponse.toVisualAgentResponse())
                 }
                 return@flow
@@ -108,6 +116,7 @@ internal class ToolCallingLoop(
             val springChunks = mutableListOf<SpringChatResponse>()
 
             chatModel.stream(initialPrompt).asFlow().collect { springResponse ->
+                token?.throwIfCancelled()
                 springChunks += springResponse
                 emit(springResponse.toVisualAgentResponse())
             }
@@ -127,6 +136,7 @@ internal class ToolCallingLoop(
             var prompt = appendToolConversationHistory(initialPrompt, toolExecutionResult)
             var lastFinalResponse: SpringChatResponse? = null
             repeat(maxRounds) { round ->
+                token?.throwIfCancelled()
                 logger.debug { "Stream tool follow-up round ${round + 1}/$maxRounds" }
                 val finalResponse = chatModel.call(prompt)
                 lastFinalResponse = finalResponse

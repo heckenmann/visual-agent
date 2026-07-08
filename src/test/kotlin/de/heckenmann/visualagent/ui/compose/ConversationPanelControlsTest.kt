@@ -37,6 +37,7 @@ class ConversationPanelControlsTest {
                     status = "Ready",
                     onInputChange = { inputState.value = it },
                     onSend = { sent = true },
+                    onCancel = {},
                     onHistoryReload = {},
                     onClear = {},
                     inputFocusRequester = FocusRequester(),
@@ -50,7 +51,7 @@ class ConversationPanelControlsTest {
     }
 
     @Test
-    fun `send button is disabled while sending`() {
+    fun `send button is hidden while sending`() {
         var sent = false
         composeTestRule.setContent {
             MaterialTheme {
@@ -60,14 +61,37 @@ class ConversationPanelControlsTest {
                     status = "Sending",
                     onInputChange = {},
                     onSend = { sent = true },
+                    onCancel = {},
                     onHistoryReload = {},
                     onClear = {},
                     inputFocusRequester = FocusRequester(),
                 )
             }
         }
-        composeTestRule.onNodeWithContentDescription("Send message").performClick()
+        composeTestRule.onNodeWithContentDescription("Cancel response").assertExists()
         assertTrue(!sent)
+    }
+
+    @Test
+    fun `cancel button is visible while sending and invokes onCancel`() {
+        var cancelled = false
+        composeTestRule.setContent {
+            MaterialTheme {
+                ConversationInputArea(
+                    input = "hi",
+                    sending = true,
+                    status = "Sending",
+                    onInputChange = {},
+                    onSend = {},
+                    onCancel = { cancelled = true },
+                    onHistoryReload = {},
+                    onClear = {},
+                    inputFocusRequester = FocusRequester(),
+                )
+            }
+        }
+        composeTestRule.onNodeWithContentDescription("Cancel response").performClick()
+        assertTrue(cancelled)
     }
 
     @Test
@@ -94,6 +118,7 @@ class ConversationPanelControlsTest {
                     status = "Ready",
                     onInputChange = {},
                     onSend = {},
+                    onCancel = {},
                     onHistoryReload = { historyClicked = true },
                     onClear = { clearClicked = true },
                     inputFocusRequester = FocusRequester(),

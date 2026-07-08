@@ -11,9 +11,14 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -42,6 +47,7 @@ internal fun SubAgentRow(
     refresh: () -> Unit,
     scope: CoroutineScope,
 ) {
+    var activeJobId by remember { mutableStateOf<String?>(null) }
     PanelContentCard(modifier = Modifier.fillMaxWidth().padding(bottom = 7.dp)) {
         Text(agent.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
         Text(
@@ -60,17 +66,22 @@ internal fun SubAgentRow(
                     if (requestedTask.isBlank()) return@ActionIconButton
                     onRunningChanged(true)
                     onStatusChanged("Running ${agent.name}...")
+                    activeJobId = null
                     scope.launch {
-                        runCatching { agentManager.runAgentJob(agent.id, requestedTask) }
-                            .onSuccess { result ->
-                                onStatusChanged("${result.agentName}: ${result.content.take(120)}")
-                                refresh()
-                            }.onFailure { error ->
-                                onStatusChanged("Run failed for ${agent.name}: ${error.message}")
-                                refresh()
-                            }.also {
-                                onRunningChanged(false)
-                            }
+                        val jobId = agentManager.enqueueAgentJob(agent.id, requestedTask)
+                        activeJobId = jobId
+                    }
+                },
+            )
+            ActionIconButton(
+                icon = Icons.Filled.Stop,
+                description = "Stop sub-agent job",
+                enabled = activeJobId != null,
+                onClick = {
+                    activeJobId?.let { jobId ->
+                        agentManager.cancelSubAgentJob(jobId)
+                        onStatusChanged("Stopped ${agent.name} job")
+                        activeJobId = null
                     }
                 },
             )

@@ -23,6 +23,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandCircleDown
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -89,6 +90,7 @@ internal fun ConversationInputArea(
     status: String,
     onInputChange: (String) -> Unit,
     onSend: () -> Unit,
+    onCancel: () -> Unit,
     onHistoryReload: () -> Unit,
     onClear: () -> Unit,
     inputFocusRequester: FocusRequester,
@@ -100,13 +102,22 @@ internal fun ConversationInputArea(
             label = { Text("Message") },
             minLines = 2,
             trailingIcon = {
-                ActionIconButton(
-                    icon = Icons.AutoMirrored.Filled.Send,
-                    description = "Send message",
-                    onClick = onSend,
-                    enabled = !sending && input.isNotBlank(),
-                    modifier = Modifier.size(32.dp),
-                )
+                if (sending) {
+                    ActionIconButton(
+                        icon = Icons.Filled.Stop,
+                        description = "Cancel response",
+                        onClick = onCancel,
+                        modifier = Modifier.size(32.dp),
+                    )
+                } else {
+                    ActionIconButton(
+                        icon = Icons.AutoMirrored.Filled.Send,
+                        description = "Send message",
+                        onClick = onSend,
+                        enabled = input.isNotBlank(),
+                        modifier = Modifier.size(32.dp),
+                    )
+                }
             },
             modifier =
                 Modifier

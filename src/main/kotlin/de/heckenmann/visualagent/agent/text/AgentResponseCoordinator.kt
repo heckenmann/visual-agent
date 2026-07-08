@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent.text
 
+import de.heckenmann.visualagent.agent.CancellationToken
 import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
@@ -14,7 +15,7 @@ internal class AgentResponseCoordinator(
     private val mainSessionId: String,
     private val repetitionGuardRetryLimit: Int,
     private val finishedToolEventsByRequestId: ConcurrentHashMap<String, MutableList<ToolCallEvent>>,
-    private val buildMainRequest: (history: List<Message>, requestId: String?) -> ChatRequestContext,
+    private val buildMainRequest: (history: List<Message>, requestId: String?, token: CancellationToken?) -> ChatRequestContext,
     private val buildMainSystemContextPrompt: () -> String,
     private val loadRecentHistoryFromDb: () -> List<Message>,
 ) {
@@ -41,21 +42,26 @@ internal class AgentResponseCoordinator(
      * @param requestId Request id used to correlate tool events
      * @return Final normalized assistant text
      */
-    suspend fun generateAssistantContentWithRepetitionGuard(requestId: String): String {
+    suspend fun generateAssistantContentWithRepetitionGuard(
+        requestId: String,
+        token: CancellationToken? = null,
+    ): String {
+        token?.throwIfCancelled()
         var raw =
             llmProvider
-                .chat(buildMainRequest(loadRecentHistoryFromDb(), requestId))
+                .chat(buildMainRequest(loadRecentHistoryFromDb(), requestId, token))
                 .message
                 .content
                 .trim()
+        token?.throwIfCancelled()
         if (raw.isBlank()) {
-            val finalFromTools = completeToolOnlyTurnWithFollowup(requestId)
+            val finalFromTools = completeToolOnlyTurnWithFollowup(requestId, token)
             if (!finalFromTools.isNullOrBlank()) return normalizeAssistantContent(finalFromTools)
         }
         if (!ResponseRepetitionGuard.isRunawayRepetition(raw)) {
             return normalizeAssistantContent(raw)
         }
-        raw = runRepetitionGuardRetry()
+        raw = runRepetitionGuardRetry(token)
         return normalizeAssistantContent(raw)
     }
 
@@ -64,15 +70,19 @@ internal class AgentResponseCoordinator(
      *
      * @return Normalized assistant output
      */
-    suspend fun retryAfterRepetition(): String = normalizeAssistantContent(runRepetitionGuardRetry())
+    suspend fun retryAfterRepetition(token: CancellationToken? = null): String = normalizeAssistantContent(runRepetitionGuardRetry(token))
 
     /**
      * Finalizes a tool-only turn into one concrete assistant message.
      *
      * @param requestId Request id used by the original model call
+     * @param token Optional cancellation token to honour during follow-up generation
      * @return Final assistant text or null when no tool events were captured
      */
-    suspend fun completeToolOnlyTurnWithFollowup(requestId: String): String? {
+    suspend fun completeToolOnlyTurnWithFollowup(
+        requestId: String,
+        token: CancellationToken? = null,
+    ): String? {
         val toolEvents = finishedToolEventsByRequestId.remove(requestId).orEmpty()
         if (toolEvents.isEmpty()) return null
         val summary =
@@ -97,7 +107,9 @@ internal class AgentResponseCoordinator(
                     },
                 enabledTools = emptySet(),
                 metadata = mapOf("sessionId" to mainSessionId, "agent" to "main", "requestId" to "$requestId:finalize"),
+                cancellationToken = token,
             )
+        token?.throwIfCancelled()
         return llmProvider
             .chat(followup)
             .message.content
@@ -120,12 +132,14 @@ internal class AgentResponseCoordinator(
     /**
      * Performs one retry request with an anti-repetition system instruction.
      *
+     * @param token Optional cancellation token to honour during the retry
      * @return Raw assistant content from the retry call
      */
-    private suspend fun runRepetitionGuardRetry(): String {
+    private suspend fun runRepetitionGuardRetry(token: CancellationToken? = null): String {
         var retryRaw = ""
         repeat(repetitionGuardRetryLimit) {
-            val base = buildMainRequest(loadRecentHistoryFromDb(), null)
+            token?.throwIfCancelled()
+            val base = buildMainRequest(loadRecentHistoryFromDb(), null, token)
             val retryInstruction =
                 Message(
                     role = "system",

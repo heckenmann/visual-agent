@@ -241,13 +241,23 @@ class AgentManager
         fun getActiveJobCount(agentId: String): Int = activeJobsByAgentId[agentId] ?: 0
 
         /** Sends a message to the main agent and persists both conversation turns. Use cases: UC-0000002, UC-0000005. */
-        suspend fun sendMessage(content: String): String = conversationOps.sendMessage(content)
+        suspend fun sendMessage(
+            content: String,
+            token: CancellationToken? = null,
+        ): String = conversationOps.sendMessage(content, token)
 
         /** Streams a main-agent response while persisting the completed turn. Use cases: UC-0000003, UC-0000005. */
         suspend fun streamMessage(
             content: String,
+            token: CancellationToken? = null,
             onChunk: (String) -> Unit,
-        ): String = conversationOps.streamMessage(content, onChunk)
+        ): String = conversationOps.streamMessage(content, token, onChunk)
+
+        /** Cancels one running sub-agent job by its job id. Use cases: UC-0000079. */
+        fun cancelSubAgentJob(jobId: String): Boolean = subAgentJobScheduler.cancelJob(jobId)
+
+        /** Cancels all sub-agent jobs. Use cases: UC-0000080. */
+        fun cancelAllRunningActions(): Set<String> = subAgentJobScheduler.cancelAllJobs()
 
         /** Deletes the main conversation history from memory and persistence. Use cases: UC-0000045. */
         fun clearHistory() {
