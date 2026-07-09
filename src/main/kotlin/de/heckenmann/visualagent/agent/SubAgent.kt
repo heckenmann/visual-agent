@@ -37,6 +37,40 @@ data class SubAgent(
     val createdAt: Long = System.currentTimeMillis(),
     var updatedAt: Long = System.currentTimeMillis(),
 ) {
+    /**
+     * Returns true when the other object is a [SubAgent] with the same identity and mutable state.
+     * Timestamps are intentionally excluded so equality reflects business state, not creation time.
+     */
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is SubAgent) return false
+        return id == other.id &&
+            name == other.name &&
+            role == other.role &&
+            status == other.status &&
+            currentTask == other.currentTask &&
+            currentTodoId == other.currentTodoId &&
+            parentAgentId == other.parentAgentId &&
+            chatHistory == other.chatHistory &&
+            config == other.config
+    }
+
+    /**
+     * Hash code consistent with [equals]; timestamps are excluded.
+     */
+    override fun hashCode(): Int {
+        var result = id.hashCode()
+        result = 31 * result + name.hashCode()
+        result = 31 * result + role.hashCode()
+        result = 31 * result + status.hashCode()
+        result = 31 * result + (currentTask?.hashCode() ?: 0)
+        result = 31 * result + (currentTodoId?.hashCode() ?: 0)
+        result = 31 * result + (parentAgentId?.hashCode() ?: 0)
+        result = 31 * result + chatHistory.hashCode()
+        result = 31 * result + config.hashCode()
+        return result
+    }
+
     companion object {
         /**
          * Creates a sub-agent with configuration loaded from a named template.
