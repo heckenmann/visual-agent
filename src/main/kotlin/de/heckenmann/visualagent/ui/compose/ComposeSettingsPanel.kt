@@ -23,6 +23,7 @@ import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderErrorMessages
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.error.ErrorMessageMapper
 import kotlinx.coroutines.launch
 
 /**
@@ -306,7 +307,8 @@ internal fun SettingsPanel(
                 }.onSuccess {
                     status = "Saved provider=${activeProvider?.name ?: providerId} model=$resolvedModel"
                 }.onFailure {
-                    status = "Save failed: ${it.message}"
+                    val userError = ErrorMessageMapper.map(it)
+                    status = "${userError.summary}: ${userError.detail}"
                 }
             },
         )

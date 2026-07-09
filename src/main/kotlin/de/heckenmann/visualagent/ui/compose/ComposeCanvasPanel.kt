@@ -74,7 +74,12 @@ internal fun CanvasPanel(
                     val imported = workspaceFileService.importFile(file)
                     canvasOperations.insertImage(imported.relativePath)
                 }.onSuccess { update(it) }
-                    .onFailure { status = "Image import failed: ${it.message}" }
+                    .onFailure {
+                        val userError =
+                            de.heckenmann.visualagent.error.ErrorMessageMapper
+                                .map(it)
+                        status = "${userError.summary}: ${userError.detail}"
+                    }
             }
         }
     val imageBytesForPath: (String) -> ByteArray? = { path ->
@@ -210,7 +215,12 @@ private fun RowScope.CanvasPersistenceToolbar(
         onClick = {
             runCatching { canvasOperations.saveDocument(documentName.trim()) }
                 .onSuccess { setStatus("Saved ${it.relativePath}") }
-                .onFailure { setStatus("Save failed: ${it.message}") }
+                .onFailure {
+                    val userError =
+                        de.heckenmann.visualagent.error.ErrorMessageMapper
+                            .map(it)
+                    setStatus("${userError.summary}: ${userError.detail}")
+                }
         },
     )
     OutlinedTextField(
@@ -231,7 +241,10 @@ private fun RowScope.CanvasPersistenceToolbar(
             }.onSuccess {
                 setStatus("Saved ${it.relativePath}")
             }.onFailure {
-                setStatus("Capture failed: ${it.message}")
+                val userError =
+                    de.heckenmann.visualagent.error.ErrorMessageMapper
+                        .map(it)
+                setStatus("${userError.summary}: ${userError.detail}")
             }
         },
     )

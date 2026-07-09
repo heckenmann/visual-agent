@@ -74,7 +74,10 @@ internal fun FilesPanel(
                 path = ""
                 refresh()
             }.onFailure {
-                status = "Import failed: ${it.message}"
+                val userError =
+                    de.heckenmann.visualagent.error.ErrorMessageMapper
+                        .map(it)
+                status = "${userError.summary}: ${userError.detail}"
             }
     }
     val picker =
@@ -192,7 +195,12 @@ private fun WorkspaceFileRow(
                                             setStatus("Renamed to ${it.relativePath}")
                                             refresh()
                                             dismiss()
-                                        }.onFailure { setStatus("Rename failed: ${it.message}") }
+                                        }.onFailure {
+                                            val userError =
+                                                de.heckenmann.visualagent.error.ErrorMessageMapper
+                                                    .map(it)
+                                            setStatus("${userError.summary}: ${userError.detail}")
+                                        }
                                 },
                             )
                         },
@@ -214,7 +222,12 @@ private fun WorkspaceFileRow(
                     onClick = {
                         runCatching { canvasOperations.openDocument(file.id, null) }
                             .onSuccess { setStatus("Opened ${file.relativePath}") }
-                            .onFailure { setStatus("Open failed: ${it.message}") }
+                            .onFailure {
+                                val userError =
+                                    de.heckenmann.visualagent.error.ErrorMessageMapper
+                                        .map(it)
+                                setStatus("${userError.summary}: ${userError.detail}")
+                            }
                     },
                 )
             }

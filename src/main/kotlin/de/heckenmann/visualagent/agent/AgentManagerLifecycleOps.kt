@@ -56,7 +56,8 @@ internal class AgentManagerLifecycleOps(
             config =
                 try {
                     Json.decodeFromString(agentRecord.config)
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    logger.warn(e) { "Could not parse agent config for ${agentRecord.id}; using defaults" }
                     AgentConfig()
                 },
             createdAt = agentRecord.createdAt.toEpochMilli(),
