@@ -7,6 +7,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -84,6 +85,88 @@ class ScrollArrowTest {
                 scope = this,
                 isClosing = { lifecycle.closing },
             )
+
+            assertEquals(0, scrollState.value)
+        }
+
+    @Test
+    fun `continuous scroll repeats until edge is reached`(): Unit =
+        runTest {
+            val scrollState = ScrollState(initial = 0)
+            val totalWidth = 2_000
+            val viewportWidth = 800
+            var job: kotlinx.coroutines.Job? = null
+            composeTestRule.setContent {
+                val scope = rememberCoroutineScope()
+                MaterialTheme {
+                    Box(
+                        modifier =
+                            Modifier
+                                .width(viewportWidth.dp)
+                                .horizontalScroll(scrollState),
+                    ) {
+                        Box(modifier = Modifier.width(totalWidth.dp)) {
+                            ScrollArrow(
+                                direction = 1,
+                                scrollState = scrollState,
+                                isClosing = { false },
+                            )
+                        }
+                    }
+                }
+                job = startContinuousScroll(direction = 1, scrollState = scrollState, scope = scope, isClosing = { false })
+            }
+
+            composeTestRule.waitUntil(timeoutMillis = 2_000) { scrollState.maxValue > 0 }
+            composeTestRule.waitUntil(timeoutMillis = 5_000) { scrollState.value == scrollState.maxValue }
+            job?.cancel()
+
+            assertEquals(scrollState.maxValue, scrollState.value)
+        }
+
+    @Test
+    fun `continuous scroll stops at min edge for left direction`(): Unit =
+        runTest {
+            val scrollState = ScrollState(initial = 500)
+            val totalWidth = 2_000
+            val viewportWidth = 800
+            var job: kotlinx.coroutines.Job? = null
+            composeTestRule.setContent {
+                val scope = rememberCoroutineScope()
+                MaterialTheme {
+                    Box(
+                        modifier =
+                            Modifier
+                                .width(viewportWidth.dp)
+                                .horizontalScroll(scrollState),
+                    ) {
+                        Box(modifier = Modifier.width(totalWidth.dp)) {
+                            ScrollArrow(
+                                direction = -1,
+                                scrollState = scrollState,
+                                isClosing = { false },
+                            )
+                        }
+                    }
+                }
+                job = startContinuousScroll(direction = -1, scrollState = scrollState, scope = scope, isClosing = { false })
+            }
+
+            composeTestRule.waitUntil(timeoutMillis = 2_000) { scrollState.maxValue > 0 }
+            composeTestRule.waitUntil(timeoutMillis = 5_000) { scrollState.value == 0 }
+            job?.cancel()
+
+            assertEquals(0, scrollState.value)
+        }
+
+    @Test
+    fun `continuous scroll returns when application is closing`(): Unit =
+        runTest {
+            val lifecycle = ApplicationLifecycle()
+            lifecycle.beginShutdown()
+            val scrollState = ScrollState(initial = 0)
+            val job = startContinuousScroll(direction = 1, scrollState = scrollState, scope = this, isClosing = { lifecycle.closing })
+            job.join()
 
             assertEquals(0, scrollState.value)
         }

@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,13 +20,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
@@ -38,7 +33,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.ReorderableRow
@@ -266,65 +260,4 @@ internal fun WindowBody(
     }
 }
 
-/**
- * Scrolls the provided [scrollState] by [direction] * [SCROLL_ARROW_STEP_PX], clamped to the
- * scrollable range. The scroll is skipped when [isClosing] is true so that no coroutine is launched
- * while the application is shutting down.
- */
-internal fun scrollArrowHandler(
-    direction: Int,
-    scrollState: androidx.compose.foundation.ScrollState,
-    scope: CoroutineScope,
-    isClosing: () -> Boolean,
-) {
-    if (isClosing()) return
-    val target = (scrollState.value + direction * SCROLL_ARROW_STEP_PX).coerceIn(0, scrollState.maxValue)
-    scope.launch {
-        if (isClosing()) return@launch
-        scrollState.animateScrollTo(target)
-    }
-}
-
-/**
- * Renders a directional arrow that scrolls the workspace row when clicked.
- *
- * Clicking the arrow animates the [scrollState] by a fixed step in the requested direction. The
- * scroll action is guarded by [isClosing] to avoid launching a coroutine after shutdown has started.
- *
- * @param direction Negative for left, positive for right
- * @param scrollState Horizontal scroll state to mutate
- * @param isClosing Returns true when the application is shutting down and pointer events should be
- *   ignored
- * @param modifier Modifier applied to the arrow root
- */
-@Composable
-internal fun ScrollArrow(
-    direction: Int,
-    scrollState: androidx.compose.foundation.ScrollState,
-    isClosing: () -> Boolean,
-    modifier: Modifier = Modifier,
-) {
-    val scope = rememberCoroutineScope()
-    val icon = if (direction < 0) Icons.AutoMirrored.Filled.KeyboardArrowLeft else Icons.AutoMirrored.Filled.KeyboardArrowRight
-    val onClick = remember(direction, scrollState, scope) { { scrollArrowHandler(direction, scrollState, scope, isClosing) } }
-    Box(
-        modifier = modifier.padding(horizontal = 2.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        ActionIconButton(
-            icon = icon,
-            description = if (direction < 0) "Scroll left" else "Scroll right",
-            onClick = onClick,
-            modifier =
-                Modifier
-                    .defaultMinSize(minWidth = 44.dp, minHeight = 64.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0xCC23252F))
-                    .border(1.dp, Color(0x558BE9FD), RoundedCornerShape(10.dp)),
-            iconSize = 32.dp,
-        )
-    }
-}
-
-private const val SCROLL_ARROW_STEP_PX = 120
 private const val HORIZONTAL_WHEEL_SCROLL_STEP = 50
