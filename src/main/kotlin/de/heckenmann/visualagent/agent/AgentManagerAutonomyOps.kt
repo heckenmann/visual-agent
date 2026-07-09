@@ -1,20 +1,14 @@
 package de.heckenmann.visualagent.agent
 
 /**
- * Handles autonomous task assignment and processing for [AgentManager].
+ * Handles autonomous task processing for [AgentManager].
+ *
+ * Assignment and execution are now automatic; the main agent only manages
+ * sub-agent definitions and todo state.
  */
 internal class AgentManagerAutonomyOps(
     private val owner: AgentManager,
 ) {
-    fun assignNextTodo(): Boolean = owner.autonomousCoordinator.assignNextTodo()
-
-    fun assignTodoToAgent(
-        todoId: String,
-        agentId: String,
-    ): Boolean = owner.autonomousCoordinator.assignTodoToAgent(todoId, agentId)
-
-    fun assignAllPendingTodos(): Int = owner.autonomousCoordinator.assignAllPendingTodos()
-
     fun seedUxTodos() = owner.autonomousCoordinator.seedUxTodos()
 
     fun startAutonomousProcessing(seed: Boolean = true) = owner.autonomousCoordinator.startAutonomousProcessing(seed)

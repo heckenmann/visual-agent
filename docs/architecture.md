@@ -151,9 +151,7 @@ names inside `ToolRegistry`. The full inventory lives in `AGENTS.md`;
 the runtime split is:
 
 Main-agent-only (`agentToolConfigService.mainAgentTools()`):
-`agent:list`, `agent:start`, `agent:create`, `agent:update`,
-`agent:delete`, `agent:message`, `agent:assign-todo`,
-`agent:assign-next-todo`, `agent:assign-all-todos`.
+`agent:list`, `agent:create`, `agent:update`, `agent:delete`.
 
 Sub-agent role-based sets (`AgentToolConfigService.toolsFor(agent)`,
 default templates `researcher`, `coder`, `analyst`): all other tool

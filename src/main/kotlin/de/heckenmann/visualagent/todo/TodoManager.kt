@@ -34,6 +34,7 @@ data class TodoChange(
 class TodoManager(
     initialTodos: List<Todo> = emptyList(),
     private val onChange: ((TodoChange) -> Unit)? = null,
+    private val eventBus: TodoEventBus? = null,
 ) {
     private val todos = initialTodos.toMutableList()
     private val listeners = CopyOnWriteArrayList<(TodoChange) -> Unit>()
@@ -87,6 +88,30 @@ class TodoManager(
                 description = description,
                 status = TodoStatus.PENDING,
                 position = nextPosition(),
+            )
+        todos.add(todo)
+        publishChange(TodoChange(TodoChangeType.ADDED, todo = todo))
+        return todo
+    }
+
+    /**
+     * Creates a pending todo assigned to a sub-agent and publishes an add event.
+     *
+     * @param description User-facing task description
+     * @param assignedAgentId Sub-agent that should execute the todo
+     * @return Created todo with generated identifier, max position, and assignment
+     */
+    fun add(
+        description: String,
+        assignedAgentId: String,
+    ): Todo {
+        val todo =
+            Todo(
+                id = UUID.randomUUID().toString(),
+                description = description,
+                status = TodoStatus.PENDING,
+                position = nextPosition(),
+                assignedAgentId = assignedAgentId,
             )
         todos.add(todo)
         publishChange(TodoChange(TodoChangeType.ADDED, todo = todo))
@@ -260,6 +285,7 @@ class TodoManager(
         listeners.forEach { listener ->
             runCatching { listener(change) }
         }
+        eventBus?.publish(change)
     }
 
     /**

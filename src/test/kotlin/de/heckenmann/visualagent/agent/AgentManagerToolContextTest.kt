@@ -1,7 +1,7 @@
 package de.heckenmann.visualagent.agent
-
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
+import de.heckenmann.visualagent.todo.TodoEventBus
 import io.mockk.coEvery
 import io.mockk.mockk
 import io.mockk.slot
@@ -26,14 +26,17 @@ class AgentManagerToolContextTest {
                     message = Message("assistant", "ok"),
                     done = true,
                 )
-            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
+            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
 
             manager.sendMessage("Use a tool")
 
             assertTrue(ToolId("agent:list") in requestSlot.captured.enabledTools)
-            assertTrue(ToolId("agent:start") in requestSlot.captured.enabledTools)
-            assertTrue(ToolId("agent:assign-todo") in requestSlot.captured.enabledTools)
-            assertTrue(ToolId("agent:message") in requestSlot.captured.enabledTools)
+            assertTrue(ToolId("agent:create") in requestSlot.captured.enabledTools)
+            assertTrue(ToolId("agent:update") in requestSlot.captured.enabledTools)
+            assertTrue(ToolId("agent:delete") in requestSlot.captured.enabledTools)
+            assertFalse(ToolId("agent:start") in requestSlot.captured.enabledTools)
+            assertFalse(ToolId("agent:assign-todo") in requestSlot.captured.enabledTools)
+            assertFalse(ToolId("agent:message") in requestSlot.captured.enabledTools)
             assertFalse(ToolId("ui") in requestSlot.captured.enabledTools)
             assertFalse(ToolId("file:read") in requestSlot.captured.enabledTools)
             assertFalse(ToolId("terminal") in requestSlot.captured.enabledTools)

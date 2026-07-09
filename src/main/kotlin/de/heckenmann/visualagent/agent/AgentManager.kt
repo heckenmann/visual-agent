@@ -13,6 +13,7 @@ import de.heckenmann.visualagent.knowledge.SubAgentStore
 import de.heckenmann.visualagent.knowledge.TodoStore
 import de.heckenmann.visualagent.orchestration.AutonomousCoordinator
 import de.heckenmann.visualagent.todo.Todo
+import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -40,12 +41,14 @@ class AgentManager
         internal val llmProvider: LLMProvider,
         internal val agentToolConfigService: AgentToolConfigService,
         internal val toolEventBus: ToolEventBus,
+        internal val todoEventBus: TodoEventBus,
     ) : DisposableBean {
         internal constructor(
             stores: PersistenceStores,
             llmProvider: LLMProvider,
             agentToolConfigService: AgentToolConfigService,
             toolEventBus: ToolEventBus,
+            todoEventBus: TodoEventBus,
         ) : this(
             stores,
             stores,
@@ -54,6 +57,7 @@ class AgentManager
             llmProvider,
             agentToolConfigService,
             toolEventBus,
+            todoEventBus,
         )
 
         companion object {
@@ -82,11 +86,7 @@ class AgentManager
             }
         }
 
-        val todoManager: TodoManager =
-            TodoManager(
-                initialTodos = todoStore.listTodos(),
-                onChange = { change -> lifecycleOps.persistTodoChange(change) },
-            )
+        internal var todoManager: TodoManager = TodoManager()
         internal val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         internal val subAgentJobScheduler =
             SubAgentJobScheduler(scope) {
@@ -102,10 +102,17 @@ class AgentManager
         internal lateinit var autonomousCoordinator: AutonomousCoordinator
         internal lateinit var responseCoordinator: AgentResponseCoordinator
         private val lifecycleOps = AgentManagerLifecycleOps(this)
-        private val conversationOps = AgentManagerConversationOps(this)
+        internal val conversationOps = AgentManagerConversationOps(this)
         private val autonomyOps = AgentManagerAutonomyOps(this)
 
         init {
+            lifecycleOps.loadAgentsFromDb()
+            todoManager =
+                TodoManager(
+                    initialTodos = todoStore.listTodos(),
+                    onChange = { change -> lifecycleOps.persistTodoChange(change) },
+                    eventBus = todoEventBus,
+                )
             responseCoordinator =
                 AgentResponseCoordinator(
                     llmProvider = llmProvider,
@@ -126,12 +133,14 @@ class AgentManager
                     memoryStore = memoryStore,
                     agentToolConfigService = agentToolConfigService,
                     jobScheduler = subAgentJobScheduler,
+                    parallelism = { AppConfig.instance.maxParallelSubAgents },
+                    todoEventBus = todoEventBus,
                     createAgent = { name, role, templateName -> lifecycleOps.createAgent(name, role, templateName) },
                     saveAgentToDb = lifecycleOps::saveAgentToDb,
                     notifyAgent = Companion::notifyAgent,
+                    persistMessage = { conversationOps.persist(it) },
                 )
             toolEventListenerHandle = conversationOps.registerToolEventListener()
-            lifecycleOps.loadAgentsFromDb()
             conversationOps.loadConversationFromDb()
             conversationOps.resumeInterruptedConversationIfNeeded()
         }
@@ -294,18 +303,6 @@ class AgentManager
 
         /** Loads all persisted sub-agent records. */
         fun getSubAgentsFromDb(): List<SubAgent> = lifecycleOps.getSubAgentsFromDb()
-
-        /** Assigns the next pending todo to an available worker. */
-        fun assignNextTodo(): Boolean = autonomyOps.assignNextTodo()
-
-        /** Assigns one todo to a specific sub-agent. */
-        fun assignTodoToAgent(
-            todoId: String,
-            agentId: String,
-        ): Boolean = autonomyOps.assignTodoToAgent(todoId, agentId)
-
-        /** Assigns as many pending todos as current capacity permits. */
-        fun assignAllPendingTodos(): Int = autonomyOps.assignAllPendingTodos()
 
         /** Adds the predefined UX improvement tasks when they are absent. Use cases: UC-0000053. */
         fun seedUxTodos() = autonomyOps.seedUxTodos()

@@ -1,14 +1,15 @@
 package de.heckenmann.visualagent.agent.tools
 
-import de.heckenmann.visualagent.agent.AgentJobResult
+import de.heckenmann.visualagent.agent.AgentConfig
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.AgentStatus
 import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.agent.SubAgentJobQueueSnapshot
-import io.mockk.coEvery
+import de.heckenmann.visualagent.knowledge.Memory
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -43,6 +44,9 @@ class AgentControlToolsTest {
             SubAgent(id = "created", name = "Coder", role = "Implementation")
         every { manager.updateAgent("created", "Senior Coder", null, any()) } returns true
         every { manager.updateAgent("missing", null, null, null) } returns false
+        every { manager.getSubAgent("created") } returns
+            SubAgent(id = "created", name = "Coder", role = "Implementation", config = AgentConfig())
+        every { manager.getSubAgent("missing") } returns null
         every { manager.deleteAgent("created") } returns true
         every { manager.deleteAgent("missing") } returns false
 
@@ -58,59 +62,83 @@ class AgentControlToolsTest {
     }
 
     @Test
-    fun `execution tools support synchronous and queued jobs`() {
-        coEvery { manager.startAgentJob("Coder", "Implementation", "coder", "Build") } returns
-            AgentJobResult("agent-1", "Coder", "built")
-        every { manager.enqueueAgentJob("Coder", "Implementation", "coder", "Build") } returns "job-1"
-        coEvery { manager.runAgentJob("agent-1", "Review") } returns AgentJobResult("agent-1", "Coder", "reviewed")
-        every { manager.enqueueAgentJob("agent-1", "Review") } returns "job-2"
+    fun `agent update merges full config fields`() {
+        every { manager.getSubAgent("agent-1") } returns
+            SubAgent(id = "agent-1", name = "Coder", role = "Implementation", config = AgentConfig())
+        every { manager.updateAgent("agent-1", null, null, any()) } returns true
 
-        assertTrue(
-            AgentStartTool(manager)
-                .execute("""{"name":"Coder","role":"Implementation","templateName":"coder","content":"Build"}""")
-                .content
-                .contains("built"),
-        )
-        assertTrue(
-            AgentStartTool(manager)
-                .execute("""{"name":"Coder","role":"Implementation","templateName":"coder","content":"Build","async":true}""")
-                .content
-                .contains("job-1"),
-        )
-        assertTrue(
-            AgentMessageTool(manager)
-                .execute("""{"agentId":"agent-1","content":"Review"}""")
-                .content
-                .contains("reviewed"),
-        )
-        assertTrue(
-            AgentMessageTool(manager)
-                .execute("""{"agentId":"agent-1","content":"Review","async":true}""")
-                .content
-                .contains("job-2"),
-        )
+        val result =
+            AgentUpdateTool(manager).execute(
+                """
+                {
+                    "id":"agent-1",
+                    "timeout":120,
+                    "maxRetries":5,
+                    "memoryLimitMb":1024,
+                    "provider":"ollama",
+                    "model":"llama3",
+                    "temperature":0.7,
+                    "topP":0.9,
+                    "maxTokens":4096,
+                    "variant":"chat",
+                    "options":{"seed":"42"},
+                    "tools":["file:read","terminal"]
+                }
+                """.trimIndent(),
+            )
+
+        assertTrue(result.success)
+        verify {
+            manager.updateAgent(
+                "agent-1",
+                null,
+                null,
+                match { config: AgentConfig ->
+                    config.timeout == 120 &&
+                        config.maxRetries == 5 &&
+                        config.memoryLimitMb == 1024L &&
+                        config.provider == "ollama" &&
+                        config.model == "llama3" &&
+                        config.temperature == 0.7 &&
+                        config.topP == 0.9 &&
+                        config.maxTokens == 4096 &&
+                        config.variant == "chat" &&
+                        config.options == mapOf("seed" to "42") &&
+                        config.tools == listOf("file:read", "terminal")
+                },
+            )
+        }
     }
 
     @Test
-    fun `todo assignment tools preserve manager outcomes`() {
-        every { manager.assignTodoToAgent("todo-1", "agent-1") } returns true
-        every { manager.assignTodoToAgent("missing", "agent-1") } returns false
-        every { manager.assignNextTodo() } returnsMany listOf(true, false)
-        every { manager.assignAllPendingTodos() } returns 3
+    fun `agent log returns persisted log entries`() {
+        val agent = SubAgent(id = "agent-1", name = "Coder", role = "Implementation")
+        every { manager.getSubAgent("agent-1") } returns agent
+        every { manager.memoryStore } returns
+            mockk {
+                every { searchMemories("agent:agent-1:log", 50) } returns
+                    listOf(
+                        Memory(
+                            id = "m1",
+                            content = "Worked on todo-1",
+                            createdAt = Instant.now(),
+                            tags = listOf("agent:agent-1:log"),
+                        ),
+                    )
+            }
 
-        assertTrue(
-            AgentAssignTodoTool(manager)
-                .execute("""{"todoId":"todo-1","agentId":"agent-1"}""")
-                .success,
-        )
-        assertFalse(
-            AgentAssignTodoTool(manager)
-                .execute("""{"todoId":"missing","agentId":"agent-1"}""")
-                .success,
-        )
-        assertTrue(AgentAssignNextTodoTool(manager).execute("{}").success)
-        assertFalse(AgentAssignNextTodoTool(manager).execute("{}").success)
-        assertTrue(AgentAssignAllTodosTool(manager).execute("{}").content.contains("3"))
-        verify(exactly = 1) { manager.assignAllPendingTodos() }
+        val result = AgentLogTool(manager).execute("""{"id":"agent-1"}""")
+
+        assertTrue(result.success)
+        assertTrue(result.content.contains("Worked on todo-1"))
+    }
+
+    @Test
+    fun `agent log fails for unknown agent`() {
+        every { manager.getSubAgent("missing") } returns null
+
+        val result = AgentLogTool(manager).execute("""{"id":"missing"}""")
+
+        assertFalse(result.success)
     }
 }

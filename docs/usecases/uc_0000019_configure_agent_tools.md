@@ -39,7 +39,7 @@ Agents receive only the tools allowed by persisted configuration.
 
 ## Acceptance Criteria
 
-- The main agent is limited to orchestration tools by policy.
+- The main agent is limited to sub-agent definition tools (`agent:list`, `agent:create`, `agent:update`, `agent:delete`) only.
 - Sub-agent tool sets can include task-specific tools like canvas or workspace files.
 - Disabled tools are not exposed in provider callbacks.
 - Per-agent tool overrides are resolved before template defaults and are still filtered by globally disabled tools.

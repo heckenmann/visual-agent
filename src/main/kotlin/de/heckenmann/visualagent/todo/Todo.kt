@@ -19,7 +19,7 @@ enum class TodoStatus {
  * @property description User-facing task description
  * @property status Current lifecycle state
  * @property position Sort key defining the todo list order; lower values appear earlier
- * @property assignedAgentId Optional sub-agent currently responsible for the item
+ * @property assignedAgentId Sub-agent currently responsible for the item; optional for legacy rows, required for new todos created by tools
  * @property createdAt Creation timestamp
  * @property completedAt Completion timestamp, set only after completion
  * @property dueDate Optional deadline supplied by the user or planner

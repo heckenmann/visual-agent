@@ -39,7 +39,21 @@ internal class JpaMemoryStore(
     override fun searchMemories(
         query: String,
         limit: Int,
-    ): List<Memory> = repository.search(query, PageRequest.of(0, limit.coerceAtLeast(1))).map(MemoryEntity::toDomain)
+    ): List<Memory> =
+        repository
+            .search(query, PageRequest.of(0, limit.coerceAtLeast(1)))
+            .map {
+                Memory(
+                    id = it.id,
+                    content = it.content,
+                    tags =
+                        it.tags
+                            .orEmpty()
+                            .split(",")
+                            .filter(String::isNotBlank),
+                    createdAt = it.createdAt,
+                )
+            }
 }
 
 @Service

@@ -1,7 +1,10 @@
 package de.heckenmann.visualagent.agent
 
+import de.heckenmann.visualagent.agent.AgentStatus
+import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.knowledge.PersistedSubAgent
 import de.heckenmann.visualagent.todo.Todo
+import de.heckenmann.visualagent.todo.TodoChangeType
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import mu.KotlinLogging
@@ -152,11 +155,19 @@ internal class AgentManagerLifecycleOps(
     fun deleteAgent(id: String): Boolean {
         val removed = owner.subAgents.remove(id)
         if (removed != null) {
+            if (removed.status == AgentStatus.BUSY) {
+                owner.autonomousCoordinator.cancelAgentTodo(id)
+            }
             owner.subAgentStore.deleteAgent(id)
+            persistTodoChangeMessage("Deleted sub-agent $id (${removed.name})")
             logger.info { "Deleted agent: $id" }
             return true
         }
         return false
+    }
+
+    fun persistTodoChangeMessage(content: String) {
+        owner.conversationOps.persist(Message(role = "system", content = content))
     }
 
     fun getSubAgentsFromDb(): List<SubAgent> = listSubAgentsFromDb()
@@ -176,13 +187,36 @@ internal class AgentManagerLifecycleOps(
             -> {
                 val todo = change.todo ?: return
                 owner.todoStore.saveTodo(todo)
+                persistTodoChangeMessage(formatTodoChangeMessage(change.type, todo))
             }
             de.heckenmann.visualagent.todo.TodoChangeType.REMOVED -> {
                 val todoId = change.todoId ?: return
                 owner.todoStore.deleteTodo(todoId)
+                persistTodoChangeMessage("Removed todo $todoId")
             }
-            de.heckenmann.visualagent.todo.TodoChangeType.REORDERED -> owner.todoManager.getAll().forEach { owner.todoStore.saveTodo(it) }
-            de.heckenmann.visualagent.todo.TodoChangeType.CLEARED -> owner.todoStore.clearTodos()
+            de.heckenmann.visualagent.todo.TodoChangeType.REORDERED -> {
+                owner.todoManager.getAll().forEach { owner.todoStore.saveTodo(it) }
+                val moved = change.todo?.let { " (${it.description.take(60)}, id=${it.id})" } ?: ""
+                persistTodoChangeMessage("Reordered todo list$moved")
+            }
+            de.heckenmann.visualagent.todo.TodoChangeType.CLEARED -> {
+                owner.todoStore.clearTodos()
+                persistTodoChangeMessage("Cleared all todos")
+            }
         }
+    }
+
+    private fun formatTodoChangeMessage(
+        type: TodoChangeType,
+        todo: Todo,
+    ): String {
+        val base =
+            when (type) {
+                TodoChangeType.ADDED -> "Created todo"
+                TodoChangeType.UPDATED -> "Updated todo"
+                else -> "Todo changed"
+            }
+        val assigned = todo.assignedAgentId?.let { " assigned to $it" }.orEmpty()
+        return "$base ${todo.id} (${todo.description.take(80)})$assigned [${todo.status}]"
     }
 }

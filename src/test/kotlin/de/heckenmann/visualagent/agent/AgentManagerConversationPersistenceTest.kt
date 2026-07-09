@@ -1,7 +1,7 @@
 package de.heckenmann.visualagent.agent
-
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
+import de.heckenmann.visualagent.todo.TodoEventBus
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -24,7 +24,7 @@ class AgentManagerConversationPersistenceTest {
                 message = Message("assistant", "Saved response"),
                 done = true,
             )
-        val manager1 = AgentManager(db1, provider1, AgentToolConfigService(db1), ToolEventBus())
+        val manager1 = AgentManager(db1, provider1, AgentToolConfigService(db1), ToolEventBus(), TodoEventBus())
 
         kotlinx.coroutines.runBlocking {
             manager1.sendMessage("Persist me")
@@ -36,7 +36,7 @@ class AgentManagerConversationPersistenceTest {
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                 .create(tempDb)
         val provider2 = mockk<LLMProvider>(relaxed = true)
-        val manager2 = AgentManager(db2, provider2, AgentToolConfigService(db2), ToolEventBus())
+        val manager2 = AgentManager(db2, provider2, AgentToolConfigService(db2), ToolEventBus(), TodoEventBus())
         val loaded = manager2.getHistory()
         assertEquals(2, loaded.size)
         assertEquals("user", loaded[0].role)
@@ -57,7 +57,7 @@ class AgentManagerConversationPersistenceTest {
         }
 
         val provider = mockk<LLMProvider>(relaxed = true)
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
         val initial = manager.getHistory()
         assertEquals(20, initial.size)
         assertTrue(initial.first().content.contains("message-10"))
@@ -84,7 +84,7 @@ class AgentManagerConversationPersistenceTest {
                 message = Message("assistant", "Hello, I can help with files, todos, code, terminal, and project context."),
                 done = true,
             )
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
 
         manager.clearHistory()
         val welcome =
@@ -125,7 +125,7 @@ class AgentManagerConversationPersistenceTest {
                     done = true,
                 ),
             )
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
 
         val answer =
             kotlinx.coroutines.runBlocking {

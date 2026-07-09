@@ -109,6 +109,7 @@ data class SubAgent(
         messages: List<Message>,
         provider: LLMProvider,
         enabledTools: Set<ToolId> = emptySet(),
+        token: CancellationToken? = null,
     ): ChatResponse {
         val combined = chatHistory + messages
         val modelSelection = config.modelSelection()
@@ -123,6 +124,7 @@ data class SubAgent(
                     options = modelSelection.options,
                     enabledTools = enabledTools,
                     metadata = mapOf("agentId" to id, "agentName" to name, "agentRole" to role),
+                    cancellationToken = token,
                 ),
             )
         // Save a brief record of the task and the assistant response in the agent's chat history.
@@ -134,6 +136,14 @@ data class SubAgent(
     /**
      * Perform a todo autonomously: call the LLM, and write a result to the knowledge DB if available.
      * The caller should set status/assignment before invoking this.
+     *
+     * @param todoId Todo identifier used for memory storage
+     * @param description Task description shown to the sub-agent
+     * @param provider LLM provider used for the call
+     * @param memoryStore Knowledge store for result and agent log persistence
+     * @param enabledTools Tool IDs exposed to this sub-agent
+     * @param token Optional cancellation token honoured during the LLM call
+     * @return Assistant response content
      */
     suspend fun performTodo(
         todoId: String,
@@ -141,24 +151,34 @@ data class SubAgent(
         provider: LLMProvider,
         memoryStore: de.heckenmann.visualagent.knowledge.MemoryStore,
         enabledTools: Set<ToolId> = emptySet(),
+        token: CancellationToken? = null,
     ): String {
         val messages =
             listOf(
                 Message(
                     "system",
-                    "You are $name. Your role is $role. Perform the following task and provide a concise result and the next steps.",
+                    buildString {
+                        append("You are $name. Your role is $role.")
+                        append(" The todo you are working on may be edited or cancelled while you work.")
+                        append(" If the task becomes unclear, use the `todos` tool to re-read the current description.")
+                        append(" Provide a concise result and next steps.")
+                    },
                 ),
                 Message("user", description),
             )
 
-        val resp = chat(messages, provider, enabledTools)
+        val resp = chat(messages, provider, enabledTools, token)
 
         // Persist result summary in knowledge DB (best-effort)
         try {
-            // Persist a structured knowledge record: summary + simple next steps (best-effort)
             val summary = resp.message.content.take(1000)
             val nextSteps = "Review and implement improvements as needed."
             memoryStore.saveStructuredKnowledge(subject = "todo:$todoId", summary = summary, nextSteps = nextSteps)
+            memoryStore.saveStructuredKnowledge(
+                subject = "agent:$id:log",
+                summary = "Worked on todo $todoId: ${description.take(120)}",
+                nextSteps = summary,
+            )
         } catch (e: Exception) {
             // swallow persistence errors to avoid blocking agent progress
         }

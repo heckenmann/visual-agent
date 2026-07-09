@@ -1,5 +1,4 @@
 package de.heckenmann.visualagent.agent.tests
-
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.ChatResponse
@@ -7,6 +6,7 @@ import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
+import de.heckenmann.visualagent.todo.TodoEventBus
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
@@ -28,7 +28,7 @@ class AgentManagerToolPayloadNormalizationTest {
                 message = Message("assistant", """{"tool_calls": []}"""),
                 done = true,
             )
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
 
         val response =
             runBlocking {

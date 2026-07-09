@@ -16,9 +16,10 @@ Desktop user or main orchestration agent.
 ## Main Flow
 
 1. A goal string is submitted.
-2. The goal is added as a todo.
+2. The goal is added as a todo with an `assignedAgentId` chosen by the caller.
 3. Autonomous processing starts without seeding unrelated defaults.
-4. Workers process the goal through normal assignment and review.
+4. The autonomous coordinator picks up the assigned todo when the selected agent is idle.
+5. Workers process the goal and persist a result message to the conversation.
 
 ## Result
 

@@ -1,7 +1,7 @@
 package de.heckenmann.visualagent.agent
-
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
+import de.heckenmann.visualagent.todo.TodoEventBus
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -24,7 +24,7 @@ class AgentManagerTodoCountQueryTest {
                     message = Message("assistant", "model-count-response"),
                     done = true,
                 )
-            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
+            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
 
             manager.todoManager.add("Task A")
             manager.todoManager.add("Task B")
@@ -50,7 +50,7 @@ class AgentManagerTodoCountQueryTest {
                     message = Message("assistant", "list-response"),
                     done = true,
                 )
-            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
+            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
 
             manager.todoManager.add("Task A")
             val response = manager.sendMessage("show all todos")
