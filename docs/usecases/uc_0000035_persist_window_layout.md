@@ -15,7 +15,7 @@ Desktop user.
 
 ## Main Flow
 
-1. The user opens, hides, or reorders workspace panels, or resizes the main application window.
+1. The user opens, hides, or reorders workspace panels from the rail or the workspace row, or resizes the main application window.
 2. The main window size, panel visibility, user-defined order, and preferred panel widths are captured.
 3. Layout state is persisted through the workspace layout service.
 4. When the application exits, the latest workspace state and window size have been saved.

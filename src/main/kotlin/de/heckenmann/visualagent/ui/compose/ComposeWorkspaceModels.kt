@@ -141,17 +141,6 @@ data class ComposeWorkspaceWindow(
 )
 
 /**
- * Direction for moving a workspace panel within the user-defined panel order.
- */
-enum class ComposePanelMoveDirection {
-    /** Move the panel closer to the primary stage position. */
-    Earlier,
-
-    /** Move the panel farther away from the primary stage position. */
-    Later,
-}
-
-/**
  * Restores persisted visibility and ordering onto the current workspace panel descriptors.
  *
  * Missing persisted IDs are ignored, and new default panels are appended in their default order.
@@ -192,56 +181,6 @@ private data class PanelSortKey(
     val persistedOrder: Int,
     val defaultOrder: Int,
 )
-
-/**
- * Moves a workspace panel earlier or later in the user-defined panel order.
- *
- * @param windows Current panel order
- * @param id Panel ID to move
- * @param direction Direction to move
- * @return Updated panel order, or the original order when movement is not possible
- */
-fun moveWorkspacePanel(
-    windows: List<ComposeWorkspaceWindow>,
-    id: String,
-    direction: ComposePanelMoveDirection,
-): List<ComposeWorkspaceWindow> {
-    val index = windows.indexOfFirst { it.id == id }
-    val targetIndex =
-        when (direction) {
-            ComposePanelMoveDirection.Earlier -> index - 1
-            ComposePanelMoveDirection.Later -> index + 1
-        }
-    if (index !in windows.indices || targetIndex !in windows.indices) return windows
-    return windows.toMutableList().also { mutable ->
-        val panel = mutable.removeAt(index)
-        mutable.add(targetIndex, panel)
-    }
-}
-
-/**
- * Moves one workspace panel to the position of another panel.
- *
- * @param windows Current panel order
- * @param draggedId Panel being dragged
- * @param targetId Panel currently used as the drop/reorder target
- * @return Updated panel order, or the original list when either ID is unknown
- */
-fun reorderWorkspacePanel(
-    windows: List<ComposeWorkspaceWindow>,
-    draggedId: String,
-    targetId: String,
-): List<ComposeWorkspaceWindow> {
-    if (draggedId == targetId) return windows
-    val fromIndex = windows.indexOfFirst { it.id == draggedId }
-    val targetIndex = windows.indexOfFirst { it.id == targetId }
-    if (fromIndex !in windows.indices || targetIndex !in windows.indices) return windows
-    return windows.toMutableList().also { mutable ->
-        val dragged = mutable.removeAt(fromIndex)
-        val insertionIndex = targetIndex.coerceIn(0, mutable.size)
-        mutable.add(insertionIndex, dragged)
-    }
-}
 
 /**
  * Toggles the visible state of a workspace panel.

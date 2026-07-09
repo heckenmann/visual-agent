@@ -22,11 +22,13 @@ Desktop user.
 5. The user drags a panel by its header to reorder the row.
 6. The user drags the resizer on the right edge of any panel, including the rightmost one, to change the panel's width; all panels to the right shift right, and the row becomes scrollable if needed. The resizer shows a visible three-bar grip.
 7. The user long-presses or right-clicks a rail button and chooses "Set width…" to adjust a panel's preferred width with a slider.
-8. The user can move a panel earlier or later through vertical drag gestures on the rail button.
-9. The user can hide a panel from either the left rail or the panel header close icon button.
-10. When the combined panel widths exceed the viewport, the user can scroll horizontally with a horizontal mouse wheel, the on-screen scroll arrows, or the horizontal scrollbar.
-11. Panel cards use consistent spacing, rounded chrome, subtle borders, and compact headers.
-12. The Compose shell exposes panel order, visibility, and preferred width through the workspace layout service.
+8. The user drags any rail button vertically to reorder panels; the dragged button shows a smooth preview, the other buttons animate out of the way, and the workspace row animates to the same order on release.
+9. The user drags any workspace panel header horizontally to reorder the row; the rail buttons animate to the same order on release.
+10. The user can hide a panel from either the left rail or the panel header close icon button.
+11. When the combined panel widths exceed the viewport, the user can scroll horizontally with a horizontal mouse wheel, the on-screen scroll arrows, or the horizontal scrollbar.
+12. Panel cards use consistent spacing, rounded chrome, subtle borders, and compact headers.
+13. Both the rail and the workspace row call the same reorder callback so the user-defined order stays synchronized.
+14. The Compose shell exposes panel order, visibility, and preferred width through the workspace layout service.
 
 ## Result
 
@@ -53,7 +55,9 @@ The user can keep multiple panels visible and ordered for the current task witho
 - Workspace panels stay inside the visible horizontal row.
 - Each registered panel can be opened through navigation.
 - Each visible panel can be hidden from its own panel header or the rail.
-- Dragging a panel header reorders the user-defined panel order.
+- Dragging a panel header reorders the user-defined panel order with an animated settle.
+- Dragging a rail button vertically reorders the user-defined panel order with an animated preview and settle.
+- Reordering from either location updates the other view with an animated transition.
 - Panel widths are attached to the panel identity, not to its position; reordering does not change panel widths.
 - Dragging a resizer on any panel's right edge, including the rightmost panel, changes only that panel's width and shifts all panels to the right instead of shrinking a neighbour; the resizer shows a visible three-bar grip.
 - Panel width changes can be made through a slider reachable from the rail button context menu.

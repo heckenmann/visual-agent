@@ -39,8 +39,7 @@ class ComposeRailTest {
                 ComposeRail(
                     windows = windows,
                     onToggleWindow = {},
-                    onMoveWindowEarlier = {},
-                    onMoveWindowLater = {},
+                    onReorderWindows = {},
                     onPanelWidthChanged = { _, _ -> },
                     onCloseApplication = {},
                     modalRequester = ComposeModalRequester { },

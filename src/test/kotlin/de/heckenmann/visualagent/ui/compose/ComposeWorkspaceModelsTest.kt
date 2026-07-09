@@ -89,19 +89,6 @@ class ComposeWorkspaceModelsTest {
     }
 
     @Test
-    fun `move workspace panel changes order within bounds`() {
-        val windows = listOf("chat", "todos", "files").map(::testWindow)
-
-        val movedEarlier = moveWorkspacePanel(windows, "files", ComposePanelMoveDirection.Earlier)
-        val movedLater = moveWorkspacePanel(movedEarlier, "files", ComposePanelMoveDirection.Later)
-        val unchanged = moveWorkspacePanel(windows, "chat", ComposePanelMoveDirection.Earlier)
-
-        assertEquals(listOf("chat", "files", "todos"), movedEarlier.map { it.id })
-        assertEquals(windows.map { it.id }, movedLater.map { it.id })
-        assertEquals(windows, unchanged)
-    }
-
-    @Test
     fun `toggle workspace panel switches visibility without changing order`() {
         val windows = listOf(testWindow("chat", visible = true), testWindow("todos", visible = false))
 
@@ -112,21 +99,6 @@ class ComposeWorkspaceModelsTest {
         assertFalse(chatHidden.first { it.id == "chat" }.visible)
         assertTrue(todosVisible.first { it.id == "todos" }.visible)
         assertEquals(windows, toggleWorkspacePanel(windows, "missing"))
-    }
-
-    @Test
-    fun `reorder workspace panel moves dragged panel to target slot`() {
-        val windows = listOf("chat", "todos", "files", "agents").map(::testWindow)
-
-        val reordered = reorderWorkspacePanel(windows, draggedId = "files", targetId = "chat")
-        val draggedOntoSelf = reorderWorkspacePanel(windows, draggedId = "chat", targetId = "chat")
-        val unknownTarget = reorderWorkspacePanel(windows, draggedId = "files", targetId = "missing")
-        val unknownDragged = reorderWorkspacePanel(windows, draggedId = "missing", targetId = "chat")
-
-        assertEquals(listOf("files", "chat", "todos", "agents"), reordered.map { it.id })
-        assertEquals(windows, draggedOntoSelf)
-        assertEquals(windows, unknownTarget)
-        assertEquals(windows, unknownDragged)
     }
 
     @Test

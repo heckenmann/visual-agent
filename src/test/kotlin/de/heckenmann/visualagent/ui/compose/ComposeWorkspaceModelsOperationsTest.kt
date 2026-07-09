@@ -80,22 +80,6 @@ class ComposeWorkspaceModelsOperationsTest {
     }
 
     @Test
-    fun `move workspace panel earlier and later`() {
-        val windows = listOf(window("a"), window("b"), window("c"))
-        assertEquals(listOf("b", "a", "c"), moveWorkspacePanel(windows, "a", ComposePanelMoveDirection.Later).map { it.id })
-        assertEquals(listOf("a", "b", "c"), moveWorkspacePanel(windows, "a", ComposePanelMoveDirection.Earlier).map { it.id })
-        assertEquals(listOf("a", "c", "b"), moveWorkspacePanel(windows, "c", ComposePanelMoveDirection.Earlier).map { it.id })
-    }
-
-    @Test
-    fun `reorder workspace panel moves dragged to target`() {
-        val windows = listOf(window("a"), window("b"), window("c"))
-        assertEquals(listOf("b", "a", "c"), reorderWorkspacePanel(windows, "a", "b").map { it.id })
-        assertEquals(windows, reorderWorkspacePanel(windows, "a", "a"))
-        assertEquals(windows, reorderWorkspacePanel(windows, "x", "b"))
-    }
-
-    @Test
     fun `toggle workspace panel visibility`() {
         val windows = listOf(window("a", visible = true), window("b", visible = false))
         val toggled = toggleWorkspacePanel(windows, "a")
