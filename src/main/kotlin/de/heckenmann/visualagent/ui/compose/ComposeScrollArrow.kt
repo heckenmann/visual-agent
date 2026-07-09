@@ -2,13 +2,14 @@
 
 package de.heckenmann.visualagent.ui.compose
 
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
@@ -46,15 +47,14 @@ import kotlinx.coroutines.withTimeoutOrNull
  */
 internal fun scrollArrowHandler(
     direction: Int,
-    scrollState: ScrollState,
+    scrollState: LazyListState,
     scope: CoroutineScope,
     isClosing: () -> Boolean,
 ) {
     if (isClosing()) return
-    val target = (scrollState.value + direction * SCROLL_ARROW_STEP_PX).coerceIn(0, scrollState.maxValue)
     scope.launch {
         if (isClosing()) return@launch
-        scrollState.animateScrollTo(target)
+        scrollState.scrollBy(direction * SCROLL_ARROW_STEP_PX.toFloat())
     }
 }
 
@@ -73,18 +73,14 @@ internal fun scrollArrowHandler(
  */
 internal fun startContinuousScroll(
     direction: Int,
-    scrollState: ScrollState,
+    scrollState: LazyListState,
     scope: CoroutineScope,
     isClosing: () -> Boolean,
 ): Job {
     return scope.launch {
         while (isActive && !isClosing()) {
-            val previous = scrollState.value
-            val target = (scrollState.value + direction * SCROLL_ARROW_STEP_PX).coerceIn(0, scrollState.maxValue)
-            scrollState.animateScrollTo(target)
-            val reachedMaxEdge = scrollState.value == scrollState.maxValue && direction > 0
-            val reachedMinEdge = scrollState.value == 0 && direction < 0
-            if (scrollState.value == previous || reachedMaxEdge || reachedMinEdge) {
+            val consumed = scrollState.scrollBy(direction * SCROLL_ARROW_STEP_PX.toFloat())
+            if (consumed == 0f) {
                 return@launch
             }
             delay(SCROLL_ARROW_REPEAT_DELAY_MS)
@@ -109,7 +105,7 @@ internal fun startContinuousScroll(
 @Composable
 internal fun ScrollArrow(
     direction: Int,
-    scrollState: ScrollState,
+    scrollState: LazyListState,
     isClosing: () -> Boolean,
     modifier: Modifier = Modifier,
 ) {

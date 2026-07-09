@@ -22,6 +22,7 @@ Enabled sub-agent.
 5. When an enabled model needs a layout change, it calls `workspace:layout` with `set` and a bounded window patch.
 6. The service persists the requested state and notifies the live Compose workspace.
 7. The Compose workspace restores the patched visibility, order, and preferred sizes into the semantic split layout.
+8. Rail buttons and workspace panels animate to reflect any order change, whether initiated by the user or by the model.
 
 ## Result
 

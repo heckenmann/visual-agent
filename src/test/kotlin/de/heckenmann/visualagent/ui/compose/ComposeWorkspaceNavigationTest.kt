@@ -71,8 +71,7 @@ class ComposeWorkspaceNavigationTest {
                 ComposeRail(
                     windows = listOf(testWindow("chat", visible = true), testWindow("todos", visible = false)),
                     onToggleWindow = {},
-                    onMoveWindowEarlier = {},
-                    onMoveWindowLater = {},
+                    onReorderWindows = {},
                     onPanelWidthChanged = { _, _ -> },
                     onCloseApplication = {},
                     modalRequester = ComposeModalRequester { },
@@ -91,8 +90,7 @@ class ComposeWorkspaceNavigationTest {
                 ComposeRail(
                     windows = emptyList(),
                     onToggleWindow = {},
-                    onMoveWindowEarlier = {},
-                    onMoveWindowLater = {},
+                    onReorderWindows = {},
                     onPanelWidthChanged = { _, _ -> },
                     onCloseApplication = { closed = true },
                     modalRequester = ComposeModalRequester { },

@@ -145,12 +145,6 @@ private fun VisualAgentComposeApp(
     val activateWindow: (String) -> Unit = { id ->
         windows = windows.map { window -> if (window.id == id) window.copy(visible = true) else window }
     }
-    val moveWindowEarlier: (String) -> Unit = { id ->
-        windows = moveWorkspacePanel(windows, id, ComposePanelMoveDirection.Earlier)
-    }
-    val moveWindowLater: (String) -> Unit = { id ->
-        windows = moveWorkspacePanel(windows, id, ComposePanelMoveDirection.Later)
-    }
     val resizeWindow: (String, Int) -> Unit = { id, width ->
         windows =
             windows.map { window ->
@@ -222,8 +216,7 @@ private fun VisualAgentComposeApp(
                     ComposeRail(
                         windows = windows,
                         onToggleWindow = toggleWindow,
-                        onMoveWindowEarlier = moveWindowEarlier,
-                        onMoveWindowLater = moveWindowLater,
+                        onReorderWindows = reorderWindows,
                         onPanelWidthChanged = updatePanelWidth,
                         onCloseApplication = onCloseApplication,
                         modalRequester = panelServices.modalRequester,
