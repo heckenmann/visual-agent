@@ -6,7 +6,7 @@ import androidx.compose.foundation.HorizontalScrollbar
 import androidx.compose.foundation.ScrollbarStyle
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,7 +17,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyItemScope
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -35,23 +38,25 @@ import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import sh.calvin.reorderable.ReorderableItem
-import sh.calvin.reorderable.ReorderableRow
-import sh.calvin.reorderable.ReorderableRowScope
+import sh.calvin.reorderable.ReorderableLazyListState
+import sh.calvin.reorderable.rememberReorderableLazyListState
 
 /**
- * Renders the visible workspace panels in a single horizontal row.
+ * Renders the visible workspace panels in a single horizontally scrollable row.
  *
  * Every visible panel gets a column that spans the full row height. Every panel,
  * including the rightmost one, has a draggable resizer handle on its right edge
  * so users can resize each panel independently. The panel order can be changed
- * by dragging the panel header grip thanks to `sh.calvin.reorderable`.
+ * by dragging the panel header grip; reordering from the left rail or from the
+ * panels themselves animates the row using `sh.calvin.reorderable` lazy item
+ * animations.
  *
  * @param windows All workspace panels in persistent order
  * @param panelServices Services required by the individual panel bodies
  * @param onToggleWindow Callback that toggles the visibility of a panel
  * @param onReorderWindows Callback that receives the visible panels in their
  *   new order after a drag gesture
- * @param onResizeWindow Callback that receives an updated list of panel widths
+ * @param onResizeWindow Callback that receives an updated preferred width for a panel
  * @param minPanelWidth Minimum width for each panel in pixels
  * @param viewport Available workspace dimensions used by resizer math
  * @param modifier Modifier applied to the workspace root
@@ -72,8 +77,19 @@ internal fun ComposeSplitWorkspace(
 ) {
     val visibleWindows = windows.filter { it.visible }
     val resizeUpdatedState = rememberUpdatedState(onResizeWindow)
-    val horizontalScrollState = rememberScrollState()
+    val horizontalScrollState = rememberLazyListState()
     val scrollScope = rememberCoroutineScope()
+    val reorderableState =
+        rememberReorderableLazyListState(
+            lazyListState = horizontalScrollState,
+            onMove = { from, to ->
+                val reordered =
+                    visibleWindows.toMutableList().apply {
+                        add(to.index, removeAt(from.index))
+                    }
+                onReorderWindows(reordered)
+            },
+        )
     Box(modifier = modifier.fillMaxSize()) {
         WorkspaceBackdrop()
         if (visibleWindows.isEmpty()) {
@@ -91,42 +107,41 @@ internal fun ComposeSplitWorkspace(
                         modifier =
                             Modifier
                                 .fillMaxSize()
-                                .horizontalScroll(horizontalScrollState)
                                 .onPointerEvent(PointerEventType.Scroll) { event ->
                                     val change = event.changes.firstOrNull()
                                     val scrollDelta = change?.scrollDelta
                                     val horizontalScrollDelta = scrollDelta?.x ?: 0f
                                     if (horizontalScrollDelta != 0f && canScroll) {
-                                        val next =
-                                            (horizontalScrollState.value + horizontalScrollDelta.toInt() * HORIZONTAL_WHEEL_SCROLL_STEP)
-                                                .coerceIn(0, horizontalScrollState.maxValue)
-                                        scrollScope.launch { horizontalScrollState.scrollTo(next) }
+                                        scrollScope.launch {
+                                            horizontalScrollState.scrollBy(
+                                                horizontalScrollDelta * HORIZONTAL_WHEEL_SCROLL_STEP,
+                                            )
+                                        }
                                         event.changes.forEach { it.consume() }
                                     }
                                 },
                     ) {
-                        ReorderableRow(
-                            list = visibleWindows,
-                            onSettle = { fromIndex, toIndex ->
-                                val reordered =
-                                    visibleWindows.toMutableList().apply {
-                                        add(toIndex, removeAt(fromIndex))
-                                    }
-                                onReorderWindows(reordered)
-                            },
+                        LazyRow(
+                            state = horizontalScrollState,
                             modifier = Modifier.fillMaxHeight(),
-                        ) { index, window, isDragging ->
-                            SplitPanelItem(
-                                window = window,
-                                panelServices = panelServices,
-                                isDragging = isDragging,
-                                width = widths.getOrElse(index) { minPanelWidth },
-                                isLast = index == visibleWindows.lastIndex,
-                                onWidthChanged = { next -> resizeUpdatedState.value.invoke(window.id, next) },
-                                onCloseWindow = { onToggleWindow(window.id) },
-                                minPanelWidth = minPanelWidth,
-                                rowHeight = viewport.height,
-                            )
+                        ) {
+                            items(
+                                items = visibleWindows,
+                                key = { it.id },
+                            ) { window ->
+                                val index = visibleWindows.indexOf(window)
+                                SplitPanelItem(
+                                    state = reorderableState,
+                                    window = window,
+                                    panelServices = panelServices,
+                                    width = widths.getOrElse(index) { minPanelWidth },
+                                    isLast = index == visibleWindows.lastIndex,
+                                    onWidthChanged = { next -> resizeUpdatedState.value.invoke(window.id, next) },
+                                    onCloseWindow = { onToggleWindow(window.id) },
+                                    minPanelWidth = minPanelWidth,
+                                    rowHeight = viewport.height,
+                                )
+                            }
                         }
                     }
                     if (canScroll) {
@@ -189,10 +204,10 @@ private fun EmptyWorkspace() {
 }
 
 @Composable
-private fun ReorderableRowScope.SplitPanelItem(
+private fun LazyItemScope.SplitPanelItem(
+    state: ReorderableLazyListState,
     window: ComposeWorkspaceWindow,
     panelServices: ComposePanelServices,
-    isDragging: Boolean,
     width: Int,
     isLast: Boolean,
     onWidthChanged: (Int) -> Unit,
@@ -200,7 +215,11 @@ private fun ReorderableRowScope.SplitPanelItem(
     minPanelWidth: Int,
     rowHeight: Int,
 ) {
-    ReorderableItem(modifier = Modifier.height(rowHeight.dp)) {
+    ReorderableItem(
+        state = state,
+        key = window.id,
+        modifier = Modifier.height(rowHeight.dp),
+    ) { isDragging ->
         Row(modifier = Modifier.height(rowHeight.dp)) {
             SplitPanelContent(
                 window = window,
@@ -260,4 +279,4 @@ internal fun WindowBody(
     }
 }
 
-private const val HORIZONTAL_WHEEL_SCROLL_STEP = 50
+private const val HORIZONTAL_WHEEL_SCROLL_STEP = 50f

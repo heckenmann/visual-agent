@@ -41,10 +41,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.ui.compose.WORKSPACE_PANEL_RESIZER_WIDTH
-import sh.calvin.reorderable.ReorderableListItemScope
+import sh.calvin.reorderable.ReorderableCollectionItemScope
 
 @Composable
-internal fun ReorderableListItemScope.SplitPanelContent(
+internal fun ReorderableCollectionItemScope.SplitPanelContent(
     window: ComposeWorkspaceWindow,
     panelServices: ComposePanelServices,
     isDragging: Boolean,
@@ -111,7 +111,7 @@ internal fun ReorderableListItemScope.SplitPanelContent(
 }
 
 @Composable
-private fun ReorderableListItemScope.SplitPanelHeader(
+private fun ReorderableCollectionItemScope.SplitPanelHeader(
     window: ComposeWorkspaceWindow,
     primary: Boolean,
     onClose: () -> Unit,
