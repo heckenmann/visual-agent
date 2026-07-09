@@ -1,14 +1,19 @@
 package de.heckenmann.visualagent.agent.tools
 
+import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.ToolDefinition
 import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.agent.ToolResult
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.knowledge.MemoryStore
 import de.heckenmann.visualagent.knowledge.TodoStore
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoStatus
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
+import org.springframework.context.annotation.Lazy
 import org.springframework.stereotype.Component
 
 /**
@@ -133,15 +138,19 @@ class ContextTool(
 @Component
 class TodosTool(
     private val todoStore: TodoStore,
+    private val memoryStore: MemoryStore,
+    @param:Lazy private val agentManager: AgentManager,
 ) : VisualAgentTool {
     override val definition =
         ToolDefinition(
             id = ToolId("todos"),
             name = ToolId("todos").toFunctionName(),
             description =
-                "Manage todos. Actions: list, count, add, update, complete, cancel, remove, reorder. " +
-                    "Input: {\"action\":\"list|count|add|update|complete|cancel|remove|reorder\", ...}. " +
-                    "The first pending todo is the next one to process; use reorder to change what is next.",
+                "Manage todos. Actions: list, count, add, update, complete, cancel, remove, reorder, get-result. " +
+                    "Input: {\"action\":\"list|count|add|update|complete|cancel|remove|reorder|get-result\", ...}. " +
+                    "Every new todo must include assignedAgentId referencing an existing sub-agent. " +
+                    "The first pending todo is the next one to process; use reorder to change what is next. " +
+                    "Use get-result to read the stored result summary for a completed/cancelled todo.",
             inputSchema = STRING_SCHEMA,
         )
 
@@ -159,6 +168,7 @@ class TodosTool(
             "cancel" -> updateStatus(input, TodoStatus.CANCELLED)
             "remove" -> removeTodo(input)
             "reorder" -> reorderTodos(input)
+            "get-result" -> getTodoResult(input)
             else -> failure("todos", "Unsupported todos action")
         }
     }
@@ -187,6 +197,18 @@ class TodosTool(
     }
 
     private fun addTodo(input: JsonObject): ToolResult {
+        val assignedAgentId =
+            input.string("assignedAgentId")
+                ?: return failure(
+                    "todos",
+                    "assignedAgentId is required and must reference an existing sub-agent",
+                )
+        if (!agentExists(assignedAgentId)) {
+            return failure(
+                "todos",
+                "assignedAgentId is required and must reference an existing sub-agent",
+            )
+        }
         val todo =
             Todo(
                 id =
@@ -196,6 +218,7 @@ class TodosTool(
                 description = input.requiredString("description"),
                 status = TodoStatus.PENDING,
                 position = todoStore.listTodos().maxOfOrNull { it.position }?.plus(1) ?: 0,
+                assignedAgentId = assignedAgentId,
             )
         todoStore.saveTodo(todo)
         return success("todos", "Added todo ${todo.id}")
@@ -204,11 +227,18 @@ class TodosTool(
     private fun updateTodo(input: JsonObject): ToolResult {
         val id = input.requiredString("id")
         val existing = todoStore.listTodos().firstOrNull { it.id == id } ?: return failure("todos", "Todo not found")
+        val newAssignedAgentId = input.string("assignedAgentId")
+        if (newAssignedAgentId != null && !agentExists(newAssignedAgentId)) {
+            return failure(
+                "todos",
+                "assignedAgentId must reference an existing sub-agent",
+            )
+        }
         val updated =
             existing
                 .copy(
                     description = input.string("description") ?: existing.description,
-                    assignedAgentId = input.string("assignedAgentId") ?: existing.assignedAgentId,
+                    assignedAgentId = newAssignedAgentId ?: existing.assignedAgentId,
                 ).also {
                     it.status =
                         input.string("status")?.let { s -> runCatching { TodoStatus.valueOf(s.uppercase()) }.getOrNull() }
@@ -267,5 +297,26 @@ class TodosTool(
             todoStore.saveTodo(todo.copy(position = index))
         }
         return success("todos", "Reordered todo $id to position $targetPosition")
+    }
+
+    private fun getTodoResult(input: JsonObject): ToolResult {
+        val id = input.requiredString("id")
+        val results = memoryStore.searchMemories("todo:$id", limit = 1)
+        val result =
+            results.firstOrNull()
+                ?: return failure("todos", "No result available for todo $id")
+        val summary = extractSummary(result.content)
+        return success("todos", "Result for todo $id:\n$summary")
+    }
+
+    private fun agentExists(agentId: String): Boolean = agentManager.getSubAgent(agentId) != null
+
+    private fun extractSummary(content: String): String {
+        val parsed = runCatching { parseObject(content) }.getOrNull()
+        if (parsed != null) {
+            val summary = parsed["summary"]?.jsonPrimitive?.contentOrNull
+            if (!summary.isNullOrBlank()) return summary
+        }
+        return content.take(2000)
     }
 }

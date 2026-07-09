@@ -17,6 +17,7 @@ import de.heckenmann.visualagent.knowledge.TodoStore
 import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
 import de.heckenmann.visualagent.knowledge.WorkspaceFileStore
 import de.heckenmann.visualagent.todo.Todo
+import de.heckenmann.visualagent.todo.TodoEventBus
 import org.springframework.boot.SpringBootConfiguration
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration
 import org.springframework.boot.builder.SpringApplicationBuilder
@@ -66,6 +67,7 @@ class TestPersistence internal constructor(
     fun createAgentManager(
         provider: LLMProvider,
         toolEventBus: ToolEventBus = ToolEventBus(),
+        todoEventBus: TodoEventBus = TodoEventBus(),
     ): AgentManager {
         val configService = AgentToolConfigService(subAgentConfigStore)
         return AgentManager(
@@ -76,6 +78,7 @@ class TestPersistence internal constructor(
             provider,
             configService,
             toolEventBus,
+            todoEventBus,
         )
     }
 

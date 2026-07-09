@@ -1,8 +1,8 @@
 package de.heckenmann.visualagent.agent
-
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+import de.heckenmann.visualagent.todo.TodoEventBus
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.CancellationException
@@ -29,7 +29,7 @@ class AgentManagerCancellationTest {
                 cancelled.await()
                 flow { throw CancellationException("Cancelled") }
             }
-            val manager = AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus())
+            val manager = AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus(), TodoEventBus())
             val token = CancellationToken()
             val streamJob =
                 launch {
@@ -63,7 +63,7 @@ class AgentManagerCancellationTest {
                 cancelled.await()
                 throw CancellationException("Cancelled")
             }
-            val manager = AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus())
+            val manager = AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus(), TodoEventBus())
             try {
                 val jobId = manager.enqueueAgentJob("test agent", "coder", "researcher", "do work")
                 started.await()
@@ -89,7 +89,7 @@ class AgentManagerCancellationTest {
                 cancelled.await()
                 throw CancellationException("Cancelled")
             }
-            val manager = AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus())
+            val manager = AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus(), TodoEventBus())
             try {
                 val jobId = manager.enqueueAgentJob("test agent", "coder", "researcher", "do work")
                 started.await()
@@ -108,7 +108,7 @@ class AgentManagerCancellationTest {
     fun `cancelSubAgentJob for unknown id returns false`() {
         val stores = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
         val provider = mockk<LLMProvider>(relaxed = true)
-        val manager = AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus())
+        val manager = AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus(), TodoEventBus())
         try {
             assertFalse(manager.cancelSubAgentJob("does-not-exist"))
         } finally {

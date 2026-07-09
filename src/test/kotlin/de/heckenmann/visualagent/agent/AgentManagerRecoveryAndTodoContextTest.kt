@@ -1,8 +1,8 @@
 package de.heckenmann.visualagent.agent
-
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.todo.TodoEventBus
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -28,7 +28,7 @@ class AgentManagerRecoveryAndTodoContextTest {
                     message = Message("assistant", "ok"),
                     done = true,
                 )
-            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
+            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
             val previousInstruction = AppConfig.instance.userModelInstruction
             try {
                 AppConfig.instance.userModelInstruction = "Always answer in German."
@@ -46,7 +46,7 @@ class AgentManagerRecoveryAndTodoContextTest {
                         "The main agent must not use direct workspace, file, terminal, browser, search, history, or todo tools",
                     ),
                 )
-                assertTrue(firstMessage.content.contains("Use only sub-agent control tools"))
+                assertTrue(firstMessage.content.contains("Use only sub-agent definition tools"))
                 assertTrue(secondMessage.role == "system")
                 assertTrue(secondMessage.content.contains("Always answer in German."))
             } finally {
@@ -71,7 +71,7 @@ class AgentManagerRecoveryAndTodoContextTest {
                     message = Message("assistant", "Recovered and continued."),
                     done = true,
                 )
-            AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
+            AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
 
             delay(600)
             val messages = db.getConversationMessages("main")
@@ -91,7 +91,7 @@ class AgentManagerRecoveryAndTodoContextTest {
             val provider = mockk<LLMProvider>(relaxed = true)
             coEvery { provider.checkConnection() } returns true
             coEvery { provider.chat(any<ChatRequestContext>()) } throws IllegalStateException("401 invalid api key")
-            AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
+            AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
 
             delay(600)
             val messages = db.getConversationMessages("main")

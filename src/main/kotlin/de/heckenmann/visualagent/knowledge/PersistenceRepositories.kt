@@ -7,11 +7,21 @@ import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
+import java.time.Instant
+
+internal interface MemoryProjection {
+    val id: String
+    val content: String
+    val tags: String?
+    val createdAt: Instant
+}
 
 internal interface MemoryRepository : JpaRepository<MemoryEntity, String> {
     @Query(
         """
-        SELECT memory FROM MemoryEntity memory
+        SELECT memory.id AS id, memory.content AS content, memory.tags AS tags, memory.createdAt AS createdAt,
+               memory.accessCount AS accessCount, memory.lastAccessed AS lastAccessed
+        FROM MemoryEntity memory
         WHERE memory.content LIKE CONCAT('%', :query, '%')
            OR memory.tags LIKE CONCAT('%', :query, '%')
         ORDER BY memory.createdAt DESC
@@ -20,7 +30,7 @@ internal interface MemoryRepository : JpaRepository<MemoryEntity, String> {
     fun search(
         @Param("query") query: String,
         pageable: Pageable,
-    ): List<MemoryEntity>
+    ): List<MemoryProjection>
 }
 
 internal interface ProjectKnowledgeRepository : JpaRepository<ProjectKnowledgeEntity, String>

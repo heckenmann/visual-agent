@@ -10,6 +10,23 @@ import kotlin.test.assertTrue
 
 class AgentToolConfigServiceTest {
     @Test
+    fun `main agent tool set only includes sub-agent definition tools`() {
+        val store = MapSubAgentConfigStore()
+        val service = AgentToolConfigService(store)
+
+        val tools = service.mainAgentTools().map { it.value }.toSet()
+        assertTrue("agent:list" in tools)
+        assertTrue("agent:create" in tools)
+        assertTrue("agent:update" in tools)
+        assertTrue("agent:delete" in tools)
+        assertFalse("agent:start" in tools)
+        assertFalse("agent:message" in tools)
+        assertFalse("agent:assign-todo" in tools)
+        assertFalse("agent:assign-next-todo" in tools)
+        assertFalse("agent:assign-all-todos" in tools)
+    }
+
+    @Test
     fun `existing default configs receive newly introduced default tools`() {
         val store = MapSubAgentConfigStore()
         store.saveSubAgentConfig(
@@ -28,20 +45,6 @@ class AgentToolConfigServiceTest {
         assertTrue("workspace:layout" in updated.tools)
         assertTrue("canvas" in updated.tools)
         assertTrue("usecases" in updated.tools)
-    }
-
-    @Test
-    fun `globally disabled tools are filtered from agent tool sets`() {
-        val store = MapSubAgentConfigStore()
-        val service = AgentToolConfigService(store)
-        val agent = SubAgent(id = "coder", name = "Coder", role = "code")
-
-        service.setToolGloballyEnabled("file:write", false)
-        service.setToolGloballyEnabled("agent:start", false)
-
-        assertFalse(ToolId("file:write") in service.toolsFor(agent))
-        assertFalse(ToolId("agent:start") in service.mainAgentTools())
-        assertTrue("file:write" in service.disabledToolIds())
     }
 
     @Test

@@ -114,9 +114,7 @@ policy reinforces this in the system prompt.
 | `agent:delete` | `delete` | Removes a sub-agent. |
 | `agent:start` | `start` (sync / `async:true`) | Creates a sub-agent from a template and runs the job sync or enqueues async. |
 | `agent:message` | `message` (sync / `async:true`) | Sends a message to an existing sub-agent id, sync or async. |
-| `agent:assign-todo` | `assignTodo` | Assigns a specific todo to a sub-agent. |
-| `agent:assign-next-todo` | `assignNextTodo` | Assigns the next pending todo to an idle agent. |
-| `agent:assign-all-todos` | `assignAllTodos` | Distributes pending todos across idle agents up to `AppConfig.maxParallelSubAgents`. |
+| `todos` | `get-result` | Returns the stored result summary for a todo. |
 
 ### Sub-agent role-based tool sets
 
@@ -148,7 +146,8 @@ role-based sets above and the global blocklist:
 - `history`: actions `load` (paged) and `search` (FTS5 + `LIKE`
   fallback) of conversation messages.
 - `todos`: actions `list`, `get`, `add`, `update`, `complete`,
-  `cancel`, `clear`, `assignToAgent`.
+  `cancel`, `clear`, `assignToAgent`, `get-result`. `add` requires a
+  valid `assignedAgentId`.
 - `context`: runtime context (active provider/model/key configured/
   streaming/thinking).
 - `pwd`: returns the managed workspace root path.

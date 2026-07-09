@@ -24,7 +24,7 @@ internal class AgentManagerConversationOps(
     private val logger = KotlinLogging.logger {}
     private val historyOps = AgentConversationHistoryOps(owner, ::buildMainRequest)
 
-    private fun persist(message: Message): Message {
+    internal fun persist(message: Message): Message {
         val id =
             owner.conversationStore.saveConversationMessage(
                 AgentManager.MAIN_SESSION_ID,

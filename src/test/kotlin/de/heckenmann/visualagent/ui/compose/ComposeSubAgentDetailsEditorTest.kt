@@ -1,7 +1,6 @@
 @file:Suppress("FunctionName")
 
 package de.heckenmann.visualagent.ui.compose
-
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -11,6 +10,7 @@ import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+import de.heckenmann.visualagent.todo.TodoEventBus
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.Rule
@@ -24,7 +24,7 @@ class ComposeSubAgentDetailsEditorTest {
     fun `sub agent details editor renders configuration fields`() {
         val db = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
         val provider = mockk<de.heckenmann.visualagent.agent.LLMProvider>(relaxed = true)
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
         val agent = manager.createAgent("Worker", "coder")
         val toolConfigService = AgentToolConfigService(db)
         val toolRegistry = mockk<ToolRegistry>()
@@ -56,7 +56,7 @@ class ComposeSubAgentDetailsEditorTest {
     fun `sub agents panel renders creation controls and empty state`() {
         val db = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
         val provider = mockk<de.heckenmann.visualagent.agent.LLMProvider>(relaxed = true)
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
         val toolConfigService = AgentToolConfigService(db)
         val toolRegistry = mockk<ToolRegistry>()
         every { toolRegistry.toolDefinitions() } returns emptyList()

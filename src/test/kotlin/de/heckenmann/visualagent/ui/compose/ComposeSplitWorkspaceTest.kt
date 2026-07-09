@@ -1,7 +1,6 @@
 @file:Suppress("FunctionName")
 
 package de.heckenmann.visualagent.ui.compose
-
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -17,6 +16,7 @@ import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.canvas.CanvasOperations
 import de.heckenmann.visualagent.config.AppConfig
 import de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
 import io.mockk.mockk
 import org.junit.Assert.assertTrue
@@ -31,7 +31,7 @@ class ComposeSplitWorkspaceTest {
     fun `split workspace renders empty state when no panels visible`() {
         val db = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
         val provider = mockk<LLMProvider>(relaxed = true)
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
         val services =
             ComposePanelServices(
                 config = AppConfig.instance,
@@ -81,7 +81,7 @@ class ComposeSplitWorkspaceTest {
     fun `split workspace renders visible chat panel`() {
         val db = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
         val provider = mockk<LLMProvider>(relaxed = true)
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
         val services =
             ComposePanelServices(
                 config = AppConfig.instance,
@@ -132,7 +132,7 @@ class ComposeSplitWorkspaceTest {
     fun `split workspace renders resizer for the rightmost visible panel`() {
         val db = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
         val provider = mockk<LLMProvider>(relaxed = true)
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
         val services =
             ComposePanelServices(
                 config = AppConfig.instance,
