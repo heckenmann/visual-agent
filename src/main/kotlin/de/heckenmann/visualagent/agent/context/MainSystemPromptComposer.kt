@@ -28,7 +28,7 @@ internal object MainSystemPromptComposer {
                 "- no active todos"
             } else {
                 todos.joinToString("\n") { todo ->
-                    "- [${todo.status}] ${todo.description} (id=${todo.id}, priority=${todo.priority}, assigned=${todo.assignedAgentId ?: "none"})"
+                    "- [${todo.status}] ${todo.description} (id=${todo.id}, position=${todo.position}, assigned=${todo.assignedAgentId ?: "none"})"
                 }
             }
         val resumeHint =
@@ -46,10 +46,17 @@ internal object MainSystemPromptComposer {
             - Done: $doneCount
             - Cancelled: $cancelledCount
             - Total: $totalCount
-            
-            Current TODO list:
+
+            Current TODO list (ordered by position; the FIRST pending todo is the next one to process):
             $todoLines
-            
+
+            Todo list ordering:
+            - The todo list is ordered by position: the FIRST pending todo is the next one to work on.
+            - New todos are appended at the end of the list.
+            - Use `todos` with `{"action":"reorder","id":"...","position":0}` to move a todo to the top (next to process).
+            - Reorder the list to reflect what should be done next — the topmost pending todo is picked up by `agent:assign-next-todo`.
+            - Keep the list ordered by priority of work, not by creation time.
+
             Execution policy:
             - Break down complex tasks.
             - Delegate implementation/research subtasks to worker agents when useful.

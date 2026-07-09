@@ -1,7 +1,6 @@
 package de.heckenmann.visualagent.knowledge
 
 import de.heckenmann.visualagent.todo.Todo
-import de.heckenmann.visualagent.todo.TodoPriority
 import de.heckenmann.visualagent.todo.TodoStatus
 import org.junit.jupiter.api.Test
 import java.time.Instant
@@ -22,7 +21,7 @@ class KnowledgeDbTodoTest {
                 id = "todo-1",
                 description = "Persisted todo",
                 status = TodoStatus.PENDING,
-                priority = TodoPriority.HIGH,
+                position = 1,
                 createdAt = Instant.now(),
             )
         db.saveTodo(todo)

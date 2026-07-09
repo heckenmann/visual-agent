@@ -1,7 +1,7 @@
 package de.heckenmann.visualagent.agent.tools
 
+import de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
 import de.heckenmann.visualagent.todo.Todo
-import de.heckenmann.visualagent.todo.TodoPriority
 import de.heckenmann.visualagent.todo.TodoStatus
 import org.junit.jupiter.api.Test
 import java.time.Instant
@@ -13,9 +13,12 @@ import kotlin.test.assertTrue
 class TodosToolTest {
     @Test
     fun `count action returns total and status distribution`() {
-        val tempDb = createTempDirectory("visual-agent-todos-tool-test").resolve("todos-tool.db").toString()
+        val tempDb =
+            createTempDirectory("visual-agent-todos-tool-test")
+                .resolve("todos-tool.db")
+                .toString()
         val db =
-            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+            KnowledgeDbTestFactory
                 .create(tempDb)
         try {
             db.saveTodo(
@@ -23,7 +26,7 @@ class TodosToolTest {
                     id = "t1",
                     description = "Pending task",
                     status = TodoStatus.PENDING,
-                    priority = TodoPriority.MEDIUM,
+                    position = 0,
                     createdAt = Instant.now(),
                 ),
             )
@@ -32,7 +35,7 @@ class TodosToolTest {
                     id = "t2",
                     description = "In progress task",
                     status = TodoStatus.IN_PROGRESS,
-                    priority = TodoPriority.HIGH,
+                    position = 1,
                     createdAt = Instant.now(),
                 ),
             )
@@ -41,13 +44,13 @@ class TodosToolTest {
                     id = "t3",
                     description = "Done task",
                     status = TodoStatus.COMPLETED,
-                    priority = TodoPriority.LOW,
+                    position = 2,
                     createdAt = Instant.now(),
                 ),
             )
 
             val tool = TodosTool(db)
-            val result = tool.execute("""{"action":"count"}""")
+            val result = tool.execute(json("action" to "count"))
 
             assertTrue(result.success)
             assertEquals("todos", result.toolId)
@@ -63,36 +66,128 @@ class TodosToolTest {
 
     @Test
     fun `todo actions cover the complete persisted lifecycle`() {
-        val tempDb = createTempDirectory("visual-agent-todos-tool-lifecycle").resolve("todos-tool.db").toString()
+        val tempDb =
+            createTempDirectory("visual-agent-todos-tool-lifecycle")
+                .resolve("todos-tool.db")
+                .toString()
         val db =
-            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+            KnowledgeDbTestFactory
                 .create(tempDb)
         try {
             val tool = TodosTool(db)
-            assertEquals("No todos.", tool.execute("""{"action":"list"}""").content)
+            assertEquals("No todos.", tool.execute(json("action" to "list")).content)
 
-            val added = tool.execute("""{"action":"add","description":"Ship feature","priority":"high"}""")
+            val added = tool.execute(json("action" to "add", "description" to "Ship feature"))
             assertTrue(added.success)
             val id = added.content.removePrefix("Added todo ")
-            assertTrue(tool.execute("""{"action":"list"}""").content.contains("Ship feature"))
+            assertTrue(tool.execute(json("action" to "list")).content.contains("Ship feature"))
 
             assertTrue(
                 tool
                     .execute(
-                        """{"action":"update","id":"$id","description":"Ship tested feature","status":"in_progress","assignedAgentId":"coder"}""",
+                        json(
+                            "action" to "update",
+                            "id" to id,
+                            "description" to "Ship tested feature",
+                            "status" to "in_progress",
+                            "assignedAgentId" to "coder",
+                        ),
                     ).success,
             )
-            assertTrue(tool.execute("""{"action":"complete","id":"$id"}""").success)
+            assertTrue(tool.execute(json("action" to "complete", "id" to id)).success)
             assertTrue(db.listTodos().single().completedAt != null)
-            assertTrue(tool.execute("""{"action":"cancel","id":"$id"}""").success)
-            assertTrue(tool.execute("""{"action":"remove","id":"$id"}""").success)
+            assertTrue(tool.execute(json("action" to "cancel", "id" to id)).success)
+            assertTrue(tool.execute(json("action" to "remove", "id" to id)).success)
             assertTrue(db.listTodos().isEmpty())
 
-            assertFalse(tool.execute("""{"action":"update","id":"missing"}""").success)
-            assertFalse(tool.execute("""{"action":"complete","id":"missing"}""").success)
-            assertFalse(tool.execute("""{"action":"invalid"}""").success)
+            assertFalse(tool.execute(json("action" to "update", "id" to "missing")).success)
+            assertFalse(tool.execute(json("action" to "complete", "id" to "missing")).success)
+            assertFalse(tool.execute(json("action" to "invalid")).success)
         } finally {
             db.close()
         }
     }
+
+    @Test
+    fun `reorder action changes position`() {
+        val tempDb =
+            createTempDirectory("visual-agent-todos-tool-reorder")
+                .resolve("todos-tool.db")
+                .toString()
+        val db =
+            KnowledgeDbTestFactory
+                .create(tempDb)
+        try {
+            val tool = TodosTool(db)
+            tool.execute(json("action" to "add", "description" to "A"))
+            tool.execute(json("action" to "add", "description" to "B"))
+            val addedC = tool.execute(json("action" to "add", "description" to "C"))
+            val idC = addedC.content.removePrefix("Added todo ")
+
+            val result = tool.execute(json("action" to "reorder", "id" to idC, "position" to 0))
+            assertTrue(result.success)
+            val listResult = tool.execute(json("action" to "list"))
+            assertTrue(listResult.content.contains("position=0"))
+            assertTrue(listResult.content.contains("C"))
+            assertEquals(0, db.listTodos().first { it.description == "C" }.position)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun `reorder before action changes position`() {
+        val tempDb =
+            createTempDirectory("visual-agent-todos-tool-reorder-before")
+                .resolve("todos-tool.db")
+                .toString()
+        val db =
+            KnowledgeDbTestFactory
+                .create(tempDb)
+        try {
+            val tool = TodosTool(db)
+            val a = tool.execute(json("action" to "add", "description" to "A"))
+            val idA = a.content.removePrefix("Added todo ")
+            tool.execute(json("action" to "add", "description" to "B"))
+            val idB = db.listTodos().first { it.description == "B" }.id
+
+            val result = tool.execute(json("action" to "reorder", "id" to idA, "before" to idB))
+            assertTrue(result.success)
+            assertEquals(0, db.listTodos().first { it.description == "A" }.position)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun `reorder fails for missing todo`() {
+        val tempDb =
+            createTempDirectory("visual-agent-todos-tool-reorder-missing")
+                .resolve("todos-tool.db")
+                .toString()
+        val db =
+            KnowledgeDbTestFactory
+                .create(tempDb)
+        try {
+            val tool = TodosTool(db)
+            assertFalse(tool.execute(json("action" to "reorder", "id" to "missing", "position" to 0)).success)
+        } finally {
+            db.close()
+        }
+    }
+}
+
+private fun json(vararg pairs: Pair<String, Any>): String {
+    val entries =
+        pairs
+            .joinToString(", ") { (key, value) ->
+                val encoded =
+                    when (value) {
+                        is String -> "\"$value\""
+                        is Number -> value.toString()
+                        else -> "\"${value.toString().replace("\"", "\\\"")}\""
+                    }
+                "\"$key\": $encoded"
+            }
+    return "{ $entries }"
 }

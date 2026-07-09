@@ -2,7 +2,6 @@ package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
-import de.heckenmann.visualagent.todo.TodoPriority
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -27,9 +26,9 @@ class AgentManagerTodoCountQueryTest {
                 )
             val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
 
-            manager.todoManager.add("Task A", TodoPriority.HIGH)
-            manager.todoManager.add("Task B", TodoPriority.MEDIUM)
-            manager.todoManager.add("Task C", TodoPriority.LOW)
+            manager.todoManager.add("Task A")
+            manager.todoManager.add("Task B")
+            manager.todoManager.add("Task C")
 
             val response = manager.sendMessage("Wie viele todos gibt es aktuell?")
 
@@ -53,7 +52,7 @@ class AgentManagerTodoCountQueryTest {
                 )
             val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
 
-            manager.todoManager.add("Task A", TodoPriority.HIGH)
+            manager.todoManager.add("Task A")
             val response = manager.sendMessage("show all todos")
 
             assertTrue(response.contains("list-response"), "Expected LLM path for list intent, got: $response")

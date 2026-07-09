@@ -58,8 +58,9 @@ internal class AutonomousTaskPlanner(
     fun buildWorkerInstruction(todo: Todo): String =
         """
         Task ID: ${todo.id}
-        Priority: ${todo.priority}
         Objective: ${todo.description}
+
+        This is the next pending todo by list order. Treat it as the highest priority work item.
 
         Deliverable requirements:
         1. Provide concrete implementation steps and results.
