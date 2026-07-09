@@ -19,6 +19,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.MutableState
@@ -209,13 +213,15 @@ fun rememberInFlightState(toolEventBus: ToolEventBus): InFlightStateHolder {
  *
  * @param state Aggregated in-flight state
  * @param modifier Modifier applied to the indicator row
+ * @param onStopAll Callback invoked by the global stop-all button
  *
- * Use cases: UC-0000072.
+ * Use cases: UC-0000072, UC-0000080.
  */
 @Composable
 internal fun InFlightIndicator(
     state: InFlightState,
     modifier: Modifier = Modifier,
+    onStopAll: () -> Unit = {},
 ) {
     val active = state.totalActive
     AnimatedVisibility(
@@ -225,7 +231,11 @@ internal fun InFlightIndicator(
         modifier = modifier,
     ) {
         val description = remember(active) { "Agent busy: ${state.describe()}" }
-        InFlightIndicatorContent(state = state, contentDescription = description)
+        InFlightIndicatorContent(
+            state = state,
+            contentDescription = description,
+            onStopAll = onStopAll,
+        )
     }
 }
 
@@ -233,6 +243,7 @@ internal fun InFlightIndicator(
 private fun InFlightIndicatorContent(
     state: InFlightState,
     contentDescription: String,
+    onStopAll: () -> Unit,
 ) {
     val active = state.totalActive
     val pulseDuration =
@@ -282,6 +293,17 @@ private fun InFlightIndicatorContent(
                                 .background(accent.copy(alpha = 0.8f), CircleShape),
                     )
                 }
+            }
+            IconButton(
+                onClick = onStopAll,
+                modifier = Modifier.padding(start = 4.dp).size(18.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Stop,
+                    contentDescription = "Stop all running actions",
+                    tint = Color(0xFFFF5555),
+                    modifier = Modifier.size(14.dp),
+                )
             }
         }
     }

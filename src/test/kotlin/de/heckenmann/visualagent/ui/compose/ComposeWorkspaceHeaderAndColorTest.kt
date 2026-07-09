@@ -23,6 +23,7 @@ class ComposeWorkspaceHeaderTest {
                     modelName = "llava",
                     beanDefinitionCount = 42,
                     inFlight = InFlightState(),
+                    onStopAll = {},
                 )
             }
         }

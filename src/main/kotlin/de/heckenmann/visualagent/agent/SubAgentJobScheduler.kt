@@ -2,10 +2,12 @@ package de.heckenmann.visualagent.agent
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.ArrayDeque
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Schedules sub-agent jobs against the user-configured parallelism limit.
@@ -23,6 +25,7 @@ internal class SubAgentJobScheduler(
     private val lock = Any()
     private val waiting = ArrayDeque<CompletableDeferred<Unit>>()
     private var activeJobs = 0
+    private val jobsById = ConcurrentHashMap<String, Job>()
 
     init {
         scope.launch {
@@ -68,11 +71,38 @@ internal class SubAgentJobScheduler(
         onFinished: (jobId: String, result: Result<T>) -> Unit,
     ): String {
         val jobId = UUID.randomUUID().toString()
-        scope.launch {
-            val result = runCatching { run(block) }
-            onFinished(jobId, result)
-        }
+        val job =
+            scope.launch {
+                val result = runCatching { run(block) }
+                jobsById.remove(jobId)
+                onFinished(jobId, result)
+            }
+        jobsById[jobId] = job
         return jobId
+    }
+
+    /**
+     * Cancels one queued or running background job.
+     *
+     * @param jobId Job identifier returned by [enqueue]
+     * @return `true` if the job was found and cancelled, `false` otherwise
+     */
+    fun cancelJob(jobId: String): Boolean {
+        val job = jobsById.remove(jobId) ?: return false
+        job.cancel()
+        return true
+    }
+
+    /**
+     * Cancels every queued or running background job.
+     *
+     * @return Set of cancelled job ids
+     */
+    fun cancelAllJobs(): Set<String> {
+        val snapshot = HashMap(jobsById)
+        jobsById.clear()
+        snapshot.forEach { (_, job) -> job.cancel() }
+        return snapshot.keys
     }
 
     /**

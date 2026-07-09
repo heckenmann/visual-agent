@@ -37,6 +37,7 @@ class OllamaClient(
 
     override suspend fun chat(request: ChatRequestContext): ChatResponse =
         withContext(Dispatchers.IO) {
+            request.cancellationToken?.throwIfCancelled()
             val selectedModel = request.model ?: AppConfig.instance.ollamaModel
             val allowedFunctionNames = promptFactory.allowedFunctionNames(request, selectedModel)
             val prompt = promptFactory.buildPrompt(request, selectedModel)
@@ -47,6 +48,7 @@ class OllamaClient(
                         .run(
                             model,
                             prompt,
+                            request.cancellationToken,
                             toolRegistry.functionCallbacks(
                                 request.enabledTools,
                                 request.metadata + mapOf("model" to selectedModel),
@@ -87,6 +89,7 @@ class OllamaClient(
             }
         return flow {
             try {
+                request.cancellationToken?.throwIfCancelled()
                 if (toolCallbacks.isEmpty()) {
                     model
                         .stream(prompt)
@@ -106,7 +109,7 @@ class OllamaClient(
                         }.collect { emit(it) }
                 } else {
                     ToolCallingLoop()
-                        .runStream(model, prompt, toolCallbacks)
+                        .runStream(model, prompt, request.cancellationToken, toolCallbacks)
                         .collect { emit(it) }
                 }
             } catch (error: Throwable) {
