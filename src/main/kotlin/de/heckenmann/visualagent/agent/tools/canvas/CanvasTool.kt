@@ -15,6 +15,7 @@ import de.heckenmann.visualagent.agent.tools.success
 import de.heckenmann.visualagent.agent.tools.toFunctionName
 import de.heckenmann.visualagent.canvas.CanvasOperations
 import de.heckenmann.visualagent.canvas.CanvasPoint
+import de.heckenmann.visualagent.error.ToolExecutionException
 import de.heckenmann.visualagent.knowledge.ConversationStore
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -263,16 +264,33 @@ class CanvasTool(
     }
 
     private fun JsonObject.requiredDouble(key: String): Double =
-        double(key) ?: throw IllegalArgumentException("Missing required field '$key'")
+        double(key)
+            ?: throw ToolExecutionException(
+                summary = "Missing required field",
+                detail = "The canvas tool input is missing the required numeric field '$key'.",
+                retryable = false,
+            )
 
     private fun JsonObject.double(key: String): Double? = this[key]?.jsonPrimitive?.doubleOrNull
 
-    private fun JsonObject.requiredInt(key: String): Int = int(key) ?: throw IllegalArgumentException("Missing required field '$key'")
+    private fun JsonObject.requiredInt(key: String): Int =
+        int(key)
+            ?: throw ToolExecutionException(
+                summary = "Missing required field",
+                detail = "The canvas tool input is missing the required integer field '$key'.",
+                retryable = false,
+            )
 
     private fun JsonObject.int(key: String): Int? = this[key]?.jsonPrimitive?.content?.toIntOrNull()
 
     private fun JsonObject.requiredPoints(key: String): List<CanvasPoint> {
-        val points = this[key]?.jsonArray ?: throw IllegalArgumentException("Missing required field '$key'")
+        val points =
+            this[key]?.jsonArray
+                ?: throw ToolExecutionException(
+                    summary = "Missing required field",
+                    detail = "The canvas tool input is missing the required point array '$key'.",
+                    retryable = false,
+                )
         return points.map { element ->
             val point = element.jsonObject
             CanvasPoint(

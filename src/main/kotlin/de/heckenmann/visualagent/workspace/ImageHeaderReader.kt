@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.workspace
 
+import de.heckenmann.visualagent.error.WorkspaceFileException
 import java.io.DataInputStream
 import java.io.EOFException
 import java.io.InputStream
@@ -24,7 +25,12 @@ object ImageHeaderReader {
                 bytes.isPngHeader() -> ImageDimensions(width = bytes.readInt(16), height = bytes.readInt(20))
                 bytes.isGifHeader() -> ImageDimensions(width = bytes.readLittleShort(6), height = bytes.readLittleShort(8))
                 bytes.isJpegHeader() -> Files.newInputStream(path).use(::readJpegDimensions)
-                else -> throw IllegalArgumentException("Unsupported image file")
+                else ->
+                    throw WorkspaceFileException(
+                        summary = "Unsupported image file",
+                        detail = "Only PNG, JPEG, and GIF files can be inspected. Convert the image or choose a supported file.",
+                        retryable = false,
+                    )
             }
         }
 

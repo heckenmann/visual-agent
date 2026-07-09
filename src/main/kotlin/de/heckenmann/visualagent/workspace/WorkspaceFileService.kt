@@ -187,7 +187,11 @@ class WorkspaceFileService(
     ): WorkspaceFileRecord =
         id?.let(store::getWorkspaceFile)
             ?: path?.let { store.getWorkspaceFileByPath(WorkspaceFilePaths.normalizeRelativePath(it)) }
-            ?: throw IllegalArgumentException("Workspace file not found")
+            ?: throw de.heckenmann.visualagent.error.WorkspaceFileException(
+                summary = "File not found",
+                detail = "The requested workspace file was not found. Import the file or check the path.",
+                retryable = false,
+            )
 
     /**
      * Deletes a managed file and its metadata.
@@ -214,7 +218,13 @@ class WorkspaceFileService(
         id: String,
         requestedName: String,
     ): WorkspaceFileRecord {
-        val current = store.getWorkspaceFile(id) ?: throw IllegalArgumentException("Workspace file not found")
+        val current =
+            store.getWorkspaceFile(id)
+                ?: throw de.heckenmann.visualagent.error.WorkspaceFileException(
+                    summary = "File not found",
+                    detail = "The workspace file to rename was not found. Refresh the file list and try again.",
+                    retryable = true,
+                )
         val source = resolveManagedPath(current.relativePath)
         val safeName = WorkspaceFilePaths.safeFileName(requestedName)
         val targetName = WorkspaceFilePaths.preserveExtensionIfMissing(source, safeName)

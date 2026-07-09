@@ -12,6 +12,7 @@ class ErrorMessageMapperTest {
 
         val userError = ErrorMessageMapper.map(error)
 
+        assertEquals(ErrorCategory.PROVIDER, userError.category)
         assertEquals("Model not available", userError.summary)
         assertContains(userError.detail, "Pull the model")
         assertContains(userError.detail, "Session settings")
@@ -24,6 +25,7 @@ class ErrorMessageMapperTest {
 
         val userError = ErrorMessageMapper.map(error)
 
+        assertEquals(ErrorCategory.PROVIDER, userError.category)
         assertEquals("Model not available", userError.summary)
         assertContains(userError.detail, "choose another model")
     }
@@ -37,6 +39,7 @@ class ErrorMessageMapperTest {
 
         val userError = ErrorMessageMapper.map(error)
 
+        assertEquals(ErrorCategory.PROVIDER, userError.category)
         assertContains(userError.summary, "not available")
         assertFalse(userError.detail.contains("{\"error\""))
     }
@@ -45,6 +48,7 @@ class ErrorMessageMapperTest {
     fun `401 unauthorized is recognized`() {
         val userError = ErrorMessageMapper.map(IllegalStateException("401 unauthorized"))
 
+        assertEquals(ErrorCategory.PROVIDER, userError.category)
         assertEquals("Authentication failed", userError.summary)
         assertContains(userError.detail, "API key")
     }
@@ -53,6 +57,7 @@ class ErrorMessageMapperTest {
     fun `429 quota error provides billing action`() {
         val userError = ErrorMessageMapper.map(IllegalStateException("429 current quota exceeded"))
 
+        assertEquals(ErrorCategory.PROVIDER, userError.category)
         assertContains(userError.summary, "quota")
         assertContains(userError.detail, "billing")
     }
@@ -62,8 +67,10 @@ class ErrorMessageMapperTest {
         val timeoutError = ErrorMessageMapper.map(IllegalStateException("request timed out"))
         val connectionError = ErrorMessageMapper.map(IllegalStateException("connection refused"))
 
+        assertEquals(ErrorCategory.PROVIDER, timeoutError.category)
         assertEquals("Provider timeout", timeoutError.summary)
         assertEquals(true, timeoutError.retryable)
+        assertEquals(ErrorCategory.PROVIDER, connectionError.category)
         assertEquals("Provider unreachable", connectionError.summary)
         assertEquals(true, connectionError.retryable)
     }
@@ -74,6 +81,7 @@ class ErrorMessageMapperTest {
 
         val userError = ErrorMessageMapper.map(error)
 
+        assertEquals(ErrorCategory.PROVIDER, userError.category)
         assertEquals("Authentication failed", userError.summary)
     }
 
@@ -81,6 +89,7 @@ class ErrorMessageMapperTest {
     fun `unknown errors fall back to generic actionable message`() {
         val userError = ErrorMessageMapper.map(IllegalStateException("unexpected failure"))
 
+        assertEquals(ErrorCategory.UNKNOWN, userError.category)
         assertEquals("Request failed", userError.summary)
         assertContains(userError.detail, "Check the active provider and model")
         assertEquals(true, userError.retryable)
@@ -94,9 +103,58 @@ class ErrorMessageMapperTest {
 
         val userError = ErrorMessageMapper.map(root)
 
+        assertEquals(ErrorCategory.PROVIDER, userError.category)
         assertEquals("Model not available", userError.summary)
         assertFalse(userError.detail.contains("unknown"))
         assertFalse(userError.detail.contains("{\"error\""))
+    }
+
+    @Test
+    fun `workspace file exception preserves category and metadata`() {
+        val error = WorkspaceFileException("File not found", "The file is missing.", retryable = true)
+
+        val userError = ErrorMessageMapper.map(error)
+
+        assertEquals(ErrorCategory.WORKSPACE, userError.category)
+        assertEquals("File not found", userError.summary)
+        assertEquals("The file is missing.", userError.detail)
+        assertEquals(true, userError.retryable)
+    }
+
+    @Test
+    fun `canvas operation exception preserves category and metadata`() {
+        val error = CanvasOperationException("Export failed", "Could not render canvas.")
+
+        val userError = ErrorMessageMapper.map(error)
+
+        assertEquals(ErrorCategory.CANVAS, userError.category)
+        assertEquals("Export failed", userError.summary)
+        assertEquals("Could not render canvas.", userError.detail)
+        assertEquals(false, userError.retryable)
+    }
+
+    @Test
+    fun `tool execution exception preserves category and metadata`() {
+        val error = ToolExecutionException("Invalid input", "Missing required argument.", retryable = true)
+
+        val userError = ErrorMessageMapper.map(error)
+
+        assertEquals(ErrorCategory.TOOL, userError.category)
+        assertEquals("Invalid input", userError.summary)
+        assertEquals("Missing required argument.", userError.detail)
+        assertEquals(true, userError.retryable)
+    }
+
+    @Test
+    fun `persistence exception preserves category and metadata`() {
+        val error = PersistenceException("Database busy", "SQLite is busy. Try again.", retryable = true)
+
+        val userError = ErrorMessageMapper.map(error)
+
+        assertEquals(ErrorCategory.PERSISTENCE, userError.category)
+        assertEquals("Database busy", userError.summary)
+        assertEquals("SQLite is busy. Try again.", userError.detail)
+        assertEquals(true, userError.retryable)
     }
 
     private class ExceptionWithResponseBody(

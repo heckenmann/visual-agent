@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.canvas
 
+import de.heckenmann.visualagent.error.CanvasOperationException
 import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
 import kotlin.io.path.readText
@@ -34,7 +35,12 @@ internal fun InMemoryCanvasService.addFigure(
 }
 
 internal fun InMemoryCanvasService.requireFigure(index: Int): CanvasFigureSnapshot =
-    figures.getOrNull(index) ?: throw IllegalArgumentException("Canvas figure index does not exist: $index")
+    figures.getOrNull(index)
+        ?: throw CanvasOperationException(
+            summary = "Figure not found",
+            detail = "The requested canvas figure does not exist. Select an existing figure and try again.",
+            retryable = false,
+        )
 
 internal fun InMemoryCanvasService.reindexFigures() {
     for (index in figures.indices) {

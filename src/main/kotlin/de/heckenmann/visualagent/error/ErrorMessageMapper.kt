@@ -1,7 +1,8 @@
 package de.heckenmann.visualagent.error
 
 /**
- * Maps provider and infrastructure exceptions into concise, actionable messages safe for the UI.
+ * Maps provider, workspace, canvas, tool, and persistence exceptions into concise, actionable
+ * messages safe for the UI.
  *
  * The mapper inspects the full exception chain (message and optional response body) and returns a
  * [UserFacingError] without exposing raw SDK stack traces, API keys, or response internals.
@@ -10,15 +11,32 @@ internal object ErrorMessageMapper {
     /**
      * Convert a throwable into a [UserFacingError] the UI can render directly.
      *
-     * @param throwable Original exception from a provider, tool, or infrastructure call
+     * @param throwable Original exception from a provider, tool, workspace, canvas, or persistence call
      * @return Structured, user-safe error description
      */
-    fun map(throwable: Throwable): UserFacingError {
+    fun map(throwable: Throwable): UserFacingError =
+        when (throwable) {
+            is VisualAgentException -> mapVisualAgentException(throwable)
+            else -> mapGenericThrowable(throwable)
+        }
+
+    private fun mapVisualAgentException(error: VisualAgentException): UserFacingError {
+        val category = error.category
+        return UserFacingError(
+            category = category,
+            summary = error.summary,
+            detail = error.detail,
+            retryable = error.retryable,
+        )
+    }
+
+    private fun mapGenericThrowable(throwable: Throwable): UserFacingError {
         val status = extractHttpStatus(throwable)
         val detail = buildDetailString(throwable)
         return when {
             status == 404 || isModelNotFound(detail) ->
                 UserFacingError(
+                    category = ErrorCategory.PROVIDER,
                     summary = "Model not available",
                     detail =
                         "The configured model is not available on the provider. " +
@@ -27,6 +45,7 @@ internal object ErrorMessageMapper {
                 )
             status == 429 || isQuota(detail) ->
                 UserFacingError(
+                    category = ErrorCategory.PROVIDER,
                     summary = "Provider quota exhausted",
                     detail =
                         "The provider rejected the request because no quota is currently available. " +
@@ -35,6 +54,7 @@ internal object ErrorMessageMapper {
                 )
             status == 403 || isSubscription(detail) ->
                 UserFacingError(
+                    category = ErrorCategory.PROVIDER,
                     summary = "Model not available for this account",
                     detail =
                         "The selected model is not available for this account. " +
@@ -43,12 +63,14 @@ internal object ErrorMessageMapper {
                 )
             status == 401 || isAuthentication(detail) ->
                 UserFacingError(
+                    category = ErrorCategory.PROVIDER,
                     summary = "Authentication failed",
                     detail = "Authentication failed. Check the provider API key and base URL in Session settings.",
                     retryable = false,
                 )
             isTimeout(detail) ->
                 UserFacingError(
+                    category = ErrorCategory.PROVIDER,
                     summary = "Provider timeout",
                     detail =
                         "The provider did not respond before the request timeout. " +
@@ -57,12 +79,14 @@ internal object ErrorMessageMapper {
                 )
             isConnection(detail) ->
                 UserFacingError(
+                    category = ErrorCategory.PROVIDER,
                     summary = "Provider unreachable",
                     detail = "The provider could not be reached. Check the connection and provider base URL.",
                     retryable = true,
                 )
             else ->
                 UserFacingError(
+                    category = ErrorCategory.UNKNOWN,
                     summary = "Request failed",
                     detail = "The model request failed. Check the active provider and model, then try again.",
                     retryable = true,
