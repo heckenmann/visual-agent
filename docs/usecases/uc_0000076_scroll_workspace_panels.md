@@ -20,11 +20,17 @@ Desktop user.
 3. The workspace row scrolls horizontally by a fixed step toward the right, clamped to the maximum scroll value.
 4. The user clicks the left arrow.
 5. The workspace row scrolls horizontally by the same step toward the left, clamped to the minimum scroll value.
-6. The user continues interacting with the workspace while scroll animations are in progress.
+6. The user presses and holds the right arrow.
+7. The workspace row scrolls continuously toward the right until the arrow is released or the maximum scroll value is reached.
+8. The user presses and holds the left arrow.
+9. The workspace row scrolls continuously toward the left until the arrow is released or the minimum scroll value is reached.
+10. The user releases the arrow button.
+11. Continuous scrolling stops immediately.
+12. The user continues interacting with the workspace while scroll animations are in progress.
 
 ## Result
 
-Users can reach panels that are outside the current viewport without resizing existing panels.
+Users can reach panels that are outside the current viewport quickly via click steps or by pressing and holding an arrow for continuous scrolling.
 
 ## Tool Calls
 
@@ -41,8 +47,10 @@ Users can reach panels that are outside the current viewport without resizing ex
 
 - Left and right arrows appear only when the workspace row is wider than the viewport.
 - Clicking an arrow scrolls the row by a fixed step in the requested direction.
+- Pressing and holding an arrow scrolls the row continuously in that direction.
+- Releasing the arrow stops continuous scrolling immediately.
 - Scroll target is clamped to the available scroll range.
-- The arrow click handler uses a shallow lambda structure to avoid Compose compiler-generated deep inner classes.
-- Clicks during application shutdown are ignored and do not launch new coroutines.
+- The arrow handler uses a shallow lambda structure to avoid Compose compiler-generated deep inner classes.
+- Pointer events during application shutdown are ignored and do not launch new coroutines.
 - `./gradlew ktlintCheck check test` passes.
 - `jacocoTestCoverageVerification` (≥ 0.80 LINE) continues to pass.
