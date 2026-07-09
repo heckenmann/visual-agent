@@ -2,7 +2,6 @@ package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
-import de.heckenmann.visualagent.todo.TodoPriority
 import io.mockk.mockk
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
@@ -19,8 +18,8 @@ class AgentManagerLifecycleOpsTest {
                 .create("jdbc:sqlite::memory:")
         val provider = mockk<LLMProvider>(relaxed = true)
         val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
-        manager.todoManager.add("first", TodoPriority.MEDIUM)
-        manager.todoManager.add("second", TodoPriority.HIGH)
+        manager.todoManager.add("first")
+        manager.todoManager.add("second")
 
         val todos = manager.getTodosFromDb()
 
@@ -34,8 +33,8 @@ class AgentManagerLifecycleOpsTest {
                 .create("jdbc:sqlite::memory:")
         val provider = mockk<LLMProvider>(relaxed = true)
         val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus())
-        manager.todoManager.add("one", TodoPriority.MEDIUM)
-        manager.todoManager.add("two", TodoPriority.HIGH)
+        manager.todoManager.add("one")
+        manager.todoManager.add("two")
         val todos = manager.todoManager.getAll()
         manager.todoManager.updateStatus(todos[0].id, de.heckenmann.visualagent.todo.TodoStatus.IN_PROGRESS)
         manager.todoManager.updateStatus(todos[1].id, de.heckenmann.visualagent.todo.TodoStatus.COMPLETED)

@@ -18,7 +18,7 @@ Main orchestration agent.
 
 1. The main agent inspects todo state.
 2. It selects an existing sub-agent or creates one for the work.
-3. It assigns one or more todos to sub-agent jobs.
+3. It assigns one or more todos to sub-agent jobs, starting with the topmost pending todo by `position`.
 4. Sub-agent execution updates status and produces results.
 5. Completion is reported back to the main agent.
 
@@ -42,4 +42,5 @@ Todo work is delegated while keeping the main agent as orchestration layer.
 ## Acceptance Criteria
 
 - Assignments use persisted todo state.
+- `agent:assign-next-todo` selects the first pending todo ordered by `position`.
 - Sub-agent results are surfaced through conversation/tool events.

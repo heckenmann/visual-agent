@@ -181,6 +181,7 @@ internal class AgentManagerLifecycleOps(
                 val todoId = change.todoId ?: return
                 owner.todoStore.deleteTodo(todoId)
             }
+            de.heckenmann.visualagent.todo.TodoChangeType.REORDERED -> owner.todoManager.getAll().forEach { owner.todoStore.saveTodo(it) }
             de.heckenmann.visualagent.todo.TodoChangeType.CLEARED -> owner.todoStore.clearTodos()
         }
     }

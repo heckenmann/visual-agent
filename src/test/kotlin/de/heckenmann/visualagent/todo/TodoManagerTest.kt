@@ -12,30 +12,33 @@ class TodoManagerTest {
 
     @Test
     fun `add creates a pending todo`() {
-        val todo = manager.add("Write tests", TodoPriority.HIGH)
+        val todo = manager.add("Write tests")
         assertEquals("Write tests", todo.description)
         assertEquals(TodoStatus.PENDING, todo.status)
-        assertEquals(TodoPriority.HIGH, todo.priority)
+        assertEquals(0, todo.position)
         assertNull(todo.assignedAgentId)
         assertNull(todo.completedAt)
     }
 
     @Test
-    fun `add uses MEDIUM priority by default`() {
-        val todo = manager.add("Default priority task")
-        assertEquals(TodoPriority.MEDIUM, todo.priority)
+    fun `add appends todos at increasing positions`() {
+        val first = manager.add("First")
+        val second = manager.add("Second")
+        assertEquals(0, first.position)
+        assertEquals(1, second.position)
     }
 
     @Test
-    fun `getAll returns all todos`() {
-        manager.add("Task A")
-        manager.add("Task B")
-        manager.add("Task C")
-        assertEquals(3, manager.getAll().size)
+    fun `getAll returns all todos ordered by position`() {
+        val a = manager.add("A")
+        val b = manager.add("B")
+        val c = manager.add("C")
+        manager.moveToPosition(c.id, 0)
+        assertEquals(listOf(c, a, b), manager.getAll())
     }
 
     @Test
-    fun `getPending returns only pending todos`() {
+    fun `getPending returns only pending todos ordered by position`() {
         val t1 = manager.add("Pending task")
         val t2 = manager.add("Another pending")
         manager.assignToAgent(t1.id, "agent-1")
@@ -175,8 +178,60 @@ class TodoManagerTest {
     }
 
     @Test
+    fun `moveToPosition reorders todos`() {
+        val a = manager.add("A")
+        val b = manager.add("B")
+        val c = manager.add("C")
+        assertTrue(manager.moveToPosition(c.id, 0))
+        assertEquals(listOf(c, a, b), manager.getAll())
+        assertEquals(0, c.position)
+        assertEquals(1, a.position)
+        assertEquals(2, b.position)
+    }
+
+    @Test
+    fun `moveToPosition coerces target into bounds`() {
+        val a = manager.add("A")
+        manager.add("B")
+        assertTrue(manager.moveToPosition(a.id, 99))
+        assertEquals(1, a.position)
+    }
+
+    @Test
+    fun `moveToPosition returns false for unknown todo`() {
+        assertFalse(manager.moveToPosition("nonexistent", 0))
+    }
+
+    @Test
+    fun `reorder reorders by ids`() {
+        val a = manager.add("A")
+        val b = manager.add("B")
+        val c = manager.add("C")
+        assertTrue(manager.reorder(listOf(c.id, a.id, b.id)))
+        assertEquals(listOf(c, a, b), manager.getAll())
+    }
+
+    @Test
+    fun `reorder returns false when ids do not match`() {
+        manager.add("A")
+        assertFalse(manager.reorder(listOf("nonexistent")))
+    }
+
+    @Test
+    fun `update changes description`() {
+        val todo = manager.add("Original")
+        assertTrue(manager.update(todo.id, "Updated"))
+        assertEquals("Updated", manager.getById(todo.id)?.description)
+    }
+
+    @Test
+    fun `update returns false for unknown todo`() {
+        assertFalse(manager.update("nonexistent", "Updated"))
+    }
+
+    @Test
     fun `full lifecycle - add, assign, complete`() {
-        val todo = manager.add("Full lifecycle task", TodoPriority.URGENT)
+        val todo = manager.add("Full lifecycle task")
         assertEquals(TodoStatus.PENDING, todo.status)
 
         manager.assignToAgent(todo.id, "agent-1")

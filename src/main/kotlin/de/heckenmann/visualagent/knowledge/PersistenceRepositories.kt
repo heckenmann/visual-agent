@@ -135,7 +135,7 @@ internal interface WorkspaceFileRepository : JpaRepository<WorkspaceFileEntity, 
 }
 
 internal interface TodoRepository : JpaRepository<TodoEntity, String> {
-    fun findAllByOrderByCreatedAtAscIdAsc(): List<TodoEntity>
+    fun findAllByOrderByPositionAscIdAsc(): List<TodoEntity>
 }
 
 internal interface SubAgentRepository : JpaRepository<SubAgentEntity, String> {

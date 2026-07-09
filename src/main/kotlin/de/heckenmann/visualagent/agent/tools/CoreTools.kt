@@ -7,7 +7,6 @@ import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.config.AppConfig
 import de.heckenmann.visualagent.knowledge.TodoStore
 import de.heckenmann.visualagent.todo.Todo
-import de.heckenmann.visualagent.todo.TodoPriority
 import de.heckenmann.visualagent.todo.TodoStatus
 import kotlinx.serialization.json.JsonObject
 import org.springframework.stereotype.Component
@@ -140,8 +139,9 @@ class TodosTool(
             id = ToolId("todos"),
             name = ToolId("todos").toFunctionName(),
             description =
-                "Manage todos. Actions: list, count, add, update, complete, cancel, remove. " +
-                    "Input: {\"action\":\"list|count|add|update|complete|cancel|remove\", ...}.",
+                "Manage todos. Actions: list, count, add, update, complete, cancel, remove, reorder. " +
+                    "Input: {\"action\":\"list|count|add|update|complete|cancel|remove|reorder\", ...}. " +
+                    "The first pending todo is the next one to process; use reorder to change what is next.",
             inputSchema = STRING_SCHEMA,
         )
 
@@ -158,6 +158,7 @@ class TodosTool(
             "complete" -> updateStatus(input, TodoStatus.COMPLETED)
             "cancel" -> updateStatus(input, TodoStatus.CANCELLED)
             "remove" -> removeTodo(input)
+            "reorder" -> reorderTodos(input)
             else -> failure("todos", "Unsupported todos action")
         }
     }
@@ -167,7 +168,7 @@ class TodosTool(
         if (rows.isEmpty()) return success("todos", "No todos.")
         val text =
             rows.joinToString("\n") {
-                "- [${it.status}] ${it.description} (id=${it.id}, priority=${it.priority}, assigned=${it.assignedAgentId ?: "none"})"
+                "- [${it.status}] ${it.description} (id=${it.id}, position=${it.position}, assigned=${it.assignedAgentId ?: "none"})"
             }
         return success("todos", text)
     }
@@ -194,7 +195,7 @@ class TodosTool(
                         .toString(),
                 description = input.requiredString("description"),
                 status = TodoStatus.PENDING,
-                priority = parsePriority(input.string("priority")),
+                position = todoStore.listTodos().maxOfOrNull { it.position }?.plus(1) ?: 0,
             )
         todoStore.saveTodo(todo)
         return success("todos", "Added todo ${todo.id}")
@@ -207,12 +208,12 @@ class TodosTool(
             existing
                 .copy(
                     description = input.string("description") ?: existing.description,
-                    priority = parsePriority(input.string("priority"), existing.priority),
                     assignedAgentId = input.string("assignedAgentId") ?: existing.assignedAgentId,
                 ).also {
                     it.status =
                         input.string("status")?.let { s -> runCatching { TodoStatus.valueOf(s.uppercase()) }.getOrNull() }
                             ?: existing.status
+                    it.position = existing.position
                     it.completedAt = existing.completedAt
                 }
         todoStore.saveTodo(updated)
@@ -242,8 +243,29 @@ class TodosTool(
         return success("todos", "Removed todo $id")
     }
 
-    private fun parsePriority(
-        value: String?,
-        fallback: TodoPriority = TodoPriority.MEDIUM,
-    ): TodoPriority = value?.let { runCatching { TodoPriority.valueOf(it.uppercase()) }.getOrNull() } ?: fallback
+    private fun reorderTodos(input: JsonObject): ToolResult {
+        val id = input.requiredString("id")
+        val todos = todoStore.listTodos()
+        val ordered = todos.sortedBy { it.position }.map { it.id }
+        val fromIndex = ordered.indexOf(id)
+        if (fromIndex == -1) return failure("todos", "Todo not found")
+        val targetPosition =
+            input.int("position") ?: run {
+                val beforeId = input.string("before") ?: return failure("todos", "Reorder requires 'position' or 'before'")
+                val beforeIndex =
+                    ordered.indexOf(beforeId).takeIf { it != -1 }
+                        ?: return failure("todos", "Reference todo not found")
+                if (fromIndex < beforeIndex) beforeIndex - 1 else beforeIndex
+            }
+        val safeTarget = targetPosition.coerceIn(0, ordered.lastIndex)
+        val reordered =
+            ordered.toMutableList().apply {
+                add(safeTarget, removeAt(fromIndex))
+            }
+        reordered.forEachIndexed { index, todoId ->
+            val todo = todos.first { it.id == todoId }
+            todoStore.saveTodo(todo.copy(position = index))
+        }
+        return success("todos", "Reordered todo $id to position $targetPosition")
+    }
 }

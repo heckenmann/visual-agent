@@ -3,7 +3,6 @@ package de.heckenmann.visualagent.agent
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.knowledge.PersistenceStores
-import de.heckenmann.visualagent.todo.TodoPriority
 import de.heckenmann.visualagent.todo.TodoStatus
 import io.mockk.coEvery
 import io.mockk.mockk
@@ -34,7 +33,7 @@ class AgentManagerTodoTest {
     @Test
     fun `assignNextTodo assigns pending todo to idle agent`() {
         val (manager, _, _) = createManager()
-        val todo = manager.todoManager.add("Research topic X", TodoPriority.HIGH)
+        val todo = manager.todoManager.add("Research topic X")
 
         val result = manager.assignNextTodo()
 
@@ -179,14 +178,15 @@ class AgentManagerTodoTest {
     }
 
     @Test
-    fun `assignNextTodo picks first idle agent and first pending todo`() {
+    fun `assignNextTodo picks first idle agent and topmost pending todo by position`() {
         val (manager, _, _) = createManager()
-        val highPrio = manager.todoManager.add("Urgent task", TodoPriority.URGENT)
-        val lowPrio = manager.todoManager.add("Low task", TodoPriority.LOW)
+        manager.todoManager.add("Later task")
+        val top = manager.todoManager.add("Top task")
+        manager.todoManager.moveToPosition(top.id, 0)
 
         manager.assignNextTodo()
 
         val busyAgent = manager.getSubAgents().first { it.status == AgentStatus.BUSY }
-        assertEquals(highPrio.id, busyAgent.currentTodoId)
+        assertEquals(top.id, busyAgent.currentTodoId)
     }
 }

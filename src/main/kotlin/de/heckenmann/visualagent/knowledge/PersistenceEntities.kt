@@ -108,7 +108,7 @@ internal class TodoEntity(
     @Column(nullable = false)
     var description: String = "",
     var status: String = "PENDING",
-    var priority: String = "MEDIUM",
+    var position: Int = 0,
     @Column(name = "assigned_agent_id")
     var assignedAgentId: String? = null,
     @Convert(converter = InstantStringConverter::class)

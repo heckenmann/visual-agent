@@ -20,7 +20,7 @@ Autonomous runtime.
 2. It selects a complex candidate.
 3. An analyst agent is found or created.
 4. The analyst returns concise subtasks.
-5. The original todo is cancelled and subtasks are added.
+5. The original todo is cancelled and subtasks are appended after the current position.
 
 ## Result
 
@@ -40,3 +40,4 @@ Large tasks become smaller units that can be assigned to workers.
 - Empty decomposition results do not modify the original todo.
 - Duplicate subtasks are removed.
 - The original complex todo is cancelled only after subtasks are produced.
+- Subtasks are appended after the decomposed todo's position; the user or model can reorder them afterwards.

@@ -2,7 +2,6 @@ package de.heckenmann.visualagent.knowledge
 
 import de.heckenmann.visualagent.agent.config.SubAgentToolConfig
 import de.heckenmann.visualagent.todo.Todo
-import de.heckenmann.visualagent.todo.TodoPriority
 import de.heckenmann.visualagent.todo.TodoStatus
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -157,7 +156,7 @@ internal class JpaTodoStore(
     }
 
     @Transactional(readOnly = true)
-    override fun listTodos(): List<Todo> = repository.findAllByOrderByCreatedAtAscIdAsc().map(TodoEntity::toDomain)
+    override fun listTodos(): List<Todo> = repository.findAllByOrderByPositionAscIdAsc().map(TodoEntity::toDomain)
 
     @Transactional
     override fun deleteTodo(todoId: String) = repository.deleteById(todoId)
@@ -258,14 +257,14 @@ private fun MemoryEntity.toDomain(): Memory =
 private fun ConversationEntity.toRecord(): ConversationRecord = ConversationRecord(id, role, content, metadata, createdAt)
 
 private fun Todo.toEntity(): TodoEntity =
-    TodoEntity(id, description, status.name, priority.name, assignedAgentId, createdAt, completedAt, dueDate)
+    TodoEntity(id, description, status.name, position, assignedAgentId, createdAt, completedAt, dueDate)
 
 private fun TodoEntity.toDomain(): Todo =
     Todo(
         id = id,
         description = description,
         status = runCatching { TodoStatus.valueOf(status) }.getOrDefault(TodoStatus.PENDING),
-        priority = runCatching { TodoPriority.valueOf(priority) }.getOrDefault(TodoPriority.MEDIUM),
+        position = position,
         assignedAgentId = assignedAgentId,
         createdAt = createdAt,
         completedAt = completedAt,

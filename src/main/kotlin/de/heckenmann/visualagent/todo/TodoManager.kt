@@ -10,6 +10,7 @@ enum class TodoChangeType {
     ADDED,
     UPDATED,
     REMOVED,
+    REORDERED,
     CLEARED,
 }
 
@@ -27,8 +28,8 @@ data class TodoChange(
 )
 
 /**
- * Manages an in-memory list of [Todo] items with CRUD operations and
- * agent assignment support.
+ * Manages an in-memory list of [Todo] items with CRUD operations,
+ * agent assignment support, and position-based ordering.
  */
 class TodoManager(
     initialTodos: List<Todo> = emptyList(),
@@ -49,14 +50,14 @@ class TodoManager(
     }
 
     /**
-     * Returns a defensive snapshot of all todos in their current order.
+     * Returns a defensive snapshot of all todos ordered by position.
      */
-    fun getAll(): List<Todo> = todos.toList()
+    fun getAll(): List<Todo> = todos.sortedBy { it.position }
 
     /**
-     * Returns todos that are ready to be assigned to an agent.
+     * Returns todos that are ready to be assigned to an agent, ordered by position.
      */
-    fun getPending(): List<Todo> = todos.filter { it.status == TodoStatus.PENDING }
+    fun getPending(): List<Todo> = todos.filter { it.status == TodoStatus.PENDING }.sortedBy { it.position }
 
     /**
      * Finds one todo by stable identifier.
@@ -74,22 +75,18 @@ class TodoManager(
     fun getByAgent(agentId: String): List<Todo> = todos.filter { it.assignedAgentId == agentId }
 
     /**
-     * Creates a pending todo and publishes an add event.
+     * Creates a pending todo appended at the end of the list and publishes an add event.
      *
      * @param description User-facing task description
-     * @param priority Initial task priority
-     * @return Created todo with generated identifier
+     * @return Created todo with generated identifier and max position
      */
-    fun add(
-        description: String,
-        priority: TodoPriority = TodoPriority.MEDIUM,
-    ): Todo {
+    fun add(description: String): Todo {
         val todo =
             Todo(
                 id = UUID.randomUUID().toString(),
                 description = description,
-                priority = priority,
                 status = TodoStatus.PENDING,
+                position = nextPosition(),
             )
         todos.add(todo)
         publishChange(TodoChange(TodoChangeType.ADDED, todo = todo))
@@ -97,21 +94,18 @@ class TodoManager(
     }
 
     /**
-     * Updates editable todo fields and publishes an update event.
+     * Updates the description of a todo and publishes an update event.
      *
      * @param todoId Identifier of the todo to update
      * @param description New task description
-     * @param priority New task priority
      * @return true if the todo exists and was updated
      */
     fun update(
         todoId: String,
         description: String,
-        priority: TodoPriority,
     ): Boolean {
         val todo = getById(todoId) ?: return false
         todo.description = description
-        todo.priority = priority
         publishChange(TodoChange(TodoChangeType.UPDATED, todo = todo))
         return true
     }
@@ -130,6 +124,23 @@ class TodoManager(
         val todo = getById(todoId) ?: return false
         todo.status = status
         todo.completedAt = if (status == TodoStatus.COMPLETED) java.time.Instant.now() else null
+        publishChange(TodoChange(TodoChangeType.UPDATED, todo = todo))
+        return true
+    }
+
+    /**
+     * Updates only the assigned agent identifier and publishes an update event.
+     *
+     * @param todoId Identifier of the todo to update
+     * @param agentId New sub-agent identifier, or null to clear the assignment
+     * @return true if the todo exists and was updated
+     */
+    fun updateAssignedAgent(
+        todoId: String,
+        agentId: String?,
+    ): Boolean {
+        val todo = getById(todoId) ?: return false
+        todo.assignedAgentId = agentId
         publishChange(TodoChange(TodoChangeType.UPDATED, todo = todo))
         return true
     }
@@ -183,6 +194,43 @@ class TodoManager(
     }
 
     /**
+     * Moves a todo to a new list position and shifts surrounding todos.
+     *
+     * @param todoId Identifier of the todo to move
+     * @param targetPosition Desired 0-based position within the ordered list
+     * @return true if the todo exists and was moved
+     */
+    fun moveToPosition(
+        todoId: String,
+        targetPosition: Int,
+    ): Boolean {
+        val ordered = getAll().toMutableList()
+        val fromIndex = ordered.indexOfFirst { it.id == todoId }
+        if (fromIndex == -1) return false
+        val safeTarget = targetPosition.coerceIn(0, ordered.lastIndex)
+        if (fromIndex == safeTarget) return true
+        val moved = ordered.removeAt(fromIndex)
+        ordered.add(safeTarget, moved)
+        renumberPositions(ordered)
+        publishChange(TodoChange(TodoChangeType.REORDERED, todo = moved))
+        return true
+    }
+
+    /**
+     * Reorders the full todo list to match the given ordered ids.
+     *
+     * @param orderedIds Todo identifiers in the desired order
+     * @return true if all ids were found and the list was reordered
+     */
+    fun reorder(orderedIds: List<String>): Boolean {
+        if (orderedIds.size != todos.size) return false
+        val ordered = orderedIds.map { id -> todos.find { it.id == id } ?: return false }.toMutableList()
+        renumberPositions(ordered)
+        publishChange(TodoChange(TodoChangeType.REORDERED))
+        return true
+    }
+
+    /**
      * Removes one todo and publishes a remove event.
      *
      * @param todoId Identifier of the todo to delete
@@ -213,4 +261,20 @@ class TodoManager(
             runCatching { listener(change) }
         }
     }
+
+    /**
+     * Assigns sequential positions starting at 0 to the given ordered list
+     * and applies them to the underlying todos.
+     */
+    private fun renumberPositions(ordered: MutableList<Todo>) {
+        ordered.forEachIndexed { index, todo ->
+            val existing = todos.find { it.id == todo.id }
+            existing?.position = index
+        }
+    }
+
+    /**
+     * Returns the next position value that appends a todo at the end of the list.
+     */
+    private fun nextPosition(): Int = if (todos.isEmpty()) 0 else todos.maxOf { it.position } + 1
 }
