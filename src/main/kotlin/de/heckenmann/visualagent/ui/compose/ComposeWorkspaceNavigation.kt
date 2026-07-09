@@ -22,11 +22,10 @@ import sh.calvin.reorderable.ReorderableColumn
 /**
  * Left-hand rail that toggles panels, reorders them and adjusts their widths.
  *
- * Panel buttons are displayed in a vertical, animated drag-and-drop list. A vertical drag on any
- * button reorders the panel in the user-defined order, and the workspace row animates the same
- * change. Horizontal drags on a panel button adjust the panel's preferred width in 20 px steps.
- * The application close button lives at the bottom of the rail and is not part of the reorderable
- * list.
+ * Panel buttons are displayed in a vertical, animated drag-and-drop list. Each button shows a
+ * ridged drag handle on its right side; dragging only that handle reorders the panel. Horizontal
+ * drags on the button body adjust the panel's preferred width in 20 px steps. The application
+ * close button lives at the bottom of the rail and is not part of the reorderable list.
  *
  * @param windows All workspace panels in persistent order
  * @param onToggleWindow Callback that toggles a panel's visibility

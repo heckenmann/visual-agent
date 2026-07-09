@@ -8,15 +8,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Chat
-import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -28,7 +21,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
@@ -71,25 +63,6 @@ internal fun ComposeWorkspaceHeader(
 @Composable
 internal fun PanelStatus(status: String) {
     Text(status, color = Color(0xFF8BE9FD), style = MaterialTheme.typography.bodySmall)
-}
-
-internal fun ComposeWorkspaceWindow.railIcon(): ImageVector =
-    when (id) {
-        "chat" -> Icons.AutoMirrored.Filled.Chat
-        "todos" -> Icons.Filled.CheckCircle
-        "files" -> Icons.Filled.Folder
-        "agents" -> Icons.Filled.Group
-        "settings" -> Icons.Filled.Settings
-        "canvas" -> Icons.Filled.Brush
-        else -> Icons.Filled.Description
-    }
-
-internal const val MIN_PANEL_WIDTH = 200
-internal const val MAX_PANEL_WIDTH = 2400
-
-@Composable
-internal fun HorizontalDividerLine() {
-    HorizontalDivider(color = Color(0x33444A65), modifier = Modifier.padding(vertical = 10.dp))
 }
 
 @Composable

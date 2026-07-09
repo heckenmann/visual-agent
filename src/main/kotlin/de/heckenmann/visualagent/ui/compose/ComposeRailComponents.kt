@@ -6,11 +6,27 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.filled.Brush
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
@@ -28,6 +44,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import sh.calvin.reorderable.ReorderableColumnScope
 import sh.calvin.reorderable.ReorderableItem
@@ -49,12 +67,14 @@ internal fun ReorderableColumnScope.DraggableRailButton(
     val backgroundColor = if (selected) Color(0xFF333644) else Color(0xFF23252F)
     val borderColor = if (selected) Color(0xCC50FA7B) else Color(0x2AFFFFFF)
     ReorderableItem {
-        Box(
+        Row(
             modifier =
                 Modifier
                     .size(36.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .draggableHandle()
+                    .background(backgroundColor, RoundedCornerShape(8.dp))
+                    .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+                    .alpha(if (isDragging) 0.85f else 1f)
                     .pointerInput(window.id, onWidthChange) {
                         detectDragGestures(
                             onDragEnd = { horizontalOffset = 0f },
@@ -71,21 +91,31 @@ internal fun ReorderableColumnScope.DraggableRailButton(
                                 horizontalOffset -= steps * RAIL_WIDTH_STEP_PX
                             }
                         }
-                    }.background(backgroundColor, RoundedCornerShape(8.dp))
-                    .border(1.dp, borderColor, RoundedCornerShape(8.dp))
-                    .alpha(if (isDragging) 0.85f else 1f)
-                    .combinedClickable(
-                        role = Role.Button,
-                        onClick = onToggle,
-                        onLongClick = { menuExpanded = true },
-                    ),
-            contentAlignment = Alignment.Center,
+                    },
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector = window.railIcon(),
-                contentDescription = "Toggle ${window.title}",
-                modifier = Modifier.size(18.dp),
-                tint = if (selected) Color(0xFF8BE9FD) else LocalContentColor.current,
+            Box(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .combinedClickable(
+                            role = Role.Button,
+                            onClick = onToggle,
+                            onLongClick = { menuExpanded = true },
+                        ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = window.railIcon(),
+                    contentDescription = "Toggle ${window.title}",
+                    modifier = Modifier.size(18.dp),
+                    tint = if (selected) Color(0xFF8BE9FD) else LocalContentColor.current,
+                )
+            }
+            RailDragHandle(
+                window = window,
+                modifier = Modifier.draggableHandle(),
             )
         }
     }
@@ -101,6 +131,39 @@ internal fun ReorderableColumnScope.DraggableRailButton(
                 onRequestWidthDialog()
             },
         )
+    }
+}
+
+@Composable
+private fun RailDragHandle(
+    window: ComposeWorkspaceWindow,
+    modifier: Modifier = Modifier,
+) {
+    val gripColor = Color(0xFF8BE9FD)
+    Box(
+        modifier =
+            modifier
+                .width(10.dp)
+                .fillMaxHeight()
+                .padding(vertical = 6.dp, horizontal = 2.dp)
+                .background(Color.Transparent),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+            modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = "Drag ${window.title}" },
+        ) {
+            repeat(4) {
+                Box(
+                    modifier =
+                        Modifier
+                            .width(6.dp)
+                            .height(2.dp)
+                            .clip(RoundedCornerShape(1.dp))
+                            .background(gripColor),
+                )
+            }
+        }
     }
 }
 
@@ -134,3 +197,22 @@ internal fun StaticRailButton(
         )
     }
 }
+
+internal fun ComposeWorkspaceWindow.railIcon(): ImageVector =
+    when (id) {
+        "chat" -> Icons.AutoMirrored.Filled.Chat
+        "todos" -> Icons.Filled.CheckCircle
+        "files" -> Icons.Filled.Folder
+        "agents" -> Icons.Filled.Group
+        "settings" -> Icons.Filled.Settings
+        "canvas" -> Icons.Filled.Brush
+        else -> Icons.Filled.Description
+    }
+
+@Composable
+internal fun HorizontalDividerLine() {
+    HorizontalDivider(color = Color(0x33444A65), modifier = Modifier.padding(vertical = 10.dp))
+}
+
+internal const val MIN_PANEL_WIDTH = 200
+internal const val MAX_PANEL_WIDTH = 2400
