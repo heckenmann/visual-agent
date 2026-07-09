@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.canvas
 
 import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.error.CanvasOperationException
 import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
 import de.heckenmann.visualagent.knowledge.WorkspaceFileStore
 import de.heckenmann.visualagent.workspace.WorkspaceFilePaths
@@ -189,7 +190,7 @@ class InMemoryCanvasServiceTest {
     @Test
     fun `moveFigure throws for invalid index`() =
         withCanvasService { service, _ ->
-            assertFailsWith<IllegalArgumentException> {
+            assertFailsWith<CanvasOperationException> {
                 service.moveFigure(5, deltaX = 1.0, deltaY = 1.0)
             }
         }

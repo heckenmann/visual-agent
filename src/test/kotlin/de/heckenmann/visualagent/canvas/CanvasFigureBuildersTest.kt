@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.canvas
 
+import de.heckenmann.visualagent.error.CanvasOperationException
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -80,7 +81,7 @@ class CanvasFigureBuildersTest {
                         ),
                 )
 
-            assertFailsWith<IllegalArgumentException> {
+            assertFailsWith<CanvasOperationException> {
                 service.requireFigure(0)
             }
         } finally {

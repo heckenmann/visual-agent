@@ -14,7 +14,8 @@ class CanvasToolValidationAndCaptureTest {
         val result = tool.execute("""{"action":"drawText","x":1,"y":2}""")
 
         assertFalse(result.success)
-        assertEquals("Missing required field 'text'", result.error)
+        assertTrue(result.error.orEmpty().contains("Missing required field"))
+        assertTrue(result.error.orEmpty().contains("'text'"))
     }
 
     @Test

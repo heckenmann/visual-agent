@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.agent.tools
 
 import de.heckenmann.visualagent.agent.ToolResult
+import de.heckenmann.visualagent.error.ToolExecutionException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
@@ -19,7 +20,13 @@ internal fun parseObject(inputJson: String): JsonObject =
 
 internal fun JsonObject.string(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
 
-internal fun JsonObject.requiredString(key: String): String = string(key) ?: throw IllegalArgumentException("Missing required field '$key'")
+internal fun JsonObject.requiredString(key: String): String =
+    string(key)
+        ?: throw ToolExecutionException(
+            summary = "Missing required field",
+            detail = "The tool input is missing the required string field '$key'.",
+            retryable = false,
+        )
 
 internal fun JsonObject.int(key: String): Int? = this[key]?.jsonPrimitive?.intOrNull
 

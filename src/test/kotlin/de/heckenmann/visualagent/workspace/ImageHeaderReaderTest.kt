@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.workspace
 
+import de.heckenmann.visualagent.error.WorkspaceFileException
 import de.heckenmann.visualagent.testsupport.TestPng
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -93,7 +94,7 @@ class ImageHeaderReaderTest {
         val image = tempDir.resolve("sample.bin")
         image.writeBytes(byteArrayOf(1, 2, 3, 4))
 
-        assertFailsWith<IllegalArgumentException> {
+        assertFailsWith<WorkspaceFileException> {
             ImageHeaderReader.dimensions(image)
         }
     }
