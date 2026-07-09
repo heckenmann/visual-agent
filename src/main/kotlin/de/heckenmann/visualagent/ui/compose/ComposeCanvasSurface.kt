@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -24,7 +25,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
@@ -84,6 +84,7 @@ internal fun CanvasSurface(
             }
     }
 
+    val scheme = MaterialTheme.colorScheme
     Box(
         modifier =
             modifier
@@ -108,17 +109,17 @@ internal fun CanvasSurface(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .border(1.dp, Color(0x33444A65), RoundedCornerShape(8.dp)),
+                    .border(1.dp, scheme.outlineVariant, RoundedCornerShape(8.dp)),
             state = canvasState,
             config =
                 InfiniteCanvasConfig(
                     showGrid = true,
                     gridSize = 48f,
-                    gridColor = Color(0x33444A65),
-                    backgroundColor = Color(0xFF191A21),
+                    gridColor = scheme.outline.copy(alpha = 0x33 / 255f),
+                    backgroundColor = scheme.surfaceContainer,
                     showBottomControls = true,
                 ),
-            nodes = canvasNodes(snapshot, nodeStates, canvasOperations, imageBytesForPath, onSnapshotChanged),
+            nodes = canvasNodes(snapshot, nodeStates, canvasOperations, imageBytesForPath, onSnapshotChanged, scheme),
         )
         if (mode == CanvasInteractionMode.Pen) {
             Canvas(
@@ -135,7 +136,7 @@ internal fun CanvasSurface(
                                     val points = strokePoints
                                     strokePoints = emptyList()
                                     if (points.size >= 2) {
-                                        onSnapshotChanged(canvasOperations.drawStroke(points, "#F8F8F2", 3.0))
+                                        onSnapshotChanged(canvasOperations.drawStroke(points, scheme.onSurface.toHexString(), 3.0))
                                     }
                                 },
                                 onDragCancel = { strokePoints = emptyList() },
@@ -162,7 +163,7 @@ internal fun CanvasSurface(
                             ),
                         )
                     drawLine(
-                        color = Color(0xFFF8F8F2),
+                        color = scheme.onSurface,
                         start = startScreen,
                         end = endScreen,
                         strokeWidth = 3f,
@@ -180,6 +181,7 @@ private fun canvasNodes(
     canvasOperations: CanvasOperations,
     imageBytesForPath: (String) -> ByteArray?,
     onSnapshotChanged: (CanvasSnapshot) -> Unit,
+    scheme: androidx.compose.material3.ColorScheme,
 ): List<CanvasNode> =
     snapshot.figures.map { figure ->
         CanvasNode(

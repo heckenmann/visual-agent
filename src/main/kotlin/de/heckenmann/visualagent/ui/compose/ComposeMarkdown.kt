@@ -30,29 +30,36 @@ internal fun ComposeMarkdown(
     markdown: String,
     modifier: Modifier = Modifier,
 ) {
+    val scheme = MaterialTheme.colorScheme
     val blocks = remember(markdown) { ComposeMarkdownParser.parse(markdown) }
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         blocks.forEach { block ->
-            MarkdownBlock(block)
+            MarkdownBlock(
+                block = block,
+                scheme = scheme,
+            )
         }
     }
 }
 
 @Composable
-private fun MarkdownBlock(block: ComposeMarkdownBlock) {
+private fun MarkdownBlock(
+    block: ComposeMarkdownBlock,
+    scheme: androidx.compose.material3.ColorScheme,
+) {
     when (block) {
         is ComposeMarkdownBlock.CodeBlock ->
             Box(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFF191A21), RoundedCornerShape(10.dp))
-                        .border(1.dp, Color(0x33444A65), RoundedCornerShape(10.dp))
+                        .background(scheme.surfaceContainer, RoundedCornerShape(10.dp))
+                        .border(1.dp, scheme.outline, RoundedCornerShape(10.dp))
                         .padding(10.dp),
             ) {
                 Text(
                     block.code.trimEnd(),
-                    color = Color(0xFFF8F8F2),
+                    color = scheme.onSurface,
                     fontFamily = FontFamily.Monospace,
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -60,39 +67,43 @@ private fun MarkdownBlock(block: ComposeMarkdownBlock) {
         is ComposeMarkdownBlock.Heading ->
             Text(
                 renderInlines(block.inlines),
-                color = Color(0xFFF8F8F2),
+                color = scheme.onSurface,
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.titleSmall,
             )
-        is ComposeMarkdownBlock.ListBlock -> MarkdownList(block)
+        is ComposeMarkdownBlock.ListBlock -> MarkdownList(block, scheme)
         is ComposeMarkdownBlock.Paragraph ->
             Text(
                 renderInlines(block.inlines),
-                color = Color(0xFFF8F8F2),
+                color = scheme.onSurface,
                 style = MaterialTheme.typography.bodySmall,
             )
-        is ComposeMarkdownBlock.Table -> MarkdownTable(block)
+        is ComposeMarkdownBlock.Table -> MarkdownTable(block, scheme)
     }
 }
 
 @Composable
-private fun MarkdownTable(block: ComposeMarkdownBlock.Table) {
+private fun MarkdownTable(
+    block: ComposeMarkdownBlock.Table,
+    scheme: androidx.compose.material3.ColorScheme,
+) {
     Column(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .border(1.dp, Color(0x33444A65), RoundedCornerShape(4.dp))
+                .border(1.dp, scheme.outline, RoundedCornerShape(4.dp))
                 .padding(1.dp),
     ) {
         block.headerRow?.let { header ->
             Row(
-                modifier = Modifier.fillMaxWidth().background(Color(0xFF191A21)),
+                modifier = Modifier.fillMaxWidth().background(scheme.surfaceContainer),
                 horizontalArrangement = Arrangement.spacedBy(0.dp),
             ) {
                 header.forEachIndexed { _, cell ->
                     MarkdownTableCell(
                         cell = cell,
                         isHeader = true,
+                        scheme = scheme,
                         modifier = Modifier.weight(1f, fill = false),
                     )
                 }
@@ -107,6 +118,7 @@ private fun MarkdownTable(block: ComposeMarkdownBlock.Table) {
                     MarkdownTableCell(
                         cell = cell,
                         isHeader = false,
+                        scheme = scheme,
                         modifier = Modifier.weight(1f, fill = false),
                     )
                 }
@@ -119,18 +131,19 @@ private fun MarkdownTable(block: ComposeMarkdownBlock.Table) {
 private fun MarkdownTableCell(
     cell: TableCell,
     isHeader: Boolean,
+    scheme: androidx.compose.material3.ColorScheme,
     modifier: Modifier = Modifier,
 ) {
     Box(
         modifier =
             modifier
                 .fillMaxHeight()
-                .border(0.5.dp, Color(0x22444A65))
+                .border(0.5.dp, scheme.outline)
                 .padding(horizontal = 8.dp, vertical = 4.dp),
     ) {
         Text(
             text = renderInlines(cell.inlines),
-            color = Color(0xFFF8F8F2),
+            color = scheme.onSurface,
             fontWeight = if (isHeader) FontWeight.SemiBold else FontWeight.Normal,
             style = MaterialTheme.typography.bodySmall,
         )
@@ -138,26 +151,31 @@ private fun MarkdownTableCell(
 }
 
 @Composable
-private fun MarkdownList(block: ComposeMarkdownBlock.ListBlock) {
+private fun MarkdownList(
+    block: ComposeMarkdownBlock.ListBlock,
+    scheme: androidx.compose.material3.ColorScheme,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         block.items.forEachIndexed { index, item ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     if (block.ordered) "${block.startNumber + index}." else "-",
-                    color = Color(0xFFFFB86C),
+                    color = scheme.tertiary,
                     fontWeight = FontWeight.SemiBold,
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    item.forEach { MarkdownBlock(it) }
+                    item.forEach { MarkdownBlock(it, scheme) }
                 }
             }
         }
     }
 }
 
+@Composable
 private fun renderInlines(inlines: List<ComposeMarkdownInline>) = inlines.toAnnotatedString()
 
+@Composable
 private fun List<ComposeMarkdownInline>.toAnnotatedString() =
     buildAnnotatedString {
         forEach { inline ->
@@ -167,11 +185,14 @@ private fun List<ComposeMarkdownInline>.toAnnotatedString() =
         }
     }
 
-private fun ComposeMarkdownInline.style(): SpanStyle =
-    SpanStyle(
-        color = if (linkDestination.isNullOrBlank()) Color.Unspecified else Color(0xFF8BE9FD),
+@Composable
+private fun ComposeMarkdownInline.style(): SpanStyle {
+    val scheme = MaterialTheme.colorScheme
+    return SpanStyle(
+        color = if (linkDestination.isNullOrBlank()) Color.Unspecified else scheme.tertiary,
         fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
         fontFamily = if (code) FontFamily.Monospace else null,
-        background = if (code) Color(0xFF191A21) else Color.Unspecified,
+        background = if (code) scheme.surfaceContainer else Color.Unspecified,
         textDecoration = if (linkDestination.isNullOrBlank()) null else TextDecoration.Underline,
     )
+}

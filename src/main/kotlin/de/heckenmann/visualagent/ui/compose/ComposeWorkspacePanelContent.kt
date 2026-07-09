@@ -33,7 +33,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -57,11 +56,11 @@ internal fun ReorderableCollectionItemScope.SplitPanelContent(
     val shape = RoundedCornerShape(8.dp)
     val borderColor =
         if (isDragging) {
-            Color(0xFFFF79C6)
+            MaterialTheme.colorScheme.secondary
         } else if (primary) {
-            Color(0x9950FA7B)
+            MaterialTheme.colorScheme.primary.copy(alpha = 0x99 / 255f)
         } else {
-            Color(0x5544475A)
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0x55 / 255f)
         }
     Card(
         modifier =
@@ -76,7 +75,12 @@ internal fun ReorderableCollectionItemScope.SplitPanelContent(
         shape = shape,
         colors =
             CardDefaults.cardColors(
-                containerColor = if (primary) Color(0xEE252734) else Color(0xE321232D),
+                containerColor =
+                    if (primary) {
+                        MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0xEE / 255f)
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0xE3 / 255f)
+                    },
             ),
         elevation =
             CardDefaults.cardElevation(
@@ -120,7 +124,7 @@ private fun ReorderableCollectionItemScope.SplitPanelHeader(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .background(if (primary) Color(0xFF2A2D39) else Color(0xFF262832))
+                .background(if (primary) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainerHigh)
                 .draggableHandle()
                 .padding(horizontal = 10.dp, vertical = if (primary) 8.dp else 7.dp),
         horizontalArrangement = Arrangement.spacedBy(9.dp),
@@ -131,28 +135,41 @@ private fun ReorderableCollectionItemScope.SplitPanelHeader(
                 Modifier
                     .size(if (primary) 28.dp else 26.dp)
                     .clip(RoundedCornerShape(7.dp))
-                    .background(if (primary) Color(0x244FFFA1) else Color(0x1F3BD8FF))
-                    .border(1.dp, if (primary) Color(0x6650FA7B) else Color(0x338BE9FD), RoundedCornerShape(7.dp)),
+                    .background(
+                        if (primary) {
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0x14 / 255f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0x12 / 255f)
+                        },
+                    ).border(
+                        1.dp,
+                        if (primary) {
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0x40 / 255f)
+                        } else {
+                            MaterialTheme.colorScheme.tertiary.copy(alpha = 0x20 / 255f)
+                        },
+                        RoundedCornerShape(7.dp),
+                    ),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = window.railIcon(),
                 contentDescription = null,
-                tint = if (primary) Color(0xFF50FA7B) else Color(0xFF8BE9FD),
+                tint = if (primary) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary,
                 modifier = Modifier.size(if (primary) 17.dp else 16.dp),
             )
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = window.title,
-                color = Color(0xFFF8F8F2),
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = window.subtitle,
-                color = if (primary) Color(0xFF8BE9FD) else Color(0xFFBFBBD0),
+                color = if (primary) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -216,7 +233,7 @@ internal fun PanelResizer(
                     .width(8.dp)
                     .fillMaxHeight(0.4f)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(Color(0x5544475A)),
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0x55 / 255f)),
             contentAlignment = Alignment.Center,
         ) {
             ResizerGrip()
@@ -238,7 +255,7 @@ private fun ResizerGrip() {
                         .padding(vertical = 2.dp)
                         .size(width = 6.dp, height = 2.dp)
                         .clip(RoundedCornerShape(1.dp))
-                        .background(Color(0xAA8BE9FD)),
+                        .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0xAA / 255f)),
             )
         }
     }

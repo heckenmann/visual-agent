@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.MutableState
@@ -264,7 +265,7 @@ private fun InFlightIndicatorContent(
         label = "in-flight-pulse",
     )
     val dotCount = active.coerceIn(1, 3)
-    val accent = Color(0xFFBD93F9)
+    val accent = MaterialTheme.colorScheme.primary
     ActionTooltip(
         description = state.describe(),
         modifier =
@@ -277,7 +278,7 @@ private fun InFlightIndicatorContent(
         Row(
             modifier =
                 Modifier
-                    .background(Color(0xFF44475A).copy(alpha = 0.35f), CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f), CircleShape)
                     .padding(horizontal = 8.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -301,7 +302,7 @@ private fun InFlightIndicatorContent(
                 Icon(
                     imageVector = Icons.Filled.Stop,
                     contentDescription = "Stop all running actions",
-                    tint = Color(0xFFFF5555),
+                    tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(14.dp),
                 )
             }

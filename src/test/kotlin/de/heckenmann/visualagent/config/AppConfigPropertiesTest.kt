@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.config
 
+import de.heckenmann.visualagent.config.ThemeMode
 import org.junit.jupiter.api.Test
 import java.util.Properties
 import kotlin.test.assertEquals
@@ -53,7 +54,7 @@ class AppConfigPropertiesTest {
         properties.setProperty(AppConfig.KEY_OLLAMA_MODEL, "test-model")
         properties.setProperty(AppConfig.KEY_OPENAI_BASE_URL, "https://openai.test")
         properties.setProperty(AppConfig.KEY_OPENAI_MODEL, "gpt-test")
-        properties.setProperty(AppConfig.KEY_UI_THEME, "Dracula")
+        properties.setProperty(AppConfig.KEY_UI_THEME_MODE, "DARK")
         properties.setProperty(AppConfig.KEY_UI_FONT_SIZE, "18")
         properties.setProperty(AppConfig.KEY_BROWSER_DEFAULT, "chromium")
         properties.setProperty(AppConfig.KEY_SESSION_CONTEXT_LENGTH, "2048")
@@ -72,7 +73,7 @@ class AppConfigPropertiesTest {
         assertEquals("test-model", config.ollamaModel)
         assertEquals("https://openai.test", config.openAiBaseUrl)
         assertEquals("gpt-test", config.openAiModel)
-        assertEquals("Dracula", config.theme)
+        assertEquals(ThemeMode.DARK, config.uiThemeMode)
         assertEquals(18, config.fontSize)
         assertEquals("chromium", config.browserDefault)
         assertEquals(2048, config.contextLength)
@@ -108,11 +109,11 @@ class AppConfigPropertiesTest {
     fun `applyTo falls back for missing keys`() {
         val config = AppConfig.instance
         val snapshot = snapshot(config)
-        config.theme = "Nord Dark"
+        config.uiThemeMode = ThemeMode.LIGHT
 
         AppConfigProperties.applyTo(config, Properties())
 
-        assertEquals("Nord Dark", config.theme)
+        assertEquals(ThemeMode.LIGHT, config.uiThemeMode)
 
         restore(config, snapshot)
     }

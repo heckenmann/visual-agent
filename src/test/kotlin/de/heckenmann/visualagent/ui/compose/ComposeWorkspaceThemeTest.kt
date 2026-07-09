@@ -2,32 +2,43 @@ package de.heckenmann.visualagent.ui.compose
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.graphics.Color
+import de.heckenmann.visualagent.config.ThemeMode
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
- * Unit tests for [visualAgentTypography], [draculaColorScheme], and [backgroundBrush].
+ * Unit tests for [visualAgentLightColorScheme], [visualAgentDarkColorScheme],
+ * [isSystemInDarkTheme], and [visualAgentTypography].
  */
 class ComposeWorkspaceThemeTest {
     @Test
-    fun `dracula color scheme exposes signature palette colors`() {
-        val scheme = draculaColorScheme()
+    fun `light and dark baseline schemes expose different surface colors`() {
+        val light = visualAgentLightColorScheme()
+        val dark = visualAgentDarkColorScheme()
 
-        assertEquals(Color(0xFF1E1F29), scheme.background)
-        assertEquals(Color(0xFF282A36), scheme.surface)
-        assertEquals(Color(0xFFBD93F9), scheme.primary)
-        assertEquals(Color(0xFFFF79C6), scheme.secondary)
-        assertEquals(Color(0xFF8BE9FD), scheme.tertiary)
+        assertNotEquals(light.surface, dark.surface)
+        assertNotEquals(light.background, dark.background)
     }
 
     @Test
-    fun `background brush returns different instances`() {
-        val brush1 = backgroundBrush()
-        val brush2 = backgroundBrush()
+    fun `baseline schemes define primary, onPrimary and error roles`() {
+        val light = visualAgentLightColorScheme()
+        val dark = visualAgentDarkColorScheme()
 
-        // Each call creates a new Brush instance
-        assertTrue(brush1 !== brush2)
+        assertNotEquals(Color.Unspecified, light.primary)
+        assertNotEquals(Color.Unspecified, light.onPrimary)
+        assertNotEquals(Color.Unspecified, light.error)
+        assertNotEquals(Color.Unspecified, dark.primary)
+        assertNotEquals(Color.Unspecified, dark.onPrimary)
+        assertNotEquals(Color.Unspecified, dark.error)
+    }
+
+    @Test
+    fun `isSystemInDarkTheme resolves explicit modes`() {
+        assertFalse(isSystemInDarkTheme(ThemeMode.LIGHT))
+        assertTrue(isSystemInDarkTheme(ThemeMode.DARK))
     }
 
     @Test

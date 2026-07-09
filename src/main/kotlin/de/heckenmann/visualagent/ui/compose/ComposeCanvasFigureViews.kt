@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -52,13 +53,14 @@ internal fun FigureNode(
     onResize: (Double, Double) -> Unit,
 ) {
     val shape: Shape = if (figure.type == "circle") CircleShape else RoundedCornerShape(8.dp)
+    val scheme = MaterialTheme.colorScheme
     Box(
         modifier =
             Modifier
                 .fillMaxSize()
                 .clip(shape)
-                .background(figureColor(figure))
-                .border(if (selected) 1.5.dp else 0.dp, if (selected) Color(0xFF8BE9FD) else Color.Transparent, shape)
+                .background(figureColor(figure, scheme))
+                .border(if (selected) 1.5.dp else 0.dp, if (selected) MaterialTheme.colorScheme.tertiary else Color.Transparent, shape)
                 .padding(6.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -66,7 +68,7 @@ internal fun FigureNode(
             "text" ->
                 Text(
                     text = figure.content.ifBlank { "Text" },
-                    color = Color(0xFF191A21),
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -97,7 +99,7 @@ internal fun FigureResizeHandle(
         modifier =
             modifier
                 .size(12.dp)
-                .background(Color(0xFFFF79C6), RoundedCornerShape(4.dp))
+                .background(MaterialTheme.colorScheme.secondary, RoundedCornerShape(4.dp))
                 .pointerInput(initialWidth, initialHeight) {
                     detectDragGestures { change, dragAmount ->
                         change.consume()
@@ -111,10 +113,11 @@ internal fun FigureResizeHandle(
 
 @Composable
 internal fun StrokeFigure(figure: CanvasFigureSnapshot) {
+    val scheme = MaterialTheme.colorScheme
     Canvas(modifier = Modifier.fillMaxSize()) {
         figure.points.zipWithNext().forEach { (start, end) ->
             drawLine(
-                color = figure.color.toComposeColor(Color(0xFFF8F8F2)),
+                color = figure.color.toComposeColor(scheme.onSurface),
                 start =
                     androidx.compose.ui.geometry.Offset(
                         start.x.toFloat(),
@@ -145,7 +148,7 @@ internal fun ImageFigure(
     if (imageBitmap == null) {
         Text(
             text = "Image",
-            color = Color(0xFF191A21),
+            color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -154,14 +157,17 @@ internal fun ImageFigure(
     }
 }
 
-private fun figureColor(figure: CanvasFigureSnapshot): Color =
+internal fun figureColor(
+    figure: CanvasFigureSnapshot,
+    scheme: androidx.compose.material3.ColorScheme,
+): Color =
     when (figure.type) {
-        "circle" -> figure.color.toComposeColor(Color(0xFFFF79C6))
-        "line" -> figure.color.toComposeColor(Color(0xFF8BE9FD))
+        "circle" -> figure.color.toComposeColor(scheme.secondary)
+        "line" -> figure.color.toComposeColor(scheme.tertiary)
         "stroke" -> Color.Transparent
-        "text" -> figure.color.toComposeColor(Color(0xFFFFB86C))
-        "image" -> Color(0xFFBD93F9)
-        else -> figure.color.toComposeColor(Color(0xFF50FA7B))
+        "text" -> figure.color.toComposeColor(scheme.primary)
+        "image" -> scheme.primaryContainer
+        else -> figure.color.toComposeColor(scheme.outline)
     }
 
 internal fun String.toComposeColor(defaultColor: Color): Color {

@@ -20,7 +20,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
@@ -43,13 +42,13 @@ internal fun ComposeWorkspaceHeader(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = "Visual Agent",
-                color = Color(0xFFF8F8F2),
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
                 text = "Compose Multiplatform workspace",
-                color = Color(0xFFBFBBD0),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
             )
         }
@@ -62,7 +61,7 @@ internal fun ComposeWorkspaceHeader(
 
 @Composable
 internal fun PanelStatus(status: String) {
-    Text(status, color = Color(0xFF8BE9FD), style = MaterialTheme.typography.bodySmall)
+    Text(status, color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.bodySmall)
 }
 
 @Composable
@@ -75,7 +74,7 @@ internal fun PanelWidthSlider(
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
             text = "${sliderValue.toInt()} px",
-            color = Color(0xFFF8F8F2),
+            color = MaterialTheme.colorScheme.onSurface,
             style = MaterialTheme.typography.bodyLarge,
         )
         Slider(
