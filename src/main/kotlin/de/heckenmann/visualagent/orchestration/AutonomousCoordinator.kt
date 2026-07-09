@@ -6,6 +6,7 @@ import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.agent.SubAgentJobScheduler
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.error.ErrorMessageMapper
 import de.heckenmann.visualagent.knowledge.MemoryStore
 import de.heckenmann.visualagent.knowledge.TodoStore
 import de.heckenmann.visualagent.todo.Todo
@@ -14,6 +15,7 @@ import de.heckenmann.visualagent.todo.TodoStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import mu.KotlinLogging
 
 /**
  * Coordinates autonomous todo decomposition, assignment, and worker execution loops.
@@ -33,6 +35,7 @@ internal class AutonomousCoordinator(
     private val saveAgentToDb: (SubAgent) -> Unit,
     private val notifyAgent: (agentId: String, message: String) -> Unit,
 ) {
+    private val logger = KotlinLogging.logger {}
     private val taskPlanner =
         AutonomousTaskPlanner(
             todoManager = todoManager,
@@ -186,16 +189,20 @@ internal class AutonomousCoordinator(
                         break
                     }
                     notifyAgent(agent.id, "Main review requested retry for todo: $todoId")
-                } catch (_: Exception) {
+                } catch (error: Exception) {
                     attempt++
                     val backoff = 500L * attempt
+                    logger.warn(error) { "Autonomous todo $todoId failed on attempt $attempt for agent ${agent.id}" }
                     delay(backoff)
                     if (attempt >= maxRetries) {
+                        val userError = ErrorMessageMapper.map(error)
                         todoManager.cancelTodo(todoId)
+                        notifyAgent(agent.id, "Failed todo: $todoId — ${userError.summary}: ${userError.detail}")
                     }
                 }
             }
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            logger.error(error) { "Autonomous job for todo $todoId crashed unexpectedly" }
             todoManager.cancelTodo(todoId)
         } finally {
             agent.status = AgentStatus.IDLE

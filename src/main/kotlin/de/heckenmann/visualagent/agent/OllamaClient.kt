@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.reactive.asFlow
 import kotlinx.coroutines.withContext
+import mu.KotlinLogging
 import org.springframework.ai.chat.messages.UserMessage
 import org.springframework.ai.chat.model.ChatModel
 import org.springframework.ai.chat.prompt.Prompt
@@ -33,6 +34,8 @@ class OllamaClient(
     private val toolRecovery: OllamaToolRecovery,
     private val toolRegistry: ToolRegistry,
 ) : LLMProvider {
+    private val logger = KotlinLogging.logger {}
+
     override suspend fun chat(messages: List<Message>): ChatResponse = chat(ChatRequestContext(messages = messages))
 
     override suspend fun chat(request: ChatRequestContext): ChatResponse =
@@ -191,7 +194,8 @@ class OllamaClient(
                     .firstOrNull()
                     ?.map { value -> value.toDouble() }
                     ?: emptyList()
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                logger.warn(e) { "Ollama embeddings failed; returning empty embeddings" }
                 emptyList()
             }
         }
@@ -203,7 +207,8 @@ class OllamaClient(
             try {
                 ollamaApi.listModels()
                 true
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                logger.warn(e) { "Ollama connection check failed" }
                 false
             }
         }
@@ -219,7 +224,8 @@ class OllamaClient(
                         .mapNotNull { model -> model.name() }
                         .distinct()
                 if (models.isEmpty()) listOf(configuredModel) else models
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                logger.warn(e) { "Ollama model list failed; falling back to configured model" }
                 listOf(configuredModel)
             }
         }
@@ -276,7 +282,8 @@ class OllamaClient(
                             quantizationLevel = details.quantizationLevel(),
                         ),
                 )
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                logger.warn(e) { "Ollama model details failed for $modelName" }
                 ShowResponse(model = modelName, modifiedAt = "")
             }
         }
