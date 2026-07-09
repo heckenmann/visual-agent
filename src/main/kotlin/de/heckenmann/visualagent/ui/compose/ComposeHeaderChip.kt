@@ -12,7 +12,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
@@ -25,13 +24,13 @@ internal fun HeaderChip(
         modifier =
             Modifier
                 .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFF242631))
-                .border(1.dp, Color(0x33444A65), RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0x33 / 255f), RoundedCornerShape(8.dp))
                 .padding(horizontal = 8.dp, vertical = 4.dp),
     ) {
         Text(
             text = "$label $value",
-            color = Color(0xFFBD93F9),
+            color = MaterialTheme.colorScheme.primary,
             style = MaterialTheme.typography.bodySmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

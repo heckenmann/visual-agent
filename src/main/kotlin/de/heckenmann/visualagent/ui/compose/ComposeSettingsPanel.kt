@@ -75,6 +75,7 @@ internal fun SettingsPanel(
     var thinkingEnabled by remember { mutableStateOf(config.thinkingEnabled) }
     var autoCompactionEnabled by remember { mutableStateOf(config.autoCompactionEnabled) }
     var userInstruction by remember { mutableStateOf(config.userModelInstruction) }
+    var themeMode by remember { mutableStateOf(config.uiThemeMode) }
     var status by remember { mutableStateOf("Ready") }
     val activeProvider = providers.firstOrNull { it.id == providerId } ?: providers.firstOrNull()
     val filteredModels =
@@ -263,6 +264,7 @@ internal fun SettingsPanel(
             autoCompactionEnabled = autoCompactionEnabled,
             userInstruction = userInstruction,
             fontSize = fontSize,
+            themeMode = themeMode,
             onContextLengthChange = { contextLength = it },
             onLoadLimitChange = { loadLimit = it },
             onMaxParallelChange = { maxParallelSubAgents = it },
@@ -274,6 +276,12 @@ internal fun SettingsPanel(
             onFontSizeChange = { newSize ->
                 fontSize = newSize
                 config.fontSize = newSize
+                onSettingsChanged()
+            },
+            onThemeModeChange = { newMode ->
+                themeMode = newMode
+                config.uiThemeMode = newMode
+                config.save()
                 onSettingsChanged()
             },
         )

@@ -9,6 +9,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTextInput
 import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.config.ThemeMode
 import org.junit.Rule
 import org.junit.Test
 import kotlin.test.assertEquals
@@ -45,6 +46,7 @@ class ComposeSettingsExecutionAndAppearanceSectionTest {
                     autoCompactionEnabled = compact.value,
                     userInstruction = instruction.value,
                     fontSize = fontSize.value,
+                    themeMode = ThemeMode.SYSTEM,
                     onContextLengthChange = { contextLength.value = it },
                     onLoadLimitChange = { loadLimit.value = it },
                     onMaxParallelChange = { parallel.value = it },
@@ -54,6 +56,7 @@ class ComposeSettingsExecutionAndAppearanceSectionTest {
                     onCompactionChange = { compact.value = it },
                     onUserInstructionChange = { instruction.value = it },
                     onFontSizeChange = { fontSize.value = it },
+                    onThemeModeChange = {},
                 )
             }
         }
@@ -85,6 +88,7 @@ class ComposeSettingsExecutionAndAppearanceSectionTest {
                     autoCompactionEnabled = true,
                     userInstruction = current,
                     fontSize = 14,
+                    themeMode = ThemeMode.SYSTEM,
                     onContextLengthChange = {},
                     onLoadLimitChange = {},
                     onMaxParallelChange = {},
@@ -94,6 +98,7 @@ class ComposeSettingsExecutionAndAppearanceSectionTest {
                     onCompactionChange = {},
                     onUserInstructionChange = { current = it },
                     onFontSizeChange = {},
+                    onThemeModeChange = {},
                 )
             }
         }
@@ -117,6 +122,7 @@ class ComposeSettingsExecutionAndAppearanceSectionTest {
                     autoCompactionEnabled = true,
                     userInstruction = "",
                     fontSize = 14,
+                    themeMode = ThemeMode.SYSTEM,
                     onContextLengthChange = {},
                     onLoadLimitChange = { loadLimit = it },
                     onMaxParallelChange = {},
@@ -126,6 +132,7 @@ class ComposeSettingsExecutionAndAppearanceSectionTest {
                     onCompactionChange = {},
                     onUserInstructionChange = {},
                     onFontSizeChange = {},
+                    onThemeModeChange = {},
                 )
             }
         }

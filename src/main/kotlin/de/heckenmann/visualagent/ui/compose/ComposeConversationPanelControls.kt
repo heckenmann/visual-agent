@@ -34,7 +34,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
@@ -55,7 +54,7 @@ internal fun ScrollToBottomButton(
         modifier =
             modifier
                 .size(44.dp)
-                .background(Color(0xFF23252F), shape = MaterialTheme.shapes.small)
+                .background(MaterialTheme.colorScheme.surfaceContainer, shape = MaterialTheme.shapes.small)
                 .padding(8.dp),
         iconSize = 26.dp,
     )

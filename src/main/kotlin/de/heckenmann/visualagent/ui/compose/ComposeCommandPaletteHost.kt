@@ -36,7 +36,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -52,6 +51,7 @@ internal fun ComposeCommandPaletteHost(
     onDismiss: () -> Unit,
 ) {
     if (!visible) return
+    val scheme = MaterialTheme.colorScheme
     var query by remember { mutableStateOf("") }
     val matches = filterCommands(commands, query)
     val focusRequester = remember { FocusRequester() }
@@ -62,7 +62,7 @@ internal fun ComposeCommandPaletteHost(
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(Color(0xB8191A21))
+                .background(scheme.scrim.copy(alpha = 0xB8 / 255f))
                 .padding(24.dp)
                 .onPreviewKeyEvent { event ->
                     when {
@@ -88,17 +88,17 @@ internal fun ComposeCommandPaletteHost(
                 Modifier
                     .widthIn(min = 420.dp, max = 680.dp)
                     .padding(top = 72.dp)
-                    .border(1.dp, Color(0x668BE9FD), RoundedCornerShape(24.dp)),
+                    .border(1.dp, scheme.tertiary.copy(alpha = 0x66 / 255f), RoundedCornerShape(24.dp)),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF282A36)),
+            colors = CardDefaults.cardColors(containerColor = scheme.surfaceContainerHigh),
             elevation = CardDefaults.cardElevation(defaultElevation = 16.dp),
         ) {
             Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(imageVector = Icons.Filled.Search, contentDescription = null, tint = Color(0xFF8BE9FD))
+                    Icon(imageVector = Icons.Filled.Search, contentDescription = null, tint = scheme.tertiary)
                     Text(
                         text = "Command Palette",
-                        color = Color(0xFFF8F8F2),
+                        color = scheme.onSurface,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.weight(1f),
@@ -120,10 +120,10 @@ internal fun ComposeCommandPaletteHost(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     if (matches.isEmpty()) {
-                        Text("No matching commands", color = Color(0xFFBD93F9), style = MaterialTheme.typography.bodyMedium)
+                        Text("No matching commands", color = scheme.primary, style = MaterialTheme.typography.bodyMedium)
                     }
                     matches.forEach { command ->
-                        CommandRow(command) {
+                        CommandRow(command, scheme) {
                             command.action()
                             onDismiss()
                         }
@@ -137,18 +137,19 @@ internal fun ComposeCommandPaletteHost(
 @Composable
 private fun CommandRow(
     command: ComposeCommand,
+    scheme: androidx.compose.material3.ColorScheme,
     onClick: () -> Unit,
 ) {
     Column(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .border(1.dp, Color(0x33444A65), RoundedCornerShape(14.dp))
+                .border(1.dp, scheme.outline.copy(alpha = 0x33 / 255f), RoundedCornerShape(14.dp))
                 .clickable(onClick = onClick)
                 .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text(command.title, color = Color(0xFFF8F8F2), fontWeight = FontWeight.SemiBold)
-        Text(command.description, color = Color(0xFFBD93F9), style = MaterialTheme.typography.bodySmall)
+        Text(command.title, color = scheme.onSurface, fontWeight = FontWeight.SemiBold)
+        Text(command.description, color = scheme.primary, style = MaterialTheme.typography.bodySmall)
     }
 }

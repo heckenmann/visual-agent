@@ -29,6 +29,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -64,8 +65,8 @@ internal fun ReorderableColumnScope.DraggableRailButton(
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     var horizontalOffset by remember { mutableFloatStateOf(0f) }
-    val backgroundColor = if (selected) Color(0xFF333644) else Color(0xFF23252F)
-    val borderColor = if (selected) Color(0xCC50FA7B) else Color(0x2AFFFFFF)
+    val backgroundColor = if (selected) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainer
+    val borderColor = if (selected) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outline.copy(alpha = 0x2A / 255f)
     ReorderableItem {
         Row(
             modifier =
@@ -110,7 +111,7 @@ internal fun ReorderableColumnScope.DraggableRailButton(
                     imageVector = window.railIcon(),
                     contentDescription = "Toggle ${window.title}",
                     modifier = Modifier.size(18.dp),
-                    tint = if (selected) Color(0xFF8BE9FD) else LocalContentColor.current,
+                    tint = if (selected) MaterialTheme.colorScheme.tertiary else LocalContentColor.current,
                 )
             }
             RailDragHandle(
@@ -122,10 +123,10 @@ internal fun ReorderableColumnScope.DraggableRailButton(
     DropdownMenu(
         expanded = menuExpanded,
         onDismissRequest = { menuExpanded = false },
-        modifier = Modifier.background(Color(0xFF23252F)),
+        modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainer),
     ) {
         DropdownMenuItem(
-            text = { Text("Set width…", color = Color(0xFFF8F8F2)) },
+            text = { Text("Set width…", color = MaterialTheme.colorScheme.onSurface) },
             onClick = {
                 menuExpanded = false
                 onRequestWidthDialog()
@@ -139,7 +140,7 @@ private fun RailDragHandle(
     window: ComposeWorkspaceWindow,
     modifier: Modifier = Modifier,
 ) {
-    val gripColor = Color(0xFF8BE9FD)
+    val gripColor = MaterialTheme.colorScheme.tertiary
     Box(
         modifier =
             modifier
@@ -174,8 +175,8 @@ internal fun StaticRailButton(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val backgroundColor = if (selected) Color(0xFF333644) else Color(0xFF23252F)
-    val borderColor = if (selected) Color(0xCC50FA7B) else Color(0x2AFFFFFF)
+    val backgroundColor = if (selected) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainer
+    val borderColor = if (selected) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outline.copy(alpha = 0x2A / 255f)
     Box(
         modifier =
             Modifier
@@ -193,7 +194,7 @@ internal fun StaticRailButton(
             imageVector = icon,
             contentDescription = description,
             modifier = Modifier.size(18.dp),
-            tint = if (selected) Color(0xFF8BE9FD) else LocalContentColor.current,
+            tint = if (selected) MaterialTheme.colorScheme.tertiary else LocalContentColor.current,
         )
     }
 }
@@ -211,7 +212,7 @@ internal fun ComposeWorkspaceWindow.railIcon(): ImageVector =
 
 @Composable
 internal fun HorizontalDividerLine() {
-    HorizontalDivider(color = Color(0x33444A65), modifier = Modifier.padding(vertical = 10.dp))
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(vertical = 10.dp))
 }
 
 internal const val MIN_PANEL_WIDTH = 200

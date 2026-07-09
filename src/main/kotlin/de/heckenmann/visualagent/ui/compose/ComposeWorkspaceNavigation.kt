@@ -12,10 +12,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import sh.calvin.reorderable.ReorderableColumn
 
@@ -51,7 +51,7 @@ internal fun ComposeRail(
             Modifier
                 .width(60.dp)
                 .fillMaxSize()
-                .background(Color(0xFF181923))
+                .background(MaterialTheme.colorScheme.surfaceContainerLowest)
                 .padding(vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {

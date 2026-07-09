@@ -44,12 +44,13 @@ internal fun ErrorBanner(
     modifier: Modifier = Modifier,
 ) {
     val color = errorBannerColorForCategory(userError.category)
+    val scheme = MaterialTheme.colorScheme
     Row(
         modifier =
             modifier
                 .fillMaxWidth()
                 .padding(8.dp)
-                .background(Color(0x22282536), RoundedCornerShape(10.dp))
+                .background(scheme.surface.copy(alpha = 0x22 / 255f), RoundedCornerShape(10.dp))
                 .border(1.dp, color, RoundedCornerShape(10.dp))
                 .padding(12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -72,7 +73,7 @@ internal fun ErrorBanner(
             )
             Text(
                 text = userError.detail,
-                color = Color(0xFFE6E6E6),
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.bodySmall,
             )
         }
@@ -95,12 +96,15 @@ internal fun ErrorBanner(
     }
 }
 
-private fun errorBannerColorForCategory(category: ErrorCategory): Color =
-    when (category) {
-        ErrorCategory.PROVIDER -> Color(0xFFFFB86C)
-        ErrorCategory.WORKSPACE -> Color(0xFF8BE9FD)
-        ErrorCategory.CANVAS -> Color(0xFFBD93F9)
-        ErrorCategory.TOOL -> Color(0xFFFF79C6)
-        ErrorCategory.PERSISTENCE -> Color(0xFFFF5555)
-        ErrorCategory.UNKNOWN -> Color(0xFFFF5555)
+@Composable
+private fun errorBannerColorForCategory(category: ErrorCategory): Color {
+    val scheme = MaterialTheme.colorScheme
+    return when (category) {
+        ErrorCategory.PROVIDER -> scheme.tertiary
+        ErrorCategory.WORKSPACE -> scheme.tertiary
+        ErrorCategory.CANVAS -> scheme.primary
+        ErrorCategory.TOOL -> scheme.secondary
+        ErrorCategory.PERSISTENCE -> scheme.error
+        ErrorCategory.UNKNOWN -> scheme.error
     }
+}

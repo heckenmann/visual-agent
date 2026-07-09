@@ -19,7 +19,7 @@ internal object AppConfigProperties {
             setProperty(AppConfig.KEY_OPENAI_BASE_URL, config.openAiBaseUrl)
             setProperty(AppConfig.KEY_OPENAI_MODEL, config.openAiModel)
             setProperty(AppConfig.KEY_DATABASE_PATH, config.databasePath)
-            setProperty(AppConfig.KEY_UI_THEME, config.theme)
+            setProperty(AppConfig.KEY_UI_THEME_MODE, config.uiThemeMode.name)
             setProperty(AppConfig.KEY_UI_FONT_SIZE, config.fontSize.toString())
             setProperty(AppConfig.KEY_BROWSER_DEFAULT, config.browserDefault)
             setProperty(AppConfig.KEY_SESSION_FAVORITE_MODELS, config.favoriteModels)
@@ -50,7 +50,7 @@ internal object AppConfigProperties {
         config.openAiBaseUrl = properties.string(AppConfig.KEY_OPENAI_BASE_URL, config.openAiBaseUrl)
         config.openAiModel = properties.string(AppConfig.KEY_OPENAI_MODEL, config.openAiModel)
         config.databasePath = properties.string(AppConfig.KEY_DATABASE_PATH, config.databasePath)
-        config.theme = properties.string(AppConfig.KEY_UI_THEME, config.theme)
+        config.uiThemeMode = properties.themeMode(AppConfig.KEY_UI_THEME_MODE, config.uiThemeMode)
         config.fontSize = properties.int(AppConfig.KEY_UI_FONT_SIZE, config.fontSize, 10..24)
         config.browserDefault = properties.string(AppConfig.KEY_BROWSER_DEFAULT, config.browserDefault)
         config.contextLength = properties.int(AppConfig.KEY_SESSION_CONTEXT_LENGTH, config.contextLength, 1024..32768)
@@ -71,6 +71,11 @@ internal object AppConfigProperties {
         key: String,
         fallback: String,
     ): String = getProperty(key, fallback)
+
+    private fun Properties.themeMode(
+        key: String,
+        fallback: ThemeMode,
+    ): ThemeMode = getProperty(key)?.let(ThemeMode::fromString) ?: fallback
 
     private fun Properties.int(
         key: String,

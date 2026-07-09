@@ -18,7 +18,7 @@ import java.util.concurrent.CopyOnWriteArrayList
  * @property openAiBaseUrl OpenAI-compatible API base URL
  * @property openAiModel Default OpenAI-compatible chat model
  * @property databasePath Path to SQLite database file
- * @property theme UI theme (default: Dracula)
+ * @property uiThemeMode UI theme mode (default: SYSTEM)
  * @property fontSize UI font size (default: 14)
  * @property browserDefault Default browser for web integration (default: firefox)
  */
@@ -31,7 +31,7 @@ class AppConfig private constructor() {
     var openAiBaseUrl: String = "https://api.openai.com"
     var openAiModel: String = "gpt-4o-mini"
     var databasePath: String = "./data/visual-agent.db"
-    var theme: String = "Dracula"
+    var uiThemeMode: ThemeMode = ThemeMode.SYSTEM
     var fontSize: Int = 14
     var browserDefault: String = "firefox"
     var contextLength: Int = 4096
@@ -62,7 +62,7 @@ class AppConfig private constructor() {
         internal const val KEY_OPENAI_BASE_URL = "openai.base.url"
         internal const val KEY_OPENAI_MODEL = "openai.model"
         internal const val KEY_DATABASE_PATH = "database.path"
-        internal const val KEY_UI_THEME = "ui.theme"
+        internal const val KEY_UI_THEME_MODE = "ui.theme.mode"
         internal const val KEY_UI_FONT_SIZE = "ui.font.size"
         internal const val KEY_BROWSER_DEFAULT = "browser.default"
         internal const val KEY_SESSION_CONTEXT_LENGTH = "session.context.length"
@@ -97,13 +97,6 @@ class AppConfig private constructor() {
         loadFromDatabase()
         publishChanges()
     }
-
-    /**
-     * Gets the normalized Compose theme identifier for the current theme setting.
-     *
-     * @return The fully qualified path to the theme stylesheet, or Dracula as default
-     */
-    fun getThemeStylesheet(): String = AppThemeStylesheets.stylesheetFor(theme)
 
     /**
      * Returns the currently selected model for the active provider.
@@ -214,7 +207,7 @@ class AppConfig private constructor() {
                 KEY_OPENAI_BASE_URL to openAiBaseUrl,
                 KEY_OPENAI_MODEL to openAiModel,
                 KEY_DATABASE_PATH to databasePath,
-                KEY_UI_THEME to theme,
+                KEY_UI_THEME_MODE to uiThemeMode.name,
                 KEY_UI_FONT_SIZE to fontSize.toString(),
                 KEY_BROWSER_DEFAULT to browserDefault,
                 KEY_SESSION_CONTEXT_LENGTH to contextLength.toString(),
@@ -239,7 +232,7 @@ class AppConfig private constructor() {
             db.setPreference(KEY_OPENAI_API_KEY, openAiApiKey)
             db.setPreference(KEY_OPENAI_BASE_URL, openAiBaseUrl)
             db.setPreference(KEY_OPENAI_MODEL, openAiModel)
-            db.setPreference(KEY_UI_THEME, theme)
+            db.setPreference(KEY_UI_THEME_MODE, uiThemeMode.name)
             db.setPreference(KEY_UI_FONT_SIZE, fontSize.toString())
             db.setPreference(KEY_BROWSER_DEFAULT, browserDefault)
             db.setPreference(KEY_SESSION_CONTEXT_LENGTH, contextLength.toString())
@@ -276,7 +269,7 @@ class AppConfig private constructor() {
             openAiApiKey = db.getPreference(KEY_OPENAI_API_KEY) ?: openAiApiKey
             openAiBaseUrl = db.getPreference(KEY_OPENAI_BASE_URL) ?: openAiBaseUrl
             openAiModel = db.getPreference(KEY_OPENAI_MODEL) ?: openAiModel
-            theme = db.getPreference(KEY_UI_THEME) ?: theme
+            uiThemeMode = db.getPreference(KEY_UI_THEME_MODE)?.let(ThemeMode::fromString) ?: uiThemeMode
             fontSize = db.getPreference(KEY_UI_FONT_SIZE)?.toIntOrNull() ?: fontSize
             browserDefault = db.getPreference(KEY_BROWSER_DEFAULT) ?: browserDefault
             contextLength = db.getPreference(KEY_SESSION_CONTEXT_LENGTH)?.toIntOrNull() ?: contextLength

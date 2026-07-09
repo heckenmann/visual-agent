@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.config
 
+import de.heckenmann.visualagent.config.ThemeMode
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -22,7 +23,7 @@ class AppConfigTest {
                     .create(tempDb)
             config.bindPreferenceStore(boundDb)
             config.databasePath = tempDb
-            config.theme = "Nord Dark"
+            config.uiThemeMode = ThemeMode.DARK
             config.fontSize = 18
             config.llmProvider = "openai"
             config.ollamaModel = "llama3.2:3b"
@@ -39,7 +40,7 @@ class AppConfigTest {
             val db =
                 de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                     .create(tempDb)
-            assertEquals("Nord Dark", db.getPreference("ui.theme"))
+            assertEquals(ThemeMode.DARK.name, db.getPreference("ui.theme.mode"))
             assertEquals("18", db.getPreference("ui.font.size"))
             assertEquals("openai", db.getPreference("llm.provider"))
             assertEquals("llama3.2:3b", db.getPreference("ollama.model"))
@@ -71,7 +72,7 @@ class AppConfigTest {
                     .create(tempDb)
             config.bindPreferenceStore(boundDb)
             config.databasePath = tempDb
-            config.theme = "Cupertino Light"
+            config.uiThemeMode = ThemeMode.LIGHT
             config.fontSize = 20
             config.llmProvider = "openai"
             config.ollamaApiKey = "ollama-reload"
@@ -84,7 +85,7 @@ class AppConfigTest {
             config.save()
 
             // Simulate in-memory drift before "next startup"/reload
-            config.theme = "Dracula"
+            config.uiThemeMode = ThemeMode.SYSTEM
             config.fontSize = 12
             config.llmProvider = "ollama"
             config.ollamaApiKey = ""
@@ -97,7 +98,7 @@ class AppConfigTest {
 
             config.reload()
 
-            assertEquals("Cupertino Light", config.theme)
+            assertEquals(ThemeMode.LIGHT, config.uiThemeMode)
             assertEquals(20, config.fontSize)
             assertEquals("openai", config.normalizedProvider())
             assertEquals("ollama-reload", config.ollamaApiKey)
@@ -175,7 +176,7 @@ class AppConfigTest {
         val openAiApiKey: String,
         val openAiBaseUrl: String,
         val openAiModel: String,
-        val theme: String,
+        val uiThemeMode: ThemeMode,
         val fontSize: Int,
         val browserDefault: String,
         val contextLength: Int,
@@ -198,7 +199,7 @@ class AppConfigTest {
             openAiApiKey = config.openAiApiKey,
             openAiBaseUrl = config.openAiBaseUrl,
             openAiModel = config.openAiModel,
-            theme = config.theme,
+            uiThemeMode = config.uiThemeMode,
             fontSize = config.fontSize,
             browserDefault = config.browserDefault,
             contextLength = config.contextLength,
@@ -223,7 +224,7 @@ class AppConfigTest {
         config.openAiApiKey = snapshot.openAiApiKey
         config.openAiBaseUrl = snapshot.openAiBaseUrl
         config.openAiModel = snapshot.openAiModel
-        config.theme = snapshot.theme
+        config.uiThemeMode = snapshot.uiThemeMode
         config.fontSize = snapshot.fontSize
         config.browserDefault = snapshot.browserDefault
         config.contextLength = snapshot.contextLength

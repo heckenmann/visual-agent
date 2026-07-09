@@ -113,6 +113,7 @@ private fun VisualAgentComposeApp(
     var modal by remember { mutableStateOf<ComposeModal?>(null) }
     var commandPaletteVisible by remember { mutableStateOf(false) }
     var uiFontSize by remember { mutableStateOf(config.fontSize) }
+    var themeMode by remember { mutableStateOf(config.uiThemeMode) }
     var settingsRevision by remember { mutableStateOf(0) }
     val workspaceFocusRequester = remember { FocusRequester() }
     val composeScope = rememberCoroutineScope()
@@ -133,12 +134,22 @@ private fun VisualAgentComposeApp(
                 modalRequester = ComposeModalRequester { requested -> modal = requested },
                 onSettingsChanged = {
                     uiFontSize = config.fontSize
+                    themeMode = config.uiThemeMode
                     settingsRevision += 1
                 },
                 inFlight = inFlight,
                 lifecycle = lifecycle,
             )
         }
+    DisposableEffect(config) {
+        val registration =
+            config.addChangeListener { change ->
+                if (change.key == AppConfig.KEY_UI_THEME_MODE) {
+                    themeMode = config.uiThemeMode
+                }
+            }
+        onDispose { registration.close() }
+    }
     val toggleWindow: (String) -> Unit = { id ->
         windows = toggleWorkspacePanel(windows, id)
     }
@@ -190,8 +201,12 @@ private fun VisualAgentComposeApp(
         onDispose { handle.close() }
     }
 
-    MaterialTheme(colorScheme = draculaColorScheme(), typography = visualAgentTypography(uiFontSize)) {
-        Surface(modifier = Modifier.fillMaxSize()) {
+    val darkTheme = isSystemInDarkTheme(themeMode)
+    MaterialTheme(
+        colorScheme = if (darkTheme) visualAgentDarkColorScheme() else visualAgentLightColorScheme(),
+        typography = visualAgentTypography(uiFontSize),
+    ) {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Box(modifier = Modifier.fillMaxSize()) {
                 Row(
                     modifier =
@@ -210,8 +225,7 @@ private fun VisualAgentComposeApp(
                                     }
                                     else -> false
                                 }
-                            }.focusable()
-                            .background(backgroundBrush()),
+                            }.focusable(),
                 ) {
                     ComposeRail(
                         windows = windows,

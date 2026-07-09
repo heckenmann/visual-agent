@@ -15,7 +15,7 @@ class AppConfigExportTest {
             val properties = Properties().apply { file.inputStream().use(::load) }
 
             assertEquals(AppConfig.instance.maxParallelSubAgents.toString(), properties["session.max.parallel.sub.agents"])
-            assertEquals(AppConfig.instance.theme, properties["ui.theme"])
+            assertEquals(AppConfig.instance.uiThemeMode.name, properties["ui.theme.mode"])
             assertFalse(properties.containsKey("openai.api.key"))
             assertFalse(properties.containsKey("ollama.api.key"))
         } finally {

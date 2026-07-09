@@ -7,16 +7,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.config.ThemeMode
 import kotlin.math.roundToInt
 
 @Composable
@@ -31,6 +32,7 @@ internal fun SettingsExecutionAndAppearanceSection(
     autoCompactionEnabled: Boolean,
     userInstruction: String,
     fontSize: Int,
+    themeMode: ThemeMode,
     onContextLengthChange: (Int) -> Unit,
     onLoadLimitChange: (String) -> Unit,
     onMaxParallelChange: (String) -> Unit,
@@ -40,11 +42,12 @@ internal fun SettingsExecutionAndAppearanceSection(
     onCompactionChange: (Boolean) -> Unit,
     onUserInstructionChange: (String) -> Unit,
     onFontSizeChange: (Int) -> Unit,
+    onThemeModeChange: (ThemeMode) -> Unit,
 ) {
     PanelSection(title = "Execution") {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("Context length", color = Color(0xFFF8F8F2), fontWeight = FontWeight.SemiBold)
+                Text("Context length", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
                 Slider(
                     value = contextLength.toFloat(),
                     onValueChange = {
@@ -55,7 +58,7 @@ internal fun SettingsExecutionAndAppearanceSection(
                     steps = ((MAX_CONTEXT_LENGTH - MIN_CONTEXT_LENGTH) / 1024) - 1,
                 )
             }
-            Text("$contextLength", color = Color(0xFFBD93F9), modifier = Modifier.width(72.dp))
+            Text("$contextLength", color = MaterialTheme.colorScheme.primary, modifier = Modifier.width(72.dp))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             NumericPanelField(
@@ -95,7 +98,7 @@ internal fun SettingsExecutionAndAppearanceSection(
     PanelSection(title = "Appearance") {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("Font size", color = Color(0xFFF8F8F2), fontWeight = FontWeight.SemiBold)
+                Text("Font size", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
                 Slider(
                     value = fontSize.toFloat(),
                     onValueChange = {
@@ -106,7 +109,21 @@ internal fun SettingsExecutionAndAppearanceSection(
                     steps = MAX_SETTINGS_FONT_SIZE - MIN_SETTINGS_FONT_SIZE - 1,
                 )
             }
-            Text("$fontSize px", color = Color(0xFFBD93F9), modifier = Modifier.width(48.dp))
+            Text("$fontSize px", color = MaterialTheme.colorScheme.primary, modifier = Modifier.width(48.dp))
         }
+        PanelDropdownField(
+            label = "Theme",
+            selectedValue = themeMode.name,
+            options = themeModeOptions(),
+            onSelected = { selected -> onThemeModeChange(ThemeMode.fromString(selected)) },
+        )
     }
 }
+
+internal fun themeModeOptions(): List<PanelSelectOption> =
+    ThemeMode.entries.map { mode ->
+        PanelSelectOption(
+            value = mode.name,
+            label = mode.name.lowercase().replaceFirstChar(Char::titlecase),
+        )
+    }

@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TooltipAnchorPosition
@@ -74,8 +75,8 @@ internal fun ActionIconButton(
     iconSize: Dp = 17.dp,
     onLongClick: (() -> Unit)? = null,
 ) {
-    val backgroundColor = if (selected) Color(0x338BE9FD) else Color.Transparent
-    val iconTint = if (selected) Color(0xFF8BE9FD) else LocalContentColor.current
+    val backgroundColor = if (selected) MaterialTheme.colorScheme.tertiary.copy(alpha = 0x33 / 255f) else Color.Transparent
+    val iconTint = if (selected) MaterialTheme.colorScheme.tertiary else LocalContentColor.current
     ActionTooltip(description = description) {
         Box(
             modifier =

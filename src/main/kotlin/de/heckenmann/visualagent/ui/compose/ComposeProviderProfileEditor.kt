@@ -24,7 +24,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -139,7 +138,7 @@ internal fun ProviderProfileEditor(
             )
         }
         if (validation != null) {
-            Text(validation, color = Color(0xFFFFB86C), style = MaterialTheme.typography.bodySmall)
+            Text(validation, color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.bodySmall)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End), modifier = Modifier.fillMaxWidth()) {
             ActionIconButton(icon = Icons.Filled.Close, description = "Cancel", onClick = onCancel)

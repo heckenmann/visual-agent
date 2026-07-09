@@ -48,11 +48,12 @@ internal fun ComposeModalHost(
     onDismiss: () -> Unit,
 ) {
     if (modal == null) return
+    val scheme = MaterialTheme.colorScheme
     Box(
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(Color(0xCC191A21))
+                .background(scheme.scrim.copy(alpha = 0xCC / 255f))
                 .padding(24.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -73,9 +74,9 @@ private fun ModalCard(content: @Composable () -> Unit) {
         modifier =
             Modifier
                 .widthIn(min = 320.dp, max = 560.dp)
-                .border(1.dp, Color(0x6650FA7B), RoundedCornerShape(22.dp)),
+                .border(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0x66 / 255f), RoundedCornerShape(22.dp)),
         shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF282A36)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
         elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
     ) {
         Column(
@@ -93,7 +94,7 @@ private fun ConfirmationModalContent(
     onDismiss: () -> Unit,
 ) {
     ModalTitle(modal.title)
-    Text(text = modal.message, color = Color(0xFFE6E6E6), style = MaterialTheme.typography.bodyMedium)
+    Text(text = modal.message, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium)
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End), modifier = Modifier.fillMaxWidth()) {
         ActionIconButton(
             icon = Icons.Filled.Close,
@@ -119,7 +120,7 @@ private fun InfoModalContent(
     ModalTitle(modal.title)
     Text(
         text = modal.message,
-        color = Color(0xFFE6E6E6),
+        color = MaterialTheme.colorScheme.onSurface,
         style = MaterialTheme.typography.bodyMedium,
         modifier = Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState()),
     )
@@ -156,7 +157,7 @@ private fun ErrorModalContent(
         )
         Text(
             text = modal.userError.detail,
-            color = Color(0xFFE6E6E6),
+            color = MaterialTheme.colorScheme.onSurface,
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
         )
@@ -190,20 +191,23 @@ private fun ErrorModalContent(
     }
 }
 
-private fun errorColorForCategory(category: ErrorCategory): Color =
-    when (category) {
-        ErrorCategory.PROVIDER -> Color(0xFFFFB86C)
-        ErrorCategory.WORKSPACE -> Color(0xFF8BE9FD)
-        ErrorCategory.CANVAS -> Color(0xFFBD93F9)
-        ErrorCategory.TOOL -> Color(0xFFFF79C6)
-        ErrorCategory.PERSISTENCE -> Color(0xFFFF5555)
-        ErrorCategory.UNKNOWN -> Color(0xFFFF5555)
+@Composable
+private fun errorColorForCategory(category: ErrorCategory): Color {
+    val scheme = MaterialTheme.colorScheme
+    return when (category) {
+        ErrorCategory.PROVIDER -> scheme.tertiary
+        ErrorCategory.WORKSPACE -> scheme.tertiary
+        ErrorCategory.CANVAS -> scheme.primary
+        ErrorCategory.TOOL -> scheme.secondary
+        ErrorCategory.PERSISTENCE -> scheme.error
+        ErrorCategory.UNKNOWN -> scheme.error
     }
+}
 
 @Composable
 private fun ModalTitle(
     title: String,
-    color: Color = Color(0xFFF8F8F2),
+    color: Color = MaterialTheme.colorScheme.onSurface,
 ) {
     Text(
         text = title,

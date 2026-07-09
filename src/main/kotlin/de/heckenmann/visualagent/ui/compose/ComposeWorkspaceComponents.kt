@@ -32,7 +32,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.unit.dp
@@ -169,8 +168,8 @@ internal fun ComposeSplitWorkspace(
                                 thickness = 8.dp,
                                 shape = RoundedCornerShape(4.dp),
                                 hoverDurationMillis = 300,
-                                hoverColor = Color(0xFF8BE9FD),
-                                unhoverColor = Color(0x558BE9FD),
+                                hoverColor = MaterialTheme.colorScheme.primary,
+                                unhoverColor = MaterialTheme.colorScheme.primary.copy(alpha = 0x33 / 255f),
                             ),
                     )
                 }
@@ -187,8 +186,8 @@ private fun WorkspaceBackdrop() {
             Modifier
                 .fillMaxSize()
                 .clip(shape)
-                .background(Color(0x55191A21))
-                .border(1.dp, Color(0x1AFFFFFF), shape),
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0x55 / 255f))
+                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0x1A / 255f), shape),
     )
 }
 
@@ -197,7 +196,7 @@ private fun EmptyWorkspace() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(
             text = "No panels are open. Use the rail to choose a workspace panel.",
-            color = Color(0xFF8BE9FD),
+            color = MaterialTheme.colorScheme.tertiary,
             style = MaterialTheme.typography.bodyMedium,
         )
     }
