@@ -39,8 +39,9 @@ Agents receive only the tools allowed by persisted configuration.
 
 ## Acceptance Criteria
 
-- The main agent is limited to sub-agent definition tools (`agent:list`, `agent:create`, `agent:update`, `agent:delete`) only.
+- The main agent is limited to sub-agent definition tools (`agent:list`, `agent:show`, `agent:create`, `agent:update`, `agent:delete`, `agent:log`) only.
 - Sub-agent tool sets can include task-specific tools like canvas or workspace files.
+- The main agent can inspect any agent's tool set via `agent:list` or `agent:show` before assigning a todo.
 - Disabled tools are not exposed in provider callbacks.
 - Per-agent tool overrides are resolved before template defaults and are still filtered by globally disabled tools.
 - Tool toggles remain separate from provider/model dropdowns so capability changes are explicit.

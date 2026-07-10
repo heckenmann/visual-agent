@@ -36,7 +36,7 @@ class AgentConfigTest {
     fun `template maps default config when unknown`() {
         val config = AgentConfig.fromTemplate("nonexistent")
 
-        assertEquals(AgentConfig(), config)
+        assertEquals(AgentConfig(templateName = "nonexistent"), config)
     }
 
     @Test

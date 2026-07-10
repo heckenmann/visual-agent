@@ -19,6 +19,7 @@ import kotlinx.serialization.Serializable
  * @property variant Optional model variant name configured in the provider catalog
  * @property options Provider-specific request options merged at execution time
  * @property tools Optional per-agent tool override; null keeps template/default tool selection
+ * @property templateName Optional template key used to initialize this config and resolve tools
  */
 @Serializable
 data class AgentConfig(
@@ -33,6 +34,7 @@ data class AgentConfig(
     val variant: String? = null,
     val options: Map<String, String> = emptyMap(),
     val tools: List<String>? = null,
+    val templateName: String? = null,
 ) {
     /**
      * Converts the agent-specific model overrides into a provider request selection.
@@ -74,6 +76,9 @@ data class AgentConfig(
          * @param templateName Template key such as `researcher`, `coder`, or `tester`
          * @return Matching sub-agent configuration
          */
-        fun fromTemplate(templateName: String): AgentConfig = TEMPLATES[templateName] ?: AgentConfig()
+        fun fromTemplate(templateName: String): AgentConfig {
+            val base = TEMPLATES[templateName] ?: AgentConfig()
+            return base.copy(templateName = templateName)
+        }
     }
 }
