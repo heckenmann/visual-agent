@@ -16,14 +16,36 @@ class AgentToolConfigServiceTest {
 
         val tools = service.mainAgentTools().map { it.value }.toSet()
         assertTrue("agent:list" in tools)
+        assertTrue("agent:show" in tools)
         assertTrue("agent:create" in tools)
         assertTrue("agent:update" in tools)
         assertTrue("agent:delete" in tools)
+        assertTrue("agent:log" in tools)
         assertFalse("agent:start" in tools)
         assertFalse("agent:message" in tools)
         assertFalse("agent:assign-todo" in tools)
         assertFalse("agent:assign-next-todo" in tools)
         assertFalse("agent:assign-all-todos" in tools)
+    }
+
+    @Test
+    fun `template name is resolved from stored agent config`() {
+        val store = MapSubAgentConfigStore()
+        val service = AgentToolConfigService(store)
+        val agent = SubAgent(id = "a", name = "Coder", role = "Implementation", config = AgentConfig.fromTemplate("coder"))
+
+        assertTrue(service.findConfigIdFor(agent) == "coder")
+        assertTrue(ToolId("file:write") in service.toolsFor(agent))
+    }
+
+    @Test
+    fun `template name falls back to researcher when no config stored and no tools match`() {
+        val store = MapSubAgentConfigStore()
+        val service = AgentToolConfigService(store)
+        val agent = SubAgent(id = "a", name = "CanvasPainter", role = "Painting", config = AgentConfig())
+
+        assertTrue(service.findConfigIdFor(agent) == null)
+        assertTrue(ToolId("file:read") in service.toolsFor(agent))
     }
 
     @Test

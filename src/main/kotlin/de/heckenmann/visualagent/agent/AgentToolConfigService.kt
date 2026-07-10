@@ -34,6 +34,7 @@ class AgentToolConfigService(
     fun mainAgentTools(): Set<ToolId> =
         setOf(
             "agent:list",
+            "agent:show",
             "agent:create",
             "agent:update",
             "agent:delete",
@@ -43,24 +44,31 @@ class AgentToolConfigService(
     /**
      * Return enabled tools for a sub-agent.
      *
+     * The agent's own tool override takes precedence, followed by the persisted
+     * template configuration, then a fallback to the default config for the
+     * agent's stored template name.
+     *
      * @param agent Sub-agent requesting tools
-     * @return Tool IDs configured for the agent role/name
+     * @return Tool IDs configured for the agent
      * @see docs/usecases/uc_0000019_configure_agent_tools.md
      */
     fun toolsFor(agent: SubAgent): Set<ToolId> {
         agent.config.tools?.let { configured ->
             return filterEnabledTools(configured).map(::ToolId).toSet()
         }
-        val key =
-            when {
-                agent.name.contains("coder", ignoreCase = true) -> "coder"
-                agent.role.contains("code", ignoreCase = true) -> "coder"
-                agent.name.contains("analyst", ignoreCase = true) -> "analyst"
-                agent.role.contains("review", ignoreCase = true) -> "analyst"
-                else -> "researcher"
-            }
-        val configured = configStore.getSubAgentConfig(key)?.tools ?: defaultConfigs().first { it.id == key }.tools
-        return filterEnabledTools(configured).map(::ToolId).toSet()
+        val key = resolveTemplateName(agent)
+        val configured = configStore.getSubAgentConfig(key)?.tools ?: defaultConfigs().firstOrNull { it.id == key }?.tools
+        return filterEnabledTools(configured ?: emptyList()).map(::ToolId).toSet()
+    }
+
+    private fun resolveTemplateName(agent: SubAgent): String {
+        val template = agent.config.templateName?.ifBlank { null }
+        if (template != null) return template
+        val tools = agent.config.tools
+        return defaultConfigs()
+            .firstOrNull { cfg ->
+                tools != null && tools.toSet() == cfg.tools.toSet()
+            }?.id ?: "researcher"
     }
 
     /**
@@ -71,6 +79,26 @@ class AgentToolConfigService(
      * @see docs/usecases/uc_0000019_configure_agent_tools.md
      */
     fun isToolGloballyEnabled(toolId: String): Boolean = toolId !in disabledToolIds()
+
+    /**
+     * Returns the persisted tool configuration id for the given sub-agent.
+     *
+     * The value is read from the agent's stored template name. If no template name
+     * is stored, the id of the default config matching the agent's explicit tool
+     * list is returned, otherwise null.
+     *
+     * @param agent Sub-agent to look up
+     * @return Matching config id, or null when no match exists
+     */
+    fun findConfigIdFor(agent: SubAgent): String? {
+        agent.config.templateName
+            ?.ifBlank { null }
+            ?.let { return it }
+        agent.config.tools?.let { tools ->
+            return defaultConfigs().firstOrNull { it.tools.toSet() == tools.toSet() }?.id
+        }
+        return null
+    }
 
     /**
      * Enables or disables one tool globally.
@@ -133,6 +161,14 @@ class AgentToolConfigService(
     }
 
     private fun filterEnabledTools(tools: Collection<String>): List<String> = tools.filter(::isToolGloballyEnabled)
+
+    /**
+     * Returns the human-readable description for a default config id.
+     *
+     * @param configId Config id such as `coder`, `analyst`, or `researcher`
+     * @return Description text, or empty when unknown
+     */
+    fun descriptionForConfigId(configId: String): String = defaultConfigs().firstOrNull { it.id == configId }?.description.orEmpty()
 
     private fun defaultConfigs(): List<SubAgentToolConfig> =
         listOf(
