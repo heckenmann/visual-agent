@@ -43,10 +43,15 @@ class AgentManagerRecoveryAndTodoContextTest {
                 assertTrue(firstMessage.content.contains("Implement worker orchestration"))
                 assertTrue(
                     firstMessage.content.contains(
-                        "The main agent must not use direct workspace, file, terminal, browser, search, history, or todo tools",
+                        "The main agent must not use direct workspace, file, terminal, browser, search, history, canvas, or other worker tools",
                     ),
                 )
-                assertTrue(firstMessage.content.contains("Use only sub-agent definition tools"))
+                assertTrue(
+                    firstMessage.content.contains(
+                        "The only tools the main agent may use directly are sub-agent definition tools",
+                    ),
+                )
+                assertTrue(firstMessage.content.contains("todos"))
                 assertTrue(secondMessage.role == "system")
                 assertTrue(secondMessage.content.contains("Always answer in German."))
             } finally {

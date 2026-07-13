@@ -2,14 +2,19 @@ package de.heckenmann.visualagent.agent.ollama
 
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.config.AppConfig
+import io.netty.channel.ChannelOption
 import org.springframework.ai.ollama.api.OllamaApi
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.HttpHeaders
+import org.springframework.http.client.ReactorClientHttpRequestFactory
+import org.springframework.http.client.reactive.ReactorClientHttpConnector
 import org.springframework.web.client.RestClient
 import org.springframework.web.reactive.function.client.ClientRequest
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction
 import org.springframework.web.reactive.function.client.WebClient
+import reactor.netty.http.client.HttpClient
+import java.time.Duration
 
 /**
  * Creates the Ollama API client with authentication for secured endpoints.
@@ -27,20 +32,40 @@ class OllamaApiConfiguration {
     fun ollamaApi(): OllamaApi = createOllamaApi(AppConfig.instance)
 }
 
-internal fun createOllamaApi(config: AppConfig): OllamaApi = createOllamaApi(config.ollamaLocalUrl) { config.ollamaApiKey }
+internal fun createOllamaApi(config: AppConfig): OllamaApi =
+    createOllamaApi(
+        baseUrl = config.ollamaLocalUrl,
+        timeoutSeconds = config.timeoutSeconds,
+        apiKey = { config.ollamaApiKey },
+    )
 
-internal fun createOllamaApi(profile: ProviderProfile): OllamaApi = createOllamaApi(profile.baseUrl) { profile.apiKey }
+internal fun createOllamaApi(profile: ProviderProfile): OllamaApi =
+    createOllamaApi(
+        baseUrl = profile.baseUrl,
+        timeoutSeconds = profile.options["timeoutSeconds"]?.toIntOrNull() ?: AppConfig.instance.timeoutSeconds,
+        apiKey = { profile.apiKey },
+    )
 
 private fun createOllamaApi(
     baseUrl: String,
+    timeoutSeconds: Int,
     apiKey: () -> String,
-): OllamaApi =
-    OllamaApi
+): OllamaApi {
+    val effectiveTimeout = timeoutSeconds.coerceIn(MIN_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS)
+    val httpClient =
+        HttpClient
+            .create()
+            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, CONNECT_TIMEOUT_MILLIS)
+            .responseTimeout(Duration.ofSeconds(effectiveTimeout.toLong()))
+    val restConnector = ReactorClientHttpRequestFactory(httpClient)
+    val webConnector = ReactorClientHttpConnector(httpClient)
+    return OllamaApi
         .builder()
         .baseUrl(baseUrl.ifBlank { "http://localhost:11434" }.trimEnd('/'))
         .restClientBuilder(
             RestClient
                 .builder()
+                .requestFactory(restConnector)
                 .requestInterceptor { request, body, execution ->
                     applyOllamaAuthentication(request.headers, apiKey())
                     execution.execute(request, body)
@@ -48,6 +73,7 @@ private fun createOllamaApi(
         ).webClientBuilder(
             WebClient
                 .builder()
+                .clientConnector(webConnector)
                 .filter(
                     ExchangeFilterFunction.ofRequestProcessor { request ->
                         val authenticatedRequest =
@@ -60,6 +86,7 @@ private fun createOllamaApi(
                     },
                 ),
         ).build()
+}
 
 internal fun applyOllamaAuthentication(
     headers: HttpHeaders,
@@ -67,3 +94,7 @@ internal fun applyOllamaAuthentication(
 ) {
     apiKey.trim().takeIf { it.isNotEmpty() }?.let(headers::setBearerAuth)
 }
+
+private const val MIN_TIMEOUT_SECONDS = 30
+private const val MAX_TIMEOUT_SECONDS = 600
+private const val CONNECT_TIMEOUT_MILLIS = 10_000

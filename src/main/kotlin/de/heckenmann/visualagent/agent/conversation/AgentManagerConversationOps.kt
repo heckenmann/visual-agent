@@ -163,41 +163,11 @@ internal class AgentManagerConversationOps(
 
     fun clearHistory() = historyOps.clearHistory()
 
-    suspend fun addWelcomeMessageAfterReset(): String {
-        val request =
-            ChatRequestContext(
-                messages =
-                    listOf(
-                        Message(
-                            role = "system",
-                            content =
-                                """
-                                You are Visual Agent.
-                                Greet the user after a conversation reset.
-                                Then list in short bullet points what you can do in this app as the main orchestrator:
-                                - coordinate worker agents
-                                - create, update, delete, and assign sub-agents
-                                - review worker results
-                                - answer project questions from the available conversation context
-                                - keep the task plan moving through worker delegation
-                                Keep it concise and friendly.
-                                """.trimIndent(),
-                        ),
-                    ),
-                enabledTools = emptySet(),
-                metadata = mapOf("sessionId" to AgentManager.MAIN_SESSION_ID, "agent" to "main"),
-            )
-        val generated =
-            owner.llmProvider
-                .chat(request)
-                .message
-                .content
-                .trim()
-        val welcome = generated.ifBlank { "Hello! I'm ready to help with your project tasks." }
-        val message = Message(role = "assistant", content = welcome)
-        persist(message)
-        return welcome
-    }
+    suspend fun addWelcomeMessageAfterReset(): WelcomeResult =
+        WelcomeMessageComposer.compose(
+            llmProvider = owner.llmProvider,
+            persist = ::persist,
+        )
 
     fun getHistory(): List<Message> = historyOps.getHistory()
 

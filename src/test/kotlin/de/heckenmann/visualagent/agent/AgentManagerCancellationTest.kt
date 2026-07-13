@@ -3,6 +3,7 @@ import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
 import de.heckenmann.visualagent.todo.TodoEventBus
+import de.heckenmann.visualagent.todo.TodoStatus
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.CancellationException
@@ -111,6 +112,32 @@ class AgentManagerCancellationTest {
         val manager = AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus(), TodoEventBus())
         try {
             assertFalse(manager.cancelSubAgentJob("does-not-exist"))
+        } finally {
+            manager.destroy()
+            stores.close()
+        }
+    }
+
+    @Test
+    fun `cancelAllActiveTodos cancels every non-terminal todo`() {
+        val stores = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+        val provider = mockk<LLMProvider>(relaxed = true)
+        val manager = AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus(), TodoEventBus())
+        try {
+            val pending = manager.todoManager.add("pending task")
+            val inProgress = manager.todoManager.add("in progress task")
+            val completed = manager.todoManager.add("completed task")
+            val cancelled = manager.todoManager.add("cancelled task")
+            manager.todoManager.updateStatus(inProgress.id, TodoStatus.IN_PROGRESS)
+            manager.todoManager.updateStatus(completed.id, TodoStatus.COMPLETED)
+            manager.todoManager.updateStatus(cancelled.id, TodoStatus.CANCELLED)
+
+            manager.cancelAllActiveTodos()
+
+            assertEquals(TodoStatus.CANCELLED, manager.todoManager.getById(pending.id)?.status)
+            assertEquals(TodoStatus.CANCELLED, manager.todoManager.getById(inProgress.id)?.status)
+            assertEquals(TodoStatus.COMPLETED, manager.todoManager.getById(completed.id)?.status)
+            assertEquals(TodoStatus.CANCELLED, manager.todoManager.getById(cancelled.id)?.status)
         } finally {
             manager.destroy()
             stores.close()

@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 
 class AgentToolConfigServiceTest {
     @Test
-    fun `main agent tool set only includes sub-agent definition tools`() {
+    fun `main agent tool set includes sub-agent definition tools and todos`() {
         val store = MapSubAgentConfigStore()
         val service = AgentToolConfigService(store)
 
@@ -21,11 +21,14 @@ class AgentToolConfigServiceTest {
         assertTrue("agent:update" in tools)
         assertTrue("agent:delete" in tools)
         assertTrue("agent:log" in tools)
+        assertTrue("todos" in tools)
         assertFalse("agent:start" in tools)
         assertFalse("agent:message" in tools)
         assertFalse("agent:assign-todo" in tools)
         assertFalse("agent:assign-next-todo" in tools)
         assertFalse("agent:assign-all-todos" in tools)
+        assertFalse("file:write" in tools)
+        assertFalse("terminal" in tools)
     }
 
     @Test
