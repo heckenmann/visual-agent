@@ -1,10 +1,12 @@
 package de.heckenmann.visualagent.agent
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
+import de.heckenmann.visualagent.agent.conversation.WelcomeResult
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.todo.TodoEventBus
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import io.mockk.slot
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -78,6 +80,8 @@ class AgentManagerConversationPersistenceTest {
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                 .create(tempDb)
         val provider = mockk<LLMProvider>(relaxed = true)
+        coEvery { provider.checkConnection() } returns true
+        coEvery { provider.getModels() } returns listOf("llava")
         coEvery { provider.chat(any<ChatRequestContext>()) } returns
             ChatResponse(
                 model = "test",
@@ -89,7 +93,10 @@ class AgentManagerConversationPersistenceTest {
         manager.clearHistory()
         val welcome =
             kotlinx.coroutines.runBlocking {
-                manager.addWelcomeMessageAfterReset()
+                (
+                    manager.addWelcomeMessageAfterReset() as
+                        WelcomeResult.Generated
+                ).message
             }
 
         val history = manager.getHistory()
@@ -101,6 +108,72 @@ class AgentManagerConversationPersistenceTest {
         assertEquals(1, rows.size)
         assertEquals("assistant", rows[0]["role"])
         assertEquals(welcome, rows[0]["content"])
+        db.close()
+    }
+
+    @Test
+    fun `clear then welcome falls back to static greeting when provider chat fails`() {
+        val tempDb = createTempDirectory("visual-agent-agent-welcome-fallback-test").resolve("history.db").toString()
+        val db =
+            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                .create(tempDb)
+        val provider = mockk<LLMProvider>(relaxed = true)
+        coEvery { provider.checkConnection() } returns true
+        coEvery { provider.getModels() } returns listOf("llava")
+        coEvery { provider.chat(any<ChatRequestContext>()) } throws
+            IllegalStateException("Provider timeout")
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+
+        manager.clearHistory()
+        val result =
+            kotlinx.coroutines.runBlocking {
+                manager.addWelcomeMessageAfterReset()
+            }
+
+        assertTrue(result is WelcomeResult.Fallback)
+        val history = manager.getHistory()
+        assertEquals(1, history.size)
+        assertEquals("assistant", history[0].role)
+        assertEquals(result.message, history[0].content)
+        assertTrue(history[0].content.contains("Hello! I'm ready to help"))
+        db.close()
+    }
+
+    @Test
+    fun `welcome request includes user model instruction when configured`() {
+        val tempDb = createTempDirectory("visual-agent-agent-welcome-instruction-test").resolve("history.db").toString()
+        val db =
+            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                .create(tempDb)
+        val provider = mockk<LLMProvider>(relaxed = true)
+        coEvery { provider.checkConnection() } returns true
+        coEvery { provider.getModels() } returns listOf("llava")
+        val requestSlot = slot<ChatRequestContext>()
+        coEvery { provider.chat(capture(requestSlot)) } returns
+            ChatResponse(
+                model = "test",
+                message = Message("assistant", "Guten Tag!"),
+                done = true,
+            )
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+        val previousInstruction = de.heckenmann.visualagent.config.AppConfig.instance.userModelInstruction
+        try {
+            de.heckenmann.visualagent.config.AppConfig.instance.userModelInstruction = "Always answer in German."
+            manager.clearHistory()
+            val result =
+                kotlinx.coroutines.runBlocking {
+                    manager.addWelcomeMessageAfterReset()
+                }
+
+            assertTrue(result is WelcomeResult.Generated)
+            val messages = requestSlot.captured.messages
+            assertEquals(1, messages.size)
+            assertEquals("system", messages[0].role)
+            assertTrue(messages[0].content.contains("Greet the user after a conversation reset"))
+            assertTrue(messages[0].content.contains("Always answer in German."))
+        } finally {
+            de.heckenmann.visualagent.config.AppConfig.instance.userModelInstruction = previousInstruction
+        }
         db.close()
     }
 
