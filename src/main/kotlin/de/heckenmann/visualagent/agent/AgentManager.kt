@@ -98,7 +98,7 @@ class AgentManager
         internal var pendingResumeMessage: String? = null
         internal var loadedHistoryCount: Int = 0
         internal val finishedToolEventsByRequestId = ConcurrentHashMap<String, MutableList<ToolCallEvent>>()
-        private lateinit var toolEventListenerHandle: AutoCloseable
+        private var toolEventListenerHandle: AutoCloseable? = null
         internal lateinit var autonomousCoordinator: AutonomousCoordinator
         internal lateinit var responseCoordinator: AgentResponseCoordinator
         private val lifecycleOps = AgentManagerLifecycleOps(this)
@@ -151,7 +151,7 @@ class AgentManager
          * Use cases: UC-0000001.
          */
         override fun destroy() {
-            runCatching { toolEventListenerHandle.close() }
+            runCatching { toolEventListenerHandle?.close() }
             scope.cancel()
         }
 
@@ -268,13 +268,24 @@ class AgentManager
         /** Cancels all sub-agent jobs. Use cases: UC-0000080. */
         fun cancelAllRunningActions(): Set<String> = subAgentJobScheduler.cancelAllJobs()
 
+        /** Cancels every non-terminal todo. Use cases: UC-0000045. */
+        fun cancelAllActiveTodos() {
+            todoManager
+                .getAll()
+                .filter {
+                    it.status != de.heckenmann.visualagent.todo.TodoStatus.COMPLETED &&
+                        it.status != de.heckenmann.visualagent.todo.TodoStatus.CANCELLED
+                }.forEach { todoManager.cancelTodo(it.id) }
+        }
+
         /** Deletes the main conversation history from memory and persistence. Use cases: UC-0000045. */
         fun clearHistory() {
             conversationOps.clearHistory()
         }
 
         /** Generates and persists the post-reset welcome message. Use cases: UC-0000045. */
-        suspend fun addWelcomeMessageAfterReset(): String = conversationOps.addWelcomeMessageAfterReset()
+        suspend fun addWelcomeMessageAfterReset(): de.heckenmann.visualagent.agent.conversation.WelcomeResult =
+            conversationOps.addWelcomeMessageAfterReset()
 
         /** Returns the currently loaded main conversation history. Use cases: UC-0000005, UC-0000046. */
         fun getHistory(): List<Message> = conversationOps.getHistory()

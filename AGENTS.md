@@ -24,6 +24,8 @@ Always run, in this order:
 - `generateUseCaseResources` runs as part of `processResources`; use cases are packaged to `build/generated/usecase-resources/usecases/`.
 - CI runs the desktop Compose test path under `xvfb-run -a` because Compose needs an X server; locally on macOS / Windows / a Linux desktop this is unnecessary.
 
+> **Agent efficiency note:** Full `./gradlew ktlintCheck check test` is slow and produces a lot of output. During iterative development, prefer running the relevant test class/method in isolation, e.g. `./gradlew test --tests "de.heckenmann.visualagent.<path>.<TestClass>.<method>"`. Run the complete gate only when the change is ready for commit or when CI-like verification is needed. The full gate must still pass before any commit.
+
 ## Commit Conventions
 
 - Conventional Commits: `type(scope): short imperative summary`. Recurring scopes: `ui`, `agent`, `todo`, `knowledge`, `workspace`, `canvas`, `orchestration`, `docs`, `build`, `ci`.
@@ -44,6 +46,7 @@ Always run, in this order:
 - All changes must be developed on a topic branch (`codex/issue-<number>-short-description` or similar) and merged into `master` through a pull request. Never commit directly to `master`.
 - When moving files, use `git mv` so Git tracks the rename instead of treating it as a delete/add pair.
 - Project language is **English**. All code comments, documentation, commit messages, PR descriptions, issue comments, and use-case files must be written in English.
+- Before committing and pushing, perform a manual smoke test of the changes and get explicit user confirmation that they are ready.
 
 ### Security
 

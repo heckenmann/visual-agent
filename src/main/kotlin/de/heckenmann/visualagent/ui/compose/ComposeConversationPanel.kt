@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.CancellationToken
 import de.heckenmann.visualagent.agent.Message
+import de.heckenmann.visualagent.agent.conversation.WelcomeResult
 import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.error.ErrorMessageMapper
@@ -242,12 +243,33 @@ internal fun ConversationPanel(
                 modalRequester.requestConfirmation(
                     ComposeConfirmationModal(
                         title = "Clear conversation?",
-                        message = "This removes the persisted conversation history for the current session.",
+                        message =
+                            "This will stop any active request, cancel all running sub-agent jobs and open todos, " +
+                                "then remove the persisted conversation history.",
                         confirmDescription = "Clear conversation",
                     ) {
-                        agentManager.clearHistory()
-                        history = agentManager.getHistory()
-                        status = "Conversation cleared"
+                        scope.launch {
+                            sending = true
+                            status = "Stopping active work and clearing conversation..."
+                            activeToken?.cancel()
+                            agentManager.cancelAllRunningActions()
+                            agentManager.cancelAllActiveTodos()
+                            runCatching {
+                                agentManager.clearHistory()
+                                agentManager.addWelcomeMessageAfterReset()
+                            }.onSuccess { result ->
+                                status =
+                                    when (result) {
+                                        is WelcomeResult.Generated -> "Conversation cleared"
+                                        is WelcomeResult.Fallback ->
+                                            "Welcome could not be generated: ${result.error.message ?: result.error::class.simpleName.orEmpty()}"
+                                    }
+                            }.onFailure { error ->
+                                status = "Welcome could not be generated: ${error.message ?: error::class.simpleName.orEmpty()}"
+                            }
+                            history = agentManager.getHistory()
+                            sending = false
+                        }
                     },
                 )
             },

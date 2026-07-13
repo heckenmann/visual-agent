@@ -24,9 +24,9 @@ class AgentToolConfigService(
     /**
      * Return enabled tools for the main orchestration agent.
      *
-     * The main agent can manage sub-agent definitions but cannot start, message, or assign
-     * work to sub-agents directly. Assignment and execution happen automatically through
-     * the autonomous coordinator.
+     * The main agent can inspect and manage sub-agents and assign work to them by
+     * creating or updating todos. It does not start or message sub-agents directly;
+     * assignment and execution happen automatically through the autonomous coordinator.
      *
      * @return Set of tool IDs exposed to the main agent
      * @see docs/usecases/uc_0000019_configure_agent_tools.md
@@ -39,6 +39,7 @@ class AgentToolConfigService(
             "agent:update",
             "agent:delete",
             "agent:log",
+            "todos",
         ).let(::filterEnabledTools).map(::ToolId).toSet()
 
     /**
