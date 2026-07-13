@@ -80,7 +80,7 @@ dependencies {
     implementation("org.commonmark:commonmark-ext-gfm-tables:0.29.0")
 
     // Workspace document analysis
-    implementation("org.apache.pdfbox:pdfbox:3.0.7")
+    implementation("org.apache.pdfbox:pdfbox:3.0.8")
 
     // Kotlin logging (wrapper for SLF4J)
     implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
