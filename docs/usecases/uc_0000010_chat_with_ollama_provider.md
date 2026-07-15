@@ -32,8 +32,12 @@ The application can run local or remote Ollama-backed sessions.
 ## Code Entry Points
 
 - `de.heckenmann.visualagent.agent.OllamaClient`
+- `de.heckenmann.visualagent.agent.OllamaToollessChat`
+- `de.heckenmann.visualagent.agent.OllamaClientAuxiliary`
+- `de.heckenmann.visualagent.agent.OllamaClientOps`
 - `de.heckenmann.visualagent.agent.ollama.OllamaApiConfiguration`
 - `de.heckenmann.visualagent.agent.OllamaPromptFactory`
+- `de.heckenmann.visualagent.agent.ollama.OllamaModelCapabilities`
 
 ## Acceptance Criteria
 

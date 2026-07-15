@@ -38,6 +38,7 @@ The main conversation is reset without requiring an application restart, and no 
 - `de.heckenmann.visualagent.agent.AgentManager.cancelAllActiveTodos`
 - `de.heckenmann.visualagent.agent.AgentManager.clearHistory`
 - `de.heckenmann.visualagent.agent.AgentManager.addWelcomeMessageAfterReset`
+- `de.heckenmann.visualagent.agent.conversation.WelcomeMessageComposer`
 
 ## Acceptance Criteria
 
