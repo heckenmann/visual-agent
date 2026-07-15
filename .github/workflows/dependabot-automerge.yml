@@ -1,0 +1,62 @@
+name: Dependabot auto-merge
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  dependabot-automerge:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v3
+        with:
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Check that only dependency files are touched
+        id: paths
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          changed_files=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --jq '.[].filename' 2>/dev/null || echo "")
+          all_allowed=true
+          for file in $changed_files; do
+            case "$file" in
+              build.gradle*|*/build.gradle*|gradle.properties|*/gradle.properties|*/libs.versions.toml|.github/workflows/*.yml)
+                ;;
+              *)
+                all_allowed=false
+                break
+                ;;
+            esac
+          done
+          echo "dependency_only=$all_allowed" >> "$GITHUB_OUTPUT"
+
+      - name: Check for no-auto-merge label
+        id: label-check
+        run: |
+          if echo '${{ toJSON(github.event.pull_request.labels) }}' | jq -e 'any(.name == "dependabot: no-auto-merge")' > /dev/null 2>&1; then
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skipped=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Enable auto-merge
+        if: |
+          steps.metadata.outputs.update-type != 'version-update:semver-major' &&
+          steps.metadata.outputs.package-ecosystem != 'github_actions' &&
+          steps.paths.outputs.dependency_only == 'true' &&
+          steps.label-check.outputs.skipped == 'false'
+        run: gh pr merge "$PR_URL" --auto --squash --delete-branch
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
