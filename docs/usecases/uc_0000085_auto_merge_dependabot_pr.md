@@ -12,20 +12,19 @@ Dependabot bot account (`dependabot[bot]`).
 
 - Dependabot is configured in `.github/dependabot.yml` (Gradle and GitHub Actions ecosystems).
 - The `Tests` workflow runs on `pull_request` events.
-- The `dependabot-automerge` job is present in `.github/workflows/test.yml`.
+- The `dependabot-automerge` workflow is present in `.github/workflows/dependabot-automerge.yml`.
 
 ## Main Flow
 
 1. Dependabot opens a pull request targeting `master`.
-2. The `Tests` workflow triggers on the `pull_request` event.
-3. The `test` job runs `./gradlew --no-daemon test` under `xvfb-run`.
-4. If the `test` job succeeds, the `dependabot-automerge` job runs (only for `dependabot[bot]` author).
-5. The job fetches Dependabot metadata to determine the update type and package ecosystem.
-6. The job checks that only dependency files (`**/build.gradle*`, `**/gradle.properties`, `**/libs.versions.toml`, `.github/workflows/*.yml`) are touched.
-7. The job checks that the PR does not have the `dependabot: no-auto-merge` label.
-8. If all conditions are met, `gh pr merge --auto --squash --delete-branch` is called.
-9. GitHub merges the PR once CI is green and any required approvals are satisfied.
-10. The source branch is deleted on merge.
+2. The `Tests` workflow triggers on the `pull_request` event and runs `./gradlew --no-daemon test`.
+3. The `dependabot-automerge` workflow triggers on the same `pull_request` event (only for `dependabot[bot]` author).
+4. The workflow fetches Dependabot metadata to determine the update type and package ecosystem.
+5. The workflow checks that only dependency files (`**/build.gradle*`, `**/gradle.properties`, `**/libs.versions.toml`, `.github/workflows/*.yml`) are touched.
+6. The workflow checks that the PR does not have the `dependabot: no-auto-merge` label.
+7. If all conditions are met, `gh pr merge --auto --squash --delete-branch` is called.
+8. GitHub waits until all required status checks (including `Gradle tests`) are green, then merges the PR.
+9. The source branch is deleted on merge.
 
 ## Exclusion Rules
 
@@ -46,7 +45,8 @@ Low-risk Dependabot PRs are merged automatically without manual intervention. Th
 
 ## Code Entry Points
 
-- `.github/workflows/test.yml` — `dependabot-automerge` job
+- `.github/workflows/dependabot-automerge.yml` — auto-merge workflow
+- `.github/workflows/test.yml` — test workflow (runs on `pull_request`)
 - `.github/dependabot.yml` — Dependabot configuration (unchanged)
 - `AGENTS.md` — documented auto-merge policy
 
