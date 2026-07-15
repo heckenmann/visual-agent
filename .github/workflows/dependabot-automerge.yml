@@ -31,7 +31,7 @@ jobs:
           all_allowed=true
           for file in $changed_files; do
             case "$file" in
-              */build.gradle*|*/gradle.properties|*/libs.versions.toml|.github/workflows/*.yml)
+              build.gradle*|*/build.gradle*|gradle.properties|*/gradle.properties|*/libs.versions.toml|.github/workflows/*.yml)
                 ;;
               *)
                 all_allowed=false

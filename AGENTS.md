@@ -37,7 +37,7 @@ Always run, in this order:
 
 - Create one focused PR per logical branch/change; do not open mega-PRs.
 - Every manually created PR must be configured to **delete the source branch on merge** (`delete_branch_on_merge: true`).
-- Dependabot PRs that meet all of the following conditions are auto-merged via the `dependabot-automerge` job in `test.yml`:
+- Dependabot PRs that meet all of the following conditions are auto-merged via the `dependabot-automerge` job in `dependabot-automerge.yml`:
   - Author is `dependabot[bot]`.
   - CI (`test` job) is green.
   - The update is a patch or minor bump (not major).
