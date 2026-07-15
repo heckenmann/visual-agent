@@ -72,6 +72,7 @@ class ComposeSubAgentDetailsEditorTest {
                     providerCatalogService = catalog,
                     modalRequester = ComposeModalRequester { },
                     inFlight = InFlightStateHolder(),
+                    toolEventBus = ToolEventBus(),
                 )
             }
         }

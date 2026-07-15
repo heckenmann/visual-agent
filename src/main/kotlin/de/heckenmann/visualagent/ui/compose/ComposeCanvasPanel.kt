@@ -28,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.canvas.CanvasOperations
 import de.heckenmann.visualagent.canvas.CanvasSnapshot
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
@@ -52,6 +53,7 @@ internal fun CanvasPanel(
     canvasOperations: CanvasOperations,
     workspaceFileService: WorkspaceFileService,
     modalRequester: ComposeModalRequester,
+    toolEventBus: ToolEventBus,
 ) {
     var snapshot by remember { mutableStateOf(canvasOperations.snapshot()) }
     var status by remember { mutableStateOf("Figures: ${snapshot.figureCount}") }
@@ -67,6 +69,11 @@ internal fun CanvasPanel(
                 "Figures: ${next.figureCount} · selected ${next.selectedFigureIndices.size}"
             }
     }
+    ToolEventRefreshEffect(
+        toolEventBus = toolEventBus,
+        toolIds = setOf("canvas"),
+        onRefresh = { snapshot = canvasOperations.snapshot() },
+    )
     val imagePicker =
         rememberFilePickerLauncher { selected: PlatformFile? ->
             selected?.file?.let { file ->

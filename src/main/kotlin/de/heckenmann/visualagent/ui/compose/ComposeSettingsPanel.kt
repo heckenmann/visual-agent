@@ -22,6 +22,7 @@ import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderErrorMessages
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
+import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfig
 import de.heckenmann.visualagent.error.ErrorMessageMapper
 import kotlinx.coroutines.launch
@@ -48,6 +49,7 @@ internal fun SettingsPanel(
     modalRequester: ComposeModalRequester,
     onSettingsChanged: () -> Unit,
     inFlight: InFlightStateHolder,
+    toolEventBus: ToolEventBus,
 ) {
     val scope = rememberCoroutineScope()
     var providers by remember { mutableStateOf(providerCatalogService.enabledProviders()) }
@@ -121,6 +123,12 @@ internal fun SettingsPanel(
         baseUrl = profile?.baseUrl.orEmpty()
         apiKey = profile?.apiKey.orEmpty()
     }
+
+    ToolEventRefreshEffect(
+        toolEventBus = toolEventBus,
+        toolIds = setOf("ui"),
+        onRefresh = { refreshProviderState() },
+    )
 
     /**
      * Reloads the selectable model list from the active provider.

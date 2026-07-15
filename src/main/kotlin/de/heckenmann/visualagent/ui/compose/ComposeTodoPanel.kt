@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.agent.AgentManager
+import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoStatus
@@ -44,6 +45,7 @@ internal fun TodoPanel(
     agentManager: AgentManager,
     modalRequester: ComposeModalRequester,
     todoEventBus: TodoEventBus,
+    toolEventBus: ToolEventBus,
 ) {
     var todos by remember { mutableStateOf(agentManager.getTodosFromDb()) }
     var statusFilter by remember { mutableStateOf(ALL_TODO_STATUSES) }
@@ -52,6 +54,11 @@ internal fun TodoPanel(
         val handle = todoEventBus.addListener { refresh() }
         onDispose { handle.close() }
     }
+    ToolEventRefreshEffect(
+        toolEventBus = toolEventBus,
+        toolIds = setOf("todos", "agent:assign-todo", "agent:assign-next-todo", "agent:assign-all-todos"),
+        onRefresh = refresh,
+    )
     val visibleTodos = todos.filter { statusFilter == ALL_TODO_STATUSES || it.status.name == statusFilter }
     val nextTodoId = remember(visibleTodos) { visibleTodos.firstOrNull { it.status == TodoStatus.PENDING }?.id }
 
