@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.todo
 
+import de.heckenmann.visualagent.knowledge.TodoStore
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -30,11 +31,15 @@ data class TodoChange(
 /**
  * Manages an in-memory list of [Todo] items with CRUD operations,
  * agent assignment support, and position-based ordering.
+ *
+ * New todos are persisted through [todoStore] immediately so background consumers
+ * such as the autonomous coordinator can observe them.
  */
 class TodoManager(
     initialTodos: List<Todo> = emptyList(),
     private val onChange: ((TodoChange) -> Unit)? = null,
     private val eventBus: TodoEventBus? = null,
+    private val todoStore: TodoStore? = null,
 ) {
     private val todos = initialTodos.toMutableList()
     private val listeners = CopyOnWriteArrayList<(TodoChange) -> Unit>()
@@ -89,8 +94,7 @@ class TodoManager(
                 status = TodoStatus.PENDING,
                 position = nextPosition(),
             )
-        todos.add(todo)
-        publishChange(TodoChange(TodoChangeType.ADDED, todo = todo))
+        persistAndPublish(todo, TodoChangeType.ADDED)
         return todo
     }
 
@@ -113,8 +117,7 @@ class TodoManager(
                 position = nextPosition(),
                 assignedAgentId = assignedAgentId,
             )
-        todos.add(todo)
-        publishChange(TodoChange(TodoChangeType.ADDED, todo = todo))
+        persistAndPublish(todo, TodoChangeType.ADDED)
         return todo
     }
 
@@ -286,6 +289,15 @@ class TodoManager(
             runCatching { listener(change) }
         }
         eventBus?.publish(change)
+    }
+
+    private fun persistAndPublish(
+        todo: Todo,
+        type: TodoChangeType,
+    ) {
+        todos.add(todo)
+        todoStore?.saveTodo(todo)
+        publishChange(TodoChange(type, todo = todo))
     }
 
     /**

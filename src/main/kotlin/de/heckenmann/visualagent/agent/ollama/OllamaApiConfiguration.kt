@@ -1,5 +1,7 @@
 package de.heckenmann.visualagent.agent.ollama
 
+import com.fasterxml.jackson.annotation.JsonInclude
+import com.fasterxml.jackson.databind.ObjectMapper
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.config.AppConfig
 import io.netty.channel.ChannelOption
@@ -9,6 +11,7 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.http.HttpHeaders
 import org.springframework.http.client.ReactorClientHttpRequestFactory
 import org.springframework.http.client.reactive.ReactorClientHttpConnector
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter
 import org.springframework.web.client.RestClient
 import org.springframework.web.reactive.function.client.ClientRequest
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction
@@ -69,6 +72,15 @@ private fun createOllamaApi(
                 .requestInterceptor { request, body, execution ->
                     applyOllamaAuthentication(request.headers, apiKey())
                     execution.execute(request, body)
+                }.messageConverters { converters ->
+                    converters.removeIf { it is MappingJackson2HttpMessageConverter }
+                    converters.add(
+                        MappingJackson2HttpMessageConverter(
+                            ObjectMapper().findAndRegisterModules().apply {
+                                setSerializationInclusion(JsonInclude.Include.NON_NULL)
+                            },
+                        ),
+                    )
                 },
         ).webClientBuilder(
             WebClient

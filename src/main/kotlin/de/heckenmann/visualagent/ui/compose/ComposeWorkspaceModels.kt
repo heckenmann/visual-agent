@@ -8,6 +8,7 @@ import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.canvas.CanvasOperations
 import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
 import de.heckenmann.visualagent.workspace.layout.WorkspaceWindowState
 import kotlin.math.max
@@ -289,6 +290,7 @@ data class ComposePanelServices(
     val agentToolConfigService: AgentToolConfigService,
     val toolRegistry: ToolRegistry,
     val toolEventBus: ToolEventBus,
+    val todoEventBus: TodoEventBus,
     val workspaceFileService: WorkspaceFileService,
     val canvasOperations: CanvasOperations,
     val modalRequester: ComposeModalRequester,

@@ -93,6 +93,7 @@ internal fun SettingsPanel(
         }.ifBlank {
             activeProvider?.defaultModel.orEmpty().ifBlank { selectableModels.firstOrNull()?.id.orEmpty() }
         }
+    val activeModelCapabilities = selectableModels.firstOrNull { it.id == resolvedModel }?.capabilities.orEmpty()
     val loadLimitValue = loadLimit.toBoundedIntOrNull(MIN_LOAD_LIMIT, MAX_LOAD_LIMIT)
     val maxParallelValue = maxParallelSubAgents.toBoundedIntOrNull(MIN_PARALLEL_SUB_AGENTS, MAX_PARALLEL_SUB_AGENTS)
     val timeoutValue = timeoutSeconds.toBoundedIntOrNull(MIN_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS)
@@ -265,6 +266,7 @@ internal fun SettingsPanel(
             userInstruction = userInstruction,
             fontSize = fontSize,
             themeMode = themeMode,
+            modelCapabilities = activeModelCapabilities,
             onContextLengthChange = { contextLength = it },
             onLoadLimitChange = { loadLimit = it },
             onMaxParallelChange = { maxParallelSubAgents = it },

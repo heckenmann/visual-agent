@@ -47,6 +47,25 @@ class AutonomousCoordinatorTest {
         }
 
     @Test
+    fun `auto pickup auto assigns unassigned todo to idle agent`(): Unit =
+        runBlocking {
+            val fixture = coordinator(chatDelayMs = 5000)
+            fixture.subAgents["agent-1"] = SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE)
+            val todo = fixture.todoManager.add("Implement feature")
+
+            try {
+                fixture.coordinator.startAutonomousProcessing(seed = false)
+                delay(2000)
+
+                assertEquals("agent-1", todo.assignedAgentId)
+                assertEquals(AgentStatus.BUSY, fixture.subAgents["agent-1"]?.status)
+                assertTrue(fixture.messages.any { it.content.contains("Started todo") })
+            } finally {
+                fixture.cancel()
+            }
+        }
+
+    @Test
     fun `auto pickup does nothing when all agents are busy`() =
         runBlocking {
             val fixture = coordinator()
@@ -170,6 +189,29 @@ class AutonomousCoordinatorTest {
 
                 assertTrue(fixture.messages.any { it.content.contains("Todo ${todo.id} was updated") })
                 assertTrue(fixture.messages.any { it.content.contains("completed todo ${todo.id}") })
+            } finally {
+                fixture.cancel()
+            }
+        }
+
+    @Test
+    fun `coordinator resumes loop when existing todo is reset to PENDING`() =
+        runBlocking {
+            val fixture = coordinator(chatDelayMs = 5000)
+            fixture.subAgents["agent-1"] = SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE)
+            val todo = fixture.todoManager.add("Implement feature", "agent-1")
+            fixture.todoManager.cancelTodo(todo.id)
+
+            try {
+                fixture.coordinator.startAutonomousProcessing(seed = false)
+                delay(400)
+                assertTrue(fixture.subAgents["agent-1"]?.status == AgentStatus.IDLE)
+
+                fixture.todoManager.updateStatus(todo.id, de.heckenmann.visualagent.todo.TodoStatus.PENDING)
+                delay(2000)
+
+                assertEquals(AgentStatus.BUSY, fixture.subAgents["agent-1"]?.status)
+                assertTrue(fixture.messages.any { it.content.contains("Started todo") })
             } finally {
                 fixture.cancel()
             }

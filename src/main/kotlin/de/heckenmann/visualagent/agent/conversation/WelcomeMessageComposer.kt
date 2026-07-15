@@ -50,7 +50,6 @@ internal object WelcomeMessageComposer {
                 IllegalStateException("Model '$configuredModel' is not available"),
             )
         }
-
         val messages = mutableListOf<Message>()
         messages +=
             Message(

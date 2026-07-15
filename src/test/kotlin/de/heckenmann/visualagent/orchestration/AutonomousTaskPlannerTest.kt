@@ -101,15 +101,10 @@ class AutonomousTaskPlannerTest {
     @Test
     fun `reviews worker output and builds complete instructions`() =
         runTest {
-            val provider = mockk<LLMProvider>()
-            coEvery { provider.chat(any<ChatRequestContext>()) } returnsMany
-                listOf(response("APPROVED\nLooks complete."), response("RETRY\nMissing tests."))
-            val toolConfig = mockk<AgentToolConfigService>()
-            every { toolConfig.mainAgentTools() } returns emptySet()
-            val planner = planner(TodoManager(), mutableMapOf(), provider = provider, toolConfig = toolConfig)
+            val planner = planner(TodoManager(), mutableMapOf())
 
             assertTrue(planner.reviewWorkerResult("todo-1", "Implement", "Done"))
-            assertFalse(planner.reviewWorkerResult("todo-1", "Implement", "Partial"))
+            assertFalse(planner.reviewWorkerResult("todo-1", "Implement", ""))
             val instruction =
                 planner.buildWorkerInstruction(
                     TodoManager().add("Implement persistence"),

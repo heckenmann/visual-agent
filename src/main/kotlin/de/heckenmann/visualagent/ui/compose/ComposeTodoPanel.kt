@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -23,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.todo.Todo
+import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoStatus
 import sh.calvin.reorderable.ReorderableColumn
 
@@ -41,10 +43,15 @@ import sh.calvin.reorderable.ReorderableColumn
 internal fun TodoPanel(
     agentManager: AgentManager,
     modalRequester: ComposeModalRequester,
+    todoEventBus: TodoEventBus,
 ) {
     var todos by remember { mutableStateOf(agentManager.getTodosFromDb()) }
     var statusFilter by remember { mutableStateOf(ALL_TODO_STATUSES) }
     val refresh = { todos = agentManager.getTodosFromDb() }
+    DisposableEffect(todoEventBus) {
+        val handle = todoEventBus.addListener { refresh() }
+        onDispose { handle.close() }
+    }
     val visibleTodos = todos.filter { statusFilter == ALL_TODO_STATUSES || it.status.name == statusFilter }
     val nextTodoId = remember(visibleTodos) { visibleTodos.firstOrNull { it.status == TodoStatus.PENDING }?.id }
 

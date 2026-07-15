@@ -254,7 +254,7 @@ internal fun WindowBody(
                 inFlight = panelServices.inFlight,
                 toolEventBus = panelServices.toolEventBus,
             )
-        "todos" -> TodoPanel(panelServices.agentManager, panelServices.modalRequester)
+        "todos" -> TodoPanel(panelServices.agentManager, panelServices.modalRequester, panelServices.todoEventBus)
         "files" -> FilesPanel(panelServices.workspaceFileService, panelServices.canvasOperations, panelServices.modalRequester)
         "agents" ->
             SubAgentsPanel(

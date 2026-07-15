@@ -170,6 +170,8 @@ This project is under active Compose migration on branch `codex/issue-48-compose
 
 ## Gotchas
 
+- Never use `sleep` in bash commands — use polling with `gh run view --json status` or similar non-blocking approaches instead.
+
 - Stale WAL/SHM: if a crashed process leaves `data/visual-agent.db-wal` / `data/visual-agent.db-shm` and you see `SQLITE_BUSY`, delete those two files before restarting.
 - GitHub CLI comment formatting: when posting issue/PR comments with `gh issue comment` / `gh pr comment`, use `--body-file path/to/file.md` (or pipe from stdin) instead of `--body "$(cat <<'EOF' ... EOF)"`. The latter double-escapes newlines and backticks, producing a single unformatted paragraph on GitHub.
 - Tool error text comes from `agent/provider/ProviderErrorMessages.kt` (matches `429`/`403`/`401`/`timeout`/`connection refused`); do not embed raw SDK exception messages in tool results.

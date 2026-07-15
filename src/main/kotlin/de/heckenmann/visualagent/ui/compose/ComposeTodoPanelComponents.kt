@@ -9,13 +9,19 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -129,6 +135,13 @@ internal fun TodoMetaLine(
     todo: Todo,
     isNext: Boolean,
 ) {
+    val statusColor =
+        when (todo.status) {
+            TodoStatus.PENDING -> MaterialTheme.colorScheme.tertiary
+            TodoStatus.IN_PROGRESS -> MaterialTheme.colorScheme.primary
+            TodoStatus.COMPLETED -> MaterialTheme.colorScheme.secondary
+            TodoStatus.CANCELLED -> MaterialTheme.colorScheme.error
+        }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         if (isNext) {
             Text(
@@ -138,10 +151,20 @@ internal fun TodoMetaLine(
                 fontWeight = FontWeight.Bold,
             )
         }
+        when (todo.status) {
+            TodoStatus.PENDING ->
+                Icon(Icons.Filled.Schedule, contentDescription = "Pending", tint = statusColor, modifier = Modifier.size(14.dp))
+            TodoStatus.IN_PROGRESS ->
+                Icon(Icons.Filled.PlayArrow, contentDescription = "In progress", tint = statusColor, modifier = Modifier.size(14.dp))
+            TodoStatus.COMPLETED ->
+                Icon(Icons.Filled.CheckCircle, contentDescription = "Completed", tint = statusColor, modifier = Modifier.size(14.dp))
+            TodoStatus.CANCELLED ->
+                Icon(Icons.Filled.Cancel, contentDescription = "Cancelled", tint = statusColor, modifier = Modifier.size(14.dp))
+        }
         Text(
             text = todo.status.name.labelizeEnumName(),
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = statusColor,
         )
         if (todo.assignedAgentId != null) {
             Text(

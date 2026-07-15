@@ -33,6 +33,7 @@ internal fun SettingsExecutionAndAppearanceSection(
     userInstruction: String,
     fontSize: Int,
     themeMode: ThemeMode,
+    modelCapabilities: Set<String> = emptySet(),
     onContextLengthChange: (Int) -> Unit,
     onLoadLimitChange: (String) -> Unit,
     onMaxParallelChange: (String) -> Unit,
@@ -82,8 +83,26 @@ internal fun SettingsExecutionAndAppearanceSection(
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             PanelCheckbox(label = "Stream", checked = streamingEnabled, onCheckedChange = onStreamingChange)
-            PanelCheckbox(label = "Reasoning", checked = thinkingEnabled, onCheckedChange = onThinkingChange)
+            if (modelCapabilities.contains("thinking")) {
+                PanelCheckbox(label = "Reasoning", checked = thinkingEnabled, onCheckedChange = onThinkingChange)
+            }
             PanelCheckbox(label = "Compaction", checked = autoCompactionEnabled, onCheckedChange = onCompactionChange)
+        }
+        if (modelCapabilities.isNotEmpty()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Capabilities:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                modelCapabilities.sorted().forEach { cap ->
+                    Text(
+                        text = cap,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
         }
         OutlinedTextField(
             value = userInstruction,

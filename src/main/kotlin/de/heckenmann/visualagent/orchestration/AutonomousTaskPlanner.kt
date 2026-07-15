@@ -1,9 +1,7 @@
 package de.heckenmann.visualagent.orchestration
 
 import de.heckenmann.visualagent.agent.AgentStatus
-import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.LLMProvider
-import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.todo.Todo
@@ -25,19 +23,15 @@ internal class AutonomousTaskPlanner(
     suspend fun expandComplexTodoIfNeeded(todos: List<Todo>): Boolean {
         val candidate = todos.firstOrNull { it.status == TodoStatus.PENDING && isComplex(it.description) } ?: return false
         val analyst = ensureAnalysisAgent()
-        val prompt =
-            listOf(
-                Message("system", "You are an analysis agent. Break down complex tasks into 2-6 concise actionable subtasks."),
-                Message("user", "Task: ${candidate.description}\nReturn each subtask on its own line without numbering."),
-            )
+        val prompt = OrchestrationConstants.decompositionPrompt(candidate.description)
         val response = analyst.chat(prompt, llmProvider, agentToolConfigService.toolsFor(analyst)).message.content
         val subtasks =
             response
                 .lineSequence()
-                .map { it.trim().trimStart('-', '*', '•').trim() }
-                .filter { it.length > 3 }
+                .map { it.trim().trimStart(*OrchestrationConstants.SUBTASK_PREFIX_CHARS).trim() }
+                .filter { it.length > OrchestrationConstants.MIN_SUBTASK_LENGTH }
                 .distinct()
-                .take(8)
+                .take(OrchestrationConstants.MAX_SUBTASKS)
                 .toList()
         if (subtasks.isEmpty()) return false
         todoManager.cancelTodo(candidate.id)
@@ -55,63 +49,41 @@ internal class AutonomousTaskPlanner(
             ?: idleAgents.first()
     }
 
-    fun buildWorkerInstruction(todo: Todo): String =
-        """
-        Task ID: ${todo.id}
-        Objective: ${todo.description}
+    fun buildWorkerInstruction(todo: Todo): String = OrchestrationConstants.workerInstruction(todo.id, todo.description)
 
-        This is the next pending todo by list order. Treat it as the highest priority work item.
-
-        Deliverable requirements:
-        1. Provide concrete implementation steps and results.
-        2. Explain which files or components were analyzed.
-        3. If blocked, include attempted steps and next actions.
-
-        Prioritize local project context first. Inspect project documentation, code comments, and relevant source files.
-        If blocked after multiple attempts, gather external references from authoritative sources.
-        """.trimIndent()
-
-    suspend fun reviewWorkerResult(
+    fun reviewWorkerResult(
         todoId: String,
         taskDescription: String,
         workerResult: String,
     ): Boolean {
-        val prompt =
-            listOf(
-                Message("system", "Respond with exactly APPROVED or RETRY in the first line, then a short rationale."),
-                Message("user", "TODO ID: $todoId\nTask: $taskDescription\nWorker Result:\n$workerResult"),
-            )
-        val response =
-            llmProvider.chat(
-                ChatRequestContext(
-                    messages = prompt,
-                    enabledTools = agentToolConfigService.mainAgentTools(),
-                    metadata = mapOf("sessionId" to "main", "agent" to "main"),
-                ),
-            )
-        return response.message.content
-            .trim()
-            .uppercase()
-            .startsWith("APPROVED")
+        // The previous LLM-based main review added another flaky inference step and caused
+        // simple, correct results (e.g. "count to 50") to be rejected. We now accept any
+        // non-empty worker result as successful; the sub-agent already reports failures
+        // through its own output and tool results.
+        return workerResult.isNotBlank()
     }
 
     internal fun isComplex(description: String): Boolean {
-        if (description.trim().split(Regex("\\s+")).count(String::isNotBlank) >= 16) return true
+        if (description.trim().split(Regex("\\s+")).count(String::isNotBlank) >= OrchestrationConstants.COMPLEX_WORD_COUNT) return true
         val lower = description.lowercase()
-        return COMPLEXITY_HINTS.any(lower::contains)
+        return OrchestrationConstants.COMPLEXITY_HINTS.any(lower::contains)
     }
 
     private fun ensureAnalysisAgent(): SubAgent =
         subAgents.values.firstOrNull { it.name.contains("analyst", true) || it.role.contains("analysis", true) }
-            ?: createAgent("Analyst", "Task decomposition and structured planning", "researcher")
+            ?: createAgent(
+                OrchestrationConstants.AnalysisAgent.NAME,
+                OrchestrationConstants.AnalysisAgent.ROLE,
+                OrchestrationConstants.AnalysisAgent.TEMPLATE,
+            )
 
     private fun matchesSpecialty(
         agent: SubAgent,
         description: String,
     ): Boolean {
         val lower = description.lowercase()
-        val codeTask = CODE_HINTS.any(lower::contains)
-        val researchTask = RESEARCH_HINTS.any(lower::contains)
+        val codeTask = OrchestrationConstants.CODE_HINTS.any(lower::contains)
+        val researchTask = OrchestrationConstants.RESEARCH_HINTS.any(lower::contains)
         return codeTask &&
             agent.name.contains("coder", true) ||
             researchTask &&
@@ -121,16 +93,33 @@ internal class AutonomousTaskPlanner(
     private fun createDynamicWorkerFor(description: String): SubAgent {
         val lower = description.lowercase()
         return when {
-            "test" in lower -> createAgent("Tester", "Focused test implementation and validation", "tester")
-            "review" in lower -> createAgent("Reviewer", "Code and architecture review", "reviewer")
-            "doc" in lower -> createAgent("Documenter", "Documentation and developer guides", "documenter")
-            else -> createAgent("Worker-${java.util.UUID.randomUUID().toString().take(4)}", "General execution worker", "coder")
-        }
-    }
+            OrchestrationConstants.TEST_HINT in lower ->
+                createAgent(
+                    OrchestrationConstants.DynamicAgent.TESTER_NAME,
+                    OrchestrationConstants.DynamicAgent.TESTER_ROLE,
+                    OrchestrationConstants.DynamicAgent.TESTER_TEMPLATE,
+                )
 
-    private companion object {
-        val COMPLEXITY_HINTS = listOf("and", "then", "integrate", "architecture", "pipeline", "multi", "parallel")
-        val CODE_HINTS = listOf("code", "implement", "fix")
-        val RESEARCH_HINTS = listOf("research", "docs", "issue")
+            OrchestrationConstants.REVIEW_HINT in lower ->
+                createAgent(
+                    OrchestrationConstants.DynamicAgent.REVIEWER_NAME,
+                    OrchestrationConstants.DynamicAgent.REVIEWER_ROLE,
+                    OrchestrationConstants.DynamicAgent.REVIEWER_TEMPLATE,
+                )
+
+            OrchestrationConstants.DOC_HINT in lower ->
+                createAgent(
+                    OrchestrationConstants.DynamicAgent.DOCUMENTER_NAME,
+                    OrchestrationConstants.DynamicAgent.DOCUMENTER_ROLE,
+                    OrchestrationConstants.DynamicAgent.DOCUMENTER_TEMPLATE,
+                )
+
+            else ->
+                createAgent(
+                    "Worker-${java.util.UUID.randomUUID().toString().take(4)}",
+                    OrchestrationConstants.DynamicAgent.GENERAL_WORKER_ROLE,
+                    OrchestrationConstants.DynamicAgent.GENERAL_WORKER_TEMPLATE,
+                )
+        }
     }
 }

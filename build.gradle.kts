@@ -101,7 +101,7 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
     systemProperty("visualagent.ollama.smoke", System.getProperty("visualagent.ollama.smoke", "false"))
-    jvmArgs("-Xshare:off")
+    jvmArgs("-Xshare:off", "-Xmx2g", "-Dkotlinx.coroutines.debug=off")
     finalizedBy(tasks.jacocoTestReport)
 }
 

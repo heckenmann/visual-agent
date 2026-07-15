@@ -45,3 +45,35 @@ data class ModelDetails(
     val parameterSize: String? = null,
     val quantizationLevel: String? = null,
 )
+
+/**
+ * Response from Ollama's `/api/tags` endpoint listing available models with capabilities.
+ *
+ * @property models List of available model entries
+ */
+@Serializable
+data class ListTagsResponse(
+    val models: List<TagModelEntry> = emptyList(),
+)
+
+/**
+ * Single model entry in the `/api/tags` response.
+ *
+ * @property name Model identifier
+ * @property model Canonical model name
+ * @property modifiedAt Last modification timestamp
+ * @property size Model size in bytes
+ * @property digest Content digest
+ * @property details Structured model metadata
+ * @property capabilities Set of supported capabilities (e.g. "completion", "tools", "thinking", "vision")
+ */
+@Serializable
+data class TagModelEntry(
+    val name: String,
+    val model: String = "",
+    val modifiedAt: String = "",
+    val size: Long = 0,
+    val digest: String = "",
+    val details: ModelDetails? = null,
+    val capabilities: Set<String> = emptySet(),
+)
