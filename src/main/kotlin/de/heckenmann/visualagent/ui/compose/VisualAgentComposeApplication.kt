@@ -32,29 +32,20 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import de.heckenmann.visualagent.AppIdentity
 import de.heckenmann.visualagent.VisualAgentApplication
-import de.heckenmann.visualagent.agent.AgentManager
-import de.heckenmann.visualagent.agent.AgentStatusCallbackAdapter
-import de.heckenmann.visualagent.agent.LLMProvider
-import de.heckenmann.visualagent.agent.config.AgentToolConfigService
-import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
-import de.heckenmann.visualagent.agent.tools.ToolEventBus
-import de.heckenmann.visualagent.agent.tools.ToolRegistry
-import de.heckenmann.visualagent.canvas.CanvasOperations
 import de.heckenmann.visualagent.config.AppConfigBean
-import de.heckenmann.visualagent.todo.TodoEventBus
-import de.heckenmann.visualagent.workspace.WorkspaceFileService
 import de.heckenmann.visualagent.workspace.layout.DesktopState
 import de.heckenmann.visualagent.workspace.layout.StageState
-import de.heckenmann.visualagent.workspace.layout.WorkspaceLayoutService
 import de.heckenmann.visualagent.workspace.layout.WorkspaceWindowState
 import kotlinx.coroutines.launch
 import org.springframework.boot.WebApplicationType
 import org.springframework.boot.builder.SpringApplicationBuilder
-import org.springframework.context.ConfigurableApplicationContext
 import kotlin.math.roundToInt
 
 /**
- * Runs the Compose Multiplatform Visual Agent desktop application.
+ * Entry point for the Compose Multiplatform Visual Agent desktop application.
+ *
+ * Bootstraps Spring, resolves all beans via [ComposeApplicationDependencies], and launches
+ * the Compose window.
  */
 fun runVisualAgentComposeApplication() {
     AppIdentity.configureProcessProperties()
@@ -62,12 +53,10 @@ fun runVisualAgentComposeApplication() {
         SpringApplicationBuilder(VisualAgentApplication::class.java)
             .web(WebApplicationType.NONE)
             .run()
-    val workspaceLayoutService = springContext.getBean(WorkspaceLayoutService::class.java)
-    val persistedStage = workspaceLayoutService.report().stage
+    val deps = springContext.getBean(ComposeApplicationDependencies::class.java)
+    val persistedStage = deps.workspaceLayoutService.report().stage
     val defaultWidth = 1280.dp
     val defaultHeight = 820.dp
-    val lifecycle = springContext.getBean(ApplicationLifecycle::class.java)
-    val appConfig = springContext.getBean(AppConfigBean::class.java)
 
     application {
         val windowState =
@@ -79,12 +68,12 @@ fun runVisualAgentComposeApplication() {
             val size = windowState.size
             val stageWidth = size.width.value.toDouble()
             val stageHeight = size.height.value.toDouble()
-            workspaceLayoutService.saveStage(StageState(width = stageWidth, height = stageHeight))
+            deps.workspaceLayoutService.saveStage(StageState(width = stageWidth, height = stageHeight))
         }
         val closeApplication = {
-            lifecycle.beginShutdown()
+            deps.lifecycle.beginShutdown()
             saveStageOnExit()
-            springContext.close()
+            deps.close()
             exitApplication()
         }
         Window(
@@ -94,10 +83,7 @@ fun runVisualAgentComposeApplication() {
             state = windowState,
         ) {
             VisualAgentComposeApp(
-                config = appConfig,
-                springContext = springContext,
-                workspaceLayoutService = workspaceLayoutService,
-                lifecycle = lifecycle,
+                deps = deps,
                 onCloseApplication = closeApplication,
             )
         }
@@ -106,51 +92,46 @@ fun runVisualAgentComposeApplication() {
 
 @Composable
 private fun VisualAgentComposeApp(
-    config: AppConfigBean,
-    springContext: ConfigurableApplicationContext,
-    workspaceLayoutService: WorkspaceLayoutService,
-    lifecycle: ApplicationLifecycle,
+    deps: ComposeApplicationDependencies,
     onCloseApplication: () -> Unit,
 ) {
-    var windows by remember { mutableStateOf(restoreWorkspaceWindows(defaultWindows(), workspaceLayoutService.report().windows)) }
+    var windows by remember { mutableStateOf(restoreWorkspaceWindows(defaultWindows(), deps.workspaceLayoutService.report().windows)) }
     var modal by remember { mutableStateOf<ComposeModal?>(null) }
     var commandPaletteVisible by remember { mutableStateOf(false) }
-    var uiFontSize by remember { mutableStateOf(config.fontSize) }
-    var themeMode by remember { mutableStateOf(config.uiThemeMode) }
+    var uiFontSize by remember { mutableStateOf(deps.appConfig.fontSize) }
+    var themeMode by remember { mutableStateOf(deps.appConfig.uiThemeMode) }
     var settingsRevision by remember { mutableStateOf(0) }
     val workspaceFocusRequester = remember { FocusRequester() }
     val composeScope = rememberCoroutineScope()
-    val toolEventBus = remember { springContext.getBean(ToolEventBus::class.java) }
-    val inFlight = rememberInFlightState(toolEventBus)
-    val agentStatusCallbackAdapter = remember { springContext.getBean(AgentStatusCallbackAdapter::class.java) }
+    val inFlight = rememberInFlightState(deps.toolEventBus)
     val panelServices =
         remember {
             ComposePanelServices(
-                config = config,
-                agentManager = springContext.getBean(AgentManager::class.java),
-                llmProvider = springContext.getBean(LLMProvider::class.java),
-                providerCatalogService = springContext.getBean(ProviderCatalogService::class.java),
-                agentToolConfigService = springContext.getBean(AgentToolConfigService::class.java),
-                toolRegistry = springContext.getBean(ToolRegistry::class.java),
-                toolEventBus = springContext.getBean(ToolEventBus::class.java),
-                todoEventBus = springContext.getBean(TodoEventBus::class.java),
-                workspaceFileService = springContext.getBean(WorkspaceFileService::class.java),
-                canvasOperations = springContext.getBean(CanvasOperations::class.java),
+                config = deps.appConfig,
+                agentManager = deps.agentManager,
+                llmProvider = deps.llmProvider,
+                providerCatalogService = deps.providerCatalogService,
+                agentToolConfigService = deps.agentToolConfigService,
+                toolRegistry = deps.toolRegistry,
+                toolEventBus = deps.toolEventBus,
+                todoEventBus = deps.todoEventBus,
+                workspaceFileService = deps.workspaceFileService,
+                canvasOperations = deps.canvasOperations,
                 modalRequester = ComposeModalRequester { requested -> modal = requested },
                 onSettingsChanged = {
-                    uiFontSize = config.fontSize
-                    themeMode = config.uiThemeMode
+                    uiFontSize = deps.appConfig.fontSize
+                    themeMode = deps.appConfig.uiThemeMode
                     settingsRevision += 1
                 },
                 inFlight = inFlight,
-                lifecycle = lifecycle,
+                lifecycle = deps.lifecycle,
             )
         }
-    DisposableEffect(config) {
+    DisposableEffect(deps.appConfig) {
         val registration =
-            config.addChangeListener { change ->
+            deps.appConfig.addChangeListener { change ->
                 if (change.key == AppConfigBean.KEY_UI_THEME_MODE) {
-                    themeMode = config.uiThemeMode
+                    themeMode = deps.appConfig.uiThemeMode
                 }
             }
         onDispose { registration.close() }
@@ -188,12 +169,12 @@ private fun VisualAgentComposeApp(
         } + ComposeCommand("close-application", "Close application", "Close Visual Agent and persist workspace state", onCloseApplication)
     LaunchedEffect(Unit) {
         workspaceFocusRequester.requestFocus()
-        springContext.getBean(AgentManager::class.java).startAutonomousProcessing(seed = false)
+        deps.agentManager.startAutonomousProcessing(seed = false)
     }
-    RegisterAgentStatusCallback(inFlight, agentStatusCallbackAdapter)
-    DisposableEffect(workspaceLayoutService) {
+    RegisterAgentStatusCallback(inFlight, deps.agentStatusCallbackAdapter)
+    DisposableEffect(deps.workspaceLayoutService) {
         val handle =
-            workspaceLayoutService.addWindowStateListener { states ->
+            deps.workspaceLayoutService.addWindowStateListener { states ->
                 composeScope.launch {
                     windows = restoreWorkspaceWindows(windows, states)
                 }
@@ -248,13 +229,13 @@ private fun VisualAgentComposeApp(
                             )
                         val minPanelWidth = ComposeWorkspaceWindowBounds.MIN_WIDTH
                         val workspaceStates = windows.mapIndexed { index, window -> window.toWorkspaceWindowState(index) }
-                        workspaceLayoutService.bind(
+                        deps.workspaceLayoutService.bind(
                             stage = StageState(width = viewport.width.toDouble(), height = viewport.height.toDouble()),
                             desktop = DesktopState(width = viewport.width.toDouble(), height = viewport.height.toDouble()),
                             windows = workspaceStates,
                         )
                         LaunchedEffect(workspaceStates) {
-                            workspaceLayoutService.applyWindowStates(workspaceStates, notifyListeners = false)
+                            deps.workspaceLayoutService.applyWindowStates(workspaceStates, notifyListeners = false)
                         }
                         val activeProvider =
                             remember(settingsRevision) {
@@ -262,9 +243,9 @@ private fun VisualAgentComposeApp(
                             }
                         Column(modifier = Modifier.fillMaxSize()) {
                             ComposeWorkspaceHeader(
-                                providerName = activeProvider?.id ?: config.llmProvider,
-                                modelName = activeProvider?.defaultModel.orEmpty().ifBlank { config.activeModel() },
-                                beanDefinitionCount = springContext.beanDefinitionCount,
+                                providerName = activeProvider?.id ?: deps.appConfig.llmProvider,
+                                modelName = activeProvider?.defaultModel.orEmpty().ifBlank { deps.appConfig.activeModel() },
+                                beanDefinitionCount = deps.beanDefinitionCount,
                                 inFlight = inFlight.state.value,
                                 onStopAll = {
                                     composeScope.launch {

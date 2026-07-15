@@ -1,6 +1,8 @@
 package de.heckenmann.visualagent.agent.openai
 
 import de.heckenmann.visualagent.agent.ShowResponse
+import de.heckenmann.visualagent.agent.tools.ToolEventBus
+import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.config.AppConfigBean
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
@@ -10,57 +12,41 @@ import kotlin.test.assertTrue
 class OpenAiClientErrorTest {
     @Test
     fun `isConnected requires non blank api key`() {
-        val originalKey = de.heckenmann.visualagent.config.AppConfig.instance.openAiApiKey
-        val originalUrl = de.heckenmann.visualagent.config.AppConfig.instance.openAiBaseUrl
-        try {
-            de.heckenmann.visualagent.config.AppConfig.instance.openAiApiKey = ""
-            de.heckenmann.visualagent.config.AppConfig.instance.openAiBaseUrl = "https://api.openai.com"
-            val client =
-                OpenAiClient(
-                    mockFactory(),
-                    de.heckenmann.visualagent.agent.tools
-                        .ToolRegistry(
-                            emptyList(),
-                            de.heckenmann.visualagent.agent.tools
-                                .ToolEventBus(),
-                            AppConfigBean(),
-                        ),
-                    AppConfigBean(),
-                )
+        val config = AppConfigBean()
+        config.openAiApiKey = ""
+        config.openAiBaseUrl = "https://api.openai.com"
+        val client =
+            OpenAiClient(
+                mockFactory(),
+                ToolRegistry(
+                    emptyList(),
+                    ToolEventBus(),
+                    config,
+                ),
+                config,
+            )
 
-            assertEquals(false, client.isConnected())
-        } finally {
-            de.heckenmann.visualagent.config.AppConfig.instance.openAiApiKey = originalKey
-            de.heckenmann.visualagent.config.AppConfig.instance.openAiBaseUrl = originalUrl
-        }
+        assertEquals(false, client.isConnected())
     }
 
     @Test
     fun `getModels throws when api key is blank for official endpoint`() =
         kotlinx.coroutines.test.runTest {
-            val originalKey = de.heckenmann.visualagent.config.AppConfig.instance.openAiApiKey
-            val originalUrl = de.heckenmann.visualagent.config.AppConfig.instance.openAiBaseUrl
-            try {
-                de.heckenmann.visualagent.config.AppConfig.instance.openAiApiKey = ""
-                de.heckenmann.visualagent.config.AppConfig.instance.openAiBaseUrl = "https://api.openai.com"
-                val client =
-                    OpenAiClient(
-                        mockFactory(),
-                        de.heckenmann.visualagent.agent.tools
-                            .ToolRegistry(
-                                emptyList(),
-                                de.heckenmann.visualagent.agent.tools
-                                    .ToolEventBus(),
-                            ),
-                    )
+            val config = AppConfigBean()
+            config.openAiApiKey = ""
+            config.openAiBaseUrl = "https://api.openai.com"
+            val client =
+                OpenAiClient(
+                    mockFactory(),
+                    ToolRegistry(
+                        emptyList(),
+                        ToolEventBus(),
+                    ),
+                )
 
-                val error = assertFailsWith<IllegalStateException> { client.getModels() }
+            val error = assertFailsWith<IllegalStateException> { client.getModels() }
 
-                assertEquals("OpenAI API key is not configured", error.message)
-            } finally {
-                de.heckenmann.visualagent.config.AppConfig.instance.openAiApiKey = originalKey
-                de.heckenmann.visualagent.config.AppConfig.instance.openAiBaseUrl = originalUrl
-            }
+            assertEquals("OpenAI API key is not configured", error.message)
         }
 
     @Test

@@ -1,6 +1,5 @@
 package de.heckenmann.visualagent.workspace
 
-import de.heckenmann.visualagent.config.AppConfig
 import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
 import de.heckenmann.visualagent.knowledge.WorkspaceFileStore
 import de.heckenmann.visualagent.testsupport.TestPng
@@ -24,17 +23,17 @@ import kotlin.test.assertTrue
 class WorkspaceFileServiceTest {
     @Test
     fun `workspace root is derived from database directory`() =
-        withDatabasePath("jdbc:sqlite:${tempDir().resolve("db/visual-agent.db")}") {
-            val service = WorkspaceFileService(FakeWorkspaceFileStore())
+        withDatabasePath("jdbc:sqlite:${tempDir().resolve("db/visual-agent.db")}") { dbPath ->
+            val service = WorkspaceFileService(FakeWorkspaceFileStore(), dbPath)
 
             assertTrue(service.workspaceRoot().endsWith("db/workspace"))
         }
 
     @Test
     fun `import stores metadata hash duplicate names rename and delete`() =
-        withDatabasePath(tempDir().resolve("data/visual-agent.db").toString()) {
+        withDatabasePath(tempDir().resolve("data/visual-agent.db").toString()) { dbPath ->
             val store = FakeWorkspaceFileStore()
-            val service = WorkspaceFileService(store)
+            val service = WorkspaceFileService(store, dbPath)
             val source = tempDir().resolve("notes.txt")
             Files.writeString(source, "Alpha")
 
@@ -53,8 +52,8 @@ class WorkspaceFileServiceTest {
 
     @Test
     fun `pdf text extraction and page preview rendering create generated workspace image`() =
-        withDatabasePath(tempDir().resolve("data/visual-agent.db").toString()) {
-            val service = WorkspaceFileService(FakeWorkspaceFileStore())
+        withDatabasePath(tempDir().resolve("data/visual-agent.db").toString()) { dbPath ->
+            val service = WorkspaceFileService(FakeWorkspaceFileStore(), dbPath)
             val pdf = tempDir().resolve("sample.pdf")
             writePdf(pdf, "Hello PDF")
             val imported = service.importFile(pdf.toFile())
@@ -73,8 +72,8 @@ class WorkspaceFileServiceTest {
 
     @Test
     fun `image metadata and base64 are available`() =
-        withDatabasePath(tempDir().resolve("data/visual-agent.db").toString()) {
-            val service = WorkspaceFileService(FakeWorkspaceFileStore())
+        withDatabasePath(tempDir().resolve("data/visual-agent.db").toString()) { dbPath ->
+            val service = WorkspaceFileService(FakeWorkspaceFileStore(), dbPath)
             val imagePath = tempDir().resolve("pixel.png")
             TestPng.write(imagePath, 2, 3)
             val imported = service.importFile(imagePath.toFile())
@@ -90,8 +89,8 @@ class WorkspaceFileServiceTest {
 
     @Test
     fun `search matches metadata and text content`() =
-        withDatabasePath(tempDir().resolve("data/visual-agent.db").toString()) {
-            val service = WorkspaceFileService(FakeWorkspaceFileStore())
+        withDatabasePath(tempDir().resolve("data/visual-agent.db").toString()) { dbPath ->
+            val service = WorkspaceFileService(FakeWorkspaceFileStore(), dbPath)
             val textFile = tempDir().resolve("notes.txt")
             Files.writeString(textFile, "Project Falcon is ready")
             val imported = service.importFile(textFile.toFile())
@@ -133,9 +132,9 @@ class WorkspaceFileServiceTest {
 
     @Test
     fun `sync reconciles missing changed and unmanaged workspace files`() =
-        withDatabasePath(tempDir().resolve("data/visual-agent.db").toString()) {
+        withDatabasePath(tempDir().resolve("data/visual-agent.db").toString()) { dbPath ->
             val store = FakeWorkspaceFileStore()
-            val service = WorkspaceFileService(store)
+            val service = WorkspaceFileService(store, dbPath)
             val created =
                 service.createManagedFile(
                     "canvas",
@@ -161,15 +160,9 @@ class WorkspaceFileServiceTest {
 
     private fun withDatabasePath(
         path: String,
-        block: () -> Unit,
+        block: (String) -> Unit,
     ) {
-        val previous = AppConfig.instance.databasePath
-        try {
-            AppConfig.instance.databasePath = path
-            block()
-        } finally {
-            AppConfig.instance.databasePath = previous
-        }
+        block(path)
     }
 
     private fun tempDir(): Path = Files.createTempDirectory("visual-agent-workspace-test")

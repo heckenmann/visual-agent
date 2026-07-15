@@ -1,6 +1,5 @@
 package de.heckenmann.visualagent.workspace
 
-import de.heckenmann.visualagent.config.AppConfig
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
@@ -19,8 +18,8 @@ internal object WorkspaceFilePaths {
     val TEXT_EXTENSIONS = setOf("txt", "md", "csv", "json", "xml", "log", "kt", "java", "draw", "jhd", "canvas")
 
     /** Returns the managed workspace root directory, creating it when necessary. */
-    fun workspaceRoot(): Path {
-        val dbPath = normalizedDatabasePath()
+    fun workspaceRoot(databasePath: String = "./data/visual-agent.db"): Path {
+        val dbPath = normalizedDatabasePath(databasePath)
         val parent = dbPath.parent ?: Path.of("data").toAbsolutePath().normalize()
         return parent
             .resolve("workspace")
@@ -30,8 +29,11 @@ internal object WorkspaceFilePaths {
     }
 
     /** Resolves a workspace-relative file path and rejects path traversal. */
-    fun resolveManagedPath(relativePath: String): Path {
-        val root = workspaceRoot()
+    fun resolveManagedPath(
+        relativePath: String,
+        databasePath: String = "./data/visual-agent.db",
+    ): Path {
+        val root = workspaceRoot(databasePath)
         val resolved = root.resolve(normalizeRelativePath(relativePath)).normalize()
         require(resolved.startsWith(root)) { "Path escapes workspace root" }
         require(resolved.exists() && resolved.isRegularFile()) { "Workspace file does not exist" }
@@ -39,7 +41,10 @@ internal object WorkspaceFilePaths {
     }
 
     /** Returns a path relative to the managed workspace root. */
-    fun relativePath(path: Path): String = workspaceRoot().relativize(path.toAbsolutePath().normalize()).toString()
+    fun relativePath(
+        path: Path,
+        databasePath: String = "./data/visual-agent.db",
+    ): String = workspaceRoot(databasePath).relativize(path.toAbsolutePath().normalize()).toString()
 
     /** Normalizes persisted workspace-relative paths to a platform-neutral form. */
     fun normalizeRelativePath(path: String): String = path.replace('\\', '/').trim().removePrefix("/")
@@ -114,8 +119,8 @@ internal object WorkspaceFilePaths {
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
-    private fun normalizedDatabasePath(): Path {
-        val raw = AppConfig.instance.databasePath.removePrefix("jdbc:sqlite:")
+    private fun normalizedDatabasePath(databasePath: String): Path {
+        val raw = databasePath.removePrefix("jdbc:sqlite:")
         val path = Path.of(raw.ifBlank { "./data/visual-agent.db" })
         return if (path.isAbsolute) path.normalize() else Path.of(System.getProperty("user.dir")).resolve(path).normalize()
     }

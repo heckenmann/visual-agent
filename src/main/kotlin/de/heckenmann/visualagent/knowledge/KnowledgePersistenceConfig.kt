@@ -24,14 +24,16 @@ internal class KnowledgePersistenceConfig {
      * @return Shared application data source
      */
     @Bean
-    fun dataSource(environment: Environment): DataSource {
+    fun databasePath(environment: Environment): String = environment.getProperty("visual-agent.db.path") ?: bootstrapDatabasePath()
+
+    @Bean
+    fun dataSource(databasePath: String): DataSource {
         val sqliteConfig =
             SQLiteConfig().apply {
                 setJournalMode(SQLiteConfig.JournalMode.WAL)
                 setBusyTimeout(5_000)
                 enforceForeignKeys(true)
             }
-        val databasePath = environment.getProperty("visual-agent.db.path") ?: bootstrapDatabasePath()
         val jdbcUrl = if (databasePath.startsWith("jdbc:sqlite:")) databasePath else "jdbc:sqlite:$databasePath"
         createParentDirectory(databasePath)
         return HikariDataSource(

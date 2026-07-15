@@ -4,8 +4,6 @@ import de.heckenmann.visualagent.agent.ChatResponse
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ShowResponse
-import de.heckenmann.visualagent.config.AppConfig
-import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
 import de.heckenmann.visualagent.knowledge.WorkspaceFileStore
 import de.heckenmann.visualagent.testsupport.TestPng
@@ -32,84 +30,67 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class WorkspaceFileToolTest {
-    private val appConfig = AppConfigBean()
-
     @Test
     fun `workspace file tool lists reads hashes and analyzes images`() {
-        val previous = AppConfig.instance.databasePath
-        try {
-            AppConfig.instance.databasePath = tempDir().resolve("data/visual-agent.db").toString()
-            val service = WorkspaceFileService(FakeWorkspaceFileStore())
-            val textFile = tempDir().resolve("notes.txt")
-            Files.writeString(textFile, "Alpha")
-            val imageFile = tempDir().resolve("pixel.png")
-            TestPng.write(imageFile, 1, 1)
-            val text = service.importFile(textFile.toFile())
-            val image = service.importFile(imageFile.toFile())
-            val tool = WorkspaceFileTool(service, SingleObjectProvider(FakeVisionProvider()))
+        val dbPath = tempDir().resolve("data/visual-agent.db").toString()
+        val service = WorkspaceFileService(FakeWorkspaceFileStore(), dbPath)
+        val textFile = tempDir().resolve("notes.txt")
+        Files.writeString(textFile, "Alpha")
+        val imageFile = tempDir().resolve("pixel.png")
+        TestPng.write(imageFile, 1, 1)
+        val text = service.importFile(textFile.toFile())
+        val image = service.importFile(imageFile.toFile())
+        val tool = WorkspaceFileTool(service, SingleObjectProvider(FakeVisionProvider()))
 
-            val list = tool.execute("""{"action":"list"}""")
-            val read = tool.execute("""{"action":"readText","id":"${text.id}"}""")
-            val hash = Json.parseToJsonElement(tool.execute("""{"action":"hash","path":"${text.relativePath}"}""").content).jsonObject
-            val info = Json.parseToJsonElement(tool.execute("""{"action":"imageInfo","id":"${image.id}"}""").content).jsonObject
-            val analysis = tool.execute("""{"action":"analyzeImage","id":"${image.id}","prompt":"describe"}""")
+        val list = tool.execute("""{"action":"list"}""")
+        val read = tool.execute("""{"action":"readText","id":"${text.id}"}""")
+        val hash = Json.parseToJsonElement(tool.execute("""{"action":"hash","path":"${text.relativePath}"}""").content).jsonObject
+        val info = Json.parseToJsonElement(tool.execute("""{"action":"imageInfo","id":"${image.id}"}""").content).jsonObject
+        val analysis = tool.execute("""{"action":"analyzeImage","id":"${image.id}","prompt":"describe"}""")
 
-            assertTrue(list.content.contains(text.relativePath))
-            assertTrue(read.content.contains("Alpha"))
-            assertEquals("sha256", hash["algorithm"]!!.jsonPrimitive.content)
-            assertEquals("1", info["width"]!!.jsonPrimitive.content)
-            assertTrue(analysis.content.contains("vision ok"))
-        } finally {
-            AppConfig.instance.databasePath = previous
-        }
+        assertTrue(list.content.contains(text.relativePath))
+        assertTrue(read.content.contains("Alpha"))
+        assertEquals("sha256", hash["algorithm"]!!.jsonPrimitive.content)
+        assertEquals("1", info["width"]!!.jsonPrimitive.content)
+        assertTrue(analysis.content.contains("vision ok"))
     }
 
     @Test
     fun `workspace file tool extracts pdf renders page preview and handles invalid actions`() {
-        val previous = AppConfig.instance.databasePath
-        try {
-            AppConfig.instance.databasePath = tempDir().resolve("data/visual-agent.db").toString()
-            val service = WorkspaceFileService(FakeWorkspaceFileStore())
-            val pdfFile = tempDir().resolve("sample.pdf")
-            writePdf(pdfFile, "Tool PDF")
-            val pdf = service.importFile(pdfFile.toFile())
-            val tool = WorkspaceFileTool(service, SingleObjectProvider(FakeVisionProvider()))
+        val dbPath = tempDir().resolve("data/visual-agent.db").toString()
+        val service = WorkspaceFileService(FakeWorkspaceFileStore(), dbPath)
+        val pdfFile = tempDir().resolve("sample.pdf")
+        writePdf(pdfFile, "Tool PDF")
+        val pdf = service.importFile(pdfFile.toFile())
+        val tool = WorkspaceFileTool(service, SingleObjectProvider(FakeVisionProvider()))
 
-            val info = tool.execute("""{"action":"info","id":"${pdf.id}"}""")
-            val text = tool.execute("""{"action":"extractPdfText","path":"${pdf.relativePath}"}""")
-            val page = Json.parseToJsonElement(tool.execute("""{"action":"renderPdfPage","id":"${pdf.id}","page":1}""").content).jsonObject
-            val unsupported = tool.execute("""{"action":"missing"}""")
+        val info = tool.execute("""{"action":"info","id":"${pdf.id}"}""")
+        val text = tool.execute("""{"action":"extractPdfText","path":"${pdf.relativePath}"}""")
+        val page = Json.parseToJsonElement(tool.execute("""{"action":"renderPdfPage","id":"${pdf.id}","page":1}""").content).jsonObject
+        val unsupported = tool.execute("""{"action":"missing"}""")
 
-            assertTrue(info.content.contains("application/pdf"))
-            assertTrue(text.content.contains("Tool PDF"))
-            assertEquals("generated/sample-page-1.png", page["path"]!!.jsonPrimitive.content)
-            assertEquals("image/png", page["mimeType"]!!.jsonPrimitive.content)
-            assertFalse(unsupported.success)
-        } finally {
-            AppConfig.instance.databasePath = previous
-        }
+        assertTrue(info.content.contains("application/pdf"))
+        assertTrue(text.content.contains("Tool PDF"))
+        assertEquals("generated/sample-page-1.png", page["path"]!!.jsonPrimitive.content)
+        assertEquals("image/png", page["mimeType"]!!.jsonPrimitive.content)
+        assertFalse(unsupported.success)
     }
 
     @Test
     fun `workspace file tool searches and syncs workspace files`() {
-        val previous = AppConfig.instance.databasePath
-        try {
-            AppConfig.instance.databasePath = tempDir().resolve("data/visual-agent.db").toString()
-            val service = WorkspaceFileService(FakeWorkspaceFileStore())
-            val imported = service.createManagedFile("imports", "notes.txt", "Needle content".toByteArray(), "text/plain")
-            val unmanaged = service.workspaceRoot().resolve("imports/manual.txt")
-            unmanaged.parent.toFile().mkdirs()
-            unmanaged.writeText("manual")
-            val tool = WorkspaceFileTool(service, SingleObjectProvider(FakeVisionProvider()))
+        val dbPath = tempDir().resolve("data/visual-agent.db").toString()
+        val service = WorkspaceFileService(FakeWorkspaceFileStore(), dbPath)
+        val imported = service.createManagedFile("imports", "notes.txt", "Needle content".toByteArray(), "text/plain")
+        val unmanaged = service.workspaceRoot().resolve("imports/manual.txt")
+        unmanaged.parent.toFile().mkdirs()
+        unmanaged.writeText("manual")
+        val tool = WorkspaceFileTool(service, SingleObjectProvider(FakeVisionProvider()))
 
-            val search = tool.execute("""{"action":"search","query":"needle"}""")
-            val sync = Json.parseToJsonElement(tool.execute("""{"action":"sync"}""").content).jsonObject
+        val search = tool.execute("""{"action":"search","query":"needle"}""")
+        val sync = Json.parseToJsonElement(tool.execute("""{"action":"sync"}""").content).jsonObject
 
-            assertTrue(search.content.contains(imported.relativePath))
-            assertEquals("1", sync["added"]!!.jsonPrimitive.content)
-        } finally {
-            AppConfig.instance.databasePath = previous
-        }
+        assertTrue(search.content.contains(imported.relativePath))
+        assertEquals("1", sync["added"]!!.jsonPrimitive.content)
     }
 
     private fun tempDir(): Path = Files.createTempDirectory("visual-agent-workspace-tool-test")

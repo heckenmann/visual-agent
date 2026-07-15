@@ -1,7 +1,6 @@
 package de.heckenmann.visualagent.agent
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
-import de.heckenmann.visualagent.config.AppConfig
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.todo.TodoEventBus
 import io.mockk.coEvery
@@ -17,7 +16,7 @@ class AgentManagerActiveJobCountTest {
     @Test
     fun `active job count tracks concurrent executions for the same agent`() =
         runBlocking {
-            val originalParallelism = AppConfig.instance.maxParallelSubAgents
+            val config = AppConfigBean()
             val stores =
                 de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                     .create("jdbc:sqlite::memory:")
@@ -31,10 +30,10 @@ class AgentManagerActiveJobCountTest {
                 ChatResponse("test", Message("assistant", "completed"), done = true)
             }
             val manager =
-                AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus(), TodoEventBus(), AppConfigBean(stores))
+                AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus(), TodoEventBus(), config)
 
             try {
-                AppConfig.instance.maxParallelSubAgents = 2
+                config.maxParallelSubAgents = 2
                 val first = async { manager.runAgentJob("1", "first") }
                 val second = async { manager.runAgentJob("1", "second") }
 
@@ -48,7 +47,7 @@ class AgentManagerActiveJobCountTest {
                 assertEquals(0, manager.getActiveJobCount("1"))
                 assertEquals(AgentStatus.IDLE, manager.getSubAgent("1")?.status)
             } finally {
-                AppConfig.instance.maxParallelSubAgents = originalParallelism
+                config.maxParallelSubAgents = 4
                 manager.destroy()
                 stores.close()
             }
