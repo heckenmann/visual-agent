@@ -1,4 +1,5 @@
 @file:Suppress("FunctionName")
+// TODO(size): 301 effective LOC, needs splitting
 
 package de.heckenmann.visualagent.ui.compose
 
@@ -34,6 +35,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.canvas.CanvasOperations
 import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
 import de.heckenmann.visualagent.workspace.WorkspaceFilePaths
@@ -57,6 +59,7 @@ internal fun FilesPanel(
     workspaceFileService: WorkspaceFileService,
     canvasOperations: CanvasOperations,
     modalRequester: ComposeModalRequester,
+    toolEventBus: ToolEventBus,
 ) {
     var files by remember { mutableStateOf(workspaceFileService.listFiles()) }
     var path by remember { mutableStateOf("") }
@@ -66,6 +69,11 @@ internal fun FilesPanel(
     val refresh = {
         files = workspaceFileService.listFiles()
     }
+    ToolEventRefreshEffect(
+        toolEventBus = toolEventBus,
+        toolIds = setOf("file:write", "file:edit", "workspace:file"),
+        onRefresh = refresh,
+    )
     val visibleFiles = filterWorkspaceFiles(files, query, typeFilter)
     val importFile: (File) -> Unit = { file ->
         runCatching { workspaceFileService.importFile(file) }

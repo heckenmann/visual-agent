@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.canvas.CanvasOperations
 import de.heckenmann.visualagent.canvas.CanvasSnapshot
 import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
@@ -33,7 +34,7 @@ class ComposeFilesPanelTest {
 
         composeTestRule.setContent {
             MaterialTheme {
-                FilesPanel(workspace, canvas, ComposeModalRequester { })
+                FilesPanel(workspace, canvas, ComposeModalRequester { }, ToolEventBus())
             }
         }
 
@@ -49,7 +50,7 @@ class ComposeFilesPanelTest {
 
         composeTestRule.setContent {
             MaterialTheme {
-                FilesPanel(workspace, canvas, ComposeModalRequester { })
+                FilesPanel(workspace, canvas, ComposeModalRequester { }, ToolEventBus())
             }
         }
 
@@ -72,7 +73,7 @@ class ComposeFilesPanelTest {
 
         composeTestRule.setContent {
             MaterialTheme {
-                FilesPanel(workspace, canvas, ComposeModalRequester { })
+                FilesPanel(workspace, canvas, ComposeModalRequester { }, ToolEventBus())
             }
         }
 
@@ -153,7 +154,7 @@ class ComposeFilesPanelTest {
 
         composeTestRule.setContent {
             MaterialTheme {
-                FilesPanel(workspace, canvas, requester)
+                FilesPanel(workspace, canvas, requester, ToolEventBus())
             }
         }
 
@@ -169,7 +170,7 @@ class ComposeFilesPanelTest {
 
         composeTestRule.setContent {
             MaterialTheme {
-                FilesPanel(workspace, canvas, ComposeModalRequester { })
+                FilesPanel(workspace, canvas, ComposeModalRequester { }, ToolEventBus())
             }
         }
 

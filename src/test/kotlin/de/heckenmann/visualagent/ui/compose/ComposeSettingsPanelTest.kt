@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
+import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfig
 import io.mockk.every
 import io.mockk.mockk
@@ -46,6 +47,7 @@ class ComposeSettingsPanelTest {
                     modalRequester = ComposeModalRequester { },
                     onSettingsChanged = {},
                     inFlight = inFlight,
+                    toolEventBus = ToolEventBus(),
                 )
             }
         }

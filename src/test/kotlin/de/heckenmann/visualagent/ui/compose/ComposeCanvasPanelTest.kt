@@ -5,6 +5,7 @@ package de.heckenmann.visualagent.ui.compose
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.canvas.CanvasOperations
 import de.heckenmann.visualagent.canvas.CanvasSnapshot
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
@@ -25,7 +26,7 @@ class ComposeCanvasPanelTest {
 
         composeTestRule.setContent {
             MaterialTheme {
-                CanvasPanel(canvas, workspace, ComposeModalRequester { })
+                CanvasPanel(canvas, workspace, ComposeModalRequester { }, ToolEventBus())
             }
         }
 

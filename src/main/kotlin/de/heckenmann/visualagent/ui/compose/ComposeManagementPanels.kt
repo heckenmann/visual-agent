@@ -26,6 +26,7 @@ import de.heckenmann.visualagent.agent.AgentConfig
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
+import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 
 /**
@@ -50,6 +51,7 @@ internal fun SubAgentsPanel(
     providerCatalogService: ProviderCatalogService,
     modalRequester: ComposeModalRequester,
     inFlight: InFlightStateHolder,
+    toolEventBus: ToolEventBus,
 ) {
     var agents by remember { mutableStateOf(agentManager.getSubAgents()) }
     var name by remember { mutableStateOf("") }
@@ -62,6 +64,11 @@ internal fun SubAgentsPanel(
     val refresh = {
         agents = agentManager.getSubAgents()
     }
+    ToolEventRefreshEffect(
+        toolEventBus = toolEventBus,
+        toolIds = setOf("agent:create", "agent:update", "agent:delete", "agent:start", "agent:list"),
+        onRefresh = refresh,
+    )
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(

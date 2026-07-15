@@ -36,7 +36,7 @@ class ComposeTodoPanelTest {
         val requester = ComposeModalRequester { }
         composeTestRule.setContent {
             MaterialTheme {
-                TodoPanel(manager, requester, manager.todoEventBus)
+                TodoPanel(manager, requester, manager.todoEventBus, ToolEventBus())
             }
         }
 
@@ -60,7 +60,7 @@ class ComposeTodoPanelTest {
         val requester = ComposeModalRequester { }
         composeTestRule.setContent {
             MaterialTheme {
-                TodoPanel(manager, requester, manager.todoEventBus)
+                TodoPanel(manager, requester, manager.todoEventBus, ToolEventBus())
             }
         }
 
@@ -76,7 +76,7 @@ class ComposeTodoPanelTest {
         val requester = ComposeModalRequester { }
         composeTestRule.setContent {
             MaterialTheme {
-                TodoPanel(manager, requester, manager.todoEventBus)
+                TodoPanel(manager, requester, manager.todoEventBus, ToolEventBus())
             }
         }
 
@@ -98,7 +98,7 @@ class ComposeTodoPanelTest {
         val requester = ComposeModalRequester { }
         composeTestRule.setContent {
             MaterialTheme {
-                TodoPanel(manager, requester, manager.todoEventBus)
+                TodoPanel(manager, requester, manager.todoEventBus, ToolEventBus())
             }
         }
 

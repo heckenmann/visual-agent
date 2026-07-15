@@ -254,8 +254,20 @@ internal fun WindowBody(
                 inFlight = panelServices.inFlight,
                 toolEventBus = panelServices.toolEventBus,
             )
-        "todos" -> TodoPanel(panelServices.agentManager, panelServices.modalRequester, panelServices.todoEventBus)
-        "files" -> FilesPanel(panelServices.workspaceFileService, panelServices.canvasOperations, panelServices.modalRequester)
+        "todos" ->
+            TodoPanel(
+                agentManager = panelServices.agentManager,
+                modalRequester = panelServices.modalRequester,
+                todoEventBus = panelServices.todoEventBus,
+                toolEventBus = panelServices.toolEventBus,
+            )
+        "files" ->
+            FilesPanel(
+                workspaceFileService = panelServices.workspaceFileService,
+                canvasOperations = panelServices.canvasOperations,
+                modalRequester = panelServices.modalRequester,
+                toolEventBus = panelServices.toolEventBus,
+            )
         "agents" ->
             SubAgentsPanel(
                 agentManager = panelServices.agentManager,
@@ -264,6 +276,7 @@ internal fun WindowBody(
                 providerCatalogService = panelServices.providerCatalogService,
                 modalRequester = panelServices.modalRequester,
                 inFlight = panelServices.inFlight,
+                toolEventBus = panelServices.toolEventBus,
             )
         "settings" ->
             SettingsPanel(
@@ -273,8 +286,15 @@ internal fun WindowBody(
                 modalRequester = panelServices.modalRequester,
                 onSettingsChanged = panelServices.onSettingsChanged,
                 inFlight = panelServices.inFlight,
+                toolEventBus = panelServices.toolEventBus,
             )
-        "canvas" -> CanvasPanel(panelServices.canvasOperations, panelServices.workspaceFileService, panelServices.modalRequester)
+        "canvas" ->
+            CanvasPanel(
+                canvasOperations = panelServices.canvasOperations,
+                workspaceFileService = panelServices.workspaceFileService,
+                modalRequester = panelServices.modalRequester,
+                toolEventBus = panelServices.toolEventBus,
+            )
     }
 }
 
