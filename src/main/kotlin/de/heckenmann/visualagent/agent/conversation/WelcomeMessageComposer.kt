@@ -34,6 +34,22 @@ internal object WelcomeMessageComposer {
                 .userModelInstruction
                 .trim()
 
+        if (!llmProvider.checkConnection()) {
+            logger.warn { "Welcome generation skipped: provider is not reachable" }
+            val fallback = persistFallback(persist, userInstruction)
+            return WelcomeResult.Fallback(fallback, IllegalStateException("Provider not reachable"))
+        }
+
+        val configuredModel = AppConfig.instance.activeModel()
+        val availableModels = runCatching { llmProvider.getModels() }.getOrDefault(emptyList())
+        if (configuredModel.isNotBlank() && configuredModel !in availableModels) {
+            logger.warn { "Welcome generation skipped: model '$configuredModel' is not available" }
+            val fallback = persistFallback(persist, userInstruction)
+            return WelcomeResult.Fallback(
+                fallback,
+                IllegalStateException("Model '$configuredModel' is not available"),
+            )
+        }
         val messages = mutableListOf<Message>()
         messages +=
             Message(
@@ -64,6 +80,15 @@ internal object WelcomeMessageComposer {
         } else {
             WelcomeResult.Generated(welcome)
         }
+    }
+
+    private fun persistFallback(
+        persist: (Message) -> Message,
+        userInstruction: String,
+    ): String {
+        val fallback = fallbackWelcome(userInstruction)
+        persist(Message(role = "assistant", content = fallback))
+        return fallback
     }
 
     private fun fallbackWelcome(userInstruction: String): String {

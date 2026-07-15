@@ -3,11 +3,11 @@ import java.nio.file.Files
 import kotlin.io.path.extension
 
 plugins {
-    kotlin("jvm") version "2.4.0"
+    kotlin("jvm") version "2.4.10"
     kotlin("plugin.jpa") version "2.4.0"
     kotlin("plugin.serialization") version "2.4.0"
     kotlin("plugin.spring") version "2.4.0"
-    kotlin("plugin.compose") version "2.4.0"
+    kotlin("plugin.compose") version "2.4.10"
     id("org.jetbrains.compose") version "1.11.1"
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
     id("org.springframework.boot") version "4.1.0"
@@ -80,7 +80,7 @@ dependencies {
     implementation("org.commonmark:commonmark-ext-gfm-tables:0.29.0")
 
     // Workspace document analysis
-    implementation("org.apache.pdfbox:pdfbox:3.0.7")
+    implementation("org.apache.pdfbox:pdfbox:3.0.8")
 
     // Kotlin logging (wrapper for SLF4J)
     implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
@@ -95,7 +95,7 @@ dependencies {
     testImplementation("io.mockk:mockk:1.14.11")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     testImplementation("org.jetbrains.compose.ui:ui-test-junit4-desktop:1.11.1")
-    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:6.1.1")
+    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:6.1.2")
 }
 
 tasks.test {
