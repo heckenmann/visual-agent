@@ -213,4 +213,36 @@ class AgentManagerConversationPersistenceTest {
         coVerify(exactly = 2) { provider.chat(any<ChatRequestContext>()) }
         db.close()
     }
+
+    @Test
+    fun `clear then welcome sends a tool-less chat request`() {
+        val tempDb = createTempDirectory("visual-agent-agent-welcome-no-tools-test").resolve("history.db").toString()
+        val db =
+            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                .create(tempDb)
+        val provider = mockk<LLMProvider>(relaxed = true)
+        coEvery { provider.checkConnection() } returns true
+        coEvery { provider.getModels() } returns listOf("llava")
+        val requestSlot = slot<ChatRequestContext>()
+        coEvery { provider.chat(capture(requestSlot)) } returns
+            ChatResponse(
+                model = "test",
+                message = Message("assistant", "Hello!"),
+                done = true,
+            )
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+
+        manager.clearHistory()
+        kotlinx.coroutines.runBlocking {
+            manager.addWelcomeMessageAfterReset()
+        }
+
+        val request = requestSlot.captured
+        assertTrue(request.enabledTools.isEmpty(), "Welcome request must not enable any tools")
+        assertTrue(
+            request.modelCapabilities.isEmpty() || !request.modelCapabilities.contains("tools"),
+            "Welcome request must not claim tool support",
+        )
+        db.close()
+    }
 }

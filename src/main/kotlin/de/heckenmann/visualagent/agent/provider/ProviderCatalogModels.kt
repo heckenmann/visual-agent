@@ -42,6 +42,7 @@ data class ProviderModelConfig(
     val variants: Map<String, Map<String, String>> = emptyMap(),
     val contextLimit: Int? = null,
     val outputLimit: Int? = null,
+    val capabilities: Set<String> = emptySet(),
 )
 
 /**

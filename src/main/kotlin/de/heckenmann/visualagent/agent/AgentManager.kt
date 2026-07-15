@@ -13,12 +13,16 @@ import de.heckenmann.visualagent.knowledge.SubAgentStore
 import de.heckenmann.visualagent.knowledge.TodoStore
 import de.heckenmann.visualagent.orchestration.AutonomousCoordinator
 import de.heckenmann.visualagent.todo.Todo
+import de.heckenmann.visualagent.todo.TodoChangeType
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoManager
+import de.heckenmann.visualagent.todo.TodoStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.springframework.beans.factory.DisposableBean
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
@@ -112,6 +116,7 @@ class AgentManager
                     initialTodos = todoStore.listTodos(),
                     onChange = { change -> lifecycleOps.persistTodoChange(change) },
                     eventBus = todoEventBus,
+                    todoStore = todoStore,
                 )
             responseCoordinator =
                 AgentResponseCoordinator(
@@ -140,6 +145,41 @@ class AgentManager
                     notifyAgent = Companion::notifyAgent,
                     persistMessage = { conversationOps.persist(it) },
                 )
+            todoEventBus.addListener { change ->
+                val todo = change.todo ?: return@addListener
+                if (change.type != TodoChangeType.UPDATED) return@addListener
+                when (todo.status) {
+                    TodoStatus.COMPLETED -> {
+                        val content =
+                            "Todo completed: ${todo.description.take(120)} (${todo.id}). " +
+                                "Use `todos` with `get-result` to read the stored result."
+                        val metadata =
+                            buildJsonObject {
+                                put("type", "todo")
+                                put("todoId", todo.id)
+                                put("success", true)
+                            }.toString()
+                        conversationOps.persist(
+                            Message(role = "sub_agent", content = content, metadata = metadata),
+                        )
+                        notifyAgent("main", content)
+                    }
+                    TodoStatus.CANCELLED -> {
+                        val content = "Todo cancelled: ${todo.description.take(120)} (${todo.id})."
+                        val metadata =
+                            buildJsonObject {
+                                put("type", "todo")
+                                put("todoId", todo.id)
+                                put("success", false)
+                            }.toString()
+                        conversationOps.persist(
+                            Message(role = "sub_agent", content = content, metadata = metadata),
+                        )
+                        notifyAgent("main", content)
+                    }
+                    else -> Unit
+                }
+            }
             toolEventListenerHandle = conversationOps.registerToolEventListener()
             conversationOps.loadConversationFromDb()
             conversationOps.resumeInterruptedConversationIfNeeded()

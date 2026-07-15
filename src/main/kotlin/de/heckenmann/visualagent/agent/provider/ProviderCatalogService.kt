@@ -97,6 +97,25 @@ class ProviderCatalogService(
     }
 
     /**
+     * Updates capabilities for existing models without replacing other model metadata.
+     *
+     * @param providerId Provider whose models should be updated
+     * @param capabilities Map of model name to set of capability strings
+     */
+    fun updateModelCapabilities(
+        providerId: String,
+        capabilities: Map<String, Set<String>>,
+    ) {
+        val profile = getProvider(providerId) ?: return
+        val models =
+            profile.models.map { model ->
+                val caps = capabilities[model.id] ?: model.capabilities
+                if (caps != model.capabilities) model.copy(capabilities = caps) else model
+            }
+        saveProvider(profile.copy(models = models))
+    }
+
+    /**
      * Returns models that may be selected by the user.
      *
      * Use cases: UC-0000007, UC-0000009.

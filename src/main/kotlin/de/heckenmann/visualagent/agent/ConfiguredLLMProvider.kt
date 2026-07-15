@@ -1,8 +1,10 @@
 package de.heckenmann.visualagent.agent
 
+import de.heckenmann.visualagent.agent.ollama.fetchModelCapabilities
 import de.heckenmann.visualagent.agent.openai.OpenAiClient
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
+import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import kotlinx.coroutines.flow.Flow
 import org.springframework.context.annotation.Primary
 import org.springframework.stereotype.Component
@@ -16,6 +18,7 @@ class ConfiguredLLMProvider(
     private val ollamaClient: OllamaClient,
     private val openAiClient: OpenAiClient,
     private val providerCatalog: ProviderCatalogService,
+    private val fetchCapabilities: suspend (ProviderProfile) -> Map<String, Set<String>> = ::fetchModelCapabilities,
 ) : LLMProvider {
     override suspend fun chat(messages: List<Message>): ChatResponse = activeProvider().chat(messages)
 
@@ -56,6 +59,10 @@ class ConfiguredLLMProvider(
                 ProviderAdapter.OPENAI_COMPATIBLE -> openAiClient.getModels(profile)
             }
         providerCatalog.updateDiscoveredModels(providerId, discovered)
+        if (profile.adapter == ProviderAdapter.OLLAMA) {
+            val capabilities = fetchCapabilities(profile)
+            providerCatalog.updateModelCapabilities(providerId, capabilities)
+        }
         return providerCatalog.selectableModels(providerId).map { it.id }
     }
 
@@ -104,6 +111,7 @@ class ConfiguredLLMProvider(
                 ),
             options = resolved.options,
             providerProfile = resolved.provider,
+            modelCapabilities = resolved.model.capabilities,
         )
     }
 }

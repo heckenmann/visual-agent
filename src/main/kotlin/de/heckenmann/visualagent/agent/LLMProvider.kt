@@ -159,6 +159,7 @@ data class ChatRequestContext(
     val metadata: Map<String, Any> = emptyMap(),
     val providerProfile: ProviderProfile? = null,
     val cancellationToken: CancellationToken? = null,
+    val modelCapabilities: Set<String> = emptySet(),
 )
 
 /**

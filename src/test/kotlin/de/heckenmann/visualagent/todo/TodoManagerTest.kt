@@ -11,6 +11,34 @@ class TodoManagerTest {
     private val manager = TodoManager()
 
     @Test
+    fun `add persists new todo to store when store is provided`() {
+        val saved = mutableListOf<Todo>()
+        val store =
+            object : de.heckenmann.visualagent.knowledge.TodoStore {
+                override fun saveTodo(todo: Todo) {
+                    saved += todo
+                }
+
+                override fun listTodos(): List<Todo> = saved
+
+                override fun deleteTodo(todoId: String) {
+                    saved.removeIf { it.id == todoId }
+                }
+
+                override fun clearTodos() {
+                    saved.clear()
+                }
+            }
+        val managerWithStore = TodoManager(todoStore = store)
+
+        val todo = managerWithStore.add("Persist me")
+
+        assertEquals(1, saved.size)
+        assertEquals(todo.id, saved[0].id)
+        assertEquals("Persist me", saved[0].description)
+    }
+
+    @Test
     fun `add creates a pending todo`() {
         val todo = manager.add("Write tests")
         assertEquals("Write tests", todo.description)

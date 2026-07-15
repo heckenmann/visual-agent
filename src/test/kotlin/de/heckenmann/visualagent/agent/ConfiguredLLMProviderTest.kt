@@ -55,7 +55,7 @@ class ConfiguredLLMProviderTest {
                 coEvery { ollama.getModels(any<ProviderProfile>()) } returns listOf("llama")
                 coEvery { ollama.stream(any<ChatRequestContext>()) } returns
                     flowOf(ChatResponse("llama", Message("assistant", "chunk"), true))
-                val router = ConfiguredLLMProvider(ollama, openAi, catalog())
+                val router = ConfiguredLLMProvider(ollama, openAi, catalog(), fetchCapabilities = { emptyMap() })
 
                 assertEquals(true, router.isConnected())
                 assertEquals(true, router.checkConnection())

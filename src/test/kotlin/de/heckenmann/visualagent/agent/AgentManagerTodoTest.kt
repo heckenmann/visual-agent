@@ -165,4 +165,65 @@ class AgentManagerTodoTest {
             val history = manager.getHistory()
             assertTrue(history.any { it.role == "system" && it.content.contains("A new task") })
         }
+
+    @Test
+    fun `main agent gets sub_agent message when todo is completed`(): Unit =
+        runBlocking {
+            val (manager, _, _) = createManager()
+            val todo = manager.todoManager.add("Complete me", "1")
+            delay(200)
+
+            manager.todoManager.updateStatus(todo.id, TodoStatus.COMPLETED)
+            delay(200)
+
+            val history = manager.getHistory()
+            assertTrue(
+                history.any {
+                    it.role == "sub_agent" &&
+                        it.content.contains("Todo completed") &&
+                        it.content.contains("Complete me") &&
+                        it.metadata?.contains("\"success\":true") == true
+                },
+                "Expected a sub_agent message about todo completion, got: ${history.map { it.content.take(60) }}",
+            )
+        }
+
+    @Test
+    fun `main agent gets sub_agent message when todo is cancelled`(): Unit =
+        runBlocking {
+            val (manager, _, _) = createManager()
+            val todo = manager.todoManager.add("Cancel me", "1")
+            delay(200)
+
+            manager.todoManager.updateStatus(todo.id, TodoStatus.CANCELLED)
+            delay(200)
+
+            val history = manager.getHistory()
+            assertTrue(
+                history.any {
+                    it.role == "sub_agent" &&
+                        it.content.contains("Todo cancelled") &&
+                        it.content.contains("Cancel me") &&
+                        it.metadata?.contains("\"success\":false") == true
+                },
+                "Expected a sub_agent message about todo cancellation, got: ${history.map { it.content.take(60) }}",
+            )
+        }
+
+    @Test
+    fun `main agent does not get terminal todo message for non-terminal status changes`(): Unit =
+        runBlocking {
+            val (manager, _, _) = createManager()
+            val todo = manager.todoManager.add("In progress task", "1")
+            delay(200)
+
+            manager.todoManager.updateStatus(todo.id, TodoStatus.IN_PROGRESS)
+            delay(200)
+
+            val history = manager.getHistory()
+            assertTrue(
+                history.none { it.content.contains("Todo completed") || it.content.contains("Todo cancelled") },
+                "Should not have terminal status messages for IN_PROGRESS",
+            )
+        }
 }
