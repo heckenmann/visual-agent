@@ -37,7 +37,15 @@ Always run, in this order:
 
 - Create one focused PR per logical branch/change; do not open mega-PRs.
 - Every manually created PR must be configured to **delete the source branch on merge** (`delete_branch_on_merge: true`).
-- Dependabot and other automated PRs are left to their own lifecycle.
+- Dependabot PRs that meet all of the following conditions are auto-merged via the `dependabot-automerge` job in `test.yml`:
+  - Author is `dependabot[bot]`.
+  - CI (`test` job) is green.
+  - The update is a patch or minor bump (not major).
+  - The package ecosystem is Gradle (not GitHub Actions).
+  - Only dependency files (`**/build.gradle*`, `**/gradle.properties`, `**/libs.versions.toml`, `.github/workflows/*.yml`) are touched.
+  - The PR does not have the `dependabot: no-auto-merge` label.
+  - Auto-merge uses squash-merge and deletes the source branch.
+- Other automated PRs (e.g. release-please) are left to their own lifecycle.
 - Before creating a PR, verify the branch is not already merged into `master` and that no duplicate open PR exists for it.
 
 ## Development Workflow
