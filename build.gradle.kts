@@ -7,7 +7,7 @@ plugins {
     kotlin("plugin.jpa") version "2.4.0"
     kotlin("plugin.serialization") version "2.4.0"
     kotlin("plugin.spring") version "2.4.0"
-    kotlin("plugin.compose") version "2.4.0"
+    kotlin("plugin.compose") version "2.4.10"
     id("org.jetbrains.compose") version "1.11.1"
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
     id("org.springframework.boot") version "4.1.0"
