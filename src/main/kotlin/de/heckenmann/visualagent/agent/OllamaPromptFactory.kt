@@ -48,18 +48,26 @@ class OllamaPromptFactory(
         request: ChatRequestContext,
         selectedModel: String,
     ): Prompt {
+        val supportsTools = request.modelCapabilities.contains("tools")
         val callbacks =
-            toolRegistry.functionCallbacks(
-                enabledTools = request.enabledTools,
-                context = request.metadata + mapOf("model" to selectedModel),
-            )
+            if (supportsTools) {
+                toolRegistry.functionCallbacks(
+                    enabledTools = request.enabledTools,
+                    context = request.metadata + mapOf("model" to selectedModel),
+                )
+            } else {
+                emptyList()
+            }
         val exactFunctionNames = callbacks.map { it.toolDefinition.name() }.distinct().sorted()
         val optionsBuilder =
             OllamaChatOptions
                 .builder()
                 .model(selectedModel)
+        if (supportsTools && callbacks.isNotEmpty()) {
+            optionsBuilder
                 .toolCallbacks(callbacks)
                 .toolContext(request.metadata + mapOf("model" to selectedModel))
+        }
         request.parameters.temperature?.let(optionsBuilder::temperature)
         request.parameters.topP?.let(optionsBuilder::topP)
         request.parameters.maxTokens?.let(optionsBuilder::numPredict)

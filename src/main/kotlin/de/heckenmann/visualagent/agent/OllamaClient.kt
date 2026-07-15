@@ -11,13 +11,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.reactive.asFlow
 import kotlinx.coroutines.withContext
 import mu.KotlinLogging
-import org.springframework.ai.chat.messages.UserMessage
 import org.springframework.ai.chat.model.ChatModel
-import org.springframework.ai.chat.prompt.Prompt
 import org.springframework.ai.ollama.OllamaChatModel
 import org.springframework.ai.ollama.api.OllamaApi
 import org.springframework.ai.ollama.api.OllamaChatOptions
@@ -25,6 +21,10 @@ import org.springframework.stereotype.Component
 
 /**
  * Spring AI backed LLM provider for Ollama endpoints and Ollama-compatible profiles.
+ *
+ * Chat, streaming, vision, embedding, and metadata operations are split across
+ * this class and the [OllamaClientAuxiliary] / [OllamaClientOps] helpers to keep
+ * the per-file line count within the project limits.
  */
 @Component
 class OllamaClient(
@@ -35,6 +35,8 @@ class OllamaClient(
     private val toolRegistry: ToolRegistry,
 ) : LLMProvider {
     private val logger = KotlinLogging.logger {}
+    private val auxiliary = OllamaClientAuxiliary(chatModel, ollamaApi)
+    private val ops = OllamaClientOps(ollamaApi)
 
     override suspend fun chat(messages: List<Message>): ChatResponse = chat(ChatRequestContext(messages = messages))
 
@@ -43,23 +45,38 @@ class OllamaClient(
             request.cancellationToken?.throwIfCancelled()
             val selectedModel = request.model ?: AppConfig.instance.ollamaModel
             val allowedFunctionNames = promptFactory.allowedFunctionNames(request, selectedModel)
-            val prompt = promptFactory.buildPrompt(request, selectedModel)
-            val model = chatModelFor(request)
+            val supportsTools = request.modelCapabilities.contains("tools")
+            val toolsEnabled = request.enabledTools.isNotEmpty()
+            logger.debug {
+                "Ollama chat: model=$selectedModel, supportsTools=$supportsTools, toolsEnabled=$toolsEnabled"
+            }
             val responseResult =
                 runCatching {
-                    ToolCallingLoop()
-                        .run(
-                            model,
-                            prompt,
-                            request.cancellationToken,
-                            toolRegistry.functionCallbacks(
-                                request.enabledTools,
-                                request.metadata + mapOf("model" to selectedModel),
-                            ),
+                    if (supportsTools && toolsEnabled) {
+                        val prompt = promptFactory.buildPrompt(request, selectedModel)
+                        val model = chatModelFor(request)
+                        ToolCallingLoop()
+                            .run(
+                                model,
+                                prompt,
+                                request.cancellationToken,
+                                toolRegistry.functionCallbacks(
+                                    request.enabledTools,
+                                    request.metadata + mapOf("model" to selectedModel),
+                                ),
+                            )
+                    } else {
+                        OllamaToollessChat.execute(
+                            ollamaApi = ollamaApiFor(request),
+                            promptFactory = promptFactory,
+                            request = request,
+                            selectedModel = selectedModel,
                         )
+                    }
                 }
             if (responseResult.isFailure) {
                 val error = responseResult.exceptionOrNull()
+                if (error is kotlinx.coroutines.CancellationException) throw error
                 if (error != null && isMissingFunctionCallbackError(error)) {
                     val recovered = toolRecovery.runUnknownToolRecovery(request, selectedModel, allowedFunctionNames, error)
                     return@withContext recovered
@@ -80,9 +97,10 @@ class OllamaClient(
         val selectedModel = request.model ?: AppConfig.instance.ollamaModel
         val allowedFunctionNames = promptFactory.allowedFunctionNames(request, selectedModel)
         val prompt = promptFactory.buildPrompt(request, selectedModel)
-        val model = chatModelFor(request)
+        val supportsTools = request.modelCapabilities.contains("tools")
+        val toolsEnabled = request.enabledTools.isNotEmpty()
         val toolCallbacks =
-            if (request.enabledTools.isEmpty()) {
+            if (!supportsTools || !toolsEnabled) {
                 emptyList()
             } else {
                 toolRegistry.functionCallbacks(
@@ -94,27 +112,21 @@ class OllamaClient(
             try {
                 request.cancellationToken?.throwIfCancelled()
                 if (toolCallbacks.isEmpty()) {
-                    model
-                        .stream(prompt)
-                        .asFlow()
-                        .map { chunk ->
-                            ChatResponse(
-                                model = chunk.metadata.model.takeIf { it.isNotBlank() } ?: selectedModel,
-                                message =
-                                    Message(
-                                        role = "assistant",
-                                        content = chunk.result?.let { it.output.text.orEmpty() }.orEmpty(),
-                                    ),
-                                done = chunk.result?.metadata?.finishReason != null,
-                                promptEvalCount = chunk.metadata.usage.promptTokens,
-                                evalCount = chunk.metadata.usage.completionTokens,
-                            )
-                        }.collect { emit(it) }
+                    OllamaToollessChat
+                        .stream(
+                            ollamaApi = ollamaApiFor(request),
+                            promptFactory = promptFactory,
+                            request = request,
+                            selectedModel = selectedModel,
+                        ).collect { emit(it) }
                 } else {
+                    val model = chatModelFor(request)
                     ToolCallingLoop()
                         .runStream(model, prompt, request.cancellationToken, toolCallbacks)
                         .collect { emit(it) }
                 }
+            } catch (error: kotlinx.coroutines.CancellationException) {
+                throw error
             } catch (error: Throwable) {
                 if (!isMissingFunctionCallbackError(error)) throw buildDetailedProviderError(error)
                 val recovered = toolRecovery.runUnknownToolRecovery(request, selectedModel, allowedFunctionNames, error)
@@ -156,137 +168,24 @@ class OllamaClient(
     override suspend fun vision(
         image: ByteArray,
         prompt: String,
-    ): ChatResponse =
-        withContext(Dispatchers.IO) {
-            val selectedModel = AppConfig.instance.ollamaModel
-            val response =
-                chatModel.call(
-                    Prompt(
-                        listOf(
-                            UserMessage
-                                .builder()
-                                .text(prompt)
-                                .media(VisionSupport.media(image))
-                                .build(),
-                        ),
-                        OllamaChatOptions.builder().model(selectedModel).build(),
-                    ),
-                )
-            ChatResponse(
-                model = response.metadata.model,
-                message =
-                    Message(
-                        role = "assistant",
-                        content = response.result?.let { it.output.text.orEmpty() }.orEmpty(),
-                    ),
-                done = true,
-                promptEvalCount = response.metadata.usage.promptTokens,
-                evalCount = response.metadata.usage.completionTokens,
-            )
-        }
+    ): ChatResponse = auxiliary.vision(image, prompt)
 
-    override suspend fun embeddings(text: String): List<Double> =
-        withContext(Dispatchers.IO) {
-            try {
-                val response = ollamaApi.embed(OllamaApi.EmbeddingsRequest(AppConfig.instance.ollamaModel, text))
-                response
-                    .embeddings()
-                    .firstOrNull()
-                    ?.map { value -> value.toDouble() }
-                    ?: emptyList()
-            } catch (e: Exception) {
-                logger.warn(e) { "Ollama embeddings failed; returning empty embeddings" }
-                emptyList()
-            }
-        }
+    override suspend fun embeddings(text: String): List<Double> = auxiliary.embeddings(text)
 
-    override fun isConnected(): Boolean = true
+    override fun isConnected(): Boolean = ops.isConnected()
 
-    override suspend fun checkConnection(): Boolean =
-        withContext(Dispatchers.IO) {
-            try {
-                ollamaApi.listModels()
-                true
-            } catch (e: Exception) {
-                logger.warn(e) { "Ollama connection check failed" }
-                false
-            }
-        }
+    override suspend fun checkConnection(): Boolean = ops.checkConnection()
 
-    override suspend fun getModels(): List<String> =
-        withContext(Dispatchers.IO) {
-            val configuredModel = AppConfig.instance.ollamaModel
-            try {
-                val models =
-                    ollamaApi
-                        .listModels()
-                        .models()
-                        .mapNotNull { model -> model.name() }
-                        .distinct()
-                if (models.isEmpty()) listOf(configuredModel) else models
-            } catch (e: Exception) {
-                logger.warn(e) { "Ollama model list failed; falling back to configured model" }
-                listOf(configuredModel)
-            }
-        }
+    override suspend fun getModels(): List<String> = ops.getModels()
 
-    internal suspend fun getModels(profile: ProviderProfile): List<String> =
-        withContext(Dispatchers.IO) {
-            val models =
-                createOllamaApi(profile)
-                    .listModels()
-                    .models()
-                    .mapNotNull { model -> model.name() }
-                    .distinct()
-            if (models.isEmpty()) listOf(profile.defaultModel).filter(String::isNotBlank) else models
-        }
+    internal suspend fun getModels(profile: ProviderProfile): List<String> = ops.getModels(profile)
 
     internal suspend fun getModelDetails(
         profile: ProviderProfile,
         modelName: String,
-    ): ShowResponse =
-        withContext(Dispatchers.IO) {
-            val response = createOllamaApi(profile).showModel(OllamaApi.ShowModelRequest(modelName))
-            ShowResponse(
-                model = modelName,
-                modifiedAt = "",
-                details =
-                    ModelDetails(
-                        family = response.details().family(),
-                        format = response.details().format(),
-                        parameterSize = response.details().parameterSize(),
-                        quantizationLevel = response.details().quantizationLevel(),
-                    ),
-            )
-        }
+    ): ShowResponse = ops.getModelDetails(profile, modelName)
 
-    override suspend fun getModelDetails(modelName: String): ShowResponse =
-        withContext(Dispatchers.IO) {
-            try {
-                val response = ollamaApi.showModel(OllamaApi.ShowModelRequest(modelName))
-                val details = response.details()
-                ShowResponse(
-                    model = modelName,
-                    modifiedAt = response.modifiedAt().toString(),
-                    parameters = response.parameters(),
-                    template = response.template(),
-                    system = response.system(),
-                    license = response.license(),
-                    details =
-                        ModelDetails(
-                            parentModel = details.parentModel(),
-                            format = details.format(),
-                            family = details.family(),
-                            families = details.families(),
-                            parameterSize = details.parameterSize(),
-                            quantizationLevel = details.quantizationLevel(),
-                        ),
-                )
-            } catch (e: Exception) {
-                logger.warn(e) { "Ollama model details failed for $modelName" }
-                ShowResponse(model = modelName, modifiedAt = "")
-            }
-        }
+    override suspend fun getModelDetails(modelName: String): ShowResponse = ops.getModelDetails(modelName)
 
     private fun chatModelFor(request: ChatRequestContext): ChatModel {
         val profile = request.providerProfile ?: return chatModel
@@ -296,4 +195,9 @@ class OllamaClient(
             .options(OllamaChatOptions.builder().model(request.model ?: profile.defaultModel).build())
             .build()
     }
+
+    private fun ollamaApiFor(request: ChatRequestContext): OllamaApi =
+        request.providerProfile
+            ?.let { createOllamaApi(it) }
+            ?: ollamaApi
 }

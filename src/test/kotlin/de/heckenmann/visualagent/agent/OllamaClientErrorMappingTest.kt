@@ -1,9 +1,5 @@
-package de.heckenmann.visualagent.agent.tests
+package de.heckenmann.visualagent.agent
 
-import de.heckenmann.visualagent.agent.Message
-import de.heckenmann.visualagent.agent.OllamaClient
-import de.heckenmann.visualagent.agent.ollama.OllamaPromptFactory
-import de.heckenmann.visualagent.agent.ollama.OllamaToolRecovery
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import io.mockk.every
@@ -11,7 +7,6 @@ import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.springframework.ai.chat.model.ChatModel
-import org.springframework.ai.chat.prompt.Prompt
 import org.springframework.ai.ollama.api.OllamaApi
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
@@ -22,9 +17,9 @@ class OllamaClientErrorMappingTest {
     fun `chat surfaces user-facing message without exposing raw http response body`() =
         runTest {
             val chatModel = mockk<ChatModel>()
-            val ollamaApi = mockk<OllamaApi>(relaxed = true)
+            val ollamaApi = mockk<OllamaApi>()
             val registry = ToolRegistry(emptyList(), ToolEventBus())
-            every { chatModel.call(any<Prompt>()) } throws
+            every { ollamaApi.chat(any()) } throws
                 ForbiddenLikeException(
                     "403 Forbidden from POST http://localhost:11434/api/chat",
                     "403 Forbidden: this model requires a subscription, upgrade for access",
@@ -45,9 +40,9 @@ class OllamaClientErrorMappingTest {
     fun `chat maps 404 to model not available message`() =
         runTest {
             val chatModel = mockk<ChatModel>()
-            val ollamaApi = mockk<OllamaApi>(relaxed = true)
+            val ollamaApi = mockk<OllamaApi>()
             val registry = ToolRegistry(emptyList(), ToolEventBus())
-            every { chatModel.call(any<Prompt>()) } throws
+            every { ollamaApi.chat(any()) } throws
                 ForbiddenLikeException(
                     "404 Not Found from POST http://localhost:11434/api/chat",
                     "{\"error\":\"model 'missing' not found\"}",
@@ -64,16 +59,6 @@ class OllamaClientErrorMappingTest {
             assertFalse(error.message.orEmpty().contains("404"))
             assertFalse(error.message.orEmpty().contains("missing"))
         }
-
-    private fun createClient(
-        chatModel: ChatModel,
-        ollamaApi: OllamaApi,
-        registry: ToolRegistry,
-    ): OllamaClient {
-        val promptFactory = OllamaPromptFactory(registry)
-        val recovery = OllamaToolRecovery(chatModel, promptFactory)
-        return OllamaClient(chatModel, ollamaApi, promptFactory, recovery, registry)
-    }
 
     class ForbiddenLikeException(
         message: String,
