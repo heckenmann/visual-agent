@@ -40,6 +40,7 @@ import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.canvas.CanvasOperations
 import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
 import de.heckenmann.visualagent.workspace.layout.DesktopState
 import de.heckenmann.visualagent.workspace.layout.StageState
@@ -129,6 +130,7 @@ private fun VisualAgentComposeApp(
                 agentToolConfigService = springContext.getBean(AgentToolConfigService::class.java),
                 toolRegistry = springContext.getBean(ToolRegistry::class.java),
                 toolEventBus = springContext.getBean(ToolEventBus::class.java),
+                todoEventBus = springContext.getBean(TodoEventBus::class.java),
                 workspaceFileService = springContext.getBean(WorkspaceFileService::class.java),
                 canvasOperations = springContext.getBean(CanvasOperations::class.java),
                 modalRequester = ComposeModalRequester { requested -> modal = requested },
@@ -171,7 +173,6 @@ private fun VisualAgentComposeApp(
             windows = next
         }
     }
-    val updatePanelWidth: (String, Int) -> Unit = resizeWindow
     val commands =
         windows.map { window ->
             ComposeCommand(
@@ -181,16 +182,12 @@ private fun VisualAgentComposeApp(
             ) {
                 activateWindow(window.id)
             }
-        } +
-            ComposeCommand(
-                id = "close-application",
-                title = "Close application",
-                description = "Close Visual Agent and persist workspace state",
-                action = onCloseApplication,
-            )
+        } + ComposeCommand("close-application", "Close application", "Close Visual Agent and persist workspace state", onCloseApplication)
     LaunchedEffect(Unit) {
         workspaceFocusRequester.requestFocus()
+        springContext.getBean(AgentManager::class.java).startAutonomousProcessing(seed = false)
     }
+    RegisterAgentStatusCallback(inFlight)
     DisposableEffect(workspaceLayoutService) {
         val handle =
             workspaceLayoutService.addWindowStateListener { states ->
@@ -231,7 +228,7 @@ private fun VisualAgentComposeApp(
                         windows = windows,
                         onToggleWindow = toggleWindow,
                         onReorderWindows = reorderWindows,
-                        onPanelWidthChanged = updatePanelWidth,
+                        onPanelWidthChanged = resizeWindow,
                         onCloseApplication = onCloseApplication,
                         modalRequester = panelServices.modalRequester,
                     )

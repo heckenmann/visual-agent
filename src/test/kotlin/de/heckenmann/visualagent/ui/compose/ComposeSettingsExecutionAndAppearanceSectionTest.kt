@@ -47,6 +47,7 @@ class ComposeSettingsExecutionAndAppearanceSectionTest {
                     userInstruction = instruction.value,
                     fontSize = fontSize.value,
                     themeMode = ThemeMode.SYSTEM,
+                    modelCapabilities = setOf("completion", "tools", "thinking"),
                     onContextLengthChange = { contextLength.value = it },
                     onLoadLimitChange = { loadLimit.value = it },
                     onMaxParallelChange = { parallel.value = it },
@@ -104,6 +105,112 @@ class ComposeSettingsExecutionAndAppearanceSectionTest {
         }
         composeTestRule.onNodeWithText("Model instruction").performTextInput(".")
         assertEquals(".", current)
+    }
+
+    @Test
+    fun `reasoning checkbox hidden when model lacks thinking capability`() {
+        composeTestRule.setContent {
+            MaterialTheme {
+                SettingsExecutionAndAppearanceSection(
+                    config = AppConfig.instance,
+                    contextLength = 4096,
+                    loadLimit = "50",
+                    maxParallelSubAgents = "4",
+                    timeoutSeconds = "120",
+                    streamingEnabled = true,
+                    thinkingEnabled = true,
+                    autoCompactionEnabled = true,
+                    userInstruction = "",
+                    fontSize = 14,
+                    themeMode = ThemeMode.SYSTEM,
+                    modelCapabilities = setOf("completion", "tools"),
+                    onContextLengthChange = {},
+                    onLoadLimitChange = {},
+                    onMaxParallelChange = {},
+                    onTimeoutChange = {},
+                    onStreamingChange = {},
+                    onThinkingChange = {},
+                    onCompactionChange = {},
+                    onUserInstructionChange = {},
+                    onFontSizeChange = {},
+                    onThemeModeChange = {},
+                )
+            }
+        }
+        composeTestRule.onNodeWithText("Stream").assertExists()
+        composeTestRule.onNodeWithText("Compaction").assertExists()
+        kotlin.test.assertFailsWith<java.lang.AssertionError> {
+            composeTestRule.onNodeWithText("Reasoning").assertExists()
+        }
+    }
+
+    @Test
+    fun `reasoning checkbox shown when model supports thinking`() {
+        composeTestRule.setContent {
+            MaterialTheme {
+                SettingsExecutionAndAppearanceSection(
+                    config = AppConfig.instance,
+                    contextLength = 4096,
+                    loadLimit = "50",
+                    maxParallelSubAgents = "4",
+                    timeoutSeconds = "120",
+                    streamingEnabled = true,
+                    thinkingEnabled = true,
+                    autoCompactionEnabled = true,
+                    userInstruction = "",
+                    fontSize = 14,
+                    themeMode = ThemeMode.SYSTEM,
+                    modelCapabilities = setOf("completion", "tools", "thinking"),
+                    onContextLengthChange = {},
+                    onLoadLimitChange = {},
+                    onMaxParallelChange = {},
+                    onTimeoutChange = {},
+                    onStreamingChange = {},
+                    onThinkingChange = {},
+                    onCompactionChange = {},
+                    onUserInstructionChange = {},
+                    onFontSizeChange = {},
+                    onThemeModeChange = {},
+                )
+            }
+        }
+        composeTestRule.onNodeWithText("Reasoning").assertExists()
+    }
+
+    @Test
+    fun `capability labels shown when model has capabilities`() {
+        composeTestRule.setContent {
+            MaterialTheme {
+                SettingsExecutionAndAppearanceSection(
+                    config = AppConfig.instance,
+                    contextLength = 4096,
+                    loadLimit = "50",
+                    maxParallelSubAgents = "4",
+                    timeoutSeconds = "120",
+                    streamingEnabled = true,
+                    thinkingEnabled = false,
+                    autoCompactionEnabled = true,
+                    userInstruction = "",
+                    fontSize = 14,
+                    themeMode = ThemeMode.SYSTEM,
+                    modelCapabilities = setOf("completion", "tools", "thinking"),
+                    onContextLengthChange = {},
+                    onLoadLimitChange = {},
+                    onMaxParallelChange = {},
+                    onTimeoutChange = {},
+                    onStreamingChange = {},
+                    onThinkingChange = {},
+                    onCompactionChange = {},
+                    onUserInstructionChange = {},
+                    onFontSizeChange = {},
+                    onThemeModeChange = {},
+                )
+            }
+        }
+        composeTestRule.onNodeWithText("Capabilities:").assertExists()
+        composeTestRule.onNodeWithText("completion").assertExists()
+        composeTestRule.onNodeWithText("tools").assertExists()
+        composeTestRule.onNodeWithText("thinking").assertExists()
     }
 
     @Test
