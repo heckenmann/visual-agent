@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.config.SubAgentToolConfig
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
+import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.knowledge.ConversationStore
 import de.heckenmann.visualagent.knowledge.Memory
 import de.heckenmann.visualagent.knowledge.MemoryStore
@@ -70,6 +71,7 @@ class TestPersistence internal constructor(
         todoEventBus: TodoEventBus = TodoEventBus(),
     ): AgentManager {
         val configService = AgentToolConfigService(subAgentConfigStore)
+        val appConfig = AppConfigBean(preferenceStore)
         return AgentManager(
             conversationStore,
             todoStore,
@@ -79,6 +81,7 @@ class TestPersistence internal constructor(
             configService,
             toolEventBus,
             todoEventBus,
+            appConfig,
         )
     }
 

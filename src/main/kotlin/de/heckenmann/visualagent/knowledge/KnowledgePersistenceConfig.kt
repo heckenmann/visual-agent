@@ -2,13 +2,15 @@ package de.heckenmann.visualagent.knowledge
 
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
-import de.heckenmann.visualagent.config.AppConfig
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.env.Environment
 import org.sqlite.SQLiteConfig
+import java.io.File
+import java.io.FileInputStream
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.Properties
 import javax.sql.DataSource
 
 /**
@@ -29,7 +31,7 @@ internal class KnowledgePersistenceConfig {
                 setBusyTimeout(5_000)
                 enforceForeignKeys(true)
             }
-        val databasePath = environment.getProperty("visual-agent.db.path") ?: AppConfig.instance.databasePath
+        val databasePath = environment.getProperty("visual-agent.db.path") ?: bootstrapDatabasePath()
         val jdbcUrl = if (databasePath.startsWith("jdbc:sqlite:")) databasePath else "jdbc:sqlite:$databasePath"
         createParentDirectory(databasePath)
         return HikariDataSource(
@@ -42,6 +44,14 @@ internal class KnowledgePersistenceConfig {
                 dataSourceProperties = sqliteConfig.toProperties()
             },
         )
+    }
+
+    private fun bootstrapDatabasePath(): String {
+        val configFile = File("src/main/resources/config/app.properties")
+        if (!configFile.exists()) return "./data/visual-agent.db"
+        val props = Properties()
+        FileInputStream(configFile).use { props.load(it) }
+        return props.getProperty("database.path", "./data/visual-agent.db")
     }
 
     private fun createParentDirectory(databasePath: String) {

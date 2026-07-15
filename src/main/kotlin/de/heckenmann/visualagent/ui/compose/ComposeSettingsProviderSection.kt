@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
-import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.config.AppConfigBean
 
 @Composable
 internal fun SettingsProviderSection(
@@ -46,7 +46,7 @@ internal fun SettingsProviderSection(
     loadingModels: Boolean,
     loadingDetails: Boolean,
     filteredModels: List<ProviderModelConfig>,
-    config: AppConfig,
+    config: AppConfigBean,
     providerCatalogService: ProviderCatalogService,
     modalRequester: ComposeModalRequester,
     onProviderSelected: (String) -> Unit,

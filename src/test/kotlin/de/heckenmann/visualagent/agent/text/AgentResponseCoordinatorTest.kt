@@ -2,10 +2,12 @@ package de.heckenmann.visualagent.agent.text
 
 import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.ChatResponse
+import de.heckenmann.visualagent.agent.ConversationOpsProvider
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ToolResult
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
+import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
@@ -21,17 +23,18 @@ class AgentResponseCoordinatorTest {
     private val provider = mockk<LLMProvider>()
     private val events = ConcurrentHashMap<String, MutableList<ToolCallEvent>>()
     private val requests = mutableListOf<ChatRequestContext>()
+    private val conversationOps =
+        ConversationOpsProvider(mockk<ToolEventBus>(relaxed = true)).apply {
+            setBuildMainRequest { history, requestId, _ ->
+                ChatRequestContext(history, metadata = mapOf("requestId" to requestId.orEmpty())).also(requests::add)
+            }
+            setBuildMainSystemContextPrompt { "system context" }
+            setLoadRecentHistoryFromDb { listOf(Message("user", "question")) }
+        }
     private val coordinator =
         AgentResponseCoordinator(
             llmProvider = provider,
-            mainSessionId = "main",
-            repetitionGuardRetryLimit = 1,
-            finishedToolEventsByRequestId = events,
-            buildMainRequest = { history, requestId, _ ->
-                ChatRequestContext(history, metadata = mapOf("requestId" to requestId.orEmpty())).also(requests::add)
-            },
-            buildMainSystemContextPrompt = { "system context" },
-            loadRecentHistoryFromDb = { listOf(Message("user", "question")) },
+            conversationOps = conversationOps,
         )
 
     @Test
@@ -48,7 +51,7 @@ class AgentResponseCoordinatorTest {
     @Test
     fun `blank response is finalized from captured tool results`() =
         runTest {
-            events["request-1"] = mutableListOf(toolEvent(success = true))
+            conversationOps.finishedToolEventsByRequestId["request-1"] = mutableListOf(toolEvent(success = true))
             coEvery { provider.chat(any<ChatRequestContext>()) } returnsMany
                 listOf(response(""), response("Final answer from tool output"))
 

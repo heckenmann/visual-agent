@@ -9,7 +9,7 @@ import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
-import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.config.AppConfigBean
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.Rule
@@ -41,7 +41,7 @@ class ComposeSettingsPanelTest {
         composeTestRule.setContent {
             MaterialTheme {
                 SettingsPanel(
-                    config = AppConfig.instance,
+                    config = AppConfigBean(),
                     llmProvider = llmProvider,
                     providerCatalogService = catalog,
                     modalRequester = ComposeModalRequester { },

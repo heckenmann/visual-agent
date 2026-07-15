@@ -2,6 +2,7 @@ package de.heckenmann.visualagent.agent
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.todo.TodoEventBus
 import io.mockk.coEvery
 import io.mockk.mockk
@@ -29,7 +30,8 @@ class AgentManagerActiveJobCountTest {
                 release.await()
                 ChatResponse("test", Message("assistant", "completed"), done = true)
             }
-            val manager = AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus(), TodoEventBus())
+            val manager =
+                AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus(), TodoEventBus(), AppConfigBean(stores))
 
             try {
                 AppConfig.instance.maxParallelSubAgents = 2

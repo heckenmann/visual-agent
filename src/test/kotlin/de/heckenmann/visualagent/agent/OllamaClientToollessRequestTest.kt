@@ -2,6 +2,7 @@ package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
+import de.heckenmann.visualagent.config.AppConfigBean
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -40,7 +41,7 @@ class OllamaClientToollessRequestTest {
                     null,
                     null,
                 )
-            val registry = ToolRegistry(emptyList(), ToolEventBus())
+            val registry = ToolRegistry(emptyList(), ToolEventBus(), AppConfigBean(mockk(relaxed = true)))
             val client = createClient(chatModel, ollamaApi, registry)
 
             client.chat(

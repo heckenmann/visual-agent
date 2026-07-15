@@ -9,6 +9,8 @@ import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.agent.tools.VisualAgentTool
 import de.heckenmann.visualagent.agent.tools.toFunctionName
+import de.heckenmann.visualagent.config.AppConfigBean
+import io.mockk.mockk
 import org.junit.jupiter.api.Test
 import org.springframework.ai.model.tool.ToolCallingChatOptions
 import kotlin.test.assertEquals
@@ -47,7 +49,7 @@ class OpenAiPromptFactoryTest {
 
     @Test
     fun `prompt omits guard when no tools enabled`() {
-        val factory = OpenAiPromptFactory(ToolRegistry(emptyList(), ToolEventBus()))
+        val factory = OpenAiPromptFactory(ToolRegistry(emptyList(), ToolEventBus(), AppConfigBean(mockk(relaxed = true))))
 
         val prompt = factory.buildPrompt(ChatRequestContext(messages = listOf(Message("user", "hi"))), "gpt-test")
 
@@ -73,7 +75,7 @@ class OpenAiPromptFactoryTest {
 
     @Test
     fun `prompt applies sampling options`() {
-        val factory = OpenAiPromptFactory(ToolRegistry(emptyList(), ToolEventBus()))
+        val factory = OpenAiPromptFactory(ToolRegistry(emptyList(), ToolEventBus(), AppConfigBean(mockk(relaxed = true))))
         val prompt =
             factory.buildPrompt(
                 ChatRequestContext(

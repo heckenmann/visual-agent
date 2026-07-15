@@ -131,7 +131,7 @@ internal class AgentManagerLifecycleOps(
         val agent = SubAgent.fromTemplate(id, name, role, templateName)
         saveAgentToDb(agent)
         owner.subAgents[agent.id] = agent
-        AgentManager.notifyAgent(agent.id, "CREATED")
+        owner.agentStatusCallbackAdapter.notify(agent.id, "CREATED")
         logger.info { "Created agent: $id ($name)" }
         return agent
     }

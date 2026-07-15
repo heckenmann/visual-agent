@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onNodeWithText
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
+import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoStatus
@@ -24,7 +25,7 @@ class ComposeTodoPanelTest {
     private fun createManager(): AgentManager {
         val db = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
         val provider = mockk<de.heckenmann.visualagent.agent.LLMProvider>(relaxed = true)
-        return AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+        return AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
     }
 
     @Test

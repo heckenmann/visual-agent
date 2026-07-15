@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.agent.openai
 
 import de.heckenmann.visualagent.agent.ShowResponse
+import de.heckenmann.visualagent.config.AppConfigBean
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -22,7 +23,9 @@ class OpenAiClientErrorTest {
                             emptyList(),
                             de.heckenmann.visualagent.agent.tools
                                 .ToolEventBus(),
+                            AppConfigBean(),
                         ),
+                    AppConfigBean(),
                 )
 
             assertEquals(false, client.isConnected())
@@ -71,7 +74,9 @@ class OpenAiClientErrorTest {
                             emptyList(),
                             de.heckenmann.visualagent.agent.tools
                                 .ToolEventBus(),
+                            AppConfigBean(),
                         ),
+                    AppConfigBean(),
                 )
             val profile =
                 de.heckenmann.visualagent.agent.provider.ProviderProfile(

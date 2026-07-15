@@ -3,7 +3,7 @@ package de.heckenmann.visualagent.agent
 import de.heckenmann.visualagent.agent.openai.OpenAiClient
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
-import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.knowledge.PreferenceStore
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -16,14 +16,16 @@ import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
 class ConfiguredLLMProviderTest {
+    private val appConfig = AppConfigBean()
+
     @Test
     fun `chat delegates to openai provider with configured model`() =
         runTest {
-            val originalProvider = AppConfig.instance.llmProvider
-            val originalModel = AppConfig.instance.openAiModel
+            val originalProvider = appConfig.llmProvider
+            val originalModel = appConfig.openAiModel
             try {
-                AppConfig.instance.llmProvider = "openai"
-                AppConfig.instance.openAiModel = "gpt-router"
+                appConfig.llmProvider = "openai"
+                appConfig.openAiModel = "gpt-router"
                 val ollama = mockk<OllamaClient>(relaxed = true)
                 val openAi = mockk<OpenAiClient>()
                 val requestSlot = io.mockk.slot<ChatRequestContext>()
@@ -37,17 +39,17 @@ class ConfiguredLLMProviderTest {
                 coVerify(exactly = 1) { openAi.chat(any<ChatRequestContext>()) }
                 coVerify(exactly = 0) { ollama.chat(any<ChatRequestContext>()) }
             } finally {
-                AppConfig.instance.llmProvider = originalProvider
-                AppConfig.instance.openAiModel = originalModel
+                appConfig.llmProvider = originalProvider
+                appConfig.openAiModel = originalModel
             }
         }
 
     @Test
     fun `models and connection delegate to ollama provider by default`() =
         runTest {
-            val originalProvider = AppConfig.instance.llmProvider
+            val originalProvider = appConfig.llmProvider
             try {
-                AppConfig.instance.llmProvider = "ollama"
+                appConfig.llmProvider = "ollama"
                 val ollama = mockk<OllamaClient>()
                 val openAi = mockk<OpenAiClient>(relaxed = true)
                 every { ollama.isConnected() } returns true
@@ -64,18 +66,18 @@ class ConfiguredLLMProviderTest {
                 coVerify(exactly = 2) { ollama.getModels(any<ProviderProfile>()) }
                 coVerify(exactly = 0) { openAi.getModels() }
             } finally {
-                AppConfig.instance.llmProvider = originalProvider
+                appConfig.llmProvider = originalProvider
             }
         }
 
     @Test
     fun `request provider override routes independently from session provider`() =
         runTest {
-            val originalProvider = AppConfig.instance.llmProvider
-            val originalModel = AppConfig.instance.openAiModel
+            val originalProvider = appConfig.llmProvider
+            val originalModel = appConfig.openAiModel
             try {
-                AppConfig.instance.llmProvider = "ollama"
-                AppConfig.instance.openAiModel = "gpt-session"
+                appConfig.llmProvider = "ollama"
+                appConfig.openAiModel = "gpt-session"
                 val ollama = mockk<OllamaClient>(relaxed = true)
                 val openAi = mockk<OpenAiClient>()
                 val requestSlot = io.mockk.slot<ChatRequestContext>()
@@ -96,17 +98,17 @@ class ConfiguredLLMProviderTest {
                 coVerify(exactly = 1) { openAi.chat(any<ChatRequestContext>()) }
                 coVerify(exactly = 0) { ollama.chat(any<ChatRequestContext>()) }
             } finally {
-                AppConfig.instance.llmProvider = originalProvider
-                AppConfig.instance.openAiModel = originalModel
+                appConfig.llmProvider = originalProvider
+                appConfig.openAiModel = originalModel
             }
         }
 
     @Test
     fun `openai profile supports discovery details and streaming`() =
         runTest {
-            val originalProvider = AppConfig.instance.llmProvider
+            val originalProvider = appConfig.llmProvider
             try {
-                AppConfig.instance.llmProvider = "openai"
+                appConfig.llmProvider = "openai"
                 val catalog = catalog()
                 val ollama = mockk<OllamaClient>(relaxed = true)
                 val openAi = mockk<OpenAiClient>()
@@ -130,16 +132,16 @@ class ConfiguredLLMProviderTest {
                         ).toList()
                 assertEquals("chunk", chunks.single().message.content)
             } finally {
-                AppConfig.instance.llmProvider = originalProvider
+                appConfig.llmProvider = originalProvider
             }
         }
 
     @Test
     fun `vision and embeddings delegate to active provider`() =
         runTest {
-            val originalProvider = AppConfig.instance.llmProvider
+            val originalProvider = appConfig.llmProvider
             try {
-                AppConfig.instance.llmProvider = "openai"
+                appConfig.llmProvider = "openai"
                 val ollama = mockk<OllamaClient>(relaxed = true)
                 val openAi = mockk<OpenAiClient>(relaxed = true)
                 coEvery { openAi.vision(any(), any()) } returns
@@ -153,16 +155,16 @@ class ConfiguredLLMProviderTest {
                 coVerify(exactly = 1) { openAi.vision(any(), any()) }
                 coVerify(exactly = 1) { openAi.embeddings("text") }
             } finally {
-                AppConfig.instance.llmProvider = originalProvider
+                appConfig.llmProvider = originalProvider
             }
         }
 
     @Test
     fun `chat and stream with message list delegate to active provider`() =
         runTest {
-            val originalProvider = AppConfig.instance.llmProvider
+            val originalProvider = appConfig.llmProvider
             try {
-                AppConfig.instance.llmProvider = "ollama"
+                appConfig.llmProvider = "ollama"
                 val ollama = mockk<OllamaClient>(relaxed = true)
                 val openAi = mockk<OpenAiClient>(relaxed = true)
                 coEvery { ollama.chat(any<List<Message>>()) } returns ChatResponse("llama", Message("assistant", "ok"), true)
@@ -175,7 +177,7 @@ class ConfiguredLLMProviderTest {
                 val streamChunks = router.stream(listOf(Message("user", "hi"))).toList()
                 assertEquals("c", streamChunks.single().message.content)
             } finally {
-                AppConfig.instance.llmProvider = originalProvider
+                appConfig.llmProvider = originalProvider
             }
         }
 
@@ -193,5 +195,6 @@ class ConfiguredLLMProviderTest {
                     values[key] = value
                 }
             },
+            appConfig,
         )
 }

@@ -5,7 +5,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
@@ -14,11 +13,19 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SubAgentJobSchedulerTest {
+    private fun scheduler(parallelism: Int = 4): SubAgentJobScheduler {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val provider =
+            object : ParallelismProvider() {
+                override fun get(): Int = parallelism
+            }
+        return SubAgentJobScheduler(scope, provider)
+    }
+
     @Test
     fun `synchronous job waits until capacity is available`() =
         runBlocking {
-            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-            val scheduler = SubAgentJobScheduler(scope) { 1 }
+            val scheduler = scheduler(1)
             val firstStarted = CompletableDeferred<Unit>()
             val releaseFirst = CompletableDeferred<Unit>()
             val secondStarted = CompletableDeferred<Unit>()
@@ -48,14 +55,12 @@ class SubAgentJobSchedulerTest {
             releaseFirst.complete(Unit)
             assertEquals("first", first.await())
             assertEquals("second", second.await())
-            scope.cancel()
         }
 
     @Test
     fun `asynchronous job is queued and completion callback is invoked`() =
         runBlocking {
-            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-            val scheduler = SubAgentJobScheduler(scope) { 1 }
+            val scheduler = scheduler(1)
             val releaseFirst = CompletableDeferred<Unit>()
             val firstStarted = CompletableDeferred<Unit>()
             val completion = CompletableDeferred<Result<String>>()
@@ -83,6 +88,5 @@ class SubAgentJobSchedulerTest {
             releaseFirst.complete(Unit)
             first.await()
             assertEquals("queued-result", completion.await().getOrThrow())
-            scope.cancel()
         }
 }

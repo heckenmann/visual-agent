@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ShowResponse
 import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
 import de.heckenmann.visualagent.knowledge.WorkspaceFileStore
 import de.heckenmann.visualagent.testsupport.TestPng
@@ -31,6 +32,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class WorkspaceFileToolTest {
+    private val appConfig = AppConfigBean()
+
     @Test
     fun `workspace file tool lists reads hashes and analyzes images`() {
         val previous = AppConfig.instance.databasePath

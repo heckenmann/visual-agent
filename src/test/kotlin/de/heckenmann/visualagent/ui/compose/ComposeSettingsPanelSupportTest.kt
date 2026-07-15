@@ -7,7 +7,7 @@ import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
-import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.config.AppConfigBean
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -155,7 +155,7 @@ class ComposeSettingsPanelSupportTest {
     @Test
     fun `save session settings persists active provider and mirrors to config`() {
         val catalog = mockk<ProviderCatalogService>(relaxed = true)
-        val config = AppConfig.instance
+        val config = AppConfigBean()
         config.llmProvider = "openai"
         val profile =
             ProviderProfile(
@@ -180,7 +180,7 @@ class ComposeSettingsPanelSupportTest {
 
     @Test
     fun `mirror provider to app config maps ollama fields`() {
-        val config = AppConfig.instance
+        val config = AppConfigBean()
         mirrorProviderToAppConfig(
             config,
             ProviderProfile(

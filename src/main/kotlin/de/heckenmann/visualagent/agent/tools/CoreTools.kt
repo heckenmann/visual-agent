@@ -5,7 +5,7 @@ import de.heckenmann.visualagent.agent.ToolDefinition
 import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.agent.ToolResult
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
-import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.knowledge.MemoryStore
 import de.heckenmann.visualagent.knowledge.TodoStore
 import de.heckenmann.visualagent.todo.Todo
@@ -27,6 +27,7 @@ import org.springframework.stereotype.Component
 @Component
 class UiTool(
     private val providerCatalog: ProviderCatalogService,
+    private val appConfig: AppConfigBean = AppConfigBean(),
 ) : VisualAgentTool {
     override val definition =
         ToolDefinition(
@@ -43,16 +44,16 @@ class UiTool(
         val input = parseObject(inputJson)
         when (input.string("action") ?: "get") {
             "set" -> {
-                input.int("fontSize")?.let { AppConfig.instance.fontSize = it.coerceIn(10, 24) }
+                input.int("fontSize")?.let { appConfig.fontSize = it.coerceIn(10, 24) }
                 input.string("provider")?.let(providerCatalog::setActiveProvider)
                 input.string("model")?.let { model ->
                     val provider = providerCatalog.getProvider(providerCatalog.activeProviderId())
                     if (provider != null) providerCatalog.saveProvider(provider.copy(defaultModel = model))
                 }
-                input.string("openAiBaseUrl")?.let { AppConfig.instance.openAiBaseUrl = it }
-                input.boolean("streamingEnabled")?.let { AppConfig.instance.streamingEnabled = it }
-                input.boolean("thinkingEnabled")?.let { AppConfig.instance.thinkingEnabled = it }
-                AppConfig.instance.save()
+                input.string("openAiBaseUrl")?.let { appConfig.openAiBaseUrl = it }
+                input.boolean("streamingEnabled")?.let { appConfig.streamingEnabled = it }
+                input.boolean("thinkingEnabled")?.let { appConfig.thinkingEnabled = it }
+                appConfig.save()
             }
             "get" -> Unit
             else -> return failure("ui", "Unsupported ui action")
@@ -61,13 +62,13 @@ class UiTool(
             "ui",
             """
             Current UI Settings:
-              Font size: ${AppConfig.instance.fontSize}px
+              Font size: ${appConfig.fontSize}px
               Provider: ${providerCatalog.activeProviderId()}
               Model: ${providerCatalog.getProvider(providerCatalog.activeProviderId())?.defaultModel.orEmpty()}
-              OpenAI Base URL: ${AppConfig.instance.openAiBaseUrl}
-              OpenAI API key configured: ${AppConfig.instance.openAiApiKey.isNotBlank()}
-              Streaming: ${AppConfig.instance.streamingEnabled}
-              Thinking: ${AppConfig.instance.thinkingEnabled}
+              OpenAI Base URL: ${appConfig.openAiBaseUrl}
+              OpenAI API key configured: ${appConfig.openAiApiKey.isNotBlank()}
+              Streaming: ${appConfig.streamingEnabled}
+              Thinking: ${appConfig.thinkingEnabled}
             Font size range: 10-24
             """.trimIndent(),
         )
@@ -103,6 +104,7 @@ class PwdTool : VisualAgentTool {
 @Component
 class ContextTool(
     private val providerCatalog: ProviderCatalogService? = null,
+    private val appConfig: AppConfigBean = AppConfigBean(),
 ) : VisualAgentTool {
     override val definition =
         ToolDefinition(
@@ -120,11 +122,11 @@ class ContextTool(
             "context",
             buildString {
                 appendLine("Workspace: ${workspaceRoot()}")
-                val activeProvider = providerCatalog?.activeProviderId() ?: AppConfig.instance.llmProvider
+                val activeProvider = providerCatalog?.activeProviderId() ?: appConfig.llmProvider
                 appendLine("Provider: $activeProvider")
-                appendLine("Model: ${providerCatalog?.getProvider(activeProvider)?.defaultModel ?: AppConfig.instance.activeModel()}")
-                appendLine("OpenAI Base URL: ${AppConfig.instance.openAiBaseUrl}")
-                appendLine("OpenAI API key configured: ${AppConfig.instance.openAiApiKey.isNotBlank()}")
+                appendLine("Model: ${providerCatalog?.getProvider(activeProvider)?.defaultModel ?: appConfig.activeModel()}")
+                appendLine("OpenAI Base URL: ${appConfig.openAiBaseUrl}")
+                appendLine("OpenAI API key configured: ${appConfig.openAiApiKey.isNotBlank()}")
                 context.entries.sortedBy { it.key }.forEach { (key, value) ->
                     appendLine("$key: $value")
                 }

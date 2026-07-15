@@ -33,13 +33,14 @@ import androidx.compose.ui.window.rememberWindowState
 import de.heckenmann.visualagent.AppIdentity
 import de.heckenmann.visualagent.VisualAgentApplication
 import de.heckenmann.visualagent.agent.AgentManager
+import de.heckenmann.visualagent.agent.AgentStatusCallbackAdapter
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.canvas.CanvasOperations
-import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
 import de.heckenmann.visualagent.workspace.layout.DesktopState
@@ -65,7 +66,8 @@ fun runVisualAgentComposeApplication() {
     val persistedStage = workspaceLayoutService.report().stage
     val defaultWidth = 1280.dp
     val defaultHeight = 820.dp
-    val lifecycle = ApplicationLifecycle()
+    val lifecycle = springContext.getBean(ApplicationLifecycle::class.java)
+    val appConfig = springContext.getBean(AppConfigBean::class.java)
 
     application {
         val windowState =
@@ -92,7 +94,7 @@ fun runVisualAgentComposeApplication() {
             state = windowState,
         ) {
             VisualAgentComposeApp(
-                config = AppConfig.instance,
+                config = appConfig,
                 springContext = springContext,
                 workspaceLayoutService = workspaceLayoutService,
                 lifecycle = lifecycle,
@@ -104,7 +106,7 @@ fun runVisualAgentComposeApplication() {
 
 @Composable
 private fun VisualAgentComposeApp(
-    config: AppConfig,
+    config: AppConfigBean,
     springContext: ConfigurableApplicationContext,
     workspaceLayoutService: WorkspaceLayoutService,
     lifecycle: ApplicationLifecycle,
@@ -120,6 +122,7 @@ private fun VisualAgentComposeApp(
     val composeScope = rememberCoroutineScope()
     val toolEventBus = remember { springContext.getBean(ToolEventBus::class.java) }
     val inFlight = rememberInFlightState(toolEventBus)
+    val agentStatusCallbackAdapter = remember { springContext.getBean(AgentStatusCallbackAdapter::class.java) }
     val panelServices =
         remember {
             ComposePanelServices(
@@ -146,7 +149,7 @@ private fun VisualAgentComposeApp(
     DisposableEffect(config) {
         val registration =
             config.addChangeListener { change ->
-                if (change.key == AppConfig.KEY_UI_THEME_MODE) {
+                if (change.key == AppConfigBean.KEY_UI_THEME_MODE) {
                     themeMode = config.uiThemeMode
                 }
             }
@@ -187,7 +190,7 @@ private fun VisualAgentComposeApp(
         workspaceFocusRequester.requestFocus()
         springContext.getBean(AgentManager::class.java).startAutonomousProcessing(seed = false)
     }
-    RegisterAgentStatusCallback(inFlight)
+    RegisterAgentStatusCallback(inFlight, agentStatusCallbackAdapter)
     DisposableEffect(workspaceLayoutService) {
         val handle =
             workspaceLayoutService.addWindowStateListener { states ->

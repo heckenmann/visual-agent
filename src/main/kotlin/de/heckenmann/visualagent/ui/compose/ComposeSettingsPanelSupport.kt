@@ -6,7 +6,7 @@ import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
-import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.config.AppConfigBean
 
 internal data class ProviderProfileFormState(
     val id: String = "",
@@ -152,7 +152,7 @@ internal fun ShowResponse.toModelDetailsText(): String =
     }.trimEnd()
 
 internal fun saveSessionSettings(
-    config: AppConfig,
+    config: AppConfigBean,
     providerCatalog: ProviderCatalogService,
     providerId: String,
     modelId: String,
@@ -172,7 +172,7 @@ internal fun saveSessionSettings(
 }
 
 internal fun mirrorProviderToAppConfig(
-    config: AppConfig,
+    config: AppConfigBean,
     profile: ProviderProfile,
 ) {
     config.llmProvider = profile.id

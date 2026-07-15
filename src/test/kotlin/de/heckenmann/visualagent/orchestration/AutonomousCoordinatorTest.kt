@@ -1,13 +1,18 @@
 package de.heckenmann.visualagent.orchestration
+// TODO(size): 312 effective LOC, needs splitting
 
 import de.heckenmann.visualagent.agent.AgentStatus
 import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.ChatResponse
+import de.heckenmann.visualagent.agent.ConversationOpsProvider
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
+import de.heckenmann.visualagent.agent.ParallelismProvider
 import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.agent.SubAgentJobScheduler
+import de.heckenmann.visualagent.agent.SubAgentOpsProvider
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
+import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.knowledge.MemoryStore
 import de.heckenmann.visualagent.knowledge.TodoStore
 import de.heckenmann.visualagent.todo.Todo
@@ -257,10 +262,9 @@ class AutonomousCoordinatorTest {
         chatDelayMs: Long = 0,
     ): Fixture {
         val todoEventBus = TodoEventBus()
-        val todoManager = TodoManager(eventBus = todoEventBus)
-        val subAgents = mutableMapOf<String, SubAgent>()
+        val todoStore = FakeTodoStore()
+        val todoManager = TodoManager(todoStore, todoEventBus)
         val provider = mockk<LLMProvider>()
-        val todoStore = FakeTodoStore(todoManager)
         val memoryStore =
             object : MemoryStore {
                 override fun saveMemory(
@@ -301,43 +305,60 @@ class AutonomousCoordinatorTest {
         val savedAgents = mutableListOf<SubAgent>()
         val messages = mutableListOf<Message>()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-        val scheduler = SubAgentJobScheduler(scope) { parallelism }
+        val parallelismProvider =
+            object : ParallelismProvider() {
+                override fun get(): Int = parallelism
+            }
+        val scheduler = SubAgentJobScheduler(scope, parallelismProvider)
+        val conversationOps =
+            ConversationOpsProvider(mockk<ToolEventBus>(relaxed = true)).apply {
+                setPersistMessage {
+                    messages.add(it)
+                    it
+                }
+            }
+        val subAgentOps = SubAgentOpsProvider()
+        subAgentOps.setCreateAgent { name, role, templateName ->
+            SubAgent
+                .fromTemplate(id = "created-${subAgentOps.subAgents.size}", name = name, role = role, templateName = templateName)
+                .also { subAgentOps.subAgents[it.id] = it }
+        }
+        subAgentOps.setSaveSubAgent { savedAgents.add(it) }
+        subAgentOps.setNotifyAgent { agentId, message -> notifications += "$agentId:$message" }
+        val subAgents = subAgentOps.subAgents
         val coordinator =
             AutonomousCoordinator(
                 scope = scope,
                 todoManager = todoManager,
-                subAgents = subAgents,
                 llmProvider = provider,
                 todoStore = todoStore,
                 memoryStore = memoryStore,
                 agentToolConfigService = toolConfig,
                 jobScheduler = scheduler,
-                parallelism = { parallelism },
+                parallelismProvider = parallelismProvider,
                 todoEventBus = todoEventBus,
-                createAgent = { name, role, templateName ->
-                    SubAgent
-                        .fromTemplate(id = "created-${subAgents.size}", name = name, role = role, templateName = templateName)
-                        .also { subAgents[it.id] = it }
-                },
-                saveAgentToDb = { savedAgents += it },
-                notifyAgent = { agentId, message -> notifications += "$agentId:$message" },
-                persistMessage = { messages += it },
+                conversationOps = conversationOps,
+                subAgentOps = subAgentOps,
             )
         return Fixture(coordinator, todoManager, subAgents, notifications, savedAgents, messages, scope)
     }
 
-    private class FakeTodoStore(
-        private val todoManager: TodoManager,
-    ) : TodoStore {
+    private class FakeTodoStore : TodoStore {
+        private val todos = mutableListOf<Todo>()
+
         override fun saveTodo(todo: Todo) {
+            todos.removeIf { it.id == todo.id }
+            todos.add(todo)
         }
 
-        override fun listTodos(): List<Todo> = todoManager.getAll()
+        override fun listTodos(): List<Todo> = todos.toList()
 
         override fun deleteTodo(todoId: String) {
+            todos.removeIf { it.id == todoId }
         }
 
         override fun clearTodos() {
+            todos.clear()
         }
     }
 }

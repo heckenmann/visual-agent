@@ -5,7 +5,7 @@ import de.heckenmann.visualagent.agent.ollama.OllamaToolRecovery
 import de.heckenmann.visualagent.agent.ollama.createOllamaApi
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
-import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.error.ErrorMessageMapper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -33,17 +33,18 @@ class OllamaClient(
     private val promptFactory: OllamaPromptFactory,
     private val toolRecovery: OllamaToolRecovery,
     private val toolRegistry: ToolRegistry,
+    private val appConfig: AppConfigBean = AppConfigBean(),
 ) : LLMProvider {
     private val logger = KotlinLogging.logger {}
-    private val auxiliary = OllamaClientAuxiliary(chatModel, ollamaApi)
-    private val ops = OllamaClientOps(ollamaApi)
+    private val auxiliary = OllamaClientAuxiliary(chatModel, ollamaApi, appConfig)
+    private val ops = OllamaClientOps(ollamaApi, appConfig)
 
     override suspend fun chat(messages: List<Message>): ChatResponse = chat(ChatRequestContext(messages = messages))
 
     override suspend fun chat(request: ChatRequestContext): ChatResponse =
         withContext(Dispatchers.IO) {
             request.cancellationToken?.throwIfCancelled()
-            val selectedModel = request.model ?: AppConfig.instance.ollamaModel
+            val selectedModel = request.model ?: appConfig.ollamaModel
             val allowedFunctionNames = promptFactory.allowedFunctionNames(request, selectedModel)
             val supportsTools = request.modelCapabilities.contains("tools")
             val toolsEnabled = request.enabledTools.isNotEmpty()
@@ -94,7 +95,7 @@ class OllamaClient(
     override suspend fun stream(messages: List<Message>): Flow<ChatResponse> = stream(ChatRequestContext(messages = messages))
 
     override suspend fun stream(request: ChatRequestContext): Flow<ChatResponse> {
-        val selectedModel = request.model ?: AppConfig.instance.ollamaModel
+        val selectedModel = request.model ?: appConfig.ollamaModel
         val allowedFunctionNames = promptFactory.allowedFunctionNames(request, selectedModel)
         val prompt = promptFactory.buildPrompt(request, selectedModel)
         val supportsTools = request.modelCapabilities.contains("tools")
@@ -191,13 +192,13 @@ class OllamaClient(
         val profile = request.providerProfile ?: return chatModel
         return OllamaChatModel
             .builder()
-            .ollamaApi(createOllamaApi(profile))
+            .ollamaApi(createOllamaApi(profile, appConfig))
             .options(OllamaChatOptions.builder().model(request.model ?: profile.defaultModel).build())
             .build()
     }
 
     private fun ollamaApiFor(request: ChatRequestContext): OllamaApi =
         request.providerProfile
-            ?.let { createOllamaApi(it) }
+            ?.let { createOllamaApi(it, appConfig) }
             ?: ollamaApi
 }

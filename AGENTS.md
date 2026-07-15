@@ -114,6 +114,7 @@ See `README.md` for the full tree and the feature status table.
 ## Patterns & Conventions
 
 - **Constructor DI**: required dependencies are direct `private val`/`private var` constructor properties; never reassign them in the class body.
+- **Spring-managed beans**: every class that holds state or provides a service must be a Spring `@Component`, `@Service`, or `@Configuration` bean with constructor injection. No `object` singletons, no `lateinit var` for collaborators, no `AppConfig.instance` outside the bootstrap path. Exceptions: pure-Kotlin stateless utilities (`object` with only `const val` or pure functions), per-composition UI holders (`remember { }`), and data class factories.
 - **DB-first reads**: history, todos, sub-agents, workspace files, preferences are loaded from DB on demand — no long-lived in-memory caches.
 - **Markdown 1:1**: pass conversation message text straight to CommonMark (with `AutolinkExtension`); do not pre-normalize, rewrite, or heuristically transform before parsing.
 - **No legacy desktop toolkit**: do not add `java.awt` / `javax.swing` / `javafx` / `pdfbox.rendering` / `apple.awt` imports. `desktopApiUsageCheck` will fail the build. The single `-Djava.awt.headless=false` JVM arg in `build.gradle.kts` is whitelisted.

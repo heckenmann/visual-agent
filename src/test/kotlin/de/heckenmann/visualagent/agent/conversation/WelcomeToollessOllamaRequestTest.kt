@@ -10,7 +10,7 @@ import de.heckenmann.visualagent.agent.ollama.OllamaPromptFactory
 import de.heckenmann.visualagent.agent.ollama.OllamaToolRecovery
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
-import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.todo.TodoEventBus
 import io.mockk.every
 import io.mockk.mockk
@@ -68,19 +68,19 @@ class WelcomeToollessOllamaRequestTest {
                 .ollamaApi(ollamaApi)
                 .options(OllamaChatOptions.builder().model("welcome-model").build())
                 .build()
-        val toolRegistry = ToolRegistry(emptyList(), ToolEventBus())
+        val appConfig = AppConfigBean(db)
+        val toolRegistry = ToolRegistry(emptyList(), ToolEventBus(), appConfig)
         val promptFactory = OllamaPromptFactory(toolRegistry)
         val toolRecovery = OllamaToolRecovery(chatModel, promptFactory)
-        val ollamaClient = OllamaClient(chatModel, ollamaApi, promptFactory, toolRecovery, toolRegistry)
+        val ollamaClient = OllamaClient(chatModel, ollamaApi, promptFactory, toolRecovery, toolRegistry, appConfig)
 
         val stubbedProvider =
             StubbedConnectionOllamaProvider(
                 delegate = ollamaClient,
                 availableModels = listOf("welcome-model"),
             )
-
-        val previousModel = AppConfig.instance.ollamaModel
-        AppConfig.instance.ollamaModel = "welcome-model"
+        val previousModel = appConfig.ollamaModel
+        appConfig.ollamaModel = "welcome-model"
         try {
             val manager =
                 AgentManager(
@@ -89,6 +89,7 @@ class WelcomeToollessOllamaRequestTest {
                     agentToolConfigService = AgentToolConfigService(db),
                     toolEventBus = ToolEventBus(),
                     todoEventBus = TodoEventBus(),
+                    appConfig = appConfig,
                 )
 
             manager.clearHistory()
@@ -100,7 +101,7 @@ class WelcomeToollessOllamaRequestTest {
                 "Welcome request after clean history must not contain a tools array, but got ${captured.tools()}",
             )
         } finally {
-            AppConfig.instance.ollamaModel = previousModel
+            appConfig.ollamaModel = previousModel
         }
 
         db.close()

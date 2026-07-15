@@ -1,6 +1,6 @@
 package de.heckenmann.visualagent.agent.provider
 
-import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.knowledge.PreferenceStore
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service
 @Service
 class ProviderCatalogService(
     private val preferenceStore: PreferenceStore,
+    private val appConfig: AppConfigBean = AppConfigBean(),
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -74,7 +75,7 @@ class ProviderCatalogService(
                 state.activeProviderId
             }
         save(state.copy(activeProviderId = nextActive, providers = remaining))
-        AppConfig.instance.llmProvider = nextActive
+        appConfig.llmProvider = nextActive
         return true
     }
 
@@ -145,7 +146,7 @@ class ProviderCatalogService(
         require(getProvider(providerId)?.enabled == true) { "Provider is missing or disabled: $providerId" }
         val state = load()
         save(state.copy(activeProviderId = providerId))
-        AppConfig.instance.llmProvider = providerId
+        appConfig.llmProvider = providerId
     }
 
     /**
@@ -196,7 +197,7 @@ class ProviderCatalogService(
 
     private fun migrateLegacyConfiguration() {
         if (preferenceStore.getPreference(KEY_CATALOG) != null) return
-        val config = AppConfig.instance
+        val config = appConfig
         val profiles =
             listOf(
                 ProviderProfile(

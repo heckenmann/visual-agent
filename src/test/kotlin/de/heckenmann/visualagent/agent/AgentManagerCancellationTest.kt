@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.agent
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
+import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoStatus
@@ -30,7 +31,8 @@ class AgentManagerCancellationTest {
                 cancelled.await()
                 flow { throw CancellationException("Cancelled") }
             }
-            val manager = AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus(), TodoEventBus())
+            val manager =
+                AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus(), TodoEventBus(), AppConfigBean(stores))
             val token = CancellationToken()
             val streamJob =
                 launch {
@@ -64,7 +66,8 @@ class AgentManagerCancellationTest {
                 cancelled.await()
                 throw CancellationException("Cancelled")
             }
-            val manager = AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus(), TodoEventBus())
+            val manager =
+                AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus(), TodoEventBus(), AppConfigBean(stores))
             try {
                 val jobId = manager.enqueueAgentJob("test agent", "coder", "researcher", "do work")
                 started.await()
@@ -90,7 +93,8 @@ class AgentManagerCancellationTest {
                 cancelled.await()
                 throw CancellationException("Cancelled")
             }
-            val manager = AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus(), TodoEventBus())
+            val manager =
+                AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus(), TodoEventBus(), AppConfigBean(stores))
             try {
                 val jobId = manager.enqueueAgentJob("test agent", "coder", "researcher", "do work")
                 started.await()
@@ -109,7 +113,7 @@ class AgentManagerCancellationTest {
     fun `cancelSubAgentJob for unknown id returns false`() {
         val stores = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
         val provider = mockk<LLMProvider>(relaxed = true)
-        val manager = AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus(), TodoEventBus())
+        val manager = AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus(), TodoEventBus(), AppConfigBean(stores))
         try {
             assertFalse(manager.cancelSubAgentJob("does-not-exist"))
         } finally {
@@ -122,7 +126,7 @@ class AgentManagerCancellationTest {
     fun `cancelAllActiveTodos cancels every non-terminal todo`() {
         val stores = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
         val provider = mockk<LLMProvider>(relaxed = true)
-        val manager = AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus(), TodoEventBus())
+        val manager = AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus(), TodoEventBus(), AppConfigBean(stores))
         try {
             val pending = manager.todoManager.add("pending task")
             val inProgress = manager.todoManager.add("in progress task")

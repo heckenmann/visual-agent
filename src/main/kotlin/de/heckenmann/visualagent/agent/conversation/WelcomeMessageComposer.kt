@@ -4,8 +4,9 @@ import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
-import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.config.AppConfigBean
 import mu.KotlinLogging
+import org.springframework.stereotype.Component
 
 /**
  * Generates a friendly welcome message after a conversation reset.
@@ -15,22 +16,22 @@ import mu.KotlinLogging
  * provider is unreachable, the configured model is not available, or the chat request
  * fails, a static fallback greeting is persisted so the conversation is never left empty.
  */
-internal object WelcomeMessageComposer {
+@Component
+class WelcomeMessageComposer(
+    private val llmProvider: LLMProvider,
+    private val appConfig: AppConfigBean,
+) {
     private val logger = KotlinLogging.logger {}
 
     /**
      * Composes and persists the post-reset welcome message.
      *
-     * @param llmProvider Provider used to generate the greeting
      * @param persist Callback that stores the resulting assistant message
      * @return Result indicating whether the greeting was generated or a fallback was used
      */
-    suspend fun compose(
-        llmProvider: LLMProvider,
-        persist: (Message) -> Message,
-    ): WelcomeResult {
+    suspend fun compose(persist: (Message) -> Message): WelcomeResult {
         val userInstruction =
-            AppConfig.instance
+            appConfig
                 .userModelInstruction
                 .trim()
 
@@ -40,7 +41,7 @@ internal object WelcomeMessageComposer {
             return WelcomeResult.Fallback(fallback, IllegalStateException("Provider not reachable"))
         }
 
-        val configuredModel = AppConfig.instance.activeModel()
+        val configuredModel = appConfig.activeModel()
         val availableModels = runCatching { llmProvider.getModels() }.getOrDefault(emptyList())
         if (configuredModel.isNotBlank() && configuredModel !in availableModels) {
             logger.warn { "Welcome generation skipped: model '$configuredModel' is not available" }
