@@ -10,7 +10,7 @@
 - Copy dependencies to `./lib/`: `./gradlew copyAllDependencies`.
 - Java toolchain is **JDK 24** (`jvmToolchain(24)`); CI runs on **JDK 21** to let the toolchain resolver fetch 24.
 - The committed tree includes `gradlew` and `gradle/wrapper/gradle-wrapper.jar` is **not** tracked (gitignored). CI uses `gradle` directly (installed by `gradle/actions/setup-gradle`) instead of `./gradlew` to avoid downloading the wrapper distribution. You only need a local Gradle 9.6.x to regenerate the wrapper.
-- `gradle.properties` sets `org.gradle.daemon=false`.
+- `gradle.properties` sets `org.gradle.daemon=true`, `org.gradle.parallel=true`, and `org.gradle.caching=true` for fast local builds.
 
 ## Pre-Commit Quality Gates
 
