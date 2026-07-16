@@ -39,9 +39,12 @@ jobs:
           cache-read-only: false
           cache-cleanup: on-success
           validate-wrappers: false
-          gradle-home-cache-includes: |
-            caches
-            configuration-cache
+
+      - name: Restore configuration cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle/configuration-cache
+          key: gradle-config-cache-${{ runner.os }}-gradle-9.6.1-${{ hashFiles('build.gradle.kts', 'settings.gradle.kts', 'gradle.properties') }}
 
       - name: Run tests
         run: xvfb-run -a gradle test --build-cache --no-daemon
