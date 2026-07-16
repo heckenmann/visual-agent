@@ -36,7 +36,7 @@ jobs:
 
       - name: Generate Gradle wrapper
         run: |
-          if [ ! -f gradlew ]; then
+          if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
             gradle wrapper --no-daemon
           fi
 
