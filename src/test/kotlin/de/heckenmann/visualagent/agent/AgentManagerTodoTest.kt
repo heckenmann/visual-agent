@@ -32,7 +32,7 @@ class AgentManagerTodoTest {
         val provider = mockk<LLMProvider>(relaxed = true)
         coEvery { provider.isConnected() } returns true
         coEvery { provider.chat(any<ChatRequestContext>()) } coAnswers {
-            delay(3000)
+            delay(100)
             ChatResponse(
                 model = "test",
                 message = Message("assistant", "Task completed"),
@@ -50,7 +50,7 @@ class AgentManagerTodoTest {
                 manager.todoManager.add("Research topic X", "1")
 
                 manager.startAutonomousProcessing(seed = false)
-                delay(1200)
+                delay(300)
 
                 val agent = manager.getSubAgents().first { it.id == "1" }
                 assertEquals(AgentStatus.BUSY, agent.status)
@@ -63,7 +63,7 @@ class AgentManagerTodoTest {
         runBlocking {
             useManager { manager ->
                 manager.startAutonomousProcessing(seed = false)
-                delay(800)
+                delay(300)
 
                 assertTrue(manager.getSubAgents().all { it.status == AgentStatus.IDLE })
             }
@@ -77,7 +77,7 @@ class AgentManagerTodoTest {
                 manager.todoManager.add("Orphan task", "1")
 
                 manager.startAutonomousProcessing(seed = false)
-                delay(800)
+                delay(300)
 
                 assertEquals(
                     TodoStatus.PENDING,
@@ -98,7 +98,7 @@ class AgentManagerTodoTest {
                 manager.todoManager.moveToPosition(top.id, 0)
 
                 manager.startAutonomousProcessing(seed = false)
-                delay(1200)
+                delay(400)
 
                 val busyAgent = manager.getSubAgents().first { it.status == AgentStatus.BUSY }
                 assertEquals(top.id, busyAgent.currentTodoId)
@@ -112,7 +112,7 @@ class AgentManagerTodoTest {
                 val todo = manager.todoManager.add("Verify status", "1")
 
                 manager.startAutonomousProcessing(seed = false)
-                delay(1200)
+                delay(400)
 
                 assertEquals(TodoStatus.IN_PROGRESS, manager.todoManager.getById(todo.id)!!.status)
                 assertNotNull(manager.todoManager.getById(todo.id)!!.assignedAgentId)
@@ -126,7 +126,7 @@ class AgentManagerTodoTest {
                 manager.todoManager.add("Solo task", "1")
 
                 manager.startAutonomousProcessing(seed = false)
-                delay(1200)
+                delay(400)
 
                 val busyCount = manager.getSubAgents().count { it.status == AgentStatus.BUSY }
                 assertEquals(1, busyCount)

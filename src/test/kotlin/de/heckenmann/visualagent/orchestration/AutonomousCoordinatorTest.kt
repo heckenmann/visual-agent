@@ -35,13 +35,13 @@ class AutonomousCoordinatorTest {
     @Test
     fun `auto pickup assigns pending todo to idle agent and schedules work`(): Unit =
         runBlocking {
-            val fixture = coordinator(chatDelayMs = 5000)
+            val fixture = coordinator(chatDelayMs = 1000)
             fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
             fixture.todoManager.add("Implement feature", "agent-1")
 
             try {
                 fixture.coordinator.startAutonomousProcessing(seed = false)
-                delay(2000)
+                delay(500)
 
                 assertEquals(AgentStatus.BUSY, fixture.subAgents["agent-1"]?.status)
                 assertTrue(fixture.notifications.any { it.contains("STATUS:BUSY") })
@@ -54,13 +54,13 @@ class AutonomousCoordinatorTest {
     @Test
     fun `auto pickup auto assigns unassigned todo to idle agent`(): Unit =
         runBlocking {
-            val fixture = coordinator(chatDelayMs = 5000)
+            val fixture = coordinator(chatDelayMs = 1000)
             fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
             val todo = fixture.todoManager.add("Implement feature")
 
             try {
                 fixture.coordinator.startAutonomousProcessing(seed = false)
-                delay(2000)
+                delay(500)
 
                 assertEquals("agent-1", todo.assignedAgentId)
                 assertEquals(AgentStatus.BUSY, fixture.subAgents["agent-1"]?.status)
@@ -79,7 +79,7 @@ class AutonomousCoordinatorTest {
 
             try {
                 fixture.coordinator.startAutonomousProcessing(seed = false)
-                delay(800)
+                delay(300)
 
                 assertTrue(fixture.messages.none { it.content.contains("Started todo") })
             } finally {
@@ -95,7 +95,7 @@ class AutonomousCoordinatorTest {
 
             try {
                 fixture.coordinator.startAutonomousProcessing(seed = false)
-                delay(800)
+                delay(300)
 
                 assertTrue(fixture.messages.none { it.content.contains("Started todo") })
             } finally {
@@ -106,7 +106,7 @@ class AutonomousCoordinatorTest {
     @Test
     fun `auto pickup respects parallelism limit`() =
         runBlocking {
-            val fixture = coordinator(parallelism = 1, chatDelayMs = 5000)
+            val fixture = coordinator(parallelism = 1, chatDelayMs = 1000)
             fixture.todoManager.add("Task 1", "agent-1")
             fixture.todoManager.add("Task 2", "agent-2")
             fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
@@ -114,7 +114,7 @@ class AutonomousCoordinatorTest {
 
             try {
                 fixture.coordinator.startAutonomousProcessing(seed = false)
-                delay(1200)
+                delay(400)
 
                 assertEquals(1, fixture.subAgents.values.count { it.status == AgentStatus.BUSY })
             } finally {
@@ -167,7 +167,7 @@ class AutonomousCoordinatorTest {
 
             try {
                 fixture.coordinator.startAutonomousProcessing(seed = false)
-                delay(1000)
+                delay(400)
 
                 val completion = fixture.messages.firstOrNull { it.content.contains("completed todo") }
                 requireNotNull(completion)
@@ -190,7 +190,7 @@ class AutonomousCoordinatorTest {
                 delay(400)
                 fixture.todoManager.update(todo.id, "New description")
 
-                delay(4000)
+                delay(1500)
 
                 assertTrue(fixture.messages.any { it.content.contains("Todo ${todo.id} was updated") })
                 assertTrue(fixture.messages.any { it.content.contains("completed todo ${todo.id}") })
@@ -202,18 +202,18 @@ class AutonomousCoordinatorTest {
     @Test
     fun `coordinator resumes loop when existing todo is reset to PENDING`() =
         runBlocking {
-            val fixture = coordinator(chatDelayMs = 5000)
+            val fixture = coordinator(chatDelayMs = 1000)
             fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
             val todo = fixture.todoManager.add("Implement feature", "agent-1")
             fixture.todoManager.cancelTodo(todo.id)
 
             try {
                 fixture.coordinator.startAutonomousProcessing(seed = false)
-                delay(400)
+                delay(300)
                 assertTrue(fixture.subAgents["agent-1"]?.status == AgentStatus.IDLE)
 
                 fixture.todoManager.updateStatus(todo.id, de.heckenmann.visualagent.todo.TodoStatus.PENDING)
-                delay(2000)
+                delay(600)
 
                 assertEquals(AgentStatus.BUSY, fixture.subAgents["agent-1"]?.status)
                 assertTrue(fixture.messages.any { it.content.contains("Started todo") })
@@ -235,7 +235,7 @@ class AutonomousCoordinatorTest {
                 delay(400)
                 fixture.todoManager.updateAssignedAgent(todo.id, "agent-2")
 
-                delay(2500)
+                delay(800)
 
                 assertTrue(fixture.messages.any { it.content.contains("Stopped because the todo was cancelled, deleted, or reassigned") })
             } finally {

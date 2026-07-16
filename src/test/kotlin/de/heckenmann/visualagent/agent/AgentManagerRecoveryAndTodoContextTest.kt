@@ -79,7 +79,7 @@ class AgentManagerRecoveryAndTodoContextTest {
                 )
             AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
-            delay(600)
+            delay(200)
             val messages = db.getConversationMessages("main")
             assertTrue(messages.any { it.role == "assistant" && it.content.contains("Recovered and continued.") })
             coVerify(atLeast = 1) { provider.chat(any<ChatRequestContext>()) }
@@ -99,7 +99,7 @@ class AgentManagerRecoveryAndTodoContextTest {
             coEvery { provider.chat(any<ChatRequestContext>()) } throws IllegalStateException("401 invalid api key")
             AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
-            delay(600)
+            delay(200)
             val messages = db.getConversationMessages("main")
             assertTrue(
                 messages.any {
