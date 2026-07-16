@@ -79,7 +79,7 @@ fun runVisualAgentComposeApplication() {
         Window(
             onCloseRequest = closeApplication,
             title = AppIdentity.DISPLAY_NAME,
-            icon = painterResource("icons/visual-agent.png"),
+            icon = @Suppress("DEPRECATION") painterResource("icons/visual-agent.png"),
             state = windowState,
         ) {
             VisualAgentComposeApp(

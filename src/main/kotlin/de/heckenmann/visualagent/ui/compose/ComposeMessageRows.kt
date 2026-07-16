@@ -50,6 +50,7 @@ internal fun MessageRow(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    @Suppress("DEPRECATION")
     val clipboard = LocalClipboardManager.current
     val isUser = message.role == "user"
     val backgroundColor = if (isUser) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
