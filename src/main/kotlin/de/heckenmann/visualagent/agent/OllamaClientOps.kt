@@ -2,7 +2,7 @@ package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.ollama.createOllamaApi
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
-import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.config.AppConfigBean
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import mu.KotlinLogging
@@ -16,6 +16,7 @@ import org.springframework.ai.ollama.api.OllamaApi
  */
 internal class OllamaClientOps(
     private val ollamaApi: OllamaApi,
+    private val appConfig: AppConfigBean,
 ) {
     private val logger = KotlinLogging.logger {}
 
@@ -45,7 +46,7 @@ internal class OllamaClientOps(
      */
     suspend fun getModels(): List<String> =
         withContext(Dispatchers.IO) {
-            val configuredModel = AppConfig.instance.ollamaModel
+            val configuredModel = appConfig.ollamaModel
             try {
                 val models =
                     ollamaApi
@@ -69,7 +70,7 @@ internal class OllamaClientOps(
     suspend fun getModels(profile: ProviderProfile): List<String> =
         withContext(Dispatchers.IO) {
             val models =
-                createOllamaApi(profile)
+                createOllamaApi(profile, appConfig)
                     .listModels()
                     .models()
                     .mapNotNull { model -> model.name() }
@@ -89,7 +90,7 @@ internal class OllamaClientOps(
         modelName: String,
     ): ShowResponse =
         withContext(Dispatchers.IO) {
-            val response = createOllamaApi(profile).showModel(OllamaApi.ShowModelRequest(modelName))
+            val response = createOllamaApi(profile, appConfig).showModel(OllamaApi.ShowModelRequest(modelName))
             ShowResponse(
                 model = modelName,
                 modifiedAt = "",

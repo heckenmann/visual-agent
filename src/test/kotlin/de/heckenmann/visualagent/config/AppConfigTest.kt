@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.config
 
+import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.config.ThemeMode
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull

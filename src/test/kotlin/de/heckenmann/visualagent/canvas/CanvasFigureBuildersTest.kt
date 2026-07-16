@@ -1,7 +1,11 @@
 package de.heckenmann.visualagent.canvas
 
 import de.heckenmann.visualagent.error.CanvasOperationException
+import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
+import de.heckenmann.visualagent.knowledge.WorkspaceFileStore
+import de.heckenmann.visualagent.workspace.WorkspaceFileService
 import org.junit.jupiter.api.Test
+import java.nio.file.Files
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
@@ -53,39 +57,32 @@ class CanvasFigureBuildersTest {
 
     @Test
     fun `requireFigure throws for missing index`() {
-        val previous = de.heckenmann.visualagent.config.AppConfig.instance.databasePath
-        try {
-            de.heckenmann.visualagent.config.AppConfig.instance.databasePath =
-                java.nio.file.Files
-                    .createTempDirectory("visual-agent-figure-test")
-                    .resolve("data/visual-agent.db")
-                    .toString()
-            val service =
-                InMemoryCanvasService(
-                    workspaceFileService =
-                        de.heckenmann.visualagent.workspace.WorkspaceFileService(
-                            object : de.heckenmann.visualagent.knowledge.WorkspaceFileStore {
-                                override fun saveWorkspaceFile(record: de.heckenmann.visualagent.knowledge.WorkspaceFileRecord) {}
+        val dbPath =
+            Files
+                .createTempDirectory("visual-agent-figure-test")
+                .resolve("data/visual-agent.db")
+                .toString()
+        val service =
+            InMemoryCanvasService(
+                workspaceFileService =
+                    WorkspaceFileService(
+                        object : WorkspaceFileStore {
+                            override fun saveWorkspaceFile(record: WorkspaceFileRecord) {}
 
-                                override fun listWorkspaceFiles(): List<de.heckenmann.visualagent.knowledge.WorkspaceFileRecord> =
-                                    emptyList()
+                            override fun listWorkspaceFiles(): List<WorkspaceFileRecord> = emptyList()
 
-                                override fun getWorkspaceFile(id: String): de.heckenmann.visualagent.knowledge.WorkspaceFileRecord? = null
+                            override fun getWorkspaceFile(id: String): WorkspaceFileRecord? = null
 
-                                override fun getWorkspaceFileByPath(
-                                    relativePath: String,
-                                ): de.heckenmann.visualagent.knowledge.WorkspaceFileRecord? = null
+                            override fun getWorkspaceFileByPath(relativePath: String): WorkspaceFileRecord? = null
 
-                                override fun deleteWorkspaceFile(id: String): Boolean = false
-                            },
-                        ),
-                )
+                            override fun deleteWorkspaceFile(id: String): Boolean = false
+                        },
+                        dbPath,
+                    ),
+            )
 
-            assertFailsWith<CanvasOperationException> {
-                service.requireFigure(0)
-            }
-        } finally {
-            de.heckenmann.visualagent.config.AppConfig.instance.databasePath = previous
+        assertFailsWith<CanvasOperationException> {
+            service.requireFigure(0)
         }
     }
 }

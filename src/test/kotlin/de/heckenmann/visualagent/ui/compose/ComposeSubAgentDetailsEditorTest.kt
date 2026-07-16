@@ -9,6 +9,7 @@ import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
+import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
 import de.heckenmann.visualagent.todo.TodoEventBus
 import io.mockk.every
@@ -24,7 +25,7 @@ class ComposeSubAgentDetailsEditorTest {
     fun `sub agent details editor renders configuration fields`() {
         val db = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
         val provider = mockk<de.heckenmann.visualagent.agent.LLMProvider>(relaxed = true)
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
         val agent = manager.createAgent("Worker", "coder")
         val toolConfigService = AgentToolConfigService(db)
         val toolRegistry = mockk<ToolRegistry>()
@@ -56,7 +57,7 @@ class ComposeSubAgentDetailsEditorTest {
     fun `sub agents panel renders creation controls and empty state`() {
         val db = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
         val provider = mockk<de.heckenmann.visualagent.agent.LLMProvider>(relaxed = true)
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
         val toolConfigService = AgentToolConfigService(db)
         val toolRegistry = mockk<ToolRegistry>()
         every { toolRegistry.toolDefinitions() } returns emptyList()

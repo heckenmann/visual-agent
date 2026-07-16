@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.agent
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
+import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.todo.TodoEventBus
 import io.mockk.mockk
 import org.junit.jupiter.api.Test
@@ -17,7 +18,7 @@ class AgentManagerLifecycleOpsTest {
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                 .create("jdbc:sqlite::memory:")
         val provider = mockk<LLMProvider>(relaxed = true)
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
         manager.todoManager.add("first")
         manager.todoManager.add("second")
 
@@ -32,7 +33,7 @@ class AgentManagerLifecycleOpsTest {
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                 .create("jdbc:sqlite::memory:")
         val provider = mockk<LLMProvider>(relaxed = true)
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
         manager.todoManager.add("one")
         manager.todoManager.add("two")
         val todos = manager.todoManager.getAll()
@@ -53,7 +54,7 @@ class AgentManagerLifecycleOpsTest {
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                 .create("jdbc:sqlite::memory:")
         val provider = mockk<LLMProvider>(relaxed = true)
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
         val agent = manager.createAgent("Worker", "Worker role")
         val config = AgentConfig(timeout = 999)
 
@@ -73,7 +74,7 @@ class AgentManagerLifecycleOpsTest {
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                 .create("jdbc:sqlite::memory:")
         val provider = mockk<LLMProvider>(relaxed = true)
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
         assertFalse(manager.updateAgent("missing", "Name", "Role"))
     }
@@ -84,7 +85,7 @@ class AgentManagerLifecycleOpsTest {
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                 .create("jdbc:sqlite::memory:")
         val provider = mockk<LLMProvider>(relaxed = true)
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
         val agent = manager.createAgent("Worker", "Worker role")
 
         val deleted = manager.deleteAgent(agent.id)
@@ -100,7 +101,7 @@ class AgentManagerLifecycleOpsTest {
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                 .create("jdbc:sqlite::memory:")
         val provider = mockk<LLMProvider>(relaxed = true)
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
         assertFalse(manager.deleteAgent("missing"))
     }
@@ -111,7 +112,7 @@ class AgentManagerLifecycleOpsTest {
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                 .create("jdbc:sqlite::memory:")
         val provider = mockk<LLMProvider>(relaxed = true)
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
         val agent = manager.createAgent("Worker", "Worker role")
 
         val fromDb = manager.getSubAgentsFromDb()
@@ -125,7 +126,7 @@ class AgentManagerLifecycleOpsTest {
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                 .create("jdbc:sqlite::memory:")
         val provider = mockk<LLMProvider>(relaxed = true)
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
         val agent = manager.createAgent("Worker", "Worker role")
         db.saveAgent(
             de.heckenmann.visualagent.knowledge.PersistedSubAgent(

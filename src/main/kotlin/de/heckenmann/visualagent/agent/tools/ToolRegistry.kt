@@ -3,7 +3,7 @@ package de.heckenmann.visualagent.agent.tools
 import de.heckenmann.visualagent.agent.ToolDefinition
 import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.agent.ToolResult
-import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.config.AppConfigBean
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.springframework.ai.chat.model.ToolContext
@@ -25,6 +25,7 @@ import org.springframework.ai.tool.definition.ToolDefinition as SpringToolDefini
 class ToolRegistry(
     tools: List<VisualAgentTool>,
     private val toolEventBus: ToolEventBus,
+    private val appConfig: AppConfigBean = AppConfigBean(),
 ) : DisposableBean {
     private val toolsById = tools.associateBy { it.definition.id }
     private val executor = Executors.newCachedThreadPool()
@@ -91,7 +92,7 @@ class ToolRegistry(
                 ): String {
                     val effectiveContext = context + (toolContext?.context ?: emptyMap())
                     val inputObject = parseObject(functionInput)
-                    val options = runtimeOptions(inputObject, AppConfig.instance.timeoutSeconds)
+                    val options = runtimeOptions(inputObject, appConfig.timeoutSeconds)
                     val startedAt = Instant.now()
                     toolEventBus.publish(
                         ToolCallEvent(

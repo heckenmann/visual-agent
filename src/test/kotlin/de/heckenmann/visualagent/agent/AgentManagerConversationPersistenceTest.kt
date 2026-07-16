@@ -2,6 +2,7 @@ package de.heckenmann.visualagent.agent
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.conversation.WelcomeResult
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
+import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.todo.TodoEventBus
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -26,7 +27,7 @@ class AgentManagerConversationPersistenceTest {
                 message = Message("assistant", "Saved response"),
                 done = true,
             )
-        val manager1 = AgentManager(db1, provider1, AgentToolConfigService(db1), ToolEventBus(), TodoEventBus())
+        val manager1 = AgentManager(db1, provider1, AgentToolConfigService(db1), ToolEventBus(), TodoEventBus(), AppConfigBean(db1))
 
         kotlinx.coroutines.runBlocking {
             manager1.sendMessage("Persist me")
@@ -38,7 +39,7 @@ class AgentManagerConversationPersistenceTest {
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                 .create(tempDb)
         val provider2 = mockk<LLMProvider>(relaxed = true)
-        val manager2 = AgentManager(db2, provider2, AgentToolConfigService(db2), ToolEventBus(), TodoEventBus())
+        val manager2 = AgentManager(db2, provider2, AgentToolConfigService(db2), ToolEventBus(), TodoEventBus(), AppConfigBean(db2))
         val loaded = manager2.getHistory()
         assertEquals(2, loaded.size)
         assertEquals("user", loaded[0].role)
@@ -59,7 +60,7 @@ class AgentManagerConversationPersistenceTest {
         }
 
         val provider = mockk<LLMProvider>(relaxed = true)
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
         val initial = manager.getHistory()
         assertEquals(20, initial.size)
         assertTrue(initial.first().content.contains("message-10"))
@@ -88,7 +89,7 @@ class AgentManagerConversationPersistenceTest {
                 message = Message("assistant", "Hello, I can help with files, todos, code, terminal, and project context."),
                 done = true,
             )
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
         manager.clearHistory()
         val welcome =
@@ -122,7 +123,7 @@ class AgentManagerConversationPersistenceTest {
         coEvery { provider.getModels() } returns listOf("llava")
         coEvery { provider.chat(any<ChatRequestContext>()) } throws
             IllegalStateException("Provider timeout")
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
         manager.clearHistory()
         val result =
@@ -155,10 +156,11 @@ class AgentManagerConversationPersistenceTest {
                 message = Message("assistant", "Guten Tag!"),
                 done = true,
             )
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
-        val previousInstruction = de.heckenmann.visualagent.config.AppConfig.instance.userModelInstruction
+        val appConfig = AppConfigBean(db)
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), appConfig)
+        val previousInstruction = appConfig.userModelInstruction
         try {
-            de.heckenmann.visualagent.config.AppConfig.instance.userModelInstruction = "Always answer in German."
+            appConfig.userModelInstruction = "Always answer in German."
             manager.clearHistory()
             val result =
                 kotlinx.coroutines.runBlocking {
@@ -172,7 +174,7 @@ class AgentManagerConversationPersistenceTest {
             assertTrue(messages[0].content.contains("Greet the user after a conversation reset"))
             assertTrue(messages[0].content.contains("Always answer in German."))
         } finally {
-            de.heckenmann.visualagent.config.AppConfig.instance.userModelInstruction = previousInstruction
+            appConfig.userModelInstruction = previousInstruction
         }
         db.close()
     }
@@ -198,7 +200,7 @@ class AgentManagerConversationPersistenceTest {
                     done = true,
                 ),
             )
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
         val answer =
             kotlinx.coroutines.runBlocking {
@@ -230,7 +232,7 @@ class AgentManagerConversationPersistenceTest {
                 message = Message("assistant", "Hello!"),
                 done = true,
             )
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
         manager.clearHistory()
         kotlinx.coroutines.runBlocking {

@@ -3,7 +3,7 @@ package de.heckenmann.visualagent.agent.ollama
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.databind.ObjectMapper
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
-import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.config.AppConfigBean
 import io.netty.channel.ChannelOption
 import org.springframework.ai.ollama.api.OllamaApi
 import org.springframework.context.annotation.Bean
@@ -23,7 +23,9 @@ import java.time.Duration
  * Creates the Ollama API client with authentication for secured endpoints.
  */
 @Configuration
-class OllamaApiConfiguration {
+class OllamaApiConfiguration(
+    private val appConfig: AppConfigBean,
+) {
     /**
      * Creates the shared Ollama API client.
      *
@@ -32,20 +34,23 @@ class OllamaApiConfiguration {
      * @return Ollama API client configured with the persisted endpoint and optional bearer token
      */
     @Bean
-    fun ollamaApi(): OllamaApi = createOllamaApi(AppConfig.instance)
+    fun ollamaApi(): OllamaApi = createOllamaApi(appConfig)
 }
 
-internal fun createOllamaApi(config: AppConfig): OllamaApi =
+internal fun createOllamaApi(config: AppConfigBean): OllamaApi =
     createOllamaApi(
         baseUrl = config.ollamaLocalUrl,
         timeoutSeconds = config.timeoutSeconds,
         apiKey = { config.ollamaApiKey },
     )
 
-internal fun createOllamaApi(profile: ProviderProfile): OllamaApi =
+internal fun createOllamaApi(
+    profile: ProviderProfile,
+    appConfig: AppConfigBean,
+): OllamaApi =
     createOllamaApi(
         baseUrl = profile.baseUrl,
-        timeoutSeconds = profile.options["timeoutSeconds"]?.toIntOrNull() ?: AppConfig.instance.timeoutSeconds,
+        timeoutSeconds = profile.options["timeoutSeconds"]?.toIntOrNull() ?: appConfig.timeoutSeconds,
         apiKey = { profile.apiKey },
     )
 

@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.todo
 
+import de.heckenmann.visualagent.knowledge.TodoStore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -8,13 +9,15 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class TodoManagerTest {
-    private val manager = TodoManager()
+    private val eventBus = TodoEventBus()
+    private val store = InMemoryTodoStore()
+    private val manager = TodoManager(store, eventBus)
 
     @Test
     fun `add persists new todo to store when store is provided`() {
         val saved = mutableListOf<Todo>()
-        val store =
-            object : de.heckenmann.visualagent.knowledge.TodoStore {
+        val testStore =
+            object : TodoStore {
                 override fun saveTodo(todo: Todo) {
                     saved += todo
                 }
@@ -29,7 +32,7 @@ class TodoManagerTest {
                     saved.clear()
                 }
             }
-        val managerWithStore = TodoManager(todoStore = store)
+        val managerWithStore = TodoManager(testStore, TodoEventBus())
 
         val todo = managerWithStore.add("Persist me")
 
@@ -147,15 +150,16 @@ class TodoManagerTest {
     @Test
     fun `updateStatus publishes update and manages completed timestamp`() {
         val changes = mutableListOf<TodoChange>()
-        val manager = TodoManager(onChange = changes::add)
-        val todo = manager.add("Status task")
+        val testManager = TodoManager(store, eventBus)
+        testManager.addListener { changes.add(it) }
+        val todo = testManager.add("Status task")
 
-        assertTrue(manager.updateStatus(todo.id, TodoStatus.COMPLETED))
+        assertTrue(testManager.updateStatus(todo.id, TodoStatus.COMPLETED))
         assertEquals(TodoStatus.COMPLETED, todo.status)
         assertNotNull(todo.completedAt)
         assertEquals(TodoChangeType.UPDATED, changes.last().type)
 
-        assertTrue(manager.updateStatus(todo.id, TodoStatus.PENDING))
+        assertTrue(testManager.updateStatus(todo.id, TodoStatus.PENDING))
         assertEquals(TodoStatus.PENDING, todo.status)
         assertNull(todo.completedAt)
         assertEquals(TodoChangeType.UPDATED, changes.last().type)
@@ -269,5 +273,24 @@ class TodoManagerTest {
         manager.completeTodo(todo.id)
         assertEquals(TodoStatus.COMPLETED, todo.status)
         assertNotNull(todo.completedAt)
+    }
+}
+
+private class InMemoryTodoStore : TodoStore {
+    private val todos = mutableListOf<Todo>()
+
+    override fun saveTodo(todo: Todo) {
+        todos.removeIf { it.id == todo.id }
+        todos.add(todo)
+    }
+
+    override fun listTodos(): List<Todo> = todos.toList()
+
+    override fun deleteTodo(todoId: String) {
+        todos.removeIf { it.id == todoId }
+    }
+
+    override fun clearTodos() {
+        todos.clear()
     }
 }

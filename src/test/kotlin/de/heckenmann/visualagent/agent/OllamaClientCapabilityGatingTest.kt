@@ -2,6 +2,7 @@ package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
+import de.heckenmann.visualagent.config.AppConfigBean
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -29,7 +30,7 @@ class OllamaClientCapabilityGatingTest {
         runTest {
             val chatModel = mockk<ChatModel>()
             val ollamaApi = mockk<OllamaApi>()
-            val registry = ToolRegistry(listOf(FakeTool("context")), ToolEventBus())
+            val registry = ToolRegistry(listOf(FakeTool("context")), ToolEventBus(), AppConfigBean())
             every { ollamaApi.chat(any()) } returns
                 OllamaApi.ChatResponse(
                     "no-tools-model",
@@ -66,7 +67,7 @@ class OllamaClientCapabilityGatingTest {
         runTest {
             val chatModel = mockk<ChatModel>()
             val ollamaApi = mockk<OllamaApi>()
-            val registry = ToolRegistry(listOf(FakeTool("context")), ToolEventBus())
+            val registry = ToolRegistry(listOf(FakeTool("context")), ToolEventBus(), AppConfigBean())
             every { ollamaApi.streamingChat(any()) } returns
                 Flux.just(
                     OllamaApi.ChatResponse(
@@ -107,7 +108,7 @@ class OllamaClientCapabilityGatingTest {
         runTest {
             val chatModel = mockk<ChatModel>()
             val ollamaApi = mockk<OllamaApi>(relaxed = true)
-            val registry = ToolRegistry(listOf(FakeTool("context")), ToolEventBus())
+            val registry = ToolRegistry(listOf(FakeTool("context")), ToolEventBus(), AppConfigBean())
             every { chatModel.call(any<Prompt>()) } answers {
                 val options = firstArg<Prompt>().options as ToolCallingChatOptions
                 assertTrue(options.toolCallbacks.orEmpty().isNotEmpty())

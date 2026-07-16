@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent.provider
 
+import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.knowledge.PreferenceStore
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
@@ -11,7 +12,7 @@ class ProviderCatalogServiceTest {
     @Test
     fun `legacy settings migrate into persisted provider profiles`() {
         val store = MapPreferenceStore()
-        val catalog = ProviderCatalogService(store)
+        val catalog = ProviderCatalogService(store, AppConfigBean(store))
 
         assertNotNull(catalog.getProvider("ollama"))
         assertNotNull(catalog.getProvider("openai"))

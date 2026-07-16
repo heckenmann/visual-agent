@@ -7,19 +7,21 @@ import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.canvas.CanvasOperations
-import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
 import de.heckenmann.visualagent.workspace.layout.WorkspaceWindowState
+import org.springframework.stereotype.Component
 import kotlin.math.max
 
 /**
  * Lifecycle state for the Compose desktop application.
  *
- * The single instance is owned by the application entry point and shared with panels through
+ * The single instance is owned by the Spring context and shared with panels through
  * [ComposePanelServices]. Panels can read [closing] to skip side effects (coroutines, network calls,
  * file writes) while the application is shutting down.
  */
+@Component
 class ApplicationLifecycle {
     /**
      * True once [beginShutdown] has been called. No new user-facing work should be started after
@@ -27,7 +29,6 @@ class ApplicationLifecycle {
      */
     @Volatile
     var closing: Boolean = false
-        private set
 
     /**
      * Marks the application as shutting down. Must be called before tearing down Spring / Compose.
@@ -283,7 +284,7 @@ const val WORKSPACE_PANEL_RESIZER_WIDTH: Int = 12
  * Keeping this bundle explicit avoids hidden global lookups from individual composables.
  */
 data class ComposePanelServices(
-    val config: AppConfig,
+    val config: AppConfigBean,
     val agentManager: AgentManager,
     val llmProvider: LLMProvider,
     val providerCatalogService: ProviderCatalogService,

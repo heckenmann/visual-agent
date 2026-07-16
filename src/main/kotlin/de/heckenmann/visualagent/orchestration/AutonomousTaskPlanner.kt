@@ -15,7 +15,7 @@ import de.heckenmann.visualagent.todo.TodoStatus
  */
 internal class AutonomousTaskPlanner(
     private val todoManager: TodoManager,
-    private val subAgents: MutableMap<String, SubAgent>,
+    private val subAgents: Map<String, SubAgent>,
     private val llmProvider: LLMProvider,
     private val agentToolConfigService: AgentToolConfigService,
     private val createAgent: (name: String, role: String, templateName: String) -> SubAgent,

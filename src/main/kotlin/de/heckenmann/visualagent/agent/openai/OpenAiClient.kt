@@ -11,7 +11,7 @@ import de.heckenmann.visualagent.agent.ToolCallingLoop
 import de.heckenmann.visualagent.agent.VisionSupport
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
-import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.config.AppConfigBean
 import io.micrometer.observation.ObservationRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -38,12 +38,13 @@ import java.time.Duration
 class OpenAiClient(
     private val promptFactory: OpenAiPromptFactory,
     private val toolRegistry: ToolRegistry,
+    private val appConfig: AppConfigBean = AppConfigBean(),
 ) : LLMProvider {
     override suspend fun chat(messages: List<Message>): ChatResponse = chat(ChatRequestContext(messages = messages))
 
     override suspend fun chat(request: ChatRequestContext): ChatResponse =
         withContext(Dispatchers.IO) {
-            val selectedModel = request.model ?: AppConfig.instance.openAiModel
+            val selectedModel = request.model ?: appConfig.openAiModel
             val prompt = promptFactory.buildPrompt(request, selectedModel)
             val model = chatModel(request.providerProfile)
             request.cancellationToken?.throwIfCancelled()
@@ -67,7 +68,7 @@ class OpenAiClient(
     override suspend fun stream(messages: List<Message>): Flow<ChatResponse> = stream(ChatRequestContext(messages = messages))
 
     override suspend fun stream(request: ChatRequestContext): Flow<ChatResponse> {
-        val selectedModel = request.model ?: AppConfig.instance.openAiModel
+        val selectedModel = request.model ?: appConfig.openAiModel
         val prompt = promptFactory.buildPrompt(request, selectedModel)
         val model = chatModel(request.providerProfile)
         val toolCallbacks =
@@ -115,7 +116,7 @@ class OpenAiClient(
         prompt: String,
     ): ChatResponse =
         withContext(Dispatchers.IO) {
-            val selectedModel = AppConfig.instance.openAiModel
+            val selectedModel = appConfig.openAiModel
             val response =
                 chatModel()
                     .call(
@@ -145,7 +146,7 @@ class OpenAiClient(
 
     override suspend fun embeddings(text: String): List<Double> = emptyList()
 
-    override fun isConnected(): Boolean = AppConfig.instance.openAiApiKey.isNotBlank()
+    override fun isConnected(): Boolean = appConfig.openAiApiKey.isNotBlank()
 
     override suspend fun checkConnection(): Boolean =
         withContext(Dispatchers.IO) {
@@ -154,7 +155,7 @@ class OpenAiClient(
 
     override suspend fun getModels(): List<String> =
         withContext(Dispatchers.IO) {
-            if (AppConfig.instance.openAiApiKey.isBlank()) {
+            if (appConfig.openAiApiKey.isBlank()) {
                 throw IllegalStateException("OpenAI API key is not configured")
             }
             try {
@@ -190,10 +191,10 @@ class OpenAiClient(
         }
 
     private fun chatModel(profile: ProviderProfile? = null): ChatModel {
-        val configuredBaseUrl = profile?.baseUrl ?: AppConfig.instance.openAiBaseUrl
-        val apiKey = apiKeyFor(configuredBaseUrl, profile?.apiKey ?: AppConfig.instance.openAiApiKey)
+        val configuredBaseUrl = profile?.baseUrl ?: appConfig.openAiBaseUrl
+        val apiKey = apiKeyFor(configuredBaseUrl, profile?.apiKey ?: appConfig.openAiApiKey)
         val baseUrl = OpenAiEndpointNormalizer.apiBaseUrl(configuredBaseUrl)
-        val model = profile?.defaultModel ?: AppConfig.instance.openAiModel
+        val model = profile?.defaultModel ?: appConfig.openAiModel
         val options =
             OpenAiChatOptions
                 .builder()
@@ -244,14 +245,14 @@ class OpenAiClient(
     private fun openAiClient(): OpenAIClient =
         OpenAiSetup.setupSyncClient(
             apiBaseUrl(),
-            AppConfig.instance.openAiApiKey,
+            appConfig.openAiApiKey,
             null,
             null,
             null,
             null,
             false,
             false,
-            AppConfig.instance.openAiModel,
+            appConfig.openAiModel,
             Duration.ofSeconds(20),
             2,
             null,
@@ -261,7 +262,7 @@ class OpenAiClient(
             emptyList(),
         )
 
-    private fun apiBaseUrl(): String = OpenAiEndpointNormalizer.apiBaseUrl(AppConfig.instance.openAiBaseUrl)
+    private fun apiBaseUrl(): String = OpenAiEndpointNormalizer.apiBaseUrl(appConfig.openAiBaseUrl)
 
     private fun modelsUri(): URI = URI.create("${apiBaseUrl()}/models")
 

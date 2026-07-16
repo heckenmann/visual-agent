@@ -8,7 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTextInput
-import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.config.ThemeMode
 import org.junit.Rule
 import org.junit.Test
@@ -36,7 +36,7 @@ class ComposeSettingsExecutionAndAppearanceSectionTest {
 
             MaterialTheme {
                 SettingsExecutionAndAppearanceSection(
-                    config = AppConfig.instance,
+                    config = AppConfigBean(),
                     contextLength = contextLength.value,
                     loadLimit = loadLimit.value,
                     maxParallelSubAgents = parallel.value,
@@ -79,7 +79,7 @@ class ComposeSettingsExecutionAndAppearanceSectionTest {
         composeTestRule.setContent {
             MaterialTheme {
                 SettingsExecutionAndAppearanceSection(
-                    config = AppConfig.instance,
+                    config = AppConfigBean(),
                     contextLength = 4096,
                     loadLimit = "50",
                     maxParallelSubAgents = "4",
@@ -112,7 +112,7 @@ class ComposeSettingsExecutionAndAppearanceSectionTest {
         composeTestRule.setContent {
             MaterialTheme {
                 SettingsExecutionAndAppearanceSection(
-                    config = AppConfig.instance,
+                    config = AppConfigBean(),
                     contextLength = 4096,
                     loadLimit = "50",
                     maxParallelSubAgents = "4",
@@ -149,7 +149,7 @@ class ComposeSettingsExecutionAndAppearanceSectionTest {
         composeTestRule.setContent {
             MaterialTheme {
                 SettingsExecutionAndAppearanceSection(
-                    config = AppConfig.instance,
+                    config = AppConfigBean(),
                     contextLength = 4096,
                     loadLimit = "50",
                     maxParallelSubAgents = "4",
@@ -182,7 +182,7 @@ class ComposeSettingsExecutionAndAppearanceSectionTest {
         composeTestRule.setContent {
             MaterialTheme {
                 SettingsExecutionAndAppearanceSection(
-                    config = AppConfig.instance,
+                    config = AppConfigBean(),
                     contextLength = 4096,
                     loadLimit = "50",
                     maxParallelSubAgents = "4",
@@ -219,7 +219,7 @@ class ComposeSettingsExecutionAndAppearanceSectionTest {
         composeTestRule.setContent {
             MaterialTheme {
                 SettingsExecutionAndAppearanceSection(
-                    config = AppConfig.instance,
+                    config = AppConfigBean(),
                     contextLength = 4096,
                     loadLimit = loadLimit,
                     maxParallelSubAgents = "4",

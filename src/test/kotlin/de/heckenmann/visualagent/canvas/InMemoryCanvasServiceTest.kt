@@ -1,6 +1,5 @@
 package de.heckenmann.visualagent.canvas
 
-import de.heckenmann.visualagent.config.AppConfig
 import de.heckenmann.visualagent.error.CanvasOperationException
 import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
 import de.heckenmann.visualagent.knowledge.WorkspaceFileStore
@@ -268,14 +267,9 @@ class InMemoryCanvasServiceTest {
         }
 
     private fun withCanvasService(block: (InMemoryCanvasService, WorkspaceFileService) -> Unit) {
-        val previous = AppConfig.instance.databasePath
-        try {
-            AppConfig.instance.databasePath = tempDir().resolve("data/visual-agent.db").toString()
-            val workspace = WorkspaceFileService(FakeWorkspaceFileStore())
-            block(InMemoryCanvasService(workspace), workspace)
-        } finally {
-            AppConfig.instance.databasePath = previous
-        }
+        val dbPath = tempDir().resolve("data/visual-agent.db").toString()
+        val workspace = WorkspaceFileService(FakeWorkspaceFileStore(), dbPath)
+        block(InMemoryCanvasService(workspace), workspace)
     }
 
     private fun tempDir(): Path = Files.createTempDirectory("visual-agent-canvas-test")

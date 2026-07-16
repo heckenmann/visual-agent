@@ -9,6 +9,7 @@ import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.agent.tools.VisualAgentTool
 import de.heckenmann.visualagent.agent.tools.toFunctionName
+import de.heckenmann.visualagent.config.AppConfigBean
 import org.junit.jupiter.api.Test
 import org.springframework.ai.ollama.api.OllamaChatOptions
 import kotlin.test.assertEquals
@@ -20,7 +21,7 @@ import kotlin.test.assertTrue
 class OllamaPromptFactoryTest {
     @Test
     fun `buildPrompt omits tool options when model lacks tools capability`() {
-        val registry = ToolRegistry(listOf(FakeTool("todos")), ToolEventBus())
+        val registry = ToolRegistry(listOf(FakeTool("todos")), ToolEventBus(), AppConfigBean())
         val factory = OllamaPromptFactory(registry)
         val request =
             ChatRequestContext(
@@ -39,7 +40,7 @@ class OllamaPromptFactoryTest {
 
     @Test
     fun `buildPrompt includes tool options when model supports tools and tools are enabled`() {
-        val registry = ToolRegistry(listOf(FakeTool("todos")), ToolEventBus())
+        val registry = ToolRegistry(listOf(FakeTool("todos")), ToolEventBus(), AppConfigBean())
         val factory = OllamaPromptFactory(registry)
         val request =
             ChatRequestContext(
@@ -58,7 +59,7 @@ class OllamaPromptFactoryTest {
 
     @Test
     fun `buildPrompt omits tool options when model supports tools but no tools are enabled`() {
-        val registry = ToolRegistry(listOf(FakeTool("todos")), ToolEventBus())
+        val registry = ToolRegistry(listOf(FakeTool("todos")), ToolEventBus(), AppConfigBean())
         val factory = OllamaPromptFactory(registry)
         val request =
             ChatRequestContext(

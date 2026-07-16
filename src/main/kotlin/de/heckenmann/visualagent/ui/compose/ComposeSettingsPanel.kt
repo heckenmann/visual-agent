@@ -23,7 +23,7 @@ import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderErrorMessages
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
-import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.error.ErrorMessageMapper
 import kotlinx.coroutines.launch
 
@@ -43,7 +43,7 @@ import kotlinx.coroutines.launch
  */
 @Composable
 internal fun SettingsPanel(
-    config: AppConfig,
+    config: AppConfigBean,
     llmProvider: LLMProvider,
     providerCatalogService: ProviderCatalogService,
     modalRequester: ComposeModalRequester,

@@ -2,6 +2,7 @@ package de.heckenmann.visualagent.agent
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
+import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.todo.TodoEventBus
 import io.mockk.coEvery
 import io.mockk.mockk
@@ -19,7 +20,7 @@ class AgentManagerConversationOpsTest {
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                 .create("jdbc:sqlite::memory:")
         val provider = mockk<LLMProvider>(relaxed = true)
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
         manager.appendSystemMessage("context")
 
         manager.clearHistory()
@@ -34,10 +35,10 @@ class AgentManagerConversationOpsTest {
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                 .create("jdbc:sqlite::memory:")
         val provider = mockk<LLMProvider>(relaxed = true)
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
         manager.appendSystemMessage("first")
         val id = db.saveConversationMessage("main", "user", "second")
-        val manager2 = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+        val manager2 = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
         manager2.deleteMessageById(id)
 
@@ -51,7 +52,7 @@ class AgentManagerConversationOpsTest {
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                 .create("jdbc:sqlite::memory:")
         val provider = mockk<LLMProvider>(relaxed = true)
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
         manager.appendSystemMessage("old")
         val id = manager.getHistory().single().id
 
@@ -67,7 +68,7 @@ class AgentManagerConversationOpsTest {
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                 .create("jdbc:sqlite::memory:")
         val provider = mockk<LLMProvider>(relaxed = true)
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
         val now = Instant.now()
         val event =
             ToolCallEvent(
@@ -103,7 +104,7 @@ class AgentManagerConversationOpsTest {
                 de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                     .create("jdbc:sqlite::memory:")
             val provider = mockk<LLMProvider>(relaxed = true)
-            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
             coEvery { provider.chat(any<ChatRequestContext>()) } returns
                 ChatResponse(
                     model = "test",
@@ -125,7 +126,7 @@ class AgentManagerConversationOpsTest {
                 de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                     .create("jdbc:sqlite::memory:")
             val provider = mockk<LLMProvider>(relaxed = true)
-            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
             val answer = manager.sendMessageToAgent("missing", "Do work")
 
@@ -138,7 +139,7 @@ class AgentManagerConversationOpsTest {
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                 .create("jdbc:sqlite::memory:")
         val provider = mockk<LLMProvider>(relaxed = true)
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
         manager.appendSystemMessage("You are helpful.")
 
@@ -158,7 +159,7 @@ class AgentManagerConversationOpsTest {
                     ChatResponse(model = "test", message = Message("assistant", "Hello"), done = false),
                     ChatResponse(model = "test", message = Message("assistant", " world"), done = true),
                 )
-            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
             val chunks = mutableListOf<String>()
 
             val result = manager.streamMessage("hi") { chunks += it }
@@ -179,7 +180,7 @@ class AgentManagerConversationOpsTest {
             val provider = mockk<LLMProvider>(relaxed = true)
             coEvery { provider.chat(any<ChatRequestContext>()) } returns
                 ChatResponse(model = "test", message = Message("assistant", "result"), done = true)
-            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
             val jobResult = manager.startAgentJob("Worker", "Worker role", "coder", "write code")
 
@@ -197,7 +198,7 @@ class AgentManagerConversationOpsTest {
             val provider = mockk<LLMProvider>(relaxed = true)
             coEvery { provider.chat(any<ChatRequestContext>()) } returns
                 ChatResponse(model = "test", message = Message("assistant", "done"), done = true)
-            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
             val agent = manager.createAgent("Worker", "Worker role")
 
             val jobResult = manager.runAgentJob(agent.id, "task")
@@ -215,10 +216,10 @@ class AgentManagerConversationOpsTest {
             val provider = mockk<LLMProvider>(relaxed = true)
             coEvery { provider.chat(any<ChatRequestContext>()) } returns
                 ChatResponse(model = "test", message = Message("assistant", "completed"), done = true)
-            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
             val agent = manager.createAgent("Worker", "Worker role")
             val finished = kotlinx.coroutines.CompletableDeferred<String>()
-            AgentManager.setAgentCallback { id, message ->
+            manager.agentStatusCallbackAdapter.register { id, message ->
                 if (id == agent.id && message.startsWith("Sub-agent job")) {
                     finished.complete(id)
                 }

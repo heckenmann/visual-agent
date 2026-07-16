@@ -16,11 +16,11 @@ import java.util.concurrent.ConcurrentHashMap
  * can start after the user raises the configured capacity.
  *
  * @property scope Coroutine scope used for queued background jobs
- * @property parallelism Current maximum number of concurrently running sub-agent jobs
+ * @property parallelismProvider Current maximum number of concurrently running sub-agent jobs
  */
-internal class SubAgentJobScheduler(
+class SubAgentJobScheduler(
     private val scope: CoroutineScope,
-    private val parallelism: () -> Int,
+    private val parallelismProvider: ParallelismProvider,
 ) {
     private val lock = Any()
     private val waiting = ArrayDeque<CompletableDeferred<Unit>>()
@@ -118,7 +118,7 @@ internal class SubAgentJobScheduler(
     private fun dispatchWaitingJobs() {
         val permits = mutableListOf<CompletableDeferred<Unit>>()
         synchronized(lock) {
-            val limit = parallelism().coerceAtLeast(1)
+            val limit = parallelismProvider.get().coerceAtLeast(1)
             while (activeJobs < limit && waiting.isNotEmpty()) {
                 activeJobs += 1
                 permits += waiting.removeFirst()

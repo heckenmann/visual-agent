@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.config
 
+import de.heckenmann.visualagent.config.AppConfigBean
 import org.junit.jupiter.api.Test
 import java.nio.file.Files
 import java.util.Properties

@@ -1,7 +1,7 @@
 package de.heckenmann.visualagent.agent.ollama
 
 import com.sun.net.httpserver.HttpServer
-import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.config.AppConfigBean
 import org.junit.jupiter.api.Test
 import java.net.InetSocketAddress
 import java.util.concurrent.atomic.AtomicReference
@@ -9,11 +9,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 class OllamaApiConfigurationTest {
+    private val appConfig = AppConfigBean()
+
     @Test
     fun `api sends current key as bearer token`() {
         val authorization = AtomicReference<String?>()
         val server = modelServer(authorization)
-        val config = AppConfig.instance
+        val config = appConfig
         val originalUrl = config.ollamaLocalUrl
         val originalKey = config.ollamaApiKey
 
@@ -39,7 +41,7 @@ class OllamaApiConfigurationTest {
     fun `api omits authorization when key is blank`() {
         val authorization = AtomicReference<String?>()
         val server = modelServer(authorization)
-        val config = AppConfig.instance
+        val config = appConfig
         val originalUrl = config.ollamaLocalUrl
         val originalKey = config.ollamaApiKey
 

@@ -16,13 +16,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.config.ThemeMode
 import kotlin.math.roundToInt
 
 @Composable
 internal fun SettingsExecutionAndAppearanceSection(
-    config: AppConfig,
+    config: AppConfigBean,
     contextLength: Int,
     loadLimit: String,
     maxParallelSubAgents: String,

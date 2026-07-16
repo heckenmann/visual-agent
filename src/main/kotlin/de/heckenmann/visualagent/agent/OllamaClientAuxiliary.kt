@@ -1,6 +1,6 @@
 package de.heckenmann.visualagent.agent
 
-import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.config.AppConfigBean
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.springframework.ai.chat.messages.UserMessage
@@ -19,6 +19,7 @@ import org.springframework.ai.ollama.api.OllamaChatOptions
 internal class OllamaClientAuxiliary(
     private val chatModel: ChatModel,
     private val ollamaApi: OllamaApi,
+    private val appConfig: AppConfigBean,
 ) {
     /**
      * Sends an image and a prompt to the vision-capable chat model.
@@ -32,7 +33,7 @@ internal class OllamaClientAuxiliary(
         prompt: String,
     ): ChatResponse =
         withContext(Dispatchers.IO) {
-            val selectedModel = AppConfig.instance.ollamaModel
+            val selectedModel = appConfig.ollamaModel
             val response =
                 chatModel.call(
                     Prompt(
@@ -68,7 +69,7 @@ internal class OllamaClientAuxiliary(
     suspend fun embeddings(text: String): List<Double> =
         withContext(Dispatchers.IO) {
             try {
-                val response = ollamaApi.embed(OllamaApi.EmbeddingsRequest(AppConfig.instance.ollamaModel, text))
+                val response = ollamaApi.embed(OllamaApi.EmbeddingsRequest(appConfig.ollamaModel, text))
                 response
                     .embeddings()
                     .firstOrNull()

@@ -2,7 +2,7 @@ package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
-import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.config.AppConfigBean
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -20,46 +20,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class OllamaClientModelSelectionTest {
-    @Test
-    fun `chat uses selected model from app config`() =
-        runTest {
-            val previousModel = AppConfig.instance.ollamaModel
-            AppConfig.instance.ollamaModel = "unit-test-model"
-            try {
-                val chatModel = mockk<ChatModel>()
-                val ollamaApi = mockk<OllamaApi>()
-                val requestSlot = io.mockk.slot<OllamaApi.ChatRequest>()
-                every { ollamaApi.chat(capture(requestSlot)) } returns
-                    OllamaApi.ChatResponse(
-                        "unit-test-model",
-                        Instant.now(),
-                        OllamaApi.Message(OllamaApi.Message.Role.ASSISTANT, "ok", null, null, null, null),
-                        null,
-                        true,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                    )
-                val client = createClient(chatModel, ollamaApi, ToolRegistry(emptyList(), ToolEventBus()))
-
-                val response = client.chat(listOf(Message("user", "hello")))
-
-                assertEquals("unit-test-model", response.model)
-                assertEquals("ok", response.message.content)
-                assertEquals("unit-test-model", requestSlot.captured.model())
-            } finally {
-                AppConfig.instance.ollamaModel = previousModel
-            }
-        }
+    private val appConfig = AppConfigBean()
 
     @Test
     fun `stream uses selected model from app config`() =
         runTest {
-            val previousModel = AppConfig.instance.ollamaModel
-            AppConfig.instance.ollamaModel = "stream-model"
+            val previousModel = appConfig.ollamaModel
+            appConfig.ollamaModel = "stream-model"
             try {
                 val chatModel = mockk<ChatModel>()
                 val ollamaApi = mockk<OllamaApi>()
@@ -79,13 +46,48 @@ class OllamaClientModelSelectionTest {
                             null,
                         ),
                     )
-                val client = createClient(chatModel, ollamaApi, ToolRegistry(emptyList(), ToolEventBus()))
+                val client = createClient(chatModel, ollamaApi, ToolRegistry(emptyList(), ToolEventBus(), AppConfigBean()), appConfig)
 
                 client.stream(listOf(Message("user", "hello"))).collect {}
 
                 verify(exactly = 1) { ollamaApi.streamingChat(any()) }
             } finally {
-                AppConfig.instance.ollamaModel = previousModel
+                appConfig.ollamaModel = previousModel
+            }
+        }
+
+    @Test
+    fun `chat uses selected model from app config`() =
+        runTest {
+            val previousModel = appConfig.ollamaModel
+            appConfig.ollamaModel = "unit-test-model"
+            try {
+                val chatModel = mockk<ChatModel>()
+                val ollamaApi = mockk<OllamaApi>()
+                val requestSlot = io.mockk.slot<OllamaApi.ChatRequest>()
+                every { ollamaApi.chat(capture(requestSlot)) } returns
+                    OllamaApi.ChatResponse(
+                        "unit-test-model",
+                        Instant.now(),
+                        OllamaApi.Message(OllamaApi.Message.Role.ASSISTANT, "ok", null, null, null, null),
+                        null,
+                        true,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                    )
+                val client = createClient(chatModel, ollamaApi, ToolRegistry(emptyList(), ToolEventBus(), AppConfigBean()), appConfig)
+
+                val response = client.chat(listOf(Message("user", "hello")))
+
+                assertEquals("unit-test-model", response.model)
+                assertEquals("ok", response.message.content)
+                assertEquals("unit-test-model", requestSlot.captured.model())
+            } finally {
+                appConfig.ollamaModel = previousModel
             }
         }
 
@@ -111,7 +113,7 @@ class OllamaClientModelSelectionTest {
                 )
                 springResponse("tool-model", "tool-ready")
             }
-            val client = createClient(chatModel, ollamaApi, registry)
+            val client = createClient(chatModel, ollamaApi, registry, appConfig)
 
             val response =
                 client.chat(
@@ -131,7 +133,7 @@ class OllamaClientModelSelectionTest {
         runTest {
             val chatModel = mockk<ChatModel>()
             val ollamaApi = mockk<OllamaApi>(relaxed = true)
-            val registry = ToolRegistry(listOf(FakeTool("todos")), ToolEventBus())
+            val registry = ToolRegistry(listOf(FakeTool("todos")), ToolEventBus(), AppConfigBean())
             every { chatModel.call(any<Prompt>()) } answers {
                 val prompt = firstArg<Prompt>()
                 val options = prompt.options as ToolCallingChatOptions
@@ -143,7 +145,7 @@ class OllamaClientModelSelectionTest {
                 }
                 springResponse("tool-model", "Recovered after unknown tool error")
             }
-            val client = createClient(chatModel, ollamaApi, registry)
+            val client = createClient(chatModel, ollamaApi, registry, appConfig)
 
             val response =
                 client.chat(
@@ -164,13 +166,11 @@ class OllamaClientModelSelectionTest {
         runTest {
             val chatModel = mockk<ChatModel>()
             val ollamaApi = mockk<OllamaApi>(relaxed = true)
-            val registry = ToolRegistry(listOf(FakeTool("todos")), ToolEventBus())
+            val registry = ToolRegistry(listOf(FakeTool("todos")), ToolEventBus(), AppConfigBean())
             every { chatModel.stream(any<Prompt>()) } throws
-                IllegalStateException(
-                    "No function callback found for function name: todo:list",
-                )
+                IllegalStateException("No function callback found for function name: todo:list")
             every { chatModel.call(any<Prompt>()) } returns springResponse("tool-model", "Recovered stream fallback")
-            val client = createClient(chatModel, ollamaApi, registry)
+            val client = createClient(chatModel, ollamaApi, registry, appConfig)
 
             val chunks =
                 client
@@ -194,10 +194,10 @@ class OllamaClientModelSelectionTest {
         runTest {
             val chatModel = mockk<ChatModel>()
             val ollamaApi = mockk<OllamaApi>(relaxed = true)
-            val registry = ToolRegistry(listOf(FakeTool("todos")), ToolEventBus())
+            val registry = ToolRegistry(listOf(FakeTool("todos")), ToolEventBus(), AppConfigBean())
             every { chatModel.call(any<Prompt>()) } throws
                 IllegalStateException("No function callback found for function name: todo:list")
-            val client = createClient(chatModel, ollamaApi, registry)
+            val client = createClient(chatModel, ollamaApi, registry, appConfig)
 
             val response =
                 client.chat(
@@ -217,14 +217,14 @@ class OllamaClientModelSelectionTest {
     @Test
     fun `vision sends image media through chat model`() =
         runTest {
-            val previousModel = AppConfig.instance.ollamaModel
-            AppConfig.instance.ollamaModel = "vision-model"
+            val previousModel = appConfig.ollamaModel
+            appConfig.ollamaModel = "vision-model"
             try {
                 val chatModel = mockk<ChatModel>()
                 val ollamaApi = mockk<OllamaApi>(relaxed = true)
                 val promptSlot = io.mockk.slot<Prompt>()
                 every { chatModel.call(capture(promptSlot)) } returns springResponse("vision-model", "image description")
-                val client = createClient(chatModel, ollamaApi, ToolRegistry(emptyList(), ToolEventBus()))
+                val client = createClient(chatModel, ollamaApi, ToolRegistry(emptyList(), ToolEventBus(), AppConfigBean()), appConfig)
 
                 val response = client.vision(byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47), "describe")
 
@@ -233,7 +233,7 @@ class OllamaClientModelSelectionTest {
                 assertEquals("describe", message.text)
                 assertEquals(1, message.media.size)
             } finally {
-                AppConfig.instance.ollamaModel = previousModel
+                appConfig.ollamaModel = previousModel
             }
         }
 
@@ -262,7 +262,7 @@ class OllamaClientModelSelectionTest {
                     listOf("vision"),
                     Instant.EPOCH,
                 )
-            val client = createClient(chatModel, ollamaApi, ToolRegistry(emptyList(), ToolEventBus()))
+            val client = createClient(chatModel, ollamaApi, ToolRegistry(emptyList(), ToolEventBus(), AppConfigBean()), appConfig)
 
             assertEquals(listOf(1.0, 2.0), client.embeddings("hello"))
             assertEquals(listOf("llama"), client.getModels())

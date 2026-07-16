@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.agent.ollama.OllamaToolRecovery
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.agent.tools.VisualAgentTool
 import de.heckenmann.visualagent.agent.tools.toFunctionName
+import de.heckenmann.visualagent.config.AppConfigBean
 import org.springframework.ai.chat.messages.AssistantMessage
 import org.springframework.ai.chat.metadata.ChatResponseMetadata
 import org.springframework.ai.chat.model.ChatModel
@@ -41,11 +42,26 @@ fun createClient(
     chatModel: ChatModel,
     ollamaApi: OllamaApi,
     registry: ToolRegistry,
+    appConfig: AppConfigBean = AppConfigBean(createMockPreferenceStore()),
 ): OllamaClient {
     val promptFactory = OllamaPromptFactory(registry)
     val recovery = OllamaToolRecovery(chatModel, promptFactory)
-    return OllamaClient(chatModel, ollamaApi, promptFactory, recovery, registry)
+    return OllamaClient(chatModel, ollamaApi, promptFactory, recovery, registry, appConfig)
 }
+
+private fun createMockPreferenceStore(): de.heckenmann.visualagent.knowledge.PreferenceStore =
+    object : de.heckenmann.visualagent.knowledge.PreferenceStore {
+        private val map = mutableMapOf<String, String>()
+
+        override fun getPreference(key: String): String? = map[key]
+
+        override fun setPreference(
+            key: String,
+            value: String,
+        ) {
+            map[key] = value
+        }
+    }
 
 /**
  * Minimal no-op tool for tests that only need a tool definition in the registry.

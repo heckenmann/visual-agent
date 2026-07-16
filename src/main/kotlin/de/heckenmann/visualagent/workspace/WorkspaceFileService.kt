@@ -4,6 +4,7 @@ import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
 import de.heckenmann.visualagent.knowledge.WorkspaceFileStore
 import org.apache.pdfbox.Loader
 import org.apache.pdfbox.text.PDFTextStripper
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Service
 import java.io.File
 import java.nio.file.Files
@@ -30,6 +31,8 @@ import kotlin.streams.asSequence
 @Service
 class WorkspaceFileService(
     private val store: WorkspaceFileStore,
+    @Qualifier("databasePath")
+    private val databasePath: String = "./data/visual-agent.db",
 ) {
     /**
      * Returns the managed workspace root directory, creating it when necessary.
@@ -37,7 +40,7 @@ class WorkspaceFileService(
      * @return Absolute normalized workspace directory
      * @see docs/usecases/uc_0000023_import_workspace_file.md
      */
-    fun workspaceRoot(): Path = WorkspaceFilePaths.workspaceRoot()
+    fun workspaceRoot(): Path = WorkspaceFilePaths.workspaceRoot(databasePath)
 
     /**
      * Imports one external file into the managed workspace.
@@ -87,7 +90,7 @@ class WorkspaceFileService(
         val record =
             WorkspaceFileRecord(
                 id = UUID.randomUUID().toString(),
-                relativePath = WorkspaceFilePaths.relativePath(destination),
+                relativePath = WorkspaceFilePaths.relativePath(destination, databasePath),
                 originalName = WorkspaceFilePaths.safeFileName(originalName),
                 mimeType = mimeType ?: WorkspaceFilePaths.detectMimeType(destination),
                 sizeBytes = destination.fileSize(),
@@ -136,7 +139,7 @@ class WorkspaceFileService(
                     stream
                         .asSequence()
                         .filter { it.isRegularFile() }
-                        .associateBy { WorkspaceFilePaths.relativePath(it) }
+                        .associateBy { WorkspaceFilePaths.relativePath(it, databasePath) }
                 }
         var added = 0
         var updated = 0
@@ -232,7 +235,7 @@ class WorkspaceFileService(
         Files.move(source, destination)
         val updated =
             current.copy(
-                relativePath = WorkspaceFilePaths.relativePath(destination),
+                relativePath = WorkspaceFilePaths.relativePath(destination, databasePath),
                 mimeType = WorkspaceFilePaths.detectMimeType(destination),
                 sizeBytes = destination.fileSize(),
                 sha256 = WorkspaceFilePaths.sha256(destination),
@@ -334,7 +337,7 @@ class WorkspaceFileService(
     /**
      * Resolves a workspace-relative path and guarantees it stays inside the managed workspace.
      */
-    fun resolveManagedPath(relativePath: String): Path = WorkspaceFilePaths.resolveManagedPath(relativePath)
+    fun resolveManagedPath(relativePath: String): Path = WorkspaceFilePaths.resolveManagedPath(relativePath, databasePath)
 
     private fun searchRecord(
         record: WorkspaceFileRecord,
@@ -367,7 +370,7 @@ class WorkspaceFileService(
         val now = Instant.now()
         return WorkspaceFileRecord(
             id = UUID.randomUUID().toString(),
-            relativePath = WorkspaceFilePaths.relativePath(path),
+            relativePath = WorkspaceFilePaths.relativePath(path, databasePath),
             originalName = WorkspaceFilePaths.safeFileName(originalName),
             mimeType = WorkspaceFilePaths.detectMimeType(path),
             sizeBytes = path.fileSize(),

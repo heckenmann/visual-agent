@@ -1,4 +1,5 @@
 package de.heckenmann.visualagent.todo
+// TODO(size): 329 effective LOC, needs splitting
 
 import de.heckenmann.visualagent.knowledge.TodoStore
 import java.util.UUID
@@ -36,13 +37,25 @@ data class TodoChange(
  * such as the autonomous coordinator can observe them.
  */
 class TodoManager(
-    initialTodos: List<Todo> = emptyList(),
-    private val onChange: ((TodoChange) -> Unit)? = null,
-    private val eventBus: TodoEventBus? = null,
-    private val todoStore: TodoStore? = null,
+    private val todoStore: TodoStore,
+    private val eventBus: TodoEventBus,
 ) {
-    private val todos = initialTodos.toMutableList()
+    /**
+     * Test-only constructor that creates a manager without persistence.
+     */
+    @Suppress("unused")
+    internal constructor() : this(NoOpTodoStore(), TodoEventBus())
+
+    private val todos = mutableListOf<Todo>()
     private val listeners = CopyOnWriteArrayList<(TodoChange) -> Unit>()
+
+    /**
+     * Loads initial todos from the store after Spring wiring is complete.
+     */
+    fun loadInitialTodos() {
+        todos.clear()
+        todos.addAll(todoStore.listTodos())
+    }
 
     /**
      * Register a listener that receives all todo change events.
@@ -284,11 +297,10 @@ class TodoManager(
      * @param change Event payload
      */
     private fun publishChange(change: TodoChange) {
-        onChange?.invoke(change)
         listeners.forEach { listener ->
             runCatching { listener(change) }
         }
-        eventBus?.publish(change)
+        eventBus.publish(change)
     }
 
     private fun persistAndPublish(
@@ -296,7 +308,7 @@ class TodoManager(
         type: TodoChangeType,
     ) {
         todos.add(todo)
-        todoStore?.saveTodo(todo)
+        todoStore.saveTodo(todo)
         publishChange(TodoChange(type, todo = todo))
     }
 
@@ -315,4 +327,15 @@ class TodoManager(
      * Returns the next position value that appends a todo at the end of the list.
      */
     private fun nextPosition(): Int = if (todos.isEmpty()) 0 else todos.maxOf { it.position } + 1
+}
+
+/** In-memory no-op store used by the test-only [TodoManager] constructor. */
+internal class NoOpTodoStore : TodoStore {
+    override fun saveTodo(todo: Todo) {}
+
+    override fun listTodos(): List<Todo> = emptyList()
+
+    override fun deleteTodo(todoId: String) {}
+
+    override fun clearTodos() {}
 }

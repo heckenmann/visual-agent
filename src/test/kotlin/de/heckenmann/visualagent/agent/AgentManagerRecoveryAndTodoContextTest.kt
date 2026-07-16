@@ -1,7 +1,7 @@
 package de.heckenmann.visualagent.agent
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
-import de.heckenmann.visualagent.config.AppConfig
+import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.todo.TodoEventBus
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -28,10 +28,11 @@ class AgentManagerRecoveryAndTodoContextTest {
                     message = Message("assistant", "ok"),
                     done = true,
                 )
-            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
-            val previousInstruction = AppConfig.instance.userModelInstruction
+            val appConfig = AppConfigBean(db)
+            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), appConfig)
+            val previousInstruction = appConfig.userModelInstruction
             try {
-                AppConfig.instance.userModelInstruction = "Always answer in German."
+                appConfig.userModelInstruction = "Always answer in German."
                 manager.todoManager.add("Implement worker orchestration")
 
                 manager.sendMessage("Start")
@@ -55,7 +56,7 @@ class AgentManagerRecoveryAndTodoContextTest {
                 assertTrue(secondMessage.role == "system")
                 assertTrue(secondMessage.content.contains("Always answer in German."))
             } finally {
-                AppConfig.instance.userModelInstruction = previousInstruction
+                appConfig.userModelInstruction = previousInstruction
             }
         }
 
@@ -76,7 +77,7 @@ class AgentManagerRecoveryAndTodoContextTest {
                     message = Message("assistant", "Recovered and continued."),
                     done = true,
                 )
-            AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+            AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
             delay(600)
             val messages = db.getConversationMessages("main")
@@ -96,7 +97,7 @@ class AgentManagerRecoveryAndTodoContextTest {
             val provider = mockk<LLMProvider>(relaxed = true)
             coEvery { provider.checkConnection() } returns true
             coEvery { provider.chat(any<ChatRequestContext>()) } throws IllegalStateException("401 invalid api key")
-            AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus())
+            AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
             delay(600)
             val messages = db.getConversationMessages("main")
