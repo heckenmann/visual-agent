@@ -177,6 +177,7 @@ private fun WorkspaceFileRow(
     refresh: () -> Unit,
     setStatus: (String) -> Unit,
 ) {
+    @Suppress("DEPRECATION")
     val clipboard = LocalClipboardManager.current
     PanelContentCard(
         modifier = Modifier.fillMaxWidth().padding(bottom = 7.dp),

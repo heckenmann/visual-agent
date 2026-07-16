@@ -61,19 +61,17 @@ class OllamaToolRecovery(
                 .trim()
         if (recoveryText.isBlank()) return null
         return ChatResponse(
-            model = recoveryModelResponse.metadata?.model ?: selectedModel,
+            model = recoveryModelResponse.metadata.model,
             message = Message(role = "assistant", content = recoveryText),
             done = true,
             promptEvalCount =
                 recoveryModelResponse.metadata
-                    ?.usage
-                    ?.promptTokens
-                    ?.toInt(),
+                    .usage
+                    .promptTokens,
             evalCount =
                 recoveryModelResponse.metadata
-                    ?.usage
-                    ?.completionTokens
-                    ?.toInt(),
+                    .usage
+                    .completionTokens,
         )
     }
 
