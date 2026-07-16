@@ -100,6 +100,11 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    testLogging {
+        events("started", "passed", "failed", "skipped")
+        setExceptionFormat("full")
+        showStandardStreams = false
+    }
     systemProperty("visualagent.ollama.smoke", System.getProperty("visualagent.ollama.smoke", "false"))
     jvmArgs("-Xshare:off", "-Xmx2g", "-Dkotlinx.coroutines.debug=off")
     finalizedBy(tasks.jacocoTestReport)
