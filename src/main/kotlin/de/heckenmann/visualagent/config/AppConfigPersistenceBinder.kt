@@ -2,15 +2,20 @@ package de.heckenmann.visualagent.config
 
 import de.heckenmann.visualagent.knowledge.PreferenceStore
 import jakarta.annotation.PostConstruct
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Component
 
 /**
- * Populates the [AppConfigBean] from the database-backed preference store.
+ * Populates the [AppConfigBean] from the database-backed preference store and the
+ * bootstrap database path. The bootstrap path is authoritative and not overwritten
+ * by any persisted preference value because [AppConfigBean.KEY_DATABASE_PATH] is
+ * resolved before the database is available.
  */
 @Component
 class AppConfigPersistenceBinder(
     private val preferenceStore: PreferenceStore,
     private val appConfigBean: AppConfigBean,
+    @Qualifier("databasePath") private val databasePath: String,
 ) {
     /**
      * Loads all user preferences from the database into the [AppConfigBean].
@@ -48,5 +53,8 @@ class AppConfigPersistenceBinder(
             preferenceStore.getPreference(AppConfigBean.KEY_SESSION_USER_MODEL_INSTRUCTION) ?: appConfigBean.userModelInstruction
         appConfigBean.favoriteModels =
             preferenceStore.getPreference(AppConfigBean.KEY_SESSION_FAVORITE_MODELS) ?: appConfigBean.favoriteModels
+        // The bootstrap database path is resolved before the data source is created and is
+        // the single source of truth for locating the database/workspace directory.
+        appConfigBean.databasePath = databasePath
     }
 }

@@ -41,7 +41,7 @@ internal class AgentManagerConversationOps(
         agentId: String,
         content: String,
     ): String {
-        val agent = owner.subAgents[agentId] ?: return "Error: Agent not found"
+        val agent = owner.subAgentOpsProvider.getSubAgent(agentId) ?: return "Error: Agent not found"
         val messages = listOf(Message("user", content))
         val response = agent.chat(messages, owner.llmProvider, owner.agentToolConfigService.toolsFor(agent))
         return response.message.content
@@ -51,7 +51,7 @@ internal class AgentManagerConversationOps(
         agentId: String,
         content: String,
     ): AgentJobResult {
-        val agent = owner.subAgents[agentId] ?: throw IllegalArgumentException("Agent not found: $agentId")
+        val agent = owner.subAgentOpsProvider.getSubAgent(agentId) ?: throw IllegalArgumentException("Agent not found: $agentId")
         return executeAgentJob(agent, content)
     }
 

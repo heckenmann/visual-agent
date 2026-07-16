@@ -10,6 +10,9 @@ import java.util.concurrent.CopyOnWriteArrayList
  * [AppConfigPersistenceBinder] populates this bean from the database-backed
  * preference store after Spring wiring is complete. Components inject this bean
  * instead of reading [AppConfig.instance] directly.
+ *
+ * The no-argument constructor is intended for tests and pure state objects that do
+ * not need persistence; production code should always inject a real [PreferenceStore].
  */
 @Component
 class AppConfigBean(

@@ -59,22 +59,26 @@ class ConversationOpsProvider(
         history: List<Message>,
         requestId: String? = null,
         token: CancellationToken? = null,
-    ): ChatRequestContext = buildMainRequest!!(history, requestId, token)
+    ): ChatRequestContext =
+        checkNotNull(buildMainRequest) { "buildMainRequest not wired; ensure AgentManager.init completed" }(history, requestId, token)
 
     /**
      * Builds the main-agent system context prompt string.
      */
-    fun buildMainSystemContextPrompt(): String = buildMainSystemContextPrompt!!()
+    fun buildMainSystemContextPrompt(): String =
+        checkNotNull(buildMainSystemContextPrompt) { "buildMainSystemContextPrompt not wired; ensure AgentManager.init completed" }()
 
     /**
      * Loads recent conversation history from the database, up to [limit] messages.
      */
-    fun loadRecentHistoryFromDb(limit: Int = 20): List<Message> = loadRecentHistoryFromDb!!(limit)
+    fun loadRecentHistoryFromDb(limit: Int = 20): List<Message> =
+        checkNotNull(loadRecentHistoryFromDb) { "loadRecentHistoryFromDb not wired; ensure AgentManager.init completed" }(limit)
 
     /**
      * Persists a message to the database and returns the saved message.
      */
-    fun persist(message: Message): Message = persistMessage!!(message)
+    fun persist(message: Message): Message =
+        checkNotNull(persistMessage) { "persistMessage not wired; ensure AgentManager.init completed" }(message)
 
     /**
      * Registers a listener on the [ToolEventBus] that collects finished tool-call events

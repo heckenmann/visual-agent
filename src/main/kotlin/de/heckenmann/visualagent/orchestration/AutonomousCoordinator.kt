@@ -50,8 +50,8 @@ class AutonomousCoordinator
         private val subAgentOps: SubAgentOpsProvider,
     ) {
         private val logger = KotlinLogging.logger {}
-        private val subAgents: MutableMap<String, SubAgent>
-            get() = subAgentOps.subAgents
+        private val subAgents: Map<String, SubAgent>
+            get() = subAgentOps.allSubAgents
         private val pendingTodoChanges = ConcurrentHashMap<String, TodoChange>()
         private val activeCancellationTokens = ConcurrentHashMap<String, CancellationToken>()
         private val agentBusySince = ConcurrentHashMap<String, Long>()

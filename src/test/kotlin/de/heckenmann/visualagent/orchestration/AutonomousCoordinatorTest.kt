@@ -36,7 +36,7 @@ class AutonomousCoordinatorTest {
     fun `auto pickup assigns pending todo to idle agent and schedules work`(): Unit =
         runBlocking {
             val fixture = coordinator(chatDelayMs = 5000)
-            fixture.subAgents["agent-1"] = SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE)
+            fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
             fixture.todoManager.add("Implement feature", "agent-1")
 
             try {
@@ -55,7 +55,7 @@ class AutonomousCoordinatorTest {
     fun `auto pickup auto assigns unassigned todo to idle agent`(): Unit =
         runBlocking {
             val fixture = coordinator(chatDelayMs = 5000)
-            fixture.subAgents["agent-1"] = SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE)
+            fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
             val todo = fixture.todoManager.add("Implement feature")
 
             try {
@@ -75,7 +75,7 @@ class AutonomousCoordinatorTest {
         runBlocking {
             val fixture = coordinator()
             fixture.todoManager.add("Implement feature", "agent-1")
-            fixture.subAgents["agent-1"] = SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.BUSY)
+            fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.BUSY))
 
             try {
                 fixture.coordinator.startAutonomousProcessing(seed = false)
@@ -109,8 +109,8 @@ class AutonomousCoordinatorTest {
             val fixture = coordinator(parallelism = 1, chatDelayMs = 5000)
             fixture.todoManager.add("Task 1", "agent-1")
             fixture.todoManager.add("Task 2", "agent-2")
-            fixture.subAgents["agent-1"] = SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE)
-            fixture.subAgents["agent-2"] = SubAgent(id = "agent-2", name = "Tester", role = "Testing", status = AgentStatus.IDLE)
+            fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
+            fixture.putSubAgent(SubAgent(id = "agent-2", name = "Tester", role = "Testing", status = AgentStatus.IDLE))
 
             try {
                 fixture.coordinator.startAutonomousProcessing(seed = false)
@@ -162,7 +162,7 @@ class AutonomousCoordinatorTest {
     fun `completion message contains only todo id and get-result hint`() =
         runBlocking {
             val fixture = coordinator()
-            fixture.subAgents["agent-1"] = SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE)
+            fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
             fixture.todoManager.add("Implement feature", "agent-1")
 
             try {
@@ -182,7 +182,7 @@ class AutonomousCoordinatorTest {
     fun `sub-agent restarts when todo description is edited while running`() =
         runBlocking {
             val fixture = coordinator(chatDelayMs = 1000)
-            fixture.subAgents["agent-1"] = SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE)
+            fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
             val todo = fixture.todoManager.add("Old description", "agent-1")
 
             try {
@@ -203,7 +203,7 @@ class AutonomousCoordinatorTest {
     fun `coordinator resumes loop when existing todo is reset to PENDING`() =
         runBlocking {
             val fixture = coordinator(chatDelayMs = 5000)
-            fixture.subAgents["agent-1"] = SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE)
+            fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
             val todo = fixture.todoManager.add("Implement feature", "agent-1")
             fixture.todoManager.cancelTodo(todo.id)
 
@@ -226,8 +226,8 @@ class AutonomousCoordinatorTest {
     fun `sub-agent stops when assigned agent changes while running`() =
         runBlocking {
             val fixture = coordinator(chatDelayMs = 1000)
-            fixture.subAgents["agent-1"] = SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE)
-            fixture.subAgents["agent-2"] = SubAgent(id = "agent-2", name = "Tester", role = "Testing", status = AgentStatus.IDLE)
+            fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
+            fixture.putSubAgent(SubAgent(id = "agent-2", name = "Tester", role = "Testing", status = AgentStatus.IDLE))
             val todo = fixture.todoManager.add("Task", "agent-1")
 
             try {
@@ -246,7 +246,8 @@ class AutonomousCoordinatorTest {
     private class Fixture(
         val coordinator: AutonomousCoordinator,
         val todoManager: TodoManager,
-        val subAgents: MutableMap<String, SubAgent>,
+        val subAgents: Map<String, SubAgent>,
+        val putSubAgent: (SubAgent) -> Unit,
         val notifications: MutableList<String>,
         val savedAgents: MutableList<SubAgent>,
         val messages: MutableList<Message>,
@@ -320,12 +321,12 @@ class AutonomousCoordinatorTest {
         val subAgentOps = SubAgentOpsProvider()
         subAgentOps.setCreateAgent { name, role, templateName ->
             SubAgent
-                .fromTemplate(id = "created-${subAgentOps.subAgents.size}", name = name, role = role, templateName = templateName)
-                .also { subAgentOps.subAgents[it.id] = it }
+                .fromTemplate(id = "created-${subAgentOps.allSubAgents.size}", name = name, role = role, templateName = templateName)
+                .also { subAgentOps.putSubAgent(it) }
         }
         subAgentOps.setSaveSubAgent { savedAgents.add(it) }
         subAgentOps.setNotifyAgent { agentId, message -> notifications += "$agentId:$message" }
-        val subAgents = subAgentOps.subAgents
+        val subAgents = subAgentOps.allSubAgents
         val coordinator =
             AutonomousCoordinator(
                 scope = scope,
@@ -340,7 +341,7 @@ class AutonomousCoordinatorTest {
                 conversationOps = conversationOps,
                 subAgentOps = subAgentOps,
             )
-        return Fixture(coordinator, todoManager, subAgents, notifications, savedAgents, messages, scope)
+        return Fixture(coordinator, todoManager, subAgents, subAgentOps::putSubAgent, notifications, savedAgents, messages, scope)
     }
 
     private class FakeTodoStore : TodoStore {

@@ -24,7 +24,7 @@ internal class AgentManagerLifecycleOps(
         logger.info { "Found ${agents.size} agents in DB" }
         if (agents.size < 3) {
             createDefaultAgents()
-            logger.info { "Created default agents; subAgents size=${owner.subAgents.size}" }
+            logger.info { "Created default agents; subAgents size=${owner.subAgentOpsProvider.allSubAgents.size}" }
             return
         }
 
@@ -33,12 +33,15 @@ internal class AgentManagerLifecycleOps(
             try {
                 val agent = mapAgentRecord(agentMap, resetStatusToIdle = true)
                 logger.debug { "Loading agent id=${agent.id} status=${agent.status}" }
-                owner.subAgents[agent.id] = agent
+                owner.subAgentOpsProvider.putSubAgent(agent)
             } catch (e: Exception) {
                 logger.warn(e) { "Error loading agent ${agentMap.id}" }
             }
         }
-        logger.debug { "Loaded subAgents keys: ${owner.subAgents.keys} and statuses=${owner.subAgents.mapValues { it.value.status }}" }
+        logger.debug {
+            "Loaded subAgents keys: ${owner.subAgentOpsProvider.allSubAgents.keys} " +
+                "and statuses=${owner.subAgentOpsProvider.allSubAgents.mapValues { it.value.status }}"
+        }
     }
 
     fun mapAgentRecord(
@@ -83,7 +86,7 @@ internal class AgentManagerLifecycleOps(
             )
         defaults.forEach { agent ->
             saveAgentToDb(agent)
-            owner.subAgents[agent.id] = agent
+            owner.subAgentOpsProvider.putSubAgent(agent)
         }
         logger.info { "Created ${defaults.size} default agents" }
     }
@@ -105,9 +108,11 @@ internal class AgentManagerLifecycleOps(
         )
     }
 
-    fun getSubAgents(): List<SubAgent> = owner.subAgents.values.toList()
+    fun getSubAgents(): List<SubAgent> =
+        owner.subAgentOpsProvider.allSubAgents.values
+            .toList()
 
-    fun getSubAgent(id: String): SubAgent? = owner.subAgents[id]
+    fun getSubAgent(id: String): SubAgent? = owner.subAgentOpsProvider.getSubAgent(id)
 
     fun getTodosFromDb(): List<Todo> = owner.todoStore.listTodos()
 
@@ -130,7 +135,7 @@ internal class AgentManagerLifecycleOps(
         val id = UUID.randomUUID().toString().take(8)
         val agent = SubAgent.fromTemplate(id, name, role, templateName)
         saveAgentToDb(agent)
-        owner.subAgents[agent.id] = agent
+        owner.subAgentOpsProvider.putSubAgent(agent)
         owner.agentStatusCallbackAdapter.notify(agent.id, "CREATED")
         logger.info { "Created agent: $id ($name)" }
         return agent
@@ -142,7 +147,7 @@ internal class AgentManagerLifecycleOps(
         role: String? = null,
         config: AgentConfig? = null,
     ): Boolean {
-        val agent = owner.subAgents[id] ?: return false
+        val agent = owner.subAgentOpsProvider.getSubAgent(id) ?: return false
         if (name != null) agent.name = name
         if (role != null) agent.role = role
         if (config != null) agent.config = config
@@ -153,7 +158,7 @@ internal class AgentManagerLifecycleOps(
     }
 
     fun deleteAgent(id: String): Boolean {
-        val removed = owner.subAgents.remove(id)
+        val removed = owner.subAgentOpsProvider.removeSubAgent(id)
         if (removed != null) {
             if (removed.status == AgentStatus.BUSY) {
                 owner.autonomousCoordinator.cancelAgentTodo(id)

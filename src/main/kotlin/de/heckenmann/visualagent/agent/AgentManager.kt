@@ -48,6 +48,8 @@ class AgentManager
         internal val toolEventBus: ToolEventBus,
         internal val todoEventBus: TodoEventBus,
         internal val appConfig: AppConfigBean,
+        internal val scope: CoroutineScope,
+        internal val parallelismProvider: ParallelismProvider,
     ) : DisposableBean {
         internal constructor(
             stores: PersistenceStores,
@@ -56,6 +58,8 @@ class AgentManager
             toolEventBus: ToolEventBus,
             todoEventBus: TodoEventBus,
             appConfig: AppConfigBean,
+            scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+            parallelismProvider: ParallelismProvider = ParallelismProvider(appConfig),
         ) : this(
             stores,
             stores,
@@ -66,6 +70,8 @@ class AgentManager
             toolEventBus,
             todoEventBus,
             appConfig,
+            scope,
+            parallelismProvider,
         )
 
         companion object {
@@ -77,16 +83,15 @@ class AgentManager
 
         internal var todoManager: TodoManager = TodoManager(todoStore, todoEventBus)
         internal val welcomeMessageComposer = WelcomeMessageComposer(llmProvider, appConfig)
-        internal val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         internal val subAgentJobScheduler =
-            SubAgentJobScheduler(scope, ParallelismProvider())
+            SubAgentJobScheduler(scope, parallelismProvider)
         internal val agentStatusCallbackAdapter = AgentStatusCallbackAdapter()
         internal val conversationOpsProvider = ConversationOpsProvider(toolEventBus)
         internal val subAgentOpsProvider = SubAgentOpsProvider()
         internal lateinit var autonomousCoordinator: AutonomousCoordinator
         internal lateinit var responseCoordinator: AgentResponseCoordinator
-        internal val subAgents: MutableMap<String, SubAgent>
-            get() = subAgentOpsProvider.subAgents
+        internal val subAgents: Map<String, SubAgent>
+            get() = subAgentOpsProvider.allSubAgents
         internal val activeJobsByAgentId = ConcurrentHashMap<String, Int>()
         internal val conversationHistory = mutableListOf<Message>()
         internal var pendingResumeMessage: String? = null
@@ -119,7 +124,7 @@ class AgentManager
                     memoryStore = memoryStore,
                     agentToolConfigService = agentToolConfigService,
                     jobScheduler = subAgentJobScheduler,
-                    parallelismProvider = ParallelismProvider(),
+                    parallelismProvider = parallelismProvider,
                     todoEventBus = todoEventBus,
                     conversationOps = conversationOpsProvider,
                     subAgentOps = subAgentOpsProvider,
