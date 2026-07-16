@@ -100,7 +100,6 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
-    maxParallelForks = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
     testLogging {
         events("started", "passed", "failed", "skipped")
         setExceptionFormat("full")

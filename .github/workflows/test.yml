@@ -39,6 +39,9 @@ jobs:
           cache-read-only: false
           cache-cleanup: on-success
           validate-wrappers: false
+          gradle-home-cache-includes: |
+            caches
+            configuration-cache
 
       - name: Run tests
         run: xvfb-run -a gradle test --build-cache --no-daemon
