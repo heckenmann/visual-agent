@@ -100,13 +100,14 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    maxParallelForks = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
     testLogging {
         events("started", "passed", "failed", "skipped")
         setExceptionFormat("full")
         showStandardStreams = false
     }
     systemProperty("visualagent.ollama.smoke", System.getProperty("visualagent.ollama.smoke", "false"))
-    jvmArgs("-Xshare:off", "-Xmx2g", "-Dkotlinx.coroutines.debug=off")
+    jvmArgs("-Xmx1g", "-Dkotlinx.coroutines.debug=off")
     finalizedBy(tasks.jacocoTestReport)
 }
 
