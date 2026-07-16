@@ -1,5 +1,7 @@
 package de.heckenmann.visualagent.agent
 
+// TODO(size): 305 effective LOC, needs splitting
+
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.conversation.AgentManagerConversationOps
 import de.heckenmann.visualagent.agent.conversation.WelcomeMessageComposer
@@ -50,6 +52,7 @@ class AgentManager
         internal val appConfig: AppConfigBean,
         internal val scope: CoroutineScope,
         internal val parallelismProvider: ParallelismProvider,
+        internal val agentStatusCallbackAdapter: AgentStatusCallbackAdapter,
     ) : DisposableBean {
         internal constructor(
             stores: PersistenceStores,
@@ -60,6 +63,7 @@ class AgentManager
             appConfig: AppConfigBean,
             scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
             parallelismProvider: ParallelismProvider = ParallelismProvider(appConfig),
+            agentStatusCallbackAdapter: AgentStatusCallbackAdapter = AgentStatusCallbackAdapter(),
         ) : this(
             stores,
             stores,
@@ -72,6 +76,7 @@ class AgentManager
             appConfig,
             scope,
             parallelismProvider,
+            agentStatusCallbackAdapter,
         )
 
         companion object {
@@ -81,15 +86,14 @@ class AgentManager
             internal const val REPETITION_GUARD_RETRY_LIMIT = 1
         }
 
+        internal lateinit var autonomousCoordinator: AutonomousCoordinator
+        internal lateinit var responseCoordinator: AgentResponseCoordinator
         internal var todoManager: TodoManager = TodoManager(todoStore, todoEventBus)
         internal val welcomeMessageComposer = WelcomeMessageComposer(llmProvider, appConfig)
         internal val subAgentJobScheduler =
             SubAgentJobScheduler(scope, parallelismProvider)
-        internal val agentStatusCallbackAdapter = AgentStatusCallbackAdapter()
         internal val conversationOpsProvider = ConversationOpsProvider(toolEventBus)
         internal val subAgentOpsProvider = SubAgentOpsProvider()
-        internal lateinit var autonomousCoordinator: AutonomousCoordinator
-        internal lateinit var responseCoordinator: AgentResponseCoordinator
         internal val subAgents: Map<String, SubAgent>
             get() = subAgentOpsProvider.allSubAgents
         internal val activeJobsByAgentId = ConcurrentHashMap<String, Int>()

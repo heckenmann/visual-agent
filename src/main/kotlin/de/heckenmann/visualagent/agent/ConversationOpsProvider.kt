@@ -3,7 +3,6 @@ package de.heckenmann.visualagent.agent
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
-import org.springframework.stereotype.Service
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -13,7 +12,6 @@ import java.util.concurrent.ConcurrentHashMap
  * [AgentManager] wires the lambdas via [setBuildMainRequest], [setBuildMainSystemContextPrompt],
  * [setLoadRecentHistoryFromDb], and [setPersistMessage] during its `init` block.
  */
-@Service
 class ConversationOpsProvider(
     private val toolEventBus: ToolEventBus,
 ) {

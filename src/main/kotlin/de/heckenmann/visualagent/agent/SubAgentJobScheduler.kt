@@ -5,7 +5,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import org.springframework.stereotype.Component
 import java.util.ArrayDeque
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -19,7 +18,6 @@ import java.util.concurrent.ConcurrentHashMap
  * @property scope Coroutine scope used for queued background jobs
  * @property parallelismProvider Current maximum number of concurrently running sub-agent jobs
  */
-@Component
 class SubAgentJobScheduler(
     private val scope: CoroutineScope,
     private val parallelismProvider: ParallelismProvider,

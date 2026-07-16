@@ -5,15 +5,11 @@ import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.ConversationOpsProvider
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.stereotype.Service
 
 /**
  * Coordinates assistant response normalization, repetition-guard retries, and tool-only followup finalization.
  */
-@Service
 class AgentResponseCoordinator
-    @Autowired
     constructor(
         private val llmProvider: LLMProvider,
         private val conversationOps: ConversationOpsProvider,

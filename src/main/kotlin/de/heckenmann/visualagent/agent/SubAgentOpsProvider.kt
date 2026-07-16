@@ -1,6 +1,5 @@
 package de.heckenmann.visualagent.agent
 
-import org.springframework.stereotype.Service
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -10,7 +9,6 @@ import java.util.concurrent.ConcurrentHashMap
  * [AgentManager] wires the lambdas via [setSaveSubAgent], [setCreateAgent],
  * and [setNotifyAgent] during its `init` block.
  */
-@Service
 class SubAgentOpsProvider {
     private val subAgents = ConcurrentHashMap<String, SubAgent>()
 

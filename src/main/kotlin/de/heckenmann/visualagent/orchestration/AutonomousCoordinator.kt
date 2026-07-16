@@ -23,8 +23,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import mu.KotlinLogging
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.stereotype.Service
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -33,9 +31,7 @@ import java.util.concurrent.ConcurrentHashMap
  *
  * Use cases: UC-0000014, UC-0000053, UC-0000054, UC-0000055, UC-0000057.
  */
-@Service
 class AutonomousCoordinator
-    @Autowired
     constructor(
         private val scope: CoroutineScope,
         private val todoManager: TodoManager,

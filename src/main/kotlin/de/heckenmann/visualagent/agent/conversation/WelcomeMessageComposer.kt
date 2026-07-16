@@ -6,7 +6,6 @@ import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.config.AppConfigBean
 import mu.KotlinLogging
-import org.springframework.stereotype.Component
 
 /**
  * Generates a friendly welcome message after a conversation reset.
@@ -16,7 +15,6 @@ import org.springframework.stereotype.Component
  * provider is unreachable, the configured model is not available, or the chat request
  * fails, a static fallback greeting is persisted so the conversation is never left empty.
  */
-@Component
 class WelcomeMessageComposer(
     private val llmProvider: LLMProvider,
     private val appConfig: AppConfigBean,

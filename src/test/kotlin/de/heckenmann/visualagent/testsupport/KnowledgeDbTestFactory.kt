@@ -2,7 +2,6 @@ package de.heckenmann.visualagent.testsupport
 
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.LLMProvider
-import de.heckenmann.visualagent.agent.ParallelismProvider
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.config.SubAgentToolConfig
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
@@ -20,9 +19,6 @@ import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
 import de.heckenmann.visualagent.knowledge.WorkspaceFileStore
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoEventBus
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import org.springframework.boot.SpringBootConfiguration
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration
 import org.springframework.boot.builder.SpringApplicationBuilder
@@ -76,19 +72,13 @@ class TestPersistence internal constructor(
     ): AgentManager {
         val configService = AgentToolConfigService(subAgentConfigStore)
         val appConfig = AppConfigBean(preferenceStore)
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         return AgentManager(
-            conversationStore,
-            todoStore,
-            subAgentStore,
-            memoryStore,
-            provider,
-            configService,
-            toolEventBus,
-            todoEventBus,
-            appConfig,
-            scope,
-            ParallelismProvider(appConfig),
+            stores = this,
+            llmProvider = provider,
+            agentToolConfigService = configService,
+            toolEventBus = toolEventBus,
+            todoEventBus = todoEventBus,
+            appConfig = appConfig,
         )
     }
 
