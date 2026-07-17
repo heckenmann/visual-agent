@@ -26,7 +26,11 @@ class AgentCreateTool(
         ToolDefinition(
             id = ToolId("agent:create"),
             name = ToolId("agent:create").toFunctionName(),
-            description = "Create a sub-agent. Input: {\"name\":\"Coder\",\"role\":\"Implementation\",\"templateName\":\"coder\"}.",
+            description =
+                "Create a new sub-agent. " +
+                    "Input: {\"name\":\"Coder\",\"role\":\"Implementation\",\"templateName\":\"coder\"}. " +
+                    "templateName selects the tool set: researcher (read/search), coder (write/terminal), analyst (analysis). " +
+                    "Returns the new agent ID and its assigned tools.",
             inputSchema = STRING_SCHEMA,
         )
 
@@ -64,10 +68,12 @@ class AgentUpdateTool(
             id = ToolId("agent:update"),
             name = ToolId("agent:update").toFunctionName(),
             description =
-                "Update a sub-agent. Input: {\"id\":\"123\",\"name\":\"Coder\",\"role\":\"Implementation\"," +
+                "Update an existing sub-agent's configuration. " +
+                    "Input: {\"id\":\"123\",\"name\":\"Coder\",\"role\":\"Implementation\"," +
                     "\"timeout\":120,\"maxRetries\":3,\"memoryLimitMb\":1024,\"provider\":\"ollama\",\"model\":\"llama3\"," +
                     "\"temperature\":0.7,\"topP\":0.9,\"maxTokens\":4096,\"variant\":\"chat\"," +
-                    "\"options\":{\"seed\":\"42\"},\"tools\":[\"file:read\",\"terminal\"],\"templateName\":\"coder\"}.",
+                    "\"options\":{\"seed\":\"42\"},\"tools\":[\"file:read\",\"terminal\"],\"templateName\":\"coder\"}. " +
+                    "All fields except id are optional. Only provided fields are updated.",
             inputSchema = STRING_SCHEMA,
         )
 
@@ -135,7 +141,10 @@ class AgentDeleteTool(
         ToolDefinition(
             id = ToolId("agent:delete"),
             name = ToolId("agent:delete").toFunctionName(),
-            description = "Delete a sub-agent. Input: {\"id\":\"123\"}.",
+            description =
+                "Delete a sub-agent. " +
+                    "Input: {\"id\":\"123\"}. " +
+                    "Permanently removes the agent. Any todos assigned to this agent will need reassignment.",
             inputSchema = STRING_SCHEMA,
         )
 
@@ -163,7 +172,10 @@ class AgentLogTool(
         ToolDefinition(
             id = ToolId("agent:log"),
             name = ToolId("agent:log").toFunctionName(),
-            description = "Read the persisted work log for a sub-agent. Input: {\"id\":\"123\"}.",
+            description =
+                "Read the persisted work log for a sub-agent. " +
+                    "Input: {\"id\":\"123\"}. " +
+                    "Returns up to 50 recent log entries with timestamps.",
             inputSchema = STRING_SCHEMA,
         )
 
@@ -194,7 +206,10 @@ class AgentShowTool(
         ToolDefinition(
             id = ToolId("agent:show"),
             name = ToolId("agent:show").toFunctionName(),
-            description = "Show full details for one sub-agent. Input: {\"id\":\"123\"}.",
+            description =
+                "Show full details for one sub-agent including tools, model, status, current task, and recent log. " +
+                    "Input: {\"id\":\"123\"}. " +
+                    "Use this to inspect an agent's capabilities before assigning work.",
             inputSchema = STRING_SCHEMA,
         )
 

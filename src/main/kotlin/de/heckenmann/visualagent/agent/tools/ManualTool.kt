@@ -23,8 +23,11 @@ class ManualTool(
             id = ToolId("manual"),
             name = ToolId("manual").toFunctionName(),
             description =
-                "Show built-in manual pages. Use action=list for all topics or action=show with a topic. " +
-                    "Includes markdown format guidance via topic=markdown.",
+                "Show built-in manual pages for tools and markdown formatting. Actions:\n" +
+                    "- list: {\"action\":\"list\"}. Lists all available topics.\n" +
+                    "- show: {\"action\":\"show\",\"topic\":\"todos\"}. Shows a manual page for a tool or topic. " +
+                    "Use topic=markdown for markdown formatting reference. " +
+                    "Use topic=<tool_id> (e.g. file:read, todos, canvas) for tool-specific documentation.",
             inputSchema = STRING_SCHEMA,
         )
 

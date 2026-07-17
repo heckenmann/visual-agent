@@ -1,3 +1,6 @@
+@file:Suppress("FunctionName")
+// TODO(size): verbose tool descriptions push this over 300 LOC; split action handlers into separate file
+
 package de.heckenmann.visualagent.agent.tools.canvas
 
 import de.heckenmann.visualagent.agent.ToolDefinition
@@ -44,10 +47,30 @@ class CanvasTool(
             id = ToolId(TOOL_ID),
             name = ToolId(TOOL_ID).toFunctionName(),
             description =
-                "Inspect or edit the canvas. Actions: get, clear, drawText, drawRect, drawLine, drawStroke, drawCircle, insertImage, " +
-                    "select, selectAt, moveFigure, resizeFigure, deleteSelectedFigures, saveDocument, openDocument, captureImage. " +
-                    "Coordinates are canvas coordinates. " +
-                    "Use get before making layout-sensitive changes.",
+                "Inspect or edit the canvas (a 2D drawing board). Actions:\n" +
+                    "- get: {\"action\":\"get\"}. Returns all figures on the canvas.\n" +
+                    "- clear: {\"action\":\"clear\"}. Removes all figures.\n" +
+                    "- drawText: {\"action\":\"drawText\",\"text\":\"hello\",\"x\":100,\"y\":200,\"color\":\"#24292f\"}.\n" +
+                    "- drawRect: {\"action\":\"drawRect\",\"x\":100,\"y\":200,\"width\":300,\"height\":150," +
+                    "\"fillColor\":\"#ffffff\",\"strokeColor\":\"#1f6feb\"}.\n" +
+                    "- drawLine: {\"action\":\"drawLine\",\"x1\":100,\"y1\":200,\"x2\":300,\"y2\":400," +
+                    "\"color\":\"#1f6feb\",\"width\":2}.\n" +
+                    "- drawStroke: {\"action\":\"drawStroke\"," +
+                    "\"points\":[{\"x\":100,\"y\":200},{\"x\":150,\"y\":250}],\"color\":\"#1f6feb\",\"width\":2}.\n" +
+                    "- drawCircle: {\"action\":\"drawCircle\",\"centerX\":200,\"centerY\":200," +
+                    "\"radius\":50,\"fillColor\":\"#ffffff\"}.\n" +
+                    "- insertImage: {\"action\":\"insertImage\",\"path\":\"relative/path/image.png\"}.\n" +
+                    "- select: {\"action\":\"select\",\"indices\":[0,1]} or {\"action\":\"select\",\"index\":0}.\n" +
+                    "- selectAt: {\"action\":\"selectAt\",\"x\":100,\"y\":200}. Select figure at coordinates.\n" +
+                    "- moveFigure: {\"action\":\"moveFigure\",\"index\":0,\"deltaX\":50,\"deltaY\":30}.\n" +
+                    "- resizeFigure: {\"action\":\"resizeFigure\",\"index\":0,\"width\":200,\"height\":100}.\n" +
+                    "- deleteSelectedFigures: {\"action\":\"deleteSelectedFigures\"}.\n" +
+                    "- saveDocument: {\"action\":\"saveDocument\",\"name\":\"my.canvas\"}. Saves to workspace/canvas/.\n" +
+                    "- openDocument: {\"action\":\"openDocument\",\"id\":\"...\"} or " +
+                    "{\"action\":\"openDocument\",\"path\":\"...\"}.\n" +
+                    "- captureImage: {\"action\":\"captureImage\",\"format\":\"png\"}. " +
+                    "Saves snapshot to conversation. " +
+                    "Coordinates are canvas coordinates. Use get before making layout-sensitive changes.",
             inputSchema = STRING_SCHEMA,
         )
 

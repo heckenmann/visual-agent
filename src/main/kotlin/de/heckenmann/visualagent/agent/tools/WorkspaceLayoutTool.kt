@@ -25,10 +25,7 @@ class WorkspaceLayoutTool(
         ToolDefinition(
             id = ToolId("workspace:layout"),
             name = ToolId("workspace:layout").toFunctionName(),
-            description =
-                "Inspect or arrange internal UI panels in the horizontal workspace row. Actions: get, set. " +
-                    "get returns screens, main window size, desktop size, and all panels with order, visible, and preferredWidth. " +
-                    "set input: {\"action\":\"set\",\"windows\":[{\"id\":\"chat\",\"order\":0,\"visible\":true,\"preferredWidth\":640}]}",
+            description = workspaceLayoutToolDescription(),
             inputSchema = STRING_SCHEMA,
         )
 
@@ -80,5 +77,16 @@ class WorkspaceLayoutTool(
                 encodeDefaults = true
                 prettyPrint = true
             }
+
+        /**
+         * Returns the tool description for workspace:layout with all actions and their parameters.
+         */
+        fun workspaceLayoutToolDescription(): String =
+            "Inspect or arrange internal UI panels in the horizontal workspace row. Actions:\n" +
+                "- get: {\"action\":\"get\"}. Returns screens, main window size, desktop size, " +
+                "and all panels with order, visible, and preferredWidth.\n" +
+                "- set: {\"action\":\"set\"," +
+                "\"windows\":[{\"id\":\"chat\",\"order\":0,\"visible\":true,\"preferredWidth\":640}]}. " +
+                "Panel IDs: chat, todos, files, canvas, agents, settings. Use get first to see current layout."
     }
 }

@@ -1,3 +1,5 @@
+// TODO(size): verbose tool descriptions push this over 300 LOC; split into separate tool files
+
 package de.heckenmann.visualagent.agent.tools
 
 import de.heckenmann.visualagent.agent.AgentManager
@@ -8,7 +10,6 @@ import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.knowledge.MemoryStore
 import de.heckenmann.visualagent.knowledge.TodoStore
-import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoStatus
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -33,7 +34,11 @@ class UiTool(
         ToolDefinition(
             id = ToolId("ui"),
             name = ToolId("ui").toFunctionName(),
-            description = "Read or update Visual Agent UI settings such as font size, model, and session options.",
+            description =
+                "Read or update Visual Agent UI settings. Actions: get, set. " +
+                    "Input: {\"action\":\"get|set\",\"fontSize\":14,\"provider\":\"ollama\"," +
+                    "\"model\":\"llama3\",\"streamingEnabled\":true,\"thinkingEnabled\":false}. " +
+                    "Font size range: 10-24. API keys are reported as configured/not configured only.",
             inputSchema = STRING_SCHEMA,
         )
 
@@ -86,7 +91,10 @@ class PwdTool : VisualAgentTool {
         ToolDefinition(
             id = ToolId("pwd"),
             name = ToolId("pwd").toFunctionName(),
-            description = "Return the current Visual Agent workspace directory.",
+            description =
+                "Return the current Visual Agent workspace directory. " +
+                    "No input parameters required. " +
+                    "Input: {}.",
             inputSchema = STRING_SCHEMA,
         )
 
@@ -110,7 +118,10 @@ class ContextTool(
         ToolDefinition(
             id = ToolId("context"),
             name = ToolId("context").toFunctionName(),
-            description = "Return current model, session, agent, workspace, and enabled tool context.",
+            description =
+                "Return current model, session, agent, workspace, and enabled tool context. " +
+                    "No input parameters required. " +
+                    "Input: {}.",
             inputSchema = STRING_SCHEMA,
         )
 
@@ -148,11 +159,25 @@ class TodosTool(
             id = ToolId("todos"),
             name = ToolId("todos").toFunctionName(),
             description =
-                "Manage todos. Actions: list, count, add, update, complete, cancel, remove, reorder, get-result. " +
-                    "Input: {\"action\":\"list|count|add|update|complete|cancel|remove|reorder|get-result\", ...}. " +
-                    "Every new todo must include assignedAgentId referencing an existing sub-agent. " +
-                    "The first pending todo is the next one to process; use reorder to change what is next. " +
-                    "Use get-result to read the stored result summary for a completed/cancelled todo.",
+                "Manage the task plan (work items / to-do list). " +
+                    "This tool is ONLY for tracking work items — NEVER use it to store code, data, file contents, or results. " +
+                    "Use file:write to save code and data to files, and use todos only to describe what work needs to be done.\n" +
+                    "Actions and their required input parameters:\n" +
+                    "- list: no parameters. Returns all todos with status, description, id, position, assigned agent.\n" +
+                    "- count: no parameters. Returns counts per status.\n" +
+                    "- add: {\"action\":\"add\",\"description\":\"task description here\",\"assignedAgentId\":\"...\"}. " +
+                    "Creates a new work item. The description must be a short task description, NOT code or data. " +
+                    "assignedAgentId is required and must reference an existing sub-agent.\n" +
+                    "- update: {\"action\":\"update\",\"id\":\"...\",\"description\":\"...\"," +
+                    "\"assignedAgentId\":\"...\",\"status\":\"PENDING|IN_PROGRESS|COMPLETED|CANCELLED\"}. " +
+                    "All fields except id are optional.\n" +
+                    "- complete: {\"action\":\"complete\",\"id\":\"...\"}. Marks a todo as COMPLETED.\n" +
+                    "- cancel: {\"action\":\"cancel\",\"id\":\"...\"}. Marks a todo as CANCELLED.\n" +
+                    "- remove: {\"action\":\"remove\",\"id\":\"...\"}. Deletes a todo permanently.\n" +
+                    "- reorder: {\"action\":\"reorder\",\"id\":\"...\",\"position\":0}. " +
+                    "Moves a todo to a new position (0 = first).\n" +
+                    "- get-result: {\"action\":\"get-result\",\"id\":\"...\"}. " +
+                    "Reads the stored result summary for a completed/cancelled todo.",
             inputSchema = STRING_SCHEMA,
         )
 
@@ -211,18 +236,8 @@ class TodosTool(
                 "assignedAgentId is required and must reference an existing sub-agent",
             )
         }
-        val todo =
-            Todo(
-                id =
-                    java.util.UUID
-                        .randomUUID()
-                        .toString(),
-                description = input.requiredString("description"),
-                status = TodoStatus.PENDING,
-                position = todoStore.listTodos().maxOfOrNull { it.position }?.plus(1) ?: 0,
-                assignedAgentId = assignedAgentId,
-            )
-        todoStore.saveTodo(todo)
+        val description = input.requiredString("description")
+        val todo = agentManager.todoManager.add(description, assignedAgentId)
         return success("todos", "Added todo ${todo.id}")
     }
 
@@ -236,19 +251,13 @@ class TodosTool(
                 "assignedAgentId must reference an existing sub-agent",
             )
         }
-        val updated =
-            existing
-                .copy(
-                    description = input.string("description") ?: existing.description,
-                    assignedAgentId = newAssignedAgentId ?: existing.assignedAgentId,
-                ).also {
-                    it.status =
-                        input.string("status")?.let { s -> runCatching { TodoStatus.valueOf(s.uppercase()) }.getOrNull() }
-                            ?: existing.status
-                    it.position = existing.position
-                    it.completedAt = existing.completedAt
-                }
-        todoStore.saveTodo(updated)
+        input.string("description")?.let { agentManager.todoManager.update(id, it) }
+        newAssignedAgentId?.let { agentManager.todoManager.updateAssignedAgent(id, it) }
+        input.string("status")?.let { s ->
+            runCatching { TodoStatus.valueOf(s.uppercase()) }.getOrNull()?.let { status ->
+                agentManager.todoManager.updateStatus(id, status)
+            }
+        }
         return success("todos", "Updated todo $id")
     }
 
@@ -258,47 +267,47 @@ class TodosTool(
     ): ToolResult {
         val id = input.requiredString("id")
         val existing = todoStore.listTodos().firstOrNull { it.id == id } ?: return failure("todos", "Todo not found")
-        val updated =
-            existing.copy().also {
-                it.status = status
-                if (status == TodoStatus.COMPLETED) {
-                    it.completedAt = java.time.Instant.now()
-                }
+        val success =
+            when (status) {
+                TodoStatus.COMPLETED -> agentManager.todoManager.completeTodo(id)
+                TodoStatus.CANCELLED -> agentManager.todoManager.cancelTodo(id)
+                else -> agentManager.todoManager.updateStatus(id, status)
             }
-        todoStore.saveTodo(updated)
-        return success("todos", "Set todo $id to $status")
+        return if (success) {
+            success("todos", "Set todo $id to $status")
+        } else {
+            failure("todos", "Todo not found or invalid status transition")
+        }
     }
 
     private fun removeTodo(input: JsonObject): ToolResult {
         val id = input.requiredString("id")
-        todoStore.deleteTodo(id)
-        return success("todos", "Removed todo $id")
+        return if (agentManager.todoManager.remove(id)) {
+            success("todos", "Removed todo $id")
+        } else {
+            failure("todos", "Todo not found")
+        }
     }
 
     private fun reorderTodos(input: JsonObject): ToolResult {
         val id = input.requiredString("id")
-        val todos = todoStore.listTodos()
-        val ordered = todos.sortedBy { it.position }.map { it.id }
-        val fromIndex = ordered.indexOf(id)
-        if (fromIndex == -1) return failure("todos", "Todo not found")
         val targetPosition =
             input.int("position") ?: run {
                 val beforeId = input.string("before") ?: return failure("todos", "Reorder requires 'position' or 'before'")
+                val todos = todoStore.listTodos()
+                val ordered = todos.sortedBy { it.position }.map { it.id }
                 val beforeIndex =
                     ordered.indexOf(beforeId).takeIf { it != -1 }
                         ?: return failure("todos", "Reference todo not found")
+                val fromIndex = ordered.indexOf(id)
+                if (fromIndex == -1) return failure("todos", "Todo not found")
                 if (fromIndex < beforeIndex) beforeIndex - 1 else beforeIndex
             }
-        val safeTarget = targetPosition.coerceIn(0, ordered.lastIndex)
-        val reordered =
-            ordered.toMutableList().apply {
-                add(safeTarget, removeAt(fromIndex))
-            }
-        reordered.forEachIndexed { index, todoId ->
-            val todo = todos.first { it.id == todoId }
-            todoStore.saveTodo(todo.copy(position = index))
+        return if (agentManager.todoManager.moveToPosition(id, targetPosition)) {
+            success("todos", "Reordered todo $id to position $targetPosition")
+        } else {
+            failure("todos", "Todo not found")
         }
-        return success("todos", "Reordered todo $id to position $targetPosition")
     }
 
     private fun getTodoResult(input: JsonObject): ToolResult {

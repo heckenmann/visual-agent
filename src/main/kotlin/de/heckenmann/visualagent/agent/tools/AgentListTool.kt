@@ -26,7 +26,11 @@ class AgentListTool(
         ToolDefinition(
             id = ToolId("agent:list"),
             name = ToolId("agent:list").toFunctionName(),
-            description = "List all sub-agents with their status, assigned tools, model, and current task.",
+            description =
+                "List all sub-agents with their status, assigned tools, model, and current task. " +
+                    "No input parameters required. " +
+                    "Input: {}. " +
+                    "Use this first to discover available agents before assigning work.",
             inputSchema = STRING_SCHEMA,
         )
 
