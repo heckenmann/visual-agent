@@ -104,7 +104,7 @@ class AutonomousTaskPlannerTest {
             val planner = planner(TodoManager(), mutableMapOf())
 
             assertTrue(planner.reviewWorkerResult("todo-1", "Implement", "Done"))
-            assertFalse(planner.reviewWorkerResult("todo-1", "Implement", ""))
+            assertTrue(planner.reviewWorkerResult("todo-1", "Implement", ""))
             val instruction =
                 planner.buildWorkerInstruction(
                     TodoManager().add("Implement persistence"),

@@ -38,23 +38,14 @@ class AgentManagerRecoveryAndTodoContextTest {
                 manager.sendMessage("Start")
 
                 val firstMessage = requestSlot.captured.messages.first()
-                val secondMessage = requestSlot.captured.messages[1]
                 assertTrue(firstMessage.role == "system")
                 assertTrue(firstMessage.content.contains("Current TODO list"))
                 assertTrue(firstMessage.content.contains("Implement worker orchestration"))
-                assertTrue(
-                    firstMessage.content.contains(
-                        "The main agent must not use direct workspace, file, terminal, browser, search, history, canvas, or other worker tools",
-                    ),
-                )
-                assertTrue(
-                    firstMessage.content.contains(
-                        "The only tools the main agent may use directly are sub-agent definition tools",
-                    ),
-                )
+                assertTrue(firstMessage.content.contains("Your Available Tools"))
+                assertTrue(firstMessage.content.contains("do NOT have access to"))
+                assertTrue(firstMessage.content.contains("agent:list"))
                 assertTrue(firstMessage.content.contains("todos"))
-                assertTrue(secondMessage.role == "system")
-                assertTrue(secondMessage.content.contains("Always answer in German."))
+                assertTrue(firstMessage.content.contains("Always answer in German."))
             } finally {
                 appConfig.userModelInstruction = previousInstruction
             }
