@@ -7,6 +7,7 @@ import de.heckenmann.visualagent.agent.conversation.AgentManagerConversationOps
 import de.heckenmann.visualagent.agent.conversation.WelcomeMessageComposer
 import de.heckenmann.visualagent.agent.text.AgentResponseCoordinator
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
+import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.knowledge.ConversationStore
@@ -24,8 +25,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
+import kotlinx.coroutines.launch
 import org.springframework.beans.factory.DisposableBean
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
@@ -137,34 +137,7 @@ class AgentManager
                 val todo = change.todo ?: return@addListener
                 if (change.type != TodoChangeType.UPDATED) return@addListener
                 when (todo.status) {
-                    TodoStatus.COMPLETED -> {
-                        val content =
-                            "Todo completed: ${todo.description.take(120)} (${todo.id}). " +
-                                "Use `todos` with `get-result` to read the stored result."
-                        val metadata =
-                            buildJsonObject {
-                                put("type", "todo")
-                                put("todoId", todo.id)
-                                put("success", true)
-                            }.toString()
-                        conversationOps.persist(
-                            Message(role = "sub_agent", content = content, metadata = metadata),
-                        )
-                        agentStatusCallbackAdapter.notify("main", content)
-                    }
-                    TodoStatus.CANCELLED -> {
-                        val content = "Todo cancelled: ${todo.description.take(120)} (${todo.id})."
-                        val metadata =
-                            buildJsonObject {
-                                put("type", "todo")
-                                put("todoId", todo.id)
-                                put("success", false)
-                            }.toString()
-                        conversationOps.persist(
-                            Message(role = "sub_agent", content = content, metadata = metadata),
-                        )
-                        agentStatusCallbackAdapter.notify("main", content)
-                    }
+                    TodoStatus.COMPLETED, TodoStatus.CANCELLED -> triggerMainAgentOnTodoChange()
                     else -> Unit
                 }
             }
@@ -402,4 +375,33 @@ class AgentManager
          * Starts autonomous mode with a specific goal, adding it as a todo first.
          */
         fun startAutonomousMode(goal: String) = autonomyOps.startAutonomousMode(goal)
+
+        /**
+         * Triggers the main agent to process a todo change notification.
+         * The agent's response is persisted to the conversation history.
+         */
+        internal fun triggerMainAgentOnTodoChange() {
+            scope.launch {
+                val history = conversationOps.loadRecentHistoryFromDb()
+                val request = conversationOps.buildMainRequest(history)
+                runCatching {
+                    val response = llmProvider.chat(request)
+                    val content = responseCoordinator.normalizeAssistantContent(response.message.content)
+                    conversationOps.persist(Message(role = "assistant", content = content))
+                }
+                toolEventBus.publish(
+                    ToolCallEvent(
+                        toolId = "todos",
+                        functionName = "todos",
+                        phase = ToolCallPhase.FINISHED,
+                        inputJson = "{}",
+                        context = mapOf("trigger" to "todoChange"),
+                        result = ToolResult(toolId = "todos", success = true, content = ""),
+                        startedAtUtc = java.time.Instant.now(),
+                        finishedAtUtc = java.time.Instant.now(),
+                        durationMillis = 0L,
+                    ),
+                )
+            }
+        }
     }

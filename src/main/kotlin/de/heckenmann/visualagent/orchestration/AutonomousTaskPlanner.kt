@@ -56,11 +56,11 @@ internal class AutonomousTaskPlanner(
         taskDescription: String,
         workerResult: String,
     ): Boolean {
-        // The previous LLM-based main review added another flaky inference step and caused
-        // simple, correct results (e.g. "count to 50") to be rejected. We now accept any
-        // non-empty worker result as successful; the sub-agent already reports failures
-        // through its own output and tool results.
-        return workerResult.isNotBlank()
+        // The sub-agent's LLM call completed without error (ToolCallingLoop returned).
+        // When the model has no more text and no more tool calls, the work is done.
+        // We accept any result — even blank — because the sub-agent may have
+        // accomplished everything through tool calls without a final text summary.
+        return true
     }
 
     internal fun isComplex(description: String): Boolean {

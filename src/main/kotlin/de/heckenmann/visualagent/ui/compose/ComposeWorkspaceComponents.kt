@@ -253,6 +253,7 @@ internal fun WindowBody(
                 modalRequester = panelServices.modalRequester,
                 inFlight = panelServices.inFlight,
                 toolEventBus = panelServices.toolEventBus,
+                todoEventBus = panelServices.todoEventBus,
             )
         "todos" ->
             TodoPanel(

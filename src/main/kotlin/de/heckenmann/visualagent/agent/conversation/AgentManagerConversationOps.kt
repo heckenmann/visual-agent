@@ -212,16 +212,6 @@ internal class AgentManagerConversationOps(
         val contextPrompt = buildMainSystemContextPrompt()
         val preparedMessages = mutableListOf<Message>()
         preparedMessages += Message("system", contextPrompt)
-        val userInstruction =
-            owner.appConfig.userModelInstruction
-                .trim()
-        if (userInstruction.isNotBlank()) {
-            preparedMessages +=
-                Message(
-                    "system",
-                    "User preferences and wishes for this session:\n$userInstruction",
-                )
-        }
         preparedMessages += history.map(::normalizeHistoryRoleForProvider)
         val metadata =
             mutableMapOf<String, Any>(
@@ -258,7 +248,7 @@ internal class AgentManagerConversationOps(
     fun buildMainSystemContextPrompt(): String {
         val todos = owner.todoStore.listTodos()
         return de.heckenmann.visualagent.agent.context.MainSystemPromptComposer
-            .compose(todos, owner.pendingResumeMessage)
+            .compose(todos, owner.pendingResumeMessage, owner.agentToolConfigService, owner.appConfig.userModelInstruction)
     }
 
     private suspend fun executeAgentJob(

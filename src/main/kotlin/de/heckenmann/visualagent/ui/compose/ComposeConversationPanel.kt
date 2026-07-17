@@ -38,6 +38,7 @@ import de.heckenmann.visualagent.agent.conversation.WelcomeResult
 import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.error.ErrorMessageMapper
+import de.heckenmann.visualagent.todo.TodoEventBus
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -57,6 +58,7 @@ internal fun ConversationPanel(
     modalRequester: ComposeModalRequester,
     inFlight: InFlightStateHolder,
     toolEventBus: ToolEventBus,
+    todoEventBus: TodoEventBus,
 ) {
     val scope = rememberCoroutineScope()
     val inputFocusRequester = remember { FocusRequester() }
@@ -82,6 +84,10 @@ internal fun ConversationPanel(
                     history = agentManager.getHistory()
                 }
             }
+        onDispose { handle.close() }
+    }
+    DisposableEffect(todoEventBus) {
+        val handle = todoEventBus.addListener { history = agentManager.getHistory() }
         onDispose { handle.close() }
     }
     val sendContent: (String) -> Unit = { rawContent ->
