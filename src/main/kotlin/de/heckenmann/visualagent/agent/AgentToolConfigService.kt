@@ -171,7 +171,12 @@ class AgentToolConfigService(
      */
     fun descriptionForConfigId(configId: String): String = defaultConfigs().firstOrNull { it.id == configId }?.description.orEmpty()
 
-    private fun defaultConfigs(): List<SubAgentToolConfig> =
+    /**
+     * Returns the default sub-agent tool configurations.
+     *
+     * @return List of default [SubAgentToolConfig] instances
+     */
+    fun defaultConfigs(): List<SubAgentToolConfig> =
         listOf(
             SubAgentToolConfig(
                 id = "researcher",
