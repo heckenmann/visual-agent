@@ -36,6 +36,6 @@ private fun assignAndReturnIfReady(
         else ->
             subAgents.values.firstOrNull { it.status == AgentStatus.IDLE }?.let { idle ->
                 todoManager.updateAssignedAgent(todo.id, idle.id)
-                todo
+                todo.copy(assignedAgentId = idle.id)
             }
     }
