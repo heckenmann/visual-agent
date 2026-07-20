@@ -19,7 +19,7 @@ Always run, in this order:
 ./gradlew ktlintCheck check test
 ```
 - `ktlintCheck` depends on `ktlintJavadocCheck` and `unusedCodeCheck`.
-- `check` depends on `locAndPackageSizeCheck` (warning-only), `unusedCodeCheck` (blocking), `desktopApiUsageCheck` (blocking), `useCaseDocumentationCheck` (blocking), `jacocoTestCoverageVerification` (≥ 0.80 LINE, excludes `**/ui/compose/*Kt*`).
+- `check` depends on `locAndPackageSizeCheck` (warning-only), `unusedCodeCheck` (blocking), `desktopApiUsageCheck` (blocking), `useCaseDocumentationCheck` (blocking), `jacocoTestCoverageVerification` (≥ 0.80 LINE; UI compose classes are included in the coverage calculation).
 - `tasks.test` is finalized by `jacocoTestReport` and uses JUnit Platform.
 - `generateUseCaseResources` runs as part of `processResources`; use cases are packaged to `build/generated/usecase-resources/usecases/`.
 - CI runs the desktop Compose test path under `xvfb-run -a` because Compose needs an X server; locally on macOS / Windows / a Linux desktop this is unnecessary.
@@ -116,6 +116,7 @@ See `README.md` for the full tree and the feature status table.
 - **Constructor DI**: required dependencies are direct `private val`/`private var` constructor properties; never reassign them in the class body.
 - **Spring-managed beans**: every class that holds state or provides a service must be a Spring `@Component`, `@Service`, or `@Configuration` bean with constructor injection. No `object` singletons, no `lateinit var` for collaborators, no `AppConfig.instance` outside the bootstrap path. Exceptions: pure-Kotlin stateless utilities (`object` with only `const val` or pure functions), per-composition UI holders (`remember { }`), and data class factories.
 - **DB-first reads**: history, todos, sub-agents, workspace files, preferences are loaded from DB on demand — no long-lived in-memory caches.
+- **Tests**: only modify or delete existing tests when there is a clear reason (changed behavior, removed feature, or test is no longer correct). Every test deletion must be justified; do not drop tests simply because they fail after a change.
 - **Markdown 1:1**: pass conversation message text straight to CommonMark (with `AutolinkExtension`); do not pre-normalize, rewrite, or heuristically transform before parsing.
 - **No legacy desktop toolkit**: do not add `java.awt` / `javax.swing` / `javafx` / `pdfbox.rendering` / `apple.awt` imports. `desktopApiUsageCheck` will fail the build. The single `-Djava.awt.headless=false` JVM arg in `build.gradle.kts` is whitelisted.
 - **No AWT-based image I/O**: use `image/RgbaPngEncoder.kt` and `workspace/ImageHeaderReader.kt` instead of `ImageIO` / `BufferedImage`. PDFBox is used only for text extraction; `pdfbox.rendering` is forbidden.

@@ -2,28 +2,29 @@
 
 ## Goal
 
-Automatically complete a todo when the sub-agent's LLM call finishes without error.
+Let the main agent review a sub-agent's work result before a todo is completed. The main agent evaluates the result and decides whether to approve or request a retry.
 
 ## Primary Actor
 
-Autonomous runtime.
+Main orchestration agent.
 
 ## Preconditions
 
 - A worker sub-agent has finished its LLM call (the `ToolCallingLoop` returned).
-- The call did not throw an exception.
+- The main provider can evaluate the result.
 
 ## Main Flow
 
-1. The sub-agent's LLM call completes — the model returned a final response with no more tool calls, or the tool-calling loop exhausted its rounds.
-2. The autonomous coordinator receives the result (which may be blank if the sub-agent accomplished everything through tool calls without a final text summary).
-3. The todo is automatically marked as `COMPLETED`.
-4. A `sub_agent` notification message is persisted to the conversation history.
-5. The main agent is triggered to review the change and inform the user.
+1. The worker returns its result (may be blank if the work was done entirely through tool calls).
+2. The planner sends the task description and result to the main LLM via `reviewWorkerResult`.
+3. The main LLM responds with `APPROVED` or `RETRY`.
+4. Approved results complete the todo.
+5. Rejected results trigger retry until the retry limit is reached.
+6. Final rejection cancels the todo.
 
 ## Result
 
-Every sub-agent LLM call that finishes without error automatically completes its assigned todo. No explicit `todos complete` call from the sub-agent is required.
+Sub-agent work is reviewed by the main agent before being marked complete. Blank results are accepted when the main agent determines the work was accomplished through tool calls.
 
 ## Tool Calls
 
@@ -32,10 +33,12 @@ Every sub-agent LLM call that finishes without error automatically completes its
 ## Code Entry Points
 
 - `de.heckenmann.visualagent.orchestration.AutonomousTaskPlanner.reviewWorkerResult`
+- `de.heckenmann.visualagent.orchestration.OrchestrationConstants.reviewPrompt`
 - `de.heckenmann.visualagent.orchestration.AutonomousCoordinator.processTodoWithLLM`
 
 ## Acceptance Criteria
 
-- A sub-agent LLM call that returns without error always completes the todo.
-- Blank results (tool-only work) are accepted as successful.
-- Exceptions still trigger the retry loop and eventual cancellation.
+- Only responses starting with `APPROVED` approve the result.
+- Retry limits are respected.
+- Final rejection cancels the todo.
+- Blank results are accepted when the main agent approves them.

@@ -101,7 +101,14 @@ class AutonomousTaskPlannerTest {
     @Test
     fun `reviews worker output and builds complete instructions`() =
         runTest {
-            val planner = planner(TodoManager(), mutableMapOf())
+            val provider = mockk<LLMProvider>()
+            coEvery { provider.chat(any<ChatRequestContext>()) } returns response("APPROVED\nLooks good.")
+            val planner =
+                planner(
+                    todoManager = TodoManager(),
+                    agents = mutableMapOf(),
+                    provider = provider,
+                )
 
             assertTrue(planner.reviewWorkerResult("todo-1", "Implement", "Done"))
             assertTrue(planner.reviewWorkerResult("todo-1", "Implement", ""))

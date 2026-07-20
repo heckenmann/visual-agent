@@ -51,16 +51,26 @@ internal class AutonomousTaskPlanner(
 
     fun buildWorkerInstruction(todo: Todo): String = OrchestrationConstants.workerInstruction(todo.id, todo.description)
 
-    fun reviewWorkerResult(
+    suspend fun reviewWorkerResult(
         todoId: String,
         taskDescription: String,
         workerResult: String,
     ): Boolean {
-        // The sub-agent's LLM call completed without error (ToolCallingLoop returned).
-        // When the model has no more text and no more tool calls, the work is done.
-        // We accept any result — even blank — because the sub-agent may have
-        // accomplished everything through tool calls without a final text summary.
-        return true
+        val prompt = OrchestrationConstants.reviewPrompt(taskDescription, workerResult)
+        val request =
+            de.heckenmann.visualagent.agent.ChatRequestContext(
+                messages = prompt,
+                enabledTools = emptySet(),
+                metadata = mapOf("sessionId" to "review", "todoId" to todoId),
+            )
+        val response = llmProvider.chat(request)
+        val verdict =
+            response
+                .message
+                .content
+                .trim()
+                .uppercase()
+        return verdict.startsWith("APPROVED")
     }
 
     internal fun isComplex(description: String): Boolean {

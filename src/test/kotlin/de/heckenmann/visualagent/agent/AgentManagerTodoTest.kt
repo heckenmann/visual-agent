@@ -1,5 +1,7 @@
 package de.heckenmann.visualagent.agent
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
+import de.heckenmann.visualagent.agent.tools.ToolCallEvent
+import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.knowledge.PersistenceStores
@@ -231,5 +233,47 @@ class AgentManagerTodoTest {
             delay(200)
 
             coVerify(exactly = 0) { provider.chat(any<ChatRequestContext>()) }
+        }
+
+    @Test
+    fun `main agent trigger persists system message and fires event on llm error`(): Unit =
+        runBlocking {
+            val db =
+                de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                    .create("jdbc:sqlite::memory:")
+            val provider = mockk<LLMProvider>(relaxed = true)
+            coEvery { provider.isConnected() } returns true
+            coEvery { provider.chat(any<ChatRequestContext>()) } throws RuntimeException("llm down")
+            val toolEventBus = ToolEventBus()
+            val events = mutableListOf<ToolCallEvent>()
+            toolEventBus.addListener { events += it }
+            val manager =
+                AgentManager(
+                    db,
+                    provider,
+                    AgentToolConfigService(db),
+                    toolEventBus,
+                    TodoEventBus(),
+                    AppConfigBean(db),
+                )
+            try {
+                val todo = manager.todoManager.add("Trigger failure test", "1")
+                delay(200)
+
+                manager.todoManager.updateStatus(todo.id, TodoStatus.COMPLETED)
+                delay(500)
+
+                val history = manager.getHistory()
+                assertTrue(
+                    history.any { it.role == "system" && it.content.contains("could not be triggered") },
+                    "Expected a system message about the trigger failure, got: ${history.map { it.role to it.content.take(60) }}",
+                )
+                assertTrue(
+                    events.any { it.phase == ToolCallPhase.FINISHED },
+                    "Expected a ToolCallEvent to be published",
+                )
+            } finally {
+                manager.destroy()
+            }
         }
 }

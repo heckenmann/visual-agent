@@ -216,7 +216,6 @@ class AutonomousCoordinator
             val watcher = startTodoChangeWatcher(todoId, agent.id, taskDescription, token, todoEventBus)
             var attempt = 0
             val maxRetries = agent.config.maxRetries.coerceAtLeast(1)
-            var instruction = taskDescription
             var cancelledByChange = false
             try {
                 delay(300)
@@ -225,13 +224,13 @@ class AutonomousCoordinator
                         val result =
                             agent.performTodo(
                                 todoId,
-                                instruction,
+                                taskDescription,
                                 llmProvider,
                                 memoryStore,
                                 agentToolConfigService.toolsFor(agent),
                                 token,
                             )
-                        if (taskPlanner.reviewWorkerResult(todoId, instruction, result)) {
+                        if (taskPlanner.reviewWorkerResult(todoId, taskDescription, result)) {
                             todoManager.completeTodo(todoId)
                             persistSubAgentMessage(
                                 agent = agent,

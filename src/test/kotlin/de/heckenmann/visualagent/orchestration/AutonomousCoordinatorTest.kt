@@ -29,6 +29,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class AutonomousCoordinatorTest {
@@ -179,6 +180,28 @@ class AutonomousCoordinatorTest {
         }
 
     @Test
+    fun `todo is completed even when sub-agent returns blank response`() =
+        runBlocking {
+            val fixture = coordinator(responseContent = "")
+            fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
+            val todo = fixture.todoManager.add("Task that yields no text", "agent-1")
+
+            try {
+                fixture.coordinator.startAutonomousProcessing(seed = false)
+                delay(1000)
+
+                assertEquals(
+                    de.heckenmann.visualagent.todo.TodoStatus.COMPLETED,
+                    fixture.todoManager.getById(todo.id)!!.status,
+                )
+                val completion = fixture.messages.firstOrNull { it.content.contains("completed todo") }
+                assertNotNull(completion)
+            } finally {
+                fixture.cancel()
+            }
+        }
+
+    @Test
     fun `sub-agent restarts when todo description is edited while running`() =
         runBlocking {
             val fixture = coordinator(chatDelayMs = 1000)
@@ -260,10 +283,12 @@ class AutonomousCoordinatorTest {
 
     private fun coordinator(
         parallelism: Int = 4,
-        chatDelayMs: Long = 0,
+        chatDelayMs: Int = 0,
+        responseContent: String = "APPROVED\nLooks good.",
+        reviewContent: String = "APPROVED",
     ): Fixture {
-        val todoEventBus = TodoEventBus()
         val todoStore = FakeTodoStore()
+        val todoEventBus = TodoEventBus()
         val todoManager = TodoManager(todoStore, todoEventBus)
         val provider = mockk<LLMProvider>()
         val memoryStore =
@@ -288,8 +313,11 @@ class AutonomousCoordinatorTest {
         every { toolConfig.mainAgentTools() } returns emptySet()
         every { toolConfig.toolsFor(any<SubAgent>()) } returns emptySet()
         coEvery { provider.chat(any<ChatRequestContext>()) } coAnswers {
-            val token = it.invocation.args[0].let { arg -> (arg as ChatRequestContext).cancellationToken }
-            if (chatDelayMs > 0) {
+            val ctx = it.invocation.args[0] as ChatRequestContext
+            val token = ctx.cancellationToken
+            val isReview = ctx.metadata["sessionId"] == "review"
+            val content = if (isReview) reviewContent else responseContent
+            if (chatDelayMs > 0 && !isReview) {
                 val start = System.currentTimeMillis()
                 while (System.currentTimeMillis() - start < chatDelayMs) {
                     if (token?.isCancelled == true) throw kotlinx.coroutines.CancellationException("cancelled")
@@ -298,7 +326,7 @@ class AutonomousCoordinatorTest {
             }
             ChatResponse(
                 model = "test",
-                message = Message("assistant", "APPROVED\nLooks good."),
+                message = Message("assistant", content),
                 done = true,
             )
         }

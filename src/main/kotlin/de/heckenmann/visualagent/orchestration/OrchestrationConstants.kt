@@ -107,4 +107,28 @@ internal object OrchestrationConstants {
         Prioritize local project context first. Inspect project documentation, code comments, and relevant source files.
         If blocked after multiple attempts, gather external references from authoritative sources.
         """.trimIndent()
+
+    /**
+     * Builds the review prompt sent to the main agent to evaluate a sub-agent's work result.
+     *
+     * @param taskDescription Original todo description
+     * @param workerResult Text returned by the sub-agent (may be blank)
+     * @return System and user messages for the review request
+     */
+    fun reviewPrompt(
+        taskDescription: String,
+        workerResult: String,
+    ): List<Message> =
+        listOf(
+            Message(
+                "system",
+                "You are reviewing a sub-agent's work result. Decide whether the task was completed successfully.\n" +
+                    "Respond with APPROVED if the result fulfills the task, or RETRY if the result is insufficient.\n" +
+                    "If the result is blank, check whether the task could have been completed entirely through tool calls.",
+            ),
+            Message(
+                "user",
+                "Task: $taskDescription\n\nResult:\n${workerResult.ifBlank { "(blank — no text returned)" }}",
+            ),
+        )
 }

@@ -26,6 +26,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import mu.KotlinLogging
 import org.springframework.beans.factory.DisposableBean
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
@@ -105,6 +106,7 @@ class AgentManager
         private val lifecycleOps = AgentManagerLifecycleOps(this)
         internal val conversationOps = AgentManagerConversationOps(this)
         private val autonomyOps = AgentManagerAutonomyOps(this)
+        private val logger = KotlinLogging.logger {}
 
         init {
             lifecycleOps.loadAgentsFromDb()
@@ -384,10 +386,22 @@ class AgentManager
             scope.launch {
                 val history = conversationOps.loadRecentHistoryFromDb()
                 val request = conversationOps.buildMainRequest(history)
-                runCatching {
-                    val response = llmProvider.chat(request)
-                    val content = responseCoordinator.normalizeAssistantContent(response.message.content)
-                    conversationOps.persist(Message(role = "assistant", content = content))
+                val result =
+                    runCatching {
+                        val response = llmProvider.chat(request)
+                        val content = responseCoordinator.normalizeAssistantContent(response.message.content)
+                        conversationOps.persist(Message(role = "assistant", content = content))
+                    }
+                result.onFailure { error ->
+                    logger.warn(error) { "triggerMainAgentOnTodoChange failed" }
+                    conversationOps.persist(
+                        Message(
+                            role = "system",
+                            content =
+                                "The main agent could not be triggered to review a todo change: " +
+                                    "${error.message ?: error::class.simpleName ?: "unknown error"}.",
+                        ),
+                    )
                 }
                 toolEventBus.publish(
                     ToolCallEvent(
