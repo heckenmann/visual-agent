@@ -405,7 +405,6 @@ tasks.register("locAndPackageSizeCheck") {
     doLast {
         val maxLocPerFile = 300
         val fileViolations = mutableListOf<String>()
-        val fileGrandfathered = mutableListOf<String>()
 
         fun effectiveLoc(lines: List<String>): Int {
             var inBlockComment = false
@@ -435,11 +434,6 @@ tasks.register("locAndPackageSizeCheck") {
             return count
         }
 
-        fun isGrandfathered(lines: List<String>): Boolean =
-            lines.any { line ->
-                line.trim().startsWith("// TODO(size):")
-            }
-
         kotlinSourceRoots
             .filter { Files.exists(it) }
             .forEach { root ->
@@ -451,24 +445,11 @@ tasks.register("locAndPackageSizeCheck") {
                             val lines = effectiveLoc(fileLines)
                             if (lines > maxLocPerFile) {
                                 val msg = "${file.toAbsolutePath()}: $lines effective LOC (max $maxLocPerFile)"
-                                if (isGrandfathered(fileLines)) {
-                                    fileGrandfathered += msg
-                                } else {
-                                    fileViolations += msg
-                                }
+                                fileViolations += msg
                             }
                         }
                 }
             }
-
-        if (fileGrandfathered.isNotEmpty()) {
-            logger.lifecycle(
-                buildString {
-                    appendLine("LOC grandfathered (TODO(size) marker present, non-blocking):")
-                    fileGrandfathered.forEach { appendLine(it) }
-                },
-            )
-        }
 
         if (fileViolations.isEmpty()) return@doLast
 
@@ -478,9 +459,7 @@ tasks.register("locAndPackageSizeCheck") {
                 appendLine("File LOC violations:")
                 fileViolations.forEach { appendLine(it) }
                 appendLine()
-                appendLine("Add `// TODO(size): <reason>` on its own line at the top of the file to")
-                appendLine("grandfather an existing violation, or split the file to bring it under")
-                appendLine("the limit.")
+                appendLine("Split the file to bring it under the limit.")
             }
         logger.error(report)
         throw GradleException("locAndPackageSizeCheck failed: ${fileViolations.size} file(s) exceed the $maxLocPerFile LOC limit.")

@@ -1,5 +1,4 @@
 package de.heckenmann.visualagent.todo
-// TODO(size): 329 effective LOC, needs splitting
 
 import de.heckenmann.visualagent.knowledge.TodoStore
 import java.util.UUID

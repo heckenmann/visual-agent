@@ -1,4 +1,3 @@
-// TODO(size): verbose tool descriptions push this over 300 LOC; split into separate tool files
 
 package de.heckenmann.visualagent.agent.tools
 

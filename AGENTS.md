@@ -19,7 +19,7 @@ Always run, in this order:
 ./gradlew ktlintCheck check test
 ```
 - `ktlintCheck` depends on `ktlintJavadocCheck` and `unusedCodeCheck`.
-- `check` depends on `locAndPackageSizeCheck` (warning-only), `unusedCodeCheck` (blocking), `desktopApiUsageCheck` (blocking), `useCaseDocumentationCheck` (blocking), `jacocoTestCoverageVerification` (≥ 0.80 LINE; UI compose classes are included in the coverage calculation).
+- `check` depends on `locAndPackageSizeCheck` (blocking, no exceptions), `unusedCodeCheck` (blocking), `desktopApiUsageCheck` (blocking), `useCaseDocumentationCheck` (blocking), `jacocoTestCoverageVerification` (≥ 0.80 LINE; UI compose classes are included in the coverage calculation).
 - `tasks.test` is finalized by `jacocoTestReport` and uses JUnit Platform.
 - `generateUseCaseResources` runs as part of `processResources`; use cases are packaged to `build/generated/usecase-resources/usecases/`.
 - CI runs the desktop Compose test path under `xvfb-run -a` because Compose needs an X server; locally on macOS / Windows / a Linux desktop this is unnecessary.
@@ -123,7 +123,7 @@ See `README.md` for the full tree and the feature status table.
 - **API-key handling**: never log, return, or include API keys in tool results or model context. `UiTool` reports only "configured / not configured". `AppConfig.exportTo()` strips API keys.
 - **Provider key live updates**: non-blank `ollama.api.key` is sent as `Authorization: Bearer <key>` on every request; key changes apply without restart. Base URL changes still require restart.
 - **Tool-name guard**: `OllamaPromptFactory` and `OpenAiPromptFactory` emit a system message listing the exact allowed function names for the request, so the model cannot invent variants.
-- **File LOC policy**: target 300 effective LOC per `.kt` file, 3000 per package. `locAndPackageSizeCheck` warns but does not block; new code should respect the limit from the start.
+- **File LOC policy**: 300 effective LOC per `.kt` file, 3000 per package. `locAndPackageSizeCheck` blocks on violations; no grandfathering or exceptions are allowed. Split files before they exceed the limit.
 - **KDoc required**: every public declaration needs a `/** ... */` immediately above. `ktlintJavadocCheck` walks the file and reports missing KDoc.
 - **No unused private declarations**: `unusedCodeCheck` flags them; suppress with `@Suppress("unused")` if intentionally retained.
 - **kotlinx.serialization**: data classes passed through `Json.encodeToString` / `decodeFromString` must be annotated `@Serializable`. After `parseToJsonElement()`, navigate with `.jsonObject` / `.jsonArray` / `.jsonPrimitive` extensions.
@@ -175,8 +175,7 @@ This project is under active Compose migration on branch `codex/issue-48-compose
 ## Known Bugs
 
 1. `vision()` in the Spring AI bridge throws `UnsupportedOperationException`.
-2. Several `.kt` files still exceed 300 effective LOC; `locAndPackageSizeCheck` warns only.
-3. `browser` and `search` tools are placeholders that always return "not configured" until a real backend is wired (issues #16, #40).
+2. `browser` and `search` tools are placeholders that always return "not configured" until a real backend is wired (issues #16, #40).
 
 ## Gotchas
 

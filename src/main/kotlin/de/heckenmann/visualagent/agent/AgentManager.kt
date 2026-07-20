@@ -1,13 +1,10 @@
 package de.heckenmann.visualagent.agent
 
-// TODO(size): 305 effective LOC, needs splitting
-
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.conversation.AgentManagerConversationOps
 import de.heckenmann.visualagent.agent.conversation.WelcomeMessageComposer
 import de.heckenmann.visualagent.agent.text.AgentResponseCoordinator
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
-import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.knowledge.ConversationStore
@@ -25,8 +22,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
-import mu.KotlinLogging
 import org.springframework.beans.factory.DisposableBean
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
@@ -106,7 +101,7 @@ class AgentManager
         private val lifecycleOps = AgentManagerLifecycleOps(this)
         internal val conversationOps = AgentManagerConversationOps(this)
         private val autonomyOps = AgentManagerAutonomyOps(this)
-        private val logger = KotlinLogging.logger {}
+        internal lateinit var todoTrigger: AgentTodoTrigger
 
         init {
             lifecycleOps.loadAgentsFromDb()
@@ -135,11 +130,19 @@ class AgentManager
                     conversationOps = conversationOpsProvider,
                     subAgentOps = subAgentOpsProvider,
                 )
+            todoTrigger =
+                AgentTodoTrigger(
+                    scope = scope,
+                    conversationOps = conversationOps,
+                    llmProvider = llmProvider,
+                    responseCoordinator = responseCoordinator,
+                    toolEventBus = toolEventBus,
+                )
             todoEventBus.addListener { change ->
                 val todo = change.todo ?: return@addListener
                 if (change.type != TodoChangeType.UPDATED) return@addListener
                 when (todo.status) {
-                    TodoStatus.COMPLETED, TodoStatus.CANCELLED -> triggerMainAgentOnTodoChange()
+                    TodoStatus.COMPLETED, TodoStatus.CANCELLED -> todoTrigger.trigger()
                     else -> Unit
                 }
             }
@@ -377,45 +380,4 @@ class AgentManager
          * Starts autonomous mode with a specific goal, adding it as a todo first.
          */
         fun startAutonomousMode(goal: String) = autonomyOps.startAutonomousMode(goal)
-
-        /**
-         * Triggers the main agent to process a todo change notification.
-         * The agent's response is persisted to the conversation history.
-         */
-        internal fun triggerMainAgentOnTodoChange() {
-            scope.launch {
-                val history = conversationOps.loadRecentHistoryFromDb()
-                val request = conversationOps.buildMainRequest(history)
-                val result =
-                    runCatching {
-                        val response = llmProvider.chat(request)
-                        val content = responseCoordinator.normalizeAssistantContent(response.message.content)
-                        conversationOps.persist(Message(role = "assistant", content = content))
-                    }
-                result.onFailure { error ->
-                    logger.warn(error) { "triggerMainAgentOnTodoChange failed" }
-                    conversationOps.persist(
-                        Message(
-                            role = "system",
-                            content =
-                                "The main agent could not be triggered to review a todo change: " +
-                                    "${error.message ?: error::class.simpleName ?: "unknown error"}.",
-                        ),
-                    )
-                }
-                toolEventBus.publish(
-                    ToolCallEvent(
-                        toolId = "todos",
-                        functionName = "todos",
-                        phase = ToolCallPhase.FINISHED,
-                        inputJson = "{}",
-                        context = mapOf("trigger" to "todoChange"),
-                        result = ToolResult(toolId = "todos", success = true, content = ""),
-                        startedAtUtc = java.time.Instant.now(),
-                        finishedAtUtc = java.time.Instant.now(),
-                        durationMillis = 0L,
-                    ),
-                )
-            }
-        }
     }
