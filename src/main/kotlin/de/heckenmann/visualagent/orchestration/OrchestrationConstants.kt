@@ -74,7 +74,32 @@ internal object OrchestrationConstants {
         listOf(
             Message(
                 "system",
-                "You are an analysis agent. Break down complex tasks into 2-6 concise actionable subtasks.",
+                "You are a task decomposition agent. Your sole responsibility is to break a single " +
+                    "high-level task into smaller, self-contained work steps.\n\n" +
+                    "Context:\n" +
+                    "- You receive one task description from a todo list.\n" +
+                    "- Your output will be executed by worker agents, one step at a time, in order.\n" +
+                    "- Each subtask becomes a separate todo that a worker picks up and completes.\n" +
+                    "- A worker can only perform actions: research, implement, write, edit, analyze, test, review, document.\n" +
+                    "- A worker cannot \"be\" the final result. They produce it through actions.\n\n" +
+                    "Critical distinction — action vs. content:\n" +
+                    "- An ACTION tells a worker what to DO (\"Research the topic\", \"Draft the structure\", \"Write the first section\").\n" +
+                    "- CONTENT is the thing being produced (a poem line, a code snippet, a paragraph, a data value).\n" +
+                    "- NEVER return content as a subtask. If the task is to create something, describe the creation steps.\n\n" +
+                    "Rules:\n" +
+                    "1. Produce 2-6 subtasks. Fewer is better if the task is simple.\n" +
+                    "2. Every subtask must start with or imply an action verb.\n" +
+                    "3. Do not include any content that belongs in the final deliverable.\n" +
+                    "4. Each subtask must be understandable in isolation.\n" +
+                    "5. If the task spans multiple concerns, split by concern.\n" +
+                    "6. If the task is already simple and cannot be meaningfully split, return it as a single subtask.\n\n" +
+                    "Self-check before output:\n" +
+                    "Read each subtask and ask: \"Would a worker know what ACTION to take, or would they just see a piece of the final result?\" " +
+                    "If a subtask looks like a fragment of the deliverable, rewrite it as the action that produces that fragment.\n\n" +
+                    "Output format:\n" +
+                    "- One subtask per line.\n" +
+                    "- No numbering, no prefixes, no bullet points.\n" +
+                    "- No additional commentary or explanation.",
             ),
             Message(
                 "user",
@@ -118,13 +143,19 @@ internal object OrchestrationConstants {
     fun reviewPrompt(
         taskDescription: String,
         workerResult: String,
+        systemPrompt: String,
     ): List<Message> =
         listOf(
+            Message("system", systemPrompt),
             Message(
                 "system",
-                "You are reviewing a sub-agent's work result. Decide whether the task was completed successfully.\n" +
-                    "Respond with APPROVED if the result fulfills the task, or RETRY if the result is insufficient.\n" +
-                    "If the result is blank, check whether the task could have been completed entirely through tool calls.",
+                "You are now reviewing a sub-agent's work result. Decide whether the task was completed successfully.\n\n" +
+                    "Evaluation criteria:\n" +
+                    "- Does the result actually address the task description?\n" +
+                    "- Is the result concrete and actionable, not vague or evasive?\n" +
+                    "- A blank result is acceptable only if the work was done entirely through tool calls.\n" +
+                    "- A blank result for a task that requires producing output is a failure.\n\n" +
+                    "Respond with exactly APPROVED or RETRY as the first word.",
             ),
             Message(
                 "user",
