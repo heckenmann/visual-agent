@@ -83,7 +83,8 @@ internal object OrchestrationConstants {
                     "- A worker can only perform actions: research, implement, write, edit, analyze, test, review, document.\n" +
                     "- A worker cannot \"be\" the final result. They produce it through actions.\n\n" +
                     "Critical distinction — action vs. content:\n" +
-                    "- An ACTION tells a worker what to DO (\"Research the topic\", \"Draft the structure\", \"Write the first section\").\n" +
+                    "- An ACTION tells a worker what to DO " +
+                    "(\"Research the topic\", \"Draft the structure\", \"Write the first section\").\n" +
                     "- CONTENT is the thing being produced (a poem line, a code snippet, a paragraph, a data value).\n" +
                     "- NEVER return content as a subtask. If the task is to create something, describe the creation steps.\n\n" +
                     "Rules:\n" +
@@ -94,8 +95,10 @@ internal object OrchestrationConstants {
                     "5. If the task spans multiple concerns, split by concern.\n" +
                     "6. If the task is already simple and cannot be meaningfully split, return it as a single subtask.\n\n" +
                     "Self-check before output:\n" +
-                    "Read each subtask and ask: \"Would a worker know what ACTION to take, or would they just see a piece of the final result?\" " +
-                    "If a subtask looks like a fragment of the deliverable, rewrite it as the action that produces that fragment.\n\n" +
+                    "Read each subtask and ask: \"Would a worker know what ACTION to take, " +
+                    "or would they just see a piece of the final result?\" " +
+                    "If a subtask looks like a fragment of the deliverable, " +
+                    "rewrite it as the action that produces that fragment.\n\n" +
                     "Output format:\n" +
                     "- One subtask per line.\n" +
                     "- No numbering, no prefixes, no bullet points.\n" +
