@@ -110,8 +110,8 @@ class AutonomousTaskPlannerTest {
                     provider = provider,
                 )
 
-            assertTrue(planner.reviewWorkerResult("todo-1", "Implement", "Done"))
-            assertTrue(planner.reviewWorkerResult("todo-1", "Implement", ""))
+            assertTrue(planner.reviewWorkerResult("todo-1", "Implement", "Done", "You are the main orchestrator agent."))
+            assertTrue(planner.reviewWorkerResult("todo-1", "Implement", "", "You are the main orchestrator agent."))
             val instruction =
                 planner.buildWorkerInstruction(
                     TodoManager().add("Implement persistence"),

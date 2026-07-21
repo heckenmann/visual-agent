@@ -230,16 +230,17 @@ class AutonomousCoordinator
                                 agentToolConfigService.toolsFor(agent),
                                 token,
                             )
-                        if (taskPlanner.reviewWorkerResult(todoId, taskDescription, result)) {
-                            todoManager.completeTodo(todoId)
+                        if (taskPlanner.reviewWorkerResult(todoId, taskDescription, result, conversationOps.buildMainSystemContextPrompt())) {
                             persistSubAgentMessage(
                                 agent = agent,
                                 content =
-                                    "Agent ${agent.name} (${agent.id}) completed todo $todoId. " +
-                                        "Use `todos` with `get-result` to read the stored result.",
+                                    "Agent ${agent.name} (${agent.id}) completed todo $todoId.\n\n" +
+                                        "Result:\n${result.take(2000)}\n\n" +
+                                        "Use `todos` with `get-result` to read the full stored result.",
                                 success = true,
                                 persistMessage = { conversationOps.persist(it) },
                             )
+                            todoManager.completeTodo(todoId)
                             return
                         }
                         attempt++

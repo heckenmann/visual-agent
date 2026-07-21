@@ -55,8 +55,9 @@ internal class AutonomousTaskPlanner(
         todoId: String,
         taskDescription: String,
         workerResult: String,
+        systemPrompt: String,
     ): Boolean {
-        val prompt = OrchestrationConstants.reviewPrompt(taskDescription, workerResult)
+        val prompt = OrchestrationConstants.reviewPrompt(taskDescription, workerResult, systemPrompt)
         val request =
             de.heckenmann.visualagent.agent.ChatRequestContext(
                 messages = prompt,

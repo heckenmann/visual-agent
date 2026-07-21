@@ -118,6 +118,7 @@ internal fun buildFixture(
                 messages.add(it)
                 it
             }
+            setBuildMainSystemContextPrompt { "You are the main orchestrator agent." }
         }
     val subAgentOps = SubAgentOpsProvider()
     subAgentOps.setCreateAgent { name, role, templateName ->
