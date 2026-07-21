@@ -1,41 +1,20 @@
 package de.heckenmann.visualagent.orchestration
-// TODO(size): 312 effective LOC, needs splitting
 
 import de.heckenmann.visualagent.agent.AgentStatus
-import de.heckenmann.visualagent.agent.ChatRequestContext
-import de.heckenmann.visualagent.agent.ChatResponse
-import de.heckenmann.visualagent.agent.ConversationOpsProvider
-import de.heckenmann.visualagent.agent.LLMProvider
-import de.heckenmann.visualagent.agent.Message
-import de.heckenmann.visualagent.agent.ParallelismProvider
 import de.heckenmann.visualagent.agent.SubAgent
-import de.heckenmann.visualagent.agent.SubAgentJobScheduler
-import de.heckenmann.visualagent.agent.SubAgentOpsProvider
-import de.heckenmann.visualagent.agent.config.AgentToolConfigService
-import de.heckenmann.visualagent.agent.tools.ToolEventBus
-import de.heckenmann.visualagent.knowledge.MemoryStore
-import de.heckenmann.visualagent.knowledge.TodoStore
-import de.heckenmann.visualagent.todo.Todo
-import de.heckenmann.visualagent.todo.TodoEventBus
-import de.heckenmann.visualagent.todo.TodoManager
-import io.mockk.coEvery
-import io.mockk.every
-import io.mockk.mockk
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import de.heckenmann.visualagent.todo.TodoStatus
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class AutonomousCoordinatorTest {
     @Test
     fun `auto pickup assigns pending todo to idle agent and schedules work`(): Unit =
         runBlocking {
-            val fixture = coordinator(chatDelayMs = 5000)
+            val fixture = buildFixture(chatDelayMs = 5000)
             fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
             fixture.todoManager.add("Implement feature", "agent-1")
 
@@ -54,7 +33,7 @@ class AutonomousCoordinatorTest {
     @Test
     fun `auto pickup auto assigns unassigned todo to idle agent`(): Unit =
         runBlocking {
-            val fixture = coordinator(chatDelayMs = 5000)
+            val fixture = buildFixture(chatDelayMs = 5000)
             fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
             val todo = fixture.todoManager.add("Implement feature")
 
@@ -73,7 +52,7 @@ class AutonomousCoordinatorTest {
     @Test
     fun `auto pickup does nothing when all agents are busy`() =
         runBlocking {
-            val fixture = coordinator()
+            val fixture = buildFixture()
             fixture.todoManager.add("Implement feature", "agent-1")
             fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.BUSY))
 
@@ -90,7 +69,7 @@ class AutonomousCoordinatorTest {
     @Test
     fun `auto pickup skips todo assigned to missing agent`() =
         runBlocking {
-            val fixture = coordinator()
+            val fixture = buildFixture()
             fixture.todoManager.add("Implement feature", "agent-missing")
 
             try {
@@ -106,7 +85,7 @@ class AutonomousCoordinatorTest {
     @Test
     fun `auto pickup respects parallelism limit`() =
         runBlocking {
-            val fixture = coordinator(parallelism = 1, chatDelayMs = 5000)
+            val fixture = buildFixture(parallelism = 1, chatDelayMs = 5000)
             fixture.todoManager.add("Task 1", "agent-1")
             fixture.todoManager.add("Task 2", "agent-2")
             fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
@@ -125,7 +104,7 @@ class AutonomousCoordinatorTest {
     @Test
     fun `seedUxTodos adds predefined seeds`() =
         runBlocking {
-            val fixture = coordinator()
+            val fixture = buildFixture()
 
             try {
                 fixture.coordinator.seedUxTodos()
@@ -140,7 +119,7 @@ class AutonomousCoordinatorTest {
     @Test
     fun `startAutonomousMode adds goal without seeding defaults`() =
         runBlocking {
-            val fixture = coordinator()
+            val fixture = buildFixture()
 
             try {
                 fixture.coordinator.startAutonomousMode("Custom goal")
@@ -161,7 +140,7 @@ class AutonomousCoordinatorTest {
     @Test
     fun `completion message contains only todo id and get-result hint`() =
         runBlocking {
-            val fixture = coordinator()
+            val fixture = buildFixture()
             fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
             fixture.todoManager.add("Implement feature", "agent-1")
 
@@ -179,9 +158,31 @@ class AutonomousCoordinatorTest {
         }
 
     @Test
+    fun `todo is completed even when sub-agent returns blank response`() =
+        runBlocking {
+            val fixture = buildFixture(responseContent = "")
+            fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
+            val todo = fixture.todoManager.add("Task that yields no text", "agent-1")
+
+            try {
+                fixture.coordinator.startAutonomousProcessing(seed = false)
+                delay(1000)
+
+                assertEquals(
+                    TodoStatus.COMPLETED,
+                    fixture.todoManager.getById(todo.id)!!.status,
+                )
+                val completion = fixture.messages.firstOrNull { it.content.contains("completed todo") }
+                assertNotNull(completion)
+            } finally {
+                fixture.cancel()
+            }
+        }
+
+    @Test
     fun `sub-agent restarts when todo description is edited while running`() =
         runBlocking {
-            val fixture = coordinator(chatDelayMs = 1000)
+            val fixture = buildFixture(chatDelayMs = 1000)
             fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
             val todo = fixture.todoManager.add("Old description", "agent-1")
 
@@ -202,7 +203,7 @@ class AutonomousCoordinatorTest {
     @Test
     fun `coordinator resumes loop when existing todo is reset to PENDING`() =
         runBlocking {
-            val fixture = coordinator(chatDelayMs = 5000)
+            val fixture = buildFixture(chatDelayMs = 5000)
             fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
             val todo = fixture.todoManager.add("Implement feature", "agent-1")
             fixture.todoManager.cancelTodo(todo.id)
@@ -212,7 +213,7 @@ class AutonomousCoordinatorTest {
                 delay(400)
                 assertTrue(fixture.subAgents["agent-1"]?.status == AgentStatus.IDLE)
 
-                fixture.todoManager.updateStatus(todo.id, de.heckenmann.visualagent.todo.TodoStatus.PENDING)
+                fixture.todoManager.updateStatus(todo.id, TodoStatus.PENDING)
                 delay(2000)
 
                 assertEquals(AgentStatus.BUSY, fixture.subAgents["agent-1"]?.status)
@@ -225,7 +226,7 @@ class AutonomousCoordinatorTest {
     @Test
     fun `sub-agent stops when assigned agent changes while running`() =
         runBlocking {
-            val fixture = coordinator(chatDelayMs = 1000)
+            val fixture = buildFixture(chatDelayMs = 1000)
             fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
             fixture.putSubAgent(SubAgent(id = "agent-2", name = "Tester", role = "Testing", status = AgentStatus.IDLE))
             val todo = fixture.todoManager.add("Task", "agent-1")
@@ -242,124 +243,4 @@ class AutonomousCoordinatorTest {
                 fixture.cancel()
             }
         }
-
-    private class Fixture(
-        val coordinator: AutonomousCoordinator,
-        val todoManager: TodoManager,
-        val subAgents: Map<String, SubAgent>,
-        val putSubAgent: (SubAgent) -> Unit,
-        val notifications: MutableList<String>,
-        val savedAgents: MutableList<SubAgent>,
-        val messages: MutableList<Message>,
-        private val scope: CoroutineScope,
-    ) {
-        fun cancel() {
-            scope.cancel()
-        }
-    }
-
-    private fun coordinator(
-        parallelism: Int = 4,
-        chatDelayMs: Long = 0,
-    ): Fixture {
-        val todoEventBus = TodoEventBus()
-        val todoStore = FakeTodoStore()
-        val todoManager = TodoManager(todoStore, todoEventBus)
-        val provider = mockk<LLMProvider>()
-        val memoryStore =
-            object : MemoryStore {
-                override fun saveMemory(
-                    content: String,
-                    tags: List<String>,
-                ): String = "memory-1"
-
-                override fun saveStructuredKnowledge(
-                    subject: String,
-                    summary: String,
-                    nextSteps: String?,
-                ): String = "knowledge-1"
-
-                override fun searchMemories(
-                    query: String,
-                    limit: Int,
-                ): List<de.heckenmann.visualagent.knowledge.Memory> = emptyList()
-            }
-        val toolConfig = mockk<AgentToolConfigService>()
-        every { toolConfig.mainAgentTools() } returns emptySet()
-        every { toolConfig.toolsFor(any<SubAgent>()) } returns emptySet()
-        coEvery { provider.chat(any<ChatRequestContext>()) } coAnswers {
-            val token = it.invocation.args[0].let { arg -> (arg as ChatRequestContext).cancellationToken }
-            if (chatDelayMs > 0) {
-                val start = System.currentTimeMillis()
-                while (System.currentTimeMillis() - start < chatDelayMs) {
-                    if (token?.isCancelled == true) throw kotlinx.coroutines.CancellationException("cancelled")
-                    delay(50)
-                }
-            }
-            ChatResponse(
-                model = "test",
-                message = Message("assistant", "APPROVED\nLooks good."),
-                done = true,
-            )
-        }
-        val notifications = mutableListOf<String>()
-        val savedAgents = mutableListOf<SubAgent>()
-        val messages = mutableListOf<Message>()
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-        val parallelismProvider =
-            object : ParallelismProvider() {
-                override fun get(): Int = parallelism
-            }
-        val scheduler = SubAgentJobScheduler(scope, parallelismProvider)
-        val conversationOps =
-            ConversationOpsProvider(mockk<ToolEventBus>(relaxed = true)).apply {
-                setPersistMessage {
-                    messages.add(it)
-                    it
-                }
-            }
-        val subAgentOps = SubAgentOpsProvider()
-        subAgentOps.setCreateAgent { name, role, templateName ->
-            SubAgent
-                .fromTemplate(id = "created-${subAgentOps.allSubAgents.size}", name = name, role = role, templateName = templateName)
-                .also { subAgentOps.putSubAgent(it) }
-        }
-        subAgentOps.setSaveSubAgent { savedAgents.add(it) }
-        subAgentOps.setNotifyAgent { agentId, message -> notifications += "$agentId:$message" }
-        val subAgents = subAgentOps.allSubAgents
-        val coordinator =
-            AutonomousCoordinator(
-                scope = scope,
-                todoManager = todoManager,
-                llmProvider = provider,
-                todoStore = todoStore,
-                memoryStore = memoryStore,
-                agentToolConfigService = toolConfig,
-                jobScheduler = scheduler,
-                parallelismProvider = parallelismProvider,
-                todoEventBus = todoEventBus,
-                conversationOps = conversationOps,
-                subAgentOps = subAgentOps,
-            )
-        return Fixture(coordinator, todoManager, subAgents, subAgentOps::putSubAgent, notifications, savedAgents, messages, scope)
-    }
-
-    private class FakeTodoStore : TodoStore {
-        private val todos = mutableListOf<Todo>()
-
-        override fun saveTodo(todo: Todo) {
-            todos.removeIf { it.id == todo.id }
-            todos.add(todo)
-        }
-
-        override fun listTodos(): List<Todo> = todos.toList()
-
-        override fun deleteTodo(todoId: String) {
-            todos.removeIf { it.id == todoId }
-        }
-
-        override fun clearTodos() {
-            todos.clear()
-        }
-    }
 }

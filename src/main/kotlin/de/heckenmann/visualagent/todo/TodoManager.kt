@@ -1,5 +1,4 @@
 package de.heckenmann.visualagent.todo
-// TODO(size): 329 effective LOC, needs splitting
 
 import de.heckenmann.visualagent.knowledge.TodoStore
 import java.util.UUID
@@ -147,6 +146,7 @@ class TodoManager(
     ): Boolean {
         val todo = getById(todoId) ?: return false
         todo.description = description
+        todoStore.saveTodo(todo)
         publishChange(TodoChange(TodoChangeType.UPDATED, todo = todo))
         return true
     }
@@ -165,6 +165,7 @@ class TodoManager(
         val todo = getById(todoId) ?: return false
         todo.status = status
         todo.completedAt = if (status == TodoStatus.COMPLETED) java.time.Instant.now() else null
+        todoStore.saveTodo(todo)
         publishChange(TodoChange(TodoChangeType.UPDATED, todo = todo))
         return true
     }
@@ -182,6 +183,7 @@ class TodoManager(
     ): Boolean {
         val todo = getById(todoId) ?: return false
         todo.assignedAgentId = agentId
+        todoStore.saveTodo(todo)
         publishChange(TodoChange(TodoChangeType.UPDATED, todo = todo))
         return true
     }
@@ -201,6 +203,7 @@ class TodoManager(
         if (todo.status != TodoStatus.PENDING) return false
         todo.assignedAgentId = agentId
         todo.status = TodoStatus.IN_PROGRESS
+        todoStore.saveTodo(todo)
         publishChange(TodoChange(TodoChangeType.UPDATED, todo = todo))
         return true
     }
@@ -216,6 +219,7 @@ class TodoManager(
         if (todo.status != TodoStatus.IN_PROGRESS) return false
         todo.status = TodoStatus.COMPLETED
         todo.completedAt = java.time.Instant.now()
+        todoStore.saveTodo(todo)
         publishChange(TodoChange(TodoChangeType.UPDATED, todo = todo))
         return true
     }
@@ -230,6 +234,7 @@ class TodoManager(
         val todo = getById(todoId) ?: return false
         if (todo.status == TodoStatus.COMPLETED || todo.status == TodoStatus.CANCELLED) return false
         todo.status = TodoStatus.CANCELLED
+        todoStore.saveTodo(todo)
         publishChange(TodoChange(TodoChangeType.UPDATED, todo = todo))
         return true
     }
@@ -253,6 +258,7 @@ class TodoManager(
         val moved = ordered.removeAt(fromIndex)
         ordered.add(safeTarget, moved)
         renumberPositions(ordered)
+        ordered.forEach { todoStore.saveTodo(it) }
         publishChange(TodoChange(TodoChangeType.REORDERED, todo = moved))
         return true
     }
@@ -267,6 +273,7 @@ class TodoManager(
         if (orderedIds.size != todos.size) return false
         val ordered = orderedIds.map { id -> todos.find { it.id == id } ?: return false }.toMutableList()
         renumberPositions(ordered)
+        ordered.forEach { todoStore.saveTodo(it) }
         publishChange(TodoChange(TodoChangeType.REORDERED))
         return true
     }
@@ -279,7 +286,10 @@ class TodoManager(
      */
     fun remove(todoId: String): Boolean {
         val removed = todos.removeIf { it.id == todoId }
-        if (removed) publishChange(TodoChange(TodoChangeType.REMOVED, todoId = todoId))
+        if (removed) {
+            todoStore.deleteTodo(todoId)
+            publishChange(TodoChange(TodoChangeType.REMOVED, todoId = todoId))
+        }
         return removed
     }
 
@@ -288,6 +298,7 @@ class TodoManager(
      */
     fun clear() {
         todos.clear()
+        todoStore.clearTodos()
         publishChange(TodoChange(TodoChangeType.CLEARED))
     }
 

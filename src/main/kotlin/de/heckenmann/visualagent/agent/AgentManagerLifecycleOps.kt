@@ -191,21 +191,17 @@ internal class AgentManagerLifecycleOps(
             de.heckenmann.visualagent.todo.TodoChangeType.UPDATED,
             -> {
                 val todo = change.todo ?: return
-                owner.todoStore.saveTodo(todo)
                 persistTodoChangeMessage(formatTodoChangeMessage(change.type, todo))
             }
             de.heckenmann.visualagent.todo.TodoChangeType.REMOVED -> {
                 val todoId = change.todoId ?: return
-                owner.todoStore.deleteTodo(todoId)
                 persistTodoChangeMessage("Removed todo $todoId")
             }
             de.heckenmann.visualagent.todo.TodoChangeType.REORDERED -> {
-                owner.todoManager.getAll().forEach { owner.todoStore.saveTodo(it) }
                 val moved = change.todo?.let { " (${it.description.take(60)}, id=${it.id})" } ?: ""
                 persistTodoChangeMessage("Reordered todo list$moved")
             }
             de.heckenmann.visualagent.todo.TodoChangeType.CLEARED -> {
-                owner.todoStore.clearTodos()
                 persistTodoChangeMessage("Cleared all todos")
             }
         }

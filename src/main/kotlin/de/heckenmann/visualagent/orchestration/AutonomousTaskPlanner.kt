@@ -51,16 +51,27 @@ internal class AutonomousTaskPlanner(
 
     fun buildWorkerInstruction(todo: Todo): String = OrchestrationConstants.workerInstruction(todo.id, todo.description)
 
-    fun reviewWorkerResult(
+    suspend fun reviewWorkerResult(
         todoId: String,
         taskDescription: String,
         workerResult: String,
+        systemPrompt: String,
     ): Boolean {
-        // The previous LLM-based main review added another flaky inference step and caused
-        // simple, correct results (e.g. "count to 50") to be rejected. We now accept any
-        // non-empty worker result as successful; the sub-agent already reports failures
-        // through its own output and tool results.
-        return workerResult.isNotBlank()
+        val prompt = OrchestrationConstants.reviewPrompt(taskDescription, workerResult, systemPrompt)
+        val request =
+            de.heckenmann.visualagent.agent.ChatRequestContext(
+                messages = prompt,
+                enabledTools = emptySet(),
+                metadata = mapOf("sessionId" to "review", "todoId" to todoId),
+            )
+        val response = llmProvider.chat(request)
+        val verdict =
+            response
+                .message
+                .content
+                .trim()
+                .uppercase()
+        return verdict.startsWith("APPROVED")
     }
 
     internal fun isComplex(description: String): Boolean {

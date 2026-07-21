@@ -20,9 +20,7 @@ class UseCaseTool : VisualAgentTool {
         ToolDefinition(
             id = ToolId(TOOL_ID),
             name = ToolId(TOOL_ID).toFunctionName(),
-            description =
-                "List, show, and search packaged Visual Agent use-case documents. " +
-                    "Use action=list, action=show with id/file, or action=search with query.",
+            description = useCaseToolDescription(),
             inputSchema = STRING_SCHEMA,
         )
 
@@ -209,5 +207,12 @@ class UseCaseTool : VisualAgentTool {
         const val MAX_RESULTS = 250
         const val MAX_SNIPPET_LENGTH = 180
         val USE_CASE_FILE_REGEX = Regex("""uc_\d{7}_[a-z0-9_]+\.md""")
+
+        fun useCaseToolDescription(): String =
+            "List, show, and search packaged Visual Agent use-case documents. Actions:\n" +
+                "- list: {\"action\":\"list\",\"limit\":100}. Lists all use cases with ID and title.\n" +
+                "- show: {\"action\":\"show\",\"id\":\"UC-0000067\"} or " +
+                "{\"action\":\"show\",\"file\":\"uc_0000067_query_use_case_catalog.md\"}. Shows full use case content.\n" +
+                "- search: {\"action\":\"search\",\"query\":\"canvas\",\"limit\":20}. Searches use case content by keyword."
     }
 }

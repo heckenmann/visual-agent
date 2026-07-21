@@ -28,9 +28,7 @@ class WorkspaceFileTool(
         ToolDefinition(
             id = ToolId(TOOL_ID),
             name = ToolId(TOOL_ID).toFunctionName(),
-            description =
-                "Inspect imported workspace files. Actions: list, info, hash, readText, extractPdfText, renderPdfPage, " +
-                    "imageInfo, imageBytes, analyzeImage, search, sync. Use id or path to identify files.",
+            description = workspaceFileToolDescription(),
             inputSchema = STRING_SCHEMA,
         )
 
@@ -219,5 +217,24 @@ class WorkspaceFileTool(
 
     private companion object {
         const val TOOL_ID = "workspace:file"
+
+        /**
+         * Returns the tool description for workspace:file with all actions and their parameters.
+         */
+        fun workspaceFileToolDescription(): String =
+            "Inspect imported workspace files. Actions:\n" +
+                "- list: {\"action\":\"list\"}. Lists all imported files.\n" +
+                "- info: {\"action\":\"info\",\"id\":\"...\"} or {\"action\":\"info\",\"path\":\"...\"}. File metadata.\n" +
+                "- hash: {\"action\":\"hash\",\"id\":\"...\"}. SHA-256 hash.\n" +
+                "- readText: {\"action\":\"readText\",\"id\":\"...\"}. Read text content.\n" +
+                "- extractPdfText: {\"action\":\"extractPdfText\",\"id\":\"...\"}. Extract text from PDF.\n" +
+                "- renderPdfPage: {\"action\":\"renderPdfPage\",\"id\":\"...\",\"page\":1}. Render PDF page as image.\n" +
+                "- imageInfo: {\"action\":\"imageInfo\",\"id\":\"...\"}. Image dimensions and type.\n" +
+                "- imageBytes: {\"action\":\"imageBytes\",\"id\":\"...\"}. Base64-encoded image bytes.\n" +
+                "- analyzeImage: {\"action\":\"analyzeImage\",\"id\":\"...\",\"prompt\":\"describe this\"}. " +
+                "Analyze image with vision model.\n" +
+                "- search: {\"action\":\"search\",\"query\":\"...\"}. Search file metadata.\n" +
+                "- sync: {\"action\":\"sync\"}. Sync metadata with filesystem. " +
+                "Use id or path to identify files."
     }
 }

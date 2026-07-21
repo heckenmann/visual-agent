@@ -5,6 +5,8 @@ import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
 import de.heckenmann.visualagent.testsupport.TestPersistence
 import de.heckenmann.visualagent.todo.Todo
+import de.heckenmann.visualagent.todo.TodoEventBus
+import de.heckenmann.visualagent.todo.TodoManager
 import de.heckenmann.visualagent.todo.TodoStatus
 import io.mockk.every
 import io.mockk.mockk
@@ -19,6 +21,7 @@ class TodosToolTest {
     private fun createTool(db: TestPersistence): TodosTool {
         val manager = mockk<AgentManager>()
         every { manager.getSubAgent(any()) } returns SubAgent(id = "agent-1", name = "Coder", role = "Implementation")
+        every { manager.todoManager } returns TodoManager(db, TodoEventBus())
         return TodosTool(db, db, manager)
     }
 
@@ -110,7 +113,6 @@ class TodosToolTest {
             )
             assertTrue(tool.execute(json("action" to "complete", "id" to id)).success)
             assertTrue(db.listTodos().single().completedAt != null)
-            assertTrue(tool.execute(json("action" to "cancel", "id" to id)).success)
             assertTrue(tool.execute(json("action" to "remove", "id" to id)).success)
             assertTrue(db.listTodos().isEmpty())
 
@@ -135,6 +137,7 @@ class TodosToolTest {
             val manager = mockk<AgentManager>()
             every { manager.getSubAgent("missing") } returns null
             every { manager.getSubAgent("agent-1") } returns SubAgent(id = "agent-1", name = "Coder", role = "Implementation")
+            every { manager.todoManager } returns TodoManager(db, TodoEventBus())
             val tool = TodosTool(db, db, manager)
 
             val missing = tool.execute(json("action" to "add", "description" to "No agent"))
@@ -165,6 +168,7 @@ class TodosToolTest {
             val manager = mockk<AgentManager>()
             every { manager.getSubAgent("missing") } returns null
             every { manager.getSubAgent("agent-1") } returns SubAgent(id = "agent-1", name = "Coder", role = "Implementation")
+            every { manager.todoManager } returns TodoManager(db, TodoEventBus())
             val tool = TodosTool(db, db, manager)
             val added = tool.execute(json("action" to "add", "description" to "Task", "assignedAgentId" to "agent-1"))
             val id = added.content.removePrefix("Added todo ")

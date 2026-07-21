@@ -20,7 +20,11 @@ class TerminalTool : VisualAgentTool {
         ToolDefinition(
             id = ToolId("terminal"),
             name = ToolId("terminal").toFunctionName(),
-            description = "Run a non-interactive shell command in the workspace. Input: {\"command\":\"pwd\",\"timeoutSeconds\":10}.",
+            description =
+                "Run a non-interactive shell command in the workspace directory. " +
+                    "Input: {\"command\":\"ls -la\",\"timeoutSeconds\":10}. " +
+                    "timeoutSeconds range: 1-30. Returns stdout + stderr combined. " +
+                    "Exit code is included in the result. Use for building, testing, git, and file operations.",
             inputSchema = STRING_SCHEMA,
         )
 
@@ -82,7 +86,10 @@ class BrowserTool : VisualAgentTool {
         ToolDefinition(
             id = ToolId("browser"),
             name = ToolId("browser").toFunctionName(),
-            description = "Browser automation interface. Currently reports unavailable when no backend is configured.",
+            description =
+                "Browser automation interface. " +
+                    "Currently not available — no browser backend is configured. " +
+                    "Input: {}.",
             inputSchema = STRING_SCHEMA,
         )
 
@@ -103,7 +110,10 @@ class SearchTool : VisualAgentTool {
         ToolDefinition(
             id = ToolId("search"),
             name = ToolId("search").toFunctionName(),
-            description = "Search interface. Currently reports unavailable when no backend is configured.",
+            description =
+                "Search interface. " +
+                    "Currently not available — no search backend is configured. " +
+                    "Input: {}.",
             inputSchema = STRING_SCHEMA,
         )
 
@@ -124,7 +134,10 @@ class SleepTool : VisualAgentTool {
         ToolDefinition(
             id = ToolId("sleep"),
             name = ToolId("sleep").toFunctionName(),
-            description = "Wait for a specified duration. Input: {\"seconds\":2}.",
+            description =
+                "Wait for a specified duration. " +
+                    "Input: {\"seconds\":2}. " +
+                    "seconds range: 0-300. Use for waiting between operations or polling.",
             inputSchema = STRING_SCHEMA,
         )
 

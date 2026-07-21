@@ -1,7 +1,5 @@
 package de.heckenmann.visualagent.agent
 
-// TODO(size): 305 effective LOC, needs splitting
-
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.conversation.AgentManagerConversationOps
 import de.heckenmann.visualagent.agent.conversation.WelcomeMessageComposer
@@ -24,8 +22,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import org.springframework.beans.factory.DisposableBean
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
@@ -105,6 +101,7 @@ class AgentManager
         private val lifecycleOps = AgentManagerLifecycleOps(this)
         internal val conversationOps = AgentManagerConversationOps(this)
         private val autonomyOps = AgentManagerAutonomyOps(this)
+        internal lateinit var todoTrigger: AgentTodoTrigger
 
         init {
             lifecycleOps.loadAgentsFromDb()
@@ -133,38 +130,19 @@ class AgentManager
                     conversationOps = conversationOpsProvider,
                     subAgentOps = subAgentOpsProvider,
                 )
+            todoTrigger =
+                AgentTodoTrigger(
+                    scope = scope,
+                    conversationOps = conversationOps,
+                    llmProvider = llmProvider,
+                    responseCoordinator = responseCoordinator,
+                    toolEventBus = toolEventBus,
+                )
             todoEventBus.addListener { change ->
                 val todo = change.todo ?: return@addListener
                 if (change.type != TodoChangeType.UPDATED) return@addListener
                 when (todo.status) {
-                    TodoStatus.COMPLETED -> {
-                        val content =
-                            "Todo completed: ${todo.description.take(120)} (${todo.id}). " +
-                                "Use `todos` with `get-result` to read the stored result."
-                        val metadata =
-                            buildJsonObject {
-                                put("type", "todo")
-                                put("todoId", todo.id)
-                                put("success", true)
-                            }.toString()
-                        conversationOps.persist(
-                            Message(role = "sub_agent", content = content, metadata = metadata),
-                        )
-                        agentStatusCallbackAdapter.notify("main", content)
-                    }
-                    TodoStatus.CANCELLED -> {
-                        val content = "Todo cancelled: ${todo.description.take(120)} (${todo.id})."
-                        val metadata =
-                            buildJsonObject {
-                                put("type", "todo")
-                                put("todoId", todo.id)
-                                put("success", false)
-                            }.toString()
-                        conversationOps.persist(
-                            Message(role = "sub_agent", content = content, metadata = metadata),
-                        )
-                        agentStatusCallbackAdapter.notify("main", content)
-                    }
+                    TodoStatus.COMPLETED, TodoStatus.CANCELLED -> todoTrigger.trigger()
                     else -> Unit
                 }
             }

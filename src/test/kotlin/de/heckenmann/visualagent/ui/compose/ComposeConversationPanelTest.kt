@@ -31,6 +31,7 @@ class ComposeConversationPanelTest {
                     modalRequester = ComposeModalRequester { },
                     inFlight = InFlightStateHolder(),
                     toolEventBus = ToolEventBus(),
+                    todoEventBus = TodoEventBus(),
                 )
             }
         }
@@ -53,6 +54,7 @@ class ComposeConversationPanelTest {
                     modalRequester = ComposeModalRequester { },
                     inFlight = InFlightStateHolder(),
                     toolEventBus = ToolEventBus(),
+                    todoEventBus = TodoEventBus(),
                 )
             }
         }

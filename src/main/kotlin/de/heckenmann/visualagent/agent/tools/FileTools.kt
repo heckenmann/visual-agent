@@ -26,7 +26,10 @@ class FileReadTool : VisualAgentTool {
         ToolDefinition(
             id = ToolId("file:read"),
             name = ToolId("file:read").toFunctionName(),
-            description = "Read a UTF-8 text file under the workspace root. Input: {\"path\":\"relative/path\"}.",
+            description =
+                "Read a UTF-8 text file under the workspace root. " +
+                    "Input: {\"path\":\"relative/path/to/file.txt\"}. " +
+                    "The path is relative to the workspace root. Returns the full file contents.",
             inputSchema = pathSchema(),
         )
 
@@ -55,7 +58,10 @@ class FileListTool : VisualAgentTool {
         ToolDefinition(
             id = ToolId("file:list"),
             name = ToolId("file:list").toFunctionName(),
-            description = "List files under a workspace directory. Input: {\"path\":\"relative/path\"}.",
+            description =
+                "List files and directories under a workspace directory. " +
+                    "Input: {\"path\":\"relative/path\"}. " +
+                    "If path is omitted, lists the workspace root. Directories are shown with a trailing slash.",
             inputSchema = pathSchema(),
         )
 
@@ -92,7 +98,11 @@ class FileGlobTool : VisualAgentTool {
         ToolDefinition(
             id = ToolId("file:glob"),
             name = ToolId("file:glob").toFunctionName(),
-            description = "Find files by glob under the workspace root. Input: {\"pattern\":\"**/*.kt\"}.",
+            description =
+                "Find files by glob pattern under the workspace root. " +
+                    "Input: {\"pattern\":\"**/*.kt\"}. " +
+                    "Returns up to 500 matching file paths relative to workspace root. " +
+                    "Common patterns: **/*.kt, **/*.md, src/**/*.java, *.gradle.kts.",
             inputSchema = requiredStringSchema("pattern"),
         )
 
@@ -127,7 +137,11 @@ class FileGrepTool : VisualAgentTool {
         ToolDefinition(
             id = ToolId("file:grep"),
             name = ToolId("file:grep").toFunctionName(),
-            description = "Search UTF-8 files under the workspace root. Input: {\"query\":\"text\",\"path\":\"optional/path\"}.",
+            description =
+                "Search UTF-8 files under the workspace root for a text query. " +
+                    "Input: {\"query\":\"search text\",\"path\":\"optional/subdirectory\"}. " +
+                    "Returns up to 200 matches with file path, line number, and matching line. " +
+                    "Search is case-insensitive. If path is omitted, searches the entire workspace.",
             inputSchema = STRING_SCHEMA,
         )
 
@@ -170,7 +184,10 @@ class FileWriteTool : VisualAgentTool {
         ToolDefinition(
             id = ToolId("file:write"),
             name = ToolId("file:write").toFunctionName(),
-            description = "Write a UTF-8 text file under the workspace root. Input: {\"path\":\"relative/path\",\"content\":\"text\"}.",
+            description =
+                "Write a UTF-8 text file under the workspace root. Creates parent directories if needed. " +
+                    "Input: {\"path\":\"relative/path/to/file.txt\",\"content\":\"file contents here\"}. " +
+                    "The path is relative to the workspace root. Overwrites existing files.",
             inputSchema = STRING_SCHEMA,
         )
 
@@ -201,7 +218,10 @@ class FileEditTool : VisualAgentTool {
         ToolDefinition(
             id = ToolId("file:edit"),
             name = ToolId("file:edit").toFunctionName(),
-            description = "Replace text in a UTF-8 file. Input: {\"path\":\"relative/path\",\"oldText\":\"old\",\"newText\":\"new\"}.",
+            description =
+                "Replace text in a UTF-8 file. " +
+                    "Input: {\"path\":\"relative/path/to/file.txt\",\"oldText\":\"text to replace\",\"newText\":\"replacement text\"}. " +
+                    "The oldText must exist exactly once in the file. Use file:read first to verify the content.",
             inputSchema = STRING_SCHEMA,
         )
 

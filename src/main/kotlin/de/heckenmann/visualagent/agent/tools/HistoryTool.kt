@@ -19,8 +19,13 @@ class HistoryTool(
             id = ToolId("history"),
             name = ToolId("history").toFunctionName(),
             description =
-                "Read conversation history. Actions: load older pages or search by keyword. " +
-                    "Input: {\"action\":\"load|search\", ...}.",
+                "Read conversation history. Actions and their required input parameters:\n" +
+                    "- load: {\"action\":\"load\",\"limit\":20,\"offset\":0}. " +
+                    "Loads older conversation pages. limit (1-100), offset (0+).\n" +
+                    "- search: {\"action\":\"search\",\"query\":\"search term\",\"limit\":20}. " +
+                    "Searches conversation history by keyword. limit (1-100).\n" +
+                    "Use search when you need information from earlier in the conversation " +
+                    "that is not in your current context.",
             inputSchema = STRING_SCHEMA,
         )
 

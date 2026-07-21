@@ -42,4 +42,4 @@ jobs:
           validate-wrappers: false
 
       - name: Run tests
-        run: xvfb-run -a gradle test --build-cache --no-daemon --no-configuration-cache
+        run: xvfb-run -a gradle ktlintCheck check test --build-cache --no-daemon --no-configuration-cache
