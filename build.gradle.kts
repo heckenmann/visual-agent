@@ -65,7 +65,7 @@ dependencies {
     implementation("io.github.vinceglb:filekit-dialogs-compose:0.14.2")
 
     // SQLite JDBC
-    implementation("org.xerial:sqlite-jdbc:3.53.2.0")
+    implementation("org.xerial:sqlite-jdbc:3.53.2.1")
 
     // Kotlinx Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
