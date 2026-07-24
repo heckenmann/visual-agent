@@ -61,7 +61,7 @@ private fun MarkdownBlock(
                     block.code.trimEnd(),
                     color = scheme.onSurface,
                     fontFamily = FontFamily.Monospace,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                 )
             }
         is ComposeMarkdownBlock.Heading ->
@@ -76,7 +76,7 @@ private fun MarkdownBlock(
             Text(
                 renderInlines(block.inlines),
                 color = scheme.onSurface,
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
             )
         is ComposeMarkdownBlock.Table -> MarkdownTable(block, scheme)
     }
@@ -162,7 +162,7 @@ private fun MarkdownList(
                     if (block.ordered) "${block.startNumber + index}." else "-",
                     color = scheme.tertiary,
                     fontWeight = FontWeight.SemiBold,
-                    style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
                 )
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     item.forEach { MarkdownBlock(it, scheme) }
