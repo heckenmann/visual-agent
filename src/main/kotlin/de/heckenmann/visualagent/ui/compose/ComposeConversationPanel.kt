@@ -27,6 +27,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.CancellationToken
@@ -61,6 +63,7 @@ internal fun ConversationPanel(
     var editingId by remember { mutableStateOf<String?>(null) }
     var deletingMessageIds by remember { mutableStateOf(setOf<String>()) }
     var activeToken by remember { mutableStateOf<CancellationToken?>(null) }
+    var panelSize by remember { mutableStateOf(IntSize.Zero) }
     val queue = remember { MessageQueue() }
     LaunchedEffect(config.queueFlushMode) {
         queue.flushMode =
@@ -136,6 +139,7 @@ internal fun ConversationPanel(
     }
     ConversationStartupScrollEffect(history, listState)
     ConversationScrollOnChangeEffect(history, listState)
+    ConversationResizeScrollEffect(panelSize, history, listState)
     LaunchedEffect(sending, inFlight.state.value.totalActive) {
         if (!sending && inFlight.state.value.totalActive == 0 && queue.isNotEmpty && !queue.flushing) {
             queue.flushing = true
@@ -178,7 +182,7 @@ internal fun ConversationPanel(
             }
         }
     }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize().onSizeChanged { panelSize = it }) {
         Box(modifier = Modifier.weight(1f)) {
             LazyColumn(
                 state = listState,

@@ -5,7 +5,9 @@ package de.heckenmann.visualagent.ui.compose
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.unit.IntSize
 import de.heckenmann.visualagent.agent.Message
+import kotlinx.coroutines.delay
 
 /**
  * Scrolls the conversation list to the bottom once on composition when history is not empty.
@@ -38,6 +40,27 @@ internal fun ConversationScrollOnChangeEffect(
     LaunchedEffect(lastMessageKey) {
         if (history.isNotEmpty()) {
             listState.requestScrollToItem(history.lastIndex)
+        }
+    }
+}
+
+/**
+ * Scrolls to the bottom of the conversation list when the panel is resized.
+ *
+ * A short debounce prevents scrolling during intermediate resize frames.
+ */
+@Composable
+internal fun ConversationResizeScrollEffect(
+    panelSize: IntSize,
+    history: List<Message>,
+    listState: LazyListState,
+) {
+    LaunchedEffect(panelSize) {
+        if (panelSize != IntSize.Zero) {
+            delay(200)
+            if (history.isNotEmpty()) {
+                listState.requestScrollToItem(history.lastIndex)
+            }
         }
     }
 }
