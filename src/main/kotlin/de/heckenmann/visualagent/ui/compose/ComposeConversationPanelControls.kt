@@ -149,7 +149,7 @@ internal fun ConversationInputArea(
 }
 
 @Composable
-private fun PulsingDots() {
+internal fun PulsingDots() {
     val transition = rememberInfiniteTransition(label = "streaming")
     val offsets = listOf(0, 160, 320)
     val alphas =

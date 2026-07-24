@@ -62,10 +62,11 @@ class ConversationPanelRowsTest {
             ToolMessageRow(
                 message = Message(role = "tool", content = "Tool file:read · ok · hello world", metadata = metadata),
                 isDeleting = false,
+                isInFlight = false,
                 onDelete = {},
             )
         }
-        composeTestRule.onNodeWithText("TOOL · file:read").assertExists()
+        composeTestRule.onNodeWithText("file:read").assertExists()
         composeTestRule.onNodeWithText("42ms").assertExists()
         // Hidden initially.
         composeTestRule.onNodeWithText("hello world").assertDoesNotExist()
@@ -77,7 +78,44 @@ class ConversationPanelRowsTest {
     }
 
     @Test
-    fun `sub-agent row renders agent name and success badge`() {
+    fun `tool row shows running spinner while in flight`() {
+        val metadata =
+            buildJsonObject {
+                put("toolId", "file:read")
+                put("status", "ok")
+            }.toString()
+        mount {
+            ToolMessageRow(
+                message = Message(role = "tool", content = "", metadata = metadata),
+                isDeleting = false,
+                isInFlight = true,
+                onDelete = {},
+            )
+        }
+        composeTestRule.onNodeWithText("running…").assertExists()
+    }
+
+    @Test
+    fun `tool row error state uses error tint`() {
+        val metadata =
+            buildJsonObject {
+                put("toolId", "file:read")
+                put("status", "error")
+                put("resultError", "boom")
+            }.toString()
+        mount {
+            ToolMessageRow(
+                message = Message(role = "tool", content = "", metadata = metadata),
+                isDeleting = false,
+                isInFlight = false,
+                onDelete = {},
+            )
+        }
+        composeTestRule.onNodeWithText("file:read").assertExists()
+    }
+
+    @Test
+    fun `sub-agent row renders agent name and success summary`() {
         val metadata =
             buildJsonObject {
                 put("type", "sub_agent")
@@ -95,11 +133,11 @@ class ConversationPanelRowsTest {
                         metadata = metadata,
                     ),
                 isDeleting = false,
+                isRunning = false,
                 onDelete = {},
             )
         }
-        composeTestRule.onNodeWithText("AGENT · researcher").assertExists()
-        composeTestRule.onNodeWithText("completed").assertExists()
+        composeTestRule.onNodeWithText("Agent \"researcher\" completed a task").assertExists()
         // Hidden until expanded.
         composeTestRule.onNodeWithText("found something").assertDoesNotExist()
         composeTestRule
@@ -111,12 +149,33 @@ class ConversationPanelRowsTest {
     }
 
     @Test
+    fun `sub-agent row shows running chip while agent is busy`() {
+        val metadata =
+            buildJsonObject {
+                put("type", "sub_agent")
+                put("success", true)
+                put("agentId", "agent-1")
+                put("agentName", "coder")
+            }.toString()
+        mount {
+            SubAgentMessageRow(
+                message = Message(role = "sub_agent", content = "x", metadata = metadata),
+                isDeleting = false,
+                isRunning = true,
+                onDelete = {},
+            )
+        }
+        composeTestRule.onNodeWithText("Agent \"coder\" is working…").assertExists()
+    }
+
+    @Test
     fun `message row delete button invokes onDelete`() {
         var deleted = false
         mount {
             MessageRow(
                 message = Message(role = "assistant", content = "hi", id = "msg-1"),
                 isStreamingPlaceholder = false,
+                isStreaming = false,
                 canRetry = false,
                 canEdit = false,
                 canDelete = true,
@@ -138,6 +197,7 @@ class ConversationPanelRowsTest {
             MessageRow(
                 message = Message(role = "assistant", content = "hi", id = "msg-1"),
                 isStreamingPlaceholder = false,
+                isStreaming = false,
                 canRetry = false,
                 canEdit = false,
                 canDelete = false,
@@ -165,6 +225,7 @@ class ConversationPanelRowsTest {
             ToolMessageRow(
                 message = Message(role = "tool", content = "Tool pwd · ok", metadata = metadata),
                 isDeleting = false,
+                isInFlight = false,
                 onDelete = { deleteClicked = true },
             )
         }
@@ -185,6 +246,7 @@ class ConversationPanelRowsTest {
             SubAgentMessageRow(
                 message = Message(role = "sub_agent", content = "x", metadata = metadata),
                 isDeleting = false,
+                isRunning = false,
                 onDelete = { deleteClicked = true },
             )
         }
@@ -218,5 +280,17 @@ class ConversationPanelRowsTest {
         assertEquals("tool", parsed.toolId)
         assertEquals("ok", parsed.status)
         assertEquals(null, parsed.durationMillis)
+    }
+
+    @Test
+    fun `thinking row is collapsed by default and expands`() {
+        mount {
+            ThinkingRow(content = "reasoning steps", isStreaming = false)
+        }
+        composeTestRule.onNodeWithText("Thinking").assertExists()
+        composeTestRule.onNodeWithText("reasoning steps").assertDoesNotExist()
+        composeTestRule.onNodeWithContentDescription("Expand thinking").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("reasoning steps").assertExists()
     }
 }

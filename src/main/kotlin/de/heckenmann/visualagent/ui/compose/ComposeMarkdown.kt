@@ -54,7 +54,7 @@ private fun MarkdownBlock(
                     Modifier
                         .fillMaxWidth()
                         .background(scheme.surfaceContainer, RoundedCornerShape(10.dp))
-                        .border(1.dp, scheme.outline, RoundedCornerShape(10.dp))
+                        .border(1.dp, scheme.outlineVariant, RoundedCornerShape(10.dp))
                         .padding(10.dp),
             ) {
                 Text(
@@ -91,7 +91,7 @@ private fun MarkdownTable(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .border(1.dp, scheme.outline, RoundedCornerShape(4.dp))
+                .border(1.dp, scheme.outlineVariant, RoundedCornerShape(4.dp))
                 .padding(1.dp),
     ) {
         block.headerRow?.let { header ->
@@ -138,7 +138,7 @@ private fun MarkdownTableCell(
         modifier =
             modifier
                 .fillMaxHeight()
-                .border(0.5.dp, scheme.outline)
+                .border(0.5.dp, scheme.outlineVariant)
                 .padding(horizontal = 8.dp, vertical = 4.dp),
     ) {
         Text(

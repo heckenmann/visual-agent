@@ -171,7 +171,7 @@ private fun VisualAgentComposeApp(
         workspaceFocusRequester.requestFocus()
         deps.agentManager.startAutonomousProcessing(seed = false)
     }
-    RegisterAgentStatusCallback(inFlight, deps.agentStatusCallbackAdapter)
+    RegisterAgentStatusCallback(inFlight, deps.agentStatusCallbackAdapter, deps.todoEventBus)
     DisposableEffect(deps.workspaceLayoutService) {
         val handle =
             deps.workspaceLayoutService.addWindowStateListener { states ->
