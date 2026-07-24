@@ -162,7 +162,7 @@ private fun MarkdownList(
                     if (block.ordered) "${block.startNumber + index}." else "-",
                     color = scheme.tertiary,
                     fontWeight = FontWeight.SemiBold,
-            style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyMedium,
                 )
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     item.forEach { MarkdownBlock(it, scheme) }

@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -60,12 +59,20 @@ internal fun MessageRow(
     val clipboard = LocalClipboardManager.current
     val isUser = message.role == "user"
     val accent = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
-    val background = if (isUser) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surfaceContainerLow
+    val background =
+        if (isUser) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerLow
+        }
     AnimatedVisibility(
         visible = !isDeleting,
         enter = fadeIn(),
         exit = fadeOut(animationSpec = tween(DELETE_ANIMATION_DURATION_MS)),
-        modifier = modifier.fillMaxWidth().then(if (!isStreaming) Modifier.animateContentSize() else Modifier),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .then(if (!isStreaming) Modifier.animateContentSize() else Modifier),
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().background(background, shape = MaterialTheme.shapes.medium).padding(12.dp),
