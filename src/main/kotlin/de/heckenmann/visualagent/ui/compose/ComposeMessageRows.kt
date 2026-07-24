@@ -40,6 +40,7 @@ import de.heckenmann.visualagent.agent.Message
 internal fun MessageRow(
     message: Message,
     isStreamingPlaceholder: Boolean,
+    isStreaming: Boolean,
     canRetry: Boolean,
     canEdit: Boolean,
     canDelete: Boolean,
@@ -58,7 +59,7 @@ internal fun MessageRow(
         visible = !isDeleting,
         enter = fadeIn(),
         exit = fadeOut(animationSpec = tween(DELETE_ANIMATION_DURATION_MS)),
-        modifier = modifier.fillMaxWidth().animateContentSize(),
+        modifier = modifier.fillMaxWidth(),
     ) {
         PanelContentCard(
             modifier = Modifier.fillMaxWidth(),
@@ -111,6 +112,13 @@ internal fun MessageRow(
                     text = "Thinking…",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            } else if (isStreaming) {
+                Text(
+                    text = message.content,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(top = 4.dp),
                 )
             } else {

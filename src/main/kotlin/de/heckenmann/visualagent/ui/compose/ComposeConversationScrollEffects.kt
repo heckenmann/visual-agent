@@ -6,10 +6,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import de.heckenmann.visualagent.agent.Message
-import kotlinx.coroutines.delay
-
-/** Debounce delay before auto-scrolling so layout info is stable after content changes. */
-internal const val SCROLL_DEBOUNCE_MS = 50L
 
 /**
  * Scrolls the conversation list to the bottom once on composition when history is not empty.
@@ -29,9 +25,9 @@ internal fun ConversationStartupScrollEffect(
 /**
  * Keeps the conversation list scrolled to the bottom when the last message changes.
  *
- * Reacting to the last message identity and content (not just the list size) ensures
- * streaming responses, which mutate the last assistant item in place, still keep the
- * latest content visible.
+ * Uses [LazyListState.requestScrollToItem] (non-suspending) so the scroll is
+ * posted as a request and processed in the next layout pass without blocking
+ * the composition or the chunk callback.
  */
 @Composable
 internal fun ConversationScrollOnChangeEffect(
@@ -41,8 +37,7 @@ internal fun ConversationScrollOnChangeEffect(
     val lastMessageKey = history.lastOrNull()?.let { "${it.id}:${it.content.hashCode()}" }
     LaunchedEffect(lastMessageKey) {
         if (history.isNotEmpty()) {
-            delay(SCROLL_DEBOUNCE_MS)
-            listState.scrollToItem(history.lastIndex)
+            listState.requestScrollToItem(history.lastIndex)
         }
     }
 }

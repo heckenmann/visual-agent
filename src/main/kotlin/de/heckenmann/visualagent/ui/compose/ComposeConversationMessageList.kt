@@ -42,6 +42,7 @@ internal fun LazyListScope.ConversationMessageList(
                     ToolMessageRow(
                         message = message,
                         isDeleting = message.id in deletingMessageIds,
+                        isInFlight = false,
                         onDelete = onDelete,
                         modifier = Modifier.padding(top = topPadding),
                     )
@@ -49,13 +50,16 @@ internal fun LazyListScope.ConversationMessageList(
                     SubAgentMessageRow(
                         message = message,
                         isDeleting = message.id in deletingMessageIds,
+                        isRunning = false,
                         onDelete = onDelete,
                         modifier = Modifier.padding(top = topPadding),
                     )
-                else ->
+                else -> {
+                    val isStreaming = message.role == "assistant" && sending && index == history.lastIndex
                     MessageRow(
                         message = message,
                         isStreamingPlaceholder = isStreamingPlaceholder,
+                        isStreaming = isStreaming,
                         canRetry = message.role == "assistant" && !sending && !isStreamingPlaceholder,
                         canEdit = message.role == "user" && !sending,
                         canDelete = message.id != null && message.role != "system" && message.id !in deletingMessageIds,
@@ -74,6 +78,7 @@ internal fun LazyListScope.ConversationMessageList(
                         onDelete = onDelete,
                         modifier = Modifier.padding(top = topPadding),
                     )
+                }
             }
         }
     }
