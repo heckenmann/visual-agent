@@ -43,6 +43,7 @@ class AppConfig private constructor() {
     var timeoutSeconds: Int = 120
     var userModelInstruction: String = ""
     var favoriteModels: String = ""
+    var queueFlushMode: String = "ONE_BY_ONE"
 
     private val listeners = CopyOnWriteArrayList<(AppConfigChange) -> Unit>()
     private var lastSnapshot = snapshot()
@@ -74,6 +75,7 @@ class AppConfig private constructor() {
         internal const val KEY_SESSION_TIMEOUT_SECONDS = "session.timeout.seconds"
         internal const val KEY_SESSION_USER_MODEL_INSTRUCTION = "session.user.model.instruction"
         internal const val KEY_SESSION_FAVORITE_MODELS = "session.favorite.models"
+        internal const val KEY_SESSION_QUEUE_FLUSH_MODE = "session.queue.flush.mode"
     }
 
     /**
@@ -219,6 +221,7 @@ class AppConfig private constructor() {
                 KEY_SESSION_TIMEOUT_SECONDS to timeoutSeconds.toString(),
                 KEY_SESSION_USER_MODEL_INSTRUCTION to userModelInstruction,
                 KEY_SESSION_FAVORITE_MODELS to favoriteModels,
+                KEY_SESSION_QUEUE_FLUSH_MODE to queueFlushMode,
             ),
         )
 
@@ -244,6 +247,7 @@ class AppConfig private constructor() {
             db.setPreference(KEY_SESSION_TIMEOUT_SECONDS, timeoutSeconds.toString())
             db.setPreference(KEY_SESSION_USER_MODEL_INSTRUCTION, userModelInstruction)
             db.setPreference(KEY_SESSION_FAVORITE_MODELS, favoriteModels)
+            db.setPreference(KEY_SESSION_QUEUE_FLUSH_MODE, queueFlushMode)
         }
     }
 
@@ -281,6 +285,7 @@ class AppConfig private constructor() {
             timeoutSeconds = db.getPreference(KEY_SESSION_TIMEOUT_SECONDS)?.toIntOrNull() ?: timeoutSeconds
             userModelInstruction = db.getPreference(KEY_SESSION_USER_MODEL_INSTRUCTION) ?: userModelInstruction
             favoriteModels = db.getPreference(KEY_SESSION_FAVORITE_MODELS) ?: favoriteModels
+            queueFlushMode = db.getPreference(KEY_SESSION_QUEUE_FLUSH_MODE) ?: queueFlushMode
         }
     }
 }

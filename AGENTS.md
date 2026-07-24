@@ -143,7 +143,8 @@ Sub-agents get their own `chatHistory + new turn`, `agentId/agentName/agentRole`
 
 ## Use-Case Documentation
 
-Every new user-visible function (toolbar button, panel button, menu action, command-palette action, tool call, autonomous workflow, persisted state change) must create or update a use-case under `docs/usecases/`. Filename pattern: `uc_\d{7}_[a-z0-9_]+\.md` (enforced by `useCaseDocumentationCheck`). Each file must include a `## Tool Calls` section before `## Code Entry Points`; write `- None.` when no tool-call path exists. The catalog is packaged into the build and exposed to enabled sub-agents through the `usecases` tool (`list`, `show`, `search`).
+Every new user-visible function (toolbar button, panel button, menu action, command-palette action, tool call, autonomous workflow, persisted state change) must create or update a use-case under `docs/usecases/`. Filename pattern: `uc_\\d{7}_[a-z0-9_]+\\.md` (enforced by `useCaseDocumentationCheck`). Each file must include a `## Tool Calls` section before `## Code Entry Points`; write `- None.` when no tool-call path exists. The catalog is packaged into the build and exposed to enabled sub-agents through the `usecases` tool (`list`, `show`, `search`).
+- Use `./scripts/next-use-case.sh <description>` to generate the next free filename. The script considers both existing files and deleted files in Git history and will never reuse a number.
 
 ## KDoc Example
 

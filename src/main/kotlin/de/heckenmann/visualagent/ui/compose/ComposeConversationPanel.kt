@@ -14,8 +14,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -29,28 +27,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.input.key.key
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.CancellationToken
-import de.heckenmann.visualagent.agent.Message
-import de.heckenmann.visualagent.agent.conversation.WelcomeResult
 import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
-import de.heckenmann.visualagent.error.ErrorMessageMapper
+import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.todo.TodoEventBus
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Conversation panel with message history, streaming input, and todo actions.
+ * Conversation panel with message history, streaming input, message queue, and todo actions.
  *
- * Use cases: UC-0000002, UC-0000003, UC-0000004, UC-0000045, UC-0000046,
- * UC-0000049, UC-0000071.
- *
- * @param agentManager Source of conversation history and message streaming
- * @param modalRequester Modal requester used for destructive confirmations
- * @param inFlight In-flight state holder for the active stream indicator
+ * Use cases: UC-0000002, UC-0000003, UC-0000004, UC-0000045, UC-0000046, UC-0000049, UC-0000071.
  */
 @Composable
 internal fun ConversationPanel(
@@ -59,6 +49,7 @@ internal fun ConversationPanel(
     inFlight: InFlightStateHolder,
     toolEventBus: ToolEventBus,
     todoEventBus: TodoEventBus,
+    config: AppConfigBean,
 ) {
     val scope = rememberCoroutineScope()
     val inputFocusRequester = remember { FocusRequester() }
@@ -70,6 +61,15 @@ internal fun ConversationPanel(
     var editingId by remember { mutableStateOf<String?>(null) }
     var deletingMessageIds by remember { mutableStateOf(setOf<String>()) }
     var activeToken by remember { mutableStateOf<CancellationToken?>(null) }
+    val queue = remember { MessageQueue() }
+    LaunchedEffect(config.queueFlushMode) {
+        queue.flushMode =
+            try {
+                QueueFlushMode.valueOf(config.queueFlushMode)
+            } catch (_: IllegalArgumentException) {
+                QueueFlushMode.ONE_BY_ONE
+            }
+    }
     val isAtBottom by remember {
         derivedStateOf {
             val info = listState.layoutInfo
@@ -87,46 +87,43 @@ internal fun ConversationPanel(
         onDispose { handle.close() }
     }
     DisposableEffect(todoEventBus) {
-        val handle = todoEventBus.addListener { history = agentManager.getHistory() }
+        val handle =
+            todoEventBus.addListener {
+                val previousHistory = history
+                history = agentManager.getHistory()
+                if (sending || inFlight.state.value.totalActive > 0) {
+                    val newSubAgentMessages =
+                        history.filter { it.role == "sub_agent" && it !in previousHistory }
+                    newSubAgentMessages.forEach { msg ->
+                        queue.enqueue(
+                            content = msg.content,
+                            source = QueuedMessageSource.TODO_RETURN,
+                        )
+                    }
+                }
+            }
         onDispose { handle.close() }
     }
     val sendContent: (String) -> Unit = { rawContent ->
         val content = rawContent.trim()
-        if (content.isNotBlank() && !sending) {
-            input = ""
-            sending = true
-            status = "Streaming..."
-            history = history + Message("user", content)
-            val streamRequestId =
-                java.util.UUID
-                    .randomUUID()
-                    .toString()
-            val token = CancellationToken()
-            activeToken = token
-            inFlight.markStreamStart(streamRequestId)
-            scope.launch {
-                val streamedContent = StringBuilder()
-                val result =
-                    runCatching {
-                        agentManager.streamMessage(content, token) { chunk ->
-                            streamedContent.append(chunk)
-                            history = history.dropLast(1) + Message("assistant", streamedContent.toString())
-                        }
-                    }
-                result
-                    .onSuccess {
-                        history = agentManager.getHistory()
-                        status = "Ready"
-                    }.onFailure {
-                        history = agentManager.getHistory()
-                        val userError = ErrorMessageMapper.map(it)
-                        status = "${userError.summary}: ${userError.detail}"
-                    }.also {
-                        inFlight.markStreamEnd(streamRequestId)
-                        sending = false
-                        activeToken = null
-                        inputFocusRequester.requestFocus()
-                    }
+        if (content.isNotBlank()) {
+            if (sending) {
+                queue.enqueue(content, QueuedMessageSource.USER)
+                status = "Queued (${queue.size})"
+            } else {
+                scope.launch {
+                    executeSend(
+                        content = content,
+                        agentManager = agentManager,
+                        inFlight = inFlight,
+                        inputFocusRequester = inputFocusRequester,
+                        onInputChange = { input = it },
+                        onSendingChange = { sending = it },
+                        onStatusChange = { status = it },
+                        onHistoryChange = { history = it },
+                        onActiveTokenChange = { activeToken = it },
+                    )
+                }
             }
         }
     }
@@ -138,9 +135,47 @@ internal fun ConversationPanel(
         inputFocusRequester.requestFocus()
     }
     ConversationStartupScrollEffect(history, listState)
-    LaunchedEffect(history.size) {
-        if (isAtBottom && history.isNotEmpty()) {
-            listState.animateScrollToItem(history.lastIndex)
+    ConversationScrollOnChangeEffect(history, listState)
+    LaunchedEffect(sending, inFlight.state.value.totalActive) {
+        if (!sending && inFlight.state.value.totalActive == 0 && queue.isNotEmpty && !queue.flushing) {
+            queue.flushing = true
+            try {
+                when (queue.flushMode) {
+                    QueueFlushMode.ONE_BY_ONE -> {
+                        while (queue.isNotEmpty) {
+                            val msg = queue.dequeue() ?: break
+                            executeSend(
+                                content = msg.content,
+                                agentManager = agentManager,
+                                inFlight = inFlight,
+                                inputFocusRequester = inputFocusRequester,
+                                onInputChange = { input = it },
+                                onSendingChange = { sending = it },
+                                onStatusChange = { status = it },
+                                onHistoryChange = { history = it },
+                                onActiveTokenChange = { activeToken = it },
+                            )
+                        }
+                    }
+                    QueueFlushMode.ALL_AT_ONCE -> {
+                        val combined = queue.messages.joinToString("\n\n") { it.content }
+                        queue.clear()
+                        executeSend(
+                            content = combined,
+                            agentManager = agentManager,
+                            inFlight = inFlight,
+                            inputFocusRequester = inputFocusRequester,
+                            onInputChange = { input = it },
+                            onSendingChange = { sending = it },
+                            onStatusChange = { status = it },
+                            onHistoryChange = { history = it },
+                            onActiveTokenChange = { activeToken = it },
+                        )
+                    }
+                }
+            } finally {
+                queue.flushing = false
+            }
         }
     }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
@@ -151,71 +186,24 @@ internal fun ConversationPanel(
                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                if (history.isEmpty()) {
-                    item {
-                        PanelEmptyState(
-                            title = "No conversation yet",
-                            body = "Send a message to start the main agent session.",
-                        )
-                    }
-                } else {
-                    itemsIndexed(history, key = { index, message -> message.id ?: "temp-$index" }) { index, message ->
-                        val previousRole = history.getOrNull(index - 1)?.role
-                        val isStreamingPlaceholder =
-                            message.role == "assistant" && message.content.isBlank() && sending && index == history.lastIndex
-                        val topPadding = if (previousRole == message.role) 2.dp else 10.dp
-                        val onDelete: () -> Unit = {
-                            message.id?.let { id ->
-                                deletingMessageIds += id
-                                scope.launch {
-                                    delay(DELETE_ANIMATION_DURATION_MS.toLong())
-                                    agentManager.deleteMessageById(id)
-                                    history = agentManager.getHistory()
-                                    deletingMessageIds -= id
-                                    status = "Message deleted"
-                                }
-                            }
+                ConversationMessageList(
+                    history = history,
+                    sending = sending,
+                    deletingMessageIds = deletingMessageIds,
+                    onDeleteMessage = { id ->
+                        deletingMessageIds += id
+                        scope.launch {
+                            delay(DELETE_ANIMATION_DURATION_MS.toLong())
+                            agentManager.deleteMessageById(id)
+                            history = agentManager.getHistory()
+                            deletingMessageIds -= id
+                            status = "Message deleted"
                         }
-                        when (message.role) {
-                            "tool" ->
-                                ToolMessageRow(
-                                    message = message,
-                                    isDeleting = message.id in deletingMessageIds,
-                                    onDelete = onDelete,
-                                    modifier = Modifier.padding(top = topPadding),
-                                )
-                            "sub_agent" ->
-                                SubAgentMessageRow(
-                                    message = message,
-                                    isDeleting = message.id in deletingMessageIds,
-                                    onDelete = onDelete,
-                                    modifier = Modifier.padding(top = topPadding),
-                                )
-                            else ->
-                                MessageRow(
-                                    message = message,
-                                    isStreamingPlaceholder = isStreamingPlaceholder,
-                                    canRetry = message.role == "assistant" && !sending && !isStreamingPlaceholder,
-                                    canEdit = message.role == "user" && !sending,
-                                    canDelete = message.id != null && message.role != "system" && message.id !in deletingMessageIds,
-                                    isDeleting = message.id in deletingMessageIds,
-                                    onCopied = { status = "Copied ${message.role} message" },
-                                    onRetry = {
-                                        val previousUserMessage = history.take(index).lastOrNull { it.role == "user" }
-                                        if (previousUserMessage == null) {
-                                            status = "No previous user message to retry"
-                                        } else {
-                                            status = "Retrying previous user message..."
-                                            sendContent(previousUserMessage.content)
-                                        }
-                                    },
-                                    onEdit = { editingId = message.id },
-                                    onDelete = onDelete,
-                                    modifier = Modifier.padding(top = topPadding),
-                                )
-                        }
-                    }
-                }
+                    },
+                    onStatusChange = { status = it },
+                    onEditMessage = { editingId = it },
+                    sendContent = sendContent,
+                )
             }
             if (!isAtBottom) {
                 androidx.compose.animation.AnimatedVisibility(
@@ -237,6 +225,36 @@ internal fun ConversationPanel(
                 }
             }
         }
+        MessageQueueStrip(
+            queue = queue,
+            onSendNow = { msg ->
+                queue.remove(msg.id)
+                activeToken?.cancel()
+                scope.launch {
+                    delay(200)
+                    executeSend(
+                        content = msg.content,
+                        agentManager = agentManager,
+                        inFlight = inFlight,
+                        inputFocusRequester = inputFocusRequester,
+                        onInputChange = { input = it },
+                        onSendingChange = { sending = it },
+                        onStatusChange = { status = it },
+                        onHistoryChange = { history = it },
+                        onActiveTokenChange = { activeToken = it },
+                    )
+                }
+            },
+            onClear = { queue.clear() },
+            onToggleFlushMode = {
+                queue.flushMode =
+                    if (queue.flushMode == QueueFlushMode.ONE_BY_ONE) {
+                        QueueFlushMode.ALL_AT_ONCE
+                    } else {
+                        QueueFlushMode.ONE_BY_ONE
+                    }
+            },
+        )
         ConversationInputArea(
             input = input,
             sending = sending,
@@ -246,68 +264,24 @@ internal fun ConversationPanel(
             onCancel = cancelCurrentRequest,
             onHistoryReload = { history = agentManager.loadOlderHistory() },
             onClear = {
-                modalRequester.requestConfirmation(
-                    ComposeConfirmationModal(
-                        title = "Clear conversation?",
-                        message =
-                            "This will stop any active request, cancel all running sub-agent jobs and open todos, " +
-                                "then remove the persisted conversation history.",
-                        confirmDescription = "Clear conversation",
-                    ) {
-                        scope.launch {
-                            sending = true
-                            status = "Stopping active work and clearing conversation..."
-                            activeToken?.cancel()
-                            agentManager.cancelAllRunningActions()
-                            agentManager.cancelAllActiveTodos()
-                            runCatching {
-                                agentManager.clearHistory()
-                                agentManager.addWelcomeMessageAfterReset()
-                            }.onSuccess { result ->
-                                status =
-                                    when (result) {
-                                        is WelcomeResult.Generated -> "Conversation cleared"
-                                        is WelcomeResult.Fallback ->
-                                            "Welcome could not be generated: ${result.error.message ?: result.error::class.simpleName.orEmpty()}"
-                                    }
-                            }.onFailure { error ->
-                                status = "Welcome could not be generated: ${error.message ?: error::class.simpleName.orEmpty()}"
-                            }
-                            history = agentManager.getHistory()
-                            sending = false
-                        }
-                    },
+                handleClearConversation(
+                    scope = scope,
+                    modalRequester = modalRequester,
+                    agentManager = agentManager,
+                    activeToken = { activeToken },
+                    onSendingChange = { sending = it },
+                    onStatusChange = { status = it },
+                    onHistoryRefresh = { history = agentManager.getHistory() },
                 )
             },
             inputFocusRequester = inputFocusRequester,
         )
     }
-    if (editingId != null) {
-        val message = history.find { it.id == editingId }
-        if (message != null) {
-            EditMessageModal(
-                content = message.content,
-                onDismiss = { editingId = null },
-                onSave = { newContent ->
-                    editingId?.let { id ->
-                        agentManager.updateMessageContentById(id, newContent)
-                        history = agentManager.getHistory()
-                    }
-                    editingId = null
-                },
-            )
-        }
-    }
-}
-
-@Composable
-internal fun ConversationStartupScrollEffect(
-    history: List<Message>,
-    listState: LazyListState,
-) {
-    LaunchedEffect(Unit) {
-        if (history.isNotEmpty()) {
-            listState.scrollToItem(history.lastIndex)
-        }
-    }
+    ConversationEditModal(
+        editingId = editingId,
+        history = history,
+        agentManager = agentManager,
+        onDismiss = { editingId = null },
+        onHistoryRefresh = { history = agentManager.getHistory() },
+    )
 }

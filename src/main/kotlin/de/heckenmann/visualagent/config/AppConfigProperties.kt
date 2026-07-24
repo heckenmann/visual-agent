@@ -31,6 +31,7 @@ internal object AppConfigProperties {
             setProperty(AppConfig.KEY_SESSION_MAX_PARALLEL_SUB_AGENTS, config.maxParallelSubAgents.toString())
             setProperty(AppConfig.KEY_SESSION_TIMEOUT_SECONDS, config.timeoutSeconds.toString())
             setProperty(AppConfig.KEY_SESSION_USER_MODEL_INSTRUCTION, config.userModelInstruction)
+            setProperty(AppConfig.KEY_SESSION_QUEUE_FLUSH_MODE, config.queueFlushMode)
         }
 
     fun applyBootstrapTo(
@@ -65,6 +66,7 @@ internal object AppConfigProperties {
         config.userModelInstruction =
             properties.string(AppConfig.KEY_SESSION_USER_MODEL_INSTRUCTION, config.userModelInstruction)
         config.favoriteModels = properties.string(AppConfig.KEY_SESSION_FAVORITE_MODELS, config.favoriteModels)
+        config.queueFlushMode = properties.string(AppConfig.KEY_SESSION_QUEUE_FLUSH_MODE, config.queueFlushMode)
     }
 
     private fun Properties.string(

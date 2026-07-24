@@ -254,6 +254,7 @@ internal fun WindowBody(
                 inFlight = panelServices.inFlight,
                 toolEventBus = panelServices.toolEventBus,
                 todoEventBus = panelServices.todoEventBus,
+                config = panelServices.config,
             )
         "todos" ->
             TodoPanel(

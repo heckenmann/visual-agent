@@ -30,6 +30,7 @@ internal fun SettingsExecutionAndAppearanceSection(
     streamingEnabled: Boolean,
     thinkingEnabled: Boolean,
     autoCompactionEnabled: Boolean,
+    queueFlushMode: String,
     userInstruction: String,
     fontSize: Int,
     themeMode: ThemeMode,
@@ -41,6 +42,7 @@ internal fun SettingsExecutionAndAppearanceSection(
     onStreamingChange: (Boolean) -> Unit,
     onThinkingChange: (Boolean) -> Unit,
     onCompactionChange: (Boolean) -> Unit,
+    onQueueFlushModeChange: (String) -> Unit,
     onUserInstructionChange: (String) -> Unit,
     onFontSizeChange: (Int) -> Unit,
     onThemeModeChange: (ThemeMode) -> Unit,
@@ -88,6 +90,16 @@ internal fun SettingsExecutionAndAppearanceSection(
             }
             PanelCheckbox(label = "Compaction", checked = autoCompactionEnabled, onCheckedChange = onCompactionChange)
         }
+        PanelDropdownField(
+            label = "Queue flush",
+            selectedValue = queueFlushMode,
+            options =
+                listOf(
+                    PanelSelectOption("ONE_BY_ONE", "One by one"),
+                    PanelSelectOption("ALL_AT_ONCE", "All at once"),
+                ),
+            onSelected = { onQueueFlushModeChange(it) },
+        )
         if (modelCapabilities.isNotEmpty()) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(

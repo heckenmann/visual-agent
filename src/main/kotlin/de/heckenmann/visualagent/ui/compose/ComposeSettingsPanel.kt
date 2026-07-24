@@ -28,18 +28,10 @@ import de.heckenmann.visualagent.error.ErrorMessageMapper
 import kotlinx.coroutines.launch
 
 /**
- * Application settings panel for provider/model configuration and runtime
- * preferences.
+ * Application settings panel for provider/model configuration and runtime preferences.
  *
  * Use cases: UC-0000007, UC-0000008, UC-0000009, UC-0000037, UC-0000038,
  * UC-0000061, UC-0000062, UC-0000064, UC-0000065, UC-0000071.
- *
- * @param config Mutable application configuration
- * @param llmProvider Provider used to refresh model lists and details
- * @param providerCatalogService Provider profile catalog
- * @param modalRequester Modal requester used for destructive confirmations
- * @param onSettingsChanged Callback invoked when provider/theme/font changed
- * @param inFlight In-flight state holder for model refresh indicators
  */
 @Composable
 internal fun SettingsPanel(
@@ -76,6 +68,7 @@ internal fun SettingsPanel(
     var streamingEnabled by remember { mutableStateOf(config.streamingEnabled) }
     var thinkingEnabled by remember { mutableStateOf(config.thinkingEnabled) }
     var autoCompactionEnabled by remember { mutableStateOf(config.autoCompactionEnabled) }
+    var queueFlushMode by remember { mutableStateOf(config.queueFlushMode) }
     var userInstruction by remember { mutableStateOf(config.userModelInstruction) }
     var themeMode by remember { mutableStateOf(config.uiThemeMode) }
     var status by remember { mutableStateOf("Ready") }
@@ -109,9 +102,6 @@ internal fun SettingsPanel(
 
     /**
      * Reloads the provider list and aligns the form state with the selected provider.
-     *
-     * @param selectedProviderId Provider ID to activate; falls back to the first enabled provider
-     *   when the requested ID is not present
      */
     fun refreshProviderState(selectedProviderId: String = providerId) {
         providers = providerCatalogService.enabledProviders()
@@ -130,12 +120,7 @@ internal fun SettingsPanel(
         onRefresh = { refreshProviderState() },
     )
 
-    /**
-     * Reloads the selectable model list from the active provider.
-     *
-     * Updates `selectableModels` and resets `modelId` if the previously selected model is no
-     * longer available. Safe to call when no provider is selected — returns immediately.
-     */
+    /** Reloads the selectable model list from the active provider. */
     fun refreshModels() {
         val requestedProviderId = providerId
         if (requestedProviderId.isBlank()) return
@@ -160,11 +145,7 @@ internal fun SettingsPanel(
         }
     }
 
-    /**
-     * Loads detailed metadata for the currently selected model.
-     *
-     * @param modelOverride Optional explicit model ID; falls back to the resolved model when blank
-     */
+    /** Loads detailed metadata for the currently selected model. */
     fun refreshModelDetails(modelOverride: String? = null) {
         val requestedProviderId = providerId
         val requestedModel = modelOverride?.trim().orEmpty().ifBlank { resolvedModel }
@@ -173,11 +154,8 @@ internal fun SettingsPanel(
         modelDetails = "Loading model details..."
         scope.launch {
             runCatching { llmProvider.getModelDetails(requestedProviderId, requestedModel) }
-                .onSuccess { details ->
-                    modelDetails = details.toModelDetailsText()
-                }.onFailure { error ->
-                    modelDetails = ProviderErrorMessages.userFacing(error)
-                }
+                .onSuccess { details -> modelDetails = details.toModelDetailsText() }
+                .onFailure { error -> modelDetails = ProviderErrorMessages.userFacing(error) }
             loadingDetails = false
         }
     }
@@ -271,6 +249,7 @@ internal fun SettingsPanel(
             streamingEnabled = streamingEnabled,
             thinkingEnabled = thinkingEnabled,
             autoCompactionEnabled = autoCompactionEnabled,
+            queueFlushMode = queueFlushMode,
             userInstruction = userInstruction,
             fontSize = fontSize,
             themeMode = themeMode,
@@ -282,6 +261,7 @@ internal fun SettingsPanel(
             onStreamingChange = { streamingEnabled = it },
             onThinkingChange = { thinkingEnabled = it },
             onCompactionChange = { autoCompactionEnabled = it },
+            onQueueFlushModeChange = { queueFlushMode = it },
             onUserInstructionChange = { userInstruction = it },
             onFontSizeChange = { newSize ->
                 fontSize = newSize
@@ -303,23 +283,26 @@ internal fun SettingsPanel(
             onClick = {
                 runCatching {
                     saveSessionSettings(
-                        config = config,
-                        providerCatalog = providerCatalogService,
-                        providerId = activeProvider?.id ?: providerId,
-                        modelId = resolvedModel,
-                        baseUrl = baseUrl,
-                        apiKey = apiKey,
+                        config,
+                        providerCatalogService,
+                        activeProvider?.id ?: providerId,
+                        resolvedModel,
+                        baseUrl,
+                        apiKey,
                     )
-                    config.fontSize = fontSize.clampFontSize()
-                    config.contextLength = contextLength.coerceIn(MIN_CONTEXT_LENGTH, MAX_CONTEXT_LENGTH)
-                    config.loadLimit = loadLimitValue ?: config.loadLimit
-                    config.maxParallelSubAgents = maxParallelValue ?: config.maxParallelSubAgents
-                    config.timeoutSeconds = timeoutValue ?: config.timeoutSeconds
-                    config.streamingEnabled = streamingEnabled
-                    config.thinkingEnabled = thinkingEnabled
-                    config.autoCompactionEnabled = autoCompactionEnabled
-                    config.userModelInstruction = userInstruction
-                    config.save()
+                    applyAndSaveSettings(
+                        config,
+                        fontSize,
+                        contextLength,
+                        loadLimitValue,
+                        maxParallelValue,
+                        timeoutValue,
+                        streamingEnabled,
+                        thinkingEnabled,
+                        autoCompactionEnabled,
+                        queueFlushMode,
+                        userInstruction,
+                    )
                     refreshProviderState(activeProvider?.id ?: providerId)
                     onSettingsChanged()
                 }.onSuccess {
