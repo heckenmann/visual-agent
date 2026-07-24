@@ -67,6 +67,7 @@ Always run, in this order:
 - When moving files, use `git mv` so Git tracks the rename instead of treating it as a delete/add pair.
 - Project language is **English**. All code comments, documentation, commit messages, PR descriptions, issue comments, and use-case files must be written in English.
 - Before committing and pushing, perform a manual smoke test of the changes and get explicit user confirmation that they are ready.
+- After creating a commit that addresses an issue, update the issue with a comment summarizing what was implemented and what remains open.
 - Never revert changes whose origin you do not know, but that make sense and are not obviously broken. If you are unsure, ask the user before reverting.
 
 ### Security
