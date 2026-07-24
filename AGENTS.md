@@ -48,6 +48,18 @@ Always run, in this order:
 - Other automated PRs (e.g. release-please) are left to their own lifecycle.
 - Before creating a PR, verify the branch is not already merged into `master` and that no duplicate open PR exists for it.
 
+## Issue Conventions
+
+- Every issue must be created with at least one label. Never create an unlabeled issue.
+- Available labels (see `.github/` or `gh label list`): `bug`, `enhancement`, `documentation`, `ui`, `dependencies`, `github_actions`, `status: research`, `status: in progress`, `good first issue`, `help wanted`, `duplicate`, `invalid`, `wontfix`.
+- **`ui`** must be added to every issue that involves Compose desktop UI changes (new panels, modified panels, layout changes, theme/styling, animations, indicators). This includes issues whose primary work is backend but have a UI Changes section.
+- **`enhancement`** is the default label for new features and improvements (the `improvement` label does not exist; use `enhancement`).
+- **`bug`** is for defects in existing behavior.
+- **`dependencies`** is for dependency-version-bump issues and Dependabot-related CI.
+- **`status: research`** is used when the issue is an audit or investigation before implementation.
+- Do **not** use the `java` label — the project is Kotlin-only and every issue touches Kotlin code, so the label carries no information.
+- Issue titles use Conventional Commits format: `type(scope): short imperative summary`.
+
 ## Development Workflow
 
 - Before starting work on a problem, check whether a GitHub issue and a documented use case exist for it. Link both in the PR description and commit messages where applicable.
@@ -55,6 +67,7 @@ Always run, in this order:
 - When moving files, use `git mv` so Git tracks the rename instead of treating it as a delete/add pair.
 - Project language is **English**. All code comments, documentation, commit messages, PR descriptions, issue comments, and use-case files must be written in English.
 - Before committing and pushing, perform a manual smoke test of the changes and get explicit user confirmation that they are ready.
+- Never revert changes whose origin you do not know, but that make sense and are not obviously broken. If you are unsure, ask the user before reverting.
 
 ### Security
 
