@@ -32,6 +32,7 @@ class ComposeConversationPanelTest {
                     inFlight = InFlightStateHolder(),
                     toolEventBus = ToolEventBus(),
                     todoEventBus = TodoEventBus(),
+                    config = AppConfigBean(db),
                 )
             }
         }
@@ -55,6 +56,7 @@ class ComposeConversationPanelTest {
                     inFlight = InFlightStateHolder(),
                     toolEventBus = ToolEventBus(),
                     todoEventBus = TodoEventBus(),
+                    config = AppConfigBean(db),
                 )
             }
         }

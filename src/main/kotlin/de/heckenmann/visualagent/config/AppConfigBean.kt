@@ -38,6 +38,7 @@ class AppConfigBean(
     var timeoutSeconds: Int = 120
     var userModelInstruction: String = ""
     var favoriteModels: String = ""
+    var queueFlushMode: String = "ONE_BY_ONE"
 
     /**
      * Returns the currently selected model for the active provider.
@@ -100,6 +101,7 @@ class AppConfigBean(
         preferenceStore.setPreference(KEY_SESSION_TIMEOUT_SECONDS, timeoutSeconds.toString())
         preferenceStore.setPreference(KEY_SESSION_USER_MODEL_INSTRUCTION, userModelInstruction)
         preferenceStore.setPreference(KEY_SESSION_FAVORITE_MODELS, favoriteModels)
+        preferenceStore.setPreference(KEY_SESSION_QUEUE_FLUSH_MODE, queueFlushMode)
         publishChanges()
     }
 
@@ -131,6 +133,7 @@ class AppConfigBean(
             KEY_SESSION_TIMEOUT_SECONDS to timeoutSeconds.toString(),
             KEY_SESSION_USER_MODEL_INSTRUCTION to userModelInstruction,
             KEY_SESSION_FAVORITE_MODELS to favoriteModels,
+            KEY_SESSION_QUEUE_FLUSH_MODE to queueFlushMode,
         )
 
     companion object {
@@ -154,6 +157,7 @@ class AppConfigBean(
         internal const val KEY_SESSION_TIMEOUT_SECONDS = "session.timeout.seconds"
         internal const val KEY_SESSION_USER_MODEL_INSTRUCTION = "session.user.model.instruction"
         internal const val KEY_SESSION_FAVORITE_MODELS = "session.favorite.models"
+        internal const val KEY_SESSION_QUEUE_FLUSH_MODE = "session.queue.flush.mode"
     }
 }
 

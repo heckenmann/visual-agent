@@ -16,10 +16,11 @@ Developer.
 ## Main Flow
 
 1. The developer implements the new function.
-2. The developer creates or updates a use-case document under `docs/usecases/`.
-3. The document explicitly names the relevant buttons, commands, or tool actions.
-4. The implementing public API references the use-case document from KDoc when practical.
-5. The build packages the use-case documents for model access through the `usecases` tool.
+2. The developer determines the next free use-case number via `scripts/next-use-case.sh`.
+3. The developer creates or updates a use-case document under `docs/usecases/` with the filename pattern `uc_<7-digit-number>_<description>.md`.
+4. The document explicitly names the relevant buttons, commands, or tool actions.
+5. The implementing public API references the use-case document from KDoc when practical.
+6. The build packages the use-case documents for model access through the `usecases` tool.
 
 ## Result
 
