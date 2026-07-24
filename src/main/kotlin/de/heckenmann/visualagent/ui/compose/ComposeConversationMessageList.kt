@@ -54,6 +54,11 @@ internal fun LazyListScope.ConversationMessageList(
                         onDelete = onDelete,
                         modifier = Modifier.padding(top = topPadding),
                     )
+                "system" ->
+                    SystemMessageRow(
+                        message = message,
+                        modifier = Modifier.padding(top = topPadding),
+                    )
                 else -> {
                     val isStreaming = message.role == "assistant" && sending && index == history.lastIndex
                     MessageRow(
