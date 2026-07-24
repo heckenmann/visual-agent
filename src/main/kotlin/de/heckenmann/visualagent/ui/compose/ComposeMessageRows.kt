@@ -59,7 +59,7 @@ internal fun MessageRow(
         visible = !isDeleting,
         enter = fadeIn(),
         exit = fadeOut(animationSpec = tween(DELETE_ANIMATION_DURATION_MS)),
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().then(if (!isStreaming) Modifier.animateContentSize() else Modifier),
     ) {
         PanelContentCard(
             modifier = Modifier.fillMaxWidth(),
