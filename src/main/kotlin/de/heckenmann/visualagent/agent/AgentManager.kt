@@ -14,8 +14,10 @@ import de.heckenmann.visualagent.knowledge.SubAgentStore
 import de.heckenmann.visualagent.knowledge.TodoStore
 import de.heckenmann.visualagent.orchestration.AutonomousCoordinator
 import de.heckenmann.visualagent.todo.Todo
+import de.heckenmann.visualagent.todo.TodoChangeType
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoManager
+import de.heckenmann.visualagent.todo.TodoStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -99,6 +101,7 @@ class AgentManager
         private val lifecycleOps = AgentManagerLifecycleOps(this)
         internal val conversationOps = AgentManagerConversationOps(this)
         private val autonomyOps = AgentManagerAutonomyOps(this)
+        internal lateinit var todoTrigger: AgentTodoTrigger
 
         init {
             lifecycleOps.loadAgentsFromDb()
@@ -127,6 +130,22 @@ class AgentManager
                     conversationOps = conversationOpsProvider,
                     subAgentOps = subAgentOpsProvider,
                 )
+            todoTrigger =
+                AgentTodoTrigger(
+                    scope = scope,
+                    conversationOps = conversationOps,
+                    llmProvider = llmProvider,
+                    responseCoordinator = responseCoordinator,
+                    toolEventBus = toolEventBus,
+                )
+            todoEventBus.addListener { change ->
+                val todo = change.todo ?: return@addListener
+                if (change.type != TodoChangeType.UPDATED) return@addListener
+                when (todo.status) {
+                    TodoStatus.COMPLETED, TodoStatus.CANCELLED -> todoTrigger.trigger(todo)
+                    else -> Unit
+                }
+            }
             toolEventListenerHandle = conversationOpsProvider.registerToolEventListener()
             conversationOps.loadConversationFromDb()
             conversationOps.resumeInterruptedConversationIfNeeded()

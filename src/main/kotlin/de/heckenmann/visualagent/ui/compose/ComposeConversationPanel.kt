@@ -109,28 +109,8 @@ internal fun ConversationPanel(
     }
     DisposableEffect(todoEventBus) {
         val handle =
-            todoEventBus.addListener { change ->
+            todoEventBus.addListener {
                 history = agentManager.getHistory()
-                val todo = change.todo ?: return@addListener
-                if (change.type != de.heckenmann.visualagent.todo.TodoChangeType.UPDATED) return@addListener
-                val action =
-                    when (todo.status) {
-                        de.heckenmann.visualagent.todo.TodoStatus.COMPLETED ->
-                            "was just completed by the sub-agent. " +
-                                "Review the result. If the task was done correctly, inform the user. " +
-                                "Do NOT create a new todo for this task. " +
-                                "If the result is incomplete or incorrect, update the todo description " +
-                                "with better instructions and set it back to PENDING."
-                        de.heckenmann.visualagent.todo.TodoStatus.CANCELLED ->
-                            "was cancelled. Inform the user. " +
-                                "If the task still needs to be done, update the todo description " +
-                                "and set it back to PENDING."
-                        else -> return@addListener
-                    }
-                queue.enqueue(
-                    content = "The todo \"${todo.description}\" (id=${todo.id}) $action",
-                    source = QueuedMessageSource.TODO_RETURN,
-                )
             }
         onDispose { handle.close() }
     }
