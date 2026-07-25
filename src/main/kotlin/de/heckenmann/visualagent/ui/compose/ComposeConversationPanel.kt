@@ -2,19 +2,21 @@
 
 package de.heckenmann.visualagent.ui.compose
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -26,8 +28,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.agent.AgentManager
@@ -80,6 +84,20 @@ internal fun ConversationPanel(
             last == null || last.index >= info.totalItemsCount - 2
         }
     }
+    val isAtTop by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val first = info.visibleItemsInfo.firstOrNull()
+            first != null && first.index == 0
+        }
+    }
+    ConversationOlderHistoryLoader(
+        isAtTop = isAtTop,
+        history = history,
+        listState = listState,
+        agentManager = agentManager,
+        onHistoryChange = { history = it },
+    )
     DisposableEffect(toolEventBus) {
         val handle =
             toolEventBus.addListener { event ->
@@ -140,95 +158,63 @@ internal fun ConversationPanel(
     ConversationStartupScrollEffect(history, listState)
     ConversationScrollOnChangeEffect(history, listState)
     ConversationResizeScrollEffect(panelSize, history, listState)
-    LaunchedEffect(sending, inFlight.state.value.totalActive) {
-        if (!sending && inFlight.state.value.totalActive == 0 && queue.isNotEmpty && !queue.flushing) {
-            queue.flushing = true
-            try {
-                when (queue.flushMode) {
-                    QueueFlushMode.ONE_BY_ONE -> {
-                        while (queue.isNotEmpty) {
-                            val msg = queue.dequeue() ?: break
-                            executeSend(
-                                content = msg.content,
-                                agentManager = agentManager,
-                                inFlight = inFlight,
-                                inputFocusRequester = inputFocusRequester,
-                                onInputChange = { input = it },
-                                onSendingChange = { sending = it },
-                                onStatusChange = { status = it },
-                                onHistoryChange = { history = it },
-                                onActiveTokenChange = { activeToken = it },
-                            )
-                        }
+    ConversationQueueFlushEffect(
+        sending = sending,
+        inFlight = inFlight,
+        queue = queue,
+        agentManager = agentManager,
+        inputFocusRequester = inputFocusRequester,
+        onInputChange = { input = it },
+        onSendingChange = { sending = it },
+        onStatusChange = { status = it },
+        onHistoryChange = { history = it },
+        onActiveTokenChange = { activeToken = it },
+    )
+    var inputAreaHeight by remember { mutableStateOf(0) }
+    val density = LocalDensity.current
+    val animatedBottomPadding by animateDpAsState(
+        targetValue = with(density) { inputAreaHeight.toDp() } + 8.dp,
+        animationSpec = tween(200),
+        label = "input-bottom-padding",
+    )
+    Box(modifier = Modifier.fillMaxSize().onSizeChanged { panelSize = it }) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding =
+                PaddingValues(
+                    start = 8.dp,
+                    end = 8.dp,
+                    top = 4.dp,
+                    bottom = animatedBottomPadding,
+                ),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            ConversationMessageList(
+                history = history,
+                sending = sending,
+                deletingMessageIds = deletingMessageIds,
+                onDeleteMessage = { id ->
+                    deletingMessageIds += id
+                    scope.launch {
+                        delay(DELETE_ANIMATION_DURATION_MS.toLong())
+                        agentManager.deleteMessageById(id)
+                        history = agentManager.getHistory()
+                        deletingMessageIds -= id
+                        status = "Message deleted"
                     }
-                    QueueFlushMode.ALL_AT_ONCE -> {
-                        val combined = queue.messages.joinToString("\n\n") { it.content }
-                        queue.clear()
-                        executeSend(
-                            content = combined,
-                            agentManager = agentManager,
-                            inFlight = inFlight,
-                            inputFocusRequester = inputFocusRequester,
-                            onInputChange = { input = it },
-                            onSendingChange = { sending = it },
-                            onStatusChange = { status = it },
-                            onHistoryChange = { history = it },
-                            onActiveTokenChange = { activeToken = it },
-                        )
-                    }
-                }
-            } finally {
-                queue.flushing = false
-            }
+                },
+                onStatusChange = { status = it },
+                onEditMessage = { editingId = it },
+                sendContent = sendContent,
+            )
         }
-    }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize().onSizeChanged { panelSize = it }) {
-        Box(modifier = Modifier.weight(1f)) {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                ConversationMessageList(
-                    history = history,
-                    sending = sending,
-                    deletingMessageIds = deletingMessageIds,
-                    onDeleteMessage = { id ->
-                        deletingMessageIds += id
-                        scope.launch {
-                            delay(DELETE_ANIMATION_DURATION_MS.toLong())
-                            agentManager.deleteMessageById(id)
-                            history = agentManager.getHistory()
-                            deletingMessageIds -= id
-                            status = "Message deleted"
-                        }
-                    },
-                    onStatusChange = { status = it },
-                    onEditMessage = { editingId = it },
-                    sendContent = sendContent,
-                )
-            }
-            if (!isAtBottom) {
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = !isAtBottom,
-                    modifier = Modifier.fillMaxSize(),
-                    enter = fadeIn(animationSpec = tween(180)) + slideInVertically(initialOffsetY = { it / 2 }),
-                    exit = fadeOut(animationSpec = tween(180)) + slideOutVertically(targetOffsetY = { it / 2 }),
-                ) {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.Bottom,
-                        horizontalAlignment = Alignment.End,
-                    ) {
-                        ScrollToBottomButton(
-                            onClick = { scope.launch { listState.animateScrollToItem(history.lastIndex.coerceAtLeast(0)) } },
-                            modifier = Modifier.padding(end = 12.dp, bottom = 12.dp),
-                        )
-                    }
-                }
-            }
-        }
+        ConversationScrollToBottomArea(
+            isAtBottom = isAtBottom,
+            history = history,
+            listState = listState,
+            scope = scope,
+        )
         MessageQueueStrip(
             queue = queue,
             onSendNow = { msg ->
@@ -259,27 +245,37 @@ internal fun ConversationPanel(
                     }
             },
         )
-        ConversationInputArea(
-            input = input,
-            sending = sending,
-            status = status,
-            onInputChange = { input = it },
-            onSend = sendCurrentInput,
-            onCancel = cancelCurrentRequest,
-            onHistoryReload = { history = agentManager.loadOlderHistory() },
-            onClear = {
-                handleClearConversation(
-                    scope = scope,
-                    modalRequester = modalRequester,
-                    agentManager = agentManager,
-                    activeToken = { activeToken },
-                    onSendingChange = { sending = it },
-                    onStatusChange = { status = it },
-                    onHistoryRefresh = { history = agentManager.getHistory() },
-                )
-            },
-            inputFocusRequester = inputFocusRequester,
-        )
+        Column(
+            modifier =
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 8.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .animateContentSize(animationSpec = tween(200))
+                    .onSizeChanged { inputAreaHeight = it.height },
+        ) {
+            ConversationInputArea(
+                input = input,
+                sending = sending,
+                onInputChange = { input = it },
+                onSend = sendCurrentInput,
+                onCancel = cancelCurrentRequest,
+                onClear = {
+                    handleClearConversation(
+                        scope = scope,
+                        modalRequester = modalRequester,
+                        agentManager = agentManager,
+                        activeToken = { activeToken },
+                        onSendingChange = { sending = it },
+                        onStatusChange = { status = it },
+                        onHistoryRefresh = { history = agentManager.getHistory() },
+                    )
+                },
+                inputFocusRequester = inputFocusRequester,
+            )
+        }
     }
     ConversationEditModal(
         editingId = editingId,
