@@ -52,14 +52,6 @@ internal fun LazyListScope.ConversationMessageList(
                         onDelete = onDelete,
                         modifier = Modifier.padding(top = topPadding),
                     )
-                "sub_agent" ->
-                    SubAgentMessageRow(
-                        message = message,
-                        isDeleting = message.id in deletingMessageIds,
-                        isRunning = false,
-                        onDelete = onDelete,
-                        modifier = Modifier.padding(top = topPadding),
-                    )
                 "system" ->
                     SystemMessageRow(
                         message = message,

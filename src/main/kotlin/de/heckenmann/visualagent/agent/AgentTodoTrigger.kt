@@ -37,8 +37,11 @@ internal class AgentTodoTrigger(
                 when (todo.status) {
                     TodoStatus.COMPLETED ->
                         "was just completed by the sub-agent. " +
-                            "Review the result and inform the user about what was accomplished."
-                    TodoStatus.CANCELLED -> "was cancelled. Inform the user that the task was cancelled."
+                            "Review the result and inform the user about what was accomplished. " +
+                            "Do NOT create new todos — just report the result."
+                    TodoStatus.CANCELLED ->
+                        "was cancelled. Inform the user that the task was cancelled. " +
+                            "Do NOT create new todos — just report the cancellation."
                     else -> return@launch
                 }
             conversationOps.persist(

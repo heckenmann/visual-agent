@@ -110,18 +110,7 @@ internal fun ConversationPanel(
     DisposableEffect(todoEventBus) {
         val handle =
             todoEventBus.addListener {
-                val previousHistory = history
                 history = agentManager.getHistory()
-                if (sending || inFlight.state.value.totalActive > 0) {
-                    val newSubAgentMessages =
-                        history.filter { it.role == "sub_agent" && it !in previousHistory }
-                    newSubAgentMessages.forEach { msg ->
-                        queue.enqueue(
-                            content = msg.content,
-                            source = QueuedMessageSource.TODO_RETURN,
-                        )
-                    }
-                }
             }
         onDispose { handle.close() }
     }
