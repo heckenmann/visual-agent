@@ -39,7 +39,7 @@ class MessageRowsTest {
                 )
             }
         }
-        composeTestRule.onNodeWithText("USER").assertExists()
+        composeTestRule.onNodeWithText("You").assertExists()
         composeTestRule.onNodeWithText("hello").assertExists()
         composeTestRule.onNodeWithContentDescription("Copy user message").performClick()
         assertTrue(copied)
