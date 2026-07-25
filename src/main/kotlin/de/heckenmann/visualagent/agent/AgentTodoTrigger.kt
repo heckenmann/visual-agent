@@ -5,6 +5,8 @@ import de.heckenmann.visualagent.agent.text.AgentResponseCoordinator
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
+import de.heckenmann.visualagent.todo.Todo
+import de.heckenmann.visualagent.todo.TodoStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import mu.KotlinLogging
@@ -29,8 +31,22 @@ internal class AgentTodoTrigger(
      * On LLM failure, a system message is persisted instead and the error is logged.
      * A synthetic [ToolCallEvent] is always published so the UI refreshes.
      */
-    fun trigger() {
+    fun trigger(todo: Todo) {
         scope.launch {
+            val action =
+                when (todo.status) {
+                    TodoStatus.COMPLETED ->
+                        "was just completed by the sub-agent. " +
+                            "Review the result and inform the user about what was accomplished."
+                    TodoStatus.CANCELLED -> "was cancelled. Inform the user that the task was cancelled."
+                    else -> return@launch
+                }
+            conversationOps.persist(
+                Message(
+                    role = "system",
+                    content = "The todo \"${todo.description}\" (id=${todo.id}) $action",
+                ),
+            )
             val history = conversationOps.loadRecentHistoryFromDb()
             val request = conversationOps.buildMainRequest(history)
             val result =

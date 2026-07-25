@@ -142,7 +142,7 @@ class AgentManager
                 val todo = change.todo ?: return@addListener
                 if (change.type != TodoChangeType.UPDATED) return@addListener
                 when (todo.status) {
-                    TodoStatus.COMPLETED, TodoStatus.CANCELLED -> todoTrigger.trigger()
+                    TodoStatus.COMPLETED, TodoStatus.CANCELLED -> todoTrigger.trigger(todo)
                     else -> Unit
                 }
             }
