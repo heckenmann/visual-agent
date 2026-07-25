@@ -163,7 +163,7 @@ internal fun ConversationQueueFlushEffect(
     onHistoryChange: (List<Message>) -> Unit,
     onActiveTokenChange: (de.heckenmann.visualagent.agent.CancellationToken?) -> Unit,
 ) {
-    LaunchedEffect(sending, inFlight.state.value.totalActive) {
+    LaunchedEffect(sending, inFlight.state.value.totalActive, queue.messages.size) {
         if (!sending && inFlight.state.value.totalActive == 0 && queue.isNotEmpty && !queue.flushing) {
             queue.flushing = true
             try {
