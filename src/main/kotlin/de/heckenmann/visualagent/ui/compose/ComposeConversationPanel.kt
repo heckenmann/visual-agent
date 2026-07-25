@@ -182,6 +182,7 @@ internal fun ConversationPanel(
             ConversationMessageList(
                 history = history,
                 sending = sending,
+                inFlight = inFlight,
                 deletingMessageIds = deletingMessageIds,
                 onDeleteMessage = { id ->
                     deletingMessageIds += id

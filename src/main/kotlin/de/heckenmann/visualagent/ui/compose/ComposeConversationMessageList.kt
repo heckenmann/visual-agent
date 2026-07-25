@@ -21,6 +21,7 @@ import de.heckenmann.visualagent.agent.Message
 internal fun LazyListScope.ConversationMessageList(
     history: List<Message>,
     sending: Boolean,
+    inFlight: InFlightStateHolder,
     deletingMessageIds: Set<String>,
     onDeleteMessage: (String) -> Unit,
     onStatusChange: (String) -> Unit,
@@ -84,7 +85,10 @@ internal fun LazyListScope.ConversationMessageList(
                 }
             }
         }
-        if (sending && history.isNotEmpty()) {
+        val hasInFlightTools =
+            inFlight.state.value.pendingToolIds
+                .isNotEmpty()
+        if ((sending || hasInFlightTools) && history.isNotEmpty()) {
             item(key = "streaming-indicator") {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),

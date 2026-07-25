@@ -49,7 +49,7 @@ internal class AgentTodoTrigger(
                 }
             conversationOps.persist(
                 Message(
-                    role = "system",
+                    role = "user",
                     content = "The todo \"${todo.description}\" (id=${todo.id}) $action",
                 ),
             )
