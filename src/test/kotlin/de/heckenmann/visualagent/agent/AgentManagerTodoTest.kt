@@ -184,7 +184,7 @@ class AgentManagerTodoTest {
         }
 
     @Test
-    fun `main agent trigger persists user message when todo is completed`(): Unit =
+    fun `todo completion persists system message`(): Unit =
         runBlocking {
             val (manager, _, _) = createManagerWithInstantResponse()
             val todo = manager.todoManager.add("Trigger test", "1")
@@ -195,13 +195,13 @@ class AgentManagerTodoTest {
 
             val history = manager.getHistory()
             assertTrue(
-                history.any { it.role == "user" && it.content.contains("was just completed") },
-                "Expected a persisted user message after todo completion, got: ${history.map { it.role to it.content.take(60) }}",
+                history.any { it.role == "system" && it.content.contains("[COMPLETED]") },
+                "Expected a system message after todo completion, got: ${history.map { it.role to it.content.take(60) }}",
             )
         }
 
     @Test
-    fun `main agent trigger persists user message when todo is cancelled`(): Unit =
+    fun `todo cancellation persists system message`(): Unit =
         runBlocking {
             val (manager, _, _) = createManagerWithInstantResponse()
             val todo = manager.todoManager.add("Cancel trigger test", "1")
@@ -212,13 +212,13 @@ class AgentManagerTodoTest {
 
             val history = manager.getHistory()
             assertTrue(
-                history.any { it.role == "user" && it.content.contains("was cancelled") },
-                "Expected a persisted user message after todo cancellation, got: ${history.map { it.role to it.content.take(60) }}",
+                history.any { it.role == "system" && it.content.contains("[CANCELLED]") },
+                "Expected a system message after todo cancellation, got: ${history.map { it.role to it.content.take(60) }}",
             )
         }
 
     @Test
-    fun `main agent is not triggered for non-terminal status changes`(): Unit =
+    fun `non-terminal status change does not persist completion message`(): Unit =
         runBlocking {
             val (manager, _, _) = createManagerWithInstantResponse()
             val todo = manager.todoManager.add("No trigger", "1")
@@ -229,8 +229,8 @@ class AgentManagerTodoTest {
 
             val history = manager.getHistory()
             assertTrue(
-                history.none { it.role == "user" && it.content.contains("was just completed") },
-                "Expected no user trigger message for non-terminal status change",
+                history.none { it.role == "system" && it.content.contains("[COMPLETED]") },
+                "Expected no completion system message for non-terminal status change",
             )
         }
 }
