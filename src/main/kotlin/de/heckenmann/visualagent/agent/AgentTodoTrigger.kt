@@ -53,6 +53,20 @@ internal class AgentTodoTrigger(
                     content = "The todo \"${todo.description}\" (id=${todo.id}) $action",
                 ),
             )
+            val requestId = "todo-trigger-${todo.id}"
+            toolEventBus.publish(
+                ToolCallEvent(
+                    toolId = "todos",
+                    functionName = "todos",
+                    phase = ToolCallPhase.STARTED,
+                    inputJson = "{}",
+                    context = mapOf("trigger" to "todoChange", "requestId" to requestId),
+                    result = ToolResult(toolId = "todos", success = true, content = ""),
+                    startedAtUtc = java.time.Instant.now(),
+                    finishedAtUtc = java.time.Instant.now(),
+                    durationMillis = 0L,
+                ),
+            )
             val history = conversationOps.loadRecentHistoryFromDb()
             val request = conversationOps.buildMainRequest(history)
             val result =
@@ -78,7 +92,7 @@ internal class AgentTodoTrigger(
                     functionName = "todos",
                     phase = ToolCallPhase.FINISHED,
                     inputJson = "{}",
-                    context = mapOf("trigger" to "todoChange"),
+                    context = mapOf("trigger" to "todoChange", "requestId" to requestId),
                     result = ToolResult(toolId = "todos", success = true, content = ""),
                     startedAtUtc = java.time.Instant.now(),
                     finishedAtUtc = java.time.Instant.now(),
