@@ -2,13 +2,10 @@
 
 package de.heckenmann.visualagent.ui.compose
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,7 +19,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandCircleDown
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -61,45 +57,41 @@ internal fun ScrollToBottomButton(
 }
 
 @Composable
-internal fun StreamingStatusLine(visible: Boolean) {
-    AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn(animationSpec = tween(180)),
-        exit = fadeOut(animationSpec = tween(180)),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.Start),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "Thinking",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            PulsingDots()
-        }
-    }
-}
-
-@Composable
 internal fun ConversationInputArea(
     input: String,
     sending: Boolean,
-    status: String,
     onInputChange: (String) -> Unit,
     onSend: () -> Unit,
     onCancel: () -> Unit,
-    onHistoryReload: () -> Unit,
     onClear: () -> Unit,
     inputFocusRequester: FocusRequester,
 ) {
     Column {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Message",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            ActionIconButton(
+                icon = Icons.Filled.Delete,
+                description = "Clear conversation",
+                onClick = onClear,
+                modifier = Modifier.size(24.dp),
+            )
+        }
         OutlinedTextField(
             value = input,
             onValueChange = onInputChange,
-            label = { Text("Message") },
-            minLines = 2,
+            label = null,
+            placeholder = { Text("Type a message…") },
+            minLines = 1,
+            maxLines = 5,
             trailingIcon = {
                 if (sending) {
                     ActionIconButton(
@@ -121,6 +113,7 @@ internal fun ConversationInputArea(
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .padding(horizontal = 8.dp)
                     .focusRequester(inputFocusRequester)
                     .onPreviewKeyEvent { event ->
                         if (event.type == KeyEventType.KeyDown && event.key == Key.Enter && !event.isShiftPressed) {
@@ -131,20 +124,6 @@ internal fun ConversationInputArea(
                         }
                     },
         )
-        StreamingStatusLine(visible = sending)
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            ActionIconButton(
-                icon = Icons.Filled.History,
-                description = "Load older history",
-                onClick = onHistoryReload,
-            )
-            ActionIconButton(
-                icon = Icons.Filled.Delete,
-                description = "Clear conversation",
-                onClick = onClear,
-            )
-        }
-        PanelStatus(status)
     }
 }
 
