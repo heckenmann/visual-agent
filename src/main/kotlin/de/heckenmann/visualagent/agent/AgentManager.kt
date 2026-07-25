@@ -132,11 +132,7 @@ class AgentManager
                 )
             todoTrigger =
                 AgentTodoTrigger(
-                    scope = scope,
                     conversationOps = conversationOps,
-                    llmProvider = llmProvider,
-                    responseCoordinator = responseCoordinator,
-                    toolEventBus = toolEventBus,
                 )
             todoEventBus.addListener { change ->
                 val todo = change.todo ?: return@addListener

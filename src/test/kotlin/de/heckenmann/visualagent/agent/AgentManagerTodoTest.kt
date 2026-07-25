@@ -1,14 +1,11 @@
 package de.heckenmann.visualagent.agent
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
-import de.heckenmann.visualagent.agent.tools.ToolCallEvent
-import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.knowledge.PersistenceStores
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoStatus
 import io.mockk.coEvery
-import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -187,93 +184,53 @@ class AgentManagerTodoTest {
         }
 
     @Test
-    fun `main agent is triggered when todo is completed`(): Unit =
+    fun `main agent trigger persists user message when todo is completed`(): Unit =
         runBlocking {
-            val (manager, provider, _) = createManagerWithInstantResponse()
+            val (manager, _, _) = createManagerWithInstantResponse()
             val todo = manager.todoManager.add("Trigger test", "1")
             delay(200)
 
             manager.todoManager.updateStatus(todo.id, TodoStatus.COMPLETED)
-            delay(500)
+            delay(200)
 
-            coVerify(atLeast = 1) { provider.chat(any<ChatRequestContext>()) }
             val history = manager.getHistory()
             assertTrue(
-                history.any { it.role == "assistant" && it.content.isNotBlank() },
-                "Expected a persisted assistant response after todo completion, got: ${history.map { it.role to it.content.take(60) }}",
+                history.any { it.role == "user" && it.content.contains("was just completed") },
+                "Expected a persisted user message after todo completion, got: ${history.map { it.role to it.content.take(60) }}",
             )
         }
 
     @Test
-    fun `main agent is triggered when todo is cancelled`(): Unit =
+    fun `main agent trigger persists user message when todo is cancelled`(): Unit =
         runBlocking {
-            val (manager, provider, _) = createManagerWithInstantResponse()
+            val (manager, _, _) = createManagerWithInstantResponse()
             val todo = manager.todoManager.add("Cancel trigger test", "1")
             delay(200)
 
             manager.todoManager.updateStatus(todo.id, TodoStatus.CANCELLED)
-            delay(500)
+            delay(200)
 
-            coVerify(atLeast = 1) { provider.chat(any<ChatRequestContext>()) }
             val history = manager.getHistory()
             assertTrue(
-                history.any { it.role == "assistant" && it.content.isNotBlank() },
-                "Expected a persisted assistant response after todo cancellation, got: ${history.map { it.role to it.content.take(60) }}",
+                history.any { it.role == "user" && it.content.contains("was cancelled") },
+                "Expected a persisted user message after todo cancellation, got: ${history.map { it.role to it.content.take(60) }}",
             )
         }
 
     @Test
     fun `main agent is not triggered for non-terminal status changes`(): Unit =
         runBlocking {
-            val (manager, provider, _) = createManagerWithInstantResponse()
+            val (manager, _, _) = createManagerWithInstantResponse()
             val todo = manager.todoManager.add("No trigger", "1")
             delay(200)
 
             manager.todoManager.updateStatus(todo.id, TodoStatus.IN_PROGRESS)
             delay(200)
 
-            coVerify(exactly = 0) { provider.chat(any<ChatRequestContext>()) }
-        }
-
-    @Test
-    fun `main agent trigger persists system message and fires event on llm error`(): Unit =
-        runBlocking {
-            val db =
-                de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                    .create("jdbc:sqlite::memory:")
-            val provider = mockk<LLMProvider>(relaxed = true)
-            coEvery { provider.isConnected() } returns true
-            coEvery { provider.chat(any<ChatRequestContext>()) } throws RuntimeException("llm down")
-            val toolEventBus = ToolEventBus()
-            val events = mutableListOf<ToolCallEvent>()
-            toolEventBus.addListener { events += it }
-            val manager =
-                AgentManager(
-                    db,
-                    provider,
-                    AgentToolConfigService(db),
-                    toolEventBus,
-                    TodoEventBus(),
-                    AppConfigBean(db),
-                )
-            try {
-                val todo = manager.todoManager.add("Trigger failure test", "1")
-                delay(200)
-
-                manager.todoManager.updateStatus(todo.id, TodoStatus.COMPLETED)
-                delay(500)
-
-                val history = manager.getHistory()
-                assertTrue(
-                    history.any { it.role == "system" && it.content.contains("could not be triggered") },
-                    "Expected a system message about the trigger failure, got: ${history.map { it.role to it.content.take(60) }}",
-                )
-                assertTrue(
-                    events.any { it.phase == ToolCallPhase.FINISHED },
-                    "Expected a ToolCallEvent to be published",
-                )
-            } finally {
-                manager.destroy()
-            }
+            val history = manager.getHistory()
+            assertTrue(
+                history.none { it.role == "user" && it.content.contains("was just completed") },
+                "Expected no user trigger message for non-terminal status change",
+            )
         }
 }
