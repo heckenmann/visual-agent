@@ -3,12 +3,10 @@
 package de.heckenmann.visualagent.ui.compose
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -252,25 +250,6 @@ class ConversationPanelRowsTest {
         }
         composeTestRule.onNodeWithContentDescription("Delete sub-agent message").assertDoesNotExist()
         assertFalse(deleteClicked)
-    }
-
-    @Test
-    fun `streaming status line is only visible while streaming`() {
-        var visible by mutableStateOf(false)
-        mount {
-            Column {
-                StreamingStatusLine(visible = visible)
-            }
-        }
-        // Hidden first.
-        composeTestRule.onNodeWithText("Thinking").assertDoesNotExist()
-        visible = true
-        composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithText("Thinking").assertExists()
-        visible = false
-        composeTestRule.waitForIdle()
-        composeTestRule.mainClock.advanceTimeBy(400L)
-        composeTestRule.onNodeWithText("Thinking").assertDoesNotExist()
     }
 
     @Test

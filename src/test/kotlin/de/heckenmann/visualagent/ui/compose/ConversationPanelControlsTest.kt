@@ -34,17 +34,15 @@ class ConversationPanelControlsTest {
                 ConversationInputArea(
                     input = inputState.value,
                     sending = false,
-                    status = "Ready",
                     onInputChange = { inputState.value = it },
                     onSend = { sent = true },
                     onCancel = {},
-                    onHistoryReload = {},
                     onClear = {},
                     inputFocusRequester = FocusRequester(),
                 )
             }
         }
-        composeTestRule.onNodeWithText("Message").performTextInput("hello")
+        composeTestRule.onNodeWithText("Type a message…").performTextInput("hello")
         composeTestRule.onNodeWithContentDescription("Send message").performClick()
         assertTrue(sent)
         assertEquals("hello", currentInput)
@@ -58,11 +56,9 @@ class ConversationPanelControlsTest {
                 ConversationInputArea(
                     input = "hi",
                     sending = true,
-                    status = "Sending",
                     onInputChange = {},
                     onSend = { sent = true },
                     onCancel = {},
-                    onHistoryReload = {},
                     onClear = {},
                     inputFocusRequester = FocusRequester(),
                 )
@@ -80,11 +76,9 @@ class ConversationPanelControlsTest {
                 ConversationInputArea(
                     input = "hi",
                     sending = true,
-                    status = "Sending",
                     onInputChange = {},
                     onSend = {},
                     onCancel = { cancelled = true },
-                    onHistoryReload = {},
                     onClear = {},
                     inputFocusRequester = FocusRequester(),
                 )
@@ -107,27 +101,22 @@ class ConversationPanelControlsTest {
     }
 
     @Test
-    fun `history reload and clear buttons invoke callbacks`() {
-        var historyClicked = false
+    fun `clear button invokes callback`() {
         var clearClicked = false
         composeTestRule.setContent {
             MaterialTheme {
                 ConversationInputArea(
                     input = "",
                     sending = false,
-                    status = "Ready",
                     onInputChange = {},
                     onSend = {},
                     onCancel = {},
-                    onHistoryReload = { historyClicked = true },
                     onClear = { clearClicked = true },
                     inputFocusRequester = FocusRequester(),
                 )
             }
         }
-        composeTestRule.onNodeWithContentDescription("Load older history").performClick()
         composeTestRule.onNodeWithContentDescription("Clear conversation").performClick()
-        assertTrue(historyClicked)
         assertTrue(clearClicked)
     }
 }
