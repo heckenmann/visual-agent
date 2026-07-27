@@ -18,6 +18,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -163,16 +164,34 @@ internal fun ConversationQueueFlushEffect(
     onHistoryChange: (List<Message>) -> Unit,
     onActiveTokenChange: (de.heckenmann.visualagent.agent.CancellationToken?) -> Unit,
 ) {
-    LaunchedEffect(inFlight.state.value.totalActive, queue.messages.size) {
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(sending, inFlight.state.value.totalActive, queue.messages.size) {
         if (!sending && inFlight.state.value.totalActive == 0 && queue.isNotEmpty && !queue.flushing) {
             queue.flushing = true
-            try {
-                when (queue.flushMode) {
-                    QueueFlushMode.ONE_BY_ONE -> {
-                        while (queue.isNotEmpty) {
-                            val msg = queue.dequeue() ?: break
+            scope.launch {
+                try {
+                    when (queue.flushMode) {
+                        QueueFlushMode.ONE_BY_ONE -> {
+                            while (queue.isNotEmpty) {
+                                val msg = queue.dequeue() ?: break
+                                executeSend(
+                                    content = msg.content,
+                                    agentManager = agentManager,
+                                    inFlight = inFlight,
+                                    inputFocusRequester = inputFocusRequester,
+                                    onInputChange = onInputChange,
+                                    onSendingChange = onSendingChange,
+                                    onStatusChange = onStatusChange,
+                                    onHistoryChange = onHistoryChange,
+                                    onActiveTokenChange = onActiveTokenChange,
+                                )
+                            }
+                        }
+                        QueueFlushMode.ALL_AT_ONCE -> {
+                            val combined = queue.messages.joinToString("\n\n") { it.content }
+                            queue.clear()
                             executeSend(
-                                content = msg.content,
+                                content = combined,
                                 agentManager = agentManager,
                                 inFlight = inFlight,
                                 inputFocusRequester = inputFocusRequester,
@@ -184,24 +203,9 @@ internal fun ConversationQueueFlushEffect(
                             )
                         }
                     }
-                    QueueFlushMode.ALL_AT_ONCE -> {
-                        val combined = queue.messages.joinToString("\n\n") { it.content }
-                        queue.clear()
-                        executeSend(
-                            content = combined,
-                            agentManager = agentManager,
-                            inFlight = inFlight,
-                            inputFocusRequester = inputFocusRequester,
-                            onInputChange = onInputChange,
-                            onSendingChange = onSendingChange,
-                            onStatusChange = onStatusChange,
-                            onHistoryChange = onHistoryChange,
-                            onActiveTokenChange = onActiveTokenChange,
-                        )
-                    }
+                } finally {
+                    queue.flushing = false
                 }
-            } finally {
-                queue.flushing = false
             }
         }
     }
