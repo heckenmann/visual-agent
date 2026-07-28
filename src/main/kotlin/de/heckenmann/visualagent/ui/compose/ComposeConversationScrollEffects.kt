@@ -10,9 +10,13 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -92,7 +96,19 @@ internal fun ConversationResizeScrollEffect(
  * Automatically loads older history when the user scrolls to the top of the conversation.
  *
  * Preserves scroll position by adjusting [LazyListState.firstVisibleItemIndex] by the
- * number of newly loaded messages.
+ * number of newly loaded messages. Tracks whether more history is available so it
+ * does not re-fire once all pages are exhausted.
+ *
+ * @param isAtTop true when the user has scrolled to the first visible item.
+ * @param history current in-memory conversation history.
+ * @param listState the [LazyListState] of the conversation [LazyColumn].
+ * @param agentManager the agent manager used to load older pages.
+ * @param onHistoryChange called with the updated history list after a successful load.
+ * @param onLoadStateChange called with `true` when loading starts and `false` when it
+ *   finishes; the panel uses this to show a loading indicator and to disable the manual
+ *   button.
+ * @param onHasMoreHistoryChange called with `false` when a load returns no new messages,
+ *   signalling that no older pages remain.
  */
 @Composable
 internal fun ConversationOlderHistoryLoader(
@@ -101,11 +117,15 @@ internal fun ConversationOlderHistoryLoader(
     listState: LazyListState,
     agentManager: AgentManager,
     onHistoryChange: (List<Message>) -> Unit,
+    onLoadStateChange: (Boolean) -> Unit = {},
+    onHasMoreHistoryChange: (Boolean) -> Unit = {},
 ) {
     var loadingOlder by remember { mutableStateOf(false) }
+    var hasMoreHistory by remember { mutableStateOf(true) }
     LaunchedEffect(isAtTop) {
-        if (isAtTop && !loadingOlder && history.isNotEmpty()) {
+        if (isAtTop && !loadingOlder && hasMoreHistory && history.isNotEmpty()) {
             loadingOlder = true
+            onLoadStateChange(true)
             val previousFirstIndex = listState.firstVisibleItemIndex
             val previousOffset = listState.firstVisibleItemScrollOffset
             val loaded = agentManager.loadOlderHistory()
@@ -114,8 +134,12 @@ internal fun ConversationOlderHistoryLoader(
             if (newMessages.isNotEmpty()) {
                 onHistoryChange(agentManager.getHistory())
                 listState.scrollToItem(previousFirstIndex + newMessages.size, previousOffset)
+            } else {
+                hasMoreHistory = false
+                onHasMoreHistoryChange(false)
             }
             loadingOlder = false
+            onLoadStateChange(false)
         }
     }
 }
@@ -215,5 +239,22 @@ internal fun ConversationQueueFlushEffect(
                 }
             }
         }
+    }
+}
+
+/**
+ * Small centered [CircularProgressIndicator] shown at the top of the conversation
+ * list while older history is being fetched.
+ */
+@Composable
+internal fun OlderHistoryLoadingIndicator() {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(20.dp),
+            strokeWidth = 2.dp,
+        )
     }
 }
