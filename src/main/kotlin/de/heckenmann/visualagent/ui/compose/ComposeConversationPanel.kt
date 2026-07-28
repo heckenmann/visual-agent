@@ -20,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +42,7 @@ import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.todo.TodoEventBus
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -68,6 +70,9 @@ internal fun ConversationPanel(
     var deletingMessageIds by remember { mutableStateOf(setOf<String>()) }
     var activeToken by remember { mutableStateOf<CancellationToken?>(null) }
     var panelSize by remember { mutableStateOf(IntSize.Zero) }
+    var pendingUserMessage by remember { mutableStateOf<String?>(null) }
+    val streamingFlow = remember { MutableStateFlow("") }
+    val streamingContent by streamingFlow.collectAsState()
     val queue = remember { MessageQueue() }
     LaunchedEffect(config.queueFlushMode) {
         queue.flushMode =
@@ -92,7 +97,7 @@ internal fun ConversationPanel(
         }
     }
     ConversationOlderHistoryLoader(
-        isAtTop = isAtTop,
+        isAtTop = isAtTop && !sending,
         history = history,
         listState = listState,
         agentManager = agentManager,
@@ -101,7 +106,7 @@ internal fun ConversationPanel(
     DisposableEffect(toolEventBus) {
         val handle =
             toolEventBus.addListener { event ->
-                if (event.phase == ToolCallPhase.FINISHED) {
+                if (event.phase == ToolCallPhase.FINISHED && !sending) {
                     history = agentManager.getHistory()
                 }
             }
@@ -110,7 +115,9 @@ internal fun ConversationPanel(
     DisposableEffect(todoEventBus) {
         val handle =
             todoEventBus.addListener {
-                history = agentManager.getHistory()
+                if (!sending) {
+                    history = agentManager.getHistory()
+                }
             }
         onDispose { handle.close() }
     }
@@ -132,6 +139,8 @@ internal fun ConversationPanel(
                         onStatusChange = { status = it },
                         onHistoryChange = { history = it },
                         onActiveTokenChange = { activeToken = it },
+                        onPendingUserMessageChange = { pendingUserMessage = it },
+                        streamingFlow = streamingFlow,
                     )
                 }
             }
@@ -158,6 +167,8 @@ internal fun ConversationPanel(
         onStatusChange = { status = it },
         onHistoryChange = { history = it },
         onActiveTokenChange = { activeToken = it },
+        onPendingUserMessageChange = { pendingUserMessage = it },
+        streamingFlow = streamingFlow,
     )
     var inputAreaHeight by remember { mutableStateOf(0) }
     val density = LocalDensity.current
@@ -183,6 +194,8 @@ internal fun ConversationPanel(
                 history = history,
                 sending = sending,
                 inFlight = inFlight,
+                pendingUserMessage = pendingUserMessage,
+                streamingContent = streamingContent,
                 deletingMessageIds = deletingMessageIds,
                 onDeleteMessage = { id ->
                     deletingMessageIds += id
@@ -222,6 +235,8 @@ internal fun ConversationPanel(
                         onStatusChange = { status = it },
                         onHistoryChange = { history = it },
                         onActiveTokenChange = { activeToken = it },
+                        onPendingUserMessageChange = { pendingUserMessage = it },
+                        streamingFlow = streamingFlow,
                     )
                 }
             },

@@ -22,6 +22,8 @@ internal fun LazyListScope.ConversationMessageList(
     history: List<Message>,
     sending: Boolean,
     inFlight: InFlightStateHolder,
+    pendingUserMessage: String?,
+    streamingContent: String,
     deletingMessageIds: Set<String>,
     onDeleteMessage: (String) -> Unit,
     onStatusChange: (String) -> Unit,
@@ -38,8 +40,6 @@ internal fun LazyListScope.ConversationMessageList(
     } else {
         itemsIndexed(history, key = { index, message -> message.id ?: "temp-$index" }) { index, message ->
             val previousRole = history.getOrNull(index - 1)?.role
-            val isStreamingPlaceholder =
-                message.role == "assistant" && message.content.isBlank() && sending && index == history.lastIndex
             val topPadding = if (previousRole == message.role) 2.dp else 10.dp
             val onDelete: () -> Unit = {
                 message.id?.let { id -> onDeleteMessage(id) }
@@ -59,12 +59,11 @@ internal fun LazyListScope.ConversationMessageList(
                         modifier = Modifier.padding(top = topPadding),
                     )
                 else -> {
-                    val isStreaming = message.role == "assistant" && sending && index == history.lastIndex
                     MessageRow(
                         message = message,
-                        isStreamingPlaceholder = isStreamingPlaceholder,
-                        isStreaming = isStreaming,
-                        canRetry = message.role == "assistant" && !sending && !isStreamingPlaceholder,
+                        isStreamingPlaceholder = false,
+                        isStreaming = false,
+                        canRetry = message.role == "assistant" && !sending,
                         canEdit = message.role == "user" && !sending,
                         canDelete = message.id != null && message.role != "system" && message.id !in deletingMessageIds,
                         isDeleting = message.id in deletingMessageIds,
@@ -83,6 +82,42 @@ internal fun LazyListScope.ConversationMessageList(
                         modifier = Modifier.padding(top = topPadding),
                     )
                 }
+            }
+        }
+        if (pendingUserMessage != null) {
+            item(key = "pending-user") {
+                MessageRow(
+                    message = Message("user", pendingUserMessage),
+                    isStreamingPlaceholder = false,
+                    isStreaming = false,
+                    canRetry = false,
+                    canEdit = false,
+                    canDelete = false,
+                    isDeleting = false,
+                    onCopied = {},
+                    onRetry = {},
+                    onEdit = {},
+                    onDelete = {},
+                    modifier = Modifier.padding(top = 10.dp),
+                )
+            }
+        }
+        if (sending && streamingContent.isNotEmpty()) {
+            item(key = "streaming-assistant") {
+                MessageRow(
+                    message = Message("assistant", streamingContent),
+                    isStreamingPlaceholder = false,
+                    isStreaming = true,
+                    canRetry = false,
+                    canEdit = false,
+                    canDelete = false,
+                    isDeleting = false,
+                    onCopied = {},
+                    onRetry = {},
+                    onEdit = {},
+                    onDelete = {},
+                    modifier = Modifier.padding(top = 2.dp),
+                )
             }
         }
         val hasInFlightTools =

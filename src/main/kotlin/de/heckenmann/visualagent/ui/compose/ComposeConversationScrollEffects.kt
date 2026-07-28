@@ -29,6 +29,7 @@ import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.Message
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -163,6 +164,8 @@ internal fun ConversationQueueFlushEffect(
     onStatusChange: (String) -> Unit,
     onHistoryChange: (List<Message>) -> Unit,
     onActiveTokenChange: (de.heckenmann.visualagent.agent.CancellationToken?) -> Unit,
+    onPendingUserMessageChange: (String?) -> Unit,
+    streamingFlow: MutableStateFlow<String>,
 ) {
     val scope = rememberCoroutineScope()
     LaunchedEffect(sending, inFlight.state.value.totalActive, queue.messages.size) {
@@ -184,6 +187,8 @@ internal fun ConversationQueueFlushEffect(
                                     onStatusChange = onStatusChange,
                                     onHistoryChange = onHistoryChange,
                                     onActiveTokenChange = onActiveTokenChange,
+                                    onPendingUserMessageChange = onPendingUserMessageChange,
+                                    streamingFlow = streamingFlow,
                                 )
                             }
                         }
@@ -200,6 +205,8 @@ internal fun ConversationQueueFlushEffect(
                                 onStatusChange = onStatusChange,
                                 onHistoryChange = onHistoryChange,
                                 onActiveTokenChange = onActiveTokenChange,
+                                onPendingUserMessageChange = onPendingUserMessageChange,
+                                streamingFlow = streamingFlow,
                             )
                         }
                     }
