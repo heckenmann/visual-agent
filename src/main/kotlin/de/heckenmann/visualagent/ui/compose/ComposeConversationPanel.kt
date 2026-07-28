@@ -93,15 +93,19 @@ internal fun ConversationPanel(
         derivedStateOf {
             val info = listState.layoutInfo
             val first = info.visibleItemsInfo.firstOrNull()
-            first != null && first.index == 0
+            first != null && first.index == 0 && first.offset >= -2
         }
     }
+    var isLoadingOlder by remember { mutableStateOf(false) }
+    var hasMoreHistory by remember { mutableStateOf(true) }
     ConversationOlderHistoryLoader(
         isAtTop = isAtTop && !sending,
         history = history,
         listState = listState,
         agentManager = agentManager,
         onHistoryChange = { history = it },
+        onLoadStateChange = { isLoadingOlder = it },
+        onHasMoreHistoryChange = { hasMoreHistory = it },
     )
     DisposableEffect(toolEventBus) {
         val handle =
@@ -190,6 +194,9 @@ internal fun ConversationPanel(
                 ),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
+            if (isLoadingOlder) {
+                item(key = "loading-older") { OlderHistoryLoadingIndicator() }
+            }
             ConversationMessageList(
                 history = history,
                 sending = sending,
