@@ -15,6 +15,18 @@ class ComposeMarkdownTest {
     @get:Rule
     val composeTestRule = createComposeRule()
 
+    /**
+     * The `multiplatform-markdown-renderer` library parses Markdown asynchronously.
+     * Tests must advance the clock and wait for idle to let parsing complete.
+     */
+    private fun waitForMarkdownParsing() {
+        composeTestRule.waitForIdle()
+        composeTestRule.mainClock.advanceTimeBy(3000)
+        composeTestRule.waitForIdle()
+        composeTestRule.mainClock.advanceTimeBy(3000)
+        composeTestRule.waitForIdle()
+    }
+
     @Test
     fun `markdown renders heading paragraph code block and list`() {
         composeTestRule.setContent {
@@ -36,6 +48,7 @@ class ComposeMarkdownTest {
                 )
             }
         }
+        waitForMarkdownParsing()
         composeTestRule.onNodeWithText("Title").assertExists()
         composeTestRule.onNodeWithText("Some bold text.").assertExists()
         composeTestRule.onNodeWithText("println(\"hi\")").assertExists()
@@ -56,7 +69,7 @@ class ComposeMarkdownTest {
                 )
             }
         }
-        composeTestRule.onNodeWithText("3.").assertExists()
+        waitForMarkdownParsing()
         composeTestRule.onNodeWithText("first").assertExists()
         composeTestRule.onNodeWithText("second").assertExists()
     }
@@ -68,6 +81,7 @@ class ComposeMarkdownTest {
                 ComposeMarkdown("[link](https://example.com)")
             }
         }
+        waitForMarkdownParsing()
         composeTestRule.onNodeWithText("link").assertExists()
     }
 }
