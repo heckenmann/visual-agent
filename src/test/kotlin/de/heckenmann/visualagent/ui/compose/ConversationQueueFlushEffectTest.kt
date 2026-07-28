@@ -14,6 +14,7 @@ import de.heckenmann.visualagent.todo.TodoEventBus
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.Rule
 import org.junit.Test
@@ -56,6 +57,8 @@ class ConversationQueueFlushEffectTest {
                         onStatusChange = {},
                         onHistoryChange = {},
                         onActiveTokenChange = {},
+                        onPendingUserMessageChange = {},
+                        streamingFlow = MutableStateFlow(""),
                     )
                 }
             }
@@ -115,6 +118,8 @@ class ConversationQueueFlushEffectTest {
                         onStatusChange = {},
                         onHistoryChange = {},
                         onActiveTokenChange = {},
+                        onPendingUserMessageChange = {},
+                        streamingFlow = MutableStateFlow(""),
                     )
                 }
             }
