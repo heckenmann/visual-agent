@@ -83,8 +83,12 @@ internal class AgentConversationHistoryOps(
             )
         val messages = rows.mapNotNull(::toMessage)
         if (messages.isNotEmpty()) {
-            owner.conversationHistory.addAll(0, messages)
-            owner.loadedHistoryCount += messages.size
+            val existingIds = owner.conversationHistory.map { it.id }.toSet()
+            val newMessages = messages.filter { it.id !in existingIds }
+            if (newMessages.isNotEmpty()) {
+                owner.conversationHistory.addAll(0, newMessages)
+                owner.loadedHistoryCount += newMessages.size
+            }
         }
         return messages
     }
