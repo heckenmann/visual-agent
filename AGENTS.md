@@ -127,6 +127,7 @@ See `README.md` for the full tree and the feature status table.
 
 ## Patterns & Conventions
 
+- **Threading**: network requests, database writes, file I/O, and any operation that may take longer than ~1ms must run on a background dispatcher (`Dispatchers.IO` or `Dispatchers.Default`). UI state updates (Compose `mutableStateOf` writes) must happen on `Dispatchers.Main`. Never block the main thread with a suspend call that waits on I/O — use `withContext(Dispatchers.IO/Default)` to shift the blocking work, then `withContext(Dispatchers.Main)` to publish results. The `onChunk` callback in streaming paths is called from a background dispatcher and must use `withContext(Dispatchers.Main)` for any Compose state writes.
 - **Constructor DI**: required dependencies are direct `private val`/`private var` constructor properties; never reassign them in the class body.
 - **Spring-managed beans**: every class that holds state or provides a service must be a Spring `@Component`, `@Service`, or `@Configuration` bean with constructor injection. No `object` singletons, no `lateinit var` for collaborators, no `AppConfig.instance` outside the bootstrap path. Exceptions: pure-Kotlin stateless utilities (`object` with only `const val` or pure functions), per-composition UI holders (`remember { }`), and data class factories.
 - **DB-first reads**: history, todos, sub-agents, workspace files, preferences are loaded from DB on demand — no long-lived in-memory caches.
