@@ -16,14 +16,17 @@ class ComposeMarkdownRenderTest {
 
     /**
      * The `multiplatform-markdown-renderer` library parses Markdown asynchronously.
-     * Tests must advance the clock and wait for idle to let parsing complete before
-     * asserting on rendered text nodes.
+     * Tests use [waitForMarkdownParsing] to advance the clock in small steps until
+     * parsing completes.
      */
     private fun waitForMarkdownParsing() {
         composeTestRule.waitForIdle()
-        composeTestRule.mainClock.advanceTimeBy(3000)
+        // The library parses Markdown asynchronously using real coroutines.
+        // The Compose test clock does not advance real time, so we must sleep
+        // to let the parsing coroutine complete.
+        Thread.sleep(200)
         composeTestRule.waitForIdle()
-        composeTestRule.mainClock.advanceTimeBy(3000)
+        Thread.sleep(200)
         composeTestRule.waitForIdle()
     }
 
