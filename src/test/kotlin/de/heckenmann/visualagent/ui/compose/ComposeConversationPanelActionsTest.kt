@@ -12,6 +12,7 @@ import de.heckenmann.visualagent.todo.TodoEventBus
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -32,6 +33,7 @@ class ComposeConversationPanelActionsTest {
             var status = ""
             var history = emptyList<Message>()
             var activeToken: CancellationToken? = null
+            val streamingFlow = MutableStateFlow("")
 
             val mockManager = mockk<AgentManager>(relaxed = true)
             every { mockManager.getHistory() } returns emptyList()
@@ -52,6 +54,8 @@ class ComposeConversationPanelActionsTest {
                 onStatusChange = { status = it },
                 onHistoryChange = { history = it },
                 onActiveTokenChange = { activeToken = it },
+                onPendingUserMessageChange = {},
+                streamingFlow = streamingFlow,
             )
 
             assertEquals("", input)
@@ -69,6 +73,7 @@ class ComposeConversationPanelActionsTest {
             var status = ""
             var history = emptyList<Message>()
             var activeToken: CancellationToken? = null
+            val streamingFlow = MutableStateFlow("")
 
             val mockManager = mockk<AgentManager>(relaxed = true)
             every { mockManager.getHistory() } returns emptyList()
@@ -84,6 +89,8 @@ class ComposeConversationPanelActionsTest {
                 onStatusChange = { status = it },
                 onHistoryChange = { history = it },
                 onActiveTokenChange = { activeToken = it },
+                onPendingUserMessageChange = {},
+                streamingFlow = streamingFlow,
             )
 
             assertEquals(false, sending)

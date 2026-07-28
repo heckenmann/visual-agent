@@ -9,7 +9,10 @@ import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.conversation.WelcomeResult
 import de.heckenmann.visualagent.error.ErrorMessageMapper
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Extracted conversation panel actions to keep [ConversationPanel] under the 300-LOC limit.
@@ -83,6 +86,12 @@ internal fun ConversationEditModal(
 
 /**
  * Executes a single message send: streams the response, updates state, and handles errors.
+ *
+ * Streaming runs on [Dispatchers.IO] so the UI thread is never blocked. The streaming
+ * content is pushed to a [MutableStateFlow] (thread-safe, non-blocking via [tryEmit]).
+ * Compose collects it via [collectAsState] on the Main dispatcher, fully decoupled from
+ * the streaming coroutine. [onHistoryChange] is only refreshed from DB after streaming
+ * completes, so the LazyColumn is not rebuilt on every token.
  */
 internal suspend fun executeSend(
     content: String,
@@ -94,11 +103,14 @@ internal suspend fun executeSend(
     onStatusChange: (String) -> Unit,
     onHistoryChange: (List<Message>) -> Unit,
     onActiveTokenChange: (CancellationToken?) -> Unit,
+    onPendingUserMessageChange: (String?) -> Unit,
+    streamingFlow: MutableStateFlow<String>,
 ) {
     onInputChange("")
     onSendingChange(true)
     onStatusChange("Streaming...")
-    onHistoryChange(agentManager.getHistory() + Message("user", content))
+    onPendingUserMessageChange(content)
+    streamingFlow.value = ""
     val streamRequestId =
         java.util.UUID
             .randomUUID()
@@ -109,11 +121,16 @@ internal suspend fun executeSend(
     val streamedContent = StringBuilder()
     val result =
         runCatching {
-            agentManager.streamMessage(content, token) { chunk ->
-                streamedContent.append(chunk)
-                onHistoryChange(agentManager.getHistory().dropLast(1) + Message("assistant", streamedContent.toString()))
+            withContext(Dispatchers.IO) {
+                agentManager.streamMessage(content, token) { chunk ->
+                    streamedContent.append(chunk)
+                    streamingFlow.value = streamedContent.toString()
+                }
             }
         }
+    streamingFlow.value = ""
+    onPendingUserMessageChange(null)
+    onHistoryChange(agentManager.getHistory())
     result
         .onSuccess {
             onHistoryChange(agentManager.getHistory())

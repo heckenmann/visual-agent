@@ -2,9 +2,15 @@
 
 package de.heckenmann.visualagent.ui.compose
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.agent.Message
@@ -15,6 +21,9 @@ import de.heckenmann.visualagent.agent.Message
 internal fun LazyListScope.ConversationMessageList(
     history: List<Message>,
     sending: Boolean,
+    inFlight: InFlightStateHolder,
+    pendingUserMessage: String?,
+    streamingContent: String,
     deletingMessageIds: Set<String>,
     onDeleteMessage: (String) -> Unit,
     onStatusChange: (String) -> Unit,
@@ -31,8 +40,6 @@ internal fun LazyListScope.ConversationMessageList(
     } else {
         itemsIndexed(history, key = { index, message -> message.id ?: "temp-$index" }) { index, message ->
             val previousRole = history.getOrNull(index - 1)?.role
-            val isStreamingPlaceholder =
-                message.role == "assistant" && message.content.isBlank() && sending && index == history.lastIndex
             val topPadding = if (previousRole == message.role) 2.dp else 10.dp
             val onDelete: () -> Unit = {
                 message.id?.let { id -> onDeleteMessage(id) }
@@ -42,21 +49,21 @@ internal fun LazyListScope.ConversationMessageList(
                     ToolMessageRow(
                         message = message,
                         isDeleting = message.id in deletingMessageIds,
+                        isInFlight = false,
                         onDelete = onDelete,
                         modifier = Modifier.padding(top = topPadding),
                     )
-                "sub_agent" ->
-                    SubAgentMessageRow(
+                "system" ->
+                    SystemMessageRow(
                         message = message,
-                        isDeleting = message.id in deletingMessageIds,
-                        onDelete = onDelete,
                         modifier = Modifier.padding(top = topPadding),
                     )
-                else ->
+                else -> {
                     MessageRow(
                         message = message,
-                        isStreamingPlaceholder = isStreamingPlaceholder,
-                        canRetry = message.role == "assistant" && !sending && !isStreamingPlaceholder,
+                        isStreamingPlaceholder = false,
+                        isStreaming = false,
+                        canRetry = message.role == "assistant" && !sending,
                         canEdit = message.role == "user" && !sending,
                         canDelete = message.id != null && message.role != "system" && message.id !in deletingMessageIds,
                         isDeleting = message.id in deletingMessageIds,
@@ -74,6 +81,62 @@ internal fun LazyListScope.ConversationMessageList(
                         onDelete = onDelete,
                         modifier = Modifier.padding(top = topPadding),
                     )
+                }
+            }
+        }
+        if (pendingUserMessage != null) {
+            item(key = "pending-user") {
+                MessageRow(
+                    message = Message("user", pendingUserMessage),
+                    isStreamingPlaceholder = false,
+                    isStreaming = false,
+                    canRetry = false,
+                    canEdit = false,
+                    canDelete = false,
+                    isDeleting = false,
+                    onCopied = {},
+                    onRetry = {},
+                    onEdit = {},
+                    onDelete = {},
+                    modifier = Modifier.padding(top = 10.dp),
+                )
+            }
+        }
+        if (sending && streamingContent.isNotEmpty()) {
+            item(key = "streaming-assistant") {
+                MessageRow(
+                    message = Message("assistant", streamingContent),
+                    isStreamingPlaceholder = false,
+                    isStreaming = true,
+                    canRetry = false,
+                    canEdit = false,
+                    canDelete = false,
+                    isDeleting = false,
+                    onCopied = {},
+                    onRetry = {},
+                    onEdit = {},
+                    onDelete = {},
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+        }
+        val hasInFlightTools =
+            inFlight.state.value.pendingToolIds
+                .isNotEmpty()
+        if ((sending || hasInFlightTools) && history.isNotEmpty()) {
+            item(key = "streaming-indicator") {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.Start),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "Thinking",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    PulsingDots()
+                }
             }
         }
     }

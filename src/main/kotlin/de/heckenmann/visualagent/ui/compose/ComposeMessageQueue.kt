@@ -162,7 +162,7 @@ internal fun MessageQueueStrip(
                 Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(6.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f))
+                    .background(MaterialTheme.colorScheme.surfaceContainerLowest)
                     .padding(horizontal = 8.dp, vertical = 4.dp),
         ) {
             Row(
@@ -224,7 +224,7 @@ private fun QueuedMessageChip(
             Modifier
                 .widthIn(max = 220.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                .background(MaterialTheme.colorScheme.surfaceContainer)
                 .padding(horizontal = 6.dp, vertical = 3.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,

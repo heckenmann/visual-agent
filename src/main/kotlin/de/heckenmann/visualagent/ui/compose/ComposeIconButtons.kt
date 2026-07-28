@@ -75,7 +75,7 @@ internal fun ActionIconButton(
     iconSize: Dp = 17.dp,
     onLongClick: (() -> Unit)? = null,
 ) {
-    val backgroundColor = if (selected) MaterialTheme.colorScheme.tertiary.copy(alpha = 0x33 / 255f) else Color.Transparent
+    val backgroundColor = if (selected) MaterialTheme.colorScheme.tertiaryContainer else Color.Transparent
     val iconTint = if (selected) MaterialTheme.colorScheme.tertiary else LocalContentColor.current
     ActionTooltip(description = description) {
         Box(

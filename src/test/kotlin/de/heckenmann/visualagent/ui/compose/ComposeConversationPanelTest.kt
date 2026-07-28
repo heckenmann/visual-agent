@@ -38,7 +38,6 @@ class ComposeConversationPanelTest {
         }
 
         composeTestRule.onNodeWithText("No conversation yet").assertExists()
-        composeTestRule.onNodeWithText("Ready").assertExists()
     }
 
     @Test

@@ -32,7 +32,6 @@ class ConversationScrollOnChangeTest {
             val state = rememberLazyListState()
             listState.add(state)
             MaterialTheme {
-                // Fixed viewport so not all items are visible at once; otherwise no scrolling is needed.
                 LazyColumn(
                     state = state,
                     modifier = Modifier.width(200.dp).height(160.dp),

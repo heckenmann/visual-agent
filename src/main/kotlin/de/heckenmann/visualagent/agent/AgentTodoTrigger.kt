@@ -5,6 +5,8 @@ import de.heckenmann.visualagent.agent.text.AgentResponseCoordinator
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
+import de.heckenmann.visualagent.todo.Todo
+import de.heckenmann.visualagent.todo.TodoStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import mu.KotlinLogging
@@ -29,8 +31,42 @@ internal class AgentTodoTrigger(
      * On LLM failure, a system message is persisted instead and the error is logged.
      * A synthetic [ToolCallEvent] is always published so the UI refreshes.
      */
-    fun trigger() {
+    fun trigger(todo: Todo) {
         scope.launch {
+            val action =
+                when (todo.status) {
+                    TodoStatus.COMPLETED ->
+                        "was just completed by the sub-agent. " +
+                            "Review the result. If the task was done correctly, inform the user. " +
+                            "Do NOT create a new todo for this task. " +
+                            "If the result is incomplete or incorrect, update the todo description " +
+                            "with better instructions and set it back to PENDING."
+                    TodoStatus.CANCELLED ->
+                        "was cancelled. Inform the user. " +
+                            "If the task still needs to be done, update the todo description " +
+                            "and set it back to PENDING."
+                    else -> return@launch
+                }
+            conversationOps.persist(
+                Message(
+                    role = "system",
+                    content = "The todo \"${todo.description}\" (id=${todo.id}) $action",
+                ),
+            )
+            val requestId = "todo-trigger-${todo.id}"
+            toolEventBus.publish(
+                ToolCallEvent(
+                    toolId = "todos",
+                    functionName = "todos",
+                    phase = ToolCallPhase.STARTED,
+                    inputJson = "{}",
+                    context = mapOf("trigger" to "todoChange", "requestId" to requestId),
+                    result = ToolResult(toolId = "todos", success = true, content = ""),
+                    startedAtUtc = java.time.Instant.now(),
+                    finishedAtUtc = java.time.Instant.now(),
+                    durationMillis = 0L,
+                ),
+            )
             val history = conversationOps.loadRecentHistoryFromDb()
             val request = conversationOps.buildMainRequest(history)
             val result =
@@ -56,7 +92,7 @@ internal class AgentTodoTrigger(
                     functionName = "todos",
                     phase = ToolCallPhase.FINISHED,
                     inputJson = "{}",
-                    context = mapOf("trigger" to "todoChange"),
+                    context = mapOf("trigger" to "todoChange", "requestId" to requestId),
                     result = ToolResult(toolId = "todos", success = true, content = ""),
                     startedAtUtc = java.time.Instant.now(),
                     finishedAtUtc = java.time.Instant.now(),

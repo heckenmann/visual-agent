@@ -27,6 +27,7 @@ class MessageRowsTest {
                 MessageRow(
                     message = Message(role = "user", content = "hello", id = "msg-1"),
                     isStreamingPlaceholder = false,
+                    isStreaming = false,
                     canRetry = false,
                     canEdit = false,
                     canDelete = false,
@@ -38,7 +39,7 @@ class MessageRowsTest {
                 )
             }
         }
-        composeTestRule.onNodeWithText("USER").assertExists()
+        composeTestRule.onNodeWithText("You").assertExists()
         composeTestRule.onNodeWithText("hello").assertExists()
         composeTestRule.onNodeWithContentDescription("Copy user message").performClick()
         assertTrue(copied)
@@ -52,6 +53,7 @@ class MessageRowsTest {
                 MessageRow(
                     message = Message(role = "assistant", content = "hi", id = "msg-1"),
                     isStreamingPlaceholder = false,
+                    isStreaming = false,
                     canRetry = true,
                     canEdit = false,
                     canDelete = false,
@@ -75,6 +77,7 @@ class MessageRowsTest {
                 MessageRow(
                     message = Message(role = "user", content = "hello", id = "msg-1"),
                     isStreamingPlaceholder = false,
+                    isStreaming = false,
                     canRetry = false,
                     canEdit = true,
                     canDelete = false,
@@ -97,6 +100,7 @@ class MessageRowsTest {
                 MessageRow(
                     message = Message(role = "assistant", content = "hi", id = "msg-1"),
                     isStreamingPlaceholder = false,
+                    isStreaming = false,
                     canRetry = false,
                     canEdit = false,
                     canDelete = false,
@@ -119,6 +123,7 @@ class MessageRowsTest {
                 MessageRow(
                     message = Message(role = "assistant", content = "hi", id = "msg-1"),
                     isStreamingPlaceholder = false,
+                    isStreaming = false,
                     canRetry = false,
                     canEdit = false,
                     canDelete = true,
@@ -141,6 +146,7 @@ class MessageRowsTest {
                 MessageRow(
                     message = Message(role = "assistant", content = "hi", id = "msg-1"),
                     isStreamingPlaceholder = false,
+                    isStreaming = false,
                     canRetry = true,
                     canEdit = false,
                     canDelete = false,
@@ -165,6 +171,7 @@ class MessageRowsTest {
                 MessageRow(
                     message = Message(role = "assistant", content = "", id = null),
                     isStreamingPlaceholder = true,
+                    isStreaming = false,
                     canRetry = false,
                     canEdit = false,
                     canDelete = false,

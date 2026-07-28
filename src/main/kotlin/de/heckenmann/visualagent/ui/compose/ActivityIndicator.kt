@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
+import de.heckenmann.visualagent.todo.Todo
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 
@@ -54,12 +55,14 @@ import kotlinx.coroutines.launch
  * @property runningAgentIds Sub-agent IDs whose job is currently queued or executing
  * @property pendingToolIds Tool IDs with a STARTED event but no matching FINISHED event
  * @property settingsLoading True while a settings refresh (models, details) is in flight
+ * @property currentTodoInProgress Todo currently assigned to a running sub-agent, if any
  */
 data class InFlightState(
     val streamingRequestIds: Set<String> = emptySet(),
     val runningAgentIds: Set<String> = emptySet(),
     val pendingToolIds: Set<String> = emptySet(),
     val settingsLoading: Boolean = false,
+    val currentTodoInProgress: Todo? = null,
 ) {
     /** Total number of activities that are currently in flight. */
     val totalActive: Int
@@ -132,6 +135,13 @@ class InFlightStateHolder internal constructor() {
         val current = state.value
         if (current.settingsLoading == loading) return
         state.value = current.copy(settingsLoading = loading)
+    }
+
+    /** Sets the todo currently being processed by a running sub-agent. */
+    fun setCurrentTodoInProgress(todo: Todo?) {
+        val current = state.value
+        if (current.currentTodoInProgress?.id == todo?.id && current.currentTodoInProgress?.status == todo?.status) return
+        state.value = current.copy(currentTodoInProgress = todo)
     }
 
     /**

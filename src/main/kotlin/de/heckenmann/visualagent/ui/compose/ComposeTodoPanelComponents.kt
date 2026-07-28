@@ -59,6 +59,8 @@ internal fun ReorderableColumnScope.TodoRow(
         } else {
             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.12f)
         }
+    val agents = remember { agentManager.getSubAgents() }
+    val agentName = todo.assignedAgentId?.let { id -> agents.firstOrNull { it.id == id }?.name }
     ReorderableItem {
         PanelContentCard(
             modifier = Modifier.fillMaxWidth().alpha(alpha),
@@ -74,7 +76,7 @@ internal fun ReorderableColumnScope.TodoRow(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    TodoMetaLine(todo = todo, isNext = isNext)
+                    TodoMetaLine(todo = todo, isNext = isNext, agentName = agentName)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
                     ActionIconButton(
@@ -134,6 +136,7 @@ internal fun ReorderableColumnScope.TodoRow(
 internal fun TodoMetaLine(
     todo: Todo,
     isNext: Boolean,
+    agentName: String?,
 ) {
     val statusColor =
         when (todo.status) {
@@ -168,7 +171,7 @@ internal fun TodoMetaLine(
         )
         if (todo.assignedAgentId != null) {
             Text(
-                text = "· ${todo.assignedAgentId}",
+                text = "· ${agentName ?: todo.assignedAgentId}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
