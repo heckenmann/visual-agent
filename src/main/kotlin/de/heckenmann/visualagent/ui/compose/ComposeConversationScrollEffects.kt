@@ -148,6 +148,9 @@ internal fun ConversationOlderHistoryLoader(
 
 /**
  * Shows a floating scroll-to-bottom button when the user is not at the bottom of the conversation.
+ *
+ * @param bottomPadding extra bottom padding to keep the button above an overlapping
+ *   bottom-anchored element (e.g. the input area).
  */
 @Composable
 internal fun ConversationScrollToBottomArea(
@@ -155,6 +158,7 @@ internal fun ConversationScrollToBottomArea(
     history: List<Message>,
     listState: LazyListState,
     scope: CoroutineScope,
+    bottomPadding: Int = 0,
 ) {
     AnimatedVisibility(
         visible = !isAtBottom,
@@ -169,7 +173,14 @@ internal fun ConversationScrollToBottomArea(
         ) {
             ScrollToBottomButton(
                 onClick = { scope.launch { listState.animateScrollToItem(history.lastIndex.coerceAtLeast(0)) } },
-                modifier = Modifier.padding(end = 12.dp, bottom = 12.dp),
+                modifier =
+                    Modifier.padding(
+                        end = 12.dp,
+                        bottom =
+                            with(androidx.compose.ui.platform.LocalDensity.current) {
+                                bottomPadding.toDp() + 12.dp
+                            },
+                    ),
             )
         }
     }

@@ -219,15 +219,16 @@ internal fun ConversationPanel(
                 sendContent = sendContent,
             )
         }
+        ConversationVerticalScrollbar(
+            listState = listState,
+            modifier = Modifier.align(Alignment.CenterEnd),
+        )
         ConversationScrollToBottomArea(
             isAtBottom = isAtBottom,
             history = history,
             listState = listState,
             scope = scope,
-        )
-        ConversationVerticalScrollbar(
-            listState = listState,
-            modifier = Modifier.align(Alignment.CenterEnd),
+            bottomPadding = inputAreaHeight,
         )
         MessageQueueStrip(
             queue = queue,
