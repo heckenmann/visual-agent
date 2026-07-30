@@ -197,7 +197,7 @@ internal fun ConversationPanel(
                 item(key = "loading-older") { OlderHistoryLoadingIndicator() }
             }
             ConversationMessageList(
-                history = history.reversed(),
+                history = history,
                 sending = sending,
                 inFlight = inFlight,
                 pendingUserMessage = pendingUserMessage,
