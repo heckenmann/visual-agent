@@ -39,8 +39,8 @@ internal fun LazyListScope.ConversationMessageList(
         }
     } else {
         itemsIndexed(history, key = { index, message -> message.id ?: "temp-$index" }) { index, message ->
-            val previousRole = history.getOrNull(index - 1)?.role
-            val topPadding = if (previousRole == message.role) 2.dp else 10.dp
+            val nextRole = history.getOrNull(index + 1)?.role
+            val topPadding = if (nextRole == message.role) 2.dp else 10.dp
             val onDelete: () -> Unit = {
                 message.id?.let { id -> onDeleteMessage(id) }
             }
@@ -69,7 +69,7 @@ internal fun LazyListScope.ConversationMessageList(
                         isDeleting = message.id in deletingMessageIds,
                         onCopied = { onStatusChange("Copied ${message.role} message") },
                         onRetry = {
-                            val previousUserMessage = history.take(index).lastOrNull { it.role == "user" }
+                            val previousUserMessage = history.drop(index + 1).firstOrNull { it.role == "user" }
                             if (previousUserMessage == null) {
                                 onStatusChange("No previous user message to retry")
                             } else {
