@@ -2,6 +2,9 @@
 
 package de.heckenmann.visualagent.ui.compose
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.StartOffset
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -129,36 +132,33 @@ internal fun ConversationInputArea(
 
 @Composable
 internal fun PulsingDots() {
-    val transition = rememberInfiniteTransition(label = "streaming")
-    val offsets = listOf(0, 160, 320)
+    val dotColor = MaterialTheme.colorScheme.primary
+    val transition = rememberInfiniteTransition(label = "pulsing-dots")
+    // Three staggered alpha animations, each offset by a third of the cycle.
     val alphas =
-        offsets.map { delayMs ->
-            val animatedAlpha by transition.animateFloat(
+        (0..2).map { index ->
+            val offsetMs = index * 200
+            transition.animateFloat(
                 initialValue = 0.25f,
                 targetValue = 1f,
                 animationSpec =
                     infiniteRepeatable(
-                        animation = tween(durationMillis = STREAMING_DOT_ANIMATION_CYCLE_MS),
-                        repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
-                        initialStartOffset =
-                            androidx.compose.animation.core
-                                .StartOffset(offsetMillis = delayMs),
+                        animation = tween(durationMillis = 600, easing = FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Reverse,
+                        initialStartOffset = StartOffset(offsetMillis = offsetMs),
                     ),
-                label = "streaming-dot-$delayMs",
+                label = "dot-$index",
             )
-            animatedAlpha
         }
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        alphas.forEach { alpha ->
+        alphas.forEach { state ->
             Box(
                 modifier =
                     Modifier
                         .size(4.dp)
-                        .alpha(alpha)
-                        .background(MaterialTheme.colorScheme.primary, shape = CircleShape),
+                        .alpha(state.value)
+                        .background(dotColor, shape = CircleShape),
             )
         }
     }
 }
-
-private const val STREAMING_DOT_ANIMATION_CYCLE_MS = 700

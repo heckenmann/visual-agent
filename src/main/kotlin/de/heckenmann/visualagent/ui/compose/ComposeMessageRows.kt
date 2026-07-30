@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
@@ -128,13 +129,22 @@ internal fun MessageRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else if (isStreaming) {
-                Text(
-                    text = message.content,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
+                SelectionContainer {
+                    StreamingText(
+                        text = message.content,
+                        animate = true,
+                    ) { displayedText ->
+                        Text(
+                            text = displayedText,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                }
             } else {
-                ComposeMarkdown(message.content)
+                SelectionContainer {
+                    ComposeMarkdown(message.content)
+                }
             }
         }
     }
