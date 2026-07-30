@@ -93,6 +93,49 @@ internal class AgentConversationHistoryOps(
         return messages
     }
 
+    /**
+     * Loads the newest messages from the database and appends any that are not
+     * yet in the in-memory history. Used by the scroll-to-bottom button to jump
+     * to the newest persisted message even if a background process wrote new
+     * messages after the UI last refreshed.
+     */
+    fun loadLatestHistory(limit: Int): List<Message> {
+        val rows =
+            owner.conversationStore.getConversationMessages(
+                sessionId = AgentManager.MAIN_SESSION_ID,
+                limit = limit.coerceAtLeast(1),
+            )
+        val dbMessages = rows.mapNotNull(::toMessage)
+        if (dbMessages.isEmpty()) return emptyList()
+        val existingIds = owner.conversationHistory.map { it.id }.toSet()
+        val newMessages = dbMessages.filter { it.id !in existingIds }
+        if (newMessages.isNotEmpty()) {
+            owner.conversationHistory.addAll(newMessages)
+            owner.loadedHistoryCount += newMessages.size
+        }
+        return newMessages
+    }
+
+    /**
+     * Clears the in-memory conversation history and reloads the latest page from
+     * the database. Used by the scroll-to-bottom button to guarantee the user
+     * lands on the newest persisted message without paging through intermediate
+     * chunks.
+     */
+    fun refreshHistoryToLatest(limit: Int): List<Message> {
+        owner.conversationHistory.clear()
+        owner.loadedHistoryCount = 0
+        val rows =
+            owner.conversationStore.getConversationMessages(
+                sessionId = AgentManager.MAIN_SESSION_ID,
+                limit = limit.coerceAtLeast(1),
+            )
+        val messages = rows.mapNotNull(::toMessage)
+        owner.conversationHistory.addAll(messages)
+        owner.loadedHistoryCount = messages.size
+        return messages
+    }
+
     fun loadRecentHistoryFromDb(limit: Int): List<Message> =
         owner.conversationStore
             .getConversationMessages(AgentManager.MAIN_SESSION_ID, limit)

@@ -78,6 +78,11 @@ dependencies {
     implementation("org.commonmark:commonmark:0.29.0")
     implementation("org.commonmark:commonmark-ext-autolink:0.29.0")
     implementation("org.commonmark:commonmark-ext-gfm-tables:0.29.0")
+    implementation("org.commonmark:commonmark-ext-gfm-strikethrough:0.29.0")
+
+    // Markdown rendering (Compose Multiplatform native renderer)
+    implementation("com.mikepenz:multiplatform-markdown-renderer:0.43.0")
+    implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.43.0")
 
     // Workspace document analysis
     implementation("org.apache.pdfbox:pdfbox:3.0.8")

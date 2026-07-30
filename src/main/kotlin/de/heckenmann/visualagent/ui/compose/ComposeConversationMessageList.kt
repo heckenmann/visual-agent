@@ -30,7 +30,43 @@ internal fun LazyListScope.ConversationMessageList(
     onEditMessage: (String?) -> Unit,
     sendContent: (String) -> Unit,
 ) {
-    if (history.isEmpty()) {
+    if (sending && streamingContent.isNotEmpty()) {
+        item(key = "streaming-assistant") {
+            MessageRow(
+                message = Message("assistant", streamingContent),
+                isStreamingPlaceholder = false,
+                isStreaming = true,
+                canRetry = false,
+                canEdit = false,
+                canDelete = false,
+                isDeleting = false,
+                onCopied = {},
+                onRetry = {},
+                onEdit = {},
+                onDelete = {},
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+    }
+    if (pendingUserMessage != null) {
+        item(key = "pending-user") {
+            MessageRow(
+                message = Message("user", pendingUserMessage),
+                isStreamingPlaceholder = false,
+                isStreaming = false,
+                canRetry = false,
+                canEdit = false,
+                canDelete = false,
+                isDeleting = false,
+                onCopied = {},
+                onRetry = {},
+                onEdit = {},
+                onDelete = {},
+                modifier = Modifier.padding(top = 10.dp),
+            )
+        }
+    }
+    if (history.isEmpty() && pendingUserMessage == null && streamingContent.isEmpty()) {
         item {
             PanelEmptyState(
                 title = "No conversation yet",
@@ -39,8 +75,8 @@ internal fun LazyListScope.ConversationMessageList(
         }
     } else {
         itemsIndexed(history, key = { index, message -> message.id ?: "temp-$index" }) { index, message ->
-            val previousRole = history.getOrNull(index - 1)?.role
-            val topPadding = if (previousRole == message.role) 2.dp else 10.dp
+            val nextRole = history.getOrNull(index + 1)?.role
+            val topPadding = if (nextRole == message.role) 2.dp else 10.dp
             val onDelete: () -> Unit = {
                 message.id?.let { id -> onDeleteMessage(id) }
             }
@@ -69,7 +105,7 @@ internal fun LazyListScope.ConversationMessageList(
                         isDeleting = message.id in deletingMessageIds,
                         onCopied = { onStatusChange("Copied ${message.role} message") },
                         onRetry = {
-                            val previousUserMessage = history.take(index).lastOrNull { it.role == "user" }
+                            val previousUserMessage = history.drop(index + 1).firstOrNull { it.role == "user" }
                             if (previousUserMessage == null) {
                                 onStatusChange("No previous user message to retry")
                             } else {
@@ -82,42 +118,6 @@ internal fun LazyListScope.ConversationMessageList(
                         modifier = Modifier.padding(top = topPadding),
                     )
                 }
-            }
-        }
-        if (pendingUserMessage != null) {
-            item(key = "pending-user") {
-                MessageRow(
-                    message = Message("user", pendingUserMessage),
-                    isStreamingPlaceholder = false,
-                    isStreaming = false,
-                    canRetry = false,
-                    canEdit = false,
-                    canDelete = false,
-                    isDeleting = false,
-                    onCopied = {},
-                    onRetry = {},
-                    onEdit = {},
-                    onDelete = {},
-                    modifier = Modifier.padding(top = 10.dp),
-                )
-            }
-        }
-        if (sending && streamingContent.isNotEmpty()) {
-            item(key = "streaming-assistant") {
-                MessageRow(
-                    message = Message("assistant", streamingContent),
-                    isStreamingPlaceholder = false,
-                    isStreaming = true,
-                    canRetry = false,
-                    canEdit = false,
-                    canDelete = false,
-                    isDeleting = false,
-                    onCopied = {},
-                    onRetry = {},
-                    onEdit = {},
-                    onDelete = {},
-                    modifier = Modifier.padding(top = 2.dp),
-                )
             }
         }
         val hasInFlightTools =

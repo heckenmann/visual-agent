@@ -23,7 +23,7 @@ class ConversationStartupScrollTest {
         composeTestRule.setContent {
             val state = rememberLazyListState()
             listState.add(state)
-            LazyColumn(state = state, modifier = Modifier.fillMaxSize()) {
+            LazyColumn(state = state, modifier = Modifier.fillMaxSize(), reverseLayout = true) {
                 items(messages) { message ->
                     Text(message.content)
                 }
@@ -31,11 +31,10 @@ class ConversationStartupScrollTest {
             ConversationStartupScrollEffect(messages, state)
         }
         composeTestRule.waitForIdle()
-        val info = listState.single().layoutInfo
-        val lastVisibleIndex = info.visibleItemsInfo.lastOrNull()?.index ?: -1
+        // With reverseLayout, newest items are at index 0.
         assertTrue(
-            lastVisibleIndex >= messages.lastIndex,
-            "expected last message to be visible after startup scroll, but last visible index was $lastVisibleIndex of ${messages.size}",
+            !listState.single().canScrollBackward,
+            "expected canScrollBackward=false after startup scroll",
         )
     }
 }

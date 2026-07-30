@@ -8,14 +8,16 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -24,7 +26,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.unit.IntSize
@@ -37,6 +38,19 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
 /**
+ * Scrolls a [LazyListState] to the bottom of its content.
+ *
+ * When the LazyColumn uses [androidx.compose.foundation.lazy.LazyListScope.reverseLayout] = true,
+ * the newest items are at index 0, so scrolling to the bottom is simply
+ * [LazyListState.scrollToItem]`(0)`. No retry loops or [Int.MAX_VALUE] hacks
+ * are needed — the layout engine handles this correctly on the next frame.
+ */
+internal suspend fun LazyListState.scrollToBottom() {
+    if (layoutInfo.totalItemsCount == 0) return
+    scrollToItem(0)
+}
+
+/**
  * Scrolls the conversation list to the bottom once on composition when history is not empty.
  */
 @Composable
@@ -46,28 +60,36 @@ internal fun ConversationStartupScrollEffect(
 ) {
     LaunchedEffect(Unit) {
         if (history.isNotEmpty()) {
-            listState.scrollToItem(history.lastIndex)
+            // Retry until items are laid out (handles async Markdown rendering
+            // where items may initially report height 0).
+            var attempts = 0
+            while (listState.layoutInfo.totalItemsCount == 0 && attempts < 10) {
+                kotlinx.coroutines.delay(16)
+                attempts++
+            }
+            listState.scrollToBottom()
         }
     }
 }
 
 /**
- * Keeps the conversation list scrolled to the bottom when the last message changes.
+ * Keeps the conversation list scrolled to the bottom when a new message is appended.
  *
- * Uses [LazyListState.requestScrollToItem] (non-suspending) so the scroll is
- * posted as a request and processed in the next layout pass without blocking
- * the composition or the chunk callback.
+ * Only fires when the message count increases — not when the history list is
+ * refreshed in-place (e.g. after getHistory()). This prevents the scroll from
+ * fighting the user when they scroll up to read older messages.
  */
 @Composable
 internal fun ConversationScrollOnChangeEffect(
     history: List<Message>,
     listState: LazyListState,
 ) {
-    val lastMessageKey = history.lastOrNull()?.let { "${it.id}:${it.content.hashCode()}" }
-    LaunchedEffect(lastMessageKey) {
-        if (history.isNotEmpty()) {
-            listState.requestScrollToItem(history.lastIndex)
+    var lastCount by remember { mutableStateOf(history.size) }
+    LaunchedEffect(history.size) {
+        if (history.isNotEmpty() && history.size > lastCount) {
+            listState.scrollToBottom()
         }
+        lastCount = history.size
     }
 }
 
@@ -86,20 +108,22 @@ internal fun ConversationResizeScrollEffect(
         if (panelSize != IntSize.Zero) {
             delay(200)
             if (history.isNotEmpty()) {
-                listState.requestScrollToItem(history.lastIndex)
+                listState.scrollToBottom()
             }
         }
     }
 }
 
 /**
- * Automatically loads older history when the user scrolls to the top of the conversation.
+ * Automatically loads older history when the user scrolls to the end of the conversation.
  *
+ * With [reverseLayout] = true, the oldest messages are at the end (highest indices),
+ * so "scrolling to the top" in the visual sense means scrolling to the last item.
  * Preserves scroll position by adjusting [LazyListState.firstVisibleItemIndex] by the
  * number of newly loaded messages. Tracks whether more history is available so it
  * does not re-fire once all pages are exhausted.
  *
- * @param isAtTop true when the user has scrolled to the first visible item.
+ * @param isAtEnd true when the user has scrolled to the last visible item (oldest messages).
  * @param history current in-memory conversation history.
  * @param listState the [LazyListState] of the conversation [LazyColumn].
  * @param agentManager the agent manager used to load older pages.
@@ -112,7 +136,7 @@ internal fun ConversationResizeScrollEffect(
  */
 @Composable
 internal fun ConversationOlderHistoryLoader(
-    isAtTop: Boolean,
+    isAtEnd: Boolean,
     history: List<Message>,
     listState: LazyListState,
     agentManager: AgentManager,
@@ -122,8 +146,8 @@ internal fun ConversationOlderHistoryLoader(
 ) {
     var loadingOlder by remember { mutableStateOf(false) }
     var hasMoreHistory by remember { mutableStateOf(true) }
-    LaunchedEffect(isAtTop) {
-        if (isAtTop && !loadingOlder && hasMoreHistory && history.isNotEmpty()) {
+    LaunchedEffect(isAtEnd) {
+        if (isAtEnd && !loadingOlder && hasMoreHistory && history.isNotEmpty()) {
             loadingOlder = true
             onLoadStateChange(true)
             val previousFirstIndex = listState.firstVisibleItemIndex
@@ -133,6 +157,8 @@ internal fun ConversationOlderHistoryLoader(
             val newMessages = loaded.filter { it.id !in existingIds }
             if (newMessages.isNotEmpty()) {
                 onHistoryChange(agentManager.getHistory())
+                // With reverseLayout, older messages are appended at the end.
+                // Preserve the user's scroll position by adjusting the index.
                 listState.scrollToItem(previousFirstIndex + newMessages.size, previousOffset)
             } else {
                 hasMoreHistory = false
@@ -146,28 +172,57 @@ internal fun ConversationOlderHistoryLoader(
 
 /**
  * Shows a floating scroll-to-bottom button when the user is not at the bottom of the conversation.
+ *
+ * On click, optionally refreshes the in-memory history from the database (picking
+ * up any messages written by background processes) and then scrolls to the
+ * newest persisted message.
+ *
+ * @param agentManager used to reload the latest history from the database before
+ *   scrolling. If `null`, no DB refresh is performed (useful for isolated tests).
+ * @param onHistoryRefresh called after the DB refresh so the caller can update
+ *   its local `history` state (which drives the LazyColumn items). No-op if
+ *   [agentManager] is `null`.
+ * @param bottomPadding extra bottom padding (in pixels) to keep the button above an overlapping
+ *   bottom-anchored element (e.g. the input area).
+ * @param modifier additional modifier; callers should align this to the bottom-end of the Box.
  */
 @Composable
 internal fun ConversationScrollToBottomArea(
     isAtBottom: Boolean,
-    history: List<Message>,
     listState: LazyListState,
     scope: CoroutineScope,
+    agentManager: AgentManager? = null,
+    onHistoryRefresh: () -> Unit = {},
+    bottomPadding: Int = 0,
+    modifier: Modifier = Modifier,
 ) {
-    AnimatedVisibility(
-        visible = !isAtBottom,
-        modifier = Modifier.fillMaxSize(),
-        enter = fadeIn(animationSpec = tween(180)) + slideInVertically(initialOffsetY = { it / 2 }),
-        exit = fadeOut(animationSpec = tween(180)) + slideOutVertically(targetOffsetY = { it / 2 }),
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val bottomDp = with(density) { bottomPadding.toDp() } + 12.dp
+    // Wrap in a Box with fillMaxSize so the alignment is stable even when
+    // AnimatedVisibility collapses to zero size during exit animation.
+    Box(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = androidx.compose.ui.Alignment.BottomEnd,
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.Bottom,
-            horizontalAlignment = Alignment.End,
+        AnimatedVisibility(
+            visible = !isAtBottom,
+            enter = fadeIn(animationSpec = tween(180)) + slideInVertically(initialOffsetY = { it / 2 }),
+            exit = fadeOut(animationSpec = tween(180)) + slideOutVertically(targetOffsetY = { it / 2 }),
         ) {
             ScrollToBottomButton(
-                onClick = { scope.launch { listState.animateScrollToItem(history.lastIndex.coerceAtLeast(0)) } },
-                modifier = Modifier.padding(end = 12.dp, bottom = 12.dp),
+                onClick = {
+                    scope.launch {
+                        // Clear the in-memory history and reload the latest page
+                        // from the DB so the user always lands on the newest
+                        // persisted message, even after many background writes.
+                        agentManager?.refreshHistoryToLatest()
+                        onHistoryRefresh()
+                        // With reverseLayout, newest items are at index 0.
+                        // No delay needed — scrollToItem(0) works immediately.
+                        listState.scrollToBottom()
+                    }
+                },
+                modifier = Modifier.padding(end = 12.dp, bottom = bottomDp),
             )
         }
     }
@@ -257,4 +312,21 @@ internal fun OlderHistoryLoadingIndicator() {
             strokeWidth = 2.dp,
         )
     }
+}
+
+/**
+ * A vertical scrollbar attached to the conversation [LazyListState].
+ *
+ * @param listState the [LazyListState] of the conversation [LazyColumn]
+ * @param modifier additional modifier; callers should align this to the right edge
+ */
+@Composable
+internal fun ConversationVerticalScrollbar(
+    listState: LazyListState,
+    modifier: Modifier = Modifier,
+) {
+    VerticalScrollbar(
+        adapter = rememberScrollbarAdapter(listState),
+        modifier = modifier.padding(end = 2.dp),
+    )
 }

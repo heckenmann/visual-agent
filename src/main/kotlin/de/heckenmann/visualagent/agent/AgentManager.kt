@@ -362,6 +362,24 @@ class AgentManager
         fun loadOlderHistory(pageSize: Int = HISTORY_PAGE_SIZE): List<Message> = conversationOps.loadOlderHistory(pageSize)
 
         /**
+         * Loads the latest messages from the database and appends any that are
+         * missing from the in-memory history.
+         *
+         * @return the updated history list (newest messages appended).
+         */
+        fun loadLatestHistory(limit: Int = HISTORY_PAGE_SIZE): List<Message> = conversationOps.loadLatestHistory(limit)
+
+        /**
+         * Clears the in-memory conversation history and reloads the latest page
+         * from the database. Used by the scroll-to-bottom button to guarantee
+         * the user lands on the newest persisted message without paging through
+         * intermediate chunks.
+         *
+         * @return the reloaded history list.
+         */
+        fun refreshHistoryToLatest(limit: Int = HISTORY_PAGE_SIZE): List<Message> = conversationOps.refreshHistoryToLatest(limit)
+
+        /**
          * Returns all sub-agents from the database (bypasses the in-memory cache).
          */
         fun getSubAgentsFromDb(): List<SubAgent> = lifecycleOps.getSubAgentsFromDb()

@@ -137,7 +137,17 @@ internal object MainSystemPromptComposer {
 
             ## Markdown Output Rules
 
-            - Your full visible response is always interpreted by a Markdown parser in the UI.
+            - Your responses are rendered by a full Markdown renderer in the UI.
+            - Prefer Markdown formatting for all responses:
+              - Use **bold** for emphasis, *italic* for secondary emphasis.
+              - Use ~~strikethrough~~ where appropriate.
+              - Use fenced code blocks (```language) for all code snippets.
+              - Use GFM tables (| col1 | col2 |) for any tabular data — do not emit ASCII-art tables.
+              - Use bullet lists (- item) and numbered lists (1. item) for enumerations.
+              - Use headings (# H1, ## H2) to structure longer responses.
+              - Use > for block quotes when referencing external text.
+            - Always use valid Markdown — the renderer supports GFM (GitHub Flavored Markdown) including tables and strikethrough.
+            - Do not wrap Markdown in code blocks — emit it directly; the renderer parses the response text.
             - Never concatenate sections without whitespace, e.g. `text.**Heading:**text`.
             - Put a blank line before a new section heading and a newline after heading labels.
             - Prefer plain paragraphs over decorative heading-heavy templates.
