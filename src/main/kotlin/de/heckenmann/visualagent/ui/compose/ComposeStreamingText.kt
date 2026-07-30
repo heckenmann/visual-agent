@@ -7,16 +7,19 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 /**
  * Renders text with a progressive typewriter effect, revealing content
  * character-by-character or in small groups for a natural streaming feel.
  *
  * When [animate] is false the full [text] is displayed immediately.
- * When [animate] is true, the text is revealed incrementally — each
- * change to [text] restarts the animation from the beginning.
+ * When [animate] is true, the text is revealed incrementally. New text
+ * that extends the previous text continues the animation from the current
+ * position instead of restarting, so rapid streaming updates are visible.
  *
  * @param text the full text to display
  * @param animate whether to animate the reveal
@@ -33,17 +36,19 @@ internal fun StreamingText(
     content: @Composable (displayedText: String) -> Unit,
 ) {
     var visibleLength by remember { mutableIntStateOf(if (animate) 0 else text.length) }
+    val currentText by rememberUpdatedState(text)
+    val currentAnimate by rememberUpdatedState(animate)
 
-    LaunchedEffect(text, animate) {
-        if (!animate) {
-            visibleLength = text.length
-            return@LaunchedEffect
-        }
-        // Restart animation from the beginning whenever text changes.
-        visibleLength = 0
-        while (visibleLength < text.length) {
+    LaunchedEffect(Unit) {
+        while (isActive) {
             delay(tickDelayMs)
-            visibleLength = (visibleLength + charsPerTick).coerceAtMost(text.length)
+            if (!currentAnimate) {
+                visibleLength = currentText.length
+                continue
+            }
+            if (visibleLength < currentText.length) {
+                visibleLength = (visibleLength + charsPerTick).coerceAtMost(currentText.length)
+            }
         }
     }
 
