@@ -29,7 +29,7 @@ class ConversationOlderHistoryLoaderTest {
     val composeTestRule = createComposeRule()
 
     @Test
-    fun `loads older history when scrolled to top`() {
+    fun `loads older history when scrolled to end`() {
         val initialHistory = (1..5).map { Message("user", "msg $it", id = "id-$it") }
         val olderPage = (6..10).map { Message("user", "older $it", id = "id-$it") }
         val fullHistory = olderPage + initialHistory
@@ -55,13 +55,14 @@ class ConversationOlderHistoryLoaderTest {
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.width(200.dp).height(160.dp),
+                    reverseLayout = true,
                 ) {
                     items(history.size) { index ->
                         Text(text = history[index].content, modifier = Modifier.height(40.dp))
                     }
                 }
                 ConversationOlderHistoryLoader(
-                    isAtTop = true,
+                    isAtEnd = true,
                     history = history,
                     listState = listState,
                     agentManager = mockManager,
@@ -76,7 +77,7 @@ class ConversationOlderHistoryLoaderTest {
         composeTestRule.mainClock.advanceTimeBy(100)
         composeTestRule.waitForIdle()
 
-        assertEquals(1, loadCalls, "loadOlderHistory should be called once when at top")
+        assertEquals(1, loadCalls, "loadOlderHistory should be called once when at end")
         assertEquals(fullHistory.size, history.size, "history should contain older + initial messages")
         assertFalse(loadingState, "loading should be false after completion")
     }
@@ -104,13 +105,14 @@ class ConversationOlderHistoryLoaderTest {
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.width(200.dp).height(160.dp),
+                    reverseLayout = true,
                 ) {
                     items(history.size) { index ->
                         Text(text = history[index].content, modifier = Modifier.height(40.dp))
                     }
                 }
                 ConversationOlderHistoryLoader(
-                    isAtTop = true,
+                    isAtEnd = true,
                     history = history,
                     listState = listState,
                     agentManager = mockManager,
@@ -129,7 +131,7 @@ class ConversationOlderHistoryLoaderTest {
     }
 
     @Test
-    fun `does not load when not at top`() {
+    fun `does not load when not at end`() {
         val initialHistory = (1..5).map { Message("user", "msg $it", id = "id-$it") }
         var history by mutableStateOf(initialHistory)
         var loadCalls = 0
@@ -149,13 +151,14 @@ class ConversationOlderHistoryLoaderTest {
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.width(200.dp).height(160.dp),
+                    reverseLayout = true,
                 ) {
                     items(history.size) { index ->
                         Text(text = history[index].content, modifier = Modifier.height(40.dp))
                     }
                 }
                 ConversationOlderHistoryLoader(
-                    isAtTop = false,
+                    isAtEnd = false,
                     history = history,
                     listState = listState,
                     agentManager = mockManager,
@@ -168,7 +171,7 @@ class ConversationOlderHistoryLoaderTest {
         composeTestRule.mainClock.advanceTimeBy(100)
         composeTestRule.waitForIdle()
 
-        assertEquals(0, loadCalls, "loadOlderHistory should not be called when not at top")
+        assertEquals(0, loadCalls, "loadOlderHistory should not be called when not at end")
     }
 
     @Test
@@ -191,13 +194,14 @@ class ConversationOlderHistoryLoaderTest {
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.width(200.dp).height(160.dp),
+                    reverseLayout = true,
                 ) {
                     items(history.size) { index ->
                         Text(text = history[index].content, modifier = Modifier.height(40.dp))
                     }
                 }
                 ConversationOlderHistoryLoader(
-                    isAtTop = true,
+                    isAtEnd = true,
                     history = history,
                     listState = listState,
                     agentManager = mockManager,
@@ -218,7 +222,7 @@ class ConversationOlderHistoryLoaderTest {
         val initialHistory = (1..3).map { Message("user", "msg $it", id = "id-$it") }
         var history by mutableStateOf(initialHistory)
         var loadCalls = 0
-        var isAtTop by mutableStateOf(true)
+        var isAtEnd by mutableStateOf(true)
 
         val mockManager = mockk<AgentManager>(relaxed = true)
         every { mockManager.loadOlderHistory(any()) } answers {
@@ -236,13 +240,14 @@ class ConversationOlderHistoryLoaderTest {
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.width(200.dp).height(160.dp),
+                    reverseLayout = true,
                 ) {
                     items(history.size) { index ->
                         Text(text = history[index].content, modifier = Modifier.height(40.dp))
                     }
                 }
                 ConversationOlderHistoryLoader(
-                    isAtTop = isAtTop,
+                    isAtEnd = isAtEnd,
                     history = history,
                     listState = listState,
                     agentManager = mockManager,
@@ -257,10 +262,10 @@ class ConversationOlderHistoryLoaderTest {
 
         assertEquals(1, loadCalls, "loadOlderHistory should be called once")
 
-        // Toggle isAtTop off and back on — should NOT re-fire because hasMoreHistory is false.
-        isAtTop = false
+        // Toggle isAtEnd off and back on — should NOT re-fire because hasMoreHistory is false.
+        isAtEnd = false
         composeTestRule.waitForIdle()
-        isAtTop = true
+        isAtEnd = true
         composeTestRule.waitForIdle()
         composeTestRule.mainClock.advanceTimeBy(100)
         composeTestRule.waitForIdle()
@@ -301,13 +306,14 @@ class ConversationOlderHistoryLoaderTest {
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.width(200.dp).height(160.dp),
+                    reverseLayout = true,
                 ) {
                     items(history.size) { index ->
                         Text(text = history[index].content, modifier = Modifier.height(40.dp))
                     }
                 }
                 ConversationOlderHistoryLoader(
-                    isAtTop = true,
+                    isAtEnd = true,
                     history = history,
                     listState = listState,
                     agentManager = mockManager,

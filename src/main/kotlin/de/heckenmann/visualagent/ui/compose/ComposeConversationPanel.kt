@@ -33,6 +33,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.agent.AgentManager
@@ -83,23 +85,19 @@ internal fun ConversationPanel(
             }
     }
     val isAtBottom by remember {
+        derivedStateOf { !listState.canScrollBackward }
+    }
+    val isAtEnd by remember {
         derivedStateOf {
             val info = listState.layoutInfo
             val last = info.visibleItemsInfo.lastOrNull()
-            last == null || last.index >= info.totalItemsCount - 2
-        }
-    }
-    val isAtTop by remember {
-        derivedStateOf {
-            val info = listState.layoutInfo
-            val first = info.visibleItemsInfo.firstOrNull()
-            first != null && first.index == 0 && first.offset >= -2
+            last != null && last.index == info.totalItemsCount - 1
         }
     }
     var isLoadingOlder by remember { mutableStateOf(false) }
     var hasMoreHistory by remember { mutableStateOf(true) }
     ConversationOlderHistoryLoader(
-        isAtTop = isAtTop && !sending,
+        isAtEnd = isAtEnd && !sending,
         history = history,
         listState = listState,
         agentManager = agentManager,
@@ -184,7 +182,8 @@ internal fun ConversationPanel(
     Box(modifier = Modifier.fillMaxSize().onSizeChanged { panelSize = it }) {
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().semantics { contentDescription = "Conversation history" },
+            reverseLayout = true,
             contentPadding =
                 PaddingValues(
                     start = 8.dp,
@@ -222,13 +221,6 @@ internal fun ConversationPanel(
         ConversationVerticalScrollbar(
             listState = listState,
             modifier = Modifier.align(Alignment.CenterEnd),
-        )
-        ConversationScrollToBottomArea(
-            isAtBottom = isAtBottom,
-            history = history,
-            listState = listState,
-            scope = scope,
-            bottomPadding = inputAreaHeight,
         )
         MessageQueueStrip(
             queue = queue,
@@ -293,6 +285,16 @@ internal fun ConversationPanel(
                 inputFocusRequester = inputFocusRequester,
             )
         }
+        ConversationScrollToBottomArea(
+            isAtBottom = isAtBottom,
+            listState = listState,
+            scope = scope,
+            agentManager = agentManager,
+            onHistoryRefresh = {
+                history = agentManager.getHistory()
+            },
+            bottomPadding = inputAreaHeight,
+        )
     }
     ConversationEditModal(
         editingId = editingId,

@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.agent.Message
 import org.junit.Rule
 import org.junit.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ConversationScrollOnChangeTest {
@@ -25,7 +26,7 @@ class ConversationScrollOnChangeTest {
     val composeTestRule = createComposeRule()
 
     @Test
-    fun `scrolls to bottom when last message content changes while size stays the same`() {
+    fun `scrolls to bottom when a new message is appended`() {
         val messages: SnapshotStateList<Message> = (1..20).map { Message("user", "message $it") }.toMutableStateList()
         val listState = mutableListOf<androidx.compose.foundation.lazy.LazyListState>()
         composeTestRule.setContent {
@@ -35,6 +36,7 @@ class ConversationScrollOnChangeTest {
                 LazyColumn(
                     state = state,
                     modifier = Modifier.width(200.dp).height(160.dp),
+                    reverseLayout = true,
                 ) {
                     itemsIndexed(messages, key = { index, _ -> messages[index].id ?: "temp-$index" }) { index, _ ->
                         Text(
@@ -48,18 +50,72 @@ class ConversationScrollOnChangeTest {
         }
         composeTestRule.waitForIdle()
 
-        // Simulate streaming response updating the last message content without adding a new item.
-        messages[messages.lastIndex] = Message("assistant", "very long streamed content that extends the last item")
+        // Append a new message — should trigger scroll to bottom.
+        messages.add(Message("assistant", "new message"))
+        composeTestRule.waitForIdle()
 
+        // With reverseLayout, newest items are at index 0.
+        assertTrue(
+            !listState.single().canScrollBackward,
+            "expected canScrollBackward=false after new message appended",
+        )
+    }
+
+    @Test
+    fun `does not scroll when message content changes without count increase`() {
+        val messages: SnapshotStateList<Message> = (1..20).map { Message("user", "message $it") }.toMutableStateList()
+        val listState = mutableListOf<androidx.compose.foundation.lazy.LazyListState>()
+        composeTestRule.setContent {
+            val state = rememberLazyListState()
+            listState.add(state)
+            MaterialTheme {
+                LazyColumn(
+                    state = state,
+                    modifier = Modifier.width(200.dp).height(160.dp),
+                    reverseLayout = true,
+                ) {
+                    itemsIndexed(messages, key = { index, _ -> messages[index].id ?: "temp-$index" }) { index, _ ->
+                        Text(
+                            text = messages[index].content,
+                            modifier = Modifier.padding(vertical = 20.dp),
+                        )
+                    }
+                }
+                ConversationScrollOnChangeEffect(messages, state)
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        // Scroll to the end (oldest messages) to simulate user reading older messages.
+        kotlinx.coroutines.runBlocking { listState.single().scrollToItem(messages.lastIndex) }
+        composeTestRule.waitForIdle()
+        val firstVisibleBefore = listState.single().firstVisibleItemIndex
+
+        // Update the last message content (e.g. streaming) without changing count.
+        messages[messages.lastIndex] = Message("assistant", "very long streamed content that extends the last item")
         composeTestRule.waitForIdle()
         composeTestRule.mainClock.advanceTimeBy(100)
         composeTestRule.waitForIdle()
 
-        val info = listState.single().layoutInfo
-        val lastVisibleIndex = info.visibleItemsInfo.lastOrNull()?.index ?: -1
+        // The scroll position should NOT have changed — the user's position is preserved.
+        val firstVisibleAfter = listState.single().firstVisibleItemIndex
         assertTrue(
-            lastVisibleIndex >= messages.lastIndex,
-            "expected last message to remain visible after content change, but last visible index was $lastVisibleIndex of ${messages.size}",
+            firstVisibleAfter <= firstVisibleBefore + 1,
+            "expected scroll position to be preserved when content changes without count increase, but first visible index changed from $firstVisibleBefore to $firstVisibleAfter",
+        )
+        // With reverseLayout, newest items are at index 0. The user scrolled to the end
+        // (oldest messages), so the first visible item (index 0, newest) should NOT be visible.
+        val firstVisibleIndex =
+            listState
+                .single()
+                .layoutInfo
+                .visibleItemsInfo
+                .firstOrNull()
+                ?.index
+                ?: -1
+        assertFalse(
+            firstVisibleIndex == 0,
+            "expected newest message (index 0) to NOT be visible (user should stay at their scroll position)",
         )
     }
 }
