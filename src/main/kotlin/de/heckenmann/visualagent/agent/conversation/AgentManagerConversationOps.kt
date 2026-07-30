@@ -186,6 +186,18 @@ internal class AgentManagerConversationOps(
 
     fun loadOlderHistory(pageSize: Int = AgentManager.HISTORY_PAGE_SIZE): List<Message> = historyOps.loadOlderHistory(pageSize)
 
+    fun loadLatestHistory(limit: Int = AgentManager.HISTORY_PAGE_SIZE): List<Message> = historyOps.loadLatestHistory(limit)
+
+    /**
+     * Clears the in-memory conversation history and reloads the latest page from
+     * the database. This is used by the scroll-to-bottom button to guarantee the
+     * user lands on the newest persisted message without paging through
+     * intermediate chunks.
+     *
+     * @return the reloaded history list.
+     */
+    fun refreshHistoryToLatest(limit: Int = AgentManager.HISTORY_PAGE_SIZE): List<Message> = historyOps.refreshHistoryToLatest(limit)
+
     fun loadRecentHistoryFromDb(limit: Int = AgentManager.INITIAL_HISTORY_LOAD_LIMIT): List<Message> =
         historyOps.loadRecentHistoryFromDb(limit)
 

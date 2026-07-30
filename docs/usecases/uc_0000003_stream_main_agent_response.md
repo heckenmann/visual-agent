@@ -44,4 +44,4 @@ The user sees progress during longer responses, stays at the bottom by default, 
 - The persisted conversation contains the final complete assistant response, not partial duplicates.
 - The Compose chat panel displays a temporary assistant turn while chunks arrive, then reloads the persisted final history.
 - The chat panel auto-scrolls to the bottom whenever a new message appears while the scrollbar is already near the bottom.
-- A scroll-to-bottom button appears when the user scrolls up; clicking it animates back to the latest message.
+- A scroll-to-bottom button appears when the user scrolls up; clicking it reloads the newest messages from the database and animates back to the latest message (see UC-0000093).
