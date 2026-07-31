@@ -164,9 +164,11 @@ internal fun SettingsPanel(
     LaunchedEffect(settingsLoading) {
         inFlight.setSettingsLoading(settingsLoading)
     }
+    val scrollState = rememberScrollState()
+    RegisterPanelVerticalScrollbar(scrollState)
     Column(
         verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+        modifier = Modifier.fillMaxSize().verticalScroll(scrollState),
     ) {
         SettingsProviderSection(
             providers = providers,

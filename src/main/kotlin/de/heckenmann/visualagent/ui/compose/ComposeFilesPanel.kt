@@ -63,6 +63,8 @@ internal fun FilesPanel(
         onRefresh = refresh,
     )
     val visibleFiles = filterWorkspaceFiles(files, query, typeFilter)
+    val fileListScrollState = rememberScrollState()
+    RegisterPanelVerticalScrollbar(fileListScrollState)
     val importFile: (File) -> Unit = { file ->
         runCatching { workspaceFileService.importFile(file) }
             .onSuccess {
@@ -140,7 +142,7 @@ internal fun FilesPanel(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+        Column(modifier = Modifier.weight(1f).verticalScroll(fileListScrollState)) {
             if (visibleFiles.isEmpty()) {
                 PanelEmptyState(
                     title = "No matching files",
