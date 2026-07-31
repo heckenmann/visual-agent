@@ -1,7 +1,9 @@
 package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.openai.OpenAiClient
+import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
+import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.knowledge.PreferenceStore
@@ -14,9 +16,33 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class ConfiguredLLMProviderTest {
     private val appConfig = AppConfigBean()
+
+    @Test
+    fun `missing active provider fails instead of silently falling back to ollama`() =
+        runTest {
+            val catalog = mockk<ProviderCatalogService>()
+            every { catalog.activeProviderId() } returns "missing-provider"
+            every { catalog.getProvider("missing-provider") } returns null
+            every { catalog.resolve(any(), any(), any(), any()) } throws
+                IllegalStateException("Active provider profile is missing: missing-provider")
+            val router =
+                ConfiguredLLMProvider(
+                    mockk(relaxed = true),
+                    mockk(relaxed = true),
+                    catalog,
+                )
+
+            val error =
+                assertFailsWith<IllegalStateException> {
+                    router.chat(listOf(Message("user", "hello")))
+                }
+
+            assertEquals("Active provider profile is missing: missing-provider", error.message)
+        }
 
     @Test
     fun `chat delegates to openai provider with configured model`() =
@@ -104,6 +130,39 @@ class ConfiguredLLMProviderTest {
         }
 
     @Test
+    fun `agent request resolves its assigned provider instance and default model`() =
+        runTest {
+            val ollama = mockk<OllamaClient>(relaxed = true)
+            val openAi = mockk<OpenAiClient>()
+            val requestSlot = io.mockk.slot<ChatRequestContext>()
+            coEvery { openAi.chat(capture(requestSlot)) } returns ChatResponse("gpt-work", Message("assistant", "ok"), true)
+            val catalog = catalog()
+            catalog.saveProvider(
+                ProviderProfile(
+                    id = "openai-work",
+                    name = "OpenAI work",
+                    adapter = ProviderAdapter.OPENAI_COMPATIBLE,
+                    baseUrl = "https://work.example.test",
+                    defaultModel = "gpt-work",
+                    models = listOf(ProviderModelConfig("gpt-work")),
+                ),
+            )
+            val router = ConfiguredLLMProvider(ollama, openAi, catalog)
+
+            router.chat(
+                ChatRequestContext(
+                    messages = listOf(Message("user", "hello")),
+                    provider = "openai-work",
+                ),
+            )
+
+            assertEquals("openai-work", requestSlot.captured.providerProfile?.id)
+            assertEquals("gpt-work", requestSlot.captured.model)
+            coVerify(exactly = 1) { openAi.chat(any<ChatRequestContext>()) }
+            coVerify(exactly = 0) { ollama.chat(any<ChatRequestContext>()) }
+        }
+
+    @Test
     fun `openai profile supports discovery details and streaming`() =
         runTest {
             val originalProvider = appConfig.llmProvider
@@ -167,8 +226,8 @@ class ConfiguredLLMProviderTest {
                 appConfig.llmProvider = "ollama"
                 val ollama = mockk<OllamaClient>(relaxed = true)
                 val openAi = mockk<OpenAiClient>(relaxed = true)
-                coEvery { ollama.chat(any<List<Message>>()) } returns ChatResponse("llama", Message("assistant", "ok"), true)
-                coEvery { ollama.stream(any<List<Message>>()) } returns flowOf(ChatResponse("llama", Message("assistant", "c"), true))
+                coEvery { ollama.chat(any<ChatRequestContext>()) } returns ChatResponse("llama", Message("assistant", "ok"), true)
+                coEvery { ollama.stream(any<ChatRequestContext>()) } returns flowOf(ChatResponse("llama", Message("assistant", "c"), true))
                 val router = ConfiguredLLMProvider(ollama, openAi, catalog())
 
                 val chatResponse = router.chat(listOf(Message("user", "hi")))
@@ -179,6 +238,27 @@ class ConfiguredLLMProviderTest {
             } finally {
                 appConfig.llmProvider = originalProvider
             }
+        }
+
+    @Test
+    fun `message list overload uses active openai provider and model`() =
+        runTest {
+            val ollama = mockk<OllamaClient>(relaxed = true)
+            val openAi = mockk<OpenAiClient>()
+            val requestSlot = io.mockk.slot<ChatRequestContext>()
+            coEvery { openAi.chat(capture(requestSlot)) } returns
+                ChatResponse("gpt-active", Message("assistant", "ok"), true)
+            val catalog = catalog()
+            catalog.setActiveSelection("openai", "gpt-active")
+            val router = ConfiguredLLMProvider(ollama, openAi, catalog)
+
+            val response = router.chat(listOf(Message("user", "hello")))
+
+            assertEquals("ok", response.message.content)
+            assertEquals("openai", requestSlot.captured.provider)
+            assertEquals("gpt-active", requestSlot.captured.model)
+            coVerify(exactly = 1) { openAi.chat(any<ChatRequestContext>()) }
+            coVerify(exactly = 0) { ollama.chat(any<ChatRequestContext>()) }
         }
 
     private fun catalog(): ProviderCatalogService =

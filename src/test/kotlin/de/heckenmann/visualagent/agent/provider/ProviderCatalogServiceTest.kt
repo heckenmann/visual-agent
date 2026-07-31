@@ -44,6 +44,76 @@ class ProviderCatalogServiceTest {
     }
 
     @Test
+    fun `multiple profiles using one adapter persist independently`() {
+        val store = MapPreferenceStore()
+        val catalog = ProviderCatalogService(store)
+        catalog.saveProvider(
+            ProviderProfile(
+                id = "openai-work",
+                name = "OpenAI work",
+                adapter = ProviderAdapter.OPENAI_COMPATIBLE,
+                baseUrl = "https://work.example.test",
+                defaultModel = "gpt-work",
+                models = listOf(ProviderModelConfig("gpt-work")),
+            ),
+        )
+        catalog.saveProvider(
+            ProviderProfile(
+                id = "openai-personal",
+                name = "OpenAI personal",
+                adapter = ProviderAdapter.OPENAI_COMPATIBLE,
+                baseUrl = "https://personal.example.test",
+                defaultModel = "gpt-personal",
+                models = listOf(ProviderModelConfig("gpt-personal")),
+            ),
+        )
+
+        val restored = ProviderCatalogService(store)
+
+        assertEquals(
+            listOf("openai-personal", "openai-work"),
+            restored.listProviders().filter { it.id in setOf("openai-personal", "openai-work") }.map { it.id },
+        )
+        assertEquals("gpt-work", restored.resolve("openai-work", null).model.id)
+        assertEquals("gpt-personal", restored.resolve("openai-personal", null).model.id)
+    }
+
+    @Test
+    fun `main agent model selection persists without changing provider profile`() {
+        val store = MapPreferenceStore()
+        val catalog = ProviderCatalogService(store)
+        val profile =
+            ProviderProfile(
+                id = "openai-custom",
+                name = "OpenAI Custom",
+                adapter = ProviderAdapter.OPENAI_COMPATIBLE,
+                baseUrl = "https://custom.example.test",
+                defaultModel = "profile-default",
+            )
+        catalog.saveProvider(profile)
+
+        catalog.setActiveSelection(profile.id, "main-agent-model")
+
+        assertEquals("profile-default", catalog.getProvider(profile.id)?.defaultModel)
+        assertEquals("main-agent-model", catalog.activeModelId())
+        assertEquals("main-agent-model", catalog.resolve(null, null).model.id)
+        val restored = ProviderCatalogService(store)
+        assertEquals(profile.id, restored.activeProviderId())
+        assertEquals("main-agent-model", restored.activeModelId())
+        assertEquals("profile-default", restored.getProvider(profile.id)?.defaultModel)
+    }
+
+    @Test
+    fun `catalog seeds the codex profile without selecting it`() {
+        val catalog = ProviderCatalogService(MapPreferenceStore())
+        val profile = requireNotNull(catalog.getProvider(ProviderEnvironmentCredentials.CODEX_PROFILE_ID))
+
+        assertEquals("OpenAI ChatGPT Codex", profile.name)
+        assertEquals("https://api.openai.com/v1", profile.baseUrl)
+        assertEquals("ollama", catalog.activeProviderId())
+    }
+
+    @Test
     fun `options merge from provider through variant`() {
         val catalog = ProviderCatalogService(MapPreferenceStore())
         catalog.saveProvider(
@@ -87,6 +157,18 @@ class ProviderCatalogServiceTest {
 
         assertEquals(true, catalog.deleteProvider("openai"))
         assertFalse(catalog.activeProviderId() == "openai")
+    }
+
+    @Test
+    fun `disabling active provider selects another enabled profile`() {
+        val catalog = ProviderCatalogService(MapPreferenceStore())
+        catalog.setActiveProvider("openai")
+        val openAi = requireNotNull(catalog.getProvider("openai"))
+
+        catalog.saveProvider(openAi.copy(enabled = false))
+
+        assertEquals("ollama", catalog.activeProviderId())
+        assertFalse(requireNotNull(catalog.getProvider("openai")).enabled)
     }
 
     @Test

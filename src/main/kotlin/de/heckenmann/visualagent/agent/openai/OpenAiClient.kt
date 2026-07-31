@@ -9,6 +9,7 @@ import de.heckenmann.visualagent.agent.ModelDetails
 import de.heckenmann.visualagent.agent.ShowResponse
 import de.heckenmann.visualagent.agent.ToolCallingLoop
 import de.heckenmann.visualagent.agent.VisionSupport
+import de.heckenmann.visualagent.agent.provider.ProviderEnvironmentCredentials
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.config.AppConfigBean
@@ -46,7 +47,7 @@ class OpenAiClient(
         withContext(Dispatchers.IO) {
             val selectedModel = request.model ?: appConfig.openAiModel
             val prompt = promptFactory.buildPrompt(request, selectedModel)
-            val model = chatModel(request.providerProfile)
+            val model = chatModel(request.providerProfile, selectedModel)
             request.cancellationToken?.throwIfCancelled()
             val responseResult =
                 runCatching {
@@ -70,7 +71,7 @@ class OpenAiClient(
     override suspend fun stream(request: ChatRequestContext): Flow<ChatResponse> {
         val selectedModel = request.model ?: appConfig.openAiModel
         val prompt = promptFactory.buildPrompt(request, selectedModel)
-        val model = chatModel(request.providerProfile)
+        val model = chatModel(request.providerProfile, selectedModel)
         val toolCallbacks =
             if (request.enabledTools.isEmpty()) {
                 emptyList()
@@ -167,7 +168,7 @@ class OpenAiClient(
 
     internal suspend fun getModels(profile: ProviderProfile): List<String> =
         withContext(Dispatchers.IO) {
-            requireUsableApiKey(profile.baseUrl, profile.apiKey)
+            requireUsableApiKey(profile.baseUrl, ProviderEnvironmentCredentials.openAiApiKey(profile))
             OpenAiModelCatalog { openAiClient(profile) }.load(modelsUri(profile))
         }
 
@@ -190,11 +191,18 @@ class OpenAiClient(
             )
         }
 
-    private fun chatModel(profile: ProviderProfile? = null): ChatModel {
+    private fun chatModel(
+        profile: ProviderProfile? = null,
+        modelId: String? = null,
+    ): ChatModel {
         val configuredBaseUrl = profile?.baseUrl ?: appConfig.openAiBaseUrl
-        val apiKey = apiKeyFor(configuredBaseUrl, profile?.apiKey ?: appConfig.openAiApiKey)
+        val apiKey =
+            apiKeyFor(
+                configuredBaseUrl,
+                profile?.let(ProviderEnvironmentCredentials::openAiApiKey) ?: appConfig.openAiApiKey,
+            )
         val baseUrl = OpenAiEndpointNormalizer.apiBaseUrl(configuredBaseUrl)
-        val model = profile?.defaultModel ?: appConfig.openAiModel
+        val model = modelId ?: profile?.defaultModel ?: appConfig.openAiModel
         val options =
             OpenAiChatOptions
                 .builder()
@@ -208,7 +216,7 @@ class OpenAiClient(
     private fun openAiClient(profile: ProviderProfile): OpenAIClient =
         OpenAiSetup.setupSyncClient(
             OpenAiEndpointNormalizer.apiBaseUrl(profile.baseUrl),
-            apiKeyFor(profile.baseUrl, profile.apiKey),
+            apiKeyFor(profile.baseUrl, ProviderEnvironmentCredentials.openAiApiKey(profile)),
             null,
             null,
             null,

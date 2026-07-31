@@ -4,6 +4,7 @@ import de.heckenmann.visualagent.agent.ollama.fetchModelCapabilities
 import de.heckenmann.visualagent.agent.openai.OpenAiClient
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
+import de.heckenmann.visualagent.agent.provider.ProviderEnvironmentCredentials
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import kotlinx.coroutines.flow.Flow
 import org.springframework.context.annotation.Primary
@@ -20,14 +21,14 @@ class ConfiguredLLMProvider(
     private val providerCatalog: ProviderCatalogService,
     private val fetchCapabilities: suspend (ProviderProfile) -> Map<String, Set<String>> = ::fetchModelCapabilities,
 ) : LLMProvider {
-    override suspend fun chat(messages: List<Message>): ChatResponse = activeProvider().chat(messages)
+    override suspend fun chat(messages: List<Message>): ChatResponse = chat(ChatRequestContext(messages = messages))
 
     override suspend fun chat(request: ChatRequestContext): ChatResponse {
         val resolved = request.resolve()
         return providerFor(resolved.providerProfile).chat(resolved)
     }
 
-    override suspend fun stream(messages: List<Message>): Flow<ChatResponse> = activeProvider().stream(messages)
+    override suspend fun stream(messages: List<Message>): Flow<ChatResponse> = stream(ChatRequestContext(messages = messages))
 
     override suspend fun stream(request: ChatRequestContext): Flow<ChatResponse> {
         val resolved = request.resolve()
@@ -43,7 +44,7 @@ class ConfiguredLLMProvider(
 
     override fun isConnected(): Boolean {
         val profile = providerCatalog.getProvider(providerCatalog.activeProviderId()) ?: return false
-        return profile.adapter == ProviderAdapter.OLLAMA || profile.apiKey.isNotBlank()
+        return profile.adapter == ProviderAdapter.OLLAMA || ProviderEnvironmentCredentials.openAiApiKey(profile).isNotBlank()
     }
 
     override suspend fun checkConnection(): Boolean =
@@ -79,15 +80,19 @@ class ConfiguredLLMProvider(
         }
     }
 
-    private fun activeProvider(): LLMProvider =
-        providerCatalog
-            .getProvider(providerCatalog.activeProviderId())
-            .let(::providerFor)
+    private fun activeProvider(): LLMProvider {
+        val providerId = providerCatalog.activeProviderId()
+        val profile =
+            providerCatalog.getProvider(providerId)
+                ?: error("Active provider profile is missing: $providerId")
+        return providerFor(profile)
+    }
 
     private fun providerFor(profile: de.heckenmann.visualagent.agent.provider.ProviderProfile?): LLMProvider =
         when (profile?.adapter) {
             ProviderAdapter.OPENAI_COMPATIBLE -> openAiClient
-            else -> ollamaClient
+            ProviderAdapter.OLLAMA -> ollamaClient
+            null -> error("Resolved provider profile is missing")
         }
 
     private fun ChatRequestContext.resolve(): ChatRequestContext {
