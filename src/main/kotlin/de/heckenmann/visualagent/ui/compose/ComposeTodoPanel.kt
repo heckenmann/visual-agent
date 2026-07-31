@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.MaterialTheme
@@ -61,6 +63,8 @@ internal fun TodoPanel(
     )
     val visibleTodos = todos.filter { statusFilter == ALL_TODO_STATUSES || it.status.name == statusFilter }
     val nextTodoId = remember(visibleTodos) { visibleTodos.firstOrNull { it.status == TodoStatus.PENDING }?.id }
+    val todoListScrollState = rememberScrollState()
+    RegisterPanelVerticalScrollbar(todoListScrollState)
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize().padding(8.dp)) {
         Row(
@@ -122,7 +126,7 @@ internal fun TodoPanel(
                 refresh()
             },
             verticalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.weight(1f).animateContentSize(),
+            modifier = Modifier.weight(1f).animateContentSize().verticalScroll(todoListScrollState),
         ) { _, todo, isDragging ->
             TodoRow(
                 todo = todo,

@@ -8,7 +8,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -17,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -312,21 +310,4 @@ internal fun OlderHistoryLoadingIndicator() {
             strokeWidth = 2.dp,
         )
     }
-}
-
-/**
- * A vertical scrollbar attached to the conversation [LazyListState].
- *
- * @param listState the [LazyListState] of the conversation [LazyColumn]
- * @param modifier additional modifier; callers should align this to the right edge
- */
-@Composable
-internal fun ConversationVerticalScrollbar(
-    listState: LazyListState,
-    modifier: Modifier = Modifier,
-) {
-    VerticalScrollbar(
-        adapter = rememberScrollbarAdapter(listState),
-        modifier = modifier.padding(end = 2.dp),
-    )
 }

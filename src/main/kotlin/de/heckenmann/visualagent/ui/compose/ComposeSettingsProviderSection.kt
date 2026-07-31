@@ -2,7 +2,9 @@
 
 package de.heckenmann.visualagent.ui.compose
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
@@ -12,32 +14,22 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
-import de.heckenmann.visualagent.config.AppConfigBean
 
 @Composable
 internal fun SettingsProviderSection(
     providers: List<ProviderProfile>,
+    providerProfiles: List<ProviderProfile>,
     providerId: String,
-    activeProvider: ProviderProfile?,
-    modelId: String,
-    modelSelection: String,
-    customModelId: String,
-    baseUrl: String,
-    apiKey: String,
-    apiKeyVisible: Boolean,
+    managedProvider: ProviderProfile?,
     modelSearch: String,
     favoritesOnly: Boolean,
     favoriteModels: Set<String>,
@@ -46,33 +38,27 @@ internal fun SettingsProviderSection(
     loadingModels: Boolean,
     loadingDetails: Boolean,
     filteredModels: List<ProviderModelConfig>,
-    config: AppConfigBean,
-    providerCatalogService: ProviderCatalogService,
     modalRequester: ComposeModalRequester,
     onProviderSelected: (String) -> Unit,
-    onBaseUrlChange: (String) -> Unit,
-    onApiKeyChange: (String) -> Unit,
-    onApiKeyVisibleToggle: () -> Unit,
     onModelSearchChange: (String) -> Unit,
     onFavoritesOnlyChange: (Boolean) -> Unit,
     onFavoriteModelsChange: (Set<String>) -> Unit,
     onModelSelected: (String) -> Unit,
-    onCustomModelChange: (String) -> Unit,
     onRefreshModels: () -> Unit,
     onRefreshDetails: () -> Unit,
     onProviderAdded: (ProviderProfile) -> Unit,
     onProviderEdited: (ProviderProfile) -> Unit,
     onProviderDeleted: (ProviderProfile) -> Unit,
 ) {
-    PanelSection(title = "Provider and model") {
+    PanelSection(title = "Provider connections") {
+        Text("Choose the connection the main agent should use.")
+        ProviderSelectionList(
+            providers = providers,
+            selectedProviderId = providerId,
+            activeProviderId = providerId,
+            onSelected = onProviderSelected,
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            PanelDropdownField(
-                label = "Provider",
-                selectedValue = providerId,
-                options = providers.map { option -> PanelSelectOption(option.id, option.providerDisplayName()) },
-                onSelected = onProviderSelected,
-                modifier = Modifier.weight(1f),
-            )
             ActionIconButton(
                 icon = Icons.Filled.Add,
                 description = "Add provider",
@@ -96,15 +82,15 @@ internal fun SettingsProviderSection(
             ActionIconButton(
                 icon = Icons.Filled.Edit,
                 description = "Edit provider",
-                enabled = activeProvider != null,
+                enabled = managedProvider != null,
                 onClick = {
-                    val current = activeProvider ?: return@ActionIconButton
+                    val current = managedProvider ?: return@ActionIconButton
                     modalRequester.request(
                         ComposeContentModal(title = "Edit provider") { dismiss ->
                             ProviderProfileEditor(
                                 initial = current.toFormState(),
                                 existing = current,
-                                canDisable = providers.size > 1,
+                                canDisable = providerProfiles.count(ProviderProfile::enabled) > 1 || !current.enabled,
                                 onCancel = dismiss,
                                 onSave = { profile ->
                                     onProviderEdited(profile)
@@ -118,9 +104,9 @@ internal fun SettingsProviderSection(
             ActionIconButton(
                 icon = Icons.Filled.Delete,
                 description = "Delete provider",
-                enabled = providers.size > 1 && activeProvider != null,
+                enabled = providerProfiles.size > 1 && managedProvider != null,
                 onClick = {
-                    val current = activeProvider ?: return@ActionIconButton
+                    val current = managedProvider ?: return@ActionIconButton
                     modalRequester.requestConfirmation(
                         ComposeConfirmationModal(
                             title = "Delete provider?",
@@ -133,27 +119,15 @@ internal fun SettingsProviderSection(
                 },
             )
         }
-        OutlinedTextField(
-            value = baseUrl,
-            onValueChange = onBaseUrlChange,
-            label = { Text("Base URL") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
+        PanelInfoBox(
+            "A connection contains only endpoint, credentials, and provider options. " +
+                "Changing the connection immediately reloads its available models below.",
         )
-        OutlinedTextField(
-            value = apiKey,
-            onValueChange = onApiKeyChange,
-            label = { Text("API key") },
-            singleLine = true,
-            visualTransformation = if (apiKeyVisible) VisualTransformation.None else PasswordVisualTransformation(),
-            trailingIcon = {
-                ActionIconButton(
-                    icon = if (apiKeyVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                    description = if (apiKeyVisible) "Hide API key" else "Show API key",
-                    onClick = onApiKeyVisibleToggle,
-                )
-            },
-            modifier = Modifier.fillMaxWidth(),
+    }
+    PanelSection(title = "Main agent model") {
+        PanelInfoBox(
+            "Select a recognized model available from ${managedProvider?.name ?: "the active provider"}. " +
+                "The selected model is applied to the main agent immediately.",
         )
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
@@ -166,25 +140,6 @@ internal fun SettingsProviderSection(
             PanelCheckbox(label = "Favorites", checked = favoritesOnly, onCheckedChange = onFavoritesOnlyChange)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            PanelDropdownField(
-                label = "Model",
-                selectedValue = modelSelection,
-                options =
-                    filteredModels.map { model -> PanelSelectOption(model.id, model.modelDisplayName()) } +
-                        PanelSelectOption(CUSTOM_MODEL_ID, "Custom model ID"),
-                onSelected = onModelSelected,
-                modifier = Modifier.weight(1f),
-            )
-            ActionIconButton(
-                icon = if (resolvedModel in favoriteModels) Icons.Filled.Star else Icons.Filled.StarBorder,
-                description = if (resolvedModel in favoriteModels) "Remove model favorite" else "Add model favorite",
-                enabled = resolvedModel.isNotBlank(),
-                onClick = {
-                    onFavoriteModelsChange(
-                        if (resolvedModel in favoriteModels) favoriteModels - resolvedModel else favoriteModels + resolvedModel,
-                    )
-                },
-            )
             ActionIconButton(
                 icon = Icons.Filled.Refresh,
                 description = "Refresh models",
@@ -192,13 +147,18 @@ internal fun SettingsProviderSection(
                 onClick = onRefreshModels,
             )
         }
-        if (modelSelection == CUSTOM_MODEL_ID) {
-            OutlinedTextField(
-                value = customModelId,
-                onValueChange = onCustomModelChange,
-                label = { Text("Custom model ID") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+        if (filteredModels.isEmpty()) {
+            PanelEmptyState(
+                title = "No selectable models",
+                body = "Refresh models or adjust the search and favorites filters for ${managedProvider?.name ?: "the active provider"}.",
+            )
+        } else {
+            ModelSelectionList(
+                models = filteredModels,
+                selectedModelId = resolvedModel,
+                favoriteModels = favoriteModels,
+                onSelected = onModelSelected,
+                onFavoriteModelsChange = onFavoriteModelsChange,
             )
         }
         ActionIconButton(
@@ -208,6 +168,83 @@ internal fun SettingsProviderSection(
             onClick = onRefreshDetails,
         )
         PanelInfoBox(modelDetails)
+    }
+}
+
+@Composable
+private fun ModelSelectionList(
+    models: List<ProviderModelConfig>,
+    selectedModelId: String,
+    favoriteModels: Set<String>,
+    onSelected: (String) -> Unit,
+    onFavoriteModelsChange: (Set<String>) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+        models.forEach { model ->
+            PanelContentCard(modifier = Modifier.clickable { onSelected(model.id) }) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(
+                        selected = model.id == selectedModelId,
+                        onClick = { onSelected(model.id) },
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(model.modelDisplayName())
+                        if (model.capabilities.isNotEmpty()) {
+                            Text(model.capabilities.sorted().joinToString(" · "))
+                        }
+                    }
+                    if (model.id == selectedModelId) {
+                        Text("Selected")
+                    }
+                    ActionIconButton(
+                        icon = if (model.id in favoriteModels) Icons.Filled.Star else Icons.Filled.StarBorder,
+                        description =
+                            if (model.id in favoriteModels) {
+                                "Remove ${model.modelDisplayName()} from favorites"
+                            } else {
+                                "Add ${model.modelDisplayName()} to favorites"
+                            },
+                        onClick = {
+                            onFavoriteModelsChange(
+                                if (model.id in favoriteModels) favoriteModels - model.id else favoriteModels + model.id,
+                            )
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProviderSelectionList(
+    providers: List<ProviderProfile>,
+    selectedProviderId: String,
+    activeProviderId: String,
+    onSelected: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.fillMaxWidth()) {
+        providers.forEach { provider ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { onSelected(provider.id) },
+            ) {
+                RadioButton(
+                    selected = provider.id == selectedProviderId,
+                    onClick = { onSelected(provider.id) },
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(provider.name)
+                    Text("${provider.adapter.name} · ${provider.baseUrl}")
+                }
+                if (provider.id == activeProviderId) {
+                    Text("Active")
+                }
+            }
+        }
     }
 }
 

@@ -90,21 +90,12 @@ internal fun ProviderProfileEditor(
             },
             modifier = Modifier.fillMaxWidth(),
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = state.defaultModel,
-                onValueChange = { state = state.copy(defaultModel = it) },
-                label = { Text("Default model") },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-            )
-            PanelCheckbox(
-                label = "Enabled",
-                checked = state.enabled,
-                enabled = canDisable,
-                onCheckedChange = { state = state.copy(enabled = it) },
-            )
-        }
+        PanelCheckbox(
+            label = "Enabled",
+            checked = state.enabled,
+            enabled = canDisable,
+            onCheckedChange = { state = state.copy(enabled = it) },
+        )
         OutlinedTextField(
             value = state.optionsText,
             onValueChange = { state = state.copy(optionsText = it) },
@@ -113,30 +104,7 @@ internal fun ProviderProfileEditor(
             maxLines = 4,
             modifier = Modifier.fillMaxWidth(),
         )
-        OutlinedTextField(
-            value = state.modelsText,
-            onValueChange = { state = state.copy(modelsText = it) },
-            label = { Text("Models") },
-            minLines = 3,
-            maxLines = 6,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = state.whitelistText,
-                onValueChange = { state = state.copy(whitelistText = it) },
-                label = { Text("Model whitelist") },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-            )
-            OutlinedTextField(
-                value = state.blacklistText,
-                onValueChange = { state = state.copy(blacklistText = it) },
-                label = { Text("Model blacklist") },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-            )
-        }
+
         if (validation != null) {
             Text(validation, color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.bodySmall)
         }

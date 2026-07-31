@@ -33,6 +33,7 @@ class ComposeProviderProfileEditorTest {
         composeTestRule.onNodeWithText("Provider ID").assertExists()
         composeTestRule.onNodeWithText("Base URL").assertExists()
         composeTestRule.onNodeWithText("API key").assertExists()
+        composeTestRule.onNodeWithText("Default model").assertDoesNotExist()
     }
 
     @Test
@@ -53,7 +54,6 @@ class ComposeProviderProfileEditorTest {
         composeTestRule.onNodeWithText("Provider ID").performTextInput("custom")
         composeTestRule.onNodeWithText("Name").performTextInput("Custom")
         composeTestRule.onNodeWithText("Base URL").performTextInput("https://api.custom.com")
-        composeTestRule.onNodeWithText("Default model").performTextInput("model-x")
         composeTestRule.waitForIdle()
 
         assertTrue(saved == null)

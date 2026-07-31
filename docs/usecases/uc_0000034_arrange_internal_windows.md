@@ -26,9 +26,10 @@ Desktop user.
 9. The user drags any workspace panel header horizontally to reorder the row; the rail buttons animate to the same order on release.
 10. The user can hide a panel from either the left rail or the panel header close icon button.
 11. When the combined panel widths exceed the viewport, the user can scroll horizontally with a horizontal mouse wheel, the on-screen scroll arrows, or the horizontal scrollbar.
-12. Panel cards use consistent spacing, rounded chrome, subtle borders, and compact headers.
-13. Both the rail and the workspace row call the same reorder callback so the user-defined order stays synchronized.
-14. The Compose shell exposes panel order, visibility, and preferred width through the workspace layout service.
+12. Scrollable panel bodies use a shared vertical scrollbar in the common panel chrome; the canvas remains free of a generic vertical scrollbar because it has direct surface interactions.
+13. Panel cards use consistent spacing, rounded chrome, subtle borders, and compact headers.
+14. Both the rail and the workspace row call the same reorder callback so the user-defined order stays synchronized.
+15. The Compose shell exposes panel order, visibility, and preferred width through the workspace layout service.
 
 ## Result
 
@@ -64,5 +65,7 @@ The user can keep multiple panels visible and ordered for the current task witho
 - Horizontal scrolling works through horizontal mouse wheels, on-screen scroll arrows, and the horizontal scrollbar when the row overflows.
 - Visible panels do not overlap.
 - Large panel contents remain scrollable without expensive desktop chrome effects being recalculated.
+- Scrollable panel bodies register their adapters with the shared workspace-panel scrollbar host instead of rendering separate scrollbars.
+- The canvas panel does not receive a generic vertical scrollbar.
 - Panel cards remain visually separable through spacing, borders, and header contrast.
 - The `workspace:layout` tool exposes and accepts order, visibility, and preferred width.

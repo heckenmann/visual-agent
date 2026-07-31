@@ -108,7 +108,9 @@ internal fun ReorderableCollectionItemScope.SplitPanelContent(
                         .fillMaxWidth()
                         .padding(10.dp),
             ) {
-                WindowBody(window, panelServices)
+                PanelScrollbarHost {
+                    WindowBody(window, panelServices)
+                }
             }
         }
     }

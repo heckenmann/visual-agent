@@ -4,6 +4,7 @@ package de.heckenmann.visualagent.ui.compose
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
@@ -20,7 +21,7 @@ class ComposeSettingsPanelTest {
     val composeTestRule = createComposeRule()
 
     @Test
-    fun `settings panel renders provider and execution sections`() {
+    fun `settings panel selects the provider once and lists its models`() {
         val catalog = mockk<ProviderCatalogService>()
         every { catalog.enabledProviders() } returns
             listOf(
@@ -32,9 +33,17 @@ class ComposeSettingsPanelTest {
                     defaultModel = "llava",
                 ),
             )
+        every { catalog.listProviders() } returns catalog.enabledProviders()
         every { catalog.activeProviderId() } returns "ollama"
+        every { catalog.activeModelId() } returns "llava"
         every { catalog.getProvider("ollama") } returns catalog.enabledProviders().single()
-        every { catalog.selectableModels(any()) } returns emptyList()
+        every { catalog.selectableModels(any()) } returns
+            listOf(
+                de.heckenmann.visualagent.agent.provider.ProviderModelConfig(
+                    id = "llava",
+                    name = "LLaVA",
+                ),
+            )
         val llmProvider = mockk<LLMProvider>(relaxed = true)
         val inFlight = InFlightStateHolder()
 
@@ -52,9 +61,15 @@ class ComposeSettingsPanelTest {
             }
         }
 
-        composeTestRule.onNodeWithText("Provider and model").assertExists()
+        composeTestRule.onNodeWithText("Provider connections").assertExists()
+        composeTestRule.onNodeWithText("Main agent model").assertExists()
+        composeTestRule.onNodeWithText("Choose the connection the main agent should use.").assertExists()
+        composeTestRule.onNodeWithText("LLaVA (llava)").assertExists()
+        composeTestRule.onNodeWithContentDescription("Add LLaVA (llava) to favorites").assertExists()
+        composeTestRule.onNodeWithText("Main agent selection").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Custom model ID").assertDoesNotExist()
         composeTestRule.onNodeWithText("Execution").assertExists()
         composeTestRule.onNodeWithText("Appearance").assertExists()
-        composeTestRule.onNodeWithText("Base URL").assertExists()
+        composeTestRule.onNodeWithText("Base URL").assertDoesNotExist()
     }
 }

@@ -168,14 +168,52 @@ class ComposeSettingsPanelSupportTest {
             )
         every { catalog.getProvider("openai") } returns profile
 
-        saveSessionSettings(config, catalog, "openai", "gpt-4o", "https://api.example.com", "new-key")
+        saveSessionSettings(config, catalog, "openai", "gpt-4o")
 
-        verify { catalog.setActiveProvider("openai") }
-        verify { catalog.saveProvider(profile.copy(baseUrl = "https://api.example.com", apiKey = "new-key", defaultModel = "gpt-4o")) }
+        verify { catalog.setActiveSelection("openai", "gpt-4o") }
         assertEquals("openai", config.llmProvider)
-        assertEquals("https://api.example.com", config.openAiBaseUrl)
-        assertEquals("new-key", config.openAiApiKey)
+        assertEquals("https://api.openai.com", config.openAiBaseUrl)
+        assertEquals("key", config.openAiApiKey)
         assertEquals("gpt-4o", config.openAiModel)
+    }
+
+    @Test
+    fun `activating a listed model persists it for the main agent immediately`() {
+        val catalog = mockk<ProviderCatalogService>(relaxed = true)
+        val config = AppConfigBean()
+        val profile =
+            ProviderProfile(
+                id = "openai",
+                name = "OpenAI",
+                adapter = ProviderAdapter.OPENAI_COMPATIBLE,
+                baseUrl = "https://api.openai.com",
+            )
+        every { catalog.getProvider("openai") } returns profile
+
+        activateMainAgentSelection(config, catalog, "openai", "gpt-active")
+
+        verify { catalog.setActiveSelection("openai", "gpt-active") }
+        assertEquals("openai", config.llmProvider)
+        assertEquals("gpt-active", config.openAiModel)
+    }
+
+    @Test
+    fun `activating a provider without a model does not retain the previous provider`() {
+        val catalog = mockk<ProviderCatalogService>(relaxed = true)
+        val config = AppConfigBean()
+        val profile =
+            ProviderProfile(
+                id = "openai-codex",
+                name = "OpenAI ChatGPT Codex",
+                adapter = ProviderAdapter.OPENAI_COMPATIBLE,
+                baseUrl = "https://api.openai.com/v1",
+            )
+        every { catalog.getProvider("openai-codex") } returns profile
+
+        activateMainAgentSelection(config, catalog, "openai-codex", "")
+
+        verify { catalog.setActiveProvider("openai-codex") }
+        assertEquals("openai-codex", config.llmProvider)
     }
 
     @Test

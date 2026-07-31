@@ -69,6 +69,8 @@ internal fun SubAgentsPanel(
         toolIds = setOf("agent:create", "agent:update", "agent:delete", "agent:start", "agent:list"),
         onRefresh = refresh,
     )
+    val agentListScrollState = rememberScrollState()
+    RegisterPanelVerticalScrollbar(agentListScrollState)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
@@ -118,7 +120,7 @@ internal fun SubAgentsPanel(
             maxLines = 4,
             modifier = Modifier.fillMaxWidth(),
         )
-        Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+        Column(modifier = Modifier.weight(1f).verticalScroll(agentListScrollState)) {
             if (agents.isEmpty()) {
                 PanelEmptyState(
                     title = "No sub-agents",

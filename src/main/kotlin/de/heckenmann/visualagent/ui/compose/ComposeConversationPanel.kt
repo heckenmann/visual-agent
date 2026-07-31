@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -64,6 +65,7 @@ internal fun ConversationPanel(
     val scope = rememberCoroutineScope()
     val inputFocusRequester = remember { FocusRequester() }
     val listState = rememberLazyListState()
+    RegisterPanelScrollbar(rememberScrollbarAdapter(listState))
     var history by remember { mutableStateOf(agentManager.getHistory()) }
     var input by remember { mutableStateOf("") }
     var status by remember { mutableStateOf("Ready") }
@@ -218,10 +220,6 @@ internal fun ConversationPanel(
                 sendContent = sendContent,
             )
         }
-        ConversationVerticalScrollbar(
-            listState = listState,
-            modifier = Modifier.align(Alignment.CenterEnd),
-        )
         MessageQueueStrip(
             queue = queue,
             onSendNow = { msg ->

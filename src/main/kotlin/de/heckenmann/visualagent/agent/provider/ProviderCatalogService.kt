@@ -24,6 +24,7 @@ class ProviderCatalogService(
 
     init {
         migrateLegacyConfiguration()
+        ensureBuiltInProfiles()
     }
 
     /**
@@ -55,7 +56,19 @@ class ProviderCatalogService(
     fun saveProvider(profile: ProviderProfile) {
         val state = load()
         val providers = state.providers.filterNot { it.id == profile.id } + profile
-        save(state.copy(providers = providers))
+        require(providers.any(ProviderProfile::enabled)) { "At least one provider profile must remain enabled" }
+        val nextActiveProviderId =
+            state.activeProviderId
+                .takeIf { activeId -> providers.any { it.id == activeId && it.enabled } }
+                ?: providers.first(ProviderProfile::enabled).id
+        val nextActiveModelId =
+            if (nextActiveProviderId == state.activeProviderId) {
+                state.activeModelId
+            } else {
+                providers.first { it.id == nextActiveProviderId }.defaultModel
+            }
+        save(state.copy(activeProviderId = nextActiveProviderId, activeModelId = nextActiveModelId, providers = providers))
+        appConfig.llmProvider = nextActiveProviderId
     }
 
     /**
@@ -74,7 +87,9 @@ class ProviderCatalogService(
             } else {
                 state.activeProviderId
             }
-        save(state.copy(activeProviderId = nextActive, providers = remaining))
+        val nextActiveModel =
+            if (nextActive == state.activeProviderId) state.activeModelId else remaining.first { it.id == nextActive }.defaultModel
+        save(state.copy(activeProviderId = nextActive, activeModelId = nextActiveModel, providers = remaining))
         appConfig.llmProvider = nextActive
         return true
     }
@@ -138,14 +153,41 @@ class ProviderCatalogService(
     fun activeProviderId(): String = load().activeProviderId
 
     /**
+     * Returns the model selected for the main agent.
+     *
+     * Use cases: UC-0000007.
+     */
+    fun activeModelId(): String {
+        val state = load()
+        return state.activeModelId.ifBlank { getProvider(state.activeProviderId)?.defaultModel.orEmpty() }
+    }
+
+    /**
      * Persists the active provider identifier.
      *
      * Use cases: UC-0000007.
      */
     fun setActiveProvider(providerId: String) {
-        require(getProvider(providerId)?.enabled == true) { "Provider is missing or disabled: $providerId" }
+        val provider = getProvider(providerId)?.takeIf(ProviderProfile::enabled)
+        require(provider != null) { "Provider is missing or disabled: $providerId" }
         val state = load()
-        save(state.copy(activeProviderId = providerId))
+        save(state.copy(activeProviderId = providerId, activeModelId = provider.defaultModel))
+        appConfig.llmProvider = providerId
+    }
+
+    /**
+     * Persists the provider and model selected for the main agent without changing provider profile configuration.
+     *
+     * Use cases: UC-0000007.
+     */
+    fun setActiveSelection(
+        providerId: String,
+        modelId: String,
+    ) {
+        require(modelId.isNotBlank()) { "Model is required" }
+        resolve(providerId, modelId)
+        val state = load()
+        save(state.copy(activeProviderId = providerId, activeModelId = modelId))
         appConfig.llmProvider = providerId
     }
 
@@ -160,12 +202,16 @@ class ProviderCatalogService(
         variant: String? = null,
         agentOptions: Map<String, String> = emptyMap(),
     ): ResolvedModelConfig {
-        val selectedProviderId = providerId?.takeIf(String::isNotBlank) ?: activeProviderId()
+        val state = load()
+        val explicitProviderId = providerId?.takeIf(String::isNotBlank)
+        val selectedProviderId = explicitProviderId ?: state.activeProviderId
         val provider =
             getProvider(selectedProviderId)?.takeIf(ProviderProfile::enabled)
                 ?: error("Provider is missing or disabled: $selectedProviderId")
         val selectable = selectableModels(provider.id)
-        val explicitModelId = modelId?.takeIf(String::isNotBlank)
+        val explicitModelId =
+            modelId?.takeIf(String::isNotBlank)
+                ?: state.activeModelId.takeIf { explicitProviderId == null && it.isNotBlank() }
         val resolvedModelId =
             when {
                 explicitModelId != null -> explicitModelId
@@ -218,9 +264,29 @@ class ProviderCatalogService(
                     defaultModel = config.openAiModel,
                     models = listOf(ProviderModelConfig(config.openAiModel)),
                 ),
+                builtInCodexProfile(),
             )
-        save(CatalogState(activeProviderId = config.normalizedProvider(), providers = profiles))
+        val activeProviderId = config.normalizedProvider()
+        val activeModelId = if (activeProviderId == "openai") config.openAiModel else config.ollamaModel
+        save(CatalogState(activeProviderId = activeProviderId, activeModelId = activeModelId, providers = profiles))
     }
+
+    private fun ensureBuiltInProfiles() {
+        if (preferenceStore.getPreference(KEY_CODEX_INITIALIZED) == "true") return
+        val state = load()
+        if (state.providers.none { it.id == ProviderEnvironmentCredentials.CODEX_PROFILE_ID }) {
+            save(state.copy(providers = state.providers + builtInCodexProfile()))
+        }
+        preferenceStore.setPreference(KEY_CODEX_INITIALIZED, "true")
+    }
+
+    private fun builtInCodexProfile(): ProviderProfile =
+        ProviderProfile(
+            id = ProviderEnvironmentCredentials.CODEX_PROFILE_ID,
+            name = "OpenAI ChatGPT Codex",
+            adapter = ProviderAdapter.OPENAI_COMPATIBLE,
+            baseUrl = "https://api.openai.com/v1",
+        )
 
     private fun load(): CatalogState =
         preferenceStore
@@ -236,10 +302,12 @@ class ProviderCatalogService(
     private data class CatalogState(
         val version: Int = 1,
         val activeProviderId: String = "ollama",
+        val activeModelId: String = "",
         val providers: List<ProviderProfile> = emptyList(),
     )
 
     private companion object {
         private const val KEY_CATALOG = "llm.provider.catalog.v1"
+        private const val KEY_CODEX_INITIALIZED = "llm.provider.codex.profile.initialized.v1"
     }
 }
