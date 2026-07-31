@@ -156,39 +156,141 @@ internal fun saveSessionSettings(
     providerCatalog: ProviderCatalogService,
     providerId: String,
     modelId: String,
-    baseUrl: String,
-    apiKey: String,
 ) {
-    providerCatalog.setActiveProvider(providerId)
     val profile = providerCatalog.getProvider(providerId) ?: error("Provider is missing: $providerId")
-    val updated =
-        profile.copy(
-            baseUrl = baseUrl.trim(),
-            apiKey = apiKey.trim(),
-            defaultModel = modelId.trim(),
-        )
-    providerCatalog.saveProvider(updated)
-    mirrorProviderToAppConfig(config, updated)
+    val selectedModelId = modelId.trim()
+    providerCatalog.setActiveSelection(providerId, selectedModelId)
+    mirrorProviderToAppConfig(config, profile, selectedModelId)
+}
+
+/**
+ * Immediately activates a provider/model selection made in the settings UI.
+ *
+ * A provider without an available model is still activated so it cannot silently
+ * fall back to a different provider. The main agent will report that a model must
+ * be selected before it can send a request.
+ */
+internal fun activateMainAgentSelection(
+    config: AppConfigBean,
+    providerCatalog: ProviderCatalogService,
+    providerId: String,
+    modelId: String,
+) {
+    val profile = providerCatalog.getProvider(providerId) ?: error("Provider is missing: $providerId")
+    val selectedModelId = modelId.trim()
+    if (selectedModelId.isBlank()) {
+        providerCatalog.setActiveProvider(providerId)
+        mirrorProviderToAppConfig(config, profile)
+    } else {
+        saveSessionSettings(config, providerCatalog, providerId, selectedModelId)
+    }
+    config.save()
+}
+
+/**
+ * Activates a selected provider with its configured default or first selectable model.
+ *
+ * @return The provider display name for the settings status message
+ */
+internal fun activateSelectedProvider(
+    config: AppConfigBean,
+    providerCatalog: ProviderCatalogService,
+    providerId: String,
+): String {
+    val profile = providerCatalog.getProvider(providerId)
+    val selectableModels = providerCatalog.selectableModels(providerId)
+    val selectedModel =
+        profile
+            ?.defaultModel
+            ?.takeIf { default -> selectableModels.any { it.id == default } }
+            ?: selectableModels.firstOrNull()?.id.orEmpty()
+    activateMainAgentSelection(config, providerCatalog, providerId, selectedModel)
+    return profile?.name ?: providerId
 }
 
 internal fun mirrorProviderToAppConfig(
     config: AppConfigBean,
     profile: ProviderProfile,
+    modelId: String = profile.defaultModel,
 ) {
     config.llmProvider = profile.id
     when (profile.id) {
         "ollama" -> {
             config.ollamaLocalUrl = profile.baseUrl
             config.ollamaApiKey = profile.apiKey
-            config.ollamaModel = profile.defaultModel
+            config.ollamaModel = modelId
         }
         "openai" -> {
             config.openAiBaseUrl = profile.baseUrl
             config.openAiApiKey = profile.apiKey
-            config.openAiModel = profile.defaultModel
+            config.openAiModel = modelId
         }
     }
 }
+
+/**
+ * Provider-backed state used to refresh the settings form.
+ */
+internal data class RefreshedProviderSettings(
+    val providerProfiles: List<ProviderProfile>,
+    val providers: List<ProviderProfile>,
+    val providerId: String,
+    val selectableModels: List<ProviderModelConfig>,
+    val modelId: String,
+)
+
+/**
+ * Reads the selected provider and its available model state for the settings form.
+ */
+internal fun refreshedProviderSettings(
+    providerCatalog: ProviderCatalogService,
+    selectedProviderId: String,
+): RefreshedProviderSettings {
+    val providerProfiles = providerCatalog.listProviders()
+    val providers = providerCatalog.enabledProviders()
+    val providerId = selectedProviderId.takeIf { id -> providers.any { it.id == id } } ?: providers.firstOrNull()?.id.orEmpty()
+    val profile = providerCatalog.getProvider(providerId)
+    val selectableModels = providerCatalog.selectableModels(providerId)
+    val selectableModelIds = selectableModels.map(ProviderModelConfig::id)
+    val modelId =
+        providerCatalog
+            .activeModelId()
+            .takeIf { providerId == providerCatalog.activeProviderId() && it in selectableModelIds }
+            ?: profile?.defaultModel?.takeIf { it in selectableModelIds }
+            ?: selectableModels.firstOrNull()?.id.orEmpty()
+    return RefreshedProviderSettings(providerProfiles, providers, providerId, selectableModels, modelId)
+}
+
+/**
+ * Filters provider models according to the current search and favorites settings.
+ */
+internal fun filteredProviderModels(
+    models: List<ProviderModelConfig>,
+    search: String,
+    favoritesOnly: Boolean,
+    favoriteModels: Set<String>,
+): List<ProviderModelConfig> =
+    models.filter { model ->
+        val matchesSearch = model.id.contains(search, ignoreCase = true) || model.name.contains(search, ignoreCase = true)
+        val matchesFavorite = !favoritesOnly || model.id in favoriteModels
+        matchesSearch && matchesFavorite
+    }
+
+/**
+ * Returns whether all values required by the explicit settings save action are valid.
+ */
+internal fun canSaveSettings(
+    hasActiveProvider: Boolean,
+    modelId: String,
+    loadLimit: Int?,
+    maxParallelSubAgents: Int?,
+    timeoutSeconds: Int?,
+): Boolean =
+    hasActiveProvider &&
+        modelId.isNotBlank() &&
+        loadLimit != null &&
+        maxParallelSubAgents != null &&
+        timeoutSeconds != null
 
 internal fun Int.clampFontSize(): Int = coerceIn(MIN_SETTINGS_FONT_SIZE, MAX_SETTINGS_FONT_SIZE)
 

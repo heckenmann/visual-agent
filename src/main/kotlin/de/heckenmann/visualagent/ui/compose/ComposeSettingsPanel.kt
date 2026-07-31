@@ -45,15 +45,10 @@ internal fun SettingsPanel(
 ) {
     val scope = rememberCoroutineScope()
     var providers by remember { mutableStateOf(providerCatalogService.enabledProviders()) }
+    var providerProfiles by remember { mutableStateOf(providerCatalogService.listProviders()) }
     var providerId by remember { mutableStateOf(providerCatalogService.activeProviderId()) }
     var selectableModels by remember { mutableStateOf(providerCatalogService.selectableModels(providerId)) }
-    var modelId by remember {
-        mutableStateOf(providerCatalogService.getProvider(providerId)?.defaultModel.orEmpty())
-    }
-    var customModelId by remember { mutableStateOf(modelId) }
-    var baseUrl by remember { mutableStateOf(providerCatalogService.getProvider(providerId)?.baseUrl.orEmpty()) }
-    var apiKey by remember { mutableStateOf(providerCatalogService.getProvider(providerId)?.apiKey.orEmpty()) }
-    var apiKeyVisible by remember { mutableStateOf(false) }
+    var modelId by remember { mutableStateOf(providerCatalogService.activeModelId()) }
     var modelSearch by remember { mutableStateOf("") }
     var favoritesOnly by remember { mutableStateOf(false) }
     var favoriteModels by remember { mutableStateOf(config.favoriteModels.toFavoriteModelSet()) }
@@ -73,45 +68,30 @@ internal fun SettingsPanel(
     var themeMode by remember { mutableStateOf(config.uiThemeMode) }
     var status by remember { mutableStateOf("Ready") }
     val activeProvider = providers.firstOrNull { it.id == providerId } ?: providers.firstOrNull()
-    val filteredModels =
-        selectableModels.filter { model ->
-            val matchesSearch = model.id.contains(modelSearch, ignoreCase = true) || model.name.contains(modelSearch, ignoreCase = true)
-            val matchesFavorite = !favoritesOnly || model.id in favoriteModels
-            matchesSearch && matchesFavorite
-        }
+    val managedProvider = providerProfiles.firstOrNull { it.id == providerId }
+    val filteredModels = filteredProviderModels(selectableModels, modelSearch, favoritesOnly, favoriteModels)
     val selectableModelIds = selectableModels.map(ProviderModelConfig::id)
-    val modelSelection = if (modelId in selectableModelIds) modelId else CUSTOM_MODEL_ID
     val resolvedModel =
-        when (modelSelection) {
-            CUSTOM_MODEL_ID -> customModelId.trim()
-            else -> modelSelection
-        }.ifBlank {
-            activeProvider?.defaultModel.orEmpty().ifBlank { selectableModels.firstOrNull()?.id.orEmpty() }
-        }
+        modelId.takeIf { it in selectableModelIds }
+            ?: activeProvider?.defaultModel?.takeIf { it in selectableModelIds }
+            ?: selectableModels.firstOrNull()?.id.orEmpty()
     val activeModelCapabilities = selectableModels.firstOrNull { it.id == resolvedModel }?.capabilities.orEmpty()
     val loadLimitValue = loadLimit.toBoundedIntOrNull(MIN_LOAD_LIMIT, MAX_LOAD_LIMIT)
     val maxParallelValue = maxParallelSubAgents.toBoundedIntOrNull(MIN_PARALLEL_SUB_AGENTS, MAX_PARALLEL_SUB_AGENTS)
     val timeoutValue = timeoutSeconds.toBoundedIntOrNull(MIN_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS)
     val canSave =
-        activeProvider != null &&
-            resolvedModel.isNotBlank() &&
-            baseUrl.isNotBlank() &&
-            loadLimitValue != null &&
-            maxParallelValue != null &&
-            timeoutValue != null
+        canSaveSettings(activeProvider != null, resolvedModel, loadLimitValue, maxParallelValue, timeoutValue)
 
     /**
      * Reloads the provider list and aligns the form state with the selected provider.
      */
     fun refreshProviderState(selectedProviderId: String = providerId) {
-        providers = providerCatalogService.enabledProviders()
-        providerId = selectedProviderId.takeIf { id -> providers.any { it.id == id } } ?: providers.firstOrNull()?.id.orEmpty()
-        val profile = providerCatalogService.getProvider(providerId)
-        selectableModels = providerCatalogService.selectableModels(providerId)
-        modelId = profile?.defaultModel?.takeIf(String::isNotBlank) ?: selectableModels.firstOrNull()?.id.orEmpty()
-        customModelId = modelId
-        baseUrl = profile?.baseUrl.orEmpty()
-        apiKey = profile?.apiKey.orEmpty()
+        val refreshed = refreshedProviderSettings(providerCatalogService, selectedProviderId)
+        providerProfiles = refreshed.providerProfiles
+        providers = refreshed.providers
+        providerId = refreshed.providerId
+        selectableModels = refreshed.selectableModels
+        modelId = refreshed.modelId
     }
 
     ToolEventRefreshEffect(
@@ -132,9 +112,11 @@ internal fun SettingsPanel(
                     selectableModels = providerCatalogService.selectableModels(requestedProviderId)
                     if (modelId !in selectableModels.map(ProviderModelConfig::id)) {
                         modelId =
-                            providerCatalogService.getProvider(requestedProviderId)?.defaultModel?.takeIf(String::isNotBlank)
+                            providerCatalogService
+                                .getProvider(requestedProviderId)
+                                ?.defaultModel
+                                ?.takeIf { default -> selectableModels.any { it.id == default } }
                                 ?: selectableModels.firstOrNull()?.id.orEmpty()
-                        customModelId = modelId
                     }
                     status = "Loaded ${selectableModels.size} selectable models."
                 }.onFailure { error ->
@@ -172,14 +154,9 @@ internal fun SettingsPanel(
     ) {
         SettingsProviderSection(
             providers = providers,
+            providerProfiles = providerProfiles,
             providerId = providerId,
-            activeProvider = activeProvider,
-            modelId = modelId,
-            modelSelection = modelSelection,
-            customModelId = customModelId,
-            baseUrl = baseUrl,
-            apiKey = apiKey,
-            apiKeyVisible = apiKeyVisible,
+            managedProvider = managedProvider,
             modelSearch = modelSearch,
             favoritesOnly = favoritesOnly,
             favoriteModels = favoriteModels,
@@ -188,13 +165,17 @@ internal fun SettingsPanel(
             loadingModels = loadingModels,
             loadingDetails = loadingDetails,
             filteredModels = filteredModels,
-            config = config,
-            providerCatalogService = providerCatalogService,
             modalRequester = modalRequester,
-            onProviderSelected = { selected -> refreshProviderState(selected) },
-            onBaseUrlChange = { baseUrl = it },
-            onApiKeyChange = { apiKey = it },
-            onApiKeyVisibleToggle = { apiKeyVisible = !apiKeyVisible },
+            onProviderSelected = { selected ->
+                runCatching {
+                    val name = activateSelectedProvider(config, providerCatalogService, selected)
+                    refreshProviderState(selected)
+                    onSettingsChanged()
+                    status = "Active provider=$name"
+                }.onFailure { error ->
+                    status = ProviderErrorMessages.userFacing(error)
+                }
+            },
             onModelSearchChange = { modelSearch = it },
             onFavoritesOnlyChange = { favoritesOnly = it },
             onFavoriteModelsChange = {
@@ -204,30 +185,26 @@ internal fun SettingsPanel(
                 status = "Saved favorite models."
             },
             onModelSelected = { selected ->
-                if (selected == CUSTOM_MODEL_ID) {
-                    modelId = customModelId
-                } else {
-                    modelId = selected
-                    customModelId = selected
+                modelId = selected
+                runCatching {
+                    activateMainAgentSelection(config, providerCatalogService, providerId, selected)
+                    onSettingsChanged()
+                    status = "Active provider=${activeProvider?.name ?: providerId} model=$selected"
+                }.onFailure { error ->
+                    status = ProviderErrorMessages.userFacing(error)
                 }
-                refreshModelDetails(selected.takeUnless { it == CUSTOM_MODEL_ID })
-            },
-            onCustomModelChange = {
-                customModelId = it
-                modelId = it
+                refreshModelDetails(selected)
             },
             onRefreshModels = ::refreshModels,
             onRefreshDetails = { refreshModelDetails() },
             onProviderAdded = { profile ->
                 providerCatalogService.saveProvider(profile)
-                refreshProviderState(profile.id)
+                refreshProviderState()
                 status = "Saved provider=${profile.name}"
             },
             onProviderEdited = { profile ->
                 providerCatalogService.saveProvider(profile)
-                mirrorProviderToAppConfig(config, profile)
-                config.save()
-                refreshProviderState(profile.id)
+                refreshProviderState(providerCatalogService.activeProviderId())
                 onSettingsChanged()
                 status = "Saved provider=${profile.name}"
             },
@@ -289,8 +266,6 @@ internal fun SettingsPanel(
                         providerCatalogService,
                         activeProvider?.id ?: providerId,
                         resolvedModel,
-                        baseUrl,
-                        apiKey,
                     )
                     applyAndSaveSettings(
                         config,
@@ -318,5 +293,3 @@ internal fun SettingsPanel(
         PanelStatus(status)
     }
 }
-
-internal const val CUSTOM_MODEL_ID = "__custom_model__"
