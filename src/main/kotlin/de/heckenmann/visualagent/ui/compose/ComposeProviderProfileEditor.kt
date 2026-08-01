@@ -41,27 +41,22 @@ internal fun ProviderProfileEditor(
     var state by remember { mutableStateOf(initial) }
     var apiKeyVisible by remember { mutableStateOf(false) }
     val validation = state.validationError()
+    val saveDescription = if (existing == null) "Create provider" else "Save provider changes"
     Column(
         modifier = Modifier.heightIn(max = 560.dp).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = state.id,
-                onValueChange = { state = state.copy(id = it) },
-                label = { Text("Provider ID") },
-                enabled = existing == null,
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-            )
-            OutlinedTextField(
-                value = state.name,
-                onValueChange = { state = state.copy(name = it) },
-                label = { Text("Name") },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-            )
-        }
+        Text(
+            "Configure the provider connection. Model selection is managed separately.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        OutlinedTextField(
+            value = state.name,
+            onValueChange = { state = state.copy(name = it) },
+            label = { Text("Name") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
         PanelDropdownField(
             label = "Adapter",
             selectedValue = state.adapter.name,
@@ -112,7 +107,7 @@ internal fun ProviderProfileEditor(
             ActionIconButton(icon = Icons.Filled.Close, description = "Cancel", onClick = onCancel)
             ActionIconButton(
                 icon = Icons.Filled.Check,
-                description = "Save provider",
+                description = saveDescription,
                 enabled = validation == null,
                 onClick = { onSave(state.toProviderProfile(existing)) },
             )

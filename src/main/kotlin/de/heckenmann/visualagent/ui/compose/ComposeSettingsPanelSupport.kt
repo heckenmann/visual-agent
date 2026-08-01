@@ -7,6 +7,7 @@ import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.config.AppConfigBean
+import java.util.UUID
 
 internal data class ProviderProfileFormState(
     val id: String = "",
@@ -39,6 +40,7 @@ internal fun ProviderProfile.toFormState(): ProviderProfileFormState =
 
 internal fun newProviderFormState(): ProviderProfileFormState =
     ProviderProfileFormState(
+        id = "provider-${UUID.randomUUID()}",
         adapter = ProviderAdapter.OPENAI_COMPATIBLE,
         baseUrl = "https://api.example.com",
         enabled = true,
