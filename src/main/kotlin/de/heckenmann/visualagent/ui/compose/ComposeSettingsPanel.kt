@@ -107,22 +107,25 @@ internal fun SettingsPanel(
         loadingModels = true
         status = "Loading models..."
         scope.launch {
-            runCatching { llmProvider.getModels(requestedProviderId) }
-                .onSuccess {
-                    selectableModels = providerCatalogService.selectableModels(requestedProviderId)
-                    if (modelId !in selectableModels.map(ProviderModelConfig::id)) {
-                        modelId =
-                            providerCatalogService
-                                .getProvider(requestedProviderId)
-                                ?.defaultModel
-                                ?.takeIf { default -> selectableModels.any { it.id == default } }
-                                ?: selectableModels.firstOrNull()?.id.orEmpty()
-                    }
-                    status = "Loaded ${selectableModels.size} selectable models."
-                }.onFailure { error ->
-                    selectableModels = providerCatalogService.selectableModels(requestedProviderId)
-                    status = ProviderErrorMessages.userFacing(error)
+            runCatching {
+                val discoveredModels = llmProvider.getModels(requestedProviderId)
+                require(discoveredModels.isNotEmpty()) { "Provider did not return any models" }
+                providerCatalogService.updateDiscoveredModels(requestedProviderId, discoveredModels)
+            }.onSuccess {
+                selectableModels = providerCatalogService.selectableModels(requestedProviderId)
+                if (modelId !in selectableModels.map(ProviderModelConfig::id)) {
+                    modelId =
+                        providerCatalogService
+                            .getProvider(requestedProviderId)
+                            ?.defaultModel
+                            ?.takeIf { default -> selectableModels.any { it.id == default } }
+                            ?: selectableModels.firstOrNull()?.id.orEmpty()
                 }
+                status = "Loaded ${selectableModels.size} selectable models."
+            }.onFailure { error ->
+                selectableModels = providerCatalogService.selectableModels(requestedProviderId)
+                status = ProviderErrorMessages.userFacing(error)
+            }
             loadingModels = false
         }
     }
