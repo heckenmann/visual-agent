@@ -53,6 +53,7 @@ dependencies {
     implementation(platform("org.springframework.ai:spring-ai-bom:2.0.0"))
     implementation("org.springframework.ai:spring-ai-starter-model-ollama")
     implementation("org.springframework.ai:spring-ai-openai")
+    implementation("io.github.vupoint.cokit:cokit-client:0.0.2")
     implementation("org.hibernate.orm:hibernate-community-dialects")
     implementation("org.springframework.boot:spring-boot-starter-flyway")
 
@@ -68,8 +69,8 @@ dependencies {
     implementation("org.xerial:sqlite-jdbc:3.53.2.1")
 
     // Kotlinx Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.11.0") // Needed for Spring AI Flux to Flow
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.10.2") // Needed for Spring AI Flux to Flow
 
     // JSON Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
@@ -98,7 +99,7 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("io.mockk:mockk:1.14.11")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
     testImplementation("org.jetbrains.compose.ui:ui-test-junit4-desktop:1.11.1")
     testRuntimeOnly("org.junit.vintage:junit-vintage-engine:6.1.2")
 }
@@ -106,6 +107,7 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
     systemProperty("visualagent.ollama.smoke", System.getProperty("visualagent.ollama.smoke", "false"))
+    systemProperty("visualagent.codex.smoke", System.getProperty("visualagent.codex.smoke", "false"))
     jvmArgs("-Xshare:off", "-Xmx2g", "-Dkotlinx.coroutines.debug=off")
     finalizedBy(tasks.jacocoTestReport)
 }
