@@ -7,21 +7,14 @@ internal object ProviderEnvironmentCredentials {
     /**
      * Returns the API key for an OpenAI-compatible profile.
      *
-     * Explicit profile credentials take precedence. The Codex profile supports a dedicated
-     * variable and falls back to the standard OpenAI variable.
+     * Explicit profile credentials take precedence over the standard OpenAI variable.
      *
      * @param profile Provider profile whose credentials should be resolved
      * @return API key or an empty string when none is configured
      */
     fun openAiApiKey(profile: ProviderProfile): String {
         if (profile.apiKey.isNotBlank()) return profile.apiKey
-        val variableNames =
-            if (profile.id == CODEX_PROFILE_ID) {
-                listOf("OPENAI_CODEX_API_KEY", "OPENAI_API_KEY")
-            } else {
-                listOf("OPENAI_API_KEY")
-            }
-        return variableNames.firstNotNullOfOrNull { System.getenv(it)?.takeIf(String::isNotBlank) }.orEmpty()
+        return System.getenv("OPENAI_API_KEY")?.takeIf(String::isNotBlank).orEmpty()
     }
 
     /**

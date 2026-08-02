@@ -1,0 +1,5 @@
+public final class io/github/vupoint/cokit/client/CodexClients {
+	public static final field INSTANCE Lio/github/vupoint/cokit/client/CodexClients;
+	public final fun connect (Lio/github/vupoint/cokit/client/CodexClientConnection;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+

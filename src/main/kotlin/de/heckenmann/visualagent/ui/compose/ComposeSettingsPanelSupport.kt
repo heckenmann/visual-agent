@@ -7,6 +7,7 @@ import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.config.AppConfigBean
+import java.util.UUID
 
 internal data class ProviderProfileFormState(
     val id: String = "",
@@ -39,6 +40,7 @@ internal fun ProviderProfile.toFormState(): ProviderProfileFormState =
 
 internal fun newProviderFormState(): ProviderProfileFormState =
     ProviderProfileFormState(
+        id = "provider-${UUID.randomUUID()}",
         adapter = ProviderAdapter.OPENAI_COMPATIBLE,
         baseUrl = "https://api.example.com",
         enabled = true,
@@ -49,7 +51,7 @@ internal fun ProviderProfileFormState.validationError(): String? =
         id.isBlank() -> "Provider ID is required."
         !id.trim().matches(PROVIDER_ID_PATTERN) -> "Provider ID contains invalid characters."
         name.isBlank() -> "Name is required."
-        baseUrl.isBlank() -> "Base URL is required."
+        adapter != ProviderAdapter.CODEX_CLI && baseUrl.isBlank() -> "Base URL is required."
         else -> null
     }
 

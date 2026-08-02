@@ -9,6 +9,7 @@ import kotlinx.serialization.Serializable
 enum class ProviderAdapter {
     OLLAMA,
     OPENAI_COMPATIBLE,
+    CODEX_CLI,
 }
 
 /**

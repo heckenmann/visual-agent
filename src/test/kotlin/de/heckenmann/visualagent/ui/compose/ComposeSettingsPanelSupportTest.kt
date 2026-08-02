@@ -72,7 +72,7 @@ class ComposeSettingsPanelSupportTest {
         assertEquals(ProviderAdapter.OPENAI_COMPATIBLE, form.adapter)
         assertEquals("https://api.example.com", form.baseUrl)
         assertTrue(form.enabled)
-        assertTrue(form.id.isBlank())
+        assertTrue(form.id.matches(Regex("provider-[0-9a-f-]{36}")))
     }
 
     @Test

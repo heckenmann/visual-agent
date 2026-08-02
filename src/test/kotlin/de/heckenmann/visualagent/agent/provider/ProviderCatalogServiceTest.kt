@@ -108,8 +108,9 @@ class ProviderCatalogServiceTest {
         val catalog = ProviderCatalogService(MapPreferenceStore())
         val profile = requireNotNull(catalog.getProvider(ProviderEnvironmentCredentials.CODEX_PROFILE_ID))
 
-        assertEquals("OpenAI ChatGPT Codex", profile.name)
-        assertEquals("https://api.openai.com/v1", profile.baseUrl)
+        assertEquals("Codex CLI", profile.name)
+        assertEquals(ProviderAdapter.CODEX_CLI, profile.adapter)
+        assertEquals("", profile.baseUrl)
         assertEquals("ollama", catalog.activeProviderId())
     }
 
@@ -244,6 +245,35 @@ class ProviderCatalogServiceTest {
                 ?.status,
         )
         assertFalse(catalog.deleteProvider("missing"))
+    }
+
+    @Test
+    fun `configured discovery persists codex display names and known metadata`() {
+        val catalog = ProviderCatalogService(MapPreferenceStore())
+        catalog.saveProvider(
+            ProviderProfile(
+                id = "codex-custom",
+                name = "Codex CLI",
+                adapter = ProviderAdapter.CODEX_CLI,
+                baseUrl = "",
+                defaultModel = "gpt-codex",
+                models = listOf(ProviderModelConfig("gpt-codex", name = "Old name", status = ModelStatus.BETA)),
+            ),
+        )
+
+        catalog.updateDiscoveredModelConfigs(
+            "codex-custom",
+            listOf(
+                ProviderModelConfig("gpt-codex", name = "Codex Updated"),
+                ProviderModelConfig("gpt-new", name = "Codex New"),
+            ),
+        )
+
+        val models = requireNotNull(catalog.getProvider("codex-custom")).models.associateBy(ProviderModelConfig::id)
+        assertEquals("Codex Updated", models.getValue("gpt-codex").name)
+        assertEquals(ModelStatus.BETA, models.getValue("gpt-codex").status)
+        assertEquals("Codex New", models.getValue("gpt-new").name)
+        assertEquals(ModelStatus.ACTIVE, models.getValue("gpt-new").status)
     }
 
     private class MapPreferenceStore : PreferenceStore {

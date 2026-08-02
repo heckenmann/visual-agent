@@ -16,11 +16,13 @@ Desktop user.
 ## Main Flow
 
 1. The user sends a message or the main agent streams a response.
-2. The conversation history is updated:
+2. The conversation displays new content:
    - A new message is appended, or
+   - The just-submitted user message is displayed as a temporary pending row before persistence completes, or
    - The content of the last assistant message grows during streaming.
-3. The conversation list detects the change and scrolls to the bottom after a short debounce.
-4. The user always sees the newest content without manually scrolling.
+3. The conversation list detects new content and scrolls to the bottom after the next layout frame.
+4. During streaming, each visible assistant update and each conversation viewport-height change keeps the newest content visible.
+5. The user always sees the newest content without manually scrolling.
 
 ## Result
 
@@ -34,12 +36,15 @@ The conversation panel stays pinned to the latest message automatically, includi
 
 - `de.heckenmann.visualagent.ui.compose.ConversationPanel`
 - `de.heckenmann.visualagent.ui.compose.ConversationScrollOnChangeEffect`
+- `de.heckenmann.visualagent.ui.compose.ConversationResizeScrollEffect`
 - `de.heckenmann.visualagent.ui.compose.ConversationStartupScrollEffect`
 
 ## Acceptance Criteria
 
 - On startup the list scrolls to the bottom if history is not empty.
 - When a new message is appended the list scrolls to the bottom.
+- When a user submits a message, the temporary pending row scrolls into view before the request completes.
 - When the last message content changes during streaming the list scrolls to the bottom.
+- When the panel or overlaid input area changes height, the list remains at the newest message.
 - The auto-scroll effect is covered by a regression test.
 - The implementation stays within the 300 LOC per-file limit.

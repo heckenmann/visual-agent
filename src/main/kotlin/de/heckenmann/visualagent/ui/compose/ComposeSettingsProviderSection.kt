@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import de.heckenmann.visualagent.agent.codex.CodexCliAccountService
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 
@@ -39,6 +40,7 @@ internal fun SettingsProviderSection(
     loadingDetails: Boolean,
     filteredModels: List<ProviderModelConfig>,
     modalRequester: ComposeModalRequester,
+    codexCliAccountService: CodexCliAccountService?,
     onProviderSelected: (String) -> Unit,
     onModelSearchChange: (String) -> Unit,
     onFavoritesOnlyChange: (Boolean) -> Unit,
@@ -63,19 +65,11 @@ internal fun SettingsProviderSection(
                 icon = Icons.Filled.Add,
                 description = "Add provider",
                 onClick = {
-                    modalRequester.request(
-                        ComposeContentModal(title = "Add provider") { dismiss ->
-                            ProviderProfileEditor(
-                                initial = newProviderFormState(),
-                                existing = null,
-                                canDisable = true,
-                                onCancel = dismiss,
-                                onSave = { profile ->
-                                    onProviderAdded(profile)
-                                    dismiss()
-                                },
-                            )
-                        },
+                    modalRequester.requestProviderProfileDialog(
+                        profile = null,
+                        canDisable = true,
+                        codexCliAccountService = codexCliAccountService,
+                        onSave = onProviderAdded,
                     )
                 },
             )
@@ -85,19 +79,11 @@ internal fun SettingsProviderSection(
                 enabled = managedProvider != null,
                 onClick = {
                     val current = managedProvider ?: return@ActionIconButton
-                    modalRequester.request(
-                        ComposeContentModal(title = "Edit provider") { dismiss ->
-                            ProviderProfileEditor(
-                                initial = current.toFormState(),
-                                existing = current,
-                                canDisable = providerProfiles.count(ProviderProfile::enabled) > 1 || !current.enabled,
-                                onCancel = dismiss,
-                                onSave = { profile ->
-                                    onProviderEdited(profile)
-                                    dismiss()
-                                },
-                            )
-                        },
+                    modalRequester.requestProviderProfileDialog(
+                        profile = current,
+                        canDisable = providerProfiles.count(ProviderProfile::enabled) > 1 || !current.enabled,
+                        codexCliAccountService = codexCliAccountService,
+                        onSave = onProviderEdited,
                     )
                 },
             )
@@ -169,6 +155,30 @@ internal fun SettingsProviderSection(
         )
         PanelInfoBox(modelDetails)
     }
+}
+
+private fun ComposeModalRequester.requestProviderProfileDialog(
+    profile: ProviderProfile?,
+    canDisable: Boolean,
+    codexCliAccountService: CodexCliAccountService?,
+    onSave: (ProviderProfile) -> Unit,
+) {
+    val isNew = profile == null
+    request(
+        ComposeContentModal(title = if (isNew) "New provider" else "Edit provider") { dismiss ->
+            ProviderProfileEditor(
+                initial = profile?.toFormState() ?: newProviderFormState(),
+                existing = profile,
+                canDisable = canDisable,
+                codexCliAccountService = codexCliAccountService,
+                onCancel = dismiss,
+                onSave = { savedProfile ->
+                    onSave(savedProfile)
+                    dismiss()
+                },
+            )
+        },
+    )
 }
 
 @Composable

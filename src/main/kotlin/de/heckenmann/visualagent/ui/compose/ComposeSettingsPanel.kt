@@ -19,6 +19,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.agent.LLMProvider
+import de.heckenmann.visualagent.agent.codex.CodexCliAccountService
+import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderErrorMessages
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
@@ -38,6 +40,7 @@ internal fun SettingsPanel(
     config: AppConfigBean,
     llmProvider: LLMProvider,
     providerCatalogService: ProviderCatalogService,
+    codexCliAccountService: CodexCliAccountService? = null,
     modalRequester: ComposeModalRequester,
     onSettingsChanged: () -> Unit,
     inFlight: InFlightStateHolder,
@@ -107,23 +110,32 @@ internal fun SettingsPanel(
         loadingModels = true
         status = "Loading models..."
         scope.launch {
-            runCatching { llmProvider.getModels(requestedProviderId) }
-                .onSuccess {
-                    selectableModels = providerCatalogService.selectableModels(requestedProviderId)
-                    if (modelId !in selectableModels.map(ProviderModelConfig::id)) {
-                        modelId =
-                            providerCatalogService
-                                .getProvider(requestedProviderId)
-                                ?.defaultModel
-                                ?.takeIf { default -> selectableModels.any { it.id == default } }
-                                ?: selectableModels.firstOrNull()?.id.orEmpty()
-                    }
-                    status = "Loaded ${selectableModels.size} selectable models."
-                }.onFailure { error ->
-                    selectableModels = providerCatalogService.selectableModels(requestedProviderId)
-                    status = ProviderErrorMessages.userFacing(error)
+            runCatching {
+                val discoveredModels = llmProvider.getModels(requestedProviderId)
+                require(discoveredModels.isNotEmpty()) { "Provider did not return any models" }
+                providerCatalogService.updateDiscoveredModels(requestedProviderId, discoveredModels)
+            }.onSuccess {
+                selectableModels = providerCatalogService.selectableModels(requestedProviderId)
+                if (modelId !in selectableModels.map(ProviderModelConfig::id)) {
+                    modelId =
+                        providerCatalogService
+                            .getProvider(requestedProviderId)
+                            ?.defaultModel
+                            ?.takeIf { default -> selectableModels.any { it.id == default } }
+                            ?: selectableModels.firstOrNull()?.id.orEmpty()
                 }
+                status = "Loaded ${selectableModels.size} selectable models."
+            }.onFailure { error ->
+                selectableModels = providerCatalogService.selectableModels(requestedProviderId)
+                status = ProviderErrorMessages.userFacing(error)
+            }
             loadingModels = false
+        }
+    }
+
+    LaunchedEffect(providerId, managedProvider?.adapter, selectableModels.isEmpty()) {
+        if (managedProvider?.adapter == ProviderAdapter.CODEX_CLI && selectableModels.isEmpty()) {
+            refreshModels()
         }
     }
 
@@ -166,6 +178,7 @@ internal fun SettingsPanel(
             loadingDetails = loadingDetails,
             filteredModels = filteredModels,
             modalRequester = modalRequester,
+            codexCliAccountService = codexCliAccountService,
             onProviderSelected = { selected ->
                 runCatching {
                     val name = activateSelectedProvider(config, providerCatalogService, selected)

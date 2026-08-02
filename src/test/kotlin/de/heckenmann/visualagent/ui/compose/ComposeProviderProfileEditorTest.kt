@@ -4,8 +4,10 @@ package de.heckenmann.visualagent.ui.compose
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTextInput
+import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import org.junit.Rule
 import org.junit.Test
@@ -30,10 +32,11 @@ class ComposeProviderProfileEditorTest {
             }
         }
 
-        composeTestRule.onNodeWithText("Provider ID").assertExists()
+        composeTestRule.onNodeWithText("Provider ID").assertDoesNotExist()
         composeTestRule.onNodeWithText("Base URL").assertExists()
         composeTestRule.onNodeWithText("API key").assertExists()
         composeTestRule.onNodeWithText("Default model").assertDoesNotExist()
+        composeTestRule.onNodeWithContentDescription("Create provider").assertExists()
     }
 
     @Test
@@ -51,11 +54,34 @@ class ComposeProviderProfileEditorTest {
             }
         }
 
-        composeTestRule.onNodeWithText("Provider ID").performTextInput("custom")
         composeTestRule.onNodeWithText("Name").performTextInput("Custom")
         composeTestRule.onNodeWithText("Base URL").performTextInput("https://api.custom.com")
         composeTestRule.waitForIdle()
 
         assertTrue(saved == null)
+    }
+
+    @Test
+    fun `profile editor identifies the edit action`() {
+        val profile =
+            ProviderProfile(
+                id = "existing",
+                name = "Existing provider",
+                adapter = ProviderAdapter.OPENAI_COMPATIBLE,
+                baseUrl = "https://api.example.com",
+            )
+        composeTestRule.setContent {
+            MaterialTheme {
+                ProviderProfileEditor(
+                    initial = profile.toFormState(),
+                    existing = profile,
+                    canDisable = true,
+                    onCancel = {},
+                    onSave = {},
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithContentDescription("Save provider changes").assertExists()
     }
 }

@@ -25,6 +25,7 @@ class ProviderCatalogService(
     init {
         migrateLegacyConfiguration()
         ensureBuiltInProfiles()
+        migrateBuiltInCodexProfile()
     }
 
     /**
@@ -109,6 +110,20 @@ class ProviderCatalogService(
             modelIds
                 .distinct()
                 .map { id -> existing[id] ?: ProviderModelConfig(id = id) }
+        saveProvider(profile.copy(models = models))
+    }
+
+    /** Replaces discovered models while preserving provider-supplied display names. */
+    fun updateDiscoveredModelConfigs(
+        providerId: String,
+        discoveredModels: List<ProviderModelConfig>,
+    ) {
+        val profile = getProvider(providerId) ?: return
+        val existing = profile.models.associateBy(ProviderModelConfig::id)
+        val models =
+            discoveredModels
+                .distinctBy(ProviderModelConfig::id)
+                .map { discovered -> existing[discovered.id]?.copy(name = discovered.name) ?: discovered }
         saveProvider(profile.copy(models = models))
     }
 
@@ -283,10 +298,28 @@ class ProviderCatalogService(
     private fun builtInCodexProfile(): ProviderProfile =
         ProviderProfile(
             id = ProviderEnvironmentCredentials.CODEX_PROFILE_ID,
-            name = "OpenAI ChatGPT Codex",
-            adapter = ProviderAdapter.OPENAI_COMPATIBLE,
-            baseUrl = "https://api.openai.com/v1",
+            name = "Codex CLI",
+            adapter = ProviderAdapter.CODEX_CLI,
+            baseUrl = "",
         )
+
+    private fun migrateBuiltInCodexProfile() {
+        val state = load()
+        val providers =
+            state.providers.map { profile ->
+                if (profile.id == ProviderEnvironmentCredentials.CODEX_PROFILE_ID) {
+                    profile.copy(
+                        name = "Codex CLI",
+                        adapter = ProviderAdapter.CODEX_CLI,
+                        baseUrl = "",
+                        apiKey = "",
+                    )
+                } else {
+                    profile
+                }
+            }
+        if (providers != state.providers) save(state.copy(providers = providers))
+    }
 
     private fun load(): CatalogState =
         preferenceStore

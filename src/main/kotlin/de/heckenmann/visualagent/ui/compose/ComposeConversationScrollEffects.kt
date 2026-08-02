@@ -24,6 +24,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.unit.IntSize
@@ -71,43 +72,59 @@ internal fun ConversationStartupScrollEffect(
 }
 
 /**
- * Keeps the conversation list scrolled to the bottom when a new message is appended.
+ * Keeps the conversation list scrolled to the bottom when a new message is displayed.
  *
- * Only fires when the message count increases — not when the history list is
- * refreshed in-place (e.g. after getHistory()). This prevents the scroll from
- * fighting the user when they scroll up to read older messages.
+ * Fires when persisted history grows, a temporary user message is displayed while a
+ * request is in flight, or the streaming assistant row receives new content. The
+ * temporary message is necessary because the panel renders it before it refreshes
+ * history from the database. In each case, the scroll waits for the next frame so the
+ * LazyColumn has measured the changed item. Refreshes that only replace existing
+ * history retain the user's scroll position.
  */
 @Composable
 internal fun ConversationScrollOnChangeEffect(
     history: List<Message>,
     listState: LazyListState,
+    pendingUserMessage: String? = null,
+    streamingContent: String = "",
 ) {
     var lastCount by remember { mutableStateOf(history.size) }
-    LaunchedEffect(history.size) {
-        if (history.isNotEmpty() && history.size > lastCount) {
+    var lastPendingUserMessage by remember { mutableStateOf(pendingUserMessage) }
+    var lastStreamingContent by remember { mutableStateOf(streamingContent) }
+    LaunchedEffect(history.size, pendingUserMessage, streamingContent) {
+        val appendedHistory = history.isNotEmpty() && history.size > lastCount
+        val displayedPendingMessage = pendingUserMessage != null && pendingUserMessage != lastPendingUserMessage
+        val updatedStreamingContent = streamingContent.isNotEmpty() && streamingContent != lastStreamingContent
+        if (appendedHistory || displayedPendingMessage || updatedStreamingContent) {
+            withFrameNanos { }
             listState.scrollToBottom()
         }
         lastCount = history.size
+        lastPendingUserMessage = pendingUserMessage
+        lastStreamingContent = streamingContent
     }
 }
 
 /**
- * Scrolls to the bottom of the conversation list when the panel is resized.
+ * Scrolls to the bottom of the conversation list when its visible viewport changes.
  *
- * A short debounce prevents scrolling during intermediate resize frames.
+ * The outer panel size tracks workspace resizing. The input area height is included
+ * because it overlays the list and changes its effective visible height without
+ * changing the outer panel dimensions. A short debounce prevents scrolling during
+ * intermediate resize frames.
  */
 @Composable
 internal fun ConversationResizeScrollEffect(
     panelSize: IntSize,
-    history: List<Message>,
+    inputAreaHeight: Int,
+    hasConversationContent: Boolean,
     listState: LazyListState,
 ) {
-    LaunchedEffect(panelSize) {
-        if (panelSize != IntSize.Zero) {
+    LaunchedEffect(panelSize, inputAreaHeight) {
+        if (panelSize != IntSize.Zero && hasConversationContent) {
             delay(200)
-            if (history.isNotEmpty()) {
-                listState.scrollToBottom()
-            }
+            withFrameNanos { }
+            listState.scrollToBottom()
         }
     }
 }

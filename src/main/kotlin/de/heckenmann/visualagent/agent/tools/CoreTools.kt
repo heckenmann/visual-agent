@@ -134,7 +134,7 @@ class ContextTool(
                 appendLine("Workspace: ${workspaceRoot()}")
                 val activeProvider = providerCatalog?.activeProviderId() ?: appConfig.llmProvider
                 appendLine("Provider: $activeProvider")
-                appendLine("Model: ${providerCatalog?.getProvider(activeProvider)?.defaultModel ?: appConfig.activeModel()}")
+                appendLine("Model: ${providerCatalog?.activeModelId() ?: appConfig.activeModel()}")
                 appendLine("OpenAI Base URL: ${appConfig.openAiBaseUrl}")
                 appendLine("OpenAI API key configured: ${appConfig.openAiApiKey.isNotBlank()}")
                 context.entries.sortedBy { it.key }.forEach { (key, value) ->
