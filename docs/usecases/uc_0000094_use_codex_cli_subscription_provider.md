@@ -221,7 +221,7 @@ The model marked `isDefault` becomes the suggested default only when the user ha
 Each Visual Agent request uses an ephemeral Codex thread so Visual Agent remains the authoritative conversation store and Codex does not create an additional persistent transcript by default.
 
 1. Send `thread/start` with the selected model, current workspace directory, service name, approval policy, and bounded sandbox configuration.
-2. Map prior Visual Agent system/developer/user/assistant messages into explicit thread input/history items without rewriting Markdown.
+2. Map system messages to `developerInstructions` and inject prior user/assistant messages with `thread/injectItems` without rewriting Markdown.
 3. Send the current user input with `turn/start`.
 4. Preserve message order and reject unsupported rich content rather than serializing arbitrary objects.
 5. Include the selected model and supported reasoning effort. Unsupported sampling options are ignored only when documented; otherwise the UI explains that Codex CLI does not support them.
@@ -346,7 +346,7 @@ The user can use their Codex subscription in Visual Agent through the official C
 
 ## Tool Calls
 
-- Visual Agent tools are exposed through the planned Spring AI/app-server dynamic tool bridge when protocol compatibility is confirmed.
+- Enabled Visual Agent tools are exposed through the Spring AI/app-server `dynamicTools` bridge after opting into the experimental API capability.
 - Built-in Codex command, file, permission, and MCP actions remain governed by app-server approval requests and Visual Agent confirmation dialogs.
 
 ## Code Entry Points
@@ -373,7 +373,7 @@ Implemented:
 Planned follow-ups:
 
 - `de.heckenmann.visualagent.agent.codex.CodexCliInstaller`
-- Dynamic Visual Agent tool bridging and app-server approval dialogs.
+- App-server approval dialogs for built-in Codex command, file, permission, and MCP requests.
 
 The existing experimental `CodexResponsesClient`, `CodexResponsesTransport`, `CodexResponsesModels`, and environment-backed `CodexSessionResolver` are removed as part of implementation.
 
