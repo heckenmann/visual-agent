@@ -108,8 +108,9 @@ class ProviderCatalogServiceTest {
         val catalog = ProviderCatalogService(MapPreferenceStore())
         val profile = requireNotNull(catalog.getProvider(ProviderEnvironmentCredentials.CODEX_PROFILE_ID))
 
-        assertEquals("OpenAI ChatGPT Codex", profile.name)
-        assertEquals("https://api.openai.com/v1", profile.baseUrl)
+        assertEquals("Codex CLI", profile.name)
+        assertEquals(ProviderAdapter.CODEX_CLI, profile.adapter)
+        assertEquals("", profile.baseUrl)
         assertEquals("ollama", catalog.activeProviderId())
     }
 

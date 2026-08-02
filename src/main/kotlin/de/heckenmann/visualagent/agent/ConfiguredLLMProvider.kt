@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent
 
+import de.heckenmann.visualagent.agent.codex.CodexCliProvider
 import de.heckenmann.visualagent.agent.ollama.fetchModelCapabilities
 import de.heckenmann.visualagent.agent.openai.OpenAiClient
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
@@ -20,6 +21,7 @@ class ConfiguredLLMProvider(
     private val openAiClient: OpenAiClient,
     private val providerCatalog: ProviderCatalogService,
     private val fetchCapabilities: suspend (ProviderProfile) -> Map<String, Set<String>> = ::fetchModelCapabilities,
+    private val codexCliProvider: CodexCliProvider? = null,
 ) : LLMProvider {
     override suspend fun chat(messages: List<Message>): ChatResponse = chat(ChatRequestContext(messages = messages))
 
@@ -44,7 +46,11 @@ class ConfiguredLLMProvider(
 
     override fun isConnected(): Boolean {
         val profile = providerCatalog.getProvider(providerCatalog.activeProviderId()) ?: return false
-        return profile.adapter == ProviderAdapter.OLLAMA || ProviderEnvironmentCredentials.openAiApiKey(profile).isNotBlank()
+        return when (profile.adapter) {
+            ProviderAdapter.OLLAMA -> true
+            ProviderAdapter.OPENAI_COMPATIBLE -> ProviderEnvironmentCredentials.openAiApiKey(profile).isNotBlank()
+            ProviderAdapter.CODEX_CLI -> requireCodexProvider().isConnected()
+        }
     }
 
     override suspend fun checkConnection(): Boolean =
@@ -58,6 +64,7 @@ class ConfiguredLLMProvider(
             when (profile.adapter) {
                 ProviderAdapter.OLLAMA -> ollamaClient.getModels(profile)
                 ProviderAdapter.OPENAI_COMPATIBLE -> openAiClient.getModels(profile)
+                ProviderAdapter.CODEX_CLI -> requireCodexProvider().getModels(profile)
             }
         providerCatalog.updateDiscoveredModels(providerId, discovered)
         if (profile.adapter == ProviderAdapter.OLLAMA) {
@@ -77,6 +84,7 @@ class ConfiguredLLMProvider(
         return when (profile.adapter) {
             ProviderAdapter.OLLAMA -> ollamaClient.getModelDetails(profile, modelName)
             ProviderAdapter.OPENAI_COMPATIBLE -> openAiClient.getModelDetails(profile, modelName)
+            ProviderAdapter.CODEX_CLI -> requireCodexProvider().getModelDetails(profile, modelName)
         }
     }
 
@@ -92,8 +100,11 @@ class ConfiguredLLMProvider(
         when (profile?.adapter) {
             ProviderAdapter.OPENAI_COMPATIBLE -> openAiClient
             ProviderAdapter.OLLAMA -> ollamaClient
+            ProviderAdapter.CODEX_CLI -> requireCodexProvider()
             null -> error("Resolved provider profile is missing")
         }
+
+    private fun requireCodexProvider(): CodexCliProvider = requireNotNull(codexCliProvider) { "Codex CLI provider is unavailable" }
 
     private fun ChatRequestContext.resolve(): ChatRequestContext {
         val explicitOptions =

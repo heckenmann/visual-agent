@@ -25,6 +25,7 @@ class ProviderCatalogService(
     init {
         migrateLegacyConfiguration()
         ensureBuiltInProfiles()
+        migrateBuiltInCodexProfile()
     }
 
     /**
@@ -283,10 +284,28 @@ class ProviderCatalogService(
     private fun builtInCodexProfile(): ProviderProfile =
         ProviderProfile(
             id = ProviderEnvironmentCredentials.CODEX_PROFILE_ID,
-            name = "OpenAI ChatGPT Codex",
-            adapter = ProviderAdapter.OPENAI_COMPATIBLE,
-            baseUrl = "https://api.openai.com/v1",
+            name = "Codex CLI",
+            adapter = ProviderAdapter.CODEX_CLI,
+            baseUrl = "",
         )
+
+    private fun migrateBuiltInCodexProfile() {
+        val state = load()
+        val providers =
+            state.providers.map { profile ->
+                if (profile.id == ProviderEnvironmentCredentials.CODEX_PROFILE_ID) {
+                    profile.copy(
+                        name = "Codex CLI",
+                        adapter = ProviderAdapter.CODEX_CLI,
+                        baseUrl = "",
+                        apiKey = "",
+                    )
+                } else {
+                    profile
+                }
+            }
+        if (providers != state.providers) save(state.copy(providers = providers))
+    }
 
     private fun load(): CatalogState =
         preferenceStore
