@@ -13,6 +13,7 @@ import org.springframework.ai.chat.model.ChatModel
 import org.springframework.ai.chat.model.ChatResponse
 import org.springframework.ai.chat.model.Generation
 import org.springframework.ai.chat.prompt.Prompt
+import org.springframework.ai.tool.ToolCallback
 import reactor.core.publisher.Flux
 
 /**
@@ -21,15 +22,16 @@ import reactor.core.publisher.Flux
 internal class CodexCliChatModel(
     private val bridge: CodexAppServerChatBridge,
     private val cancellationToken: CancellationToken? = null,
+    private val toolCallbacks: List<ToolCallback> = emptyList(),
 ) : ChatModel {
     override fun call(prompt: Prompt): ChatResponse =
         runBlocking(Dispatchers.IO) {
-            bridge.complete(prompt, cancellationToken).toSpringResponse()
+            bridge.complete(prompt, cancellationToken, toolCallbacks).toSpringResponse()
         }
 
     override fun stream(prompt: Prompt): Flux<ChatResponse> =
         bridge
-            .stream(prompt, cancellationToken)
+            .stream(prompt, cancellationToken, toolCallbacks)
             .flowOn(Dispatchers.IO)
             .asFlux()
             .map(CodexAppServerChatChunk::toSpringResponse)
@@ -51,6 +53,7 @@ internal interface CodexAppServerChatBridge {
     suspend fun complete(
         prompt: Prompt,
         cancellationToken: CancellationToken? = null,
+        toolCallbacks: List<ToolCallback> = emptyList(),
     ): CodexAppServerChatResult
 
     /**
@@ -62,6 +65,7 @@ internal interface CodexAppServerChatBridge {
     fun stream(
         prompt: Prompt,
         cancellationToken: CancellationToken? = null,
+        toolCallbacks: List<ToolCallback> = emptyList(),
     ): Flow<CodexAppServerChatChunk>
 }
 

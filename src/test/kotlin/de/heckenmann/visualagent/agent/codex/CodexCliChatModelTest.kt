@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import org.junit.jupiter.api.Test
 import org.springframework.ai.chat.prompt.Prompt
+import org.springframework.ai.tool.ToolCallback
 import kotlin.test.assertEquals
 
 class CodexCliChatModelTest {
@@ -52,6 +53,7 @@ class CodexCliChatModelTest {
         override suspend fun complete(
             prompt: Prompt,
             cancellationToken: CancellationToken?,
+            toolCallbacks: List<ToolCallback>,
         ): CodexAppServerChatResult {
             completedPrompt = prompt
             return completion
@@ -60,6 +62,7 @@ class CodexCliChatModelTest {
         override fun stream(
             prompt: Prompt,
             cancellationToken: CancellationToken?,
+            toolCallbacks: List<ToolCallback>,
         ): Flow<CodexAppServerChatChunk> {
             streamedPrompt = prompt
             return flowOf(*chunks.toTypedArray())

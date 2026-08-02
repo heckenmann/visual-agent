@@ -117,6 +117,13 @@ object CodexRpc {
             resultSerializer = ThreadStartResult.serializer(),
         )
 
+        val InjectItems: CodexRpcMethod<ThreadInjectItemsParams, CodexRpcUnit> = CodexRpcMethod(
+            method = "thread/injectItems",
+            paramsSerializer = ThreadInjectItemsParams.serializer(),
+            resultSerializer = CodexRpcUnit.serializer(),
+            emptyResult = CodexRpcUnit,
+        )
+
         val Resume: CodexRpcMethod<ThreadResumeParams, ThreadResumeResult> = CodexRpcMethod(
             method = "thread/resume",
             paramsSerializer = ThreadResumeParams.serializer(),

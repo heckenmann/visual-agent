@@ -17,6 +17,7 @@ internal const val PERMISSION_APPROVAL_METHOD = "item/permissions/requestApprova
 internal const val USER_INPUT_REQUEST_METHOD = "item/tool/requestUserInput"
 internal const val MCP_ELICITATION_REQUEST_METHOD = "mcpServer/elicitation/request"
 internal const val ATTESTATION_GENERATE_METHOD = "attestation/generate"
+internal const val DYNAMIC_TOOL_CALL_METHOD = "item/tool/call"
 
 sealed interface CodexServerRequest {
     val method: String
@@ -55,6 +56,12 @@ sealed interface CodexServerRequest {
         val request: AttestationGenerateRequest,
     ) : CodexServerRequest {
         override val method: String = ATTESTATION_GENERATE_METHOD
+    }
+
+    data class DynamicToolCall(
+        val request: DynamicToolCallRequest,
+    ) : CodexServerRequest {
+        override val method: String = DYNAMIC_TOOL_CALL_METHOD
     }
 
     data class Unsupported(

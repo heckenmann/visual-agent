@@ -6,7 +6,9 @@ import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ModelDetails
 import de.heckenmann.visualagent.agent.ShowResponse
+import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
+import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.workspace.WorkspaceFilePaths
 import io.github.vupoint.cokit.client.CodexCursor
 import io.github.vupoint.cokit.client.CodexRpc
@@ -29,6 +31,7 @@ import java.nio.file.Path
 class CodexCliProvider internal constructor(
     private val locator: CodexCliLocator,
     private val connectionFactory: CodexAppServerConnector,
+    private val toolRegistry: ToolRegistry,
 ) : LLMProvider {
     override suspend fun chat(messages: List<Message>): ChatResponse = error("Codex CLI chat requires a configured provider profile")
 
@@ -36,7 +39,7 @@ class CodexCliProvider internal constructor(
         withContext(Dispatchers.IO) {
             val profile = requireNotNull(request.providerProfile) { "Codex CLI provider profile is missing" }
             val modelName = request.model ?: profile.defaultModel
-            val chatModel = chatModel(profile, modelName, request.workingDirectory(), request.cancellationToken)
+            val chatModel = chatModel(profile, modelName, request)
             val response = chatModel.call(request.toPrompt())
             ChatResponse(
                 model = response.metadata.model.ifBlank { modelName },
@@ -51,7 +54,7 @@ class CodexCliProvider internal constructor(
     override suspend fun stream(request: ChatRequestContext): Flow<ChatResponse> {
         val profile = requireNotNull(request.providerProfile) { "Codex CLI provider profile is missing" }
         val modelName = request.model ?: profile.defaultModel
-        val chatModel = chatModel(profile, modelName, request.workingDirectory(), request.cancellationToken)
+        val chatModel = chatModel(profile, modelName, request)
         return flow {
             chatModel.stream(request.toPrompt()).asFlow().collect { response ->
                 val generation = requireNotNull(response.result)
@@ -79,7 +82,9 @@ class CodexCliProvider internal constructor(
 
     override suspend fun getModels(): List<String> = error("Codex CLI model discovery requires a provider profile")
 
-    internal suspend fun getModels(profile: ProviderProfile): List<String> =
+    internal suspend fun getModels(profile: ProviderProfile): List<String> = getModelConfigs(profile).map(ProviderModelConfig::id)
+
+    internal suspend fun getModelConfigs(profile: ProviderProfile): List<ProviderModelConfig> =
         withContext(Dispatchers.IO) {
             val executable = resolveExecutable(profile)
             val models = linkedMapOf<String, String>()
@@ -96,7 +101,7 @@ class CodexCliProvider internal constructor(
                 } while (cursor != null)
             }
             check(models.isNotEmpty()) { "Codex CLI returned no available models" }
-            models.keys.toList()
+            models.map { (id, name) -> ProviderModelConfig(id = id, name = name) }
         }
 
     override suspend fun getModelDetails(modelName: String): ShowResponse =
@@ -110,12 +115,12 @@ class CodexCliProvider internal constructor(
     private suspend fun chatModel(
         profile: ProviderProfile,
         model: String,
-        workingDirectory: Path,
-        cancellationToken: de.heckenmann.visualagent.agent.CancellationToken?,
+        request: ChatRequestContext,
     ): CodexCliChatModel =
         CodexCliChatModel(
-            CoKitCodexAppServerChatBridge(connectionFactory, resolveExecutable(profile), workingDirectory, model),
-            cancellationToken,
+            CoKitCodexAppServerChatBridge(connectionFactory, resolveExecutable(profile), request.workingDirectory(), model),
+            request.cancellationToken,
+            toolRegistry.functionCallbacks(request.enabledTools, request.metadata),
         )
 
     private suspend fun resolveExecutable(profile: ProviderProfile): Path =

@@ -1,5 +1,6 @@
 package io.github.vupoint.cokit.client
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -23,12 +24,27 @@ value class ApprovalPolicy(val value: String) {
 
 @Serializable
 @JvmInline
-value class SandboxPolicy(val value: String) {
+value class SandboxMode(val value: String) {
     companion object {
-        val ReadOnly = SandboxPolicy("readOnly")
-        val WorkspaceWrite = SandboxPolicy("workspaceWrite")
-        val DangerFullAccess = SandboxPolicy("dangerFullAccess")
+        val ReadOnly = SandboxMode("read-only")
+        val WorkspaceWrite = SandboxMode("workspace-write")
+        val DangerFullAccess = SandboxMode("danger-full-access")
     }
+}
+
+@Serializable
+sealed interface SandboxPolicy {
+    @Serializable
+    @SerialName("readOnly")
+    data object ReadOnly : SandboxPolicy
+
+    @Serializable
+    @SerialName("workspaceWrite")
+    data object WorkspaceWrite : SandboxPolicy
+
+    @Serializable
+    @SerialName("dangerFullAccess")
+    data object DangerFullAccess : SandboxPolicy
 }
 
 @Serializable

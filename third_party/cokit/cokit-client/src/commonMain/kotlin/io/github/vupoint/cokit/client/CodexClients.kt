@@ -55,6 +55,7 @@ internal class DefaultCodexClient(
     private var userInputRequestHandler: UserInputRequestHandler? = null
     private var mcpElicitationHandler: McpElicitationHandler? = null
     private var attestationGenerateHandler: AttestationGenerateHandler? = null
+    private var dynamicToolCallHandler: DynamicToolCallHandler? = null
     private val serverRequestJob: Job = scope.launch {
         rpc.serverRequests.collect { request ->
             mutableServerRequests.tryEmit(request.toCodexServerRequest())
@@ -102,6 +103,10 @@ internal class DefaultCodexClient(
         attestationGenerateHandler = handler
     }
 
+    override fun registerDynamicToolCallHandler(handler: DynamicToolCallHandler) {
+        dynamicToolCallHandler = handler
+    }
+
     override fun close() {
         notificationJob.cancel()
         serverRequestJob.cancel()
@@ -109,6 +114,29 @@ internal class DefaultCodexClient(
     }
 
     private suspend fun resolveServerRequest(request: JsonRpcRequest): JsonRpcResponse {
+        val dynamicToolHandler = dynamicToolCallHandler
+        if (request.method == "item/tool/call" && dynamicToolHandler != null) {
+            val toolRequest = try {
+                request.decodeDynamicToolCallRequest()
+            } catch (error: Throwable) {
+                return JsonRpcResponse(
+                    id = request.id,
+                    error = invalidServerRequestParamsError(request.method),
+                )
+            }
+            return try {
+                JsonRpcResponse(
+                    id = request.id,
+                    result = dynamicToolHandler.call(toolRequest).toProtocolPayload().toJsonElement(),
+                )
+            } catch (error: Throwable) {
+                JsonRpcResponse(
+                    id = request.id,
+                    error = serverRequestHandlerError(),
+                )
+            }
+        }
+
         val handler = commandApprovalHandler
         if (request.method == "item/commandExecution/requestApproval" && handler != null) {
             val commandRequest = try {

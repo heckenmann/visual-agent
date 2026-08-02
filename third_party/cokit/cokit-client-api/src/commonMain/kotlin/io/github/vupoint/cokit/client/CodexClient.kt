@@ -40,4 +40,6 @@ interface CodexClient : AutoCloseable {
     fun registerMcpElicitationHandler(handler: McpElicitationHandler)
 
     fun registerAttestationGenerateHandler(handler: AttestationGenerateHandler)
+
+    fun registerDynamicToolCallHandler(handler: DynamicToolCallHandler)
 }

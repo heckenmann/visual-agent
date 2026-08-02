@@ -6,6 +6,7 @@ import de.heckenmann.visualagent.agent.openai.OpenAiClient
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
+import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.knowledge.PreferenceStore
 import io.github.vupoint.cokit.client.CodexRpc
 import io.github.vupoint.cokit.client.models.ModelListParams
@@ -33,7 +34,7 @@ internal class CodexCliAppServerSmokeTest {
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
             try {
                 val connectionFactory = CodexAppServerConnectionFactory(processFactory, scope)
-                val provider = CodexCliProvider(locator, connectionFactory)
+                val provider = CodexCliProvider(locator, connectionFactory, mockk<ToolRegistry>(relaxed = true))
                 val model =
                     connectionFactory
                         .connect(location.executable, Path.of(System.getProperty("user.dir")))

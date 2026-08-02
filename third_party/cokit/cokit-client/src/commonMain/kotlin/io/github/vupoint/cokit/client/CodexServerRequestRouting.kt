@@ -29,6 +29,7 @@ private const val PERMISSION_APPROVAL_METHOD = "item/permissions/requestApproval
 private const val USER_INPUT_REQUEST_METHOD = "item/tool/requestUserInput"
 private const val MCP_ELICITATION_REQUEST_METHOD = "mcpServer/elicitation/request"
 private const val ATTESTATION_GENERATE_METHOD = "attestation/generate"
+private const val DYNAMIC_TOOL_CALL_METHOD = "item/tool/call"
 
 internal fun JsonRpcRequest.toCodexServerRequest(): CodexServerRequest {
     return when (method) {
@@ -59,6 +60,11 @@ internal fun JsonRpcRequest.toCodexServerRequest(): CodexServerRequest {
         }
         ATTESTATION_GENERATE_METHOD -> runCatching {
             CodexServerRequest.AttestationGenerate(decodeAttestationGenerateRequest())
+        }.getOrElse {
+            CodexServerRequest.Unsupported(method)
+        }
+        DYNAMIC_TOOL_CALL_METHOD -> runCatching {
+            CodexServerRequest.DynamicToolCall(decodeDynamicToolCallRequest())
         }.getOrElse {
             CodexServerRequest.Unsupported(method)
         }
@@ -107,6 +113,19 @@ internal fun JsonRpcRequest.decodeAttestationGenerateRequest(): AttestationGener
     }
     return CodexProtocolJson.decodeFromJsonElement(AttestationGenerateRequest.serializer(), paramsElement)
 }
+
+internal fun JsonRpcRequest.decodeDynamicToolCallRequest(): DynamicToolCallRequest {
+    val paramsElement = requireNotNull(params) {
+        "Expected dynamic tool call request params"
+    }
+    return CodexProtocolJson.decodeFromJsonElement(DynamicToolCallRequest.serializer(), paramsElement)
+}
+
+internal fun DynamicToolCallResponse.toProtocolPayload(): CodexJsonPayload =
+    CodexProtocolJson.encodeToJsonElement(
+        DynamicToolCallResponse.serializer(),
+        this,
+    ).toCodexPayload()
 
 internal fun ApprovalDecision.toProtocolPayload(): CodexJsonPayload {
     val value = when (this) {

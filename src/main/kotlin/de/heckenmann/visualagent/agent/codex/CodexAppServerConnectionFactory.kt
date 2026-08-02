@@ -4,6 +4,7 @@ import io.github.vupoint.cokit.client.ClientInfo
 import io.github.vupoint.cokit.client.CodexClient
 import io.github.vupoint.cokit.client.CodexClientConnection
 import io.github.vupoint.cokit.client.CodexClients
+import io.github.vupoint.cokit.client.InitializeCapabilities
 import kotlinx.coroutines.CoroutineScope
 import org.springframework.stereotype.Component
 import java.nio.file.Path
@@ -28,6 +29,7 @@ internal class CodexAppServerConnectionFactory(
                         transport = transport,
                         clientInfo = ClientInfo("visual_agent", "Visual Agent", APPLICATION_VERSION),
                         scope = applicationScope,
+                        capabilities = InitializeCapabilities(experimentalApi = true),
                     ),
                 ),
                 transport,

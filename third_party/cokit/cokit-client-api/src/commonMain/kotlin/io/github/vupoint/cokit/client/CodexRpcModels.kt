@@ -8,11 +8,14 @@ import kotlinx.serialization.Serializable
 data class ThreadStartParams(
     val cwd: CodexHostPath? = null,
     val approvalPolicy: ApprovalPolicy? = null,
-    val sandbox: SandboxPolicy? = null,
+    val sandbox: SandboxMode? = null,
     val permissions: CodexJsonPayload? = null,
     val model: ModelName? = null,
     val effort: ReasoningEffort? = null,
     val personality: String? = null,
+    val baseInstructions: String? = null,
+    val developerInstructions: String? = null,
+    val dynamicTools: List<DynamicToolSpec>? = null,
 )
 
 @Serializable
@@ -143,6 +146,12 @@ data class ThreadGoalClearResult(
 @Serializable
 data class ThreadCompactionStartParams(
     val threadId: ThreadId,
+)
+
+@Serializable
+data class ThreadInjectItemsParams(
+    val threadId: ThreadId,
+    val items: List<CodexJsonPayload>,
 )
 
 @ExperimentalCodexApi
