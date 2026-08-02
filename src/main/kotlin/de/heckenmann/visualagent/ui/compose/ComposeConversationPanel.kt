@@ -158,7 +158,7 @@ internal fun ConversationPanel(
         inputFocusRequester.requestFocus()
     }
     ConversationStartupScrollEffect(history, listState)
-    ConversationScrollOnChangeEffect(history, listState)
+    ConversationScrollOnChangeEffect(history, listState, pendingUserMessage)
     ConversationResizeScrollEffect(panelSize, history, listState)
     ConversationQueueFlushEffect(
         sending = sending,

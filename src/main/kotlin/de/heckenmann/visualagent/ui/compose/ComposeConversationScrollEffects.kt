@@ -24,6 +24,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.unit.IntSize
@@ -71,23 +72,31 @@ internal fun ConversationStartupScrollEffect(
 }
 
 /**
- * Keeps the conversation list scrolled to the bottom when a new message is appended.
+ * Keeps the conversation list scrolled to the bottom when a new message is displayed.
  *
- * Only fires when the message count increases — not when the history list is
- * refreshed in-place (e.g. after getHistory()). This prevents the scroll from
- * fighting the user when they scroll up to read older messages.
+ * Fires when persisted history grows or a temporary user message is displayed while
+ * a request is in flight. The latter is necessary because the panel renders the
+ * pending message before it refreshes history from the database. In both cases, the
+ * scroll waits for the next frame so the LazyColumn has measured the new item.
+ * Refreshes that only replace existing history retain the user's scroll position.
  */
 @Composable
 internal fun ConversationScrollOnChangeEffect(
     history: List<Message>,
     listState: LazyListState,
+    pendingUserMessage: String? = null,
 ) {
     var lastCount by remember { mutableStateOf(history.size) }
-    LaunchedEffect(history.size) {
-        if (history.isNotEmpty() && history.size > lastCount) {
+    var lastPendingUserMessage by remember { mutableStateOf(pendingUserMessage) }
+    LaunchedEffect(history.size, pendingUserMessage) {
+        val appendedHistory = history.isNotEmpty() && history.size > lastCount
+        val displayedPendingMessage = pendingUserMessage != null && pendingUserMessage != lastPendingUserMessage
+        if (appendedHistory || displayedPendingMessage) {
+            withFrameNanos { }
             listState.scrollToBottom()
         }
         lastCount = history.size
+        lastPendingUserMessage = pendingUserMessage
     }
 }
 

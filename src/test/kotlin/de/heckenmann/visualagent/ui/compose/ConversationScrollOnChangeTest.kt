@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Modifier
@@ -58,6 +59,60 @@ class ConversationScrollOnChangeTest {
         assertTrue(
             !listState.single().canScrollBackward,
             "expected canScrollBackward=false after new message appended",
+        )
+    }
+
+    @Test
+    fun `scrolls to bottom when a pending user message is displayed`() {
+        val messages: SnapshotStateList<Message> = (1..20).map { Message("user", "message $it") }.toMutableStateList()
+        val listState = mutableListOf<androidx.compose.foundation.lazy.LazyListState>()
+        val pendingUserMessage = mutableStateOf<String?>(null)
+        composeTestRule.setContent {
+            val state = rememberLazyListState()
+            listState.add(state)
+            MaterialTheme {
+                LazyColumn(
+                    state = state,
+                    modifier = Modifier.width(200.dp).height(160.dp),
+                    reverseLayout = true,
+                ) {
+                    pendingUserMessage.value?.let { pending ->
+                        item(key = "pending-user") {
+                            Text(text = pending, modifier = Modifier.padding(vertical = 20.dp))
+                        }
+                    }
+                    itemsIndexed(messages, key = { index, _ -> messages[index].id ?: "temp-$index" }) { index, _ ->
+                        Text(
+                            text = messages[index].content,
+                            modifier = Modifier.padding(vertical = 20.dp),
+                        )
+                    }
+                }
+                ConversationScrollOnChangeEffect(
+                    history = messages,
+                    pendingUserMessage = pendingUserMessage.value,
+                    listState = state,
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        kotlinx.coroutines.runBlocking { listState.single().scrollToItem(messages.lastIndex) }
+        composeTestRule.waitForIdle()
+
+        pendingUserMessage.value = "newly submitted message"
+        composeTestRule.waitForIdle()
+
+        val newestVisibleIndex =
+            listState
+                .single()
+                .layoutInfo
+                .visibleItemsInfo
+                .firstOrNull()
+                ?.index
+        assertTrue(
+            newestVisibleIndex == 0,
+            "expected pending user message at index 0 to be visible after sending",
         )
     }
 
