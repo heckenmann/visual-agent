@@ -24,7 +24,7 @@ Users close the entire Visual Agent desktop application from the left navigation
 - None.
 
 ## Code Entry Points
-- `src/main/kotlin/de/heckenmann/visualagent/ui/compose/VisualAgentComposeApplication.kt`
+- `application/src/main/kotlin/de/heckenmann/visualagent/ui/compose/VisualAgentComposeApplication.kt`
 - `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
 - `de.heckenmann.visualagent.Main`
 

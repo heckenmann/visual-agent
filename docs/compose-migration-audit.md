@@ -14,7 +14,7 @@ The migration replaces the Visual Agent desktop UI toolkit. It does not implemen
 
 - `Main.kt` starts the Compose desktop application.
 - `build.gradle.kts` uses Compose Multiplatform, Material3, `sh.calvin.reorderable:reorderable`, FileKit, and InfiniteCanvas dependencies with no OpenJFX, AtlantaFX, Ikonli JavaFX, or JHotDraw dependencies.
-- `desktopApiUsageCheck` is part of `check` and rejects legacy desktop image/toolkit API usage below `src/main` and `src/test`.
+- `desktopApiUsageCheck` is part of `check` and rejects legacy desktop image/toolkit API usage below `application/src/main` and `application/src/test`.
 - `gradle --no-daemon test` passes locally after the latest UX/layout documentation updates.
 - `./gradlew run --no-daemon` starts the Spring context and Compose desktop runtime locally.
 

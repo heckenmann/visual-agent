@@ -1,7 +1,7 @@
 # Visual Agent
 
 <p align="center">
-  <img src="src/main/resources/icons/visual-agent.svg" alt="Visual Agent icon" width="160">
+  <img src="application/src/main/resources/icons/visual-agent.svg" alt="Visual Agent icon" width="160">
 </p>
 
 Visual Agent is a Kotlin desktop application. Its goal is to provide the model with as many tools as possible so it can visualize its own output — today that includes a canvas, workspace files, and a todo/sub-agent system; future work will add more rendering and interaction surfaces.
@@ -41,12 +41,44 @@ See [Setup Guide](docs/setup.md) for prerequisites, build/run commands, Ollama c
 
 ```bash
 ./gradlew build
-./gradlew run
+./gradlew :application:run
 ```
+
+## Gradle Modules
+
+The project uses an acyclic Gradle module graph:
+
+```text
+:application
+ ├── :ui
+ └── :providers
+```
+
+`:application` is the only composition root and the only module allowed to depend on Visual Agent submodules. `:ui` and `:providers` are independent leaf modules: neither may depend on `:application`, the other leaf module, or a future sibling module.
+
+Filesystem ownership follows the same structure:
+
+```text
+application/          # :application
+modules/ui/           # :ui
+modules/providers/    # :providers
+```
+
+Run targeted module tasks from the repository root:
+
+```bash
+./gradlew :ui:build :ui:test
+./gradlew :providers:build :providers:test
+./gradlew :application:build :application:test
+./gradlew :application:run
+```
+
+See the module READMEs for ownership and migration details: [`:application`](application/README.md), [`:ui`](modules/ui/README.md), and [`:providers`](modules/providers/README.md).
 
 ## Documentation
 
 - [Architecture](docs/architecture.md) — runtime layers, provider routing, tool system, persistence, in-flight indicator, current constraints
+- [Gradle Module Architecture](docs/gradle-module-architecture.md) — module graph, dependency rules, migration sequence, and verification commands
 - [API Reference](docs/api.md) — `LLMProvider`, Spring AI integration, tool-calling contracts, activity surface
 - [Database Schema](docs/database.md) — SQLite schema, indexes, persistence behavior
 - [SubAgents](docs/subagents.md) — autonomous/sub-agent model, tool sets, autonomous loop

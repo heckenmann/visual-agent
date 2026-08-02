@@ -1,6 +1,9 @@
-# Gradle
+# Gradle build outputs and caches
 .gradle/
 build/
+
+# Kotlin compiler caches
+.kotlin/
 
 # IDE
 .idea/

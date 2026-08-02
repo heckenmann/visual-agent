@@ -73,7 +73,7 @@ Stores user configuration values persisted beyond app restarts.
 
 It now backs the application settings binder through the `PreferenceStore` abstraction.
 
-`src/main/resources/config/app.properties` is only used to bootstrap the database path. Runtime configuration changes are written to this table instead of rewriting the properties file. The database path itself is not loaded from this table because the application needs it before it can open SQLite.
+`application/src/main/resources/config/app.properties` is only used to bootstrap the database path. Runtime configuration changes are written to this table instead of rewriting the properties file. The database path itself is not loaded from this table because the application needs it before it can open SQLite.
 
 Provider-related entries include:
 
