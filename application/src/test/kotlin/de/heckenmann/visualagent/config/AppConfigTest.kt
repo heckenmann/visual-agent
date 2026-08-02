@@ -15,7 +15,7 @@ class AppConfigTest {
         val config = AppConfig.instance
         val original = snapshot(config)
         val tempDb = createTempDirectory("visual-agent-config-test").resolve("settings.db").toString()
-        val propertiesFile = File("src/main/resources/config/app.properties")
+        val propertiesFile = File("application/src/main/resources/config/app.properties")
         val propertiesBefore = propertiesFile.readText()
 
         try {

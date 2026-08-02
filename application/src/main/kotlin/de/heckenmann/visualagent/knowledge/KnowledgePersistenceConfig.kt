@@ -49,7 +49,7 @@ internal class KnowledgePersistenceConfig {
     }
 
     private fun bootstrapDatabasePath(): String {
-        val configFile = File("src/main/resources/config/app.properties")
+        val configFile = File("application/src/main/resources/config/app.properties")
         if (!configFile.exists()) return "./data/visual-agent.db"
         val props = Properties()
         FileInputStream(configFile).use { props.load(it) }

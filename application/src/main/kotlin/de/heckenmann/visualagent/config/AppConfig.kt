@@ -8,7 +8,7 @@ import java.util.Properties
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
- * Loads the database connection bootstrap from `src/main/resources/config/app.properties`.
+ * Loads the database connection bootstrap from `application/src/main/resources/config/app.properties`.
  * Runtime configuration is persisted in SQLite preferences after the database is available.
  *
  * @property llmProvider Active provider identifier (`ollama` or `openai`)
@@ -252,7 +252,7 @@ class AppConfig private constructor() {
     }
 
     private fun loadFromProperties() {
-        val configFile = File("src/main/resources/config/app.properties")
+        val configFile = File("application/src/main/resources/config/app.properties")
 
         if (configFile.exists()) {
             val props = Properties()

@@ -13,7 +13,7 @@ import kotlin.test.fail
  * single source of truth for the Material3 color schemes.
  */
 class ComposeHardcodedColorTest {
-    private val composeDir = File("src/main/kotlin/de/heckenmann/visualagent/ui/compose")
+    private val composeDir = File("application/src/main/kotlin/de/heckenmann/visualagent/ui/compose")
     private val themeFileName = "ComposeWorkspaceTheme.kt"
     private val colorPattern = Regex("""Color\s*\(\s*0x""")
 
