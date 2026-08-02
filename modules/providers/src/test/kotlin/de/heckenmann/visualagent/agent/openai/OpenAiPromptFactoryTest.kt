@@ -2,15 +2,12 @@ package de.heckenmann.visualagent.agent.openai
 
 import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.Message
+import de.heckenmann.visualagent.agent.TestToolRegistry
+import de.heckenmann.visualagent.agent.TestVisualAgentTool
 import de.heckenmann.visualagent.agent.ToolDefinition
 import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.agent.ToolResult
-import de.heckenmann.visualagent.agent.tools.ToolEventBus
-import de.heckenmann.visualagent.agent.tools.ToolRegistry
-import de.heckenmann.visualagent.agent.tools.VisualAgentTool
-import de.heckenmann.visualagent.agent.tools.toFunctionName
-import de.heckenmann.visualagent.config.AppConfigBean
-import io.mockk.mockk
+import de.heckenmann.visualagent.agent.toTestFunctionName
 import org.junit.jupiter.api.Test
 import org.springframework.ai.model.tool.ToolCallingChatOptions
 import kotlin.test.assertEquals
@@ -19,7 +16,7 @@ import kotlin.test.assertTrue
 class OpenAiPromptFactoryTest {
     @Test
     fun `prompt attaches enabled tool callbacks`() {
-        val registry = ToolRegistry(listOf(FakeTool("context"), FakeTool("terminal")), ToolEventBus())
+        val registry = TestToolRegistry(listOf(FakeTool("context"), FakeTool("terminal")))
         val factory = OpenAiPromptFactory(registry)
 
         val prompt =
@@ -49,7 +46,7 @@ class OpenAiPromptFactoryTest {
 
     @Test
     fun `prompt omits guard when no tools enabled`() {
-        val factory = OpenAiPromptFactory(ToolRegistry(emptyList(), ToolEventBus(), AppConfigBean(mockk(relaxed = true))))
+        val factory = OpenAiPromptFactory(TestToolRegistry())
 
         val prompt = factory.buildPrompt(ChatRequestContext(messages = listOf(Message("user", "hi"))), "gpt-test")
 
@@ -58,7 +55,7 @@ class OpenAiPromptFactoryTest {
 
     @Test
     fun `allowedFunctionNames returns sorted enabled names`() {
-        val registry = ToolRegistry(listOf(FakeTool("terminal"), FakeTool("context")), ToolEventBus())
+        val registry = TestToolRegistry(listOf(FakeTool("terminal"), FakeTool("context")))
         val factory = OpenAiPromptFactory(registry)
 
         val names =
@@ -75,7 +72,7 @@ class OpenAiPromptFactoryTest {
 
     @Test
     fun `prompt applies sampling options`() {
-        val factory = OpenAiPromptFactory(ToolRegistry(emptyList(), ToolEventBus(), AppConfigBean(mockk(relaxed = true))))
+        val factory = OpenAiPromptFactory(TestToolRegistry())
         val prompt =
             factory.buildPrompt(
                 ChatRequestContext(
@@ -102,11 +99,11 @@ class OpenAiPromptFactoryTest {
 
     private class FakeTool(
         id: String,
-    ) : VisualAgentTool {
+    ) : TestVisualAgentTool {
         override val definition =
             ToolDefinition(
                 id = ToolId(id),
-                name = ToolId(id).toFunctionName(),
+                name = ToolId(id).toTestFunctionName(),
                 description = "Fake $id",
                 inputSchema = """{"type":"object"}""",
             )

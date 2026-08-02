@@ -5,7 +5,7 @@ import java.net.URI
 /**
  * Normalizes OpenAI-compatible endpoint URLs for clients that expect the API base path.
  */
-internal object OpenAiEndpointNormalizer {
+object OpenAiEndpointNormalizer {
     /**
      * Returns the configured endpoint with a `/v1` API path when no version path is present.
      *

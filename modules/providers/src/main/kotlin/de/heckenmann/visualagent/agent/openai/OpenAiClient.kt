@@ -9,10 +9,11 @@ import de.heckenmann.visualagent.agent.ModelDetails
 import de.heckenmann.visualagent.agent.ShowResponse
 import de.heckenmann.visualagent.agent.ToolCallingLoop
 import de.heckenmann.visualagent.agent.VisionSupport
+import de.heckenmann.visualagent.agent.provider.DefaultProviderRuntimeConfig
 import de.heckenmann.visualagent.agent.provider.ProviderEnvironmentCredentials
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
-import de.heckenmann.visualagent.agent.tools.ToolRegistry
-import de.heckenmann.visualagent.config.AppConfigBean
+import de.heckenmann.visualagent.agent.provider.ProviderRuntimeConfig
+import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
 import io.micrometer.observation.ObservationRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -38,8 +39,8 @@ import java.time.Duration
 @Component
 class OpenAiClient(
     private val promptFactory: OpenAiPromptFactory,
-    private val toolRegistry: ToolRegistry,
-    private val appConfig: AppConfigBean = AppConfigBean(),
+    private val toolRegistry: ProviderToolCallbacks,
+    private val appConfig: ProviderRuntimeConfig = DefaultProviderRuntimeConfig(),
 ) : LLMProvider {
     override suspend fun chat(messages: List<Message>): ChatResponse = chat(ChatRequestContext(messages = messages))
 

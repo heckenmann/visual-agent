@@ -1,9 +1,8 @@
 package de.heckenmann.visualagent.agent.openai
 
 import de.heckenmann.visualagent.agent.ShowResponse
-import de.heckenmann.visualagent.agent.tools.ToolEventBus
-import de.heckenmann.visualagent.agent.tools.ToolRegistry
-import de.heckenmann.visualagent.config.AppConfigBean
+import de.heckenmann.visualagent.agent.TestProviderRuntimeConfig
+import de.heckenmann.visualagent.agent.TestToolRegistry
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -12,17 +11,13 @@ import kotlin.test.assertTrue
 class OpenAiClientErrorTest {
     @Test
     fun `isConnected requires non blank api key`() {
-        val config = AppConfigBean()
+        val config = TestProviderRuntimeConfig()
         config.openAiApiKey = ""
         config.openAiBaseUrl = "https://api.openai.com"
         val client =
             OpenAiClient(
                 mockFactory(),
-                ToolRegistry(
-                    emptyList(),
-                    ToolEventBus(),
-                    config,
-                ),
+                TestToolRegistry(),
                 config,
             )
 
@@ -32,16 +27,14 @@ class OpenAiClientErrorTest {
     @Test
     fun `getModels throws when api key is blank for official endpoint`() =
         kotlinx.coroutines.test.runTest {
-            val config = AppConfigBean()
+            val config = TestProviderRuntimeConfig()
             config.openAiApiKey = ""
             config.openAiBaseUrl = "https://api.openai.com"
             val client =
                 OpenAiClient(
                     mockFactory(),
-                    ToolRegistry(
-                        emptyList(),
-                        ToolEventBus(),
-                    ),
+                    TestToolRegistry(),
+                    config,
                 )
 
             val error = assertFailsWith<IllegalStateException> { client.getModels() }
@@ -55,14 +48,8 @@ class OpenAiClientErrorTest {
             val client =
                 OpenAiClient(
                     mockFactory(),
-                    de.heckenmann.visualagent.agent.tools
-                        .ToolRegistry(
-                            emptyList(),
-                            de.heckenmann.visualagent.agent.tools
-                                .ToolEventBus(),
-                            AppConfigBean(),
-                        ),
-                    AppConfigBean(),
+                    TestToolRegistry(),
+                    TestProviderRuntimeConfig(),
                 )
             val profile =
                 de.heckenmann.visualagent.agent.provider.ProviderProfile(
@@ -85,12 +72,7 @@ class OpenAiClientErrorTest {
         val client =
             OpenAiClient(
                 mockFactory(),
-                de.heckenmann.visualagent.agent.tools
-                    .ToolRegistry(
-                        emptyList(),
-                        de.heckenmann.visualagent.agent.tools
-                            .ToolEventBus(),
-                    ),
+                TestToolRegistry(),
             )
         val exception = ExceptionWithResponseBody("HTTP 500 Internal Server Error", "{\"error\":\"bad request\"}")
 
@@ -105,12 +87,7 @@ class OpenAiClientErrorTest {
         val client =
             OpenAiClient(
                 mockFactory(),
-                de.heckenmann.visualagent.agent.tools
-                    .ToolRegistry(
-                        emptyList(),
-                        de.heckenmann.visualagent.agent.tools
-                            .ToolEventBus(),
-                    ),
+                TestToolRegistry(),
             )
         val nested = IllegalStateException("inner")
         val exception = RuntimeException("outer", nested)

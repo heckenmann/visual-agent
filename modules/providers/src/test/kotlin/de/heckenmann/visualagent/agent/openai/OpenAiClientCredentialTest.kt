@@ -1,10 +1,9 @@
 package de.heckenmann.visualagent.agent.openai
 
+import de.heckenmann.visualagent.agent.TestProviderRuntimeConfig
+import de.heckenmann.visualagent.agent.TestToolRegistry
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
-import de.heckenmann.visualagent.agent.tools.ToolEventBus
-import de.heckenmann.visualagent.agent.tools.ToolRegistry
-import de.heckenmann.visualagent.config.AppConfigBean
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
@@ -20,8 +19,8 @@ class OpenAiClientCredentialTest {
             val client =
                 OpenAiClient(
                     mockk(relaxed = true),
-                    ToolRegistry(emptyList(), ToolEventBus(), AppConfigBean(mockk(relaxed = true))),
-                    AppConfigBean(mockk(relaxed = true)),
+                    TestToolRegistry(),
+                    TestProviderRuntimeConfig(),
                 )
             val profile =
                 ProviderProfile(
