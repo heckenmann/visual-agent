@@ -1,7 +1,6 @@
 package de.heckenmann.visualagent.agent.provider
 
-import de.heckenmann.visualagent.config.AppConfigBean
-import de.heckenmann.visualagent.knowledge.PreferenceStore
+import de.heckenmann.visualagent.agent.TestProviderRuntimeConfig
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -12,7 +11,7 @@ class ProviderCatalogServiceTest {
     @Test
     fun `legacy settings migrate into persisted provider profiles`() {
         val store = MapPreferenceStore()
-        val catalog = ProviderCatalogService(store, AppConfigBean(store))
+        val catalog = ProviderCatalogService(store, TestProviderRuntimeConfig())
 
         assertNotNull(catalog.getProvider("ollama"))
         assertNotNull(catalog.getProvider("openai"))
@@ -276,7 +275,7 @@ class ProviderCatalogServiceTest {
         assertEquals(ModelStatus.ACTIVE, models.getValue("gpt-new").status)
     }
 
-    private class MapPreferenceStore : PreferenceStore {
+    private class MapPreferenceStore : ProviderPreferenceStore {
         private val values = mutableMapOf<String, String>()
 
         override fun getPreference(key: String): String? = values[key]

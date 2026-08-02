@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.knowledge
 
 import de.heckenmann.visualagent.agent.config.SubAgentToolConfig
+import de.heckenmann.visualagent.agent.provider.ProviderPreferenceStore
 import de.heckenmann.visualagent.todo.Todo
 import java.time.Instant
 
@@ -100,12 +101,12 @@ interface MemoryStore {
 }
 
 /** Stores application preferences by key. Use cases: UC-0000030, UC-0000035, UC-0000037, UC-0000038. */
-interface PreferenceStore {
+interface PreferenceStore : ProviderPreferenceStore {
     /** Returns a stored preference or null when absent. */
-    fun getPreference(key: String): String?
+    override fun getPreference(key: String): String?
 
     /** Stores or replaces one preference value. */
-    fun setPreference(
+    override fun setPreference(
         key: String,
         value: String,
     )

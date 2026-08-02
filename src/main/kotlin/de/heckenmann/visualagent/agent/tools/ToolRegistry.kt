@@ -3,6 +3,7 @@ package de.heckenmann.visualagent.agent.tools
 import de.heckenmann.visualagent.agent.ToolDefinition
 import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.agent.ToolResult
+import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
 import de.heckenmann.visualagent.config.AppConfigBean
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -26,7 +27,8 @@ class ToolRegistry(
     tools: List<VisualAgentTool>,
     private val toolEventBus: ToolEventBus,
     private val appConfig: AppConfigBean = AppConfigBean(),
-) : DisposableBean {
+) : DisposableBean,
+    ProviderToolCallbacks {
     private val toolsById = tools.associateBy { it.definition.id }
     private val executor = Executors.newCachedThreadPool()
 
@@ -64,9 +66,9 @@ class ToolRegistry(
      * @return Tool callbacks that can be attached to Spring AI options
      * @see docs/usecases/uc_0000020_execute_tool_call.md
      */
-    fun functionCallbacks(
+    override fun functionCallbacks(
         enabledTools: Set<ToolId>,
-        context: Map<String, Any> = emptyMap(),
+        context: Map<String, Any>,
     ): List<ToolCallback> =
         resolve(enabledTools).map { tool ->
             val definition = tool.definition

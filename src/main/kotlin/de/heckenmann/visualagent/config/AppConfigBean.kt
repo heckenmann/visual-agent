@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.config
 
+import de.heckenmann.visualagent.agent.provider.ProviderRuntimeConfig
 import de.heckenmann.visualagent.knowledge.PreferenceStore
 import org.springframework.stereotype.Component
 import java.util.concurrent.CopyOnWriteArrayList
@@ -17,14 +18,14 @@ import java.util.concurrent.CopyOnWriteArrayList
 @Component
 class AppConfigBean(
     private val preferenceStore: PreferenceStore = NoOpPreferenceStore(),
-) {
-    var llmProvider: String = "ollama"
-    var ollamaLocalUrl: String = "http://localhost:11434"
-    var ollamaModel: String = "llava"
-    var ollamaApiKey: String = ""
-    var openAiApiKey: String = ""
-    var openAiBaseUrl: String = "https://api.openai.com"
-    var openAiModel: String = "gpt-4o-mini"
+) : ProviderRuntimeConfig {
+    override var llmProvider: String = "ollama"
+    override var ollamaLocalUrl: String = "http://localhost:11434"
+    override var ollamaModel: String = "llava"
+    override var ollamaApiKey = ""
+    override var openAiApiKey = ""
+    override var openAiBaseUrl: String = "https://api.openai.com"
+    override var openAiModel: String = "gpt-4o-mini"
     var databasePath: String = "./data/visual-agent.db"
     var uiThemeMode: ThemeMode = ThemeMode.SYSTEM
     var fontSize: Int = 14
@@ -35,7 +36,7 @@ class AppConfigBean(
     var autoCompactionEnabled: Boolean = true
     var loadLimit: Int = 50
     var maxParallelSubAgents: Int = 4
-    var timeoutSeconds: Int = 120
+    override var timeoutSeconds: Int = 120
     var userModelInstruction: String = ""
     var favoriteModels: String = ""
     var queueFlushMode: String = "ONE_BY_ONE"
@@ -62,7 +63,7 @@ class AppConfigBean(
     /**
      * Returns the persisted provider after normalizing unsupported values to Ollama.
      */
-    fun normalizedProvider(): String =
+    override fun normalizedProvider(): String =
         when (llmProvider.lowercase()) {
             "openai" -> "openai"
             else -> "ollama"

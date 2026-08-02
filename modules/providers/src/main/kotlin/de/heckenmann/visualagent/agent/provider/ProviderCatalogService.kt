@@ -1,7 +1,5 @@
 package de.heckenmann.visualagent.agent.provider
 
-import de.heckenmann.visualagent.config.AppConfigBean
-import de.heckenmann.visualagent.knowledge.PreferenceStore
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -17,8 +15,8 @@ import org.springframework.stereotype.Service
  */
 @Service
 class ProviderCatalogService(
-    private val preferenceStore: PreferenceStore,
-    private val appConfig: AppConfigBean = AppConfigBean(),
+    private val preferenceStore: ProviderPreferenceStore,
+    private val appConfig: ProviderRuntimeConfig = DefaultProviderRuntimeConfig(),
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
