@@ -63,7 +63,7 @@ Leaving the key blank omits the `Authorization` header. Profile URL and key chan
 ## Persistence Runtime
 
 - Database path defaults to `./data/visual-agent.db`
-- `src/main/resources/config/app.properties` is bootstrap-only and stores the database path.
+- `application/src/main/resources/config/app.properties` is bootstrap-only and stores the database path.
 - Runtime configuration is stored in SQLite `user_preferences`; normal saves do not rewrite `app.properties`.
 - Imported workspace files default to `./data/workspace/`
 - Files panel search covers metadata and bounded text/PDF content. The `Sync DB` action reconciles metadata with files found below the managed workspace directory.
@@ -111,4 +111,4 @@ Restart the app afterwards.
 
 ### Migration startup issues
 
-If Flyway or JPA fails during startup, check the `data/visual-agent.db` file path in `src/main/resources/config/app.properties` and ensure the application can create or write to the `data/` directory.
+If Flyway or JPA fails during startup, check the `data/visual-agent.db` file path in `application/src/main/resources/config/app.properties` and ensure the application can create or write to the `data/` directory.

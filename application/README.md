@@ -18,9 +18,14 @@ This is the only module allowed to depend on Visual Agent submodules:
 :application -> :providers
 ```
 
-## Source layout during the initial migration
+## Source layout
 
-The existing application source and resource trees remain at the repository root (`src/main` and `src/test`) while this module owns their Gradle source sets. They will be relocated incrementally with `git mv` in later extraction steps.
+Application source, resources, and cross-module integration tests live under this module:
+
+```text
+application/src/main/
+application/src/test/
+```
 
 ## Commands
 

@@ -236,7 +236,7 @@ marked for modularization:
 - `ui/compose/ComposeWorkspaceComponents.kt`
 - `ui/compose/ComposeWorkspaceModels.kt`
 - `ui/compose/VisualAgentComposeApplication.kt`
-- `src/test/kotlin/de/heckenmann/visualagent/agent/tools/CanvasToolTest.kt`
+- `application/src/test/kotlin/de/heckenmann/visualagent/agent/tools/CanvasToolTest.kt`
 
 The `ui/compose` package also exceeds the 3 000 LOC package target at
 5 290 LOC.
