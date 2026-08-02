@@ -87,11 +87,11 @@ internal class CoKitCodexAppServerChatBridgeTest {
 
             bridge.complete(prompt, toolCallbacks = listOf(recordingToolCallback()))
 
-            assertEquals(listOf("thread/start", "thread/injectItems", "turn/start", "thread/delete"), methods)
+            assertEquals(listOf("thread/start", "thread/inject_items", "turn/start", "thread/delete"), methods)
             val threadStart = params.getValue("thread/start") as ThreadStartParams
             assertEquals("Follow application policy", threadStart.developerInstructions)
             assertEquals(listOf("todos"), threadStart.dynamicTools?.map { it.name })
-            val injected = params.getValue("thread/injectItems") as ThreadInjectItemsParams
+            val injected = params.getValue("thread/inject_items") as ThreadInjectItemsParams
             assertEquals(2, injected.items.size)
             assertEquals(true, injected.items[0].toJsonString().contains("\"role\":\"user\""))
             assertEquals(true, injected.items[1].toJsonString().contains("\"role\":\"assistant\""))
@@ -111,11 +111,46 @@ internal class CoKitCodexAppServerChatBridgeTest {
             assertEquals("handled {\"action\":\"list\"}", toolResult.contentItems.single().text)
         }
 
+    @Test
+    fun `returns assistant text included only in completed turn items`() =
+        runBlocking {
+            val notifications = MutableSharedFlow<CodexNotification>(extraBufferCapacity = 8)
+            val methods = mutableListOf<String>()
+            val params = mutableMapOf<String, Any>()
+            val client =
+                fakeClient(
+                    notifications,
+                    methods,
+                    params,
+                    emitDeltas = false,
+                    completedTurn = { turnId ->
+                        Turn(
+                            turnId,
+                            TurnStatus.Completed,
+                            items =
+                                listOf(
+                                    CodexJsonPayload.parse(
+                                        """{"type":"message","role":"assistant","content":[{"type":"output_text","text":"final answer"}]}""",
+                                    ),
+                                ),
+                        )
+                    },
+                )
+            val connector = CodexAppServerConnector { _, _ -> CodexAppServerConnection(client, AutoCloseable {}) }
+            val bridge = CoKitCodexAppServerChatBridge(connector, Path.of("/codex"), Path.of("/workspace"), "model")
+
+            val result = bridge.complete(Prompt("hello"))
+
+            assertEquals("final answer", result.content)
+        }
+
     private fun fakeClient(
         notifications: MutableSharedFlow<CodexNotification>,
         methods: MutableList<String>,
         params: MutableMap<String, Any>,
         handlers: MutableList<DynamicToolCallHandler> = mutableListOf(),
+        emitDeltas: Boolean = true,
+        completedTurn: (TurnId) -> Turn = { turnId -> Turn(turnId, TurnStatus.Completed) },
     ): CodexClient {
         val threadId = ThreadId("thread")
         val turnId = TurnId("turn")
@@ -131,11 +166,13 @@ internal class CoKitCodexAppServerChatBridgeTest {
                     params[rpc.method] = requireNotNull(arguments[1])
                     when (rpc.method) {
                         "thread/start" -> ThreadStartResult(Thread(threadId))
-                        "thread/injectItems" -> CodexRpcUnit
+                        "thread/inject_items" -> CodexRpcUnit
                         "turn/start" -> {
-                            notifications.tryEmit(CodexNotification.AgentMessageDelta(threadId, turnId, ItemId("item"), "first "))
-                            notifications.tryEmit(CodexNotification.AgentMessageDelta(threadId, turnId, ItemId("item"), "second"))
-                            notifications.tryEmit(CodexNotification.TurnCompleted(Turn(turnId, TurnStatus.Completed)))
+                            if (emitDeltas) {
+                                notifications.tryEmit(CodexNotification.AgentMessageDelta(threadId, turnId, ItemId("item"), "first "))
+                                notifications.tryEmit(CodexNotification.AgentMessageDelta(threadId, turnId, ItemId("item"), "second"))
+                            }
+                            notifications.tryEmit(CodexNotification.TurnCompleted(completedTurn(turnId)))
                             TurnStartResult(Turn(turnId, TurnStatus.InProgress))
                         }
                         "thread/delete" -> CodexRpcUnit

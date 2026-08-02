@@ -221,7 +221,7 @@ The model marked `isDefault` becomes the suggested default only when the user ha
 Each Visual Agent request uses an ephemeral Codex thread so Visual Agent remains the authoritative conversation store and Codex does not create an additional persistent transcript by default.
 
 1. Send `thread/start` with the selected model, current workspace directory, service name, approval policy, and bounded sandbox configuration.
-2. Map system messages to `developerInstructions` and inject prior user/assistant messages with `thread/injectItems` without rewriting Markdown.
+2. Map system messages to `developerInstructions` and inject prior user/assistant messages with `thread/inject_items` without rewriting Markdown.
 3. Send the current user input with `turn/start`.
 4. Preserve message order and reject unsupported rich content rather than serializing arbitrary objects.
 5. Include the selected model and supported reasoning effort. Unsupported sampling options are ignored only when documented; otherwise the UI explains that Codex CLI does not support them.

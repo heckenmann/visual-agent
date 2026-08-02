@@ -118,7 +118,7 @@ object CodexRpc {
         )
 
         val InjectItems: CodexRpcMethod<ThreadInjectItemsParams, CodexRpcUnit> = CodexRpcMethod(
-            method = "thread/injectItems",
+            method = "thread/inject_items",
             paramsSerializer = ThreadInjectItemsParams.serializer(),
             resultSerializer = CodexRpcUnit.serializer(),
             emptyResult = CodexRpcUnit,

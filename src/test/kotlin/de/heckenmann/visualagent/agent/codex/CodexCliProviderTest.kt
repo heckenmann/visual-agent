@@ -89,7 +89,7 @@ class CodexCliProviderTest {
                     val rpc = arguments?.get(0) as CodexRpcMethod<*, *>
                     when (rpc.method) {
                         "thread/start" -> ThreadStartResult(Thread(threadId))
-                        "thread/injectItems", "thread/delete" -> CodexRpcUnit
+                        "thread/inject_items", "thread/delete" -> CodexRpcUnit
                         "turn/start" -> {
                             notifications.tryEmit(CodexNotification.AgentMessageDelta(threadId, turnId, ItemId("item"), "answer"))
                             notifications.tryEmit(CodexNotification.TurnCompleted(Turn(turnId, TurnStatus.Completed)))
