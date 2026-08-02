@@ -1,6 +1,6 @@
 package de.heckenmann.visualagent.agent
 
-import de.heckenmann.visualagent.config.AppConfigBean
+import de.heckenmann.visualagent.agent.provider.ProviderRuntimeConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.springframework.ai.chat.messages.UserMessage
@@ -19,7 +19,7 @@ import org.springframework.ai.ollama.api.OllamaChatOptions
 internal class OllamaClientAuxiliary(
     private val chatModel: ChatModel,
     private val ollamaApi: OllamaApi,
-    private val appConfig: AppConfigBean,
+    private val appConfig: ProviderRuntimeConfig,
 ) {
     /**
      * Sends an image and a prompt to the vision-capable chat model.

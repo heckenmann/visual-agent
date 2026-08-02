@@ -1,7 +1,7 @@
 package de.heckenmann.visualagent.agent.ollama
 
 import com.sun.net.httpserver.HttpServer
-import de.heckenmann.visualagent.config.AppConfigBean
+import de.heckenmann.visualagent.agent.TestProviderRuntimeConfig
 import org.junit.jupiter.api.Test
 import java.net.InetSocketAddress
 import java.util.concurrent.atomic.AtomicReference
@@ -9,7 +9,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 class OllamaApiConfigurationTest {
-    private val appConfig = AppConfigBean()
+    private val appConfig = TestProviderRuntimeConfig()
 
     @Test
     fun `api sends current key as bearer token`() {

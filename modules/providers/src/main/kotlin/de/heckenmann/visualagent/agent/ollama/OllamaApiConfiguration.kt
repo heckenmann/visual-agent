@@ -1,7 +1,7 @@
 package de.heckenmann.visualagent.agent.ollama
 
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
-import de.heckenmann.visualagent.config.AppConfigBean
+import de.heckenmann.visualagent.agent.provider.ProviderRuntimeConfig
 import io.netty.channel.ChannelOption
 import org.springframework.ai.ollama.api.OllamaApi
 import org.springframework.context.annotation.Bean
@@ -21,7 +21,7 @@ import java.time.Duration
  */
 @Configuration
 class OllamaApiConfiguration(
-    private val appConfig: AppConfigBean,
+    private val appConfig: ProviderRuntimeConfig,
 ) {
     /**
      * Creates the shared Ollama API client.
@@ -34,7 +34,7 @@ class OllamaApiConfiguration(
     fun ollamaApi(): OllamaApi = createOllamaApi(appConfig)
 }
 
-internal fun createOllamaApi(config: AppConfigBean): OllamaApi =
+internal fun createOllamaApi(config: ProviderRuntimeConfig): OllamaApi =
     createOllamaApi(
         baseUrl = config.ollamaLocalUrl,
         timeoutSeconds = config.timeoutSeconds,
@@ -43,7 +43,7 @@ internal fun createOllamaApi(config: AppConfigBean): OllamaApi =
 
 internal fun createOllamaApi(
     profile: ProviderProfile,
-    appConfig: AppConfigBean,
+    appConfig: ProviderRuntimeConfig,
 ): OllamaApi =
     createOllamaApi(
         baseUrl = profile.baseUrl,

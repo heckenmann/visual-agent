@@ -2,7 +2,7 @@ package de.heckenmann.visualagent.agent.ollama
 
 import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.Message
-import de.heckenmann.visualagent.agent.tools.ToolRegistry
+import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
 import org.springframework.ai.chat.messages.AssistantMessage
 import org.springframework.ai.chat.messages.SystemMessage
 import org.springframework.ai.chat.messages.UserMessage
@@ -16,7 +16,7 @@ import org.springframework.ai.chat.messages.Message as SpringMessage
  */
 @Component
 class OllamaPromptFactory(
-    private val toolRegistry: ToolRegistry,
+    private val toolRegistry: ProviderToolCallbacks,
 ) {
     /**
      * Returns provider-safe function names enabled for the request.

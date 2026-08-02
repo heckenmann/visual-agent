@@ -2,7 +2,7 @@ package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.ollama.createOllamaApi
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
-import de.heckenmann.visualagent.config.AppConfigBean
+import de.heckenmann.visualagent.agent.provider.ProviderRuntimeConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import mu.KotlinLogging
@@ -16,7 +16,7 @@ import org.springframework.ai.ollama.api.OllamaApi
  */
 internal class OllamaClientOps(
     private val ollamaApi: OllamaApi,
-    private val appConfig: AppConfigBean,
+    private val appConfig: ProviderRuntimeConfig,
 ) {
     private val logger = KotlinLogging.logger {}
 

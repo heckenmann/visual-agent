@@ -3,10 +3,10 @@ package de.heckenmann.visualagent.agent
 import de.heckenmann.visualagent.agent.ollama.OllamaPromptFactory
 import de.heckenmann.visualagent.agent.ollama.OllamaToolRecovery
 import de.heckenmann.visualagent.agent.ollama.createOllamaApi
+import de.heckenmann.visualagent.agent.provider.ProviderErrorMessages
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
-import de.heckenmann.visualagent.agent.tools.ToolRegistry
-import de.heckenmann.visualagent.config.AppConfigBean
-import de.heckenmann.visualagent.error.ErrorMessageMapper
+import de.heckenmann.visualagent.agent.provider.ProviderRuntimeConfig
+import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -32,8 +32,8 @@ class OllamaClient(
     private val ollamaApi: OllamaApi,
     private val promptFactory: OllamaPromptFactory,
     private val toolRecovery: OllamaToolRecovery,
-    private val toolRegistry: ToolRegistry,
-    private val appConfig: AppConfigBean = AppConfigBean(),
+    private val toolRegistry: ProviderToolCallbacks,
+    private val appConfig: ProviderRuntimeConfig,
 ) : LLMProvider {
     private val logger = KotlinLogging.logger {}
     private val auxiliary = OllamaClientAuxiliary(chatModel, ollamaApi, appConfig)
@@ -162,7 +162,7 @@ class OllamaClient(
      */
     private fun buildDetailedProviderError(throwable: Throwable?): Throwable {
         if (throwable == null) return IllegalStateException("Unknown chat model error")
-        val userFacing = ErrorMessageMapper.map(throwable)
+        val userFacing = ProviderErrorMessages.userFacingError(throwable)
         return IllegalStateException("${userFacing.summary}: ${userFacing.detail}", throwable)
     }
 
