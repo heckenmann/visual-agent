@@ -55,4 +55,33 @@ class ProviderErrorMessagesTest {
 
         assertContains(ProviderErrorMessages.userFacing(error), "Authentication")
     }
+
+    @Test
+    fun `structured status codes classify errors without exception messages`() {
+        val error = ProviderErrorMessages.userFacing(StructuredProviderException(statusCode = 401))
+
+        assertContains(error, "Authentication")
+    }
+
+    @Test
+    fun `structured response bodies classify errors without exposing content`() {
+        val message =
+            ProviderErrorMessages.userFacing(
+                StructuredProviderException(responseBody = "quota exceeded for account"),
+            )
+
+        assertContains(message, "quota")
+        assertFalse(message.contains("account"))
+    }
+
+    private class StructuredProviderException(
+        private val statusCode: Int? = null,
+        private val responseBody: String? = null,
+    ) : RuntimeException(null as String?) {
+        @Suppress("unused")
+        fun getStatusCode(): Int? = statusCode
+
+        @Suppress("unused")
+        fun getResponseBodyAsString(): String? = responseBody
+    }
 }

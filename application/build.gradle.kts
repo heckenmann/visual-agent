@@ -108,6 +108,9 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    filter {
+        isFailOnNoMatchingTests = false
+    }
     workingDir = rootProject.projectDir
     systemProperty("visualagent.ollama.smoke", System.getProperty("visualagent.ollama.smoke", "false"))
     systemProperty("visualagent.codex.smoke", System.getProperty("visualagent.codex.smoke", "false"))
@@ -172,6 +175,7 @@ springBoot {
 }
 
 tasks.withType<JavaExec>().configureEach {
+    workingDir = rootProject.projectDir
     jvmArgs(applicationIdentityArgs + macApplicationArgs)
 }
 
@@ -216,7 +220,7 @@ publishing {
 
 tasks.register<Copy>("copyAllDependencies") {
     from(configurations.compileClasspath, configurations.runtimeClasspath)
-    into("lib")
+    into(rootProject.projectDir.resolve("lib"))
 }
 
 ktlint {
@@ -224,11 +228,19 @@ ktlint {
     android.set(false)
 }
 
-val kotlinSourceRoots =
+val kotlinMainSourceRoots =
     listOf(
         projectDir.toPath().resolve("src/main/kotlin"),
-        projectDir.toPath().resolve("src/test/kotlin"),
+        rootProject.projectDir.toPath().resolve("modules/ui/src/main/kotlin"),
+        rootProject.projectDir.toPath().resolve("modules/providers/src/main/kotlin"),
     )
+val kotlinSourceRoots =
+    kotlinMainSourceRoots +
+        listOf(
+            projectDir.toPath().resolve("src/test/kotlin"),
+            rootProject.projectDir.toPath().resolve("modules/ui/src/test/kotlin"),
+            rootProject.projectDir.toPath().resolve("modules/providers/src/test/kotlin"),
+        )
 
 val generatedUseCaseResources = layout.buildDirectory.dir("generated/usecase-resources")
 
@@ -311,7 +323,7 @@ tasks.register("ktlintJavadocCheck") {
             )
         val kdocStartRegex = Regex("""^\s*/\*\*""")
         val violations = mutableListOf<String>()
-        listOf(projectDir.toPath().resolve("src/main/kotlin"))
+        kotlinMainSourceRoots
             .filter { Files.exists(it) }
             .forEach { root ->
                 Files.walk(root).use { stream ->
@@ -516,6 +528,10 @@ tasks.register("desktopApiUsageCheck") {
             listOf(
                 projectDir.toPath().resolve("src/main"),
                 projectDir.toPath().resolve("src/test"),
+                rootProject.projectDir.toPath().resolve("modules/ui/src/main"),
+                rootProject.projectDir.toPath().resolve("modules/ui/src/test"),
+                rootProject.projectDir.toPath().resolve("modules/providers/src/main"),
+                rootProject.projectDir.toPath().resolve("modules/providers/src/test"),
             )
         val checkedFiles =
             listOf(
@@ -580,7 +596,7 @@ tasks.register("unusedCodeCheck") {
         val suppressUnusedRegex = Regex("""@Suppress\(\s*"unused"\s*\)""")
         val violations = mutableListOf<String>()
 
-        listOf(projectDir.toPath().resolve("src/main/kotlin"))
+        kotlinMainSourceRoots
             .filter { Files.exists(it) }
             .forEach { root ->
                 Files.walk(root).use { stream ->

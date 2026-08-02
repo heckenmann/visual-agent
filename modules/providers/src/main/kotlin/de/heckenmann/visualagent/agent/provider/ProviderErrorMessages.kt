@@ -69,7 +69,39 @@ object ProviderErrorMessages {
 
     private fun exceptionChain(error: Throwable): String =
         generateSequence(error as Throwable?) { it.cause }
-            .mapNotNull(Throwable::message)
+            .flatMap(::exceptionDetails)
             .joinToString(" ")
             .lowercase()
+
+    private fun exceptionDetails(error: Throwable): List<String> =
+        listOfNotNull(
+            error.message?.takeIf { it.isNotBlank() },
+            extractHttpStatus(error)?.toString(),
+            extractResponseBody(error)?.takeIf { it.isNotBlank() },
+        )
+
+    private fun extractHttpStatus(error: Throwable): Int? =
+        runCatching {
+            val statusCode =
+                error.javaClass.methods
+                    .find { it.name == "getStatusCode" || it.name == "statusCode" }
+                    ?.invoke(error)
+            extractStatusValue(statusCode)
+        }.getOrNull()
+
+    private fun extractStatusValue(statusCode: Any?): Int? {
+        if (statusCode is Number) return statusCode.toInt()
+        return runCatching {
+            statusCode
+                ?.javaClass
+                ?.methods
+                ?.find { it.name == "value" || it.name == "getStatusCode" }
+                ?.invoke(statusCode) as? Number
+        }.getOrNull()?.toInt()
+    }
+
+    private fun extractResponseBody(error: Throwable): String? =
+        runCatching {
+            error.javaClass.getMethod("getResponseBodyAsString").invoke(error) as? String
+        }.getOrNull()
 }
