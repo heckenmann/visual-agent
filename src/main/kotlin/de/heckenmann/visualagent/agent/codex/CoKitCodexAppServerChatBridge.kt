@@ -34,7 +34,12 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import org.springframework.ai.chat.prompt.Prompt
@@ -150,6 +155,12 @@ internal class CoKitCodexAppServerChatBridge(
                         }
                     is CodexNotification.TurnCompleted ->
                         if (event.turn.id == turnId) {
+                            if (!emittedText) {
+                                event.turn.assistantText()?.let { text ->
+                                    emittedText = true
+                                    emit(CodexAppServerChatChunk(model, text, terminal = false))
+                                }
+                            }
                             emit(CodexAppServerChatChunk(model, "", terminal = true))
                             return@withTimeout
                         }
@@ -257,6 +268,30 @@ internal class CoKitCodexAppServerChatBridge(
             }
         return CodexJsonPayload.parse(item.toString())
     }
+
+    private fun io.github.vupoint.cokit.client.Turn.assistantText(): String? =
+        items
+            .asSequence()
+            .mapNotNull { item ->
+                runCatching { Json.parseToJsonElement(item.toJsonString()).jsonObject }.getOrNull()
+            }.mapNotNull { item ->
+                when (item["type"]?.jsonPrimitive?.contentOrNull) {
+                    "agentMessage" -> item["text"]?.jsonPrimitive?.contentOrNull
+                    "message" ->
+                        item["content"]
+                            ?.jsonArray
+                            ?.takeIf { item["role"]?.jsonPrimitive?.contentOrNull == "assistant" }
+                            ?.mapNotNull { content ->
+                                content.jsonObject
+                                    .takeIf { it["type"]?.jsonPrimitive?.contentOrNull == "output_text" }
+                                    ?.get("text")
+                                    ?.jsonPrimitive
+                                    ?.contentOrNull
+                            }?.joinToString(separator = "")
+                    else -> null
+                }
+            }.joinToString(separator = "")
+            .takeIf(String::isNotBlank)
 
     private data class MappedCodexPrompt(
         val developerInstructions: String?,
