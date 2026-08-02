@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent.codex
 
+import de.heckenmann.visualagent.agent.CancellationToken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
@@ -19,15 +20,16 @@ import reactor.core.publisher.Flux
  */
 internal class CodexCliChatModel(
     private val bridge: CodexAppServerChatBridge,
+    private val cancellationToken: CancellationToken? = null,
 ) : ChatModel {
     override fun call(prompt: Prompt): ChatResponse =
         runBlocking(Dispatchers.IO) {
-            bridge.complete(prompt).toSpringResponse()
+            bridge.complete(prompt, cancellationToken).toSpringResponse()
         }
 
     override fun stream(prompt: Prompt): Flux<ChatResponse> =
         bridge
-            .stream(prompt)
+            .stream(prompt, cancellationToken)
             .flowOn(Dispatchers.IO)
             .asFlux()
             .map(CodexAppServerChatChunk::toSpringResponse)
@@ -46,7 +48,10 @@ internal interface CodexAppServerChatBridge {
      * @param prompt Spring AI prompt to map to the app-server thread and turn
      * @return Completed assistant response
      */
-    suspend fun complete(prompt: Prompt): CodexAppServerChatResult
+    suspend fun complete(
+        prompt: Prompt,
+        cancellationToken: CancellationToken? = null,
+    ): CodexAppServerChatResult
 
     /**
      * Streams one Codex app-server turn as ordered assistant chunks.
@@ -54,7 +59,10 @@ internal interface CodexAppServerChatBridge {
      * @param prompt Spring AI prompt to map to the app-server thread and turn
      * @return Ordered assistant chunks ending in a terminal chunk
      */
-    fun stream(prompt: Prompt): Flow<CodexAppServerChatChunk>
+    fun stream(
+        prompt: Prompt,
+        cancellationToken: CancellationToken? = null,
+    ): Flow<CodexAppServerChatChunk>
 }
 
 /**

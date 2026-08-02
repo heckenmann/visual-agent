@@ -1,15 +1,19 @@
 package de.heckenmann.visualagent.agent.codex
 
+import io.github.vupoint.cokit.client.ApprovalPolicy
 import io.github.vupoint.cokit.client.CodexClient
 import io.github.vupoint.cokit.client.CodexNotification
 import io.github.vupoint.cokit.client.CodexRpcMethod
 import io.github.vupoint.cokit.client.CodexRpcUnit
 import io.github.vupoint.cokit.client.ItemId
+import io.github.vupoint.cokit.client.SandboxPolicy
 import io.github.vupoint.cokit.client.Thread
 import io.github.vupoint.cokit.client.ThreadId
+import io.github.vupoint.cokit.client.ThreadStartParams
 import io.github.vupoint.cokit.client.ThreadStartResult
 import io.github.vupoint.cokit.client.Turn
 import io.github.vupoint.cokit.client.TurnId
+import io.github.vupoint.cokit.client.TurnStartParams
 import io.github.vupoint.cokit.client.TurnStartResult
 import io.github.vupoint.cokit.client.TurnStatus
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -26,7 +30,8 @@ internal class CoKitCodexAppServerChatBridgeTest {
         runBlocking {
             val notifications = MutableSharedFlow<CodexNotification>(extraBufferCapacity = 8)
             val methods = mutableListOf<String>()
-            val client = fakeClient(notifications, methods)
+            val params = mutableMapOf<String, Any>()
+            val client = fakeClient(notifications, methods, params)
             val connector =
                 CodexAppServerConnector { _, _ ->
                     CodexAppServerConnection(client, AutoCloseable {})
@@ -37,11 +42,16 @@ internal class CoKitCodexAppServerChatBridgeTest {
 
             assertEquals("first second", result.content)
             assertEquals(listOf("thread/start", "turn/start", "thread/delete"), methods)
+            assertEquals(ApprovalPolicy.OnRequest, (params.getValue("thread/start") as ThreadStartParams).approvalPolicy)
+            assertEquals(SandboxPolicy.WorkspaceWrite, (params.getValue("thread/start") as ThreadStartParams).sandbox)
+            assertEquals(ApprovalPolicy.OnRequest, (params.getValue("turn/start") as TurnStartParams).approvalPolicy)
+            assertEquals(SandboxPolicy.WorkspaceWrite, (params.getValue("turn/start") as TurnStartParams).sandbox)
         }
 
     private fun fakeClient(
         notifications: MutableSharedFlow<CodexNotification>,
         methods: MutableList<String>,
+        params: MutableMap<String, Any>,
     ): CodexClient {
         val threadId = ThreadId("thread")
         val turnId = TurnId("turn")
@@ -54,6 +64,7 @@ internal class CoKitCodexAppServerChatBridgeTest {
                 "request" -> {
                     val rpc = arguments?.get(0) as CodexRpcMethod<*, *>
                     methods += rpc.method
+                    params[rpc.method] = requireNotNull(arguments[1])
                     when (rpc.method) {
                         "thread/start" -> ThreadStartResult(Thread(threadId))
                         "turn/start" -> {

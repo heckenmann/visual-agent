@@ -7,6 +7,7 @@ import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ModelDetails
 import de.heckenmann.visualagent.agent.ShowResponse
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
+import de.heckenmann.visualagent.workspace.WorkspaceFilePaths
 import io.github.vupoint.cokit.client.CodexCursor
 import io.github.vupoint.cokit.client.CodexRpc
 import io.github.vupoint.cokit.client.models.ModelListParams
@@ -27,7 +28,7 @@ import java.nio.file.Path
 @Component
 class CodexCliProvider internal constructor(
     private val locator: CodexCliLocator,
-    private val connectionFactory: CodexAppServerConnectionFactory,
+    private val connectionFactory: CodexAppServerConnector,
 ) : LLMProvider {
     override suspend fun chat(messages: List<Message>): ChatResponse = error("Codex CLI chat requires a configured provider profile")
 
@@ -35,7 +36,7 @@ class CodexCliProvider internal constructor(
         withContext(Dispatchers.IO) {
             val profile = requireNotNull(request.providerProfile) { "Codex CLI provider profile is missing" }
             val modelName = request.model ?: profile.defaultModel
-            val chatModel = chatModel(profile, modelName, request.workingDirectory())
+            val chatModel = chatModel(profile, modelName, request.workingDirectory(), request.cancellationToken)
             val response = chatModel.call(request.toPrompt())
             ChatResponse(
                 model = response.metadata.model.ifBlank { modelName },
@@ -50,7 +51,7 @@ class CodexCliProvider internal constructor(
     override suspend fun stream(request: ChatRequestContext): Flow<ChatResponse> {
         val profile = requireNotNull(request.providerProfile) { "Codex CLI provider profile is missing" }
         val modelName = request.model ?: profile.defaultModel
-        val chatModel = chatModel(profile, modelName, request.workingDirectory())
+        val chatModel = chatModel(profile, modelName, request.workingDirectory(), request.cancellationToken)
         return flow {
             chatModel.stream(request.toPrompt()).asFlow().collect { response ->
                 val generation = requireNotNull(response.result)
@@ -110,9 +111,11 @@ class CodexCliProvider internal constructor(
         profile: ProviderProfile,
         model: String,
         workingDirectory: Path,
+        cancellationToken: de.heckenmann.visualagent.agent.CancellationToken?,
     ): CodexCliChatModel =
         CodexCliChatModel(
             CoKitCodexAppServerChatBridge(connectionFactory, resolveExecutable(profile), workingDirectory, model),
+            cancellationToken,
         )
 
     private suspend fun resolveExecutable(profile: ProviderProfile): Path =
@@ -142,7 +145,7 @@ class CodexCliProvider internal constructor(
             ?.normalize()
             ?: defaultWorkingDirectory()
 
-    private fun defaultWorkingDirectory(): Path = Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize()
+    private fun defaultWorkingDirectory(): Path = WorkspaceFilePaths.workspaceRoot()
 
     internal companion object {
         const val OPTION_EXECUTABLE_PATH = "codex.executable.path"

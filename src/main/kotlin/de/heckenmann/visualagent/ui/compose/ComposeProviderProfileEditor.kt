@@ -81,7 +81,12 @@ internal fun ProviderProfileEditor(
             options = ProviderAdapter.entries.map { PanelSelectOption(it.name, it.name) },
             onSelected = { selected ->
                 val adapter = ProviderAdapter.valueOf(selected)
-                state = state.copy(adapter = adapter, baseUrl = if (adapter == ProviderAdapter.CODEX_CLI) "" else state.baseUrl)
+                state =
+                    state.copy(
+                        adapter = adapter,
+                        apiKey = if (adapter == ProviderAdapter.CODEX_CLI) "" else state.apiKey,
+                        baseUrl = if (adapter == ProviderAdapter.CODEX_CLI) "" else state.baseUrl,
+                    )
             },
         )
         if (state.adapter == ProviderAdapter.CODEX_CLI) {

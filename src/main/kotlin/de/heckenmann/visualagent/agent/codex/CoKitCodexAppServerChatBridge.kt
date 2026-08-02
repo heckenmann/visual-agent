@@ -1,10 +1,13 @@
 package de.heckenmann.visualagent.agent.codex
 
+import de.heckenmann.visualagent.agent.CancellationToken
+import io.github.vupoint.cokit.client.ApprovalPolicy
 import io.github.vupoint.cokit.client.CodexHostPath
 import io.github.vupoint.cokit.client.CodexNotification
 import io.github.vupoint.cokit.client.CodexRpc
 import io.github.vupoint.cokit.client.ItemType
 import io.github.vupoint.cokit.client.ModelName
+import io.github.vupoint.cokit.client.SandboxPolicy
 import io.github.vupoint.cokit.client.ThreadDeleteParams
 import io.github.vupoint.cokit.client.ThreadId
 import io.github.vupoint.cokit.client.ThreadStartParams
@@ -34,13 +37,20 @@ internal class CoKitCodexAppServerChatBridge(
     private val workingDirectory: Path,
     private val model: String,
 ) : CodexAppServerChatBridge {
-    override suspend fun complete(prompt: Prompt): CodexAppServerChatResult {
-        val chunks = stream(prompt).toList()
+    override suspend fun complete(
+        prompt: Prompt,
+        cancellationToken: CancellationToken?,
+    ): CodexAppServerChatResult {
+        val chunks = stream(prompt, cancellationToken).toList()
         return CodexAppServerChatResult(model, chunks.joinToString(separator = "", transform = CodexAppServerChatChunk::content))
     }
 
-    override fun stream(prompt: Prompt): Flow<CodexAppServerChatChunk> =
+    override fun stream(
+        prompt: Prompt,
+        cancellationToken: CancellationToken?,
+    ): Flow<CodexAppServerChatChunk> =
         channelFlow {
+            cancellationToken?.throwIfCancelled()
             connectionFactory.connect(executable, workingDirectory).use { connection ->
                 val events = Channel<CodexNotification>(Channel.UNLIMITED)
                 val collector =
@@ -56,6 +66,8 @@ internal class CoKitCodexAppServerChatBridge(
                                 CodexRpc.Thread.Start,
                                 ThreadStartParams(
                                     cwd = CodexHostPath(workingDirectory.toString()),
+                                    approvalPolicy = ApprovalPolicy.OnRequest,
+                                    sandbox = SandboxPolicy.WorkspaceWrite,
                                     model = ModelName(model),
                                 ),
                             ).thread
@@ -67,11 +79,15 @@ internal class CoKitCodexAppServerChatBridge(
                                 TurnStartParams(
                                     threadId = thread.id,
                                     input = listOf(TurnInput.Text(prompt.toCodexInput())),
+                                    cwd = CodexHostPath(workingDirectory.toString()),
+                                    approvalPolicy = ApprovalPolicy.OnRequest,
+                                    sandbox = SandboxPolicy.WorkspaceWrite,
                                     model = ModelName(model),
                                 ),
                             ).turn
                     turnId = turn.id
-                    consumeTurn(turn.id, events) { chunk -> send(chunk) }
+                    cancellationToken?.onCancelled { launch { interrupt(connection, threadId, turnId) } }
+                    consumeTurn(turn.id, events, cancellationToken) { chunk -> send(chunk) }
                 } catch (cancelled: CancellationException) {
                     interrupt(connection, threadId, turnId)
                     throw cancelled
@@ -86,11 +102,13 @@ internal class CoKitCodexAppServerChatBridge(
     private suspend fun consumeTurn(
         turnId: TurnId,
         events: Channel<CodexNotification>,
+        cancellationToken: CancellationToken?,
         emit: suspend (CodexAppServerChatChunk) -> Unit,
     ) {
         var emittedText = false
         withTimeout(OPERATION_TIMEOUT_MILLIS) {
             while (true) {
+                cancellationToken?.throwIfCancelled()
                 when (val event = events.receive()) {
                     is CodexNotification.AgentMessageDelta ->
                         if (event.turnId == turnId) {

@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent.codex
 
+import de.heckenmann.visualagent.agent.CancellationToken
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import org.junit.jupiter.api.Test
@@ -48,12 +49,18 @@ class CodexCliChatModelTest {
         var streamedPrompt: Prompt? = null
         private val chunks = chunks
 
-        override suspend fun complete(prompt: Prompt): CodexAppServerChatResult {
+        override suspend fun complete(
+            prompt: Prompt,
+            cancellationToken: CancellationToken?,
+        ): CodexAppServerChatResult {
             completedPrompt = prompt
             return completion
         }
 
-        override fun stream(prompt: Prompt): Flow<CodexAppServerChatChunk> {
+        override fun stream(
+            prompt: Prompt,
+            cancellationToken: CancellationToken?,
+        ): Flow<CodexAppServerChatChunk> {
             streamedPrompt = prompt
             return flowOf(*chunks.toTypedArray())
         }

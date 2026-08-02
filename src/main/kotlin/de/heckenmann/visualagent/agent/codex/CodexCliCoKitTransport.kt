@@ -25,7 +25,7 @@ internal class CodexCliCoKitTransport(
     private val reader = BufferedReader(InputStreamReader(childProcess.stdout, Charsets.UTF_8))
     private val writer = BufferedWriter(OutputStreamWriter(childProcess.stdin, Charsets.UTF_8))
     private val writeMutex = Mutex()
-    private val mutableIncoming = MutableSharedFlow<JsonRpcMessage>(extraBufferCapacity = 64)
+    private val mutableIncoming = MutableSharedFlow<JsonRpcMessage>(replay = PRE_SUBSCRIPTION_REPLAY)
     private var closed = false
     private val readerJob: Job =
         scope.launch {
@@ -38,6 +38,10 @@ internal class CodexCliCoKitTransport(
             } catch (_: java.io.IOException) {
                 if (!closed) close()
             }
+        }
+    private val stderrDrainJob: Job =
+        scope.launch {
+            childProcess.stderr.bufferedReader(Charsets.UTF_8).useLines { lines -> lines.forEach { } }
         }
 
     override val incoming: SharedFlow<JsonRpcMessage> = mutableIncoming
@@ -57,6 +61,7 @@ internal class CodexCliCoKitTransport(
         if (closed) return
         closed = true
         readerJob.cancel()
+        stderrDrainJob.cancel()
         runCatching { writer.close() }
         runCatching { reader.close() }
         runCatching { childProcess.stderr.close() }
@@ -65,5 +70,6 @@ internal class CodexCliCoKitTransport(
 
     private companion object {
         private const val MAX_JSON_LINE_LENGTH = 1_048_576
+        private const val PRE_SUBSCRIPTION_REPLAY = 8
     }
 }

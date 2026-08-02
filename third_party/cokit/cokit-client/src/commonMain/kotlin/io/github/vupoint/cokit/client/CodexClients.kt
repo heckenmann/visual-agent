@@ -48,10 +48,7 @@ internal class DefaultCodexClient(
         extraBufferCapacity = 64,
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
-    private val mutableNotifications = MutableSharedFlow<CodexNotification>(
-        extraBufferCapacity = 64,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST,
-    )
+    private val mutableNotifications = MutableSharedFlow<CodexNotification>()
     private var commandApprovalHandler: CommandApprovalHandler? = null
     private var fileChangeApprovalHandler: FileChangeApprovalHandler? = null
     private var permissionApprovalHandler: PermissionApprovalHandler? = null
@@ -66,7 +63,7 @@ internal class DefaultCodexClient(
     }
     private val notificationJob: Job = scope.launch {
         rpc.notifications.collect { notification ->
-            mutableNotifications.tryEmit(notification.toCodexNotification())
+            mutableNotifications.emit(notification.toCodexNotification())
         }
     }
 
