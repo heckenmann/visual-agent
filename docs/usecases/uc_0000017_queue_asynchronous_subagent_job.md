@@ -2,7 +2,7 @@
 
 ## Goal
 
-Queue assigned todo work so the autonomous coordinator can continue planning while sub-agents process work under the configured concurrency limit.
+Keep assigned todo work pending while all sub-agent slots are occupied, then process it when a later autonomous polling pass finds capacity.
 
 ## Primary Actor
 
@@ -16,14 +16,14 @@ Autonomous coordinator.
 ## Main Flow
 
 1. The autonomous coordinator identifies assigned pending work.
-2. The scheduler records work that cannot start immediately.
-3. When capacity becomes available, the selected sub-agent processes the todo.
-4. Completion updates the persisted todo, conversation history, and UI state.
-5. Queue and active-job counters reflect current work.
+2. If every slot is occupied, the coordinator leaves the todo `PENDING` and returns.
+3. A later polling pass selects the pending todo when capacity becomes available.
+4. The selected sub-agent processes the todo.
+5. Completion updates the persisted todo, conversation history, and UI state.
 
 ## Result
 
-Long-running delegated work is queued safely without exposing direct sub-agent execution tools to the main agent.
+Assigned work remains pending until a worker is available, without exposing direct sub-agent execution tools to the main agent.
 
 ## Tool Calls
 
@@ -38,6 +38,6 @@ Long-running delegated work is queued safely without exposing direct sub-agent e
 
 ## Acceptance Criteria
 
-- Assigned work is queued when all workers are busy.
+- Assigned work remains `PENDING` when all workers are busy.
+- A later autonomous polling pass retries pending assigned work when capacity is available.
 - Completed work updates persisted todo and conversation state.
-- Queue size and active-job state remain inspectable.

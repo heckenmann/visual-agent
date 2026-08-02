@@ -150,13 +150,13 @@ Tools are exposed via canonical IDs and mapped to provider-safe function
 names inside `ToolRegistry`. The full inventory lives in `AGENTS.md`;
 the runtime split is:
 
-Main-agent-only (`agentToolConfigService.mainAgentTools()`):
+Main-agent tool set (`agentToolConfigService.mainAgentTools()`):
 `agent:list`, `agent:show`, `agent:create`, `agent:update`, `agent:delete`,
 `agent:log`, and `todos`.
 
 Sub-agent role-based sets (`AgentToolConfigService.toolsFor(agent)`,
-default templates `researcher`, `coder`, `analyst`): all other tool
-IDs.
+default templates `researcher`, `coder`, `analyst`): `todos` plus the
+non-agent tool IDs applicable to the configured role.
 
 Globally disabled tools are kept in the `tools.disabled.global`
 preference as a newline-separated blocklist.
