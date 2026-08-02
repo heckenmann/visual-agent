@@ -30,6 +30,26 @@ internal fun LazyListScope.ConversationMessageList(
     onEditMessage: (String?) -> Unit,
     sendContent: (String) -> Unit,
 ) {
+    val hasInFlightTools =
+        inFlight.state.value.pendingToolIds
+            .isNotEmpty()
+    val showWaitingIndicator = (sending || hasInFlightTools) && streamingContent.isEmpty()
+    if (showWaitingIndicator) {
+        item(key = "streaming-indicator") {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.Start),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Thinking",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                PulsingDots()
+            }
+        }
+    }
     if (sending && streamingContent.isNotEmpty()) {
         item(key = "streaming-assistant") {
             MessageRow(
@@ -66,7 +86,7 @@ internal fun LazyListScope.ConversationMessageList(
             )
         }
     }
-    if (history.isEmpty() && pendingUserMessage == null && streamingContent.isEmpty()) {
+    if (history.isEmpty() && pendingUserMessage == null && streamingContent.isEmpty() && !showWaitingIndicator) {
         item {
             PanelEmptyState(
                 title = "No conversation yet",
@@ -117,25 +137,6 @@ internal fun LazyListScope.ConversationMessageList(
                         onDelete = onDelete,
                         modifier = Modifier.padding(top = topPadding),
                     )
-                }
-            }
-        }
-        val hasInFlightTools =
-            inFlight.state.value.pendingToolIds
-                .isNotEmpty()
-        if ((sending || hasInFlightTools) && history.isNotEmpty()) {
-            item(key = "streaming-indicator") {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.Start),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = "Thinking",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    PulsingDots()
                 }
             }
         }

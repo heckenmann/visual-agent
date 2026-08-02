@@ -17,8 +17,8 @@ Desktop user.
 
 1. The user sends a message.
 2. The application starts a streaming provider request.
-3. Response chunks are emitted as they arrive.
-4. The chat panel updates the visible assistant message incrementally.
+3. While waiting for the first visible assistant chunk, the chat panel displays a `Thinking` indicator beside the newest pending conversation content.
+4. Response chunks are emitted as they arrive and replace the waiting indicator with a temporary assistant message.
 5. While the user's scroll position is at the bottom of the message list, each new chunk scrolls the conversation to the newest content.
 6. If the user has scrolled up to read older messages, new chunks do not disturb the current view; instead, a scroll-to-bottom button appears.
 7. After the final chunk, the completed assistant turn is persisted and the view returns to the bottom.
@@ -41,6 +41,7 @@ The user sees progress during longer responses, stays at the bottom by default, 
 ## Acceptance Criteria
 
 - Partial chunks are visible before completion.
+- A visible waiting indicator is shown before the first assistant chunk, including for the first request in an empty conversation.
 - The persisted conversation contains the final complete assistant response, not partial duplicates.
 - The Compose chat panel displays a temporary assistant turn while chunks arrive, then reloads the persisted final history.
 - The chat panel auto-scrolls to the bottom whenever a new message appears while the scrollbar is already near the bottom.
