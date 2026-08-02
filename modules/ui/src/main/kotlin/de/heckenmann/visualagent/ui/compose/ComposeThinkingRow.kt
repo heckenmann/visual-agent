@@ -43,7 +43,7 @@ import androidx.compose.ui.unit.dp
  * @param modifier Modifier applied to the row
  */
 @Composable
-internal fun ThinkingRow(
+fun ThinkingRow(
     content: String,
     isStreaming: Boolean,
     modifier: Modifier = Modifier,
