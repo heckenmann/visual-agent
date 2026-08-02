@@ -36,6 +36,7 @@ The conversation panel stays pinned to the latest message automatically, includi
 
 - `de.heckenmann.visualagent.ui.compose.ConversationPanel`
 - `de.heckenmann.visualagent.ui.compose.ConversationScrollOnChangeEffect`
+- `de.heckenmann.visualagent.ui.compose.ConversationResizeScrollEffect`
 - `de.heckenmann.visualagent.ui.compose.ConversationStartupScrollEffect`
 
 ## Acceptance Criteria

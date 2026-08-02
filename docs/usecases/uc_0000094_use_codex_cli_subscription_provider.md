@@ -351,22 +351,29 @@ The user can use their Codex subscription in Visual Agent through the official C
 
 ## Code Entry Points
 
-Planned:
+Implemented:
 
 - `de.heckenmann.visualagent.agent.LLMProvider`
 - `de.heckenmann.visualagent.agent.ConfiguredLLMProvider`
 - `de.heckenmann.visualagent.agent.provider.ProviderAdapter.CODEX_CLI`
 - `de.heckenmann.visualagent.agent.provider.ProviderCatalogService`
 - `de.heckenmann.visualagent.agent.codex.CodexCliLocator`
-- `de.heckenmann.visualagent.agent.codex.CodexCliInstaller`
 - `de.heckenmann.visualagent.agent.codex.CodexCliAccountService`
 - `de.heckenmann.visualagent.agent.codex.CodexCliProcessFactory`
-- `de.heckenmann.visualagent.agent.codex.CodexAppServerConnection`
-- `de.heckenmann.visualagent.agent.codex.CodexAppServerManager`
+- `de.heckenmann.visualagent.agent.codex.CodexCliCoKitTransport`
+- `de.heckenmann.visualagent.agent.codex.CodexAppServerConnectionFactory`
+- `de.heckenmann.visualagent.agent.codex.CoKitCodexAppServerChatBridge`
 - `de.heckenmann.visualagent.agent.codex.CodexCliChatModel`
 - `de.heckenmann.visualagent.agent.codex.CodexCliProvider`
-- `de.heckenmann.visualagent.ui.compose.SettingsPanel`
-- `de.heckenmann.visualagent.ui.compose.SettingsProviderSection`
+- `de.heckenmann.visualagent.agent.codex.CodexModelCatalogInitializer`
+- `de.heckenmann.visualagent.ui.compose.ComposeProviderProfileEditor`
+- `de.heckenmann.visualagent.ui.compose.ComposeSettingsPanel`
+- `de.heckenmann.visualagent.ui.compose.ComposeSettingsProviderSection`
+
+Planned follow-ups:
+
+- `de.heckenmann.visualagent.agent.codex.CodexCliInstaller`
+- Dynamic Visual Agent tool bridging and app-server approval dialogs.
 
 The existing experimental `CodexResponsesClient`, `CodexResponsesTransport`, `CodexResponsesModels`, and environment-backed `CodexSessionResolver` are removed as part of implementation.
 
