@@ -151,7 +151,8 @@ names inside `ToolRegistry`. The full inventory lives in `AGENTS.md`;
 the runtime split is:
 
 Main-agent-only (`agentToolConfigService.mainAgentTools()`):
-`agent:list`, `agent:create`, `agent:update`, `agent:delete`.
+`agent:list`, `agent:show`, `agent:create`, `agent:update`, `agent:delete`,
+`agent:log`, and `todos`.
 
 Sub-agent role-based sets (`AgentToolConfigService.toolsFor(agent)`,
 default templates `researcher`, `coder`, `analyst`): all other tool
@@ -187,6 +188,8 @@ that returns "not configured"), `search` (placeholder that returns
   `WORKSPACE_PANEL_GAP = 16`.
 - `Cmd/Ctrl+1..6` focuses panels; `Cmd/Ctrl+K` opens the internal
   command palette; `Esc` closes the palette.
+- Workspace actions are icon-only buttons with descriptive tooltips and
+  accessibility descriptions.
 - Internal modals (`ComposeModalHost` with `ComposeConfirmationModal`,
   `ComposeInfoModal`, `ComposeContentModal`) replace native dialogs
   for destructive confirmations.

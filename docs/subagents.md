@@ -69,29 +69,22 @@ agent's `name` or `role` against the default templates:
 - `analyst`: same as `researcher` minus `browser` and `search`,
   plus review-friendly tools.
 
-The main agent only receives the `agent:*` tool IDs through
+The main agent receives `agent:list`, `agent:show`, `agent:create`,
+`agent:update`, `agent:delete`, `agent:log`, and `todos` through
 `mainAgentTools()`. The `MainSystemPromptComposer` execution policy
-in the system prompt reinforces that the main agent must delegate
-rather than use the lower-level tools directly.
+reinforces that it must delegate rather than use lower-level tools directly.
 
 The preference `tools.disabled.global` holds a newline-separated
 blocklist applied to all agents on top of the role-based set.
 
 ## Sub-Agent Job Lifecycle
 
-The main agent can run sub-agent work synchronously or asynchronously:
-
-- `agent:start` and `agent:message` accept an optional `async`
-  argument. When `true` the tool enqueues a job through
-  `SubAgentJobScheduler.enqueue` and returns the job id; the main
-  agent continues. When omitted or `false` the tool runs the job in
-  the calling coroutine via `runAgentJob` and waits for the result.
-- `managesExecution = true` on `AgentStartTool` and `AgentMessageTool`
-  opts these tools out of the generic async/timeout wrapper so they
-  can hand the coroutine to the scheduler themselves.
-- On async completion, `AgentManager.notifyMainAgentOfJobCompletion`
-  appends a system message to the main conversation history and
-  notifies the global UI callback so the user sees the result.
+The main agent delegates work by creating or updating todos and assigning
+them to sub-agents. `AutonomousCoordinator` selects workers and submits
+work through `SubAgentJobScheduler` under the configured concurrency limit.
+When a worker completes, its result is persisted in the conversation history
+and the UI is notified. There are no direct `agent:start` or
+`agent:message` tools in the registered tool inventory.
 
 ## Autonomous Loop
 

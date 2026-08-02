@@ -1,43 +1,43 @@
-# UC-0000017: Queue Asynchronous Subagent Job
+# UC-0000017: Queue Assigned Todo Work
 
 ## Goal
 
-Queue a sub-agent job asynchronously so the main agent can continue while the job runs later under the concurrency limit.
+Queue assigned todo work so the autonomous coordinator can continue planning while sub-agents process work under the configured concurrency limit.
 
 ## Primary Actor
 
-Main orchestration agent.
+Autonomous coordinator.
 
 ## Preconditions
 
-- A target sub-agent exists or can be created.
-- The tool input requests asynchronous execution.
+- A persisted todo is assigned to an existing sub-agent.
+- The configured concurrency limit may already be reached.
 
 ## Main Flow
 
-1. The main agent requests an async sub-agent job.
-2. The scheduler records the job in a queue and immediately returns a job identifier.
-3. When capacity becomes available, the job executes.
-4. Completion is persisted as a dedicated `sub_agent` message in the conversation history and shown in the chat panel.
-5. Queue and active job counters are updated.
+1. The autonomous coordinator identifies assigned pending work.
+2. The scheduler records work that cannot start immediately.
+3. When capacity becomes available, the selected sub-agent processes the todo.
+4. Completion updates the persisted todo, conversation history, and UI state.
+5. Queue and active-job counters reflect current work.
 
 ## Result
 
-Long-running delegated work does not block the main agent.
+Long-running delegated work is queued safely without exposing direct sub-agent execution tools to the main agent.
 
 ## Tool Calls
 
-- Any enabled tool can request asynchronous execution with `async=true`; sub-agent starts commonly use `agent:start`.
+- `todos` with an assignment action associates work with a sub-agent.
+- The autonomous coordinator performs scheduling; no direct `agent:start` or `agent:message` tool exists.
 
 ## Code Entry Points
 
+- `de.heckenmann.visualagent.orchestration.AutonomousCoordinator`
 - `de.heckenmann.visualagent.agent.SubAgentJobScheduler`
-- `de.heckenmann.visualagent.agent.AgentManager.enqueueAgentJob`
-- `de.heckenmann.visualagent.agent.conversation.AgentManagerConversationOps`
-- `de.heckenmann.visualagent.agent.tools.ToolRegistry`
+- `de.heckenmann.visualagent.agent.AgentManager`
 
 ## Acceptance Criteria
 
-- Async tool calls return before job completion.
-- Finished async jobs notify the main agent.
-- Queue size and active job state are inspectable.
+- Assigned work is queued when all workers are busy.
+- Completed work updates persisted todo and conversation state.
+- Queue size and active-job state remain inspectable.

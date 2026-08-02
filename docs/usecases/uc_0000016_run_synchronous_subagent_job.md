@@ -1,46 +1,44 @@
-# UC-0000016: Run Synchronous Subagent Job
+# UC-0000016: Process an Assigned Todo with a Sub-Agent
 
 ## Goal
 
-Run a sub-agent job synchronously so the caller waits for the result while respecting the configured maximum parallel sub-agent count.
+Process a todo assigned to a sub-agent while respecting the configured maximum parallel sub-agent count.
 
 ## Primary Actor
 
-Main orchestration agent.
+Autonomous coordinator.
 
 ## Preconditions
 
-- A target sub-agent exists or can be created.
-- The main agent has sub-agent execution tools.
+- A persisted todo is assigned to an existing sub-agent.
 - The maximum parallel sub-agent limit may already be reached.
 
 ## Main Flow
 
-1. The main agent requests a synchronous sub-agent job.
+1. The autonomous coordinator selects an assigned pending todo.
 2. The scheduler waits until capacity is available.
-3. The job runs on the selected or newly created sub-agent.
+3. The selected sub-agent processes the todo.
 4. Active job counters are updated while the job runs.
-5. The caller receives the final result.
-6. The result is persisted as a dedicated `sub_agent` message in the conversation history and shown in the chat panel.
+5. The result is persisted and the todo status is updated.
+6. The conversation history and UI reflect the completed work.
 
 ## Result
 
-The main agent gets a completed sub-agent result without exceeding configured concurrency; the result is visible as its own chat entry.
+Assigned work is completed without exceeding configured concurrency and its result remains visible to the user.
 
 ## Tool Calls
 
-- `agent:start`: start a synchronous sub-agent job.
-- `agent:message`: send a message to an existing sub-agent.
+- `todos` with an assignment action associates a todo with a sub-agent.
+- The autonomous coordinator schedules the resulting work; no direct `agent:start` or `agent:message` tool exists.
 
 ## Code Entry Points
 
+- `de.heckenmann.visualagent.orchestration.AutonomousCoordinator`
 - `de.heckenmann.visualagent.agent.SubAgentJobScheduler`
-- `de.heckenmann.visualagent.agent.AgentManager.runAgentJob`
-- `de.heckenmann.visualagent.agent.AgentManager.startAgentJob`
-- `de.heckenmann.visualagent.agent.tools.AgentStartTool`
-- `de.heckenmann.visualagent.agent.tools.AgentMessageTool`
+- `de.heckenmann.visualagent.agent.AgentManager`
 
 ## Acceptance Criteria
 
-- Synchronous requests wait instead of failing when the limit is reached.
+- Assigned todos wait instead of failing when the concurrency limit is reached.
 - Active job counts are incremented and decremented reliably.
+- Completed work updates persisted todo and conversation state.

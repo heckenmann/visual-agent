@@ -9,7 +9,7 @@ When the main agent or a sub-agent modifies data through a tool call, the UI pan
 - `ToolEventRefreshEffect` composable subscribes to `ToolEventBus` FINISHED events and debounces refresh calls.
 - Files panel refreshes on `file:write`, `file:edit`, `workspace:file` FINISHED.
 - Todos panel refreshes on `todos`, `agent:assign-todo`, `agent:assign-next-todo`, `agent:assign-all-todos` FINISHED.
-- Sub-agents panel refreshes on `agent:create`, `agent:update`, `agent:delete`, `agent:start`, `agent:list` FINISHED.
+- Sub-agents panel refreshes on `agent:create`, `agent:update`, and `agent:delete` FINISHED.
 - Canvas panel refreshes on `canvas` FINISHED.
 - Settings panel refreshes on `ui` FINISHED.
 - Conversation panel refreshes history on any FINISHED event (tool-call entries are persisted for all tools).

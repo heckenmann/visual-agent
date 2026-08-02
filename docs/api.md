@@ -99,22 +99,22 @@ Tools are defined through app-level `ToolDefinition` and executed through `Visua
 
 ### Main-agent tool set
 
-The main agent only receives the `agent:*` tool IDs through
-`AgentToolConfigService.mainAgentTools()`. The model can only drive
-sub-agent work through these tools; it cannot call file, terminal,
-browser, search, history, todo, manual, usecases, workspace, or
-canvas tools directly. The `MainSystemPromptComposer` execution
-policy reinforces this in the system prompt.
+The main agent receives the sub-agent definition IDs (`agent:*`) plus
+`todos` through `AgentToolConfigService.mainAgentTools()`. It delegates
+work by assigning todos to sub-agents and cannot call file, terminal,
+browser, search, history, manual, usecases, workspace, or canvas tools
+directly. The `MainSystemPromptComposer` execution policy reinforces
+this in the system prompt.
 
 | Tool ID | Action | Purpose |
 |---|---|---|
 | `agent:list` | `get` | Returns active/queued counts and a per-agent line. |
+| `agent:show` | `get` | Returns configuration, current work, tools, and recent log entries for one sub-agent. |
 | `agent:create` | `create` | Creates a sub-agent from a named template. |
 | `agent:update` | `update` | Updates name, role, and configuration of an existing sub-agent. |
 | `agent:delete` | `delete` | Removes a sub-agent. |
-| `agent:start` | `start` (sync / `async:true`) | Creates a sub-agent from a template and runs the job sync or enqueues async. |
-| `agent:message` | `message` (sync / `async:true`) | Sends a message to an existing sub-agent id, sync or async. |
-| `todos` | `get-result` | Returns the stored result summary for a todo. |
+| `agent:log` | `get` | Returns up to 50 persisted work-log entries for one sub-agent. |
+| `todos` | multiple | Lists and manages todos, including assigning work to a sub-agent and retrieving a stored result. |
 
 ### Sub-agent role-based tool sets
 
