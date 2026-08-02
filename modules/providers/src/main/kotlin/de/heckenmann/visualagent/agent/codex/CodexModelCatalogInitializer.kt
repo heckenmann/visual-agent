@@ -4,6 +4,7 @@ import de.heckenmann.visualagent.agent.ConfiguredLLMProvider
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderErrorMessages
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -18,6 +19,7 @@ internal class CodexModelCatalogInitializer(
     private val providerCatalog: ProviderCatalogService,
     private val llmProvider: ConfiguredLLMProvider,
     private val applicationScope: CoroutineScope,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     /** Starts model discovery after Spring has completed application startup. */
     @EventListener(ApplicationReadyEvent::class)
@@ -25,7 +27,7 @@ internal class CodexModelCatalogInitializer(
         val providerId = providerCatalog.activeProviderId()
         val profile = providerCatalog.getProvider(providerId) ?: return
         if (profile.adapter != ProviderAdapter.CODEX_CLI) return
-        applicationScope.launch(Dispatchers.IO) {
+        applicationScope.launch(ioDispatcher) {
             runCatching { llmProvider.getModels(providerId) }
                 .onFailure { error -> logger.warning(ProviderErrorMessages.userFacing(error)) }
         }

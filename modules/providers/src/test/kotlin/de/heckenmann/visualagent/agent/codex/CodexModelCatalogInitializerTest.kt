@@ -10,6 +10,7 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
@@ -26,7 +27,8 @@ internal class CodexModelCatalogInitializerTest {
             every { catalog.selectableModels(PROVIDER_ID) } returns emptyList()
             coEvery { provider.getModels(PROVIDER_ID) } returns listOf("gpt-codex")
 
-            CodexModelCatalogInitializer(catalog, provider, this).initializeActiveCodexCatalog()
+            CodexModelCatalogInitializer(catalog, provider, this, StandardTestDispatcher(testScheduler))
+                .initializeActiveCodexCatalog()
             advanceUntilIdle()
 
             coVerify(exactly = 1) { provider.getModels(PROVIDER_ID) }
@@ -42,7 +44,8 @@ internal class CodexModelCatalogInitializerTest {
             every { catalog.selectableModels(PROVIDER_ID) } returns listOf(ProviderModelConfig("gpt-codex"))
             coEvery { provider.getModels(PROVIDER_ID) } returns listOf("gpt-codex", "codex-auto-review")
 
-            CodexModelCatalogInitializer(catalog, provider, this).initializeActiveCodexCatalog()
+            CodexModelCatalogInitializer(catalog, provider, this, StandardTestDispatcher(testScheduler))
+                .initializeActiveCodexCatalog()
             advanceUntilIdle()
 
             coVerify(exactly = 1) { provider.getModels(PROVIDER_ID) }

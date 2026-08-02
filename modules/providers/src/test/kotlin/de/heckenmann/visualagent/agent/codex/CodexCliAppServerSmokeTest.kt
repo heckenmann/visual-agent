@@ -8,9 +8,9 @@ import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.agent.openai.OpenAiClient
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
+import de.heckenmann.visualagent.agent.provider.ProviderPreferenceStore
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
-import de.heckenmann.visualagent.agent.tools.ToolRegistry
-import de.heckenmann.visualagent.knowledge.PreferenceStore
+import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
 import io.github.vupoint.cokit.client.CodexRpc
 import io.github.vupoint.cokit.client.models.ModelListParams
 import io.mockk.every
@@ -41,7 +41,7 @@ internal class CodexCliAppServerSmokeTest {
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
             try {
                 val connectionFactory = CodexAppServerConnectionFactory(processFactory, scope)
-                val toolRegistry = mockk<ToolRegistry>()
+                val toolRegistry = mockk<ProviderToolCallbacks>()
                 every { toolRegistry.functionCallbacks(any(), any()) } returns listOf(smokeToolCallback())
                 val provider = CodexCliProvider(locator, connectionFactory, toolRegistry)
                 val model =
@@ -148,7 +148,7 @@ internal class CodexCliAppServerSmokeTest {
         assertTrue(catalog.selectableModels(profile.id).map { it.id }.containsAll(discovered))
     }
 
-    private class InMemoryPreferenceStore : PreferenceStore {
+    private class InMemoryPreferenceStore : ProviderPreferenceStore {
         private val values = mutableMapOf<String, String>()
 
         override fun getPreference(key: String): String? = values[key]

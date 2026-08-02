@@ -8,8 +8,8 @@ import de.heckenmann.visualagent.agent.ModelDetails
 import de.heckenmann.visualagent.agent.ShowResponse
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
-import de.heckenmann.visualagent.agent.tools.ToolRegistry
-import de.heckenmann.visualagent.workspace.WorkspaceFilePaths
+import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
+import de.heckenmann.visualagent.agent.provider.ProviderWorkingDirectory
 import io.github.vupoint.cokit.client.CodexCursor
 import io.github.vupoint.cokit.client.CodexRpc
 import io.github.vupoint.cokit.client.models.ModelListParams
@@ -31,7 +31,8 @@ import java.nio.file.Path
 class CodexCliProvider internal constructor(
     private val locator: CodexCliLocator,
     private val connectionFactory: CodexAppServerConnector,
-    private val toolRegistry: ToolRegistry,
+    private val toolRegistry: ProviderToolCallbacks,
+    private val workingDirectory: ProviderWorkingDirectory = ProviderWorkingDirectory { Path.of(System.getProperty("user.dir")) },
 ) : LLMProvider {
     override suspend fun chat(messages: List<Message>): ChatResponse = error("Codex CLI chat requires a configured provider profile")
 
@@ -150,9 +151,11 @@ class CodexCliProvider internal constructor(
             ?.normalize()
             ?: defaultWorkingDirectory()
 
-    private fun defaultWorkingDirectory(): Path = WorkspaceFilePaths.workspaceRoot()
+    private fun defaultWorkingDirectory(): Path = workingDirectory.get()
 
-    internal companion object {
+    /** Provider-profile option keys understood by the Codex CLI adapter. */
+    companion object {
+        /** Explicit Codex CLI executable path option. */
         const val OPTION_EXECUTABLE_PATH = "codex.executable.path"
         private const val MODEL_PAGE_SIZE = 100
     }

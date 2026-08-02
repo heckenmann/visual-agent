@@ -4,9 +4,8 @@ import de.heckenmann.visualagent.agent.openai.OpenAiClient
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
+import de.heckenmann.visualagent.agent.provider.ProviderPreferenceStore
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
-import de.heckenmann.visualagent.config.AppConfigBean
-import de.heckenmann.visualagent.knowledge.PreferenceStore
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -19,7 +18,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class ConfiguredLLMProviderTest {
-    private val appConfig = AppConfigBean()
+    private val appConfig = TestProviderRuntimeConfig()
 
     @Test
     fun `missing active provider fails instead of silently falling back to ollama`() =
@@ -263,7 +262,7 @@ class ConfiguredLLMProviderTest {
 
     private fun catalog(): ProviderCatalogService =
         ProviderCatalogService(
-            object : PreferenceStore {
+            object : ProviderPreferenceStore {
                 private val values = mutableMapOf<String, String>()
 
                 override fun getPreference(key: String): String? = values[key]

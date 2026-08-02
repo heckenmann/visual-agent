@@ -4,7 +4,7 @@ import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
-import de.heckenmann.visualagent.agent.tools.ToolRegistry
+import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
 import io.github.vupoint.cokit.client.CodexClient
 import io.github.vupoint.cokit.client.CodexNotification
 import io.github.vupoint.cokit.client.CodexRpcMethod
@@ -66,7 +66,7 @@ class CodexCliProviderTest {
         val locator = mockk<CodexCliLocator>()
         coEvery { locator.locate(any()) } returns
             CodexCliLocation.Ready(Path.of("/codex"), "codex-cli test", CodexCliLocationSource.EXPLICIT)
-        val toolRegistry = mockk<ToolRegistry>()
+        val toolRegistry = mockk<ProviderToolCallbacks>()
         every { toolRegistry.functionCallbacks(any(), any()) } returns emptyList()
         val connector = CodexAppServerConnector { _, _ -> CodexAppServerConnection(fakeClient(notifications), AutoCloseable {}) }
         return CodexCliProvider(locator, connector, toolRegistry)
