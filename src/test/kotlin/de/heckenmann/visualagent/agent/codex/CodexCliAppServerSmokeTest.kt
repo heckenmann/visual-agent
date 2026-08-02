@@ -1,7 +1,10 @@
 package de.heckenmann.visualagent.agent.codex
 
+import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.ConfiguredLLMProvider
+import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.OllamaClient
+import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.agent.openai.OpenAiClient
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
@@ -10,15 +13,19 @@ import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.knowledge.PreferenceStore
 import io.github.vupoint.cokit.client.CodexRpc
 import io.github.vupoint.cokit.client.models.ModelListParams
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
 import org.springframework.ai.chat.prompt.Prompt
+import org.springframework.ai.tool.ToolCallback
+import org.springframework.ai.tool.definition.ToolDefinition
 import java.nio.file.Path
 import kotlin.test.assertTrue
 
@@ -34,7 +41,9 @@ internal class CodexCliAppServerSmokeTest {
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
             try {
                 val connectionFactory = CodexAppServerConnectionFactory(processFactory, scope)
-                val provider = CodexCliProvider(locator, connectionFactory, mockk<ToolRegistry>(relaxed = true))
+                val toolRegistry = mockk<ToolRegistry>()
+                every { toolRegistry.functionCallbacks(any(), any()) } returns listOf(smokeToolCallback())
+                val provider = CodexCliProvider(locator, connectionFactory, toolRegistry)
                 val model =
                     connectionFactory
                         .connect(location.executable, Path.of(System.getProperty("user.dir")))
@@ -61,10 +70,57 @@ internal class CodexCliAppServerSmokeTest {
                         ?.output
                         ?.text
                 assertTrue(!responseText.isNullOrBlank())
+                verifyProviderStream(provider, location.executable, model)
                 verifyCatalogModelRefresh(provider)
             } finally {
                 scope.cancel()
             }
+        }
+
+    private suspend fun verifyProviderStream(
+        provider: CodexCliProvider,
+        executable: Path,
+        model: String,
+    ) {
+        val profile =
+            ProviderProfile(
+                id = "codex-provider-smoke",
+                name = "Codex provider smoke",
+                adapter = ProviderAdapter.CODEX_CLI,
+                baseUrl = "",
+                defaultModel = model,
+                options = mapOf(CodexCliProvider.OPTION_EXECUTABLE_PATH to executable.toString()),
+            )
+        val chunks =
+            provider
+                .stream(
+                    ChatRequestContext(
+                        messages =
+                            listOf(
+                                Message("system", "Follow the request exactly."),
+                                Message("user", "Earlier question"),
+                                Message("assistant", "Earlier answer"),
+                                Message("user", "Reply with exactly OK and do not call tools."),
+                            ),
+                        model = model,
+                        enabledTools = setOf(ToolId("smoke")),
+                        providerProfile = profile,
+                    ),
+                ).toList()
+        assertTrue(chunks.any { it.message.content.isNotBlank() })
+    }
+
+    private fun smokeToolCallback(): ToolCallback =
+        object : ToolCallback {
+            override fun getToolDefinition(): ToolDefinition =
+                ToolDefinition
+                    .builder()
+                    .name("smoke")
+                    .description("Returns a fixed smoke-test value")
+                    .inputSchema("{\"type\":\"object\",\"properties\":{}}")
+                    .build()
+
+            override fun call(functionInput: String): String = "smoke-ok"
         }
 
     private suspend fun verifyCatalogModelRefresh(provider: CodexCliProvider) {
