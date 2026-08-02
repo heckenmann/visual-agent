@@ -37,7 +37,9 @@ import de.heckenmann.visualagent.agent.codex.CodexCliUpdateStatus
 import de.heckenmann.visualagent.agent.codex.CodexCliVersionInfo
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 internal fun ProviderProfileEditor(
@@ -104,7 +106,10 @@ internal fun ProviderProfileEditor(
                         val result =
                             when (action) {
                                 "login" -> requireNotNull(codexCliAccountService).login(state.codexExecutablePath())
-                                "device login" -> requireNotNull(codexCliAccountService).deviceLogin(state.codexExecutablePath())
+                                "device login" ->
+                                    requireNotNull(codexCliAccountService).deviceLogin(state.codexExecutablePath()) { output ->
+                                        withContext(Dispatchers.Main) { accountStatus = output }
+                                    }
                                 else -> requireNotNull(codexCliAccountService).logout(state.codexExecutablePath())
                             }
                         accountStatus = result.message

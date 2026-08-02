@@ -78,9 +78,17 @@ class CodexCliAccountService internal constructor(
     /** Starts the official browser-based login after UI confirmation. */
     suspend fun login(explicitPath: String?): CodexAccountActionResult = accountAction(explicitPath, listOf("login"), LOGIN_TIMEOUT_SECONDS)
 
-    /** Starts the official device-code login after UI confirmation. */
-    suspend fun deviceLogin(explicitPath: String?): CodexAccountActionResult =
-        accountAction(explicitPath, listOf("login", "--device-auth"), LOGIN_TIMEOUT_SECONDS)
+    /**
+     * Starts the official device-code login and publishes its bounded setup instructions while it runs.
+     *
+     * @param explicitPath Optional configured Codex executable
+     * @param onProgress Receives sanitized cumulative CLI output from [Dispatchers.IO]
+     * @return Final official CLI action result
+     */
+    suspend fun deviceLogin(
+        explicitPath: String?,
+        onProgress: suspend (String) -> Unit = {},
+    ): CodexAccountActionResult = accountAction(explicitPath, listOf("login", "--device-auth"), LOGIN_TIMEOUT_SECONDS, onProgress)
 
     /** Logs out through the official CLI after UI confirmation. */
     suspend fun logout(explicitPath: String?): CodexAccountActionResult =
@@ -90,6 +98,7 @@ class CodexCliAccountService internal constructor(
         explicitPath: String?,
         arguments: List<String>,
         timeoutSeconds: Long,
+        onProgress: suspend (String) -> Unit = {},
     ): CodexAccountActionResult =
         withContext(Dispatchers.IO) {
             val executable =
@@ -100,17 +109,28 @@ class CodexCliAccountService internal constructor(
                     .run(
                         listOf(executable.toString()) + arguments,
                         timeoutSeconds = timeoutSeconds,
+                        onOutput = { output -> onProgress(sanitizeAccountOutput(output)) },
                     ).let { result ->
                         CodexAccountActionResult(
                             successful = result.exitCode == 0,
                             message =
-                                result.stdout.text.ifBlank { result.stderr.text }.ifBlank {
-                                    if (result.exitCode == 0) "Codex CLI action completed" else "Codex CLI action failed"
-                                },
+                                sanitizeAccountOutput(
+                                    result.stdout.text.ifBlank { result.stderr.text }.ifBlank {
+                                        if (result.exitCode == 0) "Codex CLI action completed" else "Codex CLI action failed"
+                                    },
+                                ),
                         )
                     }
             }.getOrElse { CodexAccountActionResult(false, it.message ?: "Codex CLI action failed") }
         }
+
+    private fun sanitizeAccountOutput(output: String): String =
+        output
+            .replace(ANSI_ESCAPE_PATTERN, "")
+            .lineSequence()
+            .joinToString("\n") { line ->
+                if (SENSITIVE_OUTPUT_PATTERN.containsMatchIn(line)) "[REDACTED]" else line
+            }.take(MAX_ACCOUNT_OUTPUT_CHARACTERS)
 
     private suspend fun resolve(explicitPath: String?): Path? =
         when (val result = locator.locate(explicitPath)) {
@@ -146,7 +166,10 @@ class CodexCliAccountService internal constructor(
 
     private companion object {
         private val VERSION_PATTERN = Regex("\\d+(?:\\.\\d+)+")
+        private val ANSI_ESCAPE_PATTERN = Regex("\\u001B\\[[0-?]*[ -/]*[@-~]")
+        private val SENSITIVE_OUTPUT_PATTERN = Regex("(?i)\\b(api[_ -]?key|access[_ -]?token|refresh[_ -]?token|cookie|authorization)\\b")
         private const val STATUS_TIMEOUT_SECONDS = 15L
         private const val LOGIN_TIMEOUT_SECONDS = 600L
+        private const val MAX_ACCOUNT_OUTPUT_CHARACTERS = 16_384
     }
 }

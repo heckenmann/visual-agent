@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.agent.codex
 
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Files
@@ -25,6 +26,30 @@ internal class CodexCliAccountServiceTest {
             assertTrue(service.login(executable.toString()).successful)
             assertTrue(service.deviceLogin(executable.toString()).successful)
             assertTrue(service.logout(executable.toString()).successful)
+        }
+
+    @Test
+    fun `device login publishes sanitized instructions before process completion`() =
+        runBlocking {
+            val marker = tempDir.resolve("progress-received")
+            val executable = fakeStreamingCodex(marker)
+            val processFactory = CodexCliProcessFactory()
+            val locator = CodexCliLocator(emptyEnvironment(), ProcessCodexCliVersionProbe(processFactory))
+            val service = CodexCliAccountService(locator, processFactory, releaseVersion("0.146.0"))
+            val updates = mutableListOf<String>()
+
+            val result =
+                withTimeout(5_000) {
+                    service.deviceLogin(executable.toString()) { output ->
+                        updates += output
+                        if ("ABCD-EFGH" in output) Files.writeString(marker, "received")
+                    }
+                }
+
+            assertTrue(result.successful)
+            assertTrue(updates.any { "https://auth.openai.com/device" in it && "ABCD-EFGH" in it })
+            assertTrue(updates.any { "[REDACTED]" in it })
+            assertTrue(updates.none { "secret-value" in it })
         }
 
     @Test
@@ -92,6 +117,25 @@ internal class CodexCliAccountServiceTest {
                 if [ "${'$'}1" = "login" ] && [ "${'$'}2" = "status" ]; then exit 0; fi
                 if [ "${'$'}1" = "login" ]; then printf 'login completed\n'; exit 0; fi
                 if [ "${'$'}1" = "logout" ]; then printf 'logout completed\n'; exit 0; fi
+                exit 1
+                """.trimIndent(),
+            )
+            executable.toFile().setExecutable(true)
+        }
+
+    private fun fakeStreamingCodex(marker: Path): Path =
+        tempDir.resolve("codex-streaming").also { executable ->
+            Files.writeString(
+                executable,
+                """
+                #!/bin/sh
+                if [ "${'$'}1" = "--version" ]; then printf 'codex-cli 0.146.0\n'; exit 0; fi
+                if [ "${'$'}1" = "login" ] && [ "${'$'}2" = "--device-auth" ]; then
+                    printf 'Open https://auth.openai.com/device and enter ABCD-EFGH\n'
+                    printf 'access token: secret-value\n' >&2
+                    while [ ! -f '${marker.toAbsolutePath()}' ]; do :; done
+                    exit 0
+                fi
                 exit 1
                 """.trimIndent(),
             )

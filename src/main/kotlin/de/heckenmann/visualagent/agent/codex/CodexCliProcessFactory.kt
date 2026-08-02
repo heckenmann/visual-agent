@@ -3,6 +3,8 @@ package de.heckenmann.visualagent.agent.codex
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.springframework.stereotype.Component
 import java.nio.file.Path
@@ -41,12 +43,14 @@ internal class CodexCliProcessFactory {
      * @param command Executable followed by literal arguments
      * @param workingDirectory Deliberate child working directory, when needed
      * @param timeoutSeconds Maximum process duration in seconds
+     * @param onOutput Optional bounded cumulative output callback invoked from [Dispatchers.IO]
      * @return Exit, timeout, and bounded output data
      */
     suspend fun run(
         command: List<String>,
         workingDirectory: Path? = null,
         timeoutSeconds: Long,
+        onOutput: suspend (String) -> Unit = {},
     ): CodexCliProcessResult {
         require(command.isNotEmpty()) { "Codex command must include an executable" }
         require(timeoutSeconds > 0) { "Codex timeout must be positive" }
@@ -60,8 +64,17 @@ internal class CodexCliProcessFactory {
                             environment().remove(OPENAI_CODEX_API_KEY)
                         }.start()
                 try {
-                    val stdout = async(Dispatchers.IO) { process.inputStream.readBounded() }
-                    val stderr = async(Dispatchers.IO) { process.errorStream.readBounded() }
+                    val progress = StringBuilder()
+                    val progressMutex = Mutex()
+                    val publish: suspend (String) -> Unit = { chunk ->
+                        progressMutex.withLock {
+                            val remaining = MAX_OUTPUT_CHARACTERS - progress.length
+                            if (remaining > 0) progress.append(chunk.take(remaining))
+                            onOutput(progress.toString())
+                        }
+                    }
+                    val stdout = async(Dispatchers.IO) { process.inputStream.readBounded(publish) }
+                    val stderr = async(Dispatchers.IO) { process.errorStream.readBounded(publish) }
                     val completed = process.waitFor(timeoutSeconds, TimeUnit.SECONDS)
                     if (!completed) terminateTree(process)
                     CodexCliProcessResult(
@@ -91,7 +104,7 @@ internal class CodexCliProcessFactory {
         handles.filter(ProcessHandle::isAlive).forEach(ProcessHandle::destroyForcibly)
     }
 
-    private fun java.io.InputStream.readBounded(): CodexCliProcessOutput {
+    private suspend fun java.io.InputStream.readBounded(onChunk: suspend (String) -> Unit): CodexCliProcessOutput {
         val bytes = ByteArray(BUFFER_SIZE)
         val output = StringBuilder()
         var truncated = false
@@ -105,6 +118,7 @@ internal class CodexCliProcessFactory {
             }
             val decoded = bytes.decodeToString(0, count)
             output.append(decoded.take(remaining))
+            onChunk(decoded.take(remaining))
             truncated = truncated || decoded.length > remaining
         }
         return CodexCliProcessOutput(output.toString(), truncated)
