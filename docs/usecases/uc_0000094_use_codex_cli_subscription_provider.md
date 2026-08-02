@@ -80,6 +80,8 @@ Discovery results are classified as:
 
 Changing the manual path triggers validation immediately. An invalid explicit path must not silently fall back to a different installation; the UI must let the user clear it to return to automatic discovery.
 
+The provider editor displays the normalized installed version from `<candidate> --version` and the latest official package version through `npm view @openai/codex version --json`, with `yarn info @openai/codex version --json` as a fallback. Both commands are read-only registry queries with bounded execution and output. The lookup reports the latest version as unavailable when neither package manager can complete the query. It classifies a valid comparison as **Up to date** or **Update available**. Version discovery never starts an installation or update automatically.
+
 ## Installation Flow
 
 1. Visual Agent shows that Codex CLI is missing and explains that the official CLI is required for this provider.
@@ -207,10 +209,10 @@ OpenAI's app-server documentation requests that enterprise integrations identify
 Visual Agent sends:
 
 ```json
-{"method":"model/list","id":N,"params":{"limit":100,"includeHidden":false}}
+{"method":"model/list","id":N,"params":{"limit":100,"includeHidden":true}}
 ```
 
-It follows `nextCursor` until exhausted, deduplicates by model ID, and stores display name, default status, supported reasoning efforts, input modalities, and personality support where the provider catalog can represent them. Hidden models are excluded. An empty authenticated result is an error and must not erase a previously valid catalog.
+It follows `nextCursor` until exhausted, deduplicates by model ID, and stores every model returned for the active account and client context, including entries marked hidden by Codex. It stores display name, default status, supported reasoning efforts, input modalities, and personality support where the provider catalog can represent them. An empty authenticated result is an error and must not erase a previously valid catalog.
 
 The model marked `isDefault` becomes the suggested default only when the user has not already selected a valid model.
 
