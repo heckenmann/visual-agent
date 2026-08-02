@@ -19,6 +19,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.agent.LLMProvider
+import de.heckenmann.visualagent.agent.codex.CodexCliAccountService
+import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderErrorMessages
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
@@ -38,6 +40,7 @@ internal fun SettingsPanel(
     config: AppConfigBean,
     llmProvider: LLMProvider,
     providerCatalogService: ProviderCatalogService,
+    codexCliAccountService: CodexCliAccountService? = null,
     modalRequester: ComposeModalRequester,
     onSettingsChanged: () -> Unit,
     inFlight: InFlightStateHolder,
@@ -130,6 +133,12 @@ internal fun SettingsPanel(
         }
     }
 
+    LaunchedEffect(providerId, managedProvider?.adapter, selectableModels.isEmpty()) {
+        if (managedProvider?.adapter == ProviderAdapter.CODEX_CLI && selectableModels.isEmpty()) {
+            refreshModels()
+        }
+    }
+
     /** Loads detailed metadata for the currently selected model. */
     fun refreshModelDetails(modelOverride: String? = null) {
         val requestedProviderId = providerId
@@ -169,6 +178,7 @@ internal fun SettingsPanel(
             loadingDetails = loadingDetails,
             filteredModels = filteredModels,
             modalRequester = modalRequester,
+            codexCliAccountService = codexCliAccountService,
             onProviderSelected = { selected ->
                 runCatching {
                     val name = activateSelectedProvider(config, providerCatalogService, selected)

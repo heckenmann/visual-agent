@@ -111,6 +111,7 @@ private fun VisualAgentComposeApp(
                 agentManager = deps.agentManager,
                 llmProvider = deps.llmProvider,
                 providerCatalogService = deps.providerCatalogService,
+                codexCliAccountService = deps.codexCliAccountService,
                 agentToolConfigService = deps.agentToolConfigService,
                 toolRegistry = deps.toolRegistry,
                 toolEventBus = deps.toolEventBus,

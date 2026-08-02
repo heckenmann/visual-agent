@@ -51,7 +51,7 @@ internal fun ProviderProfileFormState.validationError(): String? =
         id.isBlank() -> "Provider ID is required."
         !id.trim().matches(PROVIDER_ID_PATTERN) -> "Provider ID contains invalid characters."
         name.isBlank() -> "Name is required."
-        baseUrl.isBlank() -> "Base URL is required."
+        adapter != ProviderAdapter.CODEX_CLI && baseUrl.isBlank() -> "Base URL is required."
         else -> null
     }
 

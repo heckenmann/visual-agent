@@ -285,6 +285,7 @@ internal fun WindowBody(
                 config = panelServices.config,
                 llmProvider = panelServices.llmProvider,
                 providerCatalogService = panelServices.providerCatalogService,
+                codexCliAccountService = panelServices.codexCliAccountService,
                 modalRequester = panelServices.modalRequester,
                 onSettingsChanged = panelServices.onSettingsChanged,
                 inFlight = panelServices.inFlight,

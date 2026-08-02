@@ -2,6 +2,7 @@ package de.heckenmann.visualagent.ui.compose
 
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.LLMProvider
+import de.heckenmann.visualagent.agent.codex.CodexCliAccountService
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
@@ -288,6 +289,7 @@ data class ComposePanelServices(
     val agentManager: AgentManager,
     val llmProvider: LLMProvider,
     val providerCatalogService: ProviderCatalogService,
+    val codexCliAccountService: CodexCliAccountService? = null,
     val agentToolConfigService: AgentToolConfigService,
     val toolRegistry: ToolRegistry,
     val toolEventBus: ToolEventBus,
