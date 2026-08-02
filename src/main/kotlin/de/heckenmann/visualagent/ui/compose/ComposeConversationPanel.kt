@@ -74,6 +74,7 @@ internal fun ConversationPanel(
     var deletingMessageIds by remember { mutableStateOf(setOf<String>()) }
     var activeToken by remember { mutableStateOf<CancellationToken?>(null) }
     var panelSize by remember { mutableStateOf(IntSize.Zero) }
+    var inputAreaHeight by remember { mutableStateOf(0) }
     var pendingUserMessage by remember { mutableStateOf<String?>(null) }
     val streamingFlow = remember { MutableStateFlow("") }
     val streamingContent by streamingFlow.collectAsState()
@@ -158,8 +159,9 @@ internal fun ConversationPanel(
         inputFocusRequester.requestFocus()
     }
     ConversationStartupScrollEffect(history, listState)
-    ConversationScrollOnChangeEffect(history, listState, pendingUserMessage)
-    ConversationResizeScrollEffect(panelSize, history, listState)
+    ConversationScrollOnChangeEffect(history, listState, pendingUserMessage, streamingContent)
+    val hasConversationContent = history.isNotEmpty() || pendingUserMessage != null || streamingContent.isNotEmpty()
+    ConversationResizeScrollEffect(panelSize, inputAreaHeight, hasConversationContent, listState)
     ConversationQueueFlushEffect(
         sending = sending,
         inFlight = inFlight,
@@ -174,7 +176,6 @@ internal fun ConversationPanel(
         onPendingUserMessageChange = { pendingUserMessage = it },
         streamingFlow = streamingFlow,
     )
-    var inputAreaHeight by remember { mutableStateOf(0) }
     val density = LocalDensity.current
     val animatedBottomPadding by animateDpAsState(
         targetValue = with(density) { inputAreaHeight.toDp() } + 8.dp,

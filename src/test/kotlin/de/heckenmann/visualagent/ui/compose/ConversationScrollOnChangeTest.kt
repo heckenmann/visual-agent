@@ -117,6 +117,66 @@ class ConversationScrollOnChangeTest {
     }
 
     @Test
+    fun `scrolls to bottom when streaming assistant content changes`() {
+        val messages: SnapshotStateList<Message> = (1..20).map { Message("user", "message $it") }.toMutableStateList()
+        val listState = mutableListOf<androidx.compose.foundation.lazy.LazyListState>()
+        val streamingContent = mutableStateOf("")
+        composeTestRule.setContent {
+            val state = rememberLazyListState()
+            listState.add(state)
+            MaterialTheme {
+                LazyColumn(
+                    state = state,
+                    modifier = Modifier.width(200.dp).height(160.dp),
+                    reverseLayout = true,
+                ) {
+                    if (streamingContent.value.isNotEmpty()) {
+                        item(key = "streaming-assistant") {
+                            Text(text = streamingContent.value, modifier = Modifier.padding(vertical = 20.dp))
+                        }
+                    }
+                    itemsIndexed(messages, key = { index, _ -> messages[index].id ?: "temp-$index" }) { index, _ ->
+                        Text(
+                            text = messages[index].content,
+                            modifier = Modifier.padding(vertical = 20.dp),
+                        )
+                    }
+                }
+                ConversationScrollOnChangeEffect(
+                    history = messages,
+                    listState = state,
+                    streamingContent = streamingContent.value,
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        kotlinx.coroutines.runBlocking { listState.single().scrollToItem(messages.lastIndex) }
+        composeTestRule.waitForIdle()
+
+        streamingContent.value = "partial assistant response"
+        composeTestRule.waitForIdle()
+
+        kotlinx.coroutines.runBlocking { listState.single().scrollToItem(messages.size) }
+        composeTestRule.waitForIdle()
+
+        streamingContent.value = "partial assistant response with additional streamed content"
+        composeTestRule.waitForIdle()
+
+        val newestVisibleIndex =
+            listState
+                .single()
+                .layoutInfo
+                .visibleItemsInfo
+                .firstOrNull()
+                ?.index
+        assertTrue(
+            newestVisibleIndex == 0,
+            "expected streaming assistant message at index 0 to be visible",
+        )
+    }
+
+    @Test
     fun `does not scroll when message content changes without count increase`() {
         val messages: SnapshotStateList<Message> = (1..20).map { Message("user", "message $it") }.toMutableStateList()
         val listState = mutableListOf<androidx.compose.foundation.lazy.LazyListState>()
