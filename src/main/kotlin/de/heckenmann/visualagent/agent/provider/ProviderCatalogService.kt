@@ -113,6 +113,20 @@ class ProviderCatalogService(
         saveProvider(profile.copy(models = models))
     }
 
+    /** Replaces discovered models while preserving provider-supplied display names. */
+    fun updateDiscoveredModelConfigs(
+        providerId: String,
+        discoveredModels: List<ProviderModelConfig>,
+    ) {
+        val profile = getProvider(providerId) ?: return
+        val existing = profile.models.associateBy(ProviderModelConfig::id)
+        val models =
+            discoveredModels
+                .distinctBy(ProviderModelConfig::id)
+                .map { discovered -> existing[discovered.id]?.copy(name = discovered.name) ?: discovered }
+        saveProvider(profile.copy(models = models))
+    }
+
     /**
      * Updates capabilities for existing models without replacing other model metadata.
      *

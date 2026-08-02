@@ -245,7 +245,7 @@ private fun VisualAgentComposeApp(
                         Column(modifier = Modifier.fillMaxSize()) {
                             ComposeWorkspaceHeader(
                                 providerName = activeProvider?.id ?: deps.appConfig.llmProvider,
-                                modelName = activeProvider?.defaultModel.orEmpty().ifBlank { deps.appConfig.activeModel() },
+                                modelName = panelServices.providerCatalogService.activeModelId().ifBlank { deps.appConfig.activeModel() },
                                 beanDefinitionCount = deps.beanDefinitionCount,
                                 inFlight = inFlight.state.value,
                                 onStopAll = {

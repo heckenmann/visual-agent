@@ -60,11 +60,15 @@ class ConfiguredLLMProvider(
 
     override suspend fun getModels(providerId: String): List<String> {
         val profile = providerCatalog.getProvider(providerId) ?: error("Provider not found: $providerId")
+        if (profile.adapter == ProviderAdapter.CODEX_CLI) {
+            providerCatalog.updateDiscoveredModelConfigs(providerId, requireCodexProvider().getModelConfigs(profile))
+            return providerCatalog.selectableModels(providerId).map { it.id }
+        }
         val discovered =
             when (profile.adapter) {
                 ProviderAdapter.OLLAMA -> ollamaClient.getModels(profile)
                 ProviderAdapter.OPENAI_COMPATIBLE -> openAiClient.getModels(profile)
-                ProviderAdapter.CODEX_CLI -> requireCodexProvider().getModels(profile)
+                ProviderAdapter.CODEX_CLI -> error("Codex CLI models are handled above")
             }
         providerCatalog.updateDiscoveredModels(providerId, discovered)
         if (profile.adapter == ProviderAdapter.OLLAMA) {
