@@ -12,6 +12,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
+import de.heckenmann.visualagent.agent.Message
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
@@ -63,8 +64,9 @@ class ConversationMessageListEmptyHistoryTest {
             composeTestRule.waitForIdle()
 
             val listInfo = listStateHolder.single().layoutInfo
-            assertEquals(1, listInfo.totalItemsCount)
-            assertEquals(0, listInfo.visibleItemsInfo.single().index)
+            assertEquals(2, listInfo.totalItemsCount)
+            assertEquals(0, listInfo.visibleItemsInfo.first().index)
+            composeTestRule.onNodeWithText("Thinking").assertExists()
         }
 
     @Test
@@ -135,5 +137,89 @@ class ConversationMessageListEmptyHistoryTest {
 
             composeTestRule.onNodeWithText("Hello!").assertExists()
             composeTestRule.onNodeWithText("Streaming response...").assertExists()
+            composeTestRule.onNodeWithText("Thinking").assertDoesNotExist()
+        }
+
+    @Test
+    fun `shows waiting indicator at newest end with existing history`(): Unit =
+        runTest {
+            val listStateHolder = mutableListOf<androidx.compose.foundation.lazy.LazyListState>()
+            composeTestRule.setContent {
+                MaterialTheme {
+                    val listState = rememberLazyListState()
+                    listStateHolder += listState
+                    Box(modifier = Modifier.height(300.dp)) {
+                        LazyColumn(state = listState, reverseLayout = true) {
+                            ConversationMessageList(
+                                history =
+                                    listOf(
+                                        Message(
+                                            "assistant",
+                                            "Earlier response",
+                                            id = "assistant-1",
+                                        ),
+                                    ),
+                                sending = true,
+                                inFlight = InFlightStateHolder(),
+                                pendingUserMessage = "Follow-up",
+                                streamingContent = "",
+                                deletingMessageIds = emptySet(),
+                                onDeleteMessage = {},
+                                onStatusChange = {},
+                                onEditMessage = {},
+                                sendContent = {},
+                            )
+                        }
+                    }
+                }
+            }
+            composeTestRule.waitForIdle()
+
+            composeTestRule.onNodeWithText("Thinking").assertExists()
+            val newestVisibleIndex =
+                listStateHolder
+                    .single()
+                    .layoutInfo
+                    .visibleItemsInfo
+                    .first()
+                    .index
+            assertEquals(0, newestVisibleIndex)
+        }
+
+    @Test
+    fun `shows waiting indicator for an active tool without streaming text`(): Unit =
+        runTest {
+            val inFlight = InFlightStateHolder()
+            inFlight.state.value = InFlightState(pendingToolIds = setOf("file:read"))
+            composeTestRule.setContent {
+                MaterialTheme {
+                    Box(modifier = Modifier.height(300.dp)) {
+                        LazyColumn(state = rememberLazyListState(), reverseLayout = true) {
+                            ConversationMessageList(
+                                history =
+                                    listOf(
+                                        Message(
+                                            "assistant",
+                                            "Earlier response",
+                                            id = "assistant-1",
+                                        ),
+                                    ),
+                                sending = false,
+                                inFlight = inFlight,
+                                pendingUserMessage = null,
+                                streamingContent = "",
+                                deletingMessageIds = emptySet(),
+                                onDeleteMessage = {},
+                                onStatusChange = {},
+                                onEditMessage = {},
+                                sendContent = {},
+                            )
+                        }
+                    }
+                }
+            }
+            composeTestRule.waitForIdle()
+
+            composeTestRule.onNodeWithText("Thinking").assertExists()
         }
 }
