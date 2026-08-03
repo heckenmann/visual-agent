@@ -1,9 +1,9 @@
 package de.heckenmann.visualagent.agent.tools
 
+import de.heckenmann.visualagent.agent.tools.api.ConversationHistoryPort
 import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
-import de.heckenmann.visualagent.knowledge.ConversationStore
 import kotlinx.serialization.json.JsonObject
 import org.springframework.stereotype.Component
 
@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component
  */
 @Component
 class HistoryTool(
-    private val conversationStore: ConversationStore,
+    private val conversationHistory: ConversationHistoryPort,
 ) : VisualAgentTool {
     override val definition =
         ToolDefinition(
@@ -48,7 +48,7 @@ class HistoryTool(
     ): ToolResult {
         val limit = (input.int("limit") ?: 20).coerceIn(1, 100)
         val offset = (input.int("offset") ?: 0).coerceAtLeast(0)
-        val rows = conversationStore.getConversationMessagesPage(sessionId, limit, offset)
+        val rows = conversationHistory.loadPage(sessionId, limit, offset)
         if (rows.isEmpty()) return success("history", "No messages found for load request.")
         val content =
             rows.joinToString("\n") { row ->
@@ -63,7 +63,7 @@ class HistoryTool(
     ): ToolResult {
         val query = input.requiredString("query")
         val limit = (input.int("limit") ?: 20).coerceIn(1, 100)
-        val rows = conversationStore.searchConversationMessages(sessionId, query, limit)
+        val rows = conversationHistory.search(sessionId, query, limit)
         if (rows.isEmpty()) return success("history", "No messages matched query '$query'.")
         val content =
             rows.joinToString("\n") { row ->

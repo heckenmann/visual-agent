@@ -1,7 +1,6 @@
 package de.heckenmann.visualagent.agent.tools
 
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
-import de.heckenmann.visualagent.error.ToolExecutionException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
@@ -12,25 +11,33 @@ import kotlinx.serialization.json.jsonPrimitive
 import java.nio.file.Path
 import kotlin.io.path.absolute
 
-internal val json = Json { ignoreUnknownKeys = true }
-internal const val STRING_SCHEMA = """{"type":"object","additionalProperties":true}"""
+/** Shared JSON parser for tool input. */
+public val json = Json { ignoreUnknownKeys = true }
 
-internal fun parseObject(inputJson: String): JsonObject =
+/** Default permissive JSON schema used by tools without a richer schema. */
+public const val STRING_SCHEMA = """{"type":"object","additionalProperties":true}"""
+
+internal class ToolInputException(
+    message: String,
+) : IllegalArgumentException(message)
+
+/** Parses tool input into an object, returning an empty object for malformed input. */
+public fun parseObject(inputJson: String): JsonObject =
     runCatching { json.parseToJsonElement(inputJson).jsonObject }.getOrElse { JsonObject(emptyMap()) }
 
-internal fun JsonObject.string(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
+/** Reads an optional string property from tool input. */
+public fun JsonObject.string(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
 
-internal fun JsonObject.requiredString(key: String): String =
+/** Reads a required string property from tool input. */
+public fun JsonObject.requiredString(key: String): String =
     string(key)
-        ?: throw ToolExecutionException(
-            summary = "Missing required field",
-            detail = "The tool input is missing the required string field '$key'.",
-            retryable = false,
-        )
+        ?: throw ToolInputException("The tool input is missing the required string field '$key'.")
 
-internal fun JsonObject.int(key: String): Int? = this[key]?.jsonPrimitive?.intOrNull
+/** Reads an optional integer property from tool input. */
+public fun JsonObject.int(key: String): Int? = this[key]?.jsonPrimitive?.intOrNull
 
-internal fun JsonObject.boolean(key: String): Boolean? = this[key]?.jsonPrimitive?.booleanOrNull
+/** Reads an optional boolean property from tool input. */
+public fun JsonObject.boolean(key: String): Boolean? = this[key]?.jsonPrimitive?.booleanOrNull
 
 /**
  * Execution options parsed from model-provided tool input.
@@ -38,7 +45,7 @@ internal fun JsonObject.boolean(key: String): Boolean? = this[key]?.jsonPrimitiv
  * @property timeoutSeconds Effective timeout for this tool call
  * @property async Whether tool execution should happen asynchronously
  */
-internal data class ToolExecutionOptions(
+public data class ToolExecutionOptions(
     val timeoutSeconds: Int,
     val async: Boolean,
 )
@@ -54,7 +61,7 @@ internal data class ToolExecutionOptions(
  * @param defaultTimeoutSeconds Application default timeout
  * @return Sanitized execution options
  */
-internal fun runtimeOptions(
+public fun runtimeOptions(
     input: JsonObject,
     defaultTimeoutSeconds: Int,
 ): ToolExecutionOptions {
@@ -63,7 +70,8 @@ internal fun runtimeOptions(
     return ToolExecutionOptions(timeoutSeconds = timeout, async = async)
 }
 
-internal fun workspaceRoot(): Path = Path.of(System.getProperty("user.dir")).absolute().normalize()
+/** Returns the normalized process workspace root. */
+public fun workspaceRoot(): Path = Path.of(System.getProperty("user.dir")).absolute().normalize()
 
 private fun resolveWorkspacePath(path: String): Path {
     val resolved = workspaceRoot().resolve(path).normalize()
@@ -71,14 +79,15 @@ private fun resolveWorkspacePath(path: String): Path {
     return resolved
 }
 
-internal fun resolveWorkspacePathOrFailure(
+/** Resolves a workspace-relative path and converts traversal errors to a tool result. */
+public fun resolveWorkspacePathOrFailure(
     toolId: String,
     path: String,
 ): PathResolution =
     runCatching { PathResolution.Success(resolveWorkspacePath(path)) }
         .getOrElse { PathResolution.Failure(failure(toolId, it.message ?: "Invalid path")) }
 
-internal sealed interface PathResolution {
+public sealed interface PathResolution {
     /**
      * Successful workspace path resolution.
      */
@@ -94,17 +103,21 @@ internal sealed interface PathResolution {
     ) : PathResolution
 }
 
-internal fun success(
+/** Creates a successful tool result. */
+public fun success(
     toolId: String,
     content: String,
 ): ToolResult = ToolResult(toolId, true, content)
 
-internal fun failure(
+/** Creates a failed tool result. */
+public fun failure(
     toolId: String,
     error: String,
 ): ToolResult = ToolResult(toolId, false, "", error)
 
-internal fun pathSchema(): String = requiredStringSchema("path")
+/** Returns the standard schema for a workspace path argument. */
+public fun pathSchema(): String = requiredStringSchema("path")
 
-internal fun requiredStringSchema(name: String): String =
+/** Builds a required single-string JSON schema. */
+public fun requiredStringSchema(name: String): String =
     """{"type":"object","properties":{"$name":{"type":"string"}},"required":["$name"]}"""
