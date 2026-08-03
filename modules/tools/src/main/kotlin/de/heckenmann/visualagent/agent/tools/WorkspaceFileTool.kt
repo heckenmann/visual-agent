@@ -1,28 +1,21 @@
 package de.heckenmann.visualagent.agent.tools
 
-import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
-import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
-import de.heckenmann.visualagent.workspace.WorkspaceFileService
-import kotlinx.coroutines.runBlocking
+import de.heckenmann.visualagent.agent.tools.api.ToolWorkspaceFile
+import de.heckenmann.visualagent.agent.tools.api.WorkspaceFileToolPort
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import org.springframework.beans.factory.ObjectProvider
-import org.springframework.stereotype.Component
-import java.util.Base64
 
 /**
  * Tool that lets sub-agents inspect and analyze files imported into the managed workspace.
  *
  * Use cases: UC-0000025, UC-0000026, UC-0000027.
  */
-@Component
 class WorkspaceFileTool(
-    private val workspaceFiles: WorkspaceFileService,
-    private val llmProvider: ObjectProvider<LLMProvider>,
+    private val workspaceFiles: WorkspaceFileToolPort,
 ) : VisualAgentTool {
     override val definition =
         ToolDefinition(
@@ -64,16 +57,16 @@ class WorkspaceFileTool(
                 put(
                     "files",
                     buildJsonArray {
-                        workspaceFiles.listFiles().forEach { add(recordJson(it)) }
+                        workspaceFiles.list().forEach { add(recordJson(it)) }
                     },
                 )
             }.toString(),
         )
 
-    private fun info(record: WorkspaceFileRecord): ToolResult = success(TOOL_ID, recordJson(record).toString())
+    private fun info(record: ToolWorkspaceFile): ToolResult = success(TOOL_ID, recordJson(record).toString())
 
     private fun search(query: String): ToolResult {
-        val result = workspaceFiles.searchFiles(query)
+        val result = workspaceFiles.search(query)
         return success(
             TOOL_ID,
             buildJsonObject {
@@ -86,7 +79,7 @@ class WorkspaceFileTool(
                                 buildJsonObject {
                                     put("matchType", match.matchType)
                                     put("snippet", match.snippet)
-                                    put("file", recordJson(match.record))
+                                    put("file", recordJson(match.file))
                                 },
                             )
                         }
@@ -97,7 +90,7 @@ class WorkspaceFileTool(
     }
 
     private fun sync(): ToolResult {
-        val report = workspaceFiles.syncMetadataWithFilesystem()
+        val report = workspaceFiles.sync()
         return success(
             TOOL_ID,
             buildJsonObject {
@@ -109,7 +102,7 @@ class WorkspaceFileTool(
         )
     }
 
-    private fun hash(record: WorkspaceFileRecord): ToolResult =
+    private fun hash(record: ToolWorkspaceFile): ToolResult =
         success(
             TOOL_ID,
             buildJsonObject {
@@ -120,7 +113,7 @@ class WorkspaceFileTool(
             }.toString(),
         )
 
-    private fun readText(record: WorkspaceFileRecord): ToolResult =
+    private fun readText(record: ToolWorkspaceFile): ToolResult =
         success(
             TOOL_ID,
             buildJsonObject {
@@ -130,7 +123,7 @@ class WorkspaceFileTool(
             }.toString(),
         )
 
-    private fun extractPdfText(record: WorkspaceFileRecord): ToolResult {
+    private fun extractPdfText(record: ToolWorkspaceFile): ToolResult {
         val text = workspaceFiles.extractPdfText(record)
         return success(
             TOOL_ID,
@@ -144,11 +137,11 @@ class WorkspaceFileTool(
     }
 
     private fun renderPdfPage(
-        record: WorkspaceFileRecord,
+        record: ToolWorkspaceFile,
         page: Int,
     ): ToolResult = success(TOOL_ID, recordJson(workspaceFiles.renderPdfPage(record, page)).toString())
 
-    private fun imageInfo(record: WorkspaceFileRecord): ToolResult {
+    private fun imageInfo(record: ToolWorkspaceFile): ToolResult {
         val info = workspaceFiles.imageInfo(record)
         return success(
             TOOL_ID,
@@ -164,7 +157,7 @@ class WorkspaceFileTool(
         )
     }
 
-    private fun imageBytes(record: WorkspaceFileRecord): ToolResult {
+    private fun imageBytes(record: ToolWorkspaceFile): ToolResult {
         val bytes = workspaceFiles.imageBytes(record)
         return success(
             TOOL_ID,
@@ -178,31 +171,25 @@ class WorkspaceFileTool(
     }
 
     private fun analyzeImage(
-        record: WorkspaceFileRecord,
+        record: ToolWorkspaceFile,
         prompt: String,
     ): ToolResult {
-        val bytes = workspaceFiles.imageBytes(record)
-        val response =
-            runBlocking {
-                llmProvider
-                    .getObject()
-                    .vision(Base64.getDecoder().decode(bytes.base64), prompt)
-            }
+        val response = workspaceFiles.analyzeImage(record, prompt)
         return success(
             TOOL_ID,
             buildJsonObject {
                 put("id", record.id)
                 put("path", record.relativePath)
                 put("model", response.model)
-                put("content", response.message.content)
+                put("content", response.content)
             }.toString(),
         )
     }
 
-    private fun file(input: kotlinx.serialization.json.JsonObject): WorkspaceFileRecord =
+    private fun file(input: kotlinx.serialization.json.JsonObject): ToolWorkspaceFile =
         workspaceFiles.requireFile(input.string("id"), input.string("path"))
 
-    private fun recordJson(record: WorkspaceFileRecord) =
+    private fun recordJson(record: ToolWorkspaceFile) =
         buildJsonObject {
             put("id", record.id)
             put("path", record.relativePath)
@@ -212,7 +199,7 @@ class WorkspaceFileTool(
             put("sha256", record.sha256)
             put("importedAt", record.importedAt.toString())
             put("updatedAt", record.updatedAt.toString())
-            put("hasExtractedText", record.extractedText != null)
+            put("hasExtractedText", record.hasExtractedText)
         }
 
     private companion object {

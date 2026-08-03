@@ -1,6 +1,5 @@
 package de.heckenmann.visualagent.agent.tools
 
-import de.heckenmann.visualagent.agent.tools.canvas.CanvasTool
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive

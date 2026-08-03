@@ -5,6 +5,7 @@ package de.heckenmann.visualagent.agent.tools.canvas
 import de.heckenmann.visualagent.agent.tools.PathResolution
 import de.heckenmann.visualagent.agent.tools.STRING_SCHEMA
 import de.heckenmann.visualagent.agent.tools.VisualAgentTool
+import de.heckenmann.visualagent.agent.tools.api.CanvasToolPort
 import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
@@ -14,23 +15,17 @@ import de.heckenmann.visualagent.agent.tools.resolveWorkspacePathOrFailure
 import de.heckenmann.visualagent.agent.tools.string
 import de.heckenmann.visualagent.agent.tools.success
 import de.heckenmann.visualagent.agent.tools.toFunctionName
-import de.heckenmann.visualagent.canvas.CanvasOperations
-import de.heckenmann.visualagent.knowledge.ConversationStore
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
-import org.springframework.stereotype.Component
 
 /**
  * Tool that lets sub-agents inspect and edit the structured canvas.
  *
  * Use cases: UC-0000032, UC-0000033.
  */
-@Component
 class CanvasTool(
-    private val canvas: CanvasOperations,
-    private val conversationStore: ConversationStore,
+    private val canvas: CanvasToolPort,
 ) : VisualAgentTool {
     override val definition =
         ToolDefinition(
@@ -72,7 +67,7 @@ class CanvasTool(
         return runCatching {
             when (input.string("action") ?: "get") {
                 "get" -> snapshot()
-                "clear" -> success(CanvasToolConstants.TOOL_ID, CanvasToolConstants.json.encodeToString(canvas.clear()))
+                "clear" -> success(CanvasToolConstants.TOOL_ID, canvas.clear())
                 "drawText" -> drawText(input)
                 "drawRect" -> drawRect(input)
                 "drawLine" -> drawLine(input)
@@ -86,7 +81,7 @@ class CanvasTool(
                 "deleteSelectedFigures" -> deleteSelectedFigures()
                 "saveDocument" -> saveDocument(input)
                 "openDocument" -> openDocument(input)
-                "captureImage" -> CanvasCapture.captureImage(canvas, conversationStore, input, context)
+                "captureImage" -> CanvasCapture.captureImage(canvas, input, context)
                 else -> failure(CanvasToolConstants.TOOL_ID, "Unsupported canvas action")
             }
         }.getOrElse { error ->
@@ -94,73 +89,63 @@ class CanvasTool(
         }
     }
 
-    private fun snapshot(): ToolResult = success(CanvasToolConstants.TOOL_ID, CanvasToolConstants.json.encodeToString(canvas.snapshot()))
+    private fun snapshot(): ToolResult = success(CanvasToolConstants.TOOL_ID, canvas.snapshot())
 
     private fun drawText(input: JsonObject): ToolResult =
         success(
             CanvasToolConstants.TOOL_ID,
-            CanvasToolConstants.json.encodeToString(
-                canvas.drawText(
-                    text = input.requiredString("text"),
-                    x = input.requiredDouble("x"),
-                    y = input.requiredDouble("y"),
-                    color = input.string("color") ?: CanvasToolConstants.DEFAULT_TEXT_COLOR,
-                ),
+            canvas.drawText(
+                text = input.requiredString("text"),
+                x = input.requiredDouble("x"),
+                y = input.requiredDouble("y"),
+                color = input.string("color") ?: CanvasToolConstants.DEFAULT_TEXT_COLOR,
             ),
         )
 
     private fun drawRect(input: JsonObject): ToolResult =
         success(
             CanvasToolConstants.TOOL_ID,
-            CanvasToolConstants.json.encodeToString(
-                canvas.drawRect(
-                    x = input.requiredDouble("x"),
-                    y = input.requiredDouble("y"),
-                    width = input.requiredDouble("width"),
-                    height = input.requiredDouble("height"),
-                    fillColor = input.string("fillColor") ?: CanvasToolConstants.DEFAULT_FILL_COLOR,
-                    strokeColor = input.string("strokeColor"),
-                ),
+            canvas.drawRect(
+                x = input.requiredDouble("x"),
+                y = input.requiredDouble("y"),
+                width = input.requiredDouble("width"),
+                height = input.requiredDouble("height"),
+                fillColor = input.string("fillColor") ?: CanvasToolConstants.DEFAULT_FILL_COLOR,
+                strokeColor = input.string("strokeColor"),
             ),
         )
 
     private fun drawLine(input: JsonObject): ToolResult =
         success(
             CanvasToolConstants.TOOL_ID,
-            CanvasToolConstants.json.encodeToString(
-                canvas.drawLine(
-                    x1 = input.requiredDouble("x1"),
-                    y1 = input.requiredDouble("y1"),
-                    x2 = input.requiredDouble("x2"),
-                    y2 = input.requiredDouble("y2"),
-                    color = input.string("color") ?: CanvasToolConstants.DEFAULT_STROKE_COLOR,
-                    width = input.double("width") ?: CanvasToolConstants.DEFAULT_STROKE_WIDTH,
-                ),
+            canvas.drawLine(
+                x1 = input.requiredDouble("x1"),
+                y1 = input.requiredDouble("y1"),
+                x2 = input.requiredDouble("x2"),
+                y2 = input.requiredDouble("y2"),
+                color = input.string("color") ?: CanvasToolConstants.DEFAULT_STROKE_COLOR,
+                width = input.double("width") ?: CanvasToolConstants.DEFAULT_STROKE_WIDTH,
             ),
         )
 
     private fun drawStroke(input: JsonObject): ToolResult =
         success(
             CanvasToolConstants.TOOL_ID,
-            CanvasToolConstants.json.encodeToString(
-                canvas.drawStroke(
-                    points = input.requiredPoints("points"),
-                    color = input.string("color") ?: CanvasToolConstants.DEFAULT_STROKE_COLOR,
-                    width = input.double("width") ?: CanvasToolConstants.DEFAULT_STROKE_WIDTH,
-                ),
+            canvas.drawStroke(
+                points = input.requiredPoints("points"),
+                color = input.string("color") ?: CanvasToolConstants.DEFAULT_STROKE_COLOR,
+                width = input.double("width") ?: CanvasToolConstants.DEFAULT_STROKE_WIDTH,
             ),
         )
 
     private fun drawCircle(input: JsonObject): ToolResult =
         success(
             CanvasToolConstants.TOOL_ID,
-            CanvasToolConstants.json.encodeToString(
-                canvas.drawCircle(
-                    centerX = input.requiredDouble("centerX"),
-                    centerY = input.requiredDouble("centerY"),
-                    radius = input.requiredDouble("radius"),
-                    fillColor = input.string("fillColor") ?: CanvasToolConstants.DEFAULT_FILL_COLOR,
-                ),
+            canvas.drawCircle(
+                centerX = input.requiredDouble("centerX"),
+                centerY = input.requiredDouble("centerY"),
+                radius = input.requiredDouble("radius"),
+                fillColor = input.string("fillColor") ?: CanvasToolConstants.DEFAULT_FILL_COLOR,
             ),
         )
 
@@ -171,7 +156,7 @@ class CanvasTool(
             is PathResolution.Success ->
                 success(
                     CanvasToolConstants.TOOL_ID,
-                    CanvasToolConstants.json.encodeToString(canvas.insertImage(resolved.path.toString())),
+                    canvas.insertImage(resolved.path.toString()),
                 )
         }
     }
@@ -184,64 +169,56 @@ class CanvasTool(
                 ?.toSet()
                 ?: input.int("index")?.let { setOf(it) }
                 ?: emptySet()
-        return success(CanvasToolConstants.TOOL_ID, CanvasToolConstants.json.encodeToString(canvas.selectFigures(indices)))
+        return success(CanvasToolConstants.TOOL_ID, canvas.select(indices))
     }
 
     private fun selectAt(input: JsonObject): ToolResult =
         success(
             CanvasToolConstants.TOOL_ID,
-            CanvasToolConstants.json.encodeToString(
-                canvas.selectAt(
-                    x = input.requiredDouble("x"),
-                    y = input.requiredDouble("y"),
-                ),
+            canvas.selectAt(
+                x = input.requiredDouble("x"),
+                y = input.requiredDouble("y"),
             ),
         )
 
     private fun moveFigure(input: JsonObject): ToolResult =
         success(
             CanvasToolConstants.TOOL_ID,
-            CanvasToolConstants.json.encodeToString(
-                canvas.moveFigure(
-                    index = input.requiredInt("index"),
-                    deltaX = input.requiredDouble("deltaX"),
-                    deltaY = input.requiredDouble("deltaY"),
-                ),
+            canvas.moveFigure(
+                index = input.requiredInt("index"),
+                deltaX = input.requiredDouble("deltaX"),
+                deltaY = input.requiredDouble("deltaY"),
             ),
         )
 
     private fun resizeFigure(input: JsonObject): ToolResult =
         success(
             CanvasToolConstants.TOOL_ID,
-            CanvasToolConstants.json.encodeToString(
-                canvas.resizeFigure(
-                    index = input.requiredInt("index"),
-                    width = input.requiredDouble("width"),
-                    height = input.requiredDouble("height"),
-                ),
+            canvas.resizeFigure(
+                index = input.requiredInt("index"),
+                width = input.requiredDouble("width"),
+                height = input.requiredDouble("height"),
             ),
         )
 
     private fun deleteSelectedFigures(): ToolResult =
         success(
             CanvasToolConstants.TOOL_ID,
-            CanvasToolConstants.json.encodeToString(canvas.deleteSelectedFigures()),
+            canvas.deleteSelectedFigures(),
         )
 
     private fun saveDocument(input: JsonObject): ToolResult =
         success(
             CanvasToolConstants.TOOL_ID,
-            CanvasToolConstants.json.encodeToString(canvas.saveDocument(input.string("name") ?: CanvasToolConstants.DEFAULT_DOCUMENT_NAME)),
+            canvas.saveDocument(input.string("name") ?: CanvasToolConstants.DEFAULT_DOCUMENT_NAME),
         )
 
     private fun openDocument(input: JsonObject): ToolResult =
         success(
             CanvasToolConstants.TOOL_ID,
-            CanvasToolConstants.json.encodeToString(
-                canvas.openDocument(
-                    id = input.string("id"),
-                    path = input.string("path"),
-                ),
+            canvas.openDocument(
+                id = input.string("id"),
+                path = input.string("path"),
             ),
         )
 }

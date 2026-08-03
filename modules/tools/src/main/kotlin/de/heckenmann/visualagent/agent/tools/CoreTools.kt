@@ -1,20 +1,15 @@
 
 package de.heckenmann.visualagent.agent.tools
 
-import de.heckenmann.visualagent.agent.AgentManager
-import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
+import de.heckenmann.visualagent.agent.tools.api.TodoToolPort
 import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
-import de.heckenmann.visualagent.config.AppConfigBean
-import de.heckenmann.visualagent.knowledge.MemoryStore
-import de.heckenmann.visualagent.knowledge.TodoStore
-import de.heckenmann.visualagent.todo.TodoStatus
+import de.heckenmann.visualagent.agent.tools.api.ToolSettingsPort
+import de.heckenmann.visualagent.agent.tools.api.ToolSettingsUpdate
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
-import org.springframework.context.annotation.Lazy
-import org.springframework.stereotype.Component
 
 /**
  * Tool that exposes safe UI/session settings to the model.
@@ -24,10 +19,8 @@ import org.springframework.stereotype.Component
  *
  * Use cases: UC-0000061.
  */
-@Component
 class UiTool(
-    private val providerCatalog: ProviderCatalogService,
-    private val appConfig: AppConfigBean = AppConfigBean(),
+    private val settings: ToolSettingsPort,
 ) : VisualAgentTool {
     override val definition =
         ToolDefinition(
@@ -48,31 +41,32 @@ class UiTool(
         val input = parseObject(inputJson)
         when (input.string("action") ?: "get") {
             "set" -> {
-                input.int("fontSize")?.let { appConfig.fontSize = it.coerceIn(10, 24) }
-                input.string("provider")?.let(providerCatalog::setActiveProvider)
-                input.string("model")?.let { model ->
-                    val provider = providerCatalog.getProvider(providerCatalog.activeProviderId())
-                    if (provider != null) providerCatalog.saveProvider(provider.copy(defaultModel = model))
-                }
-                input.string("openAiBaseUrl")?.let { appConfig.openAiBaseUrl = it }
-                input.boolean("streamingEnabled")?.let { appConfig.streamingEnabled = it }
-                input.boolean("thinkingEnabled")?.let { appConfig.thinkingEnabled = it }
-                appConfig.save()
+                settings.update(
+                    ToolSettingsUpdate(
+                        fontSize = input.int("fontSize")?.coerceIn(10, 24),
+                        provider = input.string("provider"),
+                        model = input.string("model"),
+                        openAiBaseUrl = input.string("openAiBaseUrl"),
+                        streamingEnabled = input.boolean("streamingEnabled"),
+                        thinkingEnabled = input.boolean("thinkingEnabled"),
+                    ),
+                )
             }
             "get" -> Unit
             else -> return failure("ui", "Unsupported ui action")
         }
+        val current = settings.read()
         return success(
             "ui",
             """
             Current UI Settings:
-              Font size: ${appConfig.fontSize}px
-              Provider: ${providerCatalog.activeProviderId()}
-              Model: ${providerCatalog.getProvider(providerCatalog.activeProviderId())?.defaultModel.orEmpty()}
-              OpenAI Base URL: ${appConfig.openAiBaseUrl}
-              OpenAI API key configured: ${appConfig.openAiApiKey.isNotBlank()}
-              Streaming: ${appConfig.streamingEnabled}
-              Thinking: ${appConfig.thinkingEnabled}
+              Font size: ${current.fontSize}px
+              Provider: ${current.provider}
+              Model: ${current.model}
+              OpenAI Base URL: ${current.openAiBaseUrl}
+              OpenAI API key configured: ${current.openAiApiKeyConfigured}
+              Streaming: ${current.streamingEnabled}
+              Thinking: ${current.thinkingEnabled}
             Font size range: 10-24
             """.trimIndent(),
         )
@@ -84,7 +78,6 @@ class UiTool(
  *
  * Use cases: UC-0000060.
  */
-@Component
 class PwdTool : VisualAgentTool {
     override val definition =
         ToolDefinition(
@@ -108,10 +101,8 @@ class PwdTool : VisualAgentTool {
  *
  * Use cases: UC-0000059.
  */
-@Component
 class ContextTool(
-    private val providerCatalog: ProviderCatalogService? = null,
-    private val appConfig: AppConfigBean = AppConfigBean(),
+    private val settings: ToolSettingsPort,
 ) : VisualAgentTool {
     override val definition =
         ToolDefinition(
@@ -132,11 +123,11 @@ class ContextTool(
             "context",
             buildString {
                 appendLine("Workspace: ${workspaceRoot()}")
-                val activeProvider = providerCatalog?.activeProviderId() ?: appConfig.llmProvider
-                appendLine("Provider: $activeProvider")
-                appendLine("Model: ${providerCatalog?.activeModelId() ?: appConfig.activeModel()}")
-                appendLine("OpenAI Base URL: ${appConfig.openAiBaseUrl}")
-                appendLine("OpenAI API key configured: ${appConfig.openAiApiKey.isNotBlank()}")
+                val current = settings.read()
+                appendLine("Provider: ${current.provider}")
+                appendLine("Model: ${current.model}")
+                appendLine("OpenAI Base URL: ${current.openAiBaseUrl}")
+                appendLine("OpenAI API key configured: ${current.openAiApiKeyConfigured}")
                 context.entries.sortedBy { it.key }.forEach { (key, value) ->
                     appendLine("$key: $value")
                 }
@@ -147,11 +138,8 @@ class ContextTool(
 /**
  * Tool that lets the model inspect and mutate persisted todo records.
  */
-@Component
 class TodosTool(
-    private val todoStore: TodoStore,
-    private val memoryStore: MemoryStore,
-    @param:Lazy private val agentManager: AgentManager,
+    private val todos: TodoToolPort,
 ) : VisualAgentTool {
     override val definition =
         ToolDefinition(
@@ -190,8 +178,8 @@ class TodosTool(
             "count" -> countTodos()
             "add" -> addTodo(input)
             "update" -> updateTodo(input)
-            "complete" -> updateStatus(input, TodoStatus.COMPLETED)
-            "cancel" -> updateStatus(input, TodoStatus.CANCELLED)
+            "complete" -> updateStatus(input, "COMPLETED")
+            "cancel" -> updateStatus(input, "CANCELLED")
             "remove" -> removeTodo(input)
             "reorder" -> reorderTodos(input)
             "get-result" -> getTodoResult(input)
@@ -200,7 +188,7 @@ class TodosTool(
     }
 
     private fun listTodos(): ToolResult {
-        val rows = todoStore.listTodos()
+        val rows = todos.list()
         if (rows.isEmpty()) return success("todos", "No todos.")
         val text =
             rows.joinToString("\n") {
@@ -210,11 +198,11 @@ class TodosTool(
     }
 
     private fun countTodos(): ToolResult {
-        val rows = todoStore.listTodos()
-        val pending = rows.count { it.status == TodoStatus.PENDING }
-        val inProgress = rows.count { it.status == TodoStatus.IN_PROGRESS }
-        val completed = rows.count { it.status == TodoStatus.COMPLETED }
-        val cancelled = rows.count { it.status == TodoStatus.CANCELLED }
+        val rows = todos.list()
+        val pending = rows.count { it.status == "PENDING" }
+        val inProgress = rows.count { it.status == "IN_PROGRESS" }
+        val completed = rows.count { it.status == "COMPLETED" }
+        val cancelled = rows.count { it.status == "CANCELLED" }
         val total = rows.size
         return success(
             "todos",
@@ -236,13 +224,12 @@ class TodosTool(
             )
         }
         val description = input.requiredString("description")
-        val todo = agentManager.todoManager.add(description, assignedAgentId)
-        return success("todos", "Added todo ${todo.id}")
+        return success("todos", "Added todo ${todos.add(description, assignedAgentId)}")
     }
 
     private fun updateTodo(input: JsonObject): ToolResult {
         val id = input.requiredString("id")
-        val existing = todoStore.listTodos().firstOrNull { it.id == id } ?: return failure("todos", "Todo not found")
+        todos.list().firstOrNull { it.id == id } ?: return failure("todos", "Todo not found")
         val newAssignedAgentId = input.string("assignedAgentId")
         if (newAssignedAgentId != null && !agentExists(newAssignedAgentId)) {
             return failure(
@@ -250,28 +237,17 @@ class TodosTool(
                 "assignedAgentId must reference an existing sub-agent",
             )
         }
-        input.string("description")?.let { agentManager.todoManager.update(id, it) }
-        newAssignedAgentId?.let { agentManager.todoManager.updateAssignedAgent(id, it) }
-        input.string("status")?.let { s ->
-            runCatching { TodoStatus.valueOf(s.uppercase()) }.getOrNull()?.let { status ->
-                agentManager.todoManager.updateStatus(id, status)
-            }
-        }
+        todos.update(id, input.string("description"), newAssignedAgentId, input.string("status")?.uppercase())
         return success("todos", "Updated todo $id")
     }
 
     private fun updateStatus(
         input: JsonObject,
-        status: TodoStatus,
+        status: String,
     ): ToolResult {
         val id = input.requiredString("id")
-        val existing = todoStore.listTodos().firstOrNull { it.id == id } ?: return failure("todos", "Todo not found")
-        val success =
-            when (status) {
-                TodoStatus.COMPLETED -> agentManager.todoManager.completeTodo(id)
-                TodoStatus.CANCELLED -> agentManager.todoManager.cancelTodo(id)
-                else -> agentManager.todoManager.updateStatus(id, status)
-            }
+        todos.list().firstOrNull { it.id == id } ?: return failure("todos", "Todo not found")
+        val success = todos.setStatus(id, status)
         return if (success) {
             success("todos", "Set todo $id to $status")
         } else {
@@ -281,7 +257,7 @@ class TodosTool(
 
     private fun removeTodo(input: JsonObject): ToolResult {
         val id = input.requiredString("id")
-        return if (agentManager.todoManager.remove(id)) {
+        return if (todos.remove(id)) {
             success("todos", "Removed todo $id")
         } else {
             failure("todos", "Todo not found")
@@ -293,8 +269,7 @@ class TodosTool(
         val targetPosition =
             input.int("position") ?: run {
                 val beforeId = input.string("before") ?: return failure("todos", "Reorder requires 'position' or 'before'")
-                val todos = todoStore.listTodos()
-                val ordered = todos.sortedBy { it.position }.map { it.id }
+                val ordered = todos.list().sortedBy { it.position }.map { it.id }
                 val beforeIndex =
                     ordered.indexOf(beforeId).takeIf { it != -1 }
                         ?: return failure("todos", "Reference todo not found")
@@ -302,7 +277,7 @@ class TodosTool(
                 if (fromIndex == -1) return failure("todos", "Todo not found")
                 if (fromIndex < beforeIndex) beforeIndex - 1 else beforeIndex
             }
-        return if (agentManager.todoManager.moveToPosition(id, targetPosition)) {
+        return if (todos.moveToPosition(id, targetPosition)) {
             success("todos", "Reordered todo $id to position $targetPosition")
         } else {
             failure("todos", "Todo not found")
@@ -311,15 +286,12 @@ class TodosTool(
 
     private fun getTodoResult(input: JsonObject): ToolResult {
         val id = input.requiredString("id")
-        val results = memoryStore.searchMemories("todo:$id", limit = 1)
-        val result =
-            results.firstOrNull()
-                ?: return failure("todos", "No result available for todo $id")
-        val summary = extractSummary(result.content)
+        val result = todos.result(id) ?: return failure("todos", "No result available for todo $id")
+        val summary = extractSummary(result)
         return success("todos", "Result for todo $id:\n$summary")
     }
 
-    private fun agentExists(agentId: String): Boolean = agentManager.getSubAgent(agentId) != null
+    private fun agentExists(agentId: String): Boolean = todos.agentExists(agentId)
 
     private fun extractSummary(content: String): String {
         val parsed = runCatching { parseObject(content) }.getOrNull()

@@ -8,6 +8,7 @@ import de.heckenmann.visualagent.agent.OllamaClient
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.ollama.OllamaPromptFactory
 import de.heckenmann.visualagent.agent.ollama.OllamaToolRecovery
+import de.heckenmann.visualagent.agent.tools.SpringAiToolCallbacksAdapter
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.config.AppConfigBean
@@ -70,9 +71,10 @@ class WelcomeToollessOllamaRequestTest {
                 .build()
         val appConfig = AppConfigBean(db)
         val toolRegistry = ToolRegistry(emptyList(), ToolEventBus(), appConfig)
-        val promptFactory = OllamaPromptFactory(toolRegistry)
+        val callbacks = SpringAiToolCallbacksAdapter(toolRegistry)
+        val promptFactory = OllamaPromptFactory(callbacks)
         val toolRecovery = OllamaToolRecovery(chatModel, promptFactory)
-        val ollamaClient = OllamaClient(chatModel, ollamaApi, promptFactory, toolRecovery, toolRegistry, appConfig)
+        val ollamaClient = OllamaClient(chatModel, ollamaApi, promptFactory, toolRecovery, callbacks, appConfig)
 
         val stubbedProvider =
             StubbedConnectionOllamaProvider(

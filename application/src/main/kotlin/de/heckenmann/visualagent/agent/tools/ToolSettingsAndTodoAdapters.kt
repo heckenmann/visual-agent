@@ -1,0 +1,104 @@
+package de.heckenmann.visualagent.agent.tools
+
+import de.heckenmann.visualagent.agent.AgentManager
+import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
+import de.heckenmann.visualagent.agent.tools.api.TodoToolPort
+import de.heckenmann.visualagent.agent.tools.api.ToolSettings
+import de.heckenmann.visualagent.agent.tools.api.ToolSettingsPort
+import de.heckenmann.visualagent.agent.tools.api.ToolSettingsUpdate
+import de.heckenmann.visualagent.agent.tools.api.ToolTodo
+import de.heckenmann.visualagent.config.AppConfigBean
+import de.heckenmann.visualagent.knowledge.MemoryStore
+import de.heckenmann.visualagent.knowledge.TodoStore
+import de.heckenmann.visualagent.todo.TodoManager
+import de.heckenmann.visualagent.todo.TodoStatus
+import org.springframework.stereotype.Component
+
+/** Application adapter for safe settings consumed by tools. */
+@Component
+class ToolSettingsPortAdapter(
+    private val providerCatalog: ProviderCatalogService,
+    private val appConfig: AppConfigBean,
+) : ToolSettingsPort {
+    override fun read(): ToolSettings {
+        val provider = providerCatalog.activeProviderId()
+        return ToolSettings(
+            fontSize = appConfig.fontSize,
+            provider = provider,
+            model = providerCatalog.getProvider(provider)?.defaultModel.orEmpty(),
+            openAiBaseUrl = appConfig.openAiBaseUrl,
+            openAiApiKeyConfigured = appConfig.openAiApiKey.isNotBlank(),
+            streamingEnabled = appConfig.streamingEnabled,
+            thinkingEnabled = appConfig.thinkingEnabled,
+            timeoutSeconds = appConfig.timeoutSeconds,
+        )
+    }
+
+    override fun update(update: ToolSettingsUpdate): ToolSettings {
+        update.fontSize?.let { appConfig.fontSize = it }
+        update.provider?.let(providerCatalog::setActiveProvider)
+        update.model?.let { model ->
+            val provider = providerCatalog.getProvider(providerCatalog.activeProviderId())
+            if (provider != null) providerCatalog.saveProvider(provider.copy(defaultModel = model))
+        }
+        update.openAiBaseUrl?.let { appConfig.openAiBaseUrl = it }
+        update.streamingEnabled?.let { appConfig.streamingEnabled = it }
+        update.thinkingEnabled?.let { appConfig.thinkingEnabled = it }
+        appConfig.save()
+        return read()
+    }
+}
+
+/** Application adapter for todo persistence and lifecycle operations consumed by tools. */
+class TodoToolPortAdapter(
+    private val todoStore: TodoStore,
+    private val memoryStore: MemoryStore,
+    private val todoManagerProvider: () -> TodoManager,
+    private val agentManagerProvider: () -> AgentManager,
+) : TodoToolPort {
+    private val todoManager: TodoManager get() = todoManagerProvider()
+
+    override fun list(): List<ToolTodo> =
+        todoStore.listTodos().map {
+            ToolTodo(it.id, it.description, it.status.name, it.position, it.assignedAgentId)
+        }
+
+    override fun agentExists(agentId: String): Boolean = agentManagerProvider().getSubAgent(agentId) != null
+
+    override fun add(
+        description: String,
+        assignedAgentId: String,
+    ): String = todoManager.add(description, assignedAgentId).id
+
+    override fun update(
+        id: String,
+        description: String?,
+        assignedAgentId: String?,
+        status: String?,
+    ) {
+        description?.let { todoManager.update(id, it) }
+        assignedAgentId?.let { todoManager.updateAssignedAgent(id, it) }
+        status?.let { value ->
+            runCatching { TodoStatus.valueOf(value) }.getOrNull()?.let { todoManager.updateStatus(id, it) }
+        }
+    }
+
+    override fun setStatus(
+        id: String,
+        status: String,
+    ): Boolean =
+        when (TodoStatus.valueOf(status)) {
+            TodoStatus.COMPLETED -> todoManager.completeTodo(id)
+            TodoStatus.CANCELLED -> todoManager.cancelTodo(id)
+            else -> todoManager.updateStatus(id, TodoStatus.valueOf(status))
+        }
+
+    override fun remove(id: String): Boolean = todoManager.remove(id)
+
+    override fun moveToPosition(
+        id: String,
+        position: Int,
+    ): Boolean = todoManager.moveToPosition(id, position)
+
+    override fun result(id: String): String? = memoryStore.searchMemories("todo:$id", limit = 1).firstOrNull()?.content
+}

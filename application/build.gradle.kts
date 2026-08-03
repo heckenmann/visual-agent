@@ -130,6 +130,9 @@ tasks.jacocoTestReport {
                     exclude(jacocoExcludedClasses)
                 }
             },
+            fileTree(project(":tools").layout.buildDirectory.dir("classes/kotlin/main")) {
+                exclude(jacocoExcludedClasses)
+            },
         ),
     )
     reports {
@@ -146,6 +149,9 @@ tasks.jacocoTestCoverageVerification {
                 fileTree(it) {
                     exclude(jacocoExcludedClasses)
                 }
+            },
+            fileTree(project(":tools").layout.buildDirectory.dir("classes/kotlin/main")) {
+                exclude(jacocoExcludedClasses)
             },
         ),
     )

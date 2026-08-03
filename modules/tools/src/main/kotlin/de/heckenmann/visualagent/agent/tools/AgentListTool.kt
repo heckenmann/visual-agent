@@ -1,13 +1,10 @@
 package de.heckenmann.visualagent.agent.tools
 
-import de.heckenmann.visualagent.agent.AgentManager
-import de.heckenmann.visualagent.agent.SubAgent
-import de.heckenmann.visualagent.agent.config.AgentToolConfigService
+import de.heckenmann.visualagent.agent.tools.api.AgentToolPort
+import de.heckenmann.visualagent.agent.tools.api.ToolAgent
 import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
-import org.springframework.context.annotation.Lazy
-import org.springframework.stereotype.Component
 
 /**
  * Lists sub-agents and their current workload.
@@ -17,10 +14,8 @@ import org.springframework.stereotype.Component
  *
  * Use cases: UC-0000015, UC-0000018, UC-0000084.
  */
-@Component
 class AgentListTool(
-    @param:Lazy private val agentManager: AgentManager,
-    @param:Lazy private val agentToolConfigService: AgentToolConfigService,
+    private val agents: AgentToolPort,
 ) : VisualAgentTool {
     override val definition =
         ToolDefinition(
@@ -38,10 +33,10 @@ class AgentListTool(
         inputJson: String,
         context: Map<String, Any>,
     ): ToolResult {
-        val queue = agentManager.getSubAgentJobQueueSnapshot()
+        val queue = agents.queue()
         val agents =
-            agentManager
-                .getSubAgents()
+            agents
+                .list()
                 .sortedBy { it.id }
                 .joinToString("\n") { agent -> formatAgentLine(agent) }
         return success(
@@ -53,20 +48,20 @@ class AgentListTool(
         )
     }
 
-    private fun formatAgentLine(agent: SubAgent): String {
-        val tools = agentToolConfigService.toolsFor(agent).sortedBy { it.value }
+    private fun formatAgentLine(agent: ToolAgent): String {
+        val tools = agents.tools(agent.id).sorted()
         val model = agent.config.model?.ifBlank { null } ?: "default"
         val template = resolveTemplateName(agent)
         return buildString {
             append("- ${agent.id} | ${agent.name} | ${agent.role} | status=${agent.status} | model=$model | template=$template")
             agent.currentTodoId?.let { append(" | todo=$it") }
             agent.currentTask?.let { append(" | task=${it.take(120)}") }
-            append(" | tools=[${tools.joinToString(",") { it.value }}]")
+            append(" | tools=[${tools.joinToString(",")}]")
         }
     }
 
-    private fun resolveTemplateName(agent: SubAgent): String {
-        val configId = agentToolConfigService.findConfigIdFor(agent)
+    private fun resolveTemplateName(agent: ToolAgent): String {
+        val configId = agents.configId(agent.id)
         return configId ?: agent.config.model?.ifBlank { null } ?: "default"
     }
 }

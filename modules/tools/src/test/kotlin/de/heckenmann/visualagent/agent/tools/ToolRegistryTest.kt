@@ -3,7 +3,6 @@ package de.heckenmann.visualagent.agent.tools
 import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
-import de.heckenmann.visualagent.config.AppConfigBean
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -12,25 +11,24 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import de.heckenmann.visualagent.agent.ToolId as ProviderToolId
 
 class ToolRegistryTest {
-    private val appConfig = AppConfigBean()
+    private var timeoutSeconds = 60
 
     @Test
     fun `registry returns only enabled registered tools`() {
-        val registry = ToolRegistry(listOf(FakeTool("file:read"), FakeTool("terminal")), ToolEventBus(), appConfig)
+        val registry = registry(FakeTool("file:read"), FakeTool("terminal"))
 
-        val callbacks = registry.functionCallbacks(setOf(ProviderToolId("file:read"), ProviderToolId("missing")))
+        val callbacks = registry.resolve(setOf(ToolId("file:read"), ToolId("missing")))
 
-        assertEquals(listOf("file_read"), callbacks.map { it.toolDefinition.name() })
+        assertEquals(listOf("file_read"), callbacks.map { it.definition.name })
     }
 
     @Test
     fun `todos tool is exposed only under canonical function name`() {
-        val registry = ToolRegistry(listOf(FakeTool("todos")), ToolEventBus(), AppConfigBean())
+        val registry = registry(FakeTool("todos"))
 
-        val callbackNames = registry.functionCallbacks(setOf(ProviderToolId("todos"))).map { it.toolDefinition.name() }.sorted()
+        val callbackNames = registry.resolve(setOf(ToolId("todos"))).map { it.definition.name }.sorted()
 
         assertEquals(listOf("todos"), callbackNames)
     }
@@ -40,9 +38,9 @@ class ToolRegistryTest {
         val events = mutableListOf<ToolCallEvent>()
         val bus = ToolEventBus()
         bus.addListener { events += it }
-        val registry = ToolRegistry(listOf(FakeTool("context")), bus, appConfig)
+        val registry = ToolRegistry(listOf(FakeTool("context")), bus) { timeoutSeconds }
 
-        val result = registry.functionCallbacks(setOf(ProviderToolId("context"))).single().call("""{"x":1}""")
+        val result = registry.execute(registry.resolve(setOf(ToolId("context"))).single(), """{"x":1}""", emptyMap())
         val json = Json.parseToJsonElement(result).jsonObject
 
         assertEquals("context", json["toolId"]!!.jsonPrimitive.content)
@@ -67,9 +65,9 @@ class ToolRegistryTest {
         val events = mutableListOf<ToolCallEvent>()
         val bus = ToolEventBus()
         bus.addListener { events += it }
-        val registry = ToolRegistry(listOf(FailingTool("context")), bus, appConfig)
+        val registry = ToolRegistry(listOf(FailingTool("context")), bus) { timeoutSeconds }
 
-        val result = registry.functionCallbacks(setOf(ProviderToolId("context"))).single().call("""{"x":1}""")
+        val result = registry.execute(registry.resolve(setOf(ToolId("context"))).single(), """{"x":1}""", emptyMap())
         val json = Json.parseToJsonElement(result).jsonObject
 
         assertFalse(json["success"]!!.jsonPrimitive.content.toBoolean())
@@ -82,31 +80,31 @@ class ToolRegistryTest {
 
     @Test
     fun `tool call uses default timeout when not overridden`() {
-        val previousTimeout = appConfig.timeoutSeconds
-        appConfig.timeoutSeconds = 1
+        val previousTimeout = timeoutSeconds
+        timeoutSeconds = 1
         try {
-            val registry = ToolRegistry(listOf(SlowTool("context", 1500)), ToolEventBus(), appConfig)
-            val result = registry.functionCallbacks(setOf(ProviderToolId("context"))).single().call("""{}""")
+            val registry = registry(SlowTool("context", 1500))
+            val result = registry.execute(registry.resolve(setOf(ToolId("context"))).single(), """{}""", emptyMap())
             val json = Json.parseToJsonElement(result).jsonObject
             assertFalse(json["success"]!!.jsonPrimitive.content.toBoolean())
             assertTrue(json["error"]!!.jsonPrimitive.content.contains("timed out"))
         } finally {
-            appConfig.timeoutSeconds = previousTimeout
+            timeoutSeconds = previousTimeout
         }
     }
 
     @Test
     fun `tool call timeout can be overridden by model input`() {
-        val previousTimeout = appConfig.timeoutSeconds
-        appConfig.timeoutSeconds = 1
+        val previousTimeout = timeoutSeconds
+        timeoutSeconds = 1
         try {
-            val registry = ToolRegistry(listOf(SlowTool("context", 1200)), ToolEventBus(), appConfig)
-            val result = registry.functionCallbacks(setOf(ProviderToolId("context"))).single().call("""{"timeoutSeconds":2}""")
+            val registry = registry(SlowTool("context", 1200))
+            val result = registry.execute(registry.resolve(setOf(ToolId("context"))).single(), """{"timeoutSeconds":2}""", emptyMap())
             val json = Json.parseToJsonElement(result).jsonObject
             assertTrue(json["success"]!!.jsonPrimitive.content.toBoolean())
             assertEquals("ok", json["content"]!!.jsonPrimitive.content)
         } finally {
-            appConfig.timeoutSeconds = previousTimeout
+            timeoutSeconds = previousTimeout
         }
     }
 
@@ -115,9 +113,9 @@ class ToolRegistryTest {
         val events = mutableListOf<ToolCallEvent>()
         val bus = ToolEventBus()
         bus.addListener { events += it }
-        val registry = ToolRegistry(listOf(SlowTool("context", 200)), bus, appConfig)
+        val registry = ToolRegistry(listOf(SlowTool("context", 200)), bus) { timeoutSeconds }
 
-        val result = registry.functionCallbacks(setOf(ProviderToolId("context"))).single().call("""{"async":true}""")
+        val result = registry.execute(registry.resolve(setOf(ToolId("context"))).single(), """{"async":true}""", emptyMap())
         val json = Json.parseToJsonElement(result).jsonObject
         assertTrue(json["success"]!!.jsonPrimitive.content.toBoolean())
         assertTrue(json["content"]!!.jsonPrimitive.content.contains("scheduled async"))
@@ -139,13 +137,15 @@ class ToolRegistryTest {
         bus.addListener { events += it }
         val registry = ToolRegistry(listOf(ManagedTool("agent:start")), bus)
 
-        val result = registry.functionCallbacks(setOf(ProviderToolId("agent:start"))).single().call("""{"async":true}""")
+        val result = registry.execute(registry.resolve(setOf(ToolId("agent:start"))).single(), """{"async":true}""", emptyMap())
         val json = Json.parseToJsonElement(result).jsonObject
 
         assertEquals("managed", json["content"]!!.jsonPrimitive.content)
         assertEquals(2, events.size)
         assertEquals(true, events.last().context["managedExecution"])
     }
+
+    private fun registry(vararg tools: VisualAgentTool) = ToolRegistry(tools.toList(), ToolEventBus()) { timeoutSeconds }
 
     private class FakeTool(
         id: String,
