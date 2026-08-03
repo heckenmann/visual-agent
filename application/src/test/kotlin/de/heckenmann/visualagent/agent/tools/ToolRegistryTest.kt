@@ -1,6 +1,5 @@
 package de.heckenmann.visualagent.agent.tools
 
-import de.heckenmann.visualagent.agent.ToolId as ProviderToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
@@ -13,6 +12,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import de.heckenmann.visualagent.agent.ToolId as ProviderToolId
 
 class ToolRegistryTest {
     private val appConfig = AppConfigBean()

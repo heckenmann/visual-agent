@@ -1,9 +1,6 @@
 package de.heckenmann.visualagent.agent.tools
 
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
-import de.heckenmann.visualagent.agent.ToolDefinition as ProviderToolDefinition
-import de.heckenmann.visualagent.agent.ToolId as ProviderToolId
-import de.heckenmann.visualagent.agent.ToolResult as ProviderToolResult
 import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
@@ -18,6 +15,8 @@ import java.time.Instant
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import de.heckenmann.visualagent.agent.ToolDefinition as ProviderToolDefinition
+import de.heckenmann.visualagent.agent.ToolId as ProviderToolId
 import org.springframework.ai.tool.definition.ToolDefinition as SpringToolDefinition
 
 /**
@@ -118,7 +117,7 @@ class ToolRegistry(
                             inputJson = functionInput,
                             context = effectiveContext,
                             result =
-                                ProviderToolResult(
+                                ToolResult(
                                     toolId = definition.id.value,
                                     success = true,
                                     content = "",
@@ -145,7 +144,7 @@ class ToolRegistry(
                                 phase = ToolCallPhase.FINISHED,
                                 inputJson = functionInput,
                                 context = effectiveContext + mapOf("managedExecution" to true),
-                                result = result.toProviderResult(),
+                                result = result,
                                 startedAtUtc = startedAt,
                                 finishedAtUtc = finishedAt,
                                 durationMillis =
@@ -181,7 +180,7 @@ class ToolRegistry(
                             phase = ToolCallPhase.FINISHED,
                             inputJson = functionInput,
                             context = effectiveContext,
-                            result = result.toProviderResult(),
+                            result = result,
                             startedAtUtc = startedAt,
                             finishedAtUtc = finishedAt,
                             durationMillis =
@@ -217,7 +216,7 @@ class ToolRegistry(
                     phase = ToolCallPhase.FINISHED,
                     inputJson = functionInput,
                     context = effectiveContext + mapOf("async" to true),
-                    result = result.toProviderResult(),
+                    result = result,
                     startedAtUtc = startedAt,
                     finishedAtUtc = finishedAt,
                     durationMillis =
@@ -247,12 +246,4 @@ class ToolRegistry(
             failure(toolId, root?.message ?: error.message ?: error::class.simpleName.orEmpty())
         }
     }
-
-    private fun ToolResult.toProviderResult(): ProviderToolResult =
-        ProviderToolResult(
-            toolId = toolId,
-            success = success,
-            content = content,
-            error = error,
-        )
 }

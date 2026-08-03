@@ -2,12 +2,12 @@
 
 package de.heckenmann.visualagent.agent.tools.canvas
 
-import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
-import de.heckenmann.visualagent.agent.tools.api.ToolId
-import de.heckenmann.visualagent.agent.tools.api.ToolResult
 import de.heckenmann.visualagent.agent.tools.PathResolution
 import de.heckenmann.visualagent.agent.tools.STRING_SCHEMA
 import de.heckenmann.visualagent.agent.tools.VisualAgentTool
+import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
+import de.heckenmann.visualagent.agent.tools.api.ToolId
+import de.heckenmann.visualagent.agent.tools.api.ToolResult
 import de.heckenmann.visualagent.agent.tools.failure
 import de.heckenmann.visualagent.agent.tools.parseObject
 import de.heckenmann.visualagent.agent.tools.resolveWorkspacePathOrFailure

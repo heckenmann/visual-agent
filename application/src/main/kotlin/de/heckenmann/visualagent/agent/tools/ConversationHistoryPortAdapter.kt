@@ -16,15 +16,13 @@ class ConversationHistoryPortAdapter(
         sessionId: String,
         limit: Int,
         offset: Int,
-    ): List<ConversationHistoryEntry> =
-        conversationStore.getConversationMessagesPage(sessionId, limit, offset).map(::toEntry)
+    ): List<ConversationHistoryEntry> = conversationStore.getConversationMessagesPage(sessionId, limit, offset).map(::toEntry)
 
     override fun search(
         sessionId: String,
         query: String,
         limit: Int,
-    ): List<ConversationHistoryEntry> =
-        conversationStore.searchConversationMessages(sessionId, query, limit).map(::toEntry)
+    ): List<ConversationHistoryEntry> = conversationStore.searchConversationMessages(sessionId, query, limit).map(::toEntry)
 
     private fun toEntry(record: de.heckenmann.visualagent.knowledge.ConversationRecord): ConversationHistoryEntry =
         ConversationHistoryEntry(record.createdAt, record.role, record.content)

@@ -1,6 +1,6 @@
 package de.heckenmann.visualagent.agent.tools
 
-import de.heckenmann.visualagent.agent.ToolResult
+import de.heckenmann.visualagent.agent.tools.api.ToolResult
 import org.springframework.stereotype.Component
 import java.time.Instant
 import java.util.concurrent.CopyOnWriteArrayList

@@ -10,6 +10,7 @@ import de.heckenmann.visualagent.todo.TodoStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import mu.KotlinLogging
+import de.heckenmann.visualagent.agent.tools.api.ToolResult as ToolsToolResult
 
 /**
  * Handles triggering the main agent when a todo changes status.
@@ -61,7 +62,7 @@ internal class AgentTodoTrigger(
                     phase = ToolCallPhase.STARTED,
                     inputJson = "{}",
                     context = mapOf("trigger" to "todoChange", "requestId" to requestId),
-                    result = ToolResult(toolId = "todos", success = true, content = ""),
+                    result = ToolsToolResult(toolId = "todos", success = true, content = ""),
                     startedAtUtc = java.time.Instant.now(),
                     finishedAtUtc = java.time.Instant.now(),
                     durationMillis = 0L,
@@ -93,7 +94,7 @@ internal class AgentTodoTrigger(
                     phase = ToolCallPhase.FINISHED,
                     inputJson = "{}",
                     context = mapOf("trigger" to "todoChange", "requestId" to requestId),
-                    result = ToolResult(toolId = "todos", success = true, content = ""),
+                    result = ToolsToolResult(toolId = "todos", success = true, content = ""),
                     startedAtUtc = java.time.Instant.now(),
                     finishedAtUtc = java.time.Instant.now(),
                     durationMillis = 0L,

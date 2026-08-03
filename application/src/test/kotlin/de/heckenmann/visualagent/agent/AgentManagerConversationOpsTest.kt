@@ -76,7 +76,12 @@ class AgentManagerConversationOpsTest {
                 functionName = "read_file",
                 inputJson = "{}",
                 context = mapOf("requestId" to "r1"),
-                result = ToolResult(toolId = "file:read", success = true, content = "first line of file content"),
+                result =
+                    de.heckenmann.visualagent.agent.tools.api.ToolResult(
+                        toolId = "file:read",
+                        success = true,
+                        content = "first line of file content",
+                    ),
                 startedAtUtc = now,
                 finishedAtUtc = now,
                 durationMillis = 12,

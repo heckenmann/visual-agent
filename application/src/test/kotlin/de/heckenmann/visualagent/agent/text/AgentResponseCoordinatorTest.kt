@@ -101,7 +101,9 @@ class AgentResponseCoordinatorTest {
             functionName = "file_read",
             inputJson = "{}",
             context = emptyMap(),
-            result = ToolResult("file:read", success, "file content"),
+            result =
+                de.heckenmann.visualagent.agent.tools.api
+                    .ToolResult("file:read", success, "file content"),
             startedAtUtc = Instant.EPOCH,
             finishedAtUtc = Instant.EPOCH,
             durationMillis = 1,
