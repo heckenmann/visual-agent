@@ -66,7 +66,7 @@ internal fun SubAgentsPanel(
     }
     ToolEventRefreshEffect(
         toolEventBus = toolEventBus,
-        toolIds = setOf("agent:create", "agent:update", "agent:delete", "agent:start", "agent:list"),
+        toolIds = setOf("agent:create", "agent:update", "agent:delete", "agent:list"),
         onRefresh = refresh,
     )
     val agentListScrollState = rememberScrollState()

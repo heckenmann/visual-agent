@@ -32,6 +32,7 @@ Each successful build on `master` publishes an executable JAR to GitHub Packages
 - Todo list and sub-agents that can work on tasks autonomously.
 - Per-agent tool configuration, provider profiles, and persisted settings.
 - Command palette (`Cmd/Ctrl+K`) and customizable workspace panel layout.
+- Icon-only actions with descriptive tooltips throughout the Compose workspace.
 
 See the [use-case catalog](docs/usecases/) for the full list of user-visible functions.
 

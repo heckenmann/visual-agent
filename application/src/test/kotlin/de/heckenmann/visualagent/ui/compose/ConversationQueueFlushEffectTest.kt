@@ -76,9 +76,7 @@ class ConversationQueueFlushEffectTest {
 
             // When the agent finishes and totalActive drops to zero, the queue should flush.
             inFlight.markAgentEnd("agent-1")
-            composeTestRule.waitForIdle()
-            composeTestRule.mainClock.advanceTimeBy(100)
-            composeTestRule.waitForIdle()
+            composeTestRule.waitUntil(5_000) { sentMessages == 2 && queue.size == 0 }
 
             assertEquals(2, sentMessages, "both queued messages should be flushed when totalActive drops to zero")
             assertEquals(0, queue.size, "queue should be empty after flush")
@@ -136,9 +134,7 @@ class ConversationQueueFlushEffectTest {
             // Simulate executeSend finishing: stream ends, sending=false.
             inFlight.markStreamEnd("stream-1")
             sending = false
-            composeTestRule.waitForIdle()
-            composeTestRule.mainClock.advanceTimeBy(100)
-            composeTestRule.waitForIdle()
+            composeTestRule.waitUntil(5_000) { sentMessages == 1 && queue.size == 0 }
 
             assertEquals(1, sentMessages, "queued message should be flushed after the active send finishes")
             assertEquals(0, queue.size, "queue should be empty after flush")
