@@ -1,6 +1,6 @@
 package de.heckenmann.visualagent.agent.tools
 
-import de.heckenmann.visualagent.agent.ToolResult
+import de.heckenmann.visualagent.agent.tools.api.ToolResult
 import de.heckenmann.visualagent.error.ToolExecutionException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject

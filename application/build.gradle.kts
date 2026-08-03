@@ -48,6 +48,7 @@ dependencies {
     implementation(kotlin("reflect"))
     implementation(project(":ui"))
     implementation(project(":providers"))
+    implementation(project(":tools"))
 
     // Spring Boot & AI
     implementation("org.springframework.boot:spring-boot-starter")

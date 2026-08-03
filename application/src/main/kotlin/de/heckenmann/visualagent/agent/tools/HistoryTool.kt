@@ -1,8 +1,8 @@
 package de.heckenmann.visualagent.agent.tools
 
-import de.heckenmann.visualagent.agent.ToolDefinition
-import de.heckenmann.visualagent.agent.ToolId
-import de.heckenmann.visualagent.agent.ToolResult
+import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
+import de.heckenmann.visualagent.agent.tools.api.ToolId
+import de.heckenmann.visualagent.agent.tools.api.ToolResult
 import de.heckenmann.visualagent.knowledge.ConversationStore
 import kotlinx.serialization.json.JsonObject
 import org.springframework.stereotype.Component

@@ -1,9 +1,12 @@
 package de.heckenmann.visualagent.agent.tools
 
-import de.heckenmann.visualagent.agent.ToolDefinition
-import de.heckenmann.visualagent.agent.ToolId
-import de.heckenmann.visualagent.agent.ToolResult
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
+import de.heckenmann.visualagent.agent.ToolDefinition as ProviderToolDefinition
+import de.heckenmann.visualagent.agent.ToolId as ProviderToolId
+import de.heckenmann.visualagent.agent.ToolResult as ProviderToolResult
+import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
+import de.heckenmann.visualagent.agent.tools.api.ToolId
+import de.heckenmann.visualagent.agent.tools.api.ToolResult
 import de.heckenmann.visualagent.config.AppConfigBean
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -38,7 +41,7 @@ class ToolRegistry(
      * @return Tool IDs known by the registry
      * @see docs/usecases/uc_0000019_configure_agent_tools.md
      */
-    fun allToolIds(): Set<ToolId> = toolsById.keys
+    fun allToolIds(): Set<ProviderToolId> = toolsById.keys.map { ProviderToolId(it.value) }.toSet()
 
     /**
      * Return all registered tool definitions.
@@ -46,7 +49,18 @@ class ToolRegistry(
      * @return Tool definitions known by the registry
      * @see docs/usecases/uc_0000019_configure_agent_tools.md
      */
-    fun toolDefinitions(): List<ToolDefinition> = toolsById.values.map { it.definition }.sortedBy { it.id.value }
+    fun toolDefinitions(): List<ProviderToolDefinition> =
+        toolsById.values
+            .map { definition ->
+                definition.definition.let {
+                    ProviderToolDefinition(
+                        id = ProviderToolId(it.id.value),
+                        name = it.name,
+                        description = it.description,
+                        inputSchema = it.inputSchema,
+                    )
+                }
+            }.sortedBy { it.id.value }
 
     /**
      * Resolve registered tools by ID.
@@ -55,8 +69,8 @@ class ToolRegistry(
      * @return Matching registered tools in deterministic order
      * @see docs/usecases/uc_0000020_execute_tool_call.md
      */
-    fun resolve(enabledTools: Set<ToolId>): List<VisualAgentTool> =
-        enabledTools.mapNotNull { toolsById[it] }.sortedBy { it.definition.name }
+    fun resolve(enabledTools: Set<ProviderToolId>): List<VisualAgentTool> =
+        enabledTools.mapNotNull { toolsById[ToolId(it.value)] }.sortedBy { it.definition.name }
 
     /**
      * Build Spring AI callbacks for the requested tools.
@@ -67,7 +81,7 @@ class ToolRegistry(
      * @see docs/usecases/uc_0000020_execute_tool_call.md
      */
     override fun functionCallbacks(
-        enabledTools: Set<ToolId>,
+        enabledTools: Set<ProviderToolId>,
         context: Map<String, Any>,
     ): List<ToolCallback> =
         resolve(enabledTools).map { tool ->
@@ -104,7 +118,7 @@ class ToolRegistry(
                             inputJson = functionInput,
                             context = effectiveContext,
                             result =
-                                ToolResult(
+                                ProviderToolResult(
                                     toolId = definition.id.value,
                                     success = true,
                                     content = "",
@@ -131,7 +145,7 @@ class ToolRegistry(
                                 phase = ToolCallPhase.FINISHED,
                                 inputJson = functionInput,
                                 context = effectiveContext + mapOf("managedExecution" to true),
-                                result = result,
+                                result = result.toProviderResult(),
                                 startedAtUtc = startedAt,
                                 finishedAtUtc = finishedAt,
                                 durationMillis =
@@ -167,7 +181,7 @@ class ToolRegistry(
                             phase = ToolCallPhase.FINISHED,
                             inputJson = functionInput,
                             context = effectiveContext,
-                            result = result,
+                            result = result.toProviderResult(),
                             startedAtUtc = startedAt,
                             finishedAtUtc = finishedAt,
                             durationMillis =
@@ -187,7 +201,7 @@ class ToolRegistry(
 
     private fun scheduleAsyncExecution(
         tool: VisualAgentTool,
-        definition: de.heckenmann.visualagent.agent.ToolDefinition,
+        definition: ToolDefinition,
         functionInput: String,
         effectiveContext: Map<String, Any>,
         timeoutSeconds: Int,
@@ -203,7 +217,7 @@ class ToolRegistry(
                     phase = ToolCallPhase.FINISHED,
                     inputJson = functionInput,
                     context = effectiveContext + mapOf("async" to true),
-                    result = result,
+                    result = result.toProviderResult(),
                     startedAtUtc = startedAt,
                     finishedAtUtc = finishedAt,
                     durationMillis =
@@ -233,4 +247,12 @@ class ToolRegistry(
             failure(toolId, root?.message ?: error.message ?: error::class.simpleName.orEmpty())
         }
     }
+
+    private fun ToolResult.toProviderResult(): ProviderToolResult =
+        ProviderToolResult(
+            toolId = toolId,
+            success = success,
+            content = content,
+            error = error,
+        )
 }

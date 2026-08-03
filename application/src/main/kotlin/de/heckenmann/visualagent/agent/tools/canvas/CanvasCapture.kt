@@ -1,6 +1,6 @@
 package de.heckenmann.visualagent.agent.tools.canvas
 
-import de.heckenmann.visualagent.agent.ToolResult
+import de.heckenmann.visualagent.agent.tools.api.ToolResult
 import de.heckenmann.visualagent.agent.tools.string
 import de.heckenmann.visualagent.agent.tools.success
 import de.heckenmann.visualagent.canvas.CanvasOperations

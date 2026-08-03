@@ -1,9 +1,9 @@
 package de.heckenmann.visualagent.agent.tools
 
 import de.heckenmann.visualagent.agent.LLMProvider
-import de.heckenmann.visualagent.agent.ToolDefinition
-import de.heckenmann.visualagent.agent.ToolId
-import de.heckenmann.visualagent.agent.ToolResult
+import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
+import de.heckenmann.visualagent.agent.tools.api.ToolId
+import de.heckenmann.visualagent.agent.tools.api.ToolResult
 import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
 import kotlinx.coroutines.runBlocking

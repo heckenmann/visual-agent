@@ -5,6 +5,9 @@ import de.heckenmann.visualagent.agent.ollama.OllamaToolRecovery
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.agent.tools.VisualAgentTool
 import de.heckenmann.visualagent.agent.tools.toFunctionName
+import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
+import de.heckenmann.visualagent.agent.tools.api.ToolId
+import de.heckenmann.visualagent.agent.tools.api.ToolResult
 import de.heckenmann.visualagent.config.AppConfigBean
 import org.springframework.ai.chat.messages.AssistantMessage
 import org.springframework.ai.chat.metadata.ChatResponseMetadata

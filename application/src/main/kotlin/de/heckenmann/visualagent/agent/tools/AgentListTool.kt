@@ -2,9 +2,9 @@ package de.heckenmann.visualagent.agent.tools
 
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.SubAgent
-import de.heckenmann.visualagent.agent.ToolDefinition
-import de.heckenmann.visualagent.agent.ToolId
-import de.heckenmann.visualagent.agent.ToolResult
+import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
+import de.heckenmann.visualagent.agent.tools.api.ToolId
+import de.heckenmann.visualagent.agent.tools.api.ToolResult
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import org.springframework.context.annotation.Lazy
 import org.springframework.stereotype.Component

@@ -2,14 +2,15 @@
 
 ## Purpose
 
-This document records the incremental Gradle modularisation planned in issue #157. It establishes dependency directions before source files are relocated.
+This document records the incremental Gradle modularisation planned in issues #157 and #165. It establishes dependency directions before source files are relocated.
 
 ## Initial module graph
 
 ```text
 :application
  ├── :ui
- └── :providers
+ ├── :providers
+ └── :tools
 ```
 
 The filesystem layout mirrors the ownership boundary without changing Gradle project paths:
@@ -18,15 +19,18 @@ The filesystem layout mirrors the ownership boundary without changing Gradle pro
 application/          # :application, the composition root
 modules/ui/           # :ui, a leaf module
 modules/providers/    # :providers, a leaf module
+modules/tools/        # :tools, a leaf module
 ```
 
 `:application` is the only composition root. It owns desktop startup, Spring bootstrap, runtime wiring, and all logic that has not yet been extracted into a cohesive module.
 
 `:ui` owns Compose desktop UI code and UI-facing contracts. It has no Gradle project dependency on `:application`, `:providers`, or any future sibling module. Application-specific operations are supplied through narrow UI contracts implemented by `:application`.
 
-`:providers` owns LLM-provider integrations and provider-facing contracts. It has no Gradle project dependency on `:application`, `:ui`, or any future sibling module. Application-specific configuration, tools, persistence, and request context are supplied through narrow provider contracts implemented by `:application`.
+`:providers` owns LLM-provider integrations and provider-facing contracts. It has no Gradle project dependency on `:application`, `:ui`, `:tools`, or any future sibling module. Application-specific configuration, tools, persistence, and request context are supplied through narrow provider contracts implemented by `:application`.
 
-No additional feature or infrastructure module is introduced in the initial migration.
+`:tools` owns provider-neutral tool contracts, registry infrastructure, lifecycle events, parsing helpers, and tool implementations. It has no Gradle project dependency on `:application`, `:ui`, or `:providers`. Application services are supplied through narrow tool-owned ports implemented and composed by `:application`.
+
+The `:tools` extraction is tracked by issue #165 and is performed incrementally. Existing tool implementations remain in `:application` until their Application dependencies have been replaced by ports.
 
 ## Dependency rules
 
@@ -44,6 +48,7 @@ No additional feature or infrastructure module is introduced in the initial migr
 3. Relocate one coherent UI or provider slice at a time with `git mv`, together with its tests and required resources.
 4. Verify each new module directly with `:<module>:build` and `:<module>:test` before extracting another slice.
 5. Keep all unextracted agent, persistence, workspace, canvas, todo, knowledge, orchestration, and configuration logic in `:application`.
+6. Extract tool contracts and infrastructure into `:tools`, then move implementations behind ports one coherent tool family at a time.
 
 ## File-move rule
 
@@ -56,6 +61,7 @@ The final initial layout must support:
 ```bash
 ./gradlew :ui:build :ui:test
 ./gradlew :providers:build :providers:test
+./gradlew :tools:build :tools:test
 ./gradlew :application:build :application:test
 ./gradlew :application:run
 ```
