@@ -188,8 +188,9 @@ that returns "not configured"), `search` (placeholder that returns
   `WORKSPACE_PANEL_GAP = 16`.
 - `Cmd/Ctrl+1..6` focuses panels; `Cmd/Ctrl+K` opens the internal
   command palette; `Esc` closes the palette.
-- Workspace actions are icon-only buttons with descriptive tooltips and
-  accessibility descriptions.
+- Workspace toolbar action groups use icon-only buttons with descriptive
+  tooltips and accessibility descriptions. Settings authentication flows keep
+  labeled controls where their text communicates the authentication action.
 - Internal modals (`ComposeModalHost` with `ComposeConfirmationModal`,
   `ComposeInfoModal`, `ComposeContentModal`) replace native dialogs
   for destructive confirmations.
