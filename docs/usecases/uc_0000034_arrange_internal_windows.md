@@ -67,5 +67,5 @@ The user can keep multiple panels visible and ordered for the current task witho
 - Large panel contents remain scrollable without expensive desktop chrome effects being recalculated.
 - Scrollable panel bodies register their adapters with the shared workspace-panel scrollbar host instead of rendering separate scrollbars.
 - The canvas panel does not receive a generic vertical scrollbar.
-- Panel cards remain visually separable through spacing, borders, and header contrast.
+- Panel cards remain visually separable through spacing, borders, and header contrast; the vertical spacing to the workspace edges matches the horizontal gap between adjacent panels.
 - The `workspace:layout` tool exposes and accepts order, visibility, and preferred width.
