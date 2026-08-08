@@ -72,8 +72,8 @@ dependencies {
     implementation("org.xerial:sqlite-jdbc:3.53.2.1")
 
     // Kotlinx Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.10.2") // Needed for Spring AI Flux to Flow
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.11.0") // Needed for Spring AI Flux to Flow
 
     // JSON Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
@@ -102,7 +102,7 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("io.mockk:mockk:1.14.11")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     testImplementation("org.jetbrains.compose.ui:ui-test-junit4-desktop:1.11.1")
     testRuntimeOnly("org.junit.vintage:junit-vintage-engine:6.1.2")
 }
