@@ -17,7 +17,10 @@ import reactor.netty.http.client.HttpClient
 import java.time.Duration
 
 /**
- * Creates the Ollama API client with authentication for secured endpoints.
+ * Creates authenticated Ollama API clients for synchronous and streaming endpoints.
+ *
+ * [RestClient] serves synchronous Ollama API calls, while [WebClient] serves
+ * [OllamaApi.streamingChat]. Authentication reads the current key for every request.
  */
 @Configuration
 class OllamaApiConfiguration(
