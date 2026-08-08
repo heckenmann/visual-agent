@@ -32,6 +32,10 @@ class AppConfigPersistenceBinder(
         appConfigBean.uiThemeMode =
             preferenceStore.getPreference(AppConfigBean.KEY_UI_THEME_MODE)?.let(ThemeMode::fromString) ?: appConfigBean.uiThemeMode
         appConfigBean.fontSize = preferenceStore.getPreference(AppConfigBean.KEY_UI_FONT_SIZE)?.toIntOrNull() ?: appConfigBean.fontSize
+        appConfigBean.conversationInputPlacement =
+            ConversationInputPlacement.fromString(
+                preferenceStore.getPreference(AppConfigBean.KEY_UI_CONVERSATION_INPUT_PLACEMENT),
+            )
         appConfigBean.browserDefault = preferenceStore.getPreference(AppConfigBean.KEY_BROWSER_DEFAULT) ?: appConfigBean.browserDefault
         appConfigBean.contextLength =
             preferenceStore.getPreference(AppConfigBean.KEY_SESSION_CONTEXT_LENGTH)?.toIntOrNull() ?: appConfigBean.contextLength

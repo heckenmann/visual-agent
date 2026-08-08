@@ -7,12 +7,20 @@ import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.CancellationToken
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.conversation.WelcomeResult
+import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.error.ErrorMessageMapper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+/** Persist conversation placement without blocking the Compose main dispatcher. */
+internal suspend fun persistConversationInputPlacement(config: AppConfigBean) {
+    withContext(Dispatchers.IO) {
+        config.save()
+    }
+}
 
 /**
  * Extracted conversation panel actions to keep [ConversationPanel] under the 300-LOC limit.

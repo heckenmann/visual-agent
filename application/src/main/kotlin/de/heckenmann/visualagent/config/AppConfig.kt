@@ -20,6 +20,7 @@ import java.util.concurrent.CopyOnWriteArrayList
  * @property databasePath Path to SQLite database file
  * @property uiThemeMode UI theme mode (default: SYSTEM)
  * @property fontSize UI font size (default: 14)
+ * @property conversationInputPlacement Conversation composer placement (default: CONVERSATION_MESSAGE)
  * @property browserDefault Default browser for web integration (default: firefox)
  */
 class AppConfig private constructor() {
@@ -33,6 +34,7 @@ class AppConfig private constructor() {
     var databasePath: String = "./data/visual-agent.db"
     var uiThemeMode: ThemeMode = ThemeMode.SYSTEM
     var fontSize: Int = 14
+    var conversationInputPlacement: ConversationInputPlacement = ConversationInputPlacement.CONVERSATION_MESSAGE
     var browserDefault: String = "firefox"
     var contextLength: Int = 4096
     var streamingEnabled: Boolean = true
@@ -65,6 +67,7 @@ class AppConfig private constructor() {
         internal const val KEY_DATABASE_PATH = "database.path"
         internal const val KEY_UI_THEME_MODE = "ui.theme.mode"
         internal const val KEY_UI_FONT_SIZE = "ui.font.size"
+        internal const val KEY_UI_CONVERSATION_INPUT_PLACEMENT = "ui.conversation.input.placement"
         internal const val KEY_BROWSER_DEFAULT = "browser.default"
         internal const val KEY_SESSION_CONTEXT_LENGTH = "session.context.length"
         internal const val KEY_SESSION_STREAMING = "session.streaming.enabled"
@@ -211,6 +214,7 @@ class AppConfig private constructor() {
                 KEY_DATABASE_PATH to databasePath,
                 KEY_UI_THEME_MODE to uiThemeMode.name,
                 KEY_UI_FONT_SIZE to fontSize.toString(),
+                KEY_UI_CONVERSATION_INPUT_PLACEMENT to conversationInputPlacement.name,
                 KEY_BROWSER_DEFAULT to browserDefault,
                 KEY_SESSION_CONTEXT_LENGTH to contextLength.toString(),
                 KEY_SESSION_STREAMING to streamingEnabled.toString(),
@@ -237,6 +241,7 @@ class AppConfig private constructor() {
             db.setPreference(KEY_OPENAI_MODEL, openAiModel)
             db.setPreference(KEY_UI_THEME_MODE, uiThemeMode.name)
             db.setPreference(KEY_UI_FONT_SIZE, fontSize.toString())
+            db.setPreference(KEY_UI_CONVERSATION_INPUT_PLACEMENT, conversationInputPlacement.name)
             db.setPreference(KEY_BROWSER_DEFAULT, browserDefault)
             db.setPreference(KEY_SESSION_CONTEXT_LENGTH, contextLength.toString())
             db.setPreference(KEY_SESSION_STREAMING, streamingEnabled.toString())
@@ -275,6 +280,9 @@ class AppConfig private constructor() {
             openAiModel = db.getPreference(KEY_OPENAI_MODEL) ?: openAiModel
             uiThemeMode = db.getPreference(KEY_UI_THEME_MODE)?.let(ThemeMode::fromString) ?: uiThemeMode
             fontSize = db.getPreference(KEY_UI_FONT_SIZE)?.toIntOrNull() ?: fontSize
+            conversationInputPlacement =
+                db.getPreference(KEY_UI_CONVERSATION_INPUT_PLACEMENT)?.let(ConversationInputPlacement::fromString)
+                    ?: conversationInputPlacement
             browserDefault = db.getPreference(KEY_BROWSER_DEFAULT) ?: browserDefault
             contextLength = db.getPreference(KEY_SESSION_CONTEXT_LENGTH)?.toIntOrNull() ?: contextLength
             streamingEnabled = db.getPreference(KEY_SESSION_STREAMING)?.toBooleanStrictOrNull() ?: streamingEnabled

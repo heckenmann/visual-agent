@@ -2,13 +2,10 @@
 
 package de.heckenmann.visualagent.ui.compose
 
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,8 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -30,7 +25,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -43,6 +37,7 @@ import de.heckenmann.visualagent.agent.CancellationToken
 import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfigBean
+import de.heckenmann.visualagent.config.ConversationInputPlacement
 import de.heckenmann.visualagent.todo.TodoEventBus
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -75,6 +70,7 @@ internal fun ConversationPanel(
     var activeToken by remember { mutableStateOf<CancellationToken?>(null) }
     var panelSize by remember { mutableStateOf(IntSize.Zero) }
     var inputAreaHeight by remember { mutableStateOf(0) }
+    var inputPlacement by remember { mutableStateOf(config.conversationInputPlacement) }
     var pendingUserMessage by remember { mutableStateOf<String?>(null) }
     val streamingFlow = remember { MutableStateFlow("") }
     val streamingContent by streamingFlow.collectAsState()
@@ -155,6 +151,17 @@ internal fun ConversationPanel(
         activeToken?.cancel()
     }
     val sendCurrentInput = { sendContent(input) }
+    val clearConversation = {
+        handleClearConversation(
+            scope = scope,
+            modalRequester = modalRequester,
+            agentManager = agentManager,
+            activeToken = { activeToken },
+            onSendingChange = { sending = it },
+            onStatusChange = { status = it },
+            onHistoryRefresh = { history = agentManager.getHistory() },
+        )
+    }
     LaunchedEffect(Unit) {
         inputFocusRequester.requestFocus()
     }
@@ -177,6 +184,12 @@ internal fun ConversationPanel(
         streamingFlow = streamingFlow,
     )
     val density = LocalDensity.current
+    val inputIsConversationMessage = inputPlacement == ConversationInputPlacement.CONVERSATION_MESSAGE
+    val onInputPlacementChange: (ConversationInputPlacement) -> Unit = { placement ->
+        inputPlacement = placement
+        config.conversationInputPlacement = placement
+        scope.launch { persistConversationInputPlacement(config) }
+    }
     val animatedBottomPadding by animateDpAsState(
         targetValue = with(density) { inputAreaHeight.toDp() } + 8.dp,
         animationSpec = tween(200),
@@ -192,10 +205,26 @@ internal fun ConversationPanel(
                     start = 8.dp,
                     end = 8.dp,
                     top = 4.dp,
-                    bottom = animatedBottomPadding,
+                    bottom = if (inputIsConversationMessage) 8.dp else animatedBottomPadding,
                 ),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
+            if (inputIsConversationMessage) {
+                item(key = "conversation-input") {
+                    ConversationInputCard(
+                        input = input,
+                        sending = sending,
+                        onInputChange = { input = it },
+                        onSend = sendCurrentInput,
+                        onCancel = cancelCurrentRequest,
+                        onClear = clearConversation,
+                        inputPlacement = inputPlacement,
+                        onInputPlacementChange = onInputPlacementChange,
+                        inputFocusRequester = inputFocusRequester,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
             if (isLoadingOlder) {
                 item(key = "loading-older") { OlderHistoryLoadingIndicator() }
             }
@@ -221,85 +250,50 @@ internal fun ConversationPanel(
                 sendContent = sendContent,
             )
         }
-        MessageQueueStrip(
-            queue = queue,
-            onSendNow = { msg ->
-                queue.remove(msg.id)
-                activeToken?.cancel()
-                scope.launch {
-                    delay(200)
-                    executeSend(
-                        content = msg.content,
-                        agentManager = agentManager,
-                        inFlight = inFlight,
-                        inputFocusRequester = inputFocusRequester,
-                        onInputChange = { input = it },
-                        onSendingChange = { sending = it },
-                        onStatusChange = { status = it },
-                        onHistoryChange = { history = it },
-                        onActiveTokenChange = { activeToken = it },
-                        onPendingUserMessageChange = { pendingUserMessage = it },
-                        streamingFlow = streamingFlow,
-                    )
-                }
-            },
-            onClear = { queue.clear() },
-            onToggleFlushMode = {
-                queue.flushMode =
-                    if (queue.flushMode == QueueFlushMode.ONE_BY_ONE) {
-                        QueueFlushMode.ALL_AT_ONCE
-                    } else {
-                        QueueFlushMode.ONE_BY_ONE
-                    }
-            },
+        ConversationPanelQueueStrip(
+            queue,
+            scope,
+            inFlight,
+            agentManager,
+            inputFocusRequester,
+            { activeToken },
+            { input = it },
+            { sending = it },
+            { status = it },
+            { history = it },
+            { activeToken = it },
+            { pendingUserMessage = it },
+            streamingFlow,
         )
-        Column(
-            modifier =
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 8.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .animateContentSize(animationSpec = tween(200))
-                    .onSizeChanged { inputAreaHeight = it.height },
-        ) {
-            ConversationInputArea(
+        if (!inputIsConversationMessage) {
+            ConversationInputCard(
                 input = input,
                 sending = sending,
                 onInputChange = { input = it },
                 onSend = sendCurrentInput,
                 onCancel = cancelCurrentRequest,
-                onClear = {
-                    handleClearConversation(
-                        scope = scope,
-                        modalRequester = modalRequester,
-                        agentManager = agentManager,
-                        activeToken = { activeToken },
-                        onSendingChange = { sending = it },
-                        onStatusChange = { status = it },
-                        onHistoryRefresh = { history = agentManager.getHistory() },
-                    )
-                },
+                onClear = clearConversation,
+                inputPlacement = inputPlacement,
+                onInputPlacementChange = onInputPlacementChange,
                 inputFocusRequester = inputFocusRequester,
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                onSizeChanged = { inputAreaHeight = it.height },
             )
         }
-        ConversationScrollToBottomArea(
-            isAtBottom = isAtBottom,
-            listState = listState,
-            scope = scope,
-            agentManager = agentManager,
-            onHistoryRefresh = {
-                history = agentManager.getHistory()
-            },
-            bottomPadding = inputAreaHeight,
+        ConversationPanelOverlays(
+            isAtBottom,
+            listState,
+            scope,
+            agentManager,
+            inputAreaHeight,
+            editingId,
+            history,
+            { history = agentManager.getHistory() },
+            { editingId = null },
         )
     }
-    ConversationEditModal(
-        editingId = editingId,
-        history = history,
-        agentManager = agentManager,
-        onDismiss = { editingId = null },
-        onHistoryRefresh = { history = agentManager.getHistory() },
-    )
 }

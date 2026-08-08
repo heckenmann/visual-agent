@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandCircleDown
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -40,6 +41,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
+import de.heckenmann.visualagent.config.ConversationInputPlacement
 
 @Composable
 internal fun ScrollToBottomButton(
@@ -67,6 +69,8 @@ internal fun ConversationInputArea(
     onSend: () -> Unit,
     onCancel: () -> Unit,
     onClear: () -> Unit,
+    inputPlacement: ConversationInputPlacement = ConversationInputPlacement.CONVERSATION_MESSAGE,
+    onInputPlacementChange: (ConversationInputPlacement) -> Unit = {},
     inputFocusRequester: FocusRequester,
 ) {
     Column {
@@ -85,6 +89,26 @@ internal fun ConversationInputArea(
                 icon = Icons.Filled.Delete,
                 description = "Clear conversation",
                 onClick = onClear,
+                modifier = Modifier.size(24.dp),
+            )
+            ActionIconButton(
+                icon = Icons.Filled.PushPin,
+                description =
+                    if (inputPlacement == ConversationInputPlacement.FIXED) {
+                        "Use conversation message input"
+                    } else {
+                        "Pin input field to panel"
+                    },
+                onClick = {
+                    onInputPlacementChange(
+                        if (inputPlacement == ConversationInputPlacement.FIXED) {
+                            ConversationInputPlacement.CONVERSATION_MESSAGE
+                        } else {
+                            ConversationInputPlacement.FIXED
+                        },
+                    )
+                },
+                selected = inputPlacement == ConversationInputPlacement.FIXED,
                 modifier = Modifier.size(24.dp),
             )
         }

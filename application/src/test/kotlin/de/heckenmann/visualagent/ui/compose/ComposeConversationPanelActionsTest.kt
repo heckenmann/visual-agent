@@ -7,6 +7,7 @@ import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfigBean
+import de.heckenmann.visualagent.knowledge.PreferenceStore
 import de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
 import de.heckenmann.visualagent.todo.TodoEventBus
 import io.mockk.coEvery
@@ -14,12 +15,36 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class ComposeConversationPanelActionsTest {
+    @Test
+    fun `conversation placement persistence runs off the caller thread`() =
+        runBlocking {
+            val caller = Thread.currentThread()
+            val persistenceThreads = CopyOnWriteArrayList<Thread>()
+            val store =
+                object : PreferenceStore {
+                    override fun getPreference(key: String): String? = null
+
+                    override fun setPreference(
+                        key: String,
+                        value: String,
+                    ) {
+                        persistenceThreads += Thread.currentThread()
+                    }
+                }
+
+            persistConversationInputPlacement(AppConfigBean(store))
+
+            assertTrue(persistenceThreads.isNotEmpty())
+            assertTrue(persistenceThreads.all { it != caller })
+        }
+
     @Test
     fun `executeSend streams message and updates state`() =
         runBlocking {
