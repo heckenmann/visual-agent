@@ -87,6 +87,7 @@ public fun resolveWorkspacePathOrFailure(
     runCatching { PathResolution.Success(resolveWorkspacePath(path)) }
         .getOrElse { PathResolution.Failure(failure(toolId, it.message ?: "Invalid path")) }
 
+/** Result of resolving a workspace path. */
 public sealed interface PathResolution {
     /**
      * Successful workspace path resolution.

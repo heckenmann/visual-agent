@@ -25,7 +25,7 @@ class ToolSettingsPortAdapter(
         return ToolSettings(
             fontSize = appConfig.fontSize,
             provider = provider,
-            model = providerCatalog.getProvider(provider)?.defaultModel.orEmpty(),
+            model = providerCatalog.activeModelId(),
             openAiBaseUrl = appConfig.openAiBaseUrl,
             openAiApiKeyConfigured = appConfig.openAiApiKey.isNotBlank(),
             streamingEnabled = appConfig.streamingEnabled,
