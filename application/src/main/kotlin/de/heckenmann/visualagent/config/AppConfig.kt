@@ -20,7 +20,7 @@ import java.util.concurrent.CopyOnWriteArrayList
  * @property databasePath Path to SQLite database file
  * @property uiThemeMode UI theme mode (default: SYSTEM)
  * @property fontSize UI font size (default: 14)
- * @property conversationInputPlacement Conversation composer placement (default: FIXED)
+ * @property conversationInputPlacement Conversation composer placement (default: CONVERSATION_MESSAGE)
  * @property browserDefault Default browser for web integration (default: firefox)
  */
 class AppConfig private constructor() {

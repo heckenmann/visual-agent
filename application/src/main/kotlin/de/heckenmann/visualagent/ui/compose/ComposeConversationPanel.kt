@@ -188,7 +188,7 @@ internal fun ConversationPanel(
     val onInputPlacementChange: (ConversationInputPlacement) -> Unit = { placement ->
         inputPlacement = placement
         config.conversationInputPlacement = placement
-        config.save()
+        scope.launch { persistConversationInputPlacement(config) }
     }
     val animatedBottomPadding by animateDpAsState(
         targetValue = with(density) { inputAreaHeight.toDp() } + 8.dp,

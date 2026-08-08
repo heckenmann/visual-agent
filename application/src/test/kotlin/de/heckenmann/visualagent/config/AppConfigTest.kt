@@ -11,6 +11,24 @@ import kotlin.io.path.createTempDirectory
 
 class AppConfigTest {
     @Test
+    fun `export and import preserve conversation input placement`() {
+        val source = AppConfig.instance
+        val original = snapshot(source)
+        try {
+            source.conversationInputPlacement = ConversationInputPlacement.FIXED
+            val exported = AppConfigProperties.exportFrom(source)
+            val restored = AppConfig.instance
+            restored.conversationInputPlacement = ConversationInputPlacement.CONVERSATION_MESSAGE
+
+            AppConfigProperties.applyTo(restored, exported)
+
+            assertEquals(ConversationInputPlacement.FIXED, restored.conversationInputPlacement)
+        } finally {
+            restore(source, original)
+        }
+    }
+
+    @Test
     fun `save persists settings to user_preferences table`() {
         val config = AppConfig.instance
         val original = snapshot(config)

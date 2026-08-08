@@ -21,6 +21,7 @@ internal object AppConfigProperties {
             setProperty(AppConfig.KEY_DATABASE_PATH, config.databasePath)
             setProperty(AppConfig.KEY_UI_THEME_MODE, config.uiThemeMode.name)
             setProperty(AppConfig.KEY_UI_FONT_SIZE, config.fontSize.toString())
+            setProperty(AppConfig.KEY_UI_CONVERSATION_INPUT_PLACEMENT, config.conversationInputPlacement.name)
             setProperty(AppConfig.KEY_BROWSER_DEFAULT, config.browserDefault)
             setProperty(AppConfig.KEY_SESSION_FAVORITE_MODELS, config.favoriteModels)
             setProperty(AppConfig.KEY_SESSION_CONTEXT_LENGTH, config.contextLength.toString())
@@ -53,6 +54,11 @@ internal object AppConfigProperties {
         config.databasePath = properties.string(AppConfig.KEY_DATABASE_PATH, config.databasePath)
         config.uiThemeMode = properties.themeMode(AppConfig.KEY_UI_THEME_MODE, config.uiThemeMode)
         config.fontSize = properties.int(AppConfig.KEY_UI_FONT_SIZE, config.fontSize, 10..24)
+        config.conversationInputPlacement =
+            properties.conversationInputPlacement(
+                AppConfig.KEY_UI_CONVERSATION_INPUT_PLACEMENT,
+                config.conversationInputPlacement,
+            )
         config.browserDefault = properties.string(AppConfig.KEY_BROWSER_DEFAULT, config.browserDefault)
         config.contextLength = properties.int(AppConfig.KEY_SESSION_CONTEXT_LENGTH, config.contextLength, 1024..32768)
         config.streamingEnabled = properties.boolean(AppConfig.KEY_SESSION_STREAMING, config.streamingEnabled)
@@ -78,6 +84,11 @@ internal object AppConfigProperties {
         key: String,
         fallback: ThemeMode,
     ): ThemeMode = getProperty(key)?.let(ThemeMode::fromString) ?: fallback
+
+    private fun Properties.conversationInputPlacement(
+        key: String,
+        fallback: ConversationInputPlacement,
+    ): ConversationInputPlacement = getProperty(key)?.let(ConversationInputPlacement::fromString) ?: fallback
 
     private fun Properties.int(
         key: String,
