@@ -35,6 +35,7 @@ class ConversationMessageListEmptyHistoryTest {
     fun `shows pending user message when history is empty`(): Unit =
         runTest {
             val listStateHolder = mutableListOf<androidx.compose.foundation.lazy.LazyListState>()
+            val inFlight = InFlightStateHolder().also { it.markStreamStart("request-1") }
             composeTestRule.setContent {
                 MaterialTheme {
                     val listState = rememberLazyListState()
@@ -47,7 +48,7 @@ class ConversationMessageListEmptyHistoryTest {
                             ConversationMessageList(
                                 history = emptyList(),
                                 sending = true,
-                                inFlight = InFlightStateHolder(),
+                                inFlight = inFlight,
                                 pendingUserMessage = "Hello, agent!",
                                 streamingContent = "",
                                 deletingMessageIds = emptySet(),
@@ -144,6 +145,7 @@ class ConversationMessageListEmptyHistoryTest {
     fun `shows waiting indicator at newest end with existing history`(): Unit =
         runTest {
             val listStateHolder = mutableListOf<androidx.compose.foundation.lazy.LazyListState>()
+            val inFlight = InFlightStateHolder().also { it.markStreamStart("request-1") }
             composeTestRule.setContent {
                 MaterialTheme {
                     val listState = rememberLazyListState()
@@ -160,7 +162,7 @@ class ConversationMessageListEmptyHistoryTest {
                                         ),
                                     ),
                                 sending = true,
-                                inFlight = InFlightStateHolder(),
+                                inFlight = inFlight,
                                 pendingUserMessage = "Follow-up",
                                 streamingContent = "",
                                 deletingMessageIds = emptySet(),

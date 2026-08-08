@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -29,25 +30,12 @@ internal fun LazyListScope.ConversationMessageList(
     onStatusChange: (String) -> Unit,
     onEditMessage: (String?) -> Unit,
     sendContent: (String) -> Unit,
+    showWaitingIndicator: Boolean =
+        inFlight.state.value.totalActive > 0 && streamingContent.isEmpty(),
 ) {
-    val hasInFlightTools =
-        inFlight.state.value.pendingToolIds
-            .isNotEmpty()
-    val showWaitingIndicator = (sending || hasInFlightTools) && streamingContent.isEmpty()
     if (showWaitingIndicator) {
         item(key = "streaming-indicator") {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.Start),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "Thinking",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                PulsingDots()
-            }
+            ConversationWaitingIndicator()
         }
     }
     if (sending && streamingContent.isNotEmpty()) {
@@ -140,5 +128,26 @@ internal fun LazyListScope.ConversationMessageList(
                 }
             }
         }
+    }
+}
+
+/**
+ * Renders the conversation waiting indicator from the canonical in-flight state.
+ *
+ * @param modifier Modifier applied to the indicator row
+ */
+@Composable
+internal fun ConversationWaitingIndicator(modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.Start),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "Thinking",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        PulsingDots()
     }
 }

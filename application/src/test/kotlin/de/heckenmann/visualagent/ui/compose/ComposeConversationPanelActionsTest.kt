@@ -13,12 +13,13 @@ import de.heckenmann.visualagent.todo.TodoEventBus
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ComposeConversationPanelActionsTest {
@@ -86,7 +87,8 @@ class ComposeConversationPanelActionsTest {
             assertEquals("", input)
             assertEquals(false, sending)
             assertEquals("Ready", status)
-            assertNotNull(activeToken)
+            assertNull(activeToken)
+            assertEquals(0, inFlight.state.value.totalActive)
         }
 
     @Test
@@ -120,5 +122,31 @@ class ComposeConversationPanelActionsTest {
 
             assertEquals(false, sending)
             assertTrue(status.isNotBlank())
+            assertEquals(0, inFlight.state.value.totalActive)
+        }
+
+    @Test
+    fun `executeSend clears in-flight state after cancellation`() =
+        runBlocking {
+            val inFlight = InFlightStateHolder()
+            val mockManager = mockk<AgentManager>(relaxed = true)
+            every { mockManager.getHistory() } returns emptyList()
+            coEvery { mockManager.streamMessage(any(), any(), any()) } throws CancellationException("Cancelled")
+
+            executeSend(
+                content = "Test",
+                agentManager = mockManager,
+                inFlight = inFlight,
+                inputFocusRequester = FocusRequester(),
+                onInputChange = {},
+                onSendingChange = {},
+                onStatusChange = {},
+                onHistoryChange = {},
+                onActiveTokenChange = {},
+                onPendingUserMessageChange = {},
+                streamingFlow = MutableStateFlow(""),
+            )
+
+            assertEquals(0, inFlight.state.value.totalActive)
         }
 }

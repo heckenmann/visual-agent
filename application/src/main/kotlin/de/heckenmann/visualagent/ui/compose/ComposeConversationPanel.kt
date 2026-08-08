@@ -185,6 +185,7 @@ internal fun ConversationPanel(
     )
     val density = LocalDensity.current
     val inputIsConversationMessage = inputPlacement == ConversationInputPlacement.CONVERSATION_MESSAGE
+    val showWaitingIndicator = inFlight.state.value.totalActive > 0 && streamingContent.isEmpty()
     val onInputPlacementChange: (ConversationInputPlacement) -> Unit = { placement ->
         inputPlacement = placement
         config.conversationInputPlacement = placement
@@ -248,6 +249,7 @@ internal fun ConversationPanel(
                 onStatusChange = { status = it },
                 onEditMessage = { editingId = it },
                 sendContent = sendContent,
+                showWaitingIndicator = showWaitingIndicator && inputIsConversationMessage,
             )
         }
         ConversationPanelQueueStrip(
@@ -294,6 +296,11 @@ internal fun ConversationPanel(
             history,
             { history = agentManager.getHistory() },
             { editingId = null },
+        )
+        ConversationWaitingOverlay(
+            visible = showWaitingIndicator && !inputIsConversationMessage,
+            bottomPadding = with(density) { inputAreaHeight.toDp() } + 12.dp,
+            modifier = Modifier.align(Alignment.BottomStart),
         )
     }
 }
