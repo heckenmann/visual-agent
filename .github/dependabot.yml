@@ -1,11 +1,30 @@
 version: 2
 updates:
   - package-ecosystem: gradle
-    directory: /
+    directories:
+      - /
+      - /third_party/cokit
     schedule:
       interval: daily
     target-branch: master
     open-pull-requests-limit: 5
+    groups:
+      kotlin-ecosystem:
+        patterns:
+          - "org.jetbrains.kotlin*"
+          - "org.jetbrains.kotlinx*"
+      spring-ecosystem:
+        patterns:
+          - "org.springframework*"
+      compose-ecosystem:
+        patterns:
+          - "org.jetbrains.compose*"
+          - "androidx.compose*"
+      gradle-test-tooling:
+        patterns:
+          - "org.junit*"
+          - "io.mockk*"
+          - "org.jacoco*"
 
   - package-ecosystem: github-actions
     directory: /
@@ -13,3 +32,7 @@ updates:
       interval: daily
     target-branch: master
     open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"
