@@ -100,6 +100,8 @@ internal fun ComposeSplitWorkspace(
                     (visibleWindows.size * WORKSPACE_PANEL_RESIZER_WIDTH) +
                     ((visibleWindows.size - 1) * WORKSPACE_PANEL_GAP)
             val canScroll = rowWidthPx > viewport.width
+            val panelHeight =
+                (viewport.height - (2 * WORKSPACE_PANEL_GAP)).coerceAtLeast(0)
             Column(modifier = Modifier.fillMaxSize()) {
                 Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
                     Box(
@@ -138,7 +140,7 @@ internal fun ComposeSplitWorkspace(
                                     onWidthChanged = { next -> resizeUpdatedState.value.invoke(window.id, next) },
                                     onCloseWindow = { onToggleWindow(window.id) },
                                     minPanelWidth = minPanelWidth,
-                                    rowHeight = viewport.height,
+                                    rowHeight = panelHeight,
                                 )
                             }
                         }
@@ -217,9 +219,14 @@ private fun LazyItemScope.SplitPanelItem(
     ReorderableItem(
         state = state,
         key = window.id,
-        modifier = Modifier.height(rowHeight.dp),
+        modifier = Modifier.height((rowHeight + (2 * WORKSPACE_PANEL_GAP)).dp),
     ) { isDragging ->
-        Row(modifier = Modifier.height(rowHeight.dp)) {
+        Row(
+            modifier =
+                Modifier
+                    .padding(vertical = WORKSPACE_PANEL_GAP.dp)
+                    .height(rowHeight.dp),
+        ) {
             SplitPanelContent(
                 window = window,
                 panelServices = panelServices,
