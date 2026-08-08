@@ -19,6 +19,7 @@ import kotlinx.serialization.json.jsonPrimitive
  *
  * Use cases: UC-0000061.
  */
+@AgentTool
 class UiTool(
     private val settings: ToolSettingsPort,
 ) : VisualAgentTool {
@@ -78,6 +79,7 @@ class UiTool(
  *
  * Use cases: UC-0000060.
  */
+@AgentTool
 class PwdTool : VisualAgentTool {
     override val definition =
         ToolDefinition(
@@ -101,6 +103,7 @@ class PwdTool : VisualAgentTool {
  *
  * Use cases: UC-0000059.
  */
+@AgentTool
 class ContextTool(
     private val settings: ToolSettingsPort,
 ) : VisualAgentTool {
@@ -138,6 +141,7 @@ class ContextTool(
 /**
  * Tool that lets the model inspect and mutate persisted todo records.
  */
+@AgentTool
 class TodosTool(
     private val todos: TodoToolPort,
 ) : VisualAgentTool {

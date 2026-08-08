@@ -15,6 +15,7 @@ import kotlinx.serialization.json.jsonPrimitive
 /**
  * Creates a new sub-agent from a template.
  */
+@AgentTool
 class AgentCreateTool(
     private val agents: AgentToolPort,
 ) : VisualAgentTool {
@@ -55,6 +56,7 @@ class AgentCreateTool(
  *
  * Accepts full AgentConfig fields and merges them over the existing configuration.
  */
+@AgentTool
 class AgentUpdateTool(
     private val agents: AgentToolPort,
 ) : VisualAgentTool {
@@ -128,6 +130,7 @@ class AgentUpdateTool(
 /**
  * Deletes a sub-agent.
  */
+@AgentTool
 class AgentDeleteTool(
     private val agents: AgentToolPort,
 ) : VisualAgentTool {
@@ -158,6 +161,7 @@ class AgentDeleteTool(
 /**
  * Reads the persisted work log for a sub-agent.
  */
+@AgentTool
 class AgentLogTool(
     private val agents: AgentToolPort,
 ) : VisualAgentTool {
@@ -190,6 +194,7 @@ class AgentLogTool(
 /**
  * Shows full details for a single sub-agent, including tools, model, current task, and recent log.
  */
+@AgentTool
 class AgentShowTool(
     private val agents: AgentToolPort,
 ) : VisualAgentTool {

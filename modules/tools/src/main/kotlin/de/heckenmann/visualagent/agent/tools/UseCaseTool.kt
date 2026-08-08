@@ -3,7 +3,6 @@ package de.heckenmann.visualagent.agent.tools
 import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
-import org.springframework.stereotype.Component
 import java.nio.file.Files
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.name
@@ -14,7 +13,7 @@ import kotlin.io.path.readText
  *
  * Use cases: UC-0000067.
  */
-@Component
+@AgentTool
 class UseCaseTool : VisualAgentTool {
     override val definition =
         ToolDefinition(

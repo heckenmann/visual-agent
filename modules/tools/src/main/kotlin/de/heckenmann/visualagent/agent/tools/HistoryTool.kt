@@ -5,12 +5,11 @@ import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
 import kotlinx.serialization.json.JsonObject
-import org.springframework.stereotype.Component
 
 /**
  * Tool that loads or searches persisted conversation history for the current session.
  */
-@Component
+@AgentTool
 class HistoryTool(
     private val conversationHistory: ConversationHistoryPort,
 ) : VisualAgentTool {

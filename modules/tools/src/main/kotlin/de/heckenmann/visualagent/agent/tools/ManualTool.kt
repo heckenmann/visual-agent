@@ -3,7 +3,7 @@ package de.heckenmann.visualagent.agent.tools
 import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
-import org.springframework.stereotype.Component
+import org.springframework.context.annotation.Lazy
 
 /**
  * Exposes built-in manual pages for tools and markdown formatting.
@@ -14,9 +14,9 @@ import org.springframework.stereotype.Component
  *
  * Use cases: UC-0000058.
  */
-@Component
+@AgentTool
 class ManualTool(
-    private val allTools: List<VisualAgentTool> = emptyList(),
+    @param:Lazy private val allTools: List<VisualAgentTool> = emptyList(),
 ) : VisualAgentTool {
     override val definition =
         ToolDefinition(

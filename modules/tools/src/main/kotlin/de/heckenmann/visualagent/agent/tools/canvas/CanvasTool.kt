@@ -2,6 +2,7 @@
 
 package de.heckenmann.visualagent.agent.tools.canvas
 
+import de.heckenmann.visualagent.agent.tools.AgentTool
 import de.heckenmann.visualagent.agent.tools.PathResolution
 import de.heckenmann.visualagent.agent.tools.STRING_SCHEMA
 import de.heckenmann.visualagent.agent.tools.VisualAgentTool
@@ -24,6 +25,7 @@ import kotlinx.serialization.json.jsonPrimitive
  *
  * Use cases: UC-0000032, UC-0000033.
  */
+@AgentTool
 class CanvasTool(
     private val canvas: CanvasToolPort,
 ) : VisualAgentTool {

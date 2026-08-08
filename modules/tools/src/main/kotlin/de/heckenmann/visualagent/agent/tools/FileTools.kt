@@ -3,7 +3,6 @@ package de.heckenmann.visualagent.agent.tools
 import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
-import org.springframework.stereotype.Component
 import java.nio.charset.StandardCharsets
 import java.nio.file.FileSystems
 import java.nio.file.Files
@@ -20,7 +19,7 @@ import kotlin.io.path.writeText
  *
  * Use cases: UC-0000022.
  */
-@Component
+@AgentTool
 class FileReadTool : VisualAgentTool {
     override val definition =
         ToolDefinition(
@@ -52,7 +51,7 @@ class FileReadTool : VisualAgentTool {
  *
  * Use cases: UC-0000022.
  */
-@Component
+@AgentTool
 class FileListTool : VisualAgentTool {
     override val definition =
         ToolDefinition(
@@ -92,7 +91,7 @@ class FileListTool : VisualAgentTool {
  *
  * Use cases: UC-0000022.
  */
-@Component
+@AgentTool
 class FileGlobTool : VisualAgentTool {
     override val definition =
         ToolDefinition(
@@ -131,7 +130,7 @@ class FileGlobTool : VisualAgentTool {
  *
  * Use cases: UC-0000022.
  */
-@Component
+@AgentTool
 class FileGrepTool : VisualAgentTool {
     override val definition =
         ToolDefinition(
@@ -178,7 +177,7 @@ class FileGrepTool : VisualAgentTool {
  *
  * Use cases: UC-0000022.
  */
-@Component
+@AgentTool
 class FileWriteTool : VisualAgentTool {
     override val definition =
         ToolDefinition(
@@ -212,7 +211,7 @@ class FileWriteTool : VisualAgentTool {
  *
  * Use cases: UC-0000022.
  */
-@Component
+@AgentTool
 class FileEditTool : VisualAgentTool {
     override val definition =
         ToolDefinition(

@@ -14,6 +14,7 @@ import de.heckenmann.visualagent.agent.tools.api.ToolResult
  *
  * Use cases: UC-0000015, UC-0000018, UC-0000084.
  */
+@AgentTool
 class AgentListTool(
     private val agents: AgentToolPort,
 ) : VisualAgentTool {

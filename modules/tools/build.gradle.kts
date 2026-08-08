@@ -14,8 +14,8 @@ repositories {
 
 dependencies {
     implementation(kotlin("stdlib"))
-    implementation(platform("org.springframework.boot:spring-boot-dependencies:4.1.0"))
-    implementation("org.springframework:spring-context")
+    compileOnly(platform("org.springframework.boot:spring-boot-dependencies:4.1.0"))
+    compileOnly("org.springframework:spring-context")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
 
     testImplementation(kotlin("test"))

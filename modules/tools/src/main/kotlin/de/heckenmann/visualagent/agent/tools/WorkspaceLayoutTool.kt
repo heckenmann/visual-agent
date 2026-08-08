@@ -14,6 +14,7 @@ import kotlinx.serialization.json.jsonPrimitive
 /**
  * Tool that lets agents inspect and arrange the internal workspace windows.
  */
+@AgentTool
 class WorkspaceLayoutTool(
     private val workspaceLayout: WorkspaceLayoutToolPort,
 ) : VisualAgentTool {

@@ -14,6 +14,7 @@ import kotlinx.serialization.json.put
  *
  * Use cases: UC-0000025, UC-0000026, UC-0000027.
  */
+@AgentTool
 class WorkspaceFileTool(
     private val workspaceFiles: WorkspaceFileToolPort,
 ) : VisualAgentTool {

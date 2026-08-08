@@ -30,7 +30,7 @@ modules/tools/        # :tools, a leaf module
 
 `:tools` owns provider-neutral tool contracts, registry infrastructure, lifecycle events, parsing helpers, and tool implementations. It has no Gradle project dependency on `:application`, `:ui`, or `:providers`. Application services are supplied through narrow tool-owned ports implemented and composed by `:application`.
 
-The `:tools` extraction is tracked by issue #165 and is performed incrementally. Existing tool implementations remain in `:application` until their Application dependencies have been replaced by ports.
+The `:tools` extraction is tracked by issue #165. Concrete tools are Spring-discovered through the `@AgentTool` stereotype, while Application services are supplied through narrow tool-owned ports implemented and composed by `:application`. The module uses Spring as a compile-only dependency; the consuming Application runtime supplies it.
 
 ## Dependency rules
 

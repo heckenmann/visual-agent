@@ -3,7 +3,6 @@ package de.heckenmann.visualagent.agent.tools
 import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
-import org.springframework.stereotype.Component
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -14,7 +13,7 @@ import java.util.concurrent.TimeUnit
  *
  * Use cases: UC-0000021.
  */
-@Component
+@AgentTool
 class TerminalTool : VisualAgentTool {
     override val definition =
         ToolDefinition(
@@ -80,7 +79,7 @@ class TerminalTool : VisualAgentTool {
  *
  * Use cases: UC-0000044.
  */
-@Component
+@AgentTool
 class BrowserTool : VisualAgentTool {
     override val definition =
         ToolDefinition(
@@ -104,7 +103,7 @@ class BrowserTool : VisualAgentTool {
  *
  * Use cases: UC-0000044.
  */
-@Component
+@AgentTool
 class SearchTool : VisualAgentTool {
     override val definition =
         ToolDefinition(
@@ -128,7 +127,7 @@ class SearchTool : VisualAgentTool {
  *
  * Use cases: UC-0000043.
  */
-@Component
+@AgentTool
 class SleepTool : VisualAgentTool {
     override val definition =
         ToolDefinition(
