@@ -15,20 +15,20 @@ repositories {
 }
 
 tasks.named("check") {
-    dependsOn(":application:check", ":ui:check", ":providers:check", "verifyModuleDependencies")
+    dependsOn(":application:check", ":ui:check", ":providers:check", ":tools:check", "verifyModuleDependencies")
 }
 
 tasks.named("build") {
-    dependsOn(":application:build", ":ui:build", ":providers:build")
+    dependsOn(":application:build", ":ui:build", ":providers:build", ":tools:build")
 }
 
 gradle.projectsEvaluated {
     val moduleMainSourceSets =
-        listOf(":application", ":ui", ":providers").map { modulePath ->
+        listOf(":application", ":ui", ":providers", ":tools").map { modulePath ->
             project(modulePath).extensions.getByType<SourceSetContainer>().getByName("main")
         }
     val moduleTestSourceSets =
-        listOf(":application", ":ui", ":providers").map { modulePath ->
+        listOf(":application", ":ui", ":providers", ":tools").map { modulePath ->
             project(modulePath).extensions.getByType<SourceSetContainer>().getByName("test")
         }
     tasks.named<Test>("test") {
@@ -70,7 +70,7 @@ tasks.named("check") {
 }
 
 tasks.register("ktlintCheck") {
-    dependsOn(":application:ktlintCheck", ":ui:ktlintCheck", ":providers:ktlintCheck")
+    dependsOn(":application:ktlintCheck", ":ui:ktlintCheck", ":providers:ktlintCheck", ":tools:ktlintCheck")
 }
 
 tasks.register("copyAllDependencies") {
@@ -81,7 +81,7 @@ tasks.register("verifyModuleDependencies") {
     group = "verification"
     description = "Verifies that only :application depends on Visual Agent submodules."
     doLast {
-        val leafModules = setOf(":ui", ":providers")
+        val leafModules = setOf(":ui", ":providers", ":tools")
         val violations =
             leafModules.flatMap { modulePath ->
                 project(modulePath)

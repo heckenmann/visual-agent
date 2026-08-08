@@ -2,8 +2,12 @@ package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.ollama.OllamaPromptFactory
 import de.heckenmann.visualagent.agent.ollama.OllamaToolRecovery
+import de.heckenmann.visualagent.agent.tools.SpringAiToolCallbacksAdapter
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.agent.tools.VisualAgentTool
+import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
+import de.heckenmann.visualagent.agent.tools.api.ToolId
+import de.heckenmann.visualagent.agent.tools.api.ToolResult
 import de.heckenmann.visualagent.agent.tools.toFunctionName
 import de.heckenmann.visualagent.config.AppConfigBean
 import org.springframework.ai.chat.messages.AssistantMessage
@@ -44,9 +48,10 @@ fun createClient(
     registry: ToolRegistry,
     appConfig: AppConfigBean = AppConfigBean(createMockPreferenceStore()),
 ): OllamaClient {
-    val promptFactory = OllamaPromptFactory(registry)
+    val callbacks = SpringAiToolCallbacksAdapter(registry)
+    val promptFactory = OllamaPromptFactory(callbacks)
     val recovery = OllamaToolRecovery(chatModel, promptFactory)
-    return OllamaClient(chatModel, ollamaApi, promptFactory, recovery, registry, appConfig)
+    return OllamaClient(chatModel, ollamaApi, promptFactory, recovery, callbacks, appConfig)
 }
 
 private fun createMockPreferenceStore(): de.heckenmann.visualagent.knowledge.PreferenceStore =

@@ -17,7 +17,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class AgentControlToolsTest {
-    private val manager = mockk<AgentManager>()
+    private val manager = mockk<AgentManager>(relaxed = true)
     private val agentToolConfigService = mockk<de.heckenmann.visualagent.agent.config.AgentToolConfigService>()
 
     @Test
@@ -33,6 +33,7 @@ class AgentControlToolsTest {
             )
         every { manager.getSubAgentJobQueueSnapshot() } returns SubAgentJobQueueSnapshot(active = 1, queued = 2)
         every { manager.getSubAgents() } returns listOf(agent)
+        every { manager.getSubAgent("agent-1") } returns agent
         every { agentToolConfigService.toolsFor(agent) } returns setOf(ToolId("file:write"), ToolId("terminal"))
         every { agentToolConfigService.findConfigIdFor(agent) } returns "coder"
 

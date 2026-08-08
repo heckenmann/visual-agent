@@ -29,7 +29,9 @@ class AgentManagerToolHistoryPersistenceTest {
                 phase = ToolCallPhase.FINISHED,
                 inputJson = """{"action":"list"}""",
                 context = mapOf("sessionId" to "main"),
-                result = ToolResult(toolId = "todos", success = true, content = "- [PENDING] A"),
+                result =
+                    de.heckenmann.visualagent.agent.tools.api
+                        .ToolResult(toolId = "todos", success = true, content = "- [PENDING] A"),
                 startedAtUtc = now,
                 finishedAtUtc = now,
                 durationMillis = 10,
@@ -61,7 +63,12 @@ class AgentManagerToolHistoryPersistenceTest {
                 phase = ToolCallPhase.FINISHED,
                 inputJson = """{"action":"list"}""",
                 context = mapOf("sessionId" to "main"),
-                result = ToolResult(toolId = "todos", success = true, content = "- [IN_PROGRESS] Example"),
+                result =
+                    de.heckenmann.visualagent.agent.tools.api.ToolResult(
+                        toolId = "todos",
+                        success = true,
+                        content = "- [IN_PROGRESS] Example",
+                    ),
                 startedAtUtc = now,
                 finishedAtUtc = now,
                 durationMillis = 9,

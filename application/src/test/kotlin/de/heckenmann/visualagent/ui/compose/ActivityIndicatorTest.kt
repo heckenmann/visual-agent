@@ -210,7 +210,9 @@ class ActivityIndicatorTest {
             phase = phase,
             inputJson = "{}",
             context = mapOf("requestId" to requestId),
-            result = ToolResult(toolId = toolId, success = true, content = "ok"),
+            result =
+                de.heckenmann.visualagent.agent.tools.api
+                    .ToolResult(toolId = toolId, success = true, content = "ok"),
             startedAtUtc = now,
             finishedAtUtc = now,
             durationMillis = 0,

@@ -1,0 +1,228 @@
+package de.heckenmann.visualagent.agent.tools
+
+import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
+import de.heckenmann.visualagent.agent.tools.api.ToolId
+import de.heckenmann.visualagent.agent.tools.api.ToolResult
+import de.heckenmann.visualagent.agent.tools.api.ToolWorkspaceFile
+import de.heckenmann.visualagent.agent.tools.api.WorkspaceFileToolPort
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+
+/**
+ * Tool that lets sub-agents inspect and analyze files imported into the managed workspace.
+ *
+ * Use cases: UC-0000025, UC-0000026, UC-0000027.
+ */
+@AgentTool
+class WorkspaceFileTool(
+    private val workspaceFiles: WorkspaceFileToolPort,
+) : VisualAgentTool {
+    override val definition =
+        ToolDefinition(
+            id = ToolId(TOOL_ID),
+            name = ToolId(TOOL_ID).toFunctionName(),
+            description = workspaceFileToolDescription(),
+            inputSchema = STRING_SCHEMA,
+        )
+
+    override fun execute(
+        inputJson: String,
+        context: Map<String, Any>,
+    ): ToolResult {
+        val input = parseObject(inputJson)
+        return runCatching {
+            when (input.string("action") ?: "list") {
+                "list" -> list()
+                "search" -> search(input.requiredString("query"))
+                "info" -> info(file(input))
+                "sync" -> sync()
+                "hash" -> hash(file(input))
+                "readText" -> readText(file(input))
+                "extractPdfText" -> extractPdfText(file(input))
+                "renderPdfPage" -> renderPdfPage(file(input), input.int("page") ?: 1)
+                "imageInfo" -> imageInfo(file(input))
+                "imageBytes" -> imageBytes(file(input))
+                "analyzeImage" -> analyzeImage(file(input), input.requiredString("prompt"))
+                else -> failure(TOOL_ID, "Unsupported workspace file action")
+            }
+        }.getOrElse { error ->
+            failure(TOOL_ID, error.message ?: error::class.simpleName.orEmpty())
+        }
+    }
+
+    private fun list(): ToolResult =
+        success(
+            TOOL_ID,
+            buildJsonObject {
+                put(
+                    "files",
+                    buildJsonArray {
+                        workspaceFiles.list().forEach { add(recordJson(it)) }
+                    },
+                )
+            }.toString(),
+        )
+
+    private fun info(record: ToolWorkspaceFile): ToolResult = success(TOOL_ID, recordJson(record).toString())
+
+    private fun search(query: String): ToolResult {
+        val result = workspaceFiles.search(query)
+        return success(
+            TOOL_ID,
+            buildJsonObject {
+                put("query", result.query)
+                put(
+                    "matches",
+                    buildJsonArray {
+                        result.matches.forEach { match ->
+                            add(
+                                buildJsonObject {
+                                    put("matchType", match.matchType)
+                                    put("snippet", match.snippet)
+                                    put("file", recordJson(match.file))
+                                },
+                            )
+                        }
+                    },
+                )
+            }.toString(),
+        )
+    }
+
+    private fun sync(): ToolResult {
+        val report = workspaceFiles.sync()
+        return success(
+            TOOL_ID,
+            buildJsonObject {
+                put("added", report.added)
+                put("updated", report.updated)
+                put("removed", report.removed)
+                put("total", report.total)
+            }.toString(),
+        )
+    }
+
+    private fun hash(record: ToolWorkspaceFile): ToolResult =
+        success(
+            TOOL_ID,
+            buildJsonObject {
+                put("id", record.id)
+                put("path", record.relativePath)
+                put("algorithm", "sha256")
+                put("sha256", workspaceFiles.hash(record))
+            }.toString(),
+        )
+
+    private fun readText(record: ToolWorkspaceFile): ToolResult =
+        success(
+            TOOL_ID,
+            buildJsonObject {
+                put("id", record.id)
+                put("path", record.relativePath)
+                put("content", workspaceFiles.readText(record))
+            }.toString(),
+        )
+
+    private fun extractPdfText(record: ToolWorkspaceFile): ToolResult {
+        val text = workspaceFiles.extractPdfText(record)
+        return success(
+            TOOL_ID,
+            buildJsonObject {
+                put("id", record.id)
+                put("path", record.relativePath)
+                put("cached", text.cached)
+                put("content", text.text)
+            }.toString(),
+        )
+    }
+
+    private fun renderPdfPage(
+        record: ToolWorkspaceFile,
+        page: Int,
+    ): ToolResult = success(TOOL_ID, recordJson(workspaceFiles.renderPdfPage(record, page)).toString())
+
+    private fun imageInfo(record: ToolWorkspaceFile): ToolResult {
+        val info = workspaceFiles.imageInfo(record)
+        return success(
+            TOOL_ID,
+            buildJsonObject {
+                put("id", record.id)
+                put("path", record.relativePath)
+                put("mimeType", info.mimeType)
+                put("width", info.width)
+                put("height", info.height)
+                put("sizeBytes", info.sizeBytes)
+                put("sha256", info.sha256)
+            }.toString(),
+        )
+    }
+
+    private fun imageBytes(record: ToolWorkspaceFile): ToolResult {
+        val bytes = workspaceFiles.imageBytes(record)
+        return success(
+            TOOL_ID,
+            buildJsonObject {
+                put("id", record.id)
+                put("path", record.relativePath)
+                put("mimeType", bytes.mimeType)
+                put("base64", bytes.base64)
+            }.toString(),
+        )
+    }
+
+    private fun analyzeImage(
+        record: ToolWorkspaceFile,
+        prompt: String,
+    ): ToolResult {
+        val response = workspaceFiles.analyzeImage(record, prompt)
+        return success(
+            TOOL_ID,
+            buildJsonObject {
+                put("id", record.id)
+                put("path", record.relativePath)
+                put("model", response.model)
+                put("content", response.content)
+            }.toString(),
+        )
+    }
+
+    private fun file(input: kotlinx.serialization.json.JsonObject): ToolWorkspaceFile =
+        workspaceFiles.requireFile(input.string("id"), input.string("path"))
+
+    private fun recordJson(record: ToolWorkspaceFile) =
+        buildJsonObject {
+            put("id", record.id)
+            put("path", record.relativePath)
+            put("originalName", record.originalName)
+            put("mimeType", record.mimeType)
+            put("sizeBytes", record.sizeBytes)
+            put("sha256", record.sha256)
+            put("importedAt", record.importedAt.toString())
+            put("updatedAt", record.updatedAt.toString())
+            put("hasExtractedText", record.hasExtractedText)
+        }
+
+    private companion object {
+        const val TOOL_ID = "workspace:file"
+
+        /**
+         * Returns the tool description for workspace:file with all actions and their parameters.
+         */
+        fun workspaceFileToolDescription(): String =
+            "Inspect imported workspace files. Actions:\n" +
+                "- list: {\"action\":\"list\"}. Lists all imported files.\n" +
+                "- info: {\"action\":\"info\",\"id\":\"...\"} or {\"action\":\"info\",\"path\":\"...\"}. File metadata.\n" +
+                "- hash: {\"action\":\"hash\",\"id\":\"...\"}. SHA-256 hash.\n" +
+                "- readText: {\"action\":\"readText\",\"id\":\"...\"}. Read text content.\n" +
+                "- extractPdfText: {\"action\":\"extractPdfText\",\"id\":\"...\"}. Extract text from PDF.\n" +
+                "- renderPdfPage: {\"action\":\"renderPdfPage\",\"id\":\"...\",\"page\":1}. Render PDF page as image.\n" +
+                "- imageInfo: {\"action\":\"imageInfo\",\"id\":\"...\"}. Image dimensions and type.\n" +
+                "- imageBytes: {\"action\":\"imageBytes\",\"id\":\"...\"}. Base64-encoded image bytes.\n" +
+                "- analyzeImage: {\"action\":\"analyzeImage\",\"id\":\"...\",\"prompt\":\"describe this\"}. " +
+                "Analyze image with vision model.\n" +
+                "- search: {\"action\":\"search\",\"query\":\"...\"}. Search file metadata.\n" +
+                "- sync: {\"action\":\"sync\"}. Sync metadata with filesystem. " +
+                "Use id or path to identify files."
+    }
+}

@@ -1,0 +1,73 @@
+package de.heckenmann.visualagent.agent.tools
+
+import de.heckenmann.visualagent.agent.tools.api.ConversationHistoryPort
+import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
+import de.heckenmann.visualagent.agent.tools.api.ToolId
+import de.heckenmann.visualagent.agent.tools.api.ToolResult
+import kotlinx.serialization.json.JsonObject
+
+/**
+ * Tool that loads or searches persisted conversation history for the current session.
+ */
+@AgentTool
+class HistoryTool(
+    private val conversationHistory: ConversationHistoryPort,
+) : VisualAgentTool {
+    override val definition =
+        ToolDefinition(
+            id = ToolId("history"),
+            name = ToolId("history").toFunctionName(),
+            description =
+                "Read conversation history. Actions and their required input parameters:\n" +
+                    "- load: {\"action\":\"load\",\"limit\":20,\"offset\":0}. " +
+                    "Loads older conversation pages. limit (1-100), offset (0+).\n" +
+                    "- search: {\"action\":\"search\",\"query\":\"search term\",\"limit\":20}. " +
+                    "Searches conversation history by keyword. limit (1-100).\n" +
+                    "Use search when you need information from earlier in the conversation " +
+                    "that is not in your current context.",
+            inputSchema = STRING_SCHEMA,
+        )
+
+    override fun execute(
+        inputJson: String,
+        context: Map<String, Any>,
+    ): ToolResult {
+        val input = parseObject(inputJson)
+        val sessionId = context["sessionId"]?.toString().orEmpty().ifBlank { "main" }
+        return when (input.string("action") ?: "load") {
+            "load" -> loadPage(sessionId, input)
+            "search" -> search(sessionId, input)
+            else -> failure("history", "Unsupported history action")
+        }
+    }
+
+    private fun loadPage(
+        sessionId: String,
+        input: JsonObject,
+    ): ToolResult {
+        val limit = (input.int("limit") ?: 20).coerceIn(1, 100)
+        val offset = (input.int("offset") ?: 0).coerceAtLeast(0)
+        val rows = conversationHistory.loadPage(sessionId, limit, offset)
+        if (rows.isEmpty()) return success("history", "No messages found for load request.")
+        val content =
+            rows.joinToString("\n") { row ->
+                "[${row.createdAt}] ${row.role}: ${row.content}"
+            }
+        return success("history", content)
+    }
+
+    private fun search(
+        sessionId: String,
+        input: JsonObject,
+    ): ToolResult {
+        val query = input.requiredString("query")
+        val limit = (input.int("limit") ?: 20).coerceIn(1, 100)
+        val rows = conversationHistory.search(sessionId, query, limit)
+        if (rows.isEmpty()) return success("history", "No messages matched query '$query'.")
+        val content =
+            rows.joinToString("\n") { row ->
+                "[${row.createdAt}] ${row.role}: ${row.content}"
+            }
+        return success("history", content)
+    }
+}

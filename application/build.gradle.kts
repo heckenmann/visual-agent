@@ -48,6 +48,7 @@ dependencies {
     implementation(kotlin("reflect"))
     implementation(project(":ui"))
     implementation(project(":providers"))
+    implementation(project(":tools"))
 
     // Spring Boot & AI
     implementation("org.springframework.boot:spring-boot-starter")
@@ -129,6 +130,9 @@ tasks.jacocoTestReport {
                     exclude(jacocoExcludedClasses)
                 }
             },
+            fileTree(project(":tools").layout.buildDirectory.dir("classes/kotlin/main")) {
+                exclude(jacocoExcludedClasses)
+            },
         ),
     )
     reports {
@@ -145,6 +149,9 @@ tasks.jacocoTestCoverageVerification {
                 fileTree(it) {
                     exclude(jacocoExcludedClasses)
                 }
+            },
+            fileTree(project(":tools").layout.buildDirectory.dir("classes/kotlin/main")) {
+                exclude(jacocoExcludedClasses)
             },
         ),
     )
@@ -233,6 +240,7 @@ val kotlinMainSourceRoots =
         projectDir.toPath().resolve("src/main/kotlin"),
         rootProject.projectDir.toPath().resolve("modules/ui/src/main/kotlin"),
         rootProject.projectDir.toPath().resolve("modules/providers/src/main/kotlin"),
+        rootProject.projectDir.toPath().resolve("modules/tools/src/main/kotlin"),
     )
 val kotlinSourceRoots =
     kotlinMainSourceRoots +
@@ -240,6 +248,7 @@ val kotlinSourceRoots =
             projectDir.toPath().resolve("src/test/kotlin"),
             rootProject.projectDir.toPath().resolve("modules/ui/src/test/kotlin"),
             rootProject.projectDir.toPath().resolve("modules/providers/src/test/kotlin"),
+            rootProject.projectDir.toPath().resolve("modules/tools/src/test/kotlin"),
         )
 
 val generatedUseCaseResources = layout.buildDirectory.dir("generated/usecase-resources")
@@ -532,6 +541,8 @@ tasks.register("desktopApiUsageCheck") {
                 rootProject.projectDir.toPath().resolve("modules/ui/src/test"),
                 rootProject.projectDir.toPath().resolve("modules/providers/src/main"),
                 rootProject.projectDir.toPath().resolve("modules/providers/src/test"),
+                rootProject.projectDir.toPath().resolve("modules/tools/src/main"),
+                rootProject.projectDir.toPath().resolve("modules/tools/src/test"),
             )
         val checkedFiles =
             listOf(
