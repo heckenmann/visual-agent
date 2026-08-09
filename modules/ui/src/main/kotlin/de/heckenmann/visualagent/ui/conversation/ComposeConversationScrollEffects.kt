@@ -16,6 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.unit.IntSize
@@ -42,12 +43,11 @@ import kotlinx.coroutines.launch
 internal fun ConversationStartupScrollEffect(
     history: List<Message>,
     listState: LazyListState,
-    scrollCoordinator: ConversationScrollCoordinator? = null,
 ) {
-    val activeScrollCoordinator = scrollCoordinator ?: remember(listState) { ConversationScrollCoordinator(listState) }
     LaunchedEffect(Unit) {
         if (history.isNotEmpty()) {
-            activeScrollCoordinator.showInitialLatest()
+            withFrameNanos { }
+            listState.scrollToBottom()
         }
     }
 }
@@ -67,9 +67,8 @@ internal fun ConversationScrollOnChangeEffect(
     listState: LazyListState,
     pendingUserMessage: String? = null,
     streamingContent: String = "",
-    scrollCoordinator: ConversationScrollCoordinator? = null,
+    isAtLatest: Boolean = listState.conversationPosition().isAtLatest,
 ) {
-    val activeScrollCoordinator = scrollCoordinator ?: remember(listState) { ConversationScrollCoordinator(listState) }
     var lastCount by remember { mutableStateOf(history.size) }
     var lastNewestMessage by remember { mutableStateOf(history.lastOrNull()) }
     var lastPendingUserMessage by remember { mutableStateOf(pendingUserMessage) }
@@ -79,8 +78,9 @@ internal fun ConversationScrollOnChangeEffect(
             history.isNotEmpty() && history.size > lastCount && history.lastOrNull() != lastNewestMessage
         val displayedPendingMessage = pendingUserMessage != null && pendingUserMessage != lastPendingUserMessage
         val updatedStreamingContent = streamingContent.isNotEmpty() && streamingContent != lastStreamingContent
-        if (appendedLatestHistory || displayedPendingMessage || updatedStreamingContent) {
-            activeScrollCoordinator.followLatestContentChange()
+        if (isAtLatest && (appendedLatestHistory || displayedPendingMessage || updatedStreamingContent)) {
+            withFrameNanos { }
+            listState.scrollToBottom()
         }
         lastCount = history.size
         lastNewestMessage = history.lastOrNull()
@@ -100,12 +100,12 @@ internal fun ConversationResizeScrollEffect(
     viewportSize: IntSize,
     hasConversationContent: Boolean,
     listState: LazyListState,
-    scrollCoordinator: ConversationScrollCoordinator? = null,
+    isAtLatest: Boolean = listState.conversationPosition().isAtLatest,
 ) {
-    val activeScrollCoordinator = scrollCoordinator ?: remember(listState) { ConversationScrollCoordinator(listState) }
     LaunchedEffect(viewportSize) {
-        if (viewportSize != IntSize.Zero && hasConversationContent) {
-            activeScrollCoordinator.maintainLatestAfterViewportChange()
+        if (isAtLatest && viewportSize != IntSize.Zero && hasConversationContent) {
+            withFrameNanos { }
+            listState.scrollToBottom()
         }
     }
 }

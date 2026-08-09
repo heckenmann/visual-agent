@@ -26,7 +26,11 @@ import kotlin.test.fail
  * single source of truth for the Material3 color schemes.
  */
 class ComposeHardcodedColorTest {
-    private val composeDir = File("application/src/main/kotlin/de/heckenmann/visualagent/ui/compose")
+    private val composeDir =
+        listOf(
+            File("src/main/kotlin/de/heckenmann/visualagent/ui"),
+            File("modules/ui/src/main/kotlin/de/heckenmann/visualagent/ui"),
+        ).first { it.isDirectory }
     private val themeFileName = "ComposeWorkspaceTheme.kt"
     private val colorPattern = Regex("""Color\s*\(\s*0x""")
 
@@ -53,8 +57,10 @@ class ComposeHardcodedColorTest {
 
     @Test
     fun `theme file defines light and dark color schemes`() {
-        val themeFile = File(composeDir, themeFileName)
-        require(themeFile.isFile) { "Theme file not found: ${themeFile.absolutePath}" }
+        val themeFile =
+            requireNotNull(composeDir.walkTopDown().firstOrNull { it.isFile && it.name == themeFileName }) {
+                "Theme file not found below ${composeDir.absolutePath}"
+            }
 
         val source = themeFile.readText()
         assertEquals(true, source.contains("fun visualAgentLightColorScheme"), "Missing light scheme")

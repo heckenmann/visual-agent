@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -24,7 +25,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -51,8 +51,7 @@ import de.heckenmann.visualagent.ui.workspace.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-internal typealias ConversationScrollStateObserver =
-    (ConversationUiState, LazyListState, ConversationScrollCoordinator) -> Unit
+internal typealias ConversationScrollStateObserver = (ConversationUiState, LazyListState) -> Unit
 
 /**
  * Conversation panel with message history, streaming input, message queue, and todo actions.
@@ -72,13 +71,10 @@ internal fun ConversationPanel(
     val scope = rememberCoroutineScope()
     val inputFocusRequester = remember { FocusRequester() }
     val listState = rememberLazyListState()
-    val scrollCoordinator = remember(listState) { ConversationScrollCoordinator(listState) }
-    val viewport = remember(listState) { ConversationViewport(listState) }
+    val isAtLatest by remember(listState) { derivedStateOf { listState.conversationPosition().isAtLatest } }
     val conversationGateway = remember(agentManager) { AgentManagerConversationGateway(agentManager) }
     val conversationState = rememberConversationUiState(agentManager.getHistory())
-    val userScrollConnection = remember(scrollCoordinator) { ConversationUserScrollConnection(scrollCoordinator) }
-    onScrollStateObserved?.invoke(conversationState, listState, scrollCoordinator)
-    ConversationLatestPositionEffect(listState, scrollCoordinator)
+    onScrollStateObserved?.invoke(conversationState, listState)
     RegisterPanelScrollbar(rememberScrollbarAdapter(listState))
     var activeToken by remember { mutableStateOf<CancellationToken?>(null) }
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
@@ -109,12 +105,9 @@ internal fun ConversationPanel(
             includeInlineComposer = inputIsConversationMessage,
         )
     ConversationHistoryPagingEffect(
-        isAtOldest = viewport.isAtOldest && !conversationState.sending,
         state = conversationState,
-        timeline = timeline,
         listState = listState,
         gateway = conversationGateway,
-        scrollCoordinator = scrollCoordinator,
     )
     DisposableEffect(toolEventBus) {
         val handle =
@@ -173,17 +166,17 @@ internal fun ConversationPanel(
     LaunchedEffect(Unit) {
         inputFocusRequester.requestFocus()
     }
-    ConversationStartupScrollEffect(conversationState.history, listState, scrollCoordinator)
+    ConversationStartupScrollEffect(conversationState.history, listState)
     ConversationScrollOnChangeEffect(
         conversationState.history,
         listState,
         conversationState.pendingUserMessage,
         streamingContent,
-        scrollCoordinator,
+        isAtLatest,
     )
     val hasConversationContent =
         conversationState.history.isNotEmpty() || conversationState.pendingUserMessage != null || streamingContent.isNotEmpty()
-    ConversationResizeScrollEffect(viewportSize, hasConversationContent, listState, scrollCoordinator)
+    ConversationResizeScrollEffect(viewportSize, hasConversationContent, listState, isAtLatest)
     ConversationQueueFlushEffect(
         sending = conversationState.sending,
         inFlight = inFlight,
@@ -210,7 +203,6 @@ internal fun ConversationPanel(
                 modifier =
                     Modifier
                         .fillMaxSize()
-                        .nestedScroll(userScrollConnection)
                         .semantics { contentDescription = "Conversation history" },
                 reverseLayout = true,
                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
@@ -265,10 +257,10 @@ internal fun ConversationPanel(
                 conversationState.streaming,
             )
             ConversationScrollToLatestArea(
-                isAtLatest = viewport.isAtLatest,
+                isAtLatest = isAtLatest,
                 state = conversationState,
                 gateway = conversationGateway,
-                scrollCoordinator = scrollCoordinator,
+                listState = listState,
                 scope = scope,
             )
         }

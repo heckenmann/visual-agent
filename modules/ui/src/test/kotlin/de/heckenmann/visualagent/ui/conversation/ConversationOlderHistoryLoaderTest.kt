@@ -39,6 +39,12 @@ class ConversationOlderHistoryLoaderTest {
     @get:Rule
     val composeTestRule = createComposeRule()
 
+    private fun awaitLoad() {
+        composeTestRule.waitForIdle()
+        composeTestRule.mainClock.advanceTimeBy(100)
+        composeTestRule.waitForIdle()
+    }
+
     @Test
     fun `loads older history when scrolled to end`() {
         val initialHistory = (1..5).map { Message("user", "msg $it", id = "id-$it") }
@@ -84,9 +90,7 @@ class ConversationOlderHistoryLoaderTest {
             }
         }
 
-        composeTestRule.waitForIdle()
-        composeTestRule.mainClock.advanceTimeBy(100)
-        composeTestRule.waitForIdle()
+        awaitLoad()
 
         assertEquals(1, loadCalls, "loadOlderHistory should be called once when at end")
         assertEquals(fullHistory.size, history.size, "history should contain older + initial messages")
@@ -135,9 +139,7 @@ class ConversationOlderHistoryLoaderTest {
             }
         }
 
-        composeTestRule.waitForIdle()
-        composeTestRule.mainClock.advanceTimeBy(100)
-        composeTestRule.waitForIdle()
+        awaitLoad()
 
         assertEquals(1, loadCalls, "loadOlderHistory should be called once")
         assertFalse(hasMoreHistory, "hasMoreHistory should be false when no older messages remain")
@@ -181,9 +183,7 @@ class ConversationOlderHistoryLoaderTest {
             }
         }
 
-        composeTestRule.waitForIdle()
-        composeTestRule.mainClock.advanceTimeBy(100)
-        composeTestRule.waitForIdle()
+        awaitLoad()
 
         assertEquals(0, loadCalls, "loadOlderHistory should not be called when not at end")
     }
@@ -224,9 +224,7 @@ class ConversationOlderHistoryLoaderTest {
             }
         }
 
-        composeTestRule.waitForIdle()
-        composeTestRule.mainClock.advanceTimeBy(100)
-        composeTestRule.waitForIdle()
+        awaitLoad()
 
         assertEquals(0, loadCalls, "loadOlderHistory should not be called when history is empty")
     }
@@ -270,9 +268,7 @@ class ConversationOlderHistoryLoaderTest {
             }
         }
 
-        composeTestRule.waitForIdle()
-        composeTestRule.mainClock.advanceTimeBy(100)
-        composeTestRule.waitForIdle()
+        awaitLoad()
 
         assertEquals(1, loadCalls, "loadOlderHistory should be called once")
 
@@ -280,9 +276,7 @@ class ConversationOlderHistoryLoaderTest {
         isAtEnd = false
         composeTestRule.waitForIdle()
         isAtEnd = true
-        composeTestRule.waitForIdle()
-        composeTestRule.mainClock.advanceTimeBy(100)
-        composeTestRule.waitForIdle()
+        awaitLoad()
 
         assertEquals(1, loadCalls, "loadOlderHistory should not be called again after hasMoreHistory became false")
     }

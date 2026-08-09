@@ -19,7 +19,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -187,19 +186,16 @@ class ConversationHistoryScrollbarPositionTest {
 
     @Test
     fun `scroll to latest after reaching oldest keeps mouse wheel browsing available`() {
-        val recentHistory = (41..60).map { Message("user", "recent $it", id = "recent-$it") }
+        val recentHistory = (401..800).map { Message("user", "recent $it", id = "recent-$it") }
         val olderLoadStarted = CompletableDeferred<Unit>()
         val releaseOlderLoad = CompletableDeferred<Unit>()
+        val olderLoadCalls = AtomicInteger(0)
         val listStates = mutableListOf<androidx.compose.foundation.lazy.LazyListState>()
 
         composeTestRule.setContent {
             val listState = rememberLazyListState()
             val state = rememberConversationUiState(recentHistory)
-            val coordinator = remember(listState) { ConversationScrollCoordinator(listState) }
-            val viewport = remember(listState) { ConversationViewport(listState) }
-            val userScrollConnection = remember(coordinator) { ConversationUserScrollConnection(coordinator) }
-            val timeline = buildConversationTimeline(state.history, null, "", false, state.isLoadingOlder, false)
-            val isAtLatest by remember { derivedStateOf { viewport.isAtLatest } }
+            val isAtLatest by remember { derivedStateOf { listState.conversationPosition().isAtLatest } }
             val gateway =
                 remember {
                     object : ConversationHistoryGateway {
@@ -207,21 +203,25 @@ class ConversationHistoryScrollbarPositionTest {
                             ConversationHistoryPage(recentHistory, offset = 0, hasMore = true)
 
                         override suspend fun older(offset: Int): ConversationHistoryPage {
-                            olderLoadStarted.complete(Unit)
-                            releaseOlderLoad.await()
-                            return ConversationHistoryPage(emptyList(), offset = offset, hasMore = false)
+                            when (olderLoadCalls.incrementAndGet()) {
+                                1 -> {
+                                    olderLoadStarted.complete(Unit)
+                                    releaseOlderLoad.await()
+                                    return ConversationHistoryPage(emptyList(), offset = offset, hasMore = true)
+                                }
+                                else -> return ConversationHistoryPage(emptyList(), offset = offset, hasMore = false)
+                            }
                         }
                     }
                 }
             listStates += listState
             MaterialTheme {
-                Box(modifier = Modifier.width(200.dp).height(160.dp)) {
+                Box(modifier = Modifier.width(200.dp).height(5_000.dp)) {
                     LazyColumn(
                         state = listState,
                         modifier =
                             Modifier
                                 .fillMaxSize()
-                                .nestedScroll(userScrollConnection)
                                 .semantics { contentDescription = "Conversation history" },
                         reverseLayout = true,
                     ) {
@@ -230,26 +230,25 @@ class ConversationHistoryScrollbarPositionTest {
                         }
                     }
                     ConversationHistoryPagingEffect(
-                        isAtOldest = viewport.isAtOldest,
                         state = state,
-                        timeline = timeline,
                         listState = listState,
                         gateway = gateway,
-                        scrollCoordinator = coordinator,
                     )
-                    ConversationLatestPositionEffect(listState, coordinator)
                     ConversationScrollToLatestArea(
                         isAtLatest = isAtLatest,
                         state = state,
                         gateway = gateway,
-                        scrollCoordinator = coordinator,
+                        listState = listState,
                         scope = rememberCoroutineScope(),
                     )
                 }
             }
         }
         composeTestRule.waitForIdle()
-        kotlinx.coroutines.runBlocking { listStates.single().scrollToItem(recentHistory.lastIndex) }
+        composeTestRule.onNodeWithContentDescription("Conversation history").performMouseInput {
+            moveTo(center)
+            repeat(200) { scroll(-100f) }
+        }
         composeTestRule.waitUntil(timeoutMillis = 5_000) { olderLoadStarted.isCompleted }
 
         composeTestRule.onNodeWithContentDescription("Scroll to latest message").performClick()
@@ -262,8 +261,17 @@ class ConversationHistoryScrollbarPositionTest {
 
         assertTrue(
             listStates.last().canScrollBackward,
-            "the user must be able to browse older messages after returning to the latest page",
+            "the mouse wheel must move the conversation away from the latest page",
         )
-        releaseOlderLoad.complete(Unit)
+        composeTestRule.onNodeWithContentDescription("Conversation history").performMouseInput {
+            moveTo(center)
+            repeat(200) { scroll(-100f) }
+        }
+        composeTestRule.waitUntil(timeoutMillis = 5_000) { olderLoadCalls.get() == 2 }
+
+        assertTrue(
+            listStates.last().canScrollBackward,
+            "the user must be able to reach the older-history end after returning to the latest page",
+        )
     }
 }

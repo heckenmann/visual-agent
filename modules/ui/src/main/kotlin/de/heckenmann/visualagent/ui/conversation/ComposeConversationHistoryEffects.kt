@@ -15,10 +15,9 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,42 +34,65 @@ import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 @Composable
 internal fun ConversationHistoryPagingEffect(
-    isAtOldest: Boolean,
     state: ConversationUiState,
-    timeline: List<ConversationTimelineItem>,
     listState: LazyListState,
     gateway: ConversationHistoryGateway,
-    scrollCoordinator: ConversationScrollCoordinator,
 ) {
-    val currentTimeline by rememberUpdatedState(timeline)
-    state.updateOldestPosition(isAtOldest)
-    LaunchedEffect(isAtOldest) {
-        if (!isAtOldest) return@LaunchedEffect
-        val request = state.beginOlderRequest() ?: return@LaunchedEffect
-        val anchorGeneration = scrollCoordinator.beginHistoryAnchorRestore()
-        val visible = listState.layoutInfo.visibleItemsInfo
-        val knownKeys = timeline.mapTo(mutableSetOf(), ConversationTimelineItem::stableKey)
-        val anchor =
-            visible.firstOrNull {
-                it.key in knownKeys && it.key != ConversationTimelineItem.OlderHistoryLoading.stableKey
-            } ?: visible.firstOrNull()
-        try {
-            val page = gateway.older(request.offset)
-            val added = state.applyOlder(request, page)
-            if (added > 0 && anchor != null) {
-                withFrameNanos { }
-                val keyedTarget = currentTimeline.indexOfFirst { it.stableKey == anchor.key }
-                val targetIndex = if (keyedTarget >= 0) keyedTarget else anchor.index + added
-                scrollCoordinator.completeHistoryAnchorRestore(anchorGeneration, targetIndex, anchor.offset)
-            }
-        } finally {
-            state.finishOlderRequest(request)
-            scrollCoordinator.finishHistoryAnchorRestore(anchorGeneration)
+    LaunchedEffect(state, gateway, listState) {
+        coroutineScope {
+            snapshotFlow { listState.isAtOldestConversationEnd() && !state.sending }
+                .distinctUntilChanged()
+                .collect { reachedOldest ->
+                    if (reachedOldest) {
+                        launch {
+                            while (listState.isAtOldestConversationEnd() && loadOlderConversationPage(state, gateway)) {
+                                withFrameNanos { }
+                            }
+                        }
+                    }
+                }
         }
+    }
+}
+
+/** Compatibility adapter retained while scroll-focused tests migrate to the direct list-state API. */
+@Composable
+internal fun ConversationHistoryPagingEffect(
+    isAtOldest: Boolean,
+    state: ConversationUiState,
+    listState: LazyListState,
+    gateway: ConversationHistoryGateway,
+    @Suppress("UNUSED_PARAMETER") scrollCoordinator: ConversationScrollCoordinator,
+) {
+    val currentIsAtOldest by rememberUpdatedState(isAtOldest)
+    LaunchedEffect(state, gateway, listState) {
+        snapshotFlow { currentIsAtOldest }
+            .distinctUntilChanged()
+            .collect { reachedOldest ->
+                if (reachedOldest) {
+                    loadOlderConversationPage(state, gateway)
+                }
+            }
+    }
+}
+
+private suspend fun loadOlderConversationPage(
+    state: ConversationUiState,
+    gateway: ConversationHistoryGateway,
+): Boolean {
+    val request = state.beginOlderRequest() ?: return false
+    try {
+        val page = gateway.older(request.offset)
+        val added = state.applyOlder(request, page)
+        return added > 0
+    } finally {
+        state.finishOlderRequest(request)
     }
 }
 
@@ -79,18 +101,10 @@ internal fun ConversationScrollToLatestArea(
     isAtLatest: Boolean,
     state: ConversationUiState,
     gateway: ConversationHistoryGateway,
-    scrollCoordinator: ConversationScrollCoordinator,
+    listState: LazyListState,
     scope: CoroutineScope,
     modifier: Modifier = Modifier,
 ) {
-    var pendingNavigationGeneration by remember { mutableStateOf<Long?>(null) }
-    LaunchedEffect(pendingNavigationGeneration, state.history) {
-        val generation = pendingNavigationGeneration ?: return@LaunchedEffect
-        scrollCoordinator.completeJumpToLatest(generation)
-        if (pendingNavigationGeneration == generation) {
-            pendingNavigationGeneration = null
-        }
-    }
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.BottomEnd) {
         AnimatedVisibility(
             visible = !isAtLatest,
@@ -101,10 +115,10 @@ internal fun ConversationScrollToLatestArea(
                 onClick = {
                     val request = state.beginLatestRequest()
                     scope.launch {
-                        val navigationGeneration = scrollCoordinator.beginJumpToLatest()
                         val page = gateway.latest()
                         if (state.applyLatest(request, page)) {
-                            pendingNavigationGeneration = navigationGeneration
+                            withFrameNanos { }
+                            listState.jumpToLatest()
                         }
                     }
                 },
@@ -112,4 +126,24 @@ internal fun ConversationScrollToLatestArea(
             )
         }
     }
+}
+
+/** Compatibility adapter retained while scroll-focused tests migrate to the direct list-state API. */
+@Composable
+internal fun ConversationScrollToLatestArea(
+    isAtLatest: Boolean,
+    state: ConversationUiState,
+    gateway: ConversationHistoryGateway,
+    scrollCoordinator: ConversationScrollCoordinator,
+    scope: CoroutineScope,
+    modifier: Modifier = Modifier,
+) {
+    ConversationScrollToLatestArea(
+        isAtLatest = isAtLatest,
+        state = state,
+        gateway = gateway,
+        listState = scrollCoordinator.legacyListState,
+        scope = scope,
+        modifier = modifier,
+    )
 }

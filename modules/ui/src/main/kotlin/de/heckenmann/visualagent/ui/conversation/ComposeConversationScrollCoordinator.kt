@@ -3,7 +3,6 @@
 package de.heckenmann.visualagent.ui.conversation
 
 import androidx.compose.foundation.MutatePriority
-import androidx.compose.foundation.gestures.stopScroll
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -27,11 +26,22 @@ import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** Scrolls a reverse-layout conversation list to its visual newest end. */
 internal suspend fun LazyListState.scrollToBottom() {
     if (layoutInfo.totalItemsCount == 0) return
     scrollToItem(0)
+}
+
+/** Cancels an active user scroll before performing an explicit jump to the newest conversation item. */
+internal suspend fun LazyListState.jumpToLatest() {
+    scroll(MutatePriority.PreventUserInput) {
+        requestScrollToItem(0)
+    }
+    withFrameNanos { }
+    scrollToBottom()
 }
 
 /** Describes whether conversation scrolling follows latest content or preserves user browsing. */
@@ -51,12 +61,16 @@ internal enum class ConversationScrollMode {
 internal class ConversationScrollCoordinator(
     private val listState: LazyListState,
 ) {
+    /** Exposes the legacy test adapter's list state while production code uses direct list state. */
+    internal val legacyListState: LazyListState
+        get() = listState
     var mode: ConversationScrollMode by mutableStateOf(ConversationScrollMode.FOLLOWING_LATEST)
         private set
 
     private var navigationGeneration = 0L
     private var userScrollStart: ConversationListPosition? = null
     private var userScrollMoved = false
+    private val mutationMutex = Mutex()
 
     /** Marks the start of deliberate user navigation and invalidates pending jumps. */
     fun onUserScrollStarted() {
@@ -94,49 +108,47 @@ internal class ConversationScrollCoordinator(
         }
     }
 
-    private fun currentPosition(): ConversationListPosition =
-        ConversationListPosition(
-            index = listState.firstVisibleItemIndex,
-            offset = listState.firstVisibleItemScrollOffset,
-            canScrollBackward = listState.canScrollBackward,
-        )
+    private fun currentPosition(): ConversationListPosition = listState.conversationPosition()
 
-    /** Stops an active gesture, starts an explicit jump, and returns its completion generation. */
-    suspend fun beginJumpToLatest(): Long {
-        listState.stopScroll(MutatePriority.PreventUserInput)
-        navigationGeneration++
-        mode = ConversationScrollMode.JUMPING_TO_LATEST
-        return navigationGeneration
-    }
+    /** Starts an explicit jump and returns its completion generation without mutating user input. */
+    suspend fun beginJumpToLatest(): Long =
+        mutationMutex.withLock {
+            navigationGeneration++
+            mode = ConversationScrollMode.JUMPING_TO_LATEST
+            navigationGeneration
+        }
 
     /** Positions initial content at the reverse-layout newest end. */
-    suspend fun showInitialLatest() {
-        mode = ConversationScrollMode.FOLLOWING_LATEST
-        withFrameNanos { }
-        listState.scrollToBottom()
-    }
-
-    /** Follows newly laid-out content only while latest content is being followed. */
-    suspend fun followLatestContentChange() {
-        if (mode != ConversationScrollMode.FOLLOWING_LATEST) return
-        withFrameNanos { }
-        if (mode == ConversationScrollMode.FOLLOWING_LATEST) {
+    suspend fun showInitialLatest() =
+        mutationMutex.withLock {
+            mode = ConversationScrollMode.FOLLOWING_LATEST
+            withFrameNanos { }
             listState.scrollToBottom()
         }
-    }
+
+    /** Follows newly laid-out content only while latest content is being followed. */
+    suspend fun followLatestContentChange() =
+        mutationMutex.withLock {
+            if (mode != ConversationScrollMode.FOLLOWING_LATEST) return@withLock
+            withFrameNanos { }
+            if (mode == ConversationScrollMode.FOLLOWING_LATEST) {
+                listState.scrollToBottom()
+            }
+        }
 
     /** Completes an explicit latest jump unless newer user navigation invalidated it. */
-    suspend fun completeJumpToLatest(generation: Long): Boolean {
-        if (generation != navigationGeneration) return finishInvalidatedJump()
-        // History replacement and Markdown measurement are not reflected in layout until the next frame.
-        // Jumping before that frame lets LazyColumn retain its previous key anchor after scrollToItem(0).
-        withFrameNanos { }
-        if (generation != navigationGeneration) return finishInvalidatedJump()
-        listState.scrollToBottom()
-        if (generation != navigationGeneration) return finishInvalidatedJump()
-        mode = ConversationScrollMode.FOLLOWING_LATEST
-        return true
-    }
+    suspend fun completeJumpToLatest(generation: Long): Boolean =
+        mutationMutex.withLock {
+            if (generation != navigationGeneration) return@withLock finishInvalidatedJump()
+            // History replacement and Markdown measurement are not reflected in layout until the next frame.
+            // Jumping before that frame lets LazyColumn retain its previous key anchor after scrollToItem(0).
+            withFrameNanos { }
+            if (generation != navigationGeneration) return@withLock finishInvalidatedJump()
+            listState.scrollToBottom()
+            if (generation != navigationGeneration) return@withLock finishInvalidatedJump()
+            mode = ConversationScrollMode.FOLLOWING_LATEST
+            true
+        }
 
     private fun finishInvalidatedJump(): Boolean {
         mode =
@@ -149,13 +161,14 @@ internal class ConversationScrollCoordinator(
     }
 
     /** Keeps latest content visible after resize without overriding user movement. */
-    suspend fun maintainLatestAfterViewportChange() {
-        if (mode != ConversationScrollMode.FOLLOWING_LATEST) return
-        withFrameNanos { }
-        if (mode == ConversationScrollMode.FOLLOWING_LATEST) {
-            listState.scrollToBottom()
+    suspend fun maintainLatestAfterViewportChange() =
+        mutationMutex.withLock {
+            if (mode != ConversationScrollMode.FOLLOWING_LATEST) return@withLock
+            withFrameNanos { }
+            if (mode == ConversationScrollMode.FOLLOWING_LATEST) {
+                listState.scrollToBottom()
+            }
         }
-    }
 
     /** Starts restoring the visible anchor after an older-history page is loaded. */
     fun beginHistoryAnchorRestore(): Long {
@@ -169,13 +182,16 @@ internal class ConversationScrollCoordinator(
         generation: Long,
         index: Int,
         offset: Int,
-    ): Boolean {
-        if (generation != navigationGeneration) return false
-        listState.scrollToItem(index, offset)
-        if (generation != navigationGeneration) return false
-        mode = ConversationScrollMode.BROWSING_HISTORY
-        return true
-    }
+    ): Boolean =
+        mutationMutex.withLock {
+            if (generation != navigationGeneration) return@withLock false
+            withFrameNanos { }
+            if (generation != navigationGeneration) return@withLock false
+            listState.scrollToItem(index, offset)
+            if (generation != navigationGeneration) return@withLock false
+            mode = ConversationScrollMode.BROWSING_HISTORY
+            true
+        }
 
     /** Leaves anchor-restoration mode when loading finishes without a position change. */
     fun finishHistoryAnchorRestore(generation: Long) {
@@ -190,14 +206,10 @@ internal class ConversationViewport(
     private val listState: LazyListState,
 ) {
     val isAtLatest: Boolean
-        get() = !listState.canScrollBackward
+        get() = listState.conversationPosition().isAtLatest
 
     val isAtOldest: Boolean
-        get() {
-            val layoutInfo = listState.layoutInfo
-            val lastVisibleItem = layoutInfo.visibleItemsInfo.lastOrNull()
-            return lastVisibleItem != null && lastVisibleItem.index == layoutInfo.totalItemsCount - 1
-        }
+        get() = listState.isAtOldestConversationEnd()
 }
 
 /** Gives deliberate wheel and drag navigation priority over pending automatic scrolls. */
@@ -257,4 +269,19 @@ internal data class ConversationListPosition(
 ) {
     val isAtLatest: Boolean
         get() = index == 0 && offset == 0 && !canScrollBackward
+}
+
+/** Captures the viewport state used consistently by the controller and its UI affordances. */
+internal fun LazyListState.conversationPosition(): ConversationListPosition =
+    ConversationListPosition(
+        index = firstVisibleItemIndex,
+        offset = firstVisibleItemScrollOffset,
+        canScrollBackward = canScrollBackward,
+    )
+
+/** Reports whether the reverse-layout list currently exposes its oldest item. */
+internal fun LazyListState.isAtOldestConversationEnd(): Boolean {
+    val layoutInfo = layoutInfo
+    val lastVisibleItem = layoutInfo.visibleItemsInfo.lastOrNull()
+    return lastVisibleItem != null && lastVisibleItem.index == layoutInfo.totalItemsCount - 1
 }

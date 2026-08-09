@@ -55,17 +55,15 @@ internal fun ConversationOlderHistoryLoader(
                 }
             }
         }
-    val timeline = buildConversationTimeline(state.history, null, "", false, state.isLoadingOlder, false)
     LaunchedEffect(paginationResetVersion) {
         if (paginationResetVersion > 0) {
-            val request = state.beginLatestRequest()
-            state.applyLatest(request, gateway.latest())
+            state.replaceHistory(gateway.latest().messages)
         }
     }
     LaunchedEffect(state.history) { onHistoryChange(state.history) }
     LaunchedEffect(state.isLoadingOlder) { onLoadStateChange(state.isLoadingOlder) }
     LaunchedEffect(state.hasMoreHistory) { onHasMoreHistoryChange(state.hasMoreHistory) }
-    ConversationHistoryPagingEffect(isAtEnd, state, timeline, listState, gateway, coordinator)
+    ConversationHistoryPagingEffect(isAtEnd, state, listState, gateway, coordinator)
 }
 
 @Composable
@@ -105,7 +103,12 @@ internal fun ConversationResizeScrollEffect(
     listState: LazyListState,
     scrollCoordinator: ConversationScrollCoordinator? = null,
 ) {
-    ConversationResizeScrollEffect(panelSize, hasConversationContent, listState, scrollCoordinator)
+    ConversationResizeScrollEffect(
+        viewportSize = panelSize,
+        hasConversationContent = hasConversationContent,
+        listState = listState,
+        isAtLatest = listState.conversationPosition().isAtLatest,
+    )
 }
 
 internal suspend fun executeSend(

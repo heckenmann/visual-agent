@@ -92,7 +92,6 @@ class ConversationPanelScrollRegressionTest {
         val modalRequester = ComposeModalRequester { }
         lateinit var observedState: ConversationUiState
         lateinit var observedListState: LazyListState
-        lateinit var observedCoordinator: ConversationScrollCoordinator
         if (startupOnly) {
             saveMessages(db, 1..80, withVariableMarkdown = true)
         }
@@ -124,10 +123,9 @@ class ConversationPanelScrollRegressionTest {
                             toolEventBus = toolEventBus,
                             todoEventBus = todoEventBus,
                             config = config,
-                            onScrollStateObserved = { state, listState, coordinator ->
+                            onScrollStateObserved = { state, listState ->
                                 observedState = state
                                 observedListState = listState
-                                observedCoordinator = coordinator
                             },
                         )
                     }
@@ -139,7 +137,7 @@ class ConversationPanelScrollRegressionTest {
             composeTestRule.onAllNodesWithContentDescription("Conversation history").fetchSemanticsNodes().isNotEmpty()
         }
         repeat(30) { composeTestRule.mainClock.advanceTimeByFrame() }
-        assertLatestPosition(placement, observedListState, observedCoordinator)
+        assertLatestPosition(placement, observedListState)
         composeTestRule.onNodeWithText("panel message 80", substring = true).assertIsDisplayed()
         if (startupOnly) return
 
@@ -148,7 +146,6 @@ class ConversationPanelScrollRegressionTest {
             waitUntilWithFrames { observedState.history.size == 80 }
             scrollHistory(-10_000f)
             waitUntilWithFrames { !observedState.hasMoreHistory }
-            assertTrue(ConversationViewport(observedListState).isAtOldest, "precondition: oldest history must be visible")
         }
         waitUntilWithFrames { scrollToLatestButtonExists() }
         if (settleBeforeClick) {
@@ -161,11 +158,10 @@ class ConversationPanelScrollRegressionTest {
             observedState.history.any { it.content == "panel message 85" }
         }
         repeat(30) { composeTestRule.mainClock.advanceTimeByFrame() }
-        assertLatestPosition(placement, observedListState, observedCoordinator)
+        assertLatestPosition(placement, observedListState)
         waitUntilWithFrames {
             composeTestRule.onAllNodesWithContentDescription("Scroll to latest message").fetchSemanticsNodes().isEmpty()
         }
-        assertEquals(ConversationScrollMode.FOLLOWING_LATEST, observedCoordinator.mode)
         composeTestRule.onNodeWithText("panel message 85").assertIsDisplayed()
         if (placement == ConversationInputPlacement.CONVERSATION_MESSAGE) {
             composeTestRule.onNodeWithText("Type a message…").assertIsDisplayed()
@@ -174,7 +170,24 @@ class ConversationPanelScrollRegressionTest {
             moveTo(center)
             scroll(-8f)
         }
-        waitUntilWithFrames { scrollToLatestButtonExists() }
+        waitUntilWithFrames {
+            observedListState.firstVisibleItemIndex > 0 || observedListState.firstVisibleItemScrollOffset > 0
+        }
+        assertTrue(scrollToLatestButtonExists(), "manual browsing after the jump must reveal the latest-message button")
+        if (browseToOldest) {
+            val latestPageSize = observedState.history.size
+            scrollHistoryToOldest()
+            composeTestRule.onNodeWithText("panel message 1").assertIsDisplayed()
+            assertEquals(
+                latestPageSize,
+                observedState.history.size,
+                "scrolling back to the oldest message must reuse the history preserved by the latest jump",
+            )
+            assertTrue(
+                observedState.history.any { it.content == "panel message 65" },
+                "the latest jump must retain already loaded older history",
+            )
+        }
     }
 
     private fun waitUntilWithFrames(condition: () -> Boolean) {
@@ -188,6 +201,13 @@ class ConversationPanelScrollRegressionTest {
         composeTestRule.onNodeWithContentDescription("Conversation history").performMouseInput {
             moveTo(center)
             scroll(delta)
+        }
+    }
+
+    private fun scrollHistoryToOldest() {
+        repeat(200) {
+            scrollHistory(-100f)
+            composeTestRule.mainClock.advanceTimeByFrame()
         }
     }
 
@@ -210,13 +230,12 @@ class ConversationPanelScrollRegressionTest {
     private fun assertLatestPosition(
         placement: ConversationInputPlacement,
         listState: LazyListState,
-        coordinator: ConversationScrollCoordinator,
     ) {
         assertFalse(
             listState.canScrollBackward,
             "latest position stopped at index=${listState.firstVisibleItemIndex}, " +
                 "offset=${listState.firstVisibleItemScrollOffset}, " +
-                "items=${listState.layoutInfo.totalItemsCount}, mode=${coordinator.mode}",
+                "items=${listState.layoutInfo.totalItemsCount}",
         )
         assertEquals(0, listState.firstVisibleItemIndex, "latest item must be timeline index 0")
         assertEquals(0, listState.firstVisibleItemScrollOffset, "latest item must have no residual offset")

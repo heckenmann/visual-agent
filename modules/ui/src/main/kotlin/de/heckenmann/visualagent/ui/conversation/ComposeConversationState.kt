@@ -46,19 +46,19 @@ internal class ConversationUiState(
     val streaming = MutableStateFlow("")
 
     private var historyGeneration = 0L
-    private var olderPagingArmed = true
+    private var reachedOldestHistory = false
 
     fun replaceHistory(messages: List<Message>) {
         historyGeneration++
         history = messages.toList()
         isLoadingOlder = false
+        hasMoreHistory = history.isNotEmpty()
+        reachedOldestHistory = false
     }
 
     fun beginLatestRequest(): ConversationHistoryRequest {
         historyGeneration++
         isLoadingOlder = false
-        hasMoreHistory = true
-        olderPagingArmed = false
         return ConversationHistoryRequest(historyGeneration, 0)
     }
 
@@ -67,19 +67,19 @@ internal class ConversationUiState(
         page: ConversationHistoryPage,
     ): Boolean {
         if (request.generation != historyGeneration || request.offset != 0) return false
-        history = page.messages.toList()
-        hasMoreHistory = page.hasMore
+        val latestIds = page.messages.mapNotNull(Message::id).toSet()
+        val retainedHistory = history.filter { it.id == null || it.id !in latestIds }
+        history = retainedHistory + page.messages
+        if (!reachedOldestHistory) {
+            hasMoreHistory = page.hasMore
+        }
         return true
     }
 
     fun beginOlderRequest(): ConversationHistoryRequest? {
-        if (history.isEmpty() || isLoadingOlder || !hasMoreHistory || !olderPagingArmed) return null
+        if (history.isEmpty() || isLoadingOlder || !hasMoreHistory) return null
         isLoadingOlder = true
         return ConversationHistoryRequest(historyGeneration, history.size)
-    }
-
-    fun updateOldestPosition(isAtOldest: Boolean) {
-        if (!isAtOldest) olderPagingArmed = true
     }
 
     fun applyOlder(
@@ -93,6 +93,7 @@ internal class ConversationUiState(
             history = older.toList() + history
         }
         hasMoreHistory = page.hasMore && older.isNotEmpty()
+        reachedOldestHistory = !hasMoreHistory
         return older.size
     }
 

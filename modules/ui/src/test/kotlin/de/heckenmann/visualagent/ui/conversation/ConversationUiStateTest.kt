@@ -19,7 +19,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ConversationUiStateTest {
@@ -36,18 +35,37 @@ class ConversationUiStateTest {
             0,
             state.applyOlder(olderRequest, ConversationHistoryPage(listOf(message("older-1")), offset = 1, hasMore = true)),
         )
-        assertEquals(listOf("recent-2"), state.history.map { it.id })
+        assertEquals(listOf("recent-1", "recent-2"), state.history.map { it.id })
     }
 
     @Test
-    fun `latest page disarms paging until viewport leaves the oldest end`() {
+    fun `latest page keeps older history paging available for the next traversal`() {
         val state = ConversationUiState(listOf(message("recent-1")))
         val latestRequest = state.beginLatestRequest()
         state.applyLatest(latestRequest, ConversationHistoryPage(listOf(message("recent-2")), offset = 0, hasMore = true))
 
-        assertNull(state.beginOlderRequest())
-        state.updateOldestPosition(false)
+        assertEquals(2, state.beginOlderRequest()!!.offset)
+    }
+
+    @Test
+    fun `history replacement resets the oldest-page exhaustion state`() {
+        val state = ConversationUiState(listOf(message("recent-1")))
+        val request = state.beginOlderRequest()!!
+        state.applyOlder(request, ConversationHistoryPage(emptyList(), offset = 1, hasMore = false))
+
+        state.replaceHistory(listOf(message("recent-2")))
+
         assertEquals(1, state.beginOlderRequest()!!.offset)
+    }
+
+    @Test
+    fun `latest page preserves already loaded older history`() {
+        val state = ConversationUiState(listOf(message("oldest"), message("recent-1")))
+        val request = state.beginLatestRequest()
+
+        state.applyLatest(request, ConversationHistoryPage(listOf(message("recent-1"), message("recent-2")), 0, true))
+
+        assertEquals(listOf("oldest", "recent-1", "recent-2"), state.history.map { it.id })
     }
 
     @Test

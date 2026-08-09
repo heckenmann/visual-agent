@@ -103,6 +103,7 @@ class ConversationScrollOnChangeTest {
                     history = messages,
                     pendingUserMessage = pendingUserMessage.value,
                     listState = state,
+                    isAtLatest = true,
                 )
             }
         }
@@ -157,6 +158,7 @@ class ConversationScrollOnChangeTest {
                     history = messages,
                     listState = state,
                     streamingContent = streamingContent.value,
+                    isAtLatest = true,
                 )
             }
         }

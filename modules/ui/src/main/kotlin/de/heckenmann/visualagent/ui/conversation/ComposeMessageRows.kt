@@ -138,7 +138,7 @@ internal fun MessageRow(
                 SelectionContainer {
                     StreamingText(
                         text = message.content,
-                        animate = true,
+                        animate = false,
                     ) { displayedText ->
                         Text(
                             text = displayedText,
