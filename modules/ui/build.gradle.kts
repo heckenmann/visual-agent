@@ -53,7 +53,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter:4.1.0")
     implementation(platform("org.springframework.boot:spring-boot-dependencies:4.1.0"))
     implementation(platform("org.springframework.ai:spring-ai-bom:2.0.0"))
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
     implementation("org.commonmark:commonmark:0.29.0")
     implementation("org.commonmark:commonmark-ext-autolink:0.29.0")
@@ -64,7 +64,7 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation("org.springframework.boot:spring-boot-starter-test:4.1.0")
     testImplementation("io.mockk:mockk:1.14.11")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     testImplementation("org.jetbrains.compose.ui:ui-test-junit4-desktop:1.11.1")
     testImplementation(files(applicationTestClasses))
 }
