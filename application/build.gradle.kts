@@ -66,6 +66,20 @@ dependencies {
     testRuntimeOnly(libs.junit.vintage.engine)
 }
 
+val coroutinesVersion = libs.versions.coroutines.get()
+
+dependencyManagement {
+    dependencies {
+        dependency("org.jetbrains.kotlinx:kotlinx-coroutines-bom:$coroutinesVersion")
+        dependency("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
+        dependency("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:$coroutinesVersion")
+        dependency("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:$coroutinesVersion")
+        dependency("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:$coroutinesVersion")
+        dependency("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesVersion")
+        dependency("org.jetbrains.kotlinx:kotlinx-coroutines-test-jvm:$coroutinesVersion")
+    }
+}
+
 tasks.test {
     useJUnitPlatform()
     filter {
