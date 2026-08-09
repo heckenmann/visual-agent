@@ -79,33 +79,33 @@ tasks.register("copyAllDependencies") {
 
 tasks.register("verifyModuleDependencies") {
     group = "verification"
-    description = "Verifies that only :application depends on Visual Agent submodules."
+    description = "Verifies the directed dependency graph between Visual Agent modules."
     doLast {
-        val leafModules = setOf(":ui", ":providers", ":tools")
-        val violations =
-            leafModules.flatMap { modulePath ->
+        val moduleDependencies =
+            setOf(":application", ":ui", ":providers", ":tools").associateWith { modulePath ->
                 project(modulePath)
                     .configurations
                     .flatMap { configuration ->
                         configuration.dependencies
                             .withType(org.gradle.api.artifacts.ProjectDependency::class.java)
-                            .map { dependency -> "$modulePath -> ${dependency.path}" }
-                    }
+                            .map { it.path }
+                    }.toSet()
             }
-        check(violations.isEmpty()) {
-            "Submodules must not depend on :application or another submodule:\n${violations.joinToString("\n")}"
-        }
-        val applicationDependencies =
-            project(":application")
-                .configurations
-                .flatMap { configuration ->
-                    configuration.dependencies
-                        .withType(org.gradle.api.artifacts.ProjectDependency::class.java)
-                        .map { it.path }
+        val expectedDependencies =
+            mapOf(
+                ":application" to setOf(":providers", ":tools"),
+                ":ui" to setOf(":application", ":providers", ":tools"),
+                ":providers" to emptySet(),
+                ":tools" to emptySet(),
+            )
+        val violations =
+            expectedDependencies.flatMap { (modulePath, expected) ->
+                val actual = moduleDependencies.getValue(modulePath)
+                buildList {
+                    if (!actual.containsAll(expected)) add("$modulePath missing ${expected - actual}")
+                    if (!expected.containsAll(actual)) add("$modulePath has forbidden dependencies ${actual - expected}")
                 }
-                .toSet()
-        check(applicationDependencies.containsAll(leafModules)) {
-            ":application must consume every initial submodule: missing ${leafModules - applicationDependencies}"
-        }
+            }
+        check(violations.isEmpty()) { "Module dependency graph violation:\n${violations.joinToString("\n")}" }
     }
 }

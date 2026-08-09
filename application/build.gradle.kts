@@ -7,8 +7,6 @@ plugins {
     kotlin("plugin.jpa") version "2.4.10"
     kotlin("plugin.serialization") version "2.4.10"
     kotlin("plugin.spring") version "2.4.10"
-    kotlin("plugin.compose") version "2.4.10"
-    id("org.jetbrains.compose") version "1.11.1"
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
     id("org.springframework.boot") version "4.1.0"
     id("io.spring.dependency-management") version "1.1.7"
@@ -25,28 +23,9 @@ repositories {
     maven { url = uri("https://repo.spring.io/milestone") }
 }
 
-val applicationIdentityArgs =
-    listOf(
-        "-Dcom.apple.mrj.application.apple.menu.about.name=Visual Agent",
-        // Compose Desktop runs on the JVM desktop stack and fails in headless mode during screen-density discovery.
-        "-Djava.awt.headless=false",
-    )
-val macApplicationArgs =
-    if (
-        System.getProperty("os.name").contains("Mac", ignoreCase = true)
-    ) {
-        listOf(
-            "-Xdock:name=Visual Agent",
-            "-Xdock:icon=${projectDir.resolve("src/main/resources/icons/visual-agent.png").absolutePath}",
-        )
-    } else {
-        emptyList()
-    }
-
 dependencies {
     implementation(kotlin("stdlib"))
     implementation(kotlin("reflect"))
-    implementation(project(":ui"))
     implementation(project(":providers"))
     implementation(project(":tools"))
 
@@ -60,14 +39,6 @@ dependencies {
     implementation("org.hibernate.orm:hibernate-community-dialects")
     implementation("org.springframework.boot:spring-boot-starter-flyway")
 
-    // Compose Multiplatform desktop UI
-    implementation(compose.desktop.currentOs)
-    implementation("org.jetbrains.compose.material3:material3:1.9.0")
-    implementation("org.jetbrains.compose.material:material-icons-extended:1.7.3")
-    implementation("sh.calvin.reorderable:reorderable:3.1.0")
-    implementation("io.github.xingray:compose-infinite-canvas-core:0.2.0")
-    implementation("io.github.vinceglb:filekit-dialogs-compose:0.14.2")
-
     // SQLite JDBC
     implementation("org.xerial:sqlite-jdbc:3.53.2.1")
 
@@ -76,16 +47,6 @@ dependencies {
 
     // JSON Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
-
-    // Markdown parsing
-    implementation("org.commonmark:commonmark:0.29.0")
-    implementation("org.commonmark:commonmark-ext-autolink:0.29.0")
-    implementation("org.commonmark:commonmark-ext-gfm-tables:0.29.0")
-    implementation("org.commonmark:commonmark-ext-gfm-strikethrough:0.29.0")
-
-    // Markdown rendering (Compose Multiplatform native renderer)
-    implementation("com.mikepenz:multiplatform-markdown-renderer:0.43.0")
-    implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.43.0")
 
     // Workspace document analysis
     implementation("org.apache.pdfbox:pdfbox:3.0.8")
@@ -102,7 +63,6 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("io.mockk:mockk:1.14.11")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
-    testImplementation("org.jetbrains.compose.ui:ui-test-junit4-desktop:1.11.1")
     testRuntimeOnly("org.junit.vintage:junit-vintage-engine:6.1.2")
 }
 
@@ -165,24 +125,14 @@ tasks.jacocoTestCoverageVerification {
     }
 }
 
-compose.desktop {
-    application {
-        mainClass = "de.heckenmann.visualagent.Main"
-        jvmArgs += applicationIdentityArgs + macApplicationArgs
-        nativeDistributions {
-            packageName = "Visual Agent"
-            packageVersion = project.version.toString()
-        }
-    }
-}
-
 springBoot {
-    mainClass.set("de.heckenmann.visualagent.Main")
+    mainClass.set("de.heckenmann.visualagent.VisualAgentApplicationKt")
 }
 
-tasks.withType<JavaExec>().configureEach {
-    workingDir = rootProject.projectDir
-    jvmArgs(applicationIdentityArgs + macApplicationArgs)
+tasks.register("run") {
+    group = "application"
+    description = "Runs the Compose desktop host from the :ui module."
+    dependsOn(":ui:run")
 }
 
 kotlin {
