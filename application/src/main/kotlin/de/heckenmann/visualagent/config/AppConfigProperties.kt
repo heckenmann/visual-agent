@@ -21,6 +21,7 @@ internal object AppConfigProperties {
             setProperty(AppConfig.KEY_DATABASE_PATH, config.databasePath)
             setProperty(AppConfig.KEY_UI_THEME_MODE, config.uiThemeMode.name)
             setProperty(AppConfig.KEY_UI_FONT_SIZE, config.fontSize.toString())
+            setProperty(AppConfig.KEY_UI_SHOW_PANEL_LABELS, config.showPanelLabels.toString())
             setProperty(AppConfig.KEY_UI_CONVERSATION_INPUT_PLACEMENT, config.conversationInputPlacement.name)
             setProperty(AppConfig.KEY_BROWSER_DEFAULT, config.browserDefault)
             setProperty(AppConfig.KEY_SESSION_FAVORITE_MODELS, config.favoriteModels)
@@ -54,6 +55,7 @@ internal object AppConfigProperties {
         config.databasePath = properties.string(AppConfig.KEY_DATABASE_PATH, config.databasePath)
         config.uiThemeMode = properties.themeMode(AppConfig.KEY_UI_THEME_MODE, config.uiThemeMode)
         config.fontSize = properties.int(AppConfig.KEY_UI_FONT_SIZE, config.fontSize, 10..24)
+        config.showPanelLabels = properties.boolean(AppConfig.KEY_UI_SHOW_PANEL_LABELS, config.showPanelLabels)
         config.conversationInputPlacement =
             properties.conversationInputPlacement(
                 AppConfig.KEY_UI_CONVERSATION_INPUT_PLACEMENT,

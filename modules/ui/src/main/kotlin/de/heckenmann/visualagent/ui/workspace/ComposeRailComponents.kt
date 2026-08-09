@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -68,6 +70,7 @@ private const val RAIL_WIDTH_STEP_PX = 20f
 @Composable
 internal fun ReorderableColumnScope.DraggableRailButton(
     window: ComposeWorkspaceWindow,
+    showLabel: Boolean,
     selected: Boolean,
     isDragging: Boolean,
     onToggle: () -> Unit,
@@ -82,7 +85,8 @@ internal fun ReorderableColumnScope.DraggableRailButton(
         Row(
             modifier =
                 Modifier
-                    .size(36.dp)
+                    .height(36.dp)
+                    .fillMaxWidth()
                     .clip(RoundedCornerShape(8.dp))
                     .background(backgroundColor, RoundedCornerShape(8.dp))
                     .border(1.dp, borderColor, RoundedCornerShape(8.dp))
@@ -103,27 +107,42 @@ internal fun ReorderableColumnScope.DraggableRailButton(
                                 horizontalOffset -= steps * RAIL_WIDTH_STEP_PX
                             }
                         }
-                    },
+                    }.semantics { contentDescription = "Toggle ${window.title}" }
+                    .combinedClickable(
+                        role = Role.Button,
+                        onClick = onToggle,
+                        onLongClick = { menuExpanded = true },
+                    ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
+            Row(
                 modifier =
                     Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .combinedClickable(
-                            role = Role.Button,
-                            onClick = onToggle,
-                            onLongClick = { menuExpanded = true },
-                        ),
-                contentAlignment = Alignment.Center,
+                        .then(if (showLabel) Modifier.padding(ButtonDefaults.ContentPadding) else Modifier),
+                horizontalArrangement =
+                    if (showLabel) {
+                        Arrangement.spacedBy(ButtonDefaults.IconSpacing)
+                    } else {
+                        Arrangement.Center
+                    },
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
                     imageVector = window.railIcon(),
-                    contentDescription = "Toggle ${window.title}",
+                    contentDescription = null,
                     modifier = Modifier.size(18.dp),
                     tint = if (selected) MaterialTheme.colorScheme.tertiary else LocalContentColor.current,
                 )
+                if (showLabel) {
+                    Text(
+                        text = window.title,
+                        color = if (selected) MaterialTheme.colorScheme.tertiary else LocalContentColor.current,
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1,
+                    )
+                }
             }
             RailDragHandle(
                 window = window,
@@ -185,13 +204,31 @@ internal fun StaticRailButton(
     description: String,
     selected: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    alert: Boolean = false,
 ) {
-    val backgroundColor = if (selected) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainer
-    val borderColor = if (selected) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outline.copy(alpha = 0x2A / 255f)
+    val backgroundColor =
+        when {
+            alert -> MaterialTheme.colorScheme.errorContainer
+            selected -> MaterialTheme.colorScheme.surfaceContainerHigh
+            else -> MaterialTheme.colorScheme.surfaceContainer
+        }
+    val borderColor =
+        when {
+            alert -> MaterialTheme.colorScheme.error
+            selected -> MaterialTheme.colorScheme.tertiary
+            else -> MaterialTheme.colorScheme.outline.copy(alpha = 0x2A / 255f)
+        }
+    val iconTint =
+        when {
+            alert -> MaterialTheme.colorScheme.onErrorContainer
+            selected -> MaterialTheme.colorScheme.tertiary
+            else -> LocalContentColor.current
+        }
     Box(
         modifier =
-            Modifier
-                .size(36.dp)
+            modifier
+                .height(36.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .background(backgroundColor, RoundedCornerShape(8.dp))
                 .border(1.dp, borderColor, RoundedCornerShape(8.dp))
@@ -205,7 +242,7 @@ internal fun StaticRailButton(
             imageVector = icon,
             contentDescription = description,
             modifier = Modifier.size(18.dp),
-            tint = if (selected) MaterialTheme.colorScheme.tertiary else LocalContentColor.current,
+            tint = iconTint,
         )
     }
 }
