@@ -93,6 +93,27 @@ internal class AgentConversationHistoryOps(
         return messages
     }
 
+    fun readOlderHistoryPage(
+        offset: Int,
+        pageSize: Int,
+    ): ConversationHistoryPage {
+        val limit = pageSize.coerceAtLeast(1)
+        val messages =
+            owner.conversationStore
+                .getConversationMessagesPage(AgentManager.MAIN_SESSION_ID, limit, offset.coerceAtLeast(0))
+                .mapNotNull(::toMessage)
+        return ConversationHistoryPage(messages, offset.coerceAtLeast(0), messages.size == limit)
+    }
+
+    fun readLatestHistoryPage(limit: Int): ConversationHistoryPage {
+        val pageSize = limit.coerceAtLeast(1)
+        val messages =
+            owner.conversationStore
+                .getConversationMessages(AgentManager.MAIN_SESSION_ID, pageSize)
+                .mapNotNull(::toMessage)
+        return ConversationHistoryPage(messages, 0, messages.size == pageSize)
+    }
+
     /**
      * Loads the newest messages from the database and appends any that are not
      * yet in the in-memory history. Used by the scroll-to-bottom button to jump

@@ -186,6 +186,13 @@ internal class AgentManagerConversationOps(
 
     fun loadOlderHistory(pageSize: Int = AgentManager.HISTORY_PAGE_SIZE): List<Message> = historyOps.loadOlderHistory(pageSize)
 
+    fun readOlderHistoryPage(
+        offset: Int,
+        pageSize: Int,
+    ): ConversationHistoryPage = historyOps.readOlderHistoryPage(offset, pageSize)
+
+    fun readLatestHistoryPage(limit: Int): ConversationHistoryPage = historyOps.readLatestHistoryPage(limit)
+
     fun loadLatestHistory(limit: Int = AgentManager.HISTORY_PAGE_SIZE): List<Message> = historyOps.loadLatestHistory(limit)
 
     /**

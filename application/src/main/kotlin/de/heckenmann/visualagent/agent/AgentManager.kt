@@ -2,6 +2,7 @@ package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.conversation.AgentManagerConversationOps
+import de.heckenmann.visualagent.agent.conversation.ConversationHistoryPage
 import de.heckenmann.visualagent.agent.conversation.WelcomeMessageComposer
 import de.heckenmann.visualagent.agent.text.AgentResponseCoordinator
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
@@ -360,6 +361,15 @@ class AgentManager
          * Loads older conversation history from the database, paginated by [pageSize].
          */
         fun loadOlderHistory(pageSize: Int = HISTORY_PAGE_SIZE): List<Message> = conversationOps.loadOlderHistory(pageSize)
+
+        /** Returns an immutable older page without changing the active in-memory history. */
+        fun readOlderHistoryPage(
+            offset: Int,
+            pageSize: Int = HISTORY_PAGE_SIZE,
+        ): ConversationHistoryPage = conversationOps.readOlderHistoryPage(offset, pageSize)
+
+        /** Returns an immutable latest page without changing the active in-memory history. */
+        fun readLatestHistoryPage(limit: Int = HISTORY_PAGE_SIZE): ConversationHistoryPage = conversationOps.readLatestHistoryPage(limit)
 
         /**
          * Loads the latest messages from the database and appends any that are

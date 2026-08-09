@@ -92,4 +92,30 @@ class AgentManagerRefreshHistoryToLatestTest {
 
         db.close()
     }
+
+    @Test
+    fun `immutable page reads do not change active in-memory history`() {
+        val db = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+        val manager =
+            AgentManager(
+                db,
+                mockk<LLMProvider>(relaxed = true),
+                AgentToolConfigService(db),
+                ToolEventBus(),
+                TodoEventBus(),
+                AppConfigBean(db),
+            )
+        (1..30).forEach { index -> db.saveConversationMessage("main", "user", "msg-$index", null) }
+        manager.refreshHistoryToLatest()
+        val activeHistory = manager.getHistory()
+        db.saveConversationMessage("main", "user", "background-31", null)
+
+        val latest = manager.readLatestHistoryPage()
+        val older = manager.readOlderHistoryPage(offset = 20)
+
+        assertEquals("background-31", latest.messages.last().content)
+        assertEquals(11, older.messages.size)
+        assertEquals(activeHistory, manager.getHistory(), "page reads must not mutate the active history")
+        db.close()
+    }
 }
