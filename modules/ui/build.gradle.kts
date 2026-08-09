@@ -2,20 +2,21 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.net.URI
 
 plugins {
-    kotlin("jvm") version "2.4.10"
-    kotlin("plugin.serialization") version "2.4.10"
-    kotlin("plugin.spring") version "2.4.10"
-    kotlin("plugin.compose") version "2.4.10"
-    id("org.jetbrains.compose") version "1.11.1"
-    id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
-    id("io.spring.dependency-management") version "1.1.7"
-    id("org.springframework.boot") version "4.1.0"
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.kotlin.spring)
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.compose)
+    alias(libs.plugins.ktlint)
+    alias(libs.plugins.spring.boot)
     id("maven-publish")
     jacoco
 }
 
 group = "de.heckenmann.visualagent"
-version = "0.1.0"
+version =
+    libs.versions.visual.agent
+        .get()
 
 val applicationIdentityArgs =
     listOf(
@@ -32,7 +33,11 @@ val macApplicationArgs =
         emptyList()
     }
 val applicationTestClasses = project(":application").layout.buildDirectory.dir("classes/kotlin/test")
-val applicationMainJar = project(":application").layout.buildDirectory.file("libs/application-0.1.0-plain.jar")
+val applicationMainJar =
+    project(
+        ":application",
+    ).layout.buildDirectory.file("libs/application-${libs.versions.visual.agent.get()}-plain.jar")
+val publicationArtifactId = "visual-agent-${System.getenv("VISUAL_AGENT_PLATFORM") ?: "local"}"
 
 repositories {
     google()
@@ -45,27 +50,27 @@ dependencies {
     implementation(project(":providers"))
     implementation(project(":tools"))
     implementation(compose.desktop.currentOs)
-    implementation("org.jetbrains.compose.material3:material3:1.9.0")
-    implementation("org.jetbrains.compose.material:material-icons-extended:1.7.3")
-    implementation("sh.calvin.reorderable:reorderable:3.1.0")
-    implementation("io.github.xingray:compose-infinite-canvas-core:0.2.0")
-    implementation("io.github.vinceglb:filekit-dialogs-compose:0.14.2")
-    implementation("org.springframework.boot:spring-boot-starter:4.1.0")
-    implementation(platform("org.springframework.boot:spring-boot-dependencies:4.1.0"))
-    implementation(platform("org.springframework.ai:spring-ai-bom:2.0.0"))
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
-    implementation("org.commonmark:commonmark:0.29.0")
-    implementation("org.commonmark:commonmark-ext-autolink:0.29.0")
-    implementation("org.commonmark:commonmark-ext-gfm-tables:0.29.0")
-    implementation("org.commonmark:commonmark-ext-gfm-strikethrough:0.29.0")
-    implementation("com.mikepenz:multiplatform-markdown-renderer:0.43.0")
-    implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.43.0")
-    testImplementation(kotlin("test"))
-    testImplementation("org.springframework.boot:spring-boot-starter-test:4.1.0")
-    testImplementation("io.mockk:mockk:1.14.11")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
-    testImplementation("org.jetbrains.compose.ui:ui-test-junit4-desktop:1.11.1")
+    implementation(libs.compose.material3)
+    implementation(libs.compose.material.icons)
+    implementation(libs.reorderable)
+    implementation(libs.infinite.canvas)
+    implementation(libs.filekit.dialogs.compose)
+    implementation(libs.spring.boot.starter)
+    implementation(platform(libs.spring.boot.bom))
+    implementation(platform(libs.spring.ai.bom))
+    implementation(libs.coroutines.core)
+    implementation(libs.serialization.json)
+    implementation(libs.commonmark)
+    implementation(libs.commonmark.autolink)
+    implementation(libs.commonmark.gfm.tables)
+    implementation(libs.commonmark.gfm.strikethrough)
+    implementation(libs.markdown.renderer)
+    implementation(libs.markdown.renderer.m3)
+    testImplementation(libs.kotlin.test)
+    testImplementation(libs.spring.boot.starter.test)
+    testImplementation(libs.mockk)
+    testImplementation(libs.coroutines.test)
+    testImplementation(libs.compose.ui.test.junit4.desktop)
     testImplementation(files(applicationTestClasses))
 }
 
@@ -88,7 +93,7 @@ publishing {
     publications {
         create<MavenPublication>("masterJar") {
             groupId = project.group.toString()
-            artifactId = "visual-agent"
+            artifactId = publicationArtifactId
             version =
                 if (project.version.toString().endsWith("SNAPSHOT")) {
                     project.version.toString()

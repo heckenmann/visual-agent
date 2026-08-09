@@ -44,8 +44,20 @@ class ConversationInputPlacementTest {
         assertEquals(false, restored.showPanelLabels)
     }
 
+    @Test
+    fun `saving panel labels writes only its preference`() {
+        val store = InMemoryPreferenceStore()
+        val config = AppConfigBean(store)
+        config.showPanelLabels = false
+
+        config.savePanelLabels()
+
+        assertEquals("false", store.getPreference(AppConfigBean.KEY_UI_SHOW_PANEL_LABELS))
+        assertEquals(1, store.values.size)
+    }
+
     private class InMemoryPreferenceStore : PreferenceStore {
-        private val values = mutableMapOf<String, String>()
+        val values = mutableMapOf<String, String>()
 
         override fun getPreference(key: String): String? = values[key]
 

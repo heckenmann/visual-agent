@@ -8,14 +8,21 @@ plugins {
 }
 
 group = "de.heckenmann.visualagent"
-version = "0.1.0"
+version = libs.versions.visual.agent.get()
 
 repositories {
     mavenCentral()
 }
 
 tasks.named("check") {
-    dependsOn(":application:check", ":ui:check", ":providers:check", ":tools:check", "verifyModuleDependencies")
+    dependsOn(
+        ":application:check",
+        ":ui:check",
+        ":providers:check",
+        ":tools:check",
+        "verifyCentralizedVersions",
+        "verifyModuleDependencies",
+    )
 }
 
 tasks.named("build") {
@@ -107,5 +114,33 @@ tasks.register("verifyModuleDependencies") {
                 }
             }
         check(violations.isEmpty()) { "Module dependency graph violation:\n${violations.joinToString("\n")}" }
+    }
+}
+
+tasks.register("verifyCentralizedVersions") {
+    group = "verification"
+    description = "Prevents inline dependency and plugin versions in main-build module scripts."
+    val moduleBuildFiles =
+        listOf(
+            "application/build.gradle.kts",
+            "modules/ui/build.gradle.kts",
+            "modules/providers/build.gradle.kts",
+            "modules/tools/build.gradle.kts",
+        ).map(rootProject.projectDir::resolve)
+    inputs.files(moduleBuildFiles)
+    doLast {
+        val pluginVersion = Regex("""(?:kotlin|id)\([^)]*\)\s+version\s+\"""")
+        val dependencyVersion = Regex("""\"[\w.-]+:[\w.-]+:[^\"${'$'}]+\"""")
+        val projectVersion = Regex("""^\s*version\s*=\s*\"""", RegexOption.MULTILINE)
+        val violations =
+            moduleBuildFiles.flatMap { buildFile ->
+                val content = buildFile.readText()
+                buildList {
+                    if (pluginVersion.containsMatchIn(content)) add("$buildFile contains an inline plugin version")
+                    if (dependencyVersion.containsMatchIn(content)) add("$buildFile contains an inline dependency version")
+                    if (projectVersion.containsMatchIn(content)) add("$buildFile contains an inline project version")
+                }
+            }
+        check(violations.isEmpty()) { "Centralized version check failed:\n${violations.joinToString("\n")}" }
     }
 }

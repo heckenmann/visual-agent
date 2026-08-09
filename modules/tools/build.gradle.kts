@@ -1,25 +1,27 @@
 plugins {
-    kotlin("jvm") version "2.4.10"
-    kotlin("plugin.serialization") version "2.4.10"
-    id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.ktlint)
     jacoco
 }
 
 group = "de.heckenmann.visualagent"
-version = "0.1.0"
+version =
+    libs.versions.visual.agent
+        .get()
 
 repositories {
     mavenCentral()
 }
 
 dependencies {
-    implementation(kotlin("stdlib"))
-    compileOnly(platform("org.springframework.boot:spring-boot-dependencies:4.1.0"))
-    compileOnly("org.springframework:spring-context")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    implementation(libs.kotlin.stdlib)
+    compileOnly(platform(libs.spring.boot.bom))
+    compileOnly(libs.spring.context)
+    implementation(libs.serialization.json)
 
-    testImplementation(kotlin("test"))
-    testImplementation("org.junit.jupiter:junit-jupiter:6.1.2")
+    testImplementation(libs.kotlin.test)
+    testImplementation(libs.junit.jupiter)
 }
 
 tasks.test {

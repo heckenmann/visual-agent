@@ -82,6 +82,16 @@ class AppConfigBean(
     }
 
     /**
+     * Persists only the navigation-rail label preference.
+     *
+     * This targeted operation is safe to call from a background dispatcher because it does not
+     * publish configuration listeners that may update Compose state.
+     */
+    fun savePanelLabels() {
+        preferenceStore.setPreference(KEY_UI_SHOW_PANEL_LABELS, showPanelLabels.toString())
+    }
+
+    /**
      * Persists current settings to the database-backed preference store.
      */
     fun save() {

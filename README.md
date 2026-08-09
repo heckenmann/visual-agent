@@ -13,11 +13,18 @@ Visual Agent is a Kotlin desktop application. Its goal is to provide the model w
 
 Each successful build on `master` publishes an executable JAR to GitHub Packages. You need a GitHub personal access token with `read:packages` scope to download it.
 
-1. Download the latest `visual-agent-0.1.0-master-*.jar` from the [GitHub Packages registry](https://github.com/heckenmann/visual-agent/pkgs/maven/visual-agent).
+1. Download the latest package that matches your operating system from the [GitHub Packages registry](https://github.com/heckenmann/visual-agent/packages):
+
+   - Linux: `visual-agent-linux`
+   - macOS on Intel: `visual-agent-macos-x64`
+   - macOS on Apple Silicon: `visual-agent-macos-arm64`
+   - Windows: `visual-agent-windows`
+
+   Each package contains the native Compose runtime for its platform.
 2. Run it with Java 21 or later:
 
    ```bash
-   java -jar visual-agent-0.1.0-master-<version>.jar
+   java -jar visual-agent-<platform>-0.1.0-master-<version>.jar
    ```
 
    Visual Agent needs a desktop environment (it won't run headless).

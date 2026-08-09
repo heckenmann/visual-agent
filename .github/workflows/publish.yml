@@ -19,10 +19,24 @@ env:
 
 jobs:
   publish:
-    name: Build and publish master JAR
-    runs-on: ubuntu-latest
+    name: Build and publish ${{ matrix.platform }} master JAR
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            platform: linux
+          - runner: macos-15-intel
+            platform: macos-x64
+          - runner: macos-latest
+            platform: macos-arm64
+          - runner: windows-latest
+            platform: windows
+    env:
+      VISUAL_AGENT_PLATFORM: ${{ matrix.platform }}
 
     steps:
       - name: Check out repository
@@ -46,8 +60,10 @@ jobs:
 
       - name: Build JAR without tests
         run: ./gradlew --no-daemon :ui:bootJar
+        shell: bash
 
       - name: Publish to GitHub Packages
         run: ./gradlew --no-daemon :ui:publish
+        shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
