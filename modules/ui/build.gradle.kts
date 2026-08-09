@@ -8,7 +8,6 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.compose)
     alias(libs.plugins.ktlint)
-    alias(libs.plugins.spring.dependency.management)
     alias(libs.plugins.spring.boot)
     id("maven-publish")
     jacoco
@@ -38,6 +37,7 @@ val applicationMainJar =
     project(
         ":application",
     ).layout.buildDirectory.file("libs/application-${libs.versions.visual.agent.get()}-plain.jar")
+val publicationArtifactId = "visual-agent-${System.getenv("VISUAL_AGENT_PLATFORM") ?: "local"}"
 
 repositories {
     google()
@@ -93,7 +93,7 @@ publishing {
     publications {
         create<MavenPublication>("masterJar") {
             groupId = project.group.toString()
-            artifactId = "visual-agent"
+            artifactId = publicationArtifactId
             version =
                 if (project.version.toString().endsWith("SNAPSHOT")) {
                     project.version.toString()

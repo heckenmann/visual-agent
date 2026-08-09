@@ -225,25 +225,27 @@ internal fun StaticRailButton(
             selected -> MaterialTheme.colorScheme.tertiary
             else -> LocalContentColor.current
         }
-    Box(
-        modifier =
-            modifier
-                .height(36.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(backgroundColor, RoundedCornerShape(8.dp))
-                .border(1.dp, borderColor, RoundedCornerShape(8.dp))
-                .combinedClickable(
-                    role = Role.Button,
-                    onClick = onClick,
-                ),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = description,
-            modifier = Modifier.size(18.dp),
-            tint = iconTint,
-        )
+    ActionTooltip(description = description) {
+        Box(
+            modifier =
+                modifier
+                    .height(36.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(backgroundColor, RoundedCornerShape(8.dp))
+                    .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+                    .combinedClickable(
+                        role = Role.Button,
+                        onClick = onClick,
+                    ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = description,
+                modifier = Modifier.size(18.dp),
+                tint = iconTint,
+            )
+        }
     }
 }
 
