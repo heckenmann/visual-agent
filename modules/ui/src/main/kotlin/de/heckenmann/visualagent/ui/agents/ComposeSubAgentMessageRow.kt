@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandLess
@@ -72,6 +73,9 @@ internal fun SubAgentMessageRow(
 ) {
     val metadata = remember(message.metadata) { parseSubAgentMetadata(message.metadata) }
     var expanded by remember { mutableStateOf(false) }
+    val workType = if (metadata.todoId.isNullOrBlank()) "job" else "todo"
+    val completion = if (metadata.success) "completed" else "failed"
+    val summary = "Agent \"${metadata.agentName ?: "sub-agent"}\" $completion a $workType"
     val accentColor =
         if (metadata.success) {
             MaterialTheme.colorScheme.tertiary
@@ -109,7 +113,7 @@ internal fun SubAgentMessageRow(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "Agent \"${metadata.agentName ?: "sub-agent"}\" ${if (metadata.success) "completed" else "failed"} a task",
+                        text = summary,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f),
@@ -137,12 +141,9 @@ internal fun SubAgentMessageRow(
                     enter = fadeIn(animationSpec = tween(180)),
                     exit = fadeOut(animationSpec = tween(180)),
                 ) {
-                    Text(
-                        text = message.content,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
+                    SelectionContainer {
+                        ComposeMarkdown(message.content)
+                    }
                 }
             }
         }
@@ -154,6 +155,8 @@ internal data class ParsedSubAgentMetadata(
     val success: Boolean,
     val agentId: String?,
     val agentName: String?,
+    val todoId: String?,
+    val hasCompletionStatus: Boolean,
 )
 
 internal fun parseSubAgentMetadata(metadata: String?): ParsedSubAgentMetadata {
@@ -171,6 +174,8 @@ internal fun parseSubAgentMetadata(metadata: String?): ParsedSubAgentMetadata {
         success = json?.get("success")?.jsonPrimitive?.booleanOrNull ?: false,
         agentId = json?.get("agentId")?.jsonPrimitive?.content,
         agentName = json?.get("agentName")?.jsonPrimitive?.content,
+        todoId = json?.get("todoId")?.jsonPrimitive?.content,
+        hasCompletionStatus = json?.get("success") != null,
     )
 }
 

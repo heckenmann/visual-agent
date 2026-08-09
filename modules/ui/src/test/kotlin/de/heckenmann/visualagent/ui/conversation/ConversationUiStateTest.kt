@@ -91,7 +91,7 @@ class ConversationUiStateTest {
     }
 
     @Test
-    fun `timeline has explicit stable order from newest to oldest`() {
+    fun `timeline keeps the newest message group before older history`() {
         val items =
             buildConversationTimeline(
                 history = listOf(message("oldest"), message("newest")),
@@ -107,8 +107,7 @@ class ConversationUiStateTest {
         assertIs<ConversationTimelineItem.Streaming>(items[2])
         assertIs<ConversationTimelineItem.PendingUser>(items[3])
         assertEquals("message:newest", items[4].stableKey)
-        assertEquals("message:oldest", items[5].stableKey)
-        assertIs<ConversationTimelineItem.OlderHistoryLoading>(items[6])
+        assertIs<ConversationTimelineItem.OlderHistoryLoading>(items[5])
         assertEquals(items.size, items.map { it.stableKey }.distinct().size)
     }
 

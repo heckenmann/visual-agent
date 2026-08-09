@@ -1,0 +1,124 @@
+@file:Suppress("ktlint:standard:no-wildcard-imports", "FunctionName")
+
+package de.heckenmann.visualagent.ui.conversation
+
+import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
+import de.heckenmann.visualagent.agent.Message
+import de.heckenmann.visualagent.ui.agents.*
+import de.heckenmann.visualagent.ui.application.*
+import de.heckenmann.visualagent.ui.canvas.*
+import de.heckenmann.visualagent.ui.components.*
+import de.heckenmann.visualagent.ui.conversation.*
+import de.heckenmann.visualagent.ui.files.*
+import de.heckenmann.visualagent.ui.modal.*
+import de.heckenmann.visualagent.ui.settings.*
+import de.heckenmann.visualagent.ui.status.*
+import de.heckenmann.visualagent.ui.todo.*
+import de.heckenmann.visualagent.ui.workspace.*
+import org.junit.Rule
+import org.junit.Test
+
+/**
+ * Verifies the compact two-column rendering of a conversational message group.
+ */
+class ConversationMessageGroupRowTest {
+    @get:Rule
+    val composeTestRule = createComposeRule()
+
+    @Test
+    fun `group renders one user identity next to every chronological message`() {
+        val group =
+            ConversationMessageGroup(
+                listOf(
+                    persisted("newest", "user"),
+                    persisted("oldest", "user"),
+                ),
+            )
+
+        composeTestRule.setContent {
+            MaterialTheme {
+                ConversationMessageGroupRow(
+                    group = group,
+                    sending = false,
+                    deletingMessageIds = emptySet(),
+                    onDeleteMessage = {},
+                    onStatusChange = {},
+                    onEditMessage = {},
+                    onRetry = {},
+                )
+            }
+        }
+
+        composeTestRule.onAllNodesWithText("You").assertCountEquals(1)
+        composeTestRule.onNodeWithContentDescription("You avatar").assertExists()
+        composeTestRule.onNodeWithText("oldest").assertExists()
+        composeTestRule.onNodeWithText("newest").assertExists()
+    }
+
+    @Test
+    fun `assistant group uses a distinct agent avatar`() {
+        val group = ConversationMessageGroup(listOf(persisted("response", "assistant")))
+
+        composeTestRule.setContent {
+            MaterialTheme {
+                ConversationMessageGroupRow(
+                    group = group,
+                    sending = false,
+                    deletingMessageIds = emptySet(),
+                    onDeleteMessage = {},
+                    onStatusChange = {},
+                    onEditMessage = {},
+                    onRetry = {},
+                )
+            }
+        }
+
+        composeTestRule.onAllNodesWithText("Assistant").assertCountEquals(1)
+        composeTestRule.onNodeWithContentDescription("Assistant avatar").assertExists()
+    }
+
+    @Test
+    fun `system boundary renders the author column again for the same author`() {
+        val groups =
+            groupConsecutiveConversationMessages(
+                listOf(
+                    persisted("after system", "user"),
+                    persisted("system status", "system"),
+                    persisted("before system", "user"),
+                ),
+            ).filter { it.role == "user" }
+
+        composeTestRule.setContent {
+            MaterialTheme {
+                Column {
+                    groups.forEach { group ->
+                        ConversationMessageGroupRow(
+                            group = group,
+                            sending = false,
+                            deletingMessageIds = emptySet(),
+                            onDeleteMessage = {},
+                            onStatusChange = {},
+                            onEditMessage = {},
+                            onRetry = {},
+                        )
+                    }
+                }
+            }
+        }
+
+        composeTestRule.onAllNodesWithText("You").assertCountEquals(2)
+        composeTestRule.onAllNodes(hasContentDescription("You avatar")).assertCountEquals(2)
+    }
+
+    private fun persisted(
+        content: String,
+        role: String,
+    ): ConversationTimelineItem.Persisted = ConversationTimelineItem.Persisted(Message(role, content, id = content), 0)
+}
