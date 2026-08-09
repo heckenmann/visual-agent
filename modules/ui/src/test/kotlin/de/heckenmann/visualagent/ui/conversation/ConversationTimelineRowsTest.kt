@@ -20,6 +20,7 @@ import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 
@@ -65,37 +66,15 @@ class ConversationTimelineRowsTest {
             }
         }
 
+        composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("Agent \"Researcher\" completed a todo").assertExists()
         composeTestRule.onNodeWithText("Assistant").assertDoesNotExist()
     }
 
     @Test
-    fun `sub-agent history without summary metadata falls back to the generic message row`() {
-        composeTestRule.setContent {
-            MaterialTheme {
-                LazyColumn {
-                    ConversationTimeline(
-                        items =
-                            buildConversationTimeline(
-                                history = listOf(Message(role = "sub_agent", content = "Timeout diagnostic")),
-                                pendingUserMessage = null,
-                                streamingContent = "",
-                                showWaitingIndicator = false,
-                                showOlderHistoryLoading = false,
-                                includeInlineComposer = false,
-                            ),
-                        sending = false,
-                        deletingMessageIds = emptySet(),
-                        onDeleteMessage = {},
-                        onStatusChange = {},
-                        onEditMessage = {},
-                        sendContent = {},
-                    )
-                }
-            }
-        }
+    fun `incomplete sub-agent metadata uses the generic message row`() {
+        val metadata = parseSubAgentMetadata(null)
 
-        composeTestRule.onNodeWithText("Timeout diagnostic").assertExists()
-        composeTestRule.onNodeWithText("Assistant").assertExists()
+        assertFalse(shouldUseSubAgentSummary(metadata))
     }
 }

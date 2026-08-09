@@ -242,7 +242,7 @@ internal fun SubAgentTimelineRow(
     modifier: Modifier = Modifier,
 ) {
     val metadata = parseSubAgentMetadata(message.metadata)
-    if (metadata.agentName.isNullOrBlank() || !metadata.hasCompletionStatus) {
+    if (!shouldUseSubAgentSummary(metadata)) {
         MessageRow(
             message = message,
             isStreamingPlaceholder = false,
@@ -267,3 +267,7 @@ internal fun SubAgentTimelineRow(
         )
     }
 }
+
+/** Returns whether complete metadata is available for the specialist status row. */
+internal fun shouldUseSubAgentSummary(metadata: ParsedSubAgentMetadata): Boolean =
+    !metadata.agentName.isNullOrBlank() && metadata.hasCompletionStatus
