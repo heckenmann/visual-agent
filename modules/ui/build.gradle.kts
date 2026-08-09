@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import java.net.URI
 
 plugins {
     kotlin("jvm") version "2.4.10"
@@ -8,6 +9,8 @@ plugins {
     id("org.jetbrains.compose") version "1.11.1"
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
     id("io.spring.dependency-management") version "1.1.7"
+    id("org.springframework.boot") version "4.1.0"
+    id("maven-publish")
     jacoco
 }
 
@@ -73,6 +76,41 @@ compose.desktop {
         nativeDistributions {
             packageName = "Visual Agent"
             packageVersion = project.version.toString()
+        }
+    }
+}
+
+springBoot {
+    mainClass.set("de.heckenmann.visualagent.Main")
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("masterJar") {
+            groupId = project.group.toString()
+            artifactId = "visual-agent"
+            version =
+                if (project.version.toString().endsWith("SNAPSHOT")) {
+                    project.version.toString()
+                } else {
+                    val runNumber = System.getenv("GITHUB_RUN_NUMBER") ?: "0"
+                    "${project.version}-master-${System.getenv("GITHUB_SHA")?.take(8) ?: "local"}-$runNumber"
+                }
+            artifact(tasks.bootJar)
+        }
+    }
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url =
+                URI(
+                    "https://maven.pkg.github.com/" +
+                        "${System.getenv("GITHUB_REPOSITORY") ?: "heckenmann/visual-agent"}",
+                )
+            credentials {
+                username = System.getenv("GITHUB_ACTOR") ?: ""
+                password = System.getenv("GITHUB_TOKEN") ?: ""
+            }
         }
     }
 }
