@@ -130,7 +130,7 @@ tasks.register("verifyCentralizedVersions") {
     inputs.files(moduleBuildFiles)
     doLast {
         val pluginVersion = Regex("""(?:kotlin|id)\([^)]*\)\s+version\s+\"""")
-        val dependencyVersion = Regex("""\"[\w.-]+:[\w.-]+:[^\"]+\"""")
+        val dependencyVersion = Regex("""\"[\w.-]+:[\w.-]+:[^\"${'$'}]+\"""")
         val projectVersion = Regex("""^\s*version\s*=\s*\"""", RegexOption.MULTILINE)
         val violations =
             moduleBuildFiles.flatMap { buildFile ->

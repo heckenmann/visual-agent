@@ -38,6 +38,19 @@ val applicationMainJar =
         ":application",
     ).layout.buildDirectory.file("libs/application-${libs.versions.visual.agent.get()}-plain.jar")
 val publicationArtifactId = "visual-agent-${System.getenv("VISUAL_AGENT_PLATFORM") ?: "local"}"
+val coroutinesVersion = libs.versions.coroutines.get()
+
+configurations.configureEach {
+    resolutionStrategy.force(
+        "org.jetbrains.kotlinx:kotlinx-coroutines-bom:$coroutinesVersion",
+        "org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion",
+        "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:$coroutinesVersion",
+        "org.jetbrains.kotlinx:kotlinx-coroutines-reactive:$coroutinesVersion",
+        "org.jetbrains.kotlinx:kotlinx-coroutines-reactor:$coroutinesVersion",
+        "org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesVersion",
+        "org.jetbrains.kotlinx:kotlinx-coroutines-test-jvm:$coroutinesVersion",
+    )
+}
 
 repositories {
     google()
