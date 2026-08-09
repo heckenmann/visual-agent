@@ -47,11 +47,11 @@ Wheel input that was already active before the click cannot move the completed j
 - `de.heckenmann.visualagent.agent.conversation.ConversationHistoryPage`
 - `de.heckenmann.visualagent.agent.conversation.AgentConversationHistoryOps.readLatestHistoryPage`
 - `de.heckenmann.visualagent.agent.conversation.AgentConversationHistoryOps.readOlderHistoryPage`
-- `de.heckenmann.visualagent.ui.compose.ConversationUiState`
-- `de.heckenmann.visualagent.ui.compose.ConversationHistoryGateway`
-- `de.heckenmann.visualagent.ui.compose.ConversationHistoryPagingEffect`
-- `de.heckenmann.visualagent.ui.compose.ConversationScrollToLatestArea`
-- `de.heckenmann.visualagent.ui.compose.ConversationPanel`
+- `de.heckenmann.visualagent.ui.conversation.ConversationUiState`
+- `de.heckenmann.visualagent.ui.conversation.ConversationHistoryGateway`
+- `de.heckenmann.visualagent.ui.conversation.ConversationHistoryPagingEffect`
+- `de.heckenmann.visualagent.ui.conversation.ConversationScrollToLatestArea`
+- `de.heckenmann.visualagent.ui.conversation.ConversationPanel`
 
 ## Acceptance Criteria
 

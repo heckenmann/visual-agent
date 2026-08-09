@@ -29,6 +29,7 @@ class AppConfigBean(
     var databasePath: String = "./data/visual-agent.db"
     var uiThemeMode: ThemeMode = ThemeMode.SYSTEM
     var fontSize: Int = 14
+    var showPanelLabels: Boolean = true
     var conversationInputPlacement: ConversationInputPlacement = ConversationInputPlacement.CONVERSATION_MESSAGE
     var browserDefault: String = "firefox"
     var contextLength: Int = 4096
@@ -93,6 +94,7 @@ class AppConfigBean(
         preferenceStore.setPreference(KEY_OPENAI_MODEL, openAiModel)
         preferenceStore.setPreference(KEY_UI_THEME_MODE, uiThemeMode.name)
         preferenceStore.setPreference(KEY_UI_FONT_SIZE, fontSize.toString())
+        preferenceStore.setPreference(KEY_UI_SHOW_PANEL_LABELS, showPanelLabels.toString())
         preferenceStore.setPreference(KEY_UI_CONVERSATION_INPUT_PLACEMENT, conversationInputPlacement.name)
         preferenceStore.setPreference(KEY_BROWSER_DEFAULT, browserDefault)
         preferenceStore.setPreference(KEY_SESSION_CONTEXT_LENGTH, contextLength.toString())
@@ -126,6 +128,7 @@ class AppConfigBean(
             KEY_OPENAI_MODEL to openAiModel,
             KEY_UI_THEME_MODE to uiThemeMode.name,
             KEY_UI_FONT_SIZE to fontSize.toString(),
+            KEY_UI_SHOW_PANEL_LABELS to showPanelLabels.toString(),
             KEY_UI_CONVERSATION_INPUT_PLACEMENT to conversationInputPlacement.name,
             KEY_BROWSER_DEFAULT to browserDefault,
             KEY_SESSION_CONTEXT_LENGTH to contextLength.toString(),
@@ -151,6 +154,7 @@ class AppConfigBean(
         internal const val KEY_DATABASE_PATH = "database.path"
         internal const val KEY_UI_THEME_MODE = "ui.theme.mode"
         internal const val KEY_UI_FONT_SIZE = "ui.font.size"
+        internal const val KEY_UI_SHOW_PANEL_LABELS = "ui.navigation.show.panel.labels"
         internal const val KEY_UI_CONVERSATION_INPUT_PLACEMENT = "ui.conversation.input.placement"
         internal const val KEY_BROWSER_DEFAULT = "browser.default"
         internal const val KEY_SESSION_CONTEXT_LENGTH = "session.context.length"

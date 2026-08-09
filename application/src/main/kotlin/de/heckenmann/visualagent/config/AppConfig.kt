@@ -20,6 +20,7 @@ import java.util.concurrent.CopyOnWriteArrayList
  * @property databasePath Path to SQLite database file
  * @property uiThemeMode UI theme mode (default: SYSTEM)
  * @property fontSize UI font size (default: 14)
+ * @property showPanelLabels Whether the navigation rail shows panel labels by default
  * @property conversationInputPlacement Conversation composer placement (default: CONVERSATION_MESSAGE)
  * @property browserDefault Default browser for web integration (default: firefox)
  */
@@ -34,6 +35,7 @@ class AppConfig private constructor() {
     var databasePath: String = "./data/visual-agent.db"
     var uiThemeMode: ThemeMode = ThemeMode.SYSTEM
     var fontSize: Int = 14
+    var showPanelLabels: Boolean = true
     var conversationInputPlacement: ConversationInputPlacement = ConversationInputPlacement.CONVERSATION_MESSAGE
     var browserDefault: String = "firefox"
     var contextLength: Int = 4096
@@ -67,6 +69,7 @@ class AppConfig private constructor() {
         internal const val KEY_DATABASE_PATH = "database.path"
         internal const val KEY_UI_THEME_MODE = "ui.theme.mode"
         internal const val KEY_UI_FONT_SIZE = "ui.font.size"
+        internal const val KEY_UI_SHOW_PANEL_LABELS = "ui.navigation.show.panel.labels"
         internal const val KEY_UI_CONVERSATION_INPUT_PLACEMENT = "ui.conversation.input.placement"
         internal const val KEY_BROWSER_DEFAULT = "browser.default"
         internal const val KEY_SESSION_CONTEXT_LENGTH = "session.context.length"
@@ -214,6 +217,7 @@ class AppConfig private constructor() {
                 KEY_DATABASE_PATH to databasePath,
                 KEY_UI_THEME_MODE to uiThemeMode.name,
                 KEY_UI_FONT_SIZE to fontSize.toString(),
+                KEY_UI_SHOW_PANEL_LABELS to showPanelLabels.toString(),
                 KEY_UI_CONVERSATION_INPUT_PLACEMENT to conversationInputPlacement.name,
                 KEY_BROWSER_DEFAULT to browserDefault,
                 KEY_SESSION_CONTEXT_LENGTH to contextLength.toString(),
@@ -241,6 +245,7 @@ class AppConfig private constructor() {
             db.setPreference(KEY_OPENAI_MODEL, openAiModel)
             db.setPreference(KEY_UI_THEME_MODE, uiThemeMode.name)
             db.setPreference(KEY_UI_FONT_SIZE, fontSize.toString())
+            db.setPreference(KEY_UI_SHOW_PANEL_LABELS, showPanelLabels.toString())
             db.setPreference(KEY_UI_CONVERSATION_INPUT_PLACEMENT, conversationInputPlacement.name)
             db.setPreference(KEY_BROWSER_DEFAULT, browserDefault)
             db.setPreference(KEY_SESSION_CONTEXT_LENGTH, contextLength.toString())
@@ -280,6 +285,7 @@ class AppConfig private constructor() {
             openAiModel = db.getPreference(KEY_OPENAI_MODEL) ?: openAiModel
             uiThemeMode = db.getPreference(KEY_UI_THEME_MODE)?.let(ThemeMode::fromString) ?: uiThemeMode
             fontSize = db.getPreference(KEY_UI_FONT_SIZE)?.toIntOrNull() ?: fontSize
+            showPanelLabels = db.getPreference(KEY_UI_SHOW_PANEL_LABELS)?.toBooleanStrictOrNull() ?: showPanelLabels
             conversationInputPlacement =
                 db.getPreference(KEY_UI_CONVERSATION_INPUT_PLACEMENT)?.let(ConversationInputPlacement::fromString)
                     ?: conversationInputPlacement

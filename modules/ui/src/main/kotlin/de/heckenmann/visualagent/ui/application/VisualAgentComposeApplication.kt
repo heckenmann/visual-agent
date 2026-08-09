@@ -111,6 +111,7 @@ private fun VisualAgentComposeApp(
     var commandPaletteVisible by remember { mutableStateOf(false) }
     var uiFontSize by remember { mutableStateOf(deps.appConfig.fontSize) }
     var themeMode by remember { mutableStateOf(deps.appConfig.uiThemeMode) }
+    var showPanelLabels by remember { mutableStateOf(deps.appConfig.showPanelLabels) }
     var settingsRevision by remember { mutableStateOf(0) }
     val workspaceFocusRequester = remember { FocusRequester() }
     val composeScope = rememberCoroutineScope()
@@ -133,6 +134,7 @@ private fun VisualAgentComposeApp(
                 onSettingsChanged = {
                     uiFontSize = deps.appConfig.fontSize
                     themeMode = deps.appConfig.uiThemeMode
+                    showPanelLabels = deps.appConfig.showPanelLabels
                     settingsRevision += 1
                 },
                 inFlight = inFlight,
@@ -225,6 +227,12 @@ private fun VisualAgentComposeApp(
                         onToggleWindow = toggleWindow,
                         onReorderWindows = reorderWindows,
                         onPanelWidthChanged = resizeWindow,
+                        showPanelLabels = showPanelLabels,
+                        onTogglePanelLabels = {
+                            showPanelLabels = !showPanelLabels
+                            deps.appConfig.showPanelLabels = showPanelLabels
+                            deps.appConfig.save()
+                        },
                         onCloseApplication = onCloseApplication,
                         modalRequester = panelServices.modalRequester,
                     )

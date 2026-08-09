@@ -1,4 +1,3 @@
-import java.net.URI
 import java.nio.file.Files
 import kotlin.io.path.extension
 
@@ -10,7 +9,6 @@ plugins {
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
     id("org.springframework.boot") version "4.1.0"
     id("io.spring.dependency-management") version "1.1.7"
-    id("maven-publish")
     jacoco
 }
 
@@ -143,39 +141,8 @@ kotlin {
     }
 }
 
-publishing {
-    publications {
-        create<MavenPublication>("masterJar") {
-            groupId = project.group.toString()
-            artifactId = "visual-agent"
-            version =
-                if (project.version.toString().endsWith("SNAPSHOT")) {
-                    project.version.toString()
-                } else {
-                    val runNumber = System.getenv("GITHUB_RUN_NUMBER") ?: "0"
-                    "${project.version}-master-${System.getenv("GITHUB_SHA")?.take(8) ?: "local"}-$runNumber"
-                }
-            artifact(tasks.bootJar)
-        }
-    }
-    repositories {
-        maven {
-            name = "GitHubPackages"
-            url =
-                URI(
-                    "https://maven.pkg.github.com/" +
-                        "${System.getenv("GITHUB_REPOSITORY") ?: "heckenmann/visual-agent"}",
-                )
-            credentials {
-                username = System.getenv("GITHUB_ACTOR") ?: ""
-                password = System.getenv("GITHUB_TOKEN") ?: ""
-            }
-        }
-    }
-}
-
 tasks.register<Copy>("copyAllDependencies") {
-    from(configurations.compileClasspath, configurations.runtimeClasspath)
+    from(configurations.compileClasspath, configurations.runtimeClasspath, project(":ui").configurations.named("runtimeClasspath"))
     into(rootProject.projectDir.resolve("lib"))
 }
 

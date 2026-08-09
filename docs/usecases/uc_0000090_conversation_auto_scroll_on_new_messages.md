@@ -37,13 +37,13 @@ The conversation panel follows the latest message automatically without overridi
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.compose.ConversationPanel`
-- `de.heckenmann.visualagent.ui.compose.ConversationUiState`
-- `de.heckenmann.visualagent.ui.compose.ConversationTimelineItem`
-- `de.heckenmann.visualagent.ui.compose.ConversationScrollCoordinator`
-- `de.heckenmann.visualagent.ui.compose.ConversationScrollOnChangeEffect`
-- `de.heckenmann.visualagent.ui.compose.ConversationResizeScrollEffect`
-- `de.heckenmann.visualagent.ui.compose.ConversationStartupScrollEffect`
+- `de.heckenmann.visualagent.ui.conversation.ConversationPanel`
+- `de.heckenmann.visualagent.ui.conversation.ConversationUiState`
+- `de.heckenmann.visualagent.ui.conversation.ConversationTimelineItem`
+- `de.heckenmann.visualagent.ui.conversation.ConversationScrollCoordinator`
+- `de.heckenmann.visualagent.ui.conversation.ConversationScrollOnChangeEffect`
+- `de.heckenmann.visualagent.ui.conversation.ConversationResizeScrollEffect`
+- `de.heckenmann.visualagent.ui.conversation.ConversationStartupScrollEffect`
 
 ## Acceptance Criteria
 

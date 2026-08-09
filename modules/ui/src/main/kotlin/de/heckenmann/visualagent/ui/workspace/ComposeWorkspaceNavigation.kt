@@ -3,19 +3,29 @@
 package de.heckenmann.visualagent.ui.workspace
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
@@ -43,6 +53,8 @@ import sh.calvin.reorderable.ReorderableColumn
  * @param onReorderWindows Callback that receives the panels in their new order after a drag
  *   gesture settles
  * @param onPanelWidthChanged Callback that receives a new preferred width for a panel
+ * @param showPanelLabels Whether panel names are shown beside their icons
+ * @param onTogglePanelLabels Callback that toggles the panel-name display mode
  * @param onCloseApplication Callback that closes the application
  * @param modalRequester Modal requester used to show the panel width slider dialog
  *
@@ -54,16 +66,20 @@ internal fun ComposeRail(
     onToggleWindow: (String) -> Unit,
     onReorderWindows: (List<ComposeWorkspaceWindow>) -> Unit,
     onPanelWidthChanged: (String, Int) -> Unit,
+    showPanelLabels: Boolean = true,
+    onTogglePanelLabels: () -> Unit = {},
     onCloseApplication: () -> Unit,
     modalRequester: ComposeModalRequester,
 ) {
+    val railWidth = navigationRailWidth(windows, showPanelLabels)
+    val animatedRailWidth by animateDpAsState(targetValue = railWidth, label = "navigation rail width")
     Column(
         modifier =
             Modifier
-                .width(60.dp)
+                .width(animatedRailWidth)
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.surfaceContainerLowest)
-                .padding(vertical = 12.dp),
+                .padding(horizontal = 12.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         ReorderableColumn(
@@ -74,10 +90,11 @@ internal fun ComposeRail(
             },
             verticalArrangement = Arrangement.spacedBy(10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.animateContentSize(),
+            modifier = Modifier.fillMaxWidth().animateContentSize(),
         ) { _, window, isDragging ->
             DraggableRailButton(
                 window = window,
+                showLabel = showPanelLabels,
                 selected = window.visible,
                 isDragging = isDragging,
                 onToggle = { onToggleWindow(window.id) },
@@ -100,11 +117,48 @@ internal fun ComposeRail(
         }
         Spacer(modifier = Modifier.weight(1f))
         HorizontalDividerLine()
-        StaticRailButton(
-            icon = Icons.Filled.Close,
-            description = "Close application",
-            selected = false,
-            onClick = onCloseApplication,
-        )
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            StaticRailButton(
+                icon = Icons.Filled.TextFields,
+                description = if (showPanelLabels) "Hide panel labels" else "Show panel labels",
+                selected = showPanelLabels,
+                onClick = onTogglePanelLabels,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            StaticRailButton(
+                icon = Icons.Filled.Close,
+                description = "Close application",
+                selected = false,
+                onClick = onCloseApplication,
+                modifier = Modifier.fillMaxWidth(),
+                alert = true,
+            )
+        }
     }
+}
+
+@Composable
+private fun navigationRailWidth(
+    windows: List<ComposeWorkspaceWindow>,
+    showPanelLabels: Boolean,
+): Dp {
+    if (!showPanelLabels) return 60.dp
+    val textMeasurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val labelStyle = MaterialTheme.typography.labelLarge
+    val widestLabel =
+        windows
+            .map { window -> textMeasurer.measure(AnnotatedString(window.title), style = labelStyle).size.width }
+            .maxOrNull() ?: 0
+    val fixedContentWidth =
+        18.dp +
+            ButtonDefaults.IconSpacing +
+            10.dp +
+            ButtonDefaults.ContentPadding.calculateLeftPadding(LayoutDirection.Ltr) +
+            ButtonDefaults.ContentPadding.calculateRightPadding(LayoutDirection.Ltr) +
+            24.dp
+    return with(density) { (widestLabel.toDp() + fixedContentWidth).coerceAtLeast(60.dp) }
 }

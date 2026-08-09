@@ -29,6 +29,21 @@ class ConversationInputPlacementTest {
         assertEquals(ConversationInputPlacement.CONVERSATION_MESSAGE, restored.conversationInputPlacement)
     }
 
+    @Test
+    fun `panel labels default to expanded and restore an explicit compact preference`() {
+        assertEquals(true, AppConfigBean().showPanelLabels)
+        val store = InMemoryPreferenceStore()
+        val config = AppConfigBean(store)
+        config.showPanelLabels = false
+        config.save()
+
+        val restored = AppConfigBean(store)
+        AppConfigPersistenceBinder(store, restored, "./data/visual-agent.db").bind()
+
+        assertEquals("false", store.getPreference(AppConfigBean.KEY_UI_SHOW_PANEL_LABELS))
+        assertEquals(false, restored.showPanelLabels)
+    }
+
     private class InMemoryPreferenceStore : PreferenceStore {
         private val values = mutableMapOf<String, String>()
 
