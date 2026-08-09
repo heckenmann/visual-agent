@@ -142,7 +142,7 @@ kotlin {
 }
 
 tasks.register<Copy>("copyAllDependencies") {
-    from(configurations.compileClasspath, configurations.runtimeClasspath)
+    from(configurations.compileClasspath, configurations.runtimeClasspath, project(":ui").configurations.named("runtimeClasspath"))
     into(rootProject.projectDir.resolve("lib"))
 }
 
