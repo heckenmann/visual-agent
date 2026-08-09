@@ -30,6 +30,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.TimeoutException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -145,6 +146,31 @@ class ComposeConversationPanelActionsTest {
             val mockManager = mockk<AgentManager>(relaxed = true)
             every { mockManager.getHistory() } returns emptyList()
             coEvery { mockManager.streamMessage(any(), any(), any()) } throws CancellationException("Cancelled")
+
+            executeSend(
+                content = "Test",
+                agentManager = mockManager,
+                inFlight = inFlight,
+                inputFocusRequester = FocusRequester(),
+                onInputChange = {},
+                onSendingChange = {},
+                onStatusChange = {},
+                onHistoryChange = {},
+                onActiveTokenChange = {},
+                onPendingUserMessageChange = {},
+                streamingFlow = MutableStateFlow(""),
+            )
+
+            assertEquals(0, inFlight.state.value.totalActive)
+        }
+
+    @Test
+    fun `executeSend clears in-flight state after timeout`() =
+        runBlocking {
+            val inFlight = InFlightStateHolder()
+            val mockManager = mockk<AgentManager>(relaxed = true)
+            every { mockManager.getHistory() } returns emptyList()
+            coEvery { mockManager.streamMessage(any(), any(), any()) } throws TimeoutException("Timed out")
 
             executeSend(
                 content = "Test",
