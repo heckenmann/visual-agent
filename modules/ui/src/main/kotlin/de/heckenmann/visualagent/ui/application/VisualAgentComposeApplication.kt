@@ -47,9 +47,7 @@ import de.heckenmann.visualagent.ui.workspace.*
 import de.heckenmann.visualagent.workspace.layout.DesktopState
 import de.heckenmann.visualagent.workspace.layout.StageState
 import de.heckenmann.visualagent.workspace.layout.WorkspaceWindowState
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.springframework.boot.WebApplicationType
 import org.springframework.boot.builder.SpringApplicationBuilder
 import kotlin.math.roundToInt
@@ -233,11 +231,7 @@ private fun VisualAgentComposeApp(
                         onTogglePanelLabels = {
                             showPanelLabels = !showPanelLabels
                             deps.appConfig.showPanelLabels = showPanelLabels
-                            composeScope.launch {
-                                withContext(Dispatchers.IO) {
-                                    deps.appConfig.savePanelLabels()
-                                }
-                            }
+                            composeScope.persistPanelLabels(deps.appConfig)
                         },
                         onCloseApplication = onCloseApplication,
                         modalRequester = panelServices.modalRequester,
