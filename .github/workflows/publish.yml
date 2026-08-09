@@ -29,8 +29,10 @@ jobs:
         include:
           - runner: ubuntu-latest
             platform: linux
+          - runner: macos-15-intel
+            platform: macos-x64
           - runner: macos-latest
-            platform: macos
+            platform: macos-arm64
           - runner: windows-latest
             platform: windows
     env:

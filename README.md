@@ -16,7 +16,8 @@ Each successful build on `master` publishes an executable JAR to GitHub Packages
 1. Download the latest package that matches your operating system from the [GitHub Packages registry](https://github.com/heckenmann/visual-agent/packages):
 
    - Linux: `visual-agent-linux`
-   - macOS: `visual-agent-macos`
+   - macOS on Intel: `visual-agent-macos-x64`
+   - macOS on Apple Silicon: `visual-agent-macos-arm64`
    - Windows: `visual-agent-windows`
 
    Each package contains the native Compose runtime for its platform.
