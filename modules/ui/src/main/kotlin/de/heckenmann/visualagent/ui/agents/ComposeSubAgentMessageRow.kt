@@ -74,6 +74,8 @@ internal fun SubAgentMessageRow(
     val metadata = remember(message.metadata) { parseSubAgentMetadata(message.metadata) }
     var expanded by remember { mutableStateOf(false) }
     val workType = if (metadata.todoId.isNullOrBlank()) "job" else "todo"
+    val completion = if (metadata.success) "completed" else "failed"
+    val summary = "Agent \"${metadata.agentName ?: "sub-agent"}\" $completion a $workType"
     val accentColor =
         if (metadata.success) {
             MaterialTheme.colorScheme.tertiary
@@ -111,7 +113,7 @@ internal fun SubAgentMessageRow(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "Agent \"${metadata.agentName ?: "sub-agent"}\" ${if (metadata.success) "completed" else "failed"} a $workType",
+                        text = summary,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f),
