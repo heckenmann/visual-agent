@@ -70,6 +70,7 @@ fun runVisualAgentComposeApplication() {
     val defaultHeight = 820.dp
 
     application {
+        val panelLabelPersistence = remember { PanelLabelPersistence(deps.appConfig) }
         val windowState =
             rememberWindowState(
                 width = persistedStage?.width?.dp ?: defaultWidth,
@@ -82,10 +83,7 @@ fun runVisualAgentComposeApplication() {
             deps.workspaceLayoutService.saveStage(StageState(width = stageWidth, height = stageHeight))
         }
         val closeApplication = {
-            deps.lifecycle.beginShutdown()
-            saveStageOnExit()
-            deps.close()
-            exitApplication()
+            closeVisualAgentApplication(deps, saveStageOnExit, panelLabelPersistence, ::exitApplication)
         }
         Window(
             onCloseRequest = closeApplication,
@@ -96,6 +94,7 @@ fun runVisualAgentComposeApplication() {
             VisualAgentComposeApp(
                 deps = deps,
                 onCloseApplication = closeApplication,
+                panelLabelPersistence = panelLabelPersistence,
             )
         }
     }
@@ -105,6 +104,7 @@ fun runVisualAgentComposeApplication() {
 private fun VisualAgentComposeApp(
     deps: ComposeApplicationDependencies,
     onCloseApplication: () -> Unit,
+    panelLabelPersistence: PanelLabelPersistence,
 ) {
     var windows by remember { mutableStateOf(restoreWorkspaceWindows(defaultWindows(), deps.workspaceLayoutService.report().windows)) }
     var modal by remember { mutableStateOf<ComposeModal?>(null) }
@@ -231,7 +231,7 @@ private fun VisualAgentComposeApp(
                         onTogglePanelLabels = {
                             showPanelLabels = !showPanelLabels
                             deps.appConfig.showPanelLabels = showPanelLabels
-                            composeScope.persistPanelLabels(deps.appConfig)
+                            panelLabelPersistence.persist()
                         },
                         onCloseApplication = onCloseApplication,
                         modalRequester = panelServices.modalRequester,
