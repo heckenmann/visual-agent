@@ -4,6 +4,7 @@ package de.heckenmann.visualagent.ui.conversation
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -146,7 +147,7 @@ class ConversationPanelRowsTest {
                 onDelete = {},
             )
         }
-        composeTestRule.onNodeWithText("Agent \"researcher\" completed a task").assertExists()
+        composeTestRule.onNodeWithText("Agent \"researcher\" completed a todo").assertExists()
         // Hidden until expanded.
         composeTestRule.onNodeWithText("found something").assertDoesNotExist()
         composeTestRule
@@ -175,6 +176,41 @@ class ConversationPanelRowsTest {
             )
         }
         composeTestRule.onNodeWithText("Agent \"coder\" is working…").assertExists()
+    }
+
+    @Test
+    fun `sub-agent history uses its dedicated row instead of an assistant message row`() {
+        val metadata =
+            buildJsonObject {
+                put("type", "sub_agent")
+                put("agentId", "agent-1")
+                put("agentName", "Researcher")
+                put("success", true)
+            }.toString()
+        mount {
+            LazyColumn {
+                ConversationTimeline(
+                    items =
+                        buildConversationTimeline(
+                            history = listOf(Message(role = "sub_agent", content = "## Result", metadata = metadata)),
+                            pendingUserMessage = null,
+                            streamingContent = "",
+                            showWaitingIndicator = false,
+                            showOlderHistoryLoading = false,
+                            includeInlineComposer = false,
+                        ),
+                    sending = false,
+                    deletingMessageIds = emptySet(),
+                    onDeleteMessage = {},
+                    onStatusChange = {},
+                    onEditMessage = {},
+                    sendContent = {},
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Agent \"Researcher\" completed a todo").assertExists()
+        composeTestRule.onNodeWithText("Assistant").assertDoesNotExist()
     }
 
     @Test

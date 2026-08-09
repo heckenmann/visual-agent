@@ -10,6 +10,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.agent.Message
@@ -79,6 +80,7 @@ class ConversationMessageListEmptyHistoryTest {
             assertEquals(2, listInfo.totalItemsCount)
             assertEquals(0, listInfo.visibleItemsInfo.first().index)
             composeTestRule.onNodeWithText("Thinking").assertExists()
+            composeTestRule.onNodeWithContentDescription("You avatar").assertExists()
         }
 
     @Test

@@ -57,6 +57,12 @@ internal sealed interface ConversationTimelineItem {
         override val stableKey = message.id?.let { "message:$it" } ?: "temporary-message-$chronologicalIndex"
     }
 
+    data class PersistedGroup(
+        val group: ConversationMessageGroup,
+    ) : ConversationTimelineItem {
+        override val stableKey = group.stableKey
+    }
+
     data object OlderHistoryLoading : ConversationTimelineItem {
         override val stableKey = "loading-older"
     }
@@ -79,9 +85,8 @@ internal fun buildConversationTimeline(
         if (showWaitingIndicator) add(ConversationTimelineItem.Waiting)
         if (streamingContent.isNotEmpty()) add(ConversationTimelineItem.Streaming(streamingContent))
         if (pendingUserMessage != null) add(ConversationTimelineItem.PendingUser(pendingUserMessage))
-        history.indices.reversed().forEach { index ->
-            add(ConversationTimelineItem.Persisted(history[index], index))
-        }
+        val persisted = history.indices.reversed().map { index -> ConversationTimelineItem.Persisted(history[index], index) }
+        groupConsecutiveConversationMessages(persisted).forEach { group -> add(ConversationTimelineItem.PersistedGroup(group)) }
         if (showOlderHistoryLoading) add(ConversationTimelineItem.OlderHistoryLoading)
         if (history.isEmpty() && pendingUserMessage == null && streamingContent.isEmpty() && !showWaitingIndicator) {
             add(ConversationTimelineItem.Empty)
@@ -104,10 +109,20 @@ internal fun LazyListScope.ConversationTimeline(
             ConversationTimelineItem.Waiting -> ConversationWaitingIndicator()
             is ConversationTimelineItem.Streaming -> StreamingTimelineRow(item.content)
             is ConversationTimelineItem.PendingUser -> PendingTimelineRow(item.content)
-            is ConversationTimelineItem.Persisted ->
-                PersistedTimelineRow(
+            is ConversationTimelineItem.PersistedGroup ->
+                PersistedTimelineGroup(
                     item = item,
-                    nextItem = items.getOrNull(index + 1),
+                    olderItems = items.drop(index + 1),
+                    sending = sending,
+                    deletingMessageIds = deletingMessageIds,
+                    onDeleteMessage = onDeleteMessage,
+                    onStatusChange = onStatusChange,
+                    onEditMessage = onEditMessage,
+                    sendContent = sendContent,
+                )
+            is ConversationTimelineItem.Persisted ->
+                PersistedTimelineGroup(
+                    item = ConversationTimelineItem.PersistedGroup(ConversationMessageGroup(listOf(item))),
                     olderItems = items.drop(index + 1),
                     sending = sending,
                     deletingMessageIds = deletingMessageIds,
@@ -161,44 +176,25 @@ internal fun LazyListScope.ConversationMessageList(
 
 @Composable
 private fun StreamingTimelineRow(content: String) {
-    MessageRow(
+    TransientConversationMessageGroupRow(
         message = Message("assistant", content),
-        isStreamingPlaceholder = false,
         isStreaming = true,
-        canRetry = false,
-        canEdit = false,
-        canDelete = false,
-        isDeleting = false,
-        onCopied = {},
-        onRetry = {},
-        onEdit = {},
-        onDelete = {},
         modifier = Modifier.padding(top = 2.dp),
     )
 }
 
 @Composable
 private fun PendingTimelineRow(content: String) {
-    MessageRow(
+    TransientConversationMessageGroupRow(
         message = Message("user", content),
-        isStreamingPlaceholder = false,
         isStreaming = false,
-        canRetry = false,
-        canEdit = false,
-        canDelete = false,
-        isDeleting = false,
-        onCopied = {},
-        onRetry = {},
-        onEdit = {},
-        onDelete = {},
         modifier = Modifier.padding(top = 10.dp),
     )
 }
 
 @Composable
-private fun PersistedTimelineRow(
-    item: ConversationTimelineItem.Persisted,
-    nextItem: ConversationTimelineItem?,
+private fun PersistedTimelineGroup(
+    item: ConversationTimelineItem.PersistedGroup,
     olderItems: List<ConversationTimelineItem>,
     sending: Boolean,
     deletingMessageIds: Set<String>,
@@ -207,9 +203,30 @@ private fun PersistedTimelineRow(
     onEditMessage: (String?) -> Unit,
     sendContent: (String) -> Unit,
 ) {
-    val message = item.message
-    val nextRole = (nextItem as? ConversationTimelineItem.Persisted)?.message?.role
-    val topPadding = if (nextRole == message.role) 2.dp else 10.dp
+    val group = item.group
+    val message = group.messages.first().message
+    val topPadding = 10.dp
+    if (message.role == "user" || message.role == "assistant") {
+        ConversationMessageGroupRow(
+            group = group,
+            sending = sending,
+            deletingMessageIds = deletingMessageIds,
+            onDeleteMessage = onDeleteMessage,
+            onStatusChange = onStatusChange,
+            onEditMessage = onEditMessage,
+            onRetry = {
+                val previous = olderItems.persistedMessages().firstOrNull { older -> older.message.role == "user" }
+                if (previous == null) {
+                    onStatusChange("No previous user message to retry")
+                } else {
+                    onStatusChange("Retrying previous user message...")
+                    sendContent(previous.message.content)
+                }
+            },
+            modifier = Modifier.padding(top = topPadding),
+        )
+        return
+    }
     val onDelete: () -> Unit = {
         val messageId = message.id
         if (messageId != null) onDeleteMessage(messageId)
@@ -224,6 +241,14 @@ private fun PersistedTimelineRow(
                 modifier = Modifier.padding(top = topPadding),
             )
         "system" -> SystemMessageRow(message, Modifier.padding(top = topPadding))
+        "sub_agent" ->
+            SubAgentMessageRow(
+                message = message,
+                isDeleting = message.id in deletingMessageIds,
+                isRunning = false,
+                onDelete = onDelete,
+                modifier = Modifier.padding(top = topPadding),
+            )
         else ->
             MessageRow(
                 message = message,
@@ -237,7 +262,7 @@ private fun PersistedTimelineRow(
                 onRetry = {
                     val previous =
                         olderItems
-                            .filterIsInstance<ConversationTimelineItem.Persisted>()
+                            .persistedMessages()
                             .firstOrNull { it.message.role == "user" }
                     if (previous == null) {
                         onStatusChange("No previous user message to retry")
@@ -252,6 +277,9 @@ private fun PersistedTimelineRow(
             )
     }
 }
+
+private fun List<ConversationTimelineItem>.persistedMessages(): List<ConversationTimelineItem.Persisted> =
+    filterIsInstance<ConversationTimelineItem.PersistedGroup>().flatMap { it.group.messages }
 
 /** Renders the conversation waiting indicator from the canonical in-flight state. */
 @Composable

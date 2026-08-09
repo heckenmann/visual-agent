@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandLess
@@ -109,7 +110,7 @@ internal fun SubAgentMessageRow(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "Agent \"${metadata.agentName ?: "sub-agent"}\" ${if (metadata.success) "completed" else "failed"} a task",
+                        text = "Agent \"${metadata.agentName ?: "sub-agent"}\" ${if (metadata.success) "completed" else "failed"} a todo",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f),
@@ -137,12 +138,9 @@ internal fun SubAgentMessageRow(
                     enter = fadeIn(animationSpec = tween(180)),
                     exit = fadeOut(animationSpec = tween(180)),
                 ) {
-                    Text(
-                        text = message.content,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
+                    SelectionContainer {
+                        ComposeMarkdown(message.content)
+                    }
                 }
             }
         }

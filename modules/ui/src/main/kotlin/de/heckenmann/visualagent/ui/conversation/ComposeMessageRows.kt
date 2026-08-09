@@ -128,31 +128,35 @@ internal fun MessageRow(
                     )
                 }
             }
-            if (isStreamingPlaceholder) {
+            ConversationMessageContent(message, isStreamingPlaceholder, isStreaming)
+        }
+    }
+}
+
+@Composable
+internal fun ConversationMessageContent(
+    message: Message,
+    isStreamingPlaceholder: Boolean,
+    isStreaming: Boolean,
+) {
+    if (isStreamingPlaceholder) {
+        Text(
+            text = "Thinking…",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    } else if (isStreaming) {
+        SelectionContainer {
+            StreamingText(text = message.content, animate = false) { displayedText ->
                 Text(
-                    text = "Thinking…",
+                    text = displayedText,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
-            } else if (isStreaming) {
-                SelectionContainer {
-                    StreamingText(
-                        text = message.content,
-                        animate = false,
-                    ) { displayedText ->
-                        Text(
-                            text = displayedText,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                }
-            } else {
-                SelectionContainer {
-                    ComposeMarkdown(message.content)
-                }
             }
         }
+    } else {
+        SelectionContainer { ComposeMarkdown(message.content) }
     }
 }
 
