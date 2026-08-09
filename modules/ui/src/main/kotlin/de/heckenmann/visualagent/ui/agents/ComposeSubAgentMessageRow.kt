@@ -73,6 +73,7 @@ internal fun SubAgentMessageRow(
 ) {
     val metadata = remember(message.metadata) { parseSubAgentMetadata(message.metadata) }
     var expanded by remember { mutableStateOf(false) }
+    val workType = if (metadata.todoId.isNullOrBlank()) "job" else "todo"
     val accentColor =
         if (metadata.success) {
             MaterialTheme.colorScheme.tertiary
@@ -110,7 +111,7 @@ internal fun SubAgentMessageRow(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "Agent \"${metadata.agentName ?: "sub-agent"}\" ${if (metadata.success) "completed" else "failed"} a todo",
+                        text = "Agent \"${metadata.agentName ?: "sub-agent"}\" ${if (metadata.success) "completed" else "failed"} a $workType",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f),
@@ -152,6 +153,8 @@ internal data class ParsedSubAgentMetadata(
     val success: Boolean,
     val agentId: String?,
     val agentName: String?,
+    val todoId: String?,
+    val hasCompletionStatus: Boolean,
 )
 
 internal fun parseSubAgentMetadata(metadata: String?): ParsedSubAgentMetadata {
@@ -169,6 +172,8 @@ internal fun parseSubAgentMetadata(metadata: String?): ParsedSubAgentMetadata {
         success = json?.get("success")?.jsonPrimitive?.booleanOrNull ?: false,
         agentId = json?.get("agentId")?.jsonPrimitive?.content,
         agentName = json?.get("agentName")?.jsonPrimitive?.content,
+        todoId = json?.get("todoId")?.jsonPrimitive?.content,
+        hasCompletionStatus = json?.get("success") != null,
     )
 }
 

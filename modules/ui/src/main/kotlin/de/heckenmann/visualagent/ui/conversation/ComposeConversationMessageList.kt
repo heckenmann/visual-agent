@@ -107,8 +107,8 @@ internal fun LazyListScope.ConversationTimeline(
         when (item) {
             ConversationTimelineItem.InlineComposer -> inlineComposer()
             ConversationTimelineItem.Waiting -> ConversationWaitingIndicator()
-            is ConversationTimelineItem.Streaming -> StreamingTimelineRow(item.content)
-            is ConversationTimelineItem.PendingUser -> PendingTimelineRow(item.content)
+            is ConversationTimelineItem.Streaming -> StreamingTimelineRow(item.content, onStatusChange)
+            is ConversationTimelineItem.PendingUser -> PendingTimelineRow(item.content, onStatusChange)
             is ConversationTimelineItem.PersistedGroup ->
                 PersistedTimelineGroup(
                     item = item,
@@ -175,19 +175,27 @@ internal fun LazyListScope.ConversationMessageList(
 }
 
 @Composable
-private fun StreamingTimelineRow(content: String) {
+private fun StreamingTimelineRow(
+    content: String,
+    onStatusChange: (String) -> Unit,
+) {
     TransientConversationMessageGroupRow(
         message = Message("assistant", content),
         isStreaming = true,
+        onCopied = { onStatusChange("Copied assistant message") },
         modifier = Modifier.padding(top = 2.dp),
     )
 }
 
 @Composable
-private fun PendingTimelineRow(content: String) {
+private fun PendingTimelineRow(
+    content: String,
+    onStatusChange: (String) -> Unit,
+) {
     TransientConversationMessageGroupRow(
         message = Message("user", content),
         isStreaming = false,
+        onCopied = { onStatusChange("Copied user message") },
         modifier = Modifier.padding(top = 10.dp),
     )
 }
@@ -242,11 +250,11 @@ private fun PersistedTimelineGroup(
             )
         "system" -> SystemMessageRow(message, Modifier.padding(top = topPadding))
         "sub_agent" ->
-            SubAgentMessageRow(
+            SubAgentTimelineRow(
                 message = message,
-                isDeleting = message.id in deletingMessageIds,
-                isRunning = false,
+                deletingMessageIds = deletingMessageIds,
                 onDelete = onDelete,
+                onStatusChange = onStatusChange,
                 modifier = Modifier.padding(top = topPadding),
             )
         else ->

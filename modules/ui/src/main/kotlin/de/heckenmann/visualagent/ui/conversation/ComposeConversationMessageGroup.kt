@@ -122,6 +122,7 @@ internal fun ConversationMessageGroupRow(
 internal fun TransientConversationMessageGroupRow(
     message: Message,
     isStreaming: Boolean,
+    onCopied: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     PanelContentCard(modifier = modifier, backgroundColor = groupBackground(message.role)) {
@@ -131,8 +132,21 @@ internal fun TransientConversationMessageGroupRow(
             verticalAlignment = Alignment.Top,
         ) {
             ConversationAuthorColumn(message.role)
-            Column(modifier = Modifier.weight(1f)) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 ConversationMessageContent(message, isStreamingPlaceholder = false, isStreaming = isStreaming)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End)) {
+                    @Suppress("DEPRECATION")
+                    val clipboard = LocalClipboardManager.current
+                    ActionIconButton(
+                        icon = Icons.Filled.ContentCopy,
+                        description = "Copy ${message.role} message",
+                        modifier = Modifier.size(24.dp).alpha(0.6f),
+                        onClick = {
+                            clipboard.setText(AnnotatedString(message.content))
+                            onCopied()
+                        },
+                    )
+                }
             }
         }
     }
@@ -218,3 +232,38 @@ private fun groupBackground(role: String) =
     } else {
         MaterialTheme.colorScheme.surfaceContainerLow
     }
+
+@Composable
+internal fun SubAgentTimelineRow(
+    message: Message,
+    deletingMessageIds: Set<String>,
+    onDelete: () -> Unit,
+    onStatusChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val metadata = parseSubAgentMetadata(message.metadata)
+    if (metadata.agentName.isNullOrBlank() || !metadata.hasCompletionStatus) {
+        MessageRow(
+            message = message,
+            isStreamingPlaceholder = false,
+            isStreaming = false,
+            canRetry = false,
+            canEdit = false,
+            canDelete = message.id != null && message.id !in deletingMessageIds,
+            isDeleting = message.id in deletingMessageIds,
+            onCopied = { onStatusChange("Copied sub-agent message") },
+            onRetry = {},
+            onEdit = {},
+            onDelete = onDelete,
+            modifier = modifier,
+        )
+    } else {
+        SubAgentMessageRow(
+            message = message,
+            isDeleting = message.id in deletingMessageIds,
+            isRunning = false,
+            onDelete = onDelete,
+            modifier = modifier,
+        )
+    }
+}

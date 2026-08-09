@@ -283,5 +283,7 @@ internal fun LazyListState.conversationPosition(): ConversationListPosition =
 internal fun LazyListState.isAtOldestConversationEnd(): Boolean {
     val layoutInfo = layoutInfo
     val lastVisibleItem = layoutInfo.visibleItemsInfo.lastOrNull()
-    return lastVisibleItem != null && lastVisibleItem.index == layoutInfo.totalItemsCount - 1
+    return lastVisibleItem != null &&
+        lastVisibleItem.index == layoutInfo.totalItemsCount - 1 &&
+        lastVisibleItem.offset >= layoutInfo.viewportStartOffset
 }

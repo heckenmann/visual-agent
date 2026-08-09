@@ -33,6 +33,7 @@ internal fun persistSubAgentMessage(
             put("type", "sub_agent")
             put("agentId", agent.id)
             put("agentName", agent.name)
+            put("todoId", agent.currentTodoId ?: "")
             put("success", success)
         }.toString()
     persistMessage(

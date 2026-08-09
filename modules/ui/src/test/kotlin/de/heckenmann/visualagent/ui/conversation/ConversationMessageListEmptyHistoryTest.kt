@@ -81,6 +81,7 @@ class ConversationMessageListEmptyHistoryTest {
             assertEquals(0, listInfo.visibleItemsInfo.first().index)
             composeTestRule.onNodeWithText("Thinking").assertExists()
             composeTestRule.onNodeWithContentDescription("You avatar").assertExists()
+            composeTestRule.onNodeWithContentDescription("Copy user message").assertExists()
         }
 
     @Test

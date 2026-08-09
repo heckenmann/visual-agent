@@ -37,6 +37,7 @@ class ConversationTimelineRowsTest {
                 put("type", "sub_agent")
                 put("agentId", "agent-1")
                 put("agentName", "Researcher")
+                put("todoId", "todo-1")
                 put("success", true)
             }.toString()
 
@@ -66,5 +67,35 @@ class ConversationTimelineRowsTest {
 
         composeTestRule.onNodeWithText("Agent \"Researcher\" completed a todo").assertExists()
         composeTestRule.onNodeWithText("Assistant").assertDoesNotExist()
+    }
+
+    @Test
+    fun `sub-agent history without summary metadata falls back to the generic message row`() {
+        composeTestRule.setContent {
+            MaterialTheme {
+                LazyColumn {
+                    ConversationTimeline(
+                        items =
+                            buildConversationTimeline(
+                                history = listOf(Message(role = "sub_agent", content = "Timeout diagnostic")),
+                                pendingUserMessage = null,
+                                streamingContent = "",
+                                showWaitingIndicator = false,
+                                showOlderHistoryLoading = false,
+                                includeInlineComposer = false,
+                            ),
+                        sending = false,
+                        deletingMessageIds = emptySet(),
+                        onDeleteMessage = {},
+                        onStatusChange = {},
+                        onEditMessage = {},
+                        sendContent = {},
+                    )
+                }
+            }
+        }
+
+        composeTestRule.onNodeWithText("Timeout diagnostic").assertExists()
+        composeTestRule.onNodeWithText("Assistant").assertExists()
     }
 }

@@ -146,7 +146,7 @@ class ConversationPanelRowsTest {
                 onDelete = {},
             )
         }
-        composeTestRule.onNodeWithText("Agent \"researcher\" completed a todo").assertExists()
+        composeTestRule.onNodeWithText("Agent \"researcher\" completed a job").assertExists()
         // Hidden until expanded.
         composeTestRule.onNodeWithText("found something").assertDoesNotExist()
         composeTestRule
