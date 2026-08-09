@@ -2,18 +2,20 @@ import java.nio.file.Files
 import kotlin.io.path.extension
 
 plugins {
-    kotlin("jvm") version "2.4.10"
-    kotlin("plugin.jpa") version "2.4.10"
-    kotlin("plugin.serialization") version "2.4.10"
-    kotlin("plugin.spring") version "2.4.10"
-    id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
-    id("org.springframework.boot") version "4.1.0"
-    id("io.spring.dependency-management") version "1.1.7"
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.jpa)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.kotlin.spring)
+    alias(libs.plugins.ktlint)
+    alias(libs.plugins.spring.boot)
+    alias(libs.plugins.spring.dependency.management)
     jacoco
 }
 
 group = "de.heckenmann.visualagent"
-version = "0.1.0"
+version =
+    libs.versions.visual.agent
+        .get()
 
 repositories {
     google()
@@ -22,46 +24,46 @@ repositories {
 }
 
 dependencies {
-    implementation(kotlin("stdlib"))
-    implementation(kotlin("reflect"))
+    implementation(libs.kotlin.stdlib)
+    implementation(libs.kotlin.reflect)
     implementation(project(":providers"))
     implementation(project(":tools"))
 
     // Spring Boot & AI
-    implementation("org.springframework.boot:spring-boot-starter")
-    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
-    implementation(platform("org.springframework.ai:spring-ai-bom:2.0.0"))
-    implementation("org.springframework.ai:spring-ai-starter-model-ollama")
-    implementation("org.springframework.ai:spring-ai-openai")
-    implementation("io.github.vupoint.cokit:cokit-client:0.0.2")
+    implementation(libs.spring.boot.starter)
+    implementation(libs.spring.boot.starter.data.jpa)
+    implementation(platform(libs.spring.ai.bom))
+    implementation(libs.spring.ai.ollama)
+    implementation(libs.spring.ai.openai)
+    implementation(libs.cokit.client)
     implementation("org.hibernate.orm:hibernate-community-dialects")
     implementation("org.springframework.boot:spring-boot-starter-flyway")
 
     // SQLite JDBC
-    implementation("org.xerial:sqlite-jdbc:3.53.2.1")
+    implementation(libs.sqlite.jdbc)
 
     // Kotlinx Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+    implementation(libs.coroutines.core)
 
     // JSON Serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    implementation(libs.serialization.json)
 
     // Workspace document analysis
-    implementation("org.apache.pdfbox:pdfbox:3.0.8")
+    implementation(libs.pdfbox)
 
     // Kotlin logging (wrapper for SLF4J)
-    implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
+    implementation(libs.kotlin.logging)
 
     // Ensure compatible Logback is available at runtime (Spring Boot logging expects it)
-    implementation("ch.qos.logback:logback-classic:1.6.1")
-    implementation("ch.qos.logback:logback-core:1.6.1")
+    implementation(libs.logback.classic)
+    implementation(libs.logback.core)
 
     // Test
-    testImplementation(kotlin("test"))
-    testImplementation("org.springframework.boot:spring-boot-starter-test")
-    testImplementation("io.mockk:mockk:1.14.11")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
-    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:6.1.2")
+    testImplementation(libs.kotlin.test)
+    testImplementation(libs.spring.boot.starter.test)
+    testImplementation(libs.mockk)
+    testImplementation(libs.coroutines.test)
+    testRuntimeOnly(libs.junit.vintage.engine)
 }
 
 tasks.test {

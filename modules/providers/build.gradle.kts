@@ -1,13 +1,15 @@
 plugins {
-    kotlin("jvm") version "2.4.10"
-    kotlin("plugin.serialization") version "2.4.10"
-    kotlin("plugin.spring") version "2.4.10"
-    id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.kotlin.spring)
+    alias(libs.plugins.ktlint)
     jacoco
 }
 
 group = "de.heckenmann.visualagent"
-version = "0.1.0"
+version =
+    libs.versions.visual.agent
+        .get()
 
 repositories {
     mavenCentral()
@@ -15,20 +17,20 @@ repositories {
 }
 
 dependencies {
-    implementation(kotlin("stdlib"))
-    implementation(platform("org.springframework.ai:spring-ai-bom:2.0.0"))
-    implementation("org.springframework.ai:spring-ai-starter-model-ollama")
-    implementation("org.springframework.ai:spring-ai-openai")
-    implementation("io.github.vupoint.cokit:cokit-client:0.0.2")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.10.2")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
-    implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
+    implementation(libs.kotlin.stdlib)
+    implementation(platform(libs.spring.ai.bom))
+    implementation(libs.spring.ai.ollama)
+    implementation(libs.spring.ai.openai)
+    implementation(libs.cokit.client)
+    implementation(libs.coroutines.core)
+    implementation(libs.coroutines.reactor)
+    implementation(libs.serialization.json)
+    implementation(libs.kotlin.logging)
 
-    testImplementation(kotlin("test"))
-    testImplementation("org.junit.jupiter:junit-jupiter:6.1.2")
-    testImplementation("io.mockk:mockk:1.14.11")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation(libs.kotlin.test)
+    testImplementation(libs.junit.jupiter)
+    testImplementation(libs.mockk)
+    testImplementation(libs.coroutines.test)
 }
 
 tasks.test {
