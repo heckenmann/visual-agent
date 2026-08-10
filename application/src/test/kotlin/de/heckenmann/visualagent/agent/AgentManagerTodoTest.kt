@@ -232,8 +232,17 @@ class AgentManagerTodoTest {
             manager.todoManager.updateStatus(todo.id, TodoStatus.COMPLETED)
 
             coVerify(timeout = 2_000) { provider.chat(any<ChatRequestContext>()) }
-            assertEquals("user", requests.last().messages.last().role)
-            assertEquals(TODO_CHANGE_REVIEW_INSTRUCTION, requests.last().messages.last().content)
+            val completedRequest = requests.last()
+            val completedMessages = completedRequest.messages
+            val completedMessage = completedMessages.last()
+            assertEquals(
+                "user",
+                completedMessage.role,
+            )
+            assertEquals(
+                TODO_CHANGE_REVIEW_INSTRUCTION,
+                completedMessage.content,
+            )
             manager.destroy()
         }
 
@@ -251,8 +260,17 @@ class AgentManagerTodoTest {
             manager.todoManager.updateStatus(todo.id, TodoStatus.CANCELLED)
 
             coVerify(timeout = 2_000) { provider.chat(any<ChatRequestContext>()) }
-            assertEquals("user", requests.last().messages.last().role)
-            assertEquals(TODO_CHANGE_REVIEW_INSTRUCTION, requests.last().messages.last().content)
+            val cancelledRequest = requests.last()
+            val cancelledMessages = cancelledRequest.messages
+            val cancelledMessage = cancelledMessages.last()
+            assertEquals(
+                "user",
+                cancelledMessage.role,
+            )
+            assertEquals(
+                TODO_CHANGE_REVIEW_INSTRUCTION,
+                cancelledMessage.content,
+            )
             manager.destroy()
         }
 
