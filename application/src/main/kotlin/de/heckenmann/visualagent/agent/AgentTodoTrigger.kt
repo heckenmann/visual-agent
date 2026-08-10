@@ -55,13 +55,14 @@ internal class AgentTodoTrigger(
                 ),
             )
             val requestId = "todo-trigger-${todo.id}"
+            val activityRequestId = "$requestId:activity"
             toolEventBus.publish(
                 ToolCallEvent(
                     toolId = "todos",
                     functionName = "todos",
                     phase = ToolCallPhase.STARTED,
                     inputJson = "{}",
-                    context = mapOf("trigger" to "todoChange", "requestId" to requestId),
+                    context = mapOf("trigger" to "todoChange", "requestId" to activityRequestId),
                     result = ToolsToolResult(toolId = "todos", success = true, content = ""),
                     startedAtUtc = java.time.Instant.now(),
                     finishedAtUtc = java.time.Instant.now(),
@@ -71,7 +72,7 @@ internal class AgentTodoTrigger(
             val history = conversationOps.loadRecentHistoryFromDb()
             val request =
                 conversationOps.buildMainRequest(
-                    appendTodoChangeReviewInput(history),
+                    appendTodoChangeReviewInput(history, todo),
                     requestId,
                 )
             val result =
@@ -97,7 +98,7 @@ internal class AgentTodoTrigger(
                     functionName = "todos",
                     phase = ToolCallPhase.FINISHED,
                     inputJson = "{}",
-                    context = mapOf("trigger" to "todoChange", "requestId" to requestId),
+                    context = mapOf("trigger" to "todoChange", "requestId" to activityRequestId),
                     result = ToolsToolResult(toolId = "todos", success = true, content = ""),
                     startedAtUtc = java.time.Instant.now(),
                     finishedAtUtc = java.time.Instant.now(),
@@ -114,8 +115,14 @@ internal class AgentTodoTrigger(
  * The instruction is intentionally request-local: persisting it would misrepresent an
  * automated follow-up as a message authored by the user.
  */
-internal fun appendTodoChangeReviewInput(history: List<Message>): List<Message> =
-    history + Message(role = "user", content = TODO_CHANGE_REVIEW_INSTRUCTION)
-
-internal const val TODO_CHANGE_REVIEW_INSTRUCTION =
-    "Review the latest todo change described in the preceding system notification and carry out its instructions."
+internal fun appendTodoChangeReviewInput(
+    history: List<Message>,
+    todo: Todo,
+): List<Message> =
+    history +
+        Message(
+            role = "user",
+            content =
+                "Review the todo with id=${todo.id} described in the preceding system notification " +
+                    "and carry out its instructions. Do not substitute another todo.",
+        )

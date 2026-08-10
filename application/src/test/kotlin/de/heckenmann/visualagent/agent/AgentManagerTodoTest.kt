@@ -3,6 +3,7 @@ import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.knowledge.PersistenceStores
+import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoStatus
 import io.mockk.coEvery
@@ -240,7 +241,8 @@ class AgentManagerTodoTest {
                 completedMessage.role,
             )
             assertEquals(
-                TODO_CHANGE_REVIEW_INSTRUCTION,
+                "Review the todo with id=${todo.id} described in the preceding system notification " +
+                    "and carry out its instructions. Do not substitute another todo.",
                 completedMessage.content,
             )
             manager.destroy()
@@ -268,7 +270,8 @@ class AgentManagerTodoTest {
                 cancelledMessage.role,
             )
             assertEquals(
-                TODO_CHANGE_REVIEW_INSTRUCTION,
+                "Review the todo with id=${todo.id} described in the preceding system notification " +
+                    "and carry out its instructions. Do not substitute another todo.",
                 cancelledMessage.content,
             )
             manager.destroy()
@@ -277,10 +280,15 @@ class AgentManagerTodoTest {
     @Test
     fun `todo review input follows history ending in every supported role`() {
         listOf("user", "assistant", "system").forEach { finalRole ->
-            val history = appendTodoChangeReviewInput(listOf(Message(finalRole, "Existing message")))
+            val history =
+                appendTodoChangeReviewInput(
+                    listOf(Message(finalRole, "Existing message")),
+                    Todo(id = "todo-1", description = "Test todo"),
+                )
+            val reviewContent = history.last().content
 
             assertEquals("user", history.last().role)
-            assertEquals(TODO_CHANGE_REVIEW_INSTRUCTION, history.last().content)
+            assertTrue(reviewContent.contains("id=todo-1"))
         }
     }
 
