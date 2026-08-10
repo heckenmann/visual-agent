@@ -55,13 +55,14 @@ internal class AgentTodoTrigger(
                 ),
             )
             val requestId = "todo-trigger-${todo.id}"
+            val activityRequestId = "$requestId:activity"
             toolEventBus.publish(
                 ToolCallEvent(
                     toolId = "todos",
                     functionName = "todos",
                     phase = ToolCallPhase.STARTED,
                     inputJson = "{}",
-                    context = mapOf("trigger" to "todoChange", "requestId" to requestId),
+                    context = mapOf("trigger" to "todoChange", "requestId" to activityRequestId),
                     result = ToolsToolResult(toolId = "todos", success = true, content = ""),
                     startedAtUtc = java.time.Instant.now(),
                     finishedAtUtc = java.time.Instant.now(),
@@ -69,7 +70,11 @@ internal class AgentTodoTrigger(
                 ),
             )
             val history = conversationOps.loadRecentHistoryFromDb()
-            val request = conversationOps.buildMainRequest(history)
+            val request =
+                conversationOps.buildMainRequest(
+                    appendTodoChangeReviewInput(history, todo),
+                    requestId,
+                )
             val result =
                 runCatching {
                     val response = llmProvider.chat(request)
@@ -93,7 +98,7 @@ internal class AgentTodoTrigger(
                     functionName = "todos",
                     phase = ToolCallPhase.FINISHED,
                     inputJson = "{}",
-                    context = mapOf("trigger" to "todoChange", "requestId" to requestId),
+                    context = mapOf("trigger" to "todoChange", "requestId" to activityRequestId),
                     result = ToolsToolResult(toolId = "todos", success = true, content = ""),
                     startedAtUtc = java.time.Instant.now(),
                     finishedAtUtc = java.time.Instant.now(),
@@ -103,3 +108,21 @@ internal class AgentTodoTrigger(
         }
     }
 }
+
+/**
+ * Adds the explicit user turn required to initiate an autonomous todo review.
+ *
+ * The instruction is intentionally request-local: persisting it would misrepresent an
+ * automated follow-up as a message authored by the user.
+ */
+internal fun appendTodoChangeReviewInput(
+    history: List<Message>,
+    todo: Todo,
+): List<Message> =
+    history +
+        Message(
+            role = "user",
+            content =
+                "Review the todo with id=${todo.id} described in the preceding system notification " +
+                    "and carry out its instructions. Do not substitute another todo.",
+        )

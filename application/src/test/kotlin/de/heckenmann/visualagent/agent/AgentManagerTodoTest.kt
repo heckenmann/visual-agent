@@ -3,9 +3,11 @@ import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.knowledge.PersistenceStores
+import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoStatus
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -216,6 +218,79 @@ class AgentManagerTodoTest {
                 "Expected a system message after todo cancellation, got: ${history.map { it.role to it.content.take(60) }}",
             )
         }
+
+    @Test
+    fun `completed todo review request ends with an explicit user instruction`(): Unit =
+        runBlocking {
+            val (manager, provider, _) = createManagerWithInstantResponse()
+            val requests = mutableListOf<ChatRequestContext>()
+            coEvery { provider.chat(any<ChatRequestContext>()) } coAnswers {
+                requests += firstArg<ChatRequestContext>()
+                ChatResponse(model = "test", message = Message("assistant", "Reviewed"), done = true)
+            }
+            val todo = manager.todoManager.add("Completed review", "1")
+
+            manager.todoManager.updateStatus(todo.id, TodoStatus.COMPLETED)
+
+            coVerify(timeout = 2_000) { provider.chat(any<ChatRequestContext>()) }
+            val completedRequest = requests.last()
+            val completedMessages = completedRequest.messages
+            val completedMessage = completedMessages.last()
+            assertEquals(
+                "user",
+                completedMessage.role,
+            )
+            assertEquals(
+                "Review the todo with id=${todo.id} described in the preceding system notification " +
+                    "and carry out its instructions. Do not substitute another todo.",
+                completedMessage.content,
+            )
+            manager.destroy()
+        }
+
+    @Test
+    fun `cancelled todo review request ends with an explicit user instruction`(): Unit =
+        runBlocking {
+            val (manager, provider, _) = createManagerWithInstantResponse()
+            val requests = mutableListOf<ChatRequestContext>()
+            coEvery { provider.chat(any<ChatRequestContext>()) } coAnswers {
+                requests += firstArg<ChatRequestContext>()
+                ChatResponse(model = "test", message = Message("assistant", "Reviewed"), done = true)
+            }
+            val todo = manager.todoManager.add("Cancelled review", "1")
+
+            manager.todoManager.updateStatus(todo.id, TodoStatus.CANCELLED)
+
+            coVerify(timeout = 2_000) { provider.chat(any<ChatRequestContext>()) }
+            val cancelledRequest = requests.last()
+            val cancelledMessages = cancelledRequest.messages
+            val cancelledMessage = cancelledMessages.last()
+            assertEquals(
+                "user",
+                cancelledMessage.role,
+            )
+            assertEquals(
+                "Review the todo with id=${todo.id} described in the preceding system notification " +
+                    "and carry out its instructions. Do not substitute another todo.",
+                cancelledMessage.content,
+            )
+            manager.destroy()
+        }
+
+    @Test
+    fun `todo review input follows history ending in every supported role`() {
+        listOf("user", "assistant", "system").forEach { finalRole ->
+            val history =
+                appendTodoChangeReviewInput(
+                    listOf(Message(finalRole, "Existing message")),
+                    Todo(id = "todo-1", description = "Test todo"),
+                )
+            val reviewContent = history.last().content
+
+            assertEquals("user", history.last().role)
+            assertTrue(reviewContent.contains("id=todo-1"))
+        }
+    }
 
     @Test
     fun `non-terminal status change does not persist completion message`(): Unit =
