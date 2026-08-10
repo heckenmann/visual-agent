@@ -69,7 +69,11 @@ internal class AgentTodoTrigger(
                 ),
             )
             val history = conversationOps.loadRecentHistoryFromDb()
-            val request = conversationOps.buildMainRequest(history)
+            val request =
+                conversationOps.buildMainRequest(
+                    appendTodoChangeReviewInput(history),
+                    requestId,
+                )
             val result =
                 runCatching {
                     val response = llmProvider.chat(request)
@@ -103,3 +107,15 @@ internal class AgentTodoTrigger(
         }
     }
 }
+
+/**
+ * Adds the explicit user turn required to initiate an autonomous todo review.
+ *
+ * The instruction is intentionally request-local: persisting it would misrepresent an
+ * automated follow-up as a message authored by the user.
+ */
+internal fun appendTodoChangeReviewInput(history: List<Message>): List<Message> =
+    history + Message(role = "user", content = TODO_CHANGE_REVIEW_INSTRUCTION)
+
+internal const val TODO_CHANGE_REVIEW_INSTRUCTION =
+    "Review the latest todo change described in the preceding system notification and carry out its instructions."

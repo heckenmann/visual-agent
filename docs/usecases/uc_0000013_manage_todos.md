@@ -24,6 +24,7 @@ Desktop user.
 7. The todo manager records the change.
 8. The todo store persists the authoritative state ordered by `position`.
 9. Agent prompts and tools read current todo summaries from persistence.
+10. When an autonomous todo reaches `COMPLETED` or `CANCELLED`, the main agent receives a request-local user instruction to review the persisted status notification.
 
 ## Result
 
@@ -51,3 +52,4 @@ Todos stay synchronized between UI, database, and agent context.
 - The first pending todo is visually highlighted as the next task.
 - Status is edited through a bounded dropdown choice, not free text.
 - The `todos` tool supports a `reorder` action to change which task is next.
+- Autonomous terminal-status reviews always end with an explicit user instruction accepted by every configured provider.

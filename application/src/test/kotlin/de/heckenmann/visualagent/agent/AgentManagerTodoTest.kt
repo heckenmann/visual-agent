@@ -6,6 +6,7 @@ import de.heckenmann.visualagent.knowledge.PersistenceStores
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoStatus
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -216,6 +217,54 @@ class AgentManagerTodoTest {
                 "Expected a system message after todo cancellation, got: ${history.map { it.role to it.content.take(60) }}",
             )
         }
+
+    @Test
+    fun `completed todo review request ends with an explicit user instruction`(): Unit =
+        runBlocking {
+            val (manager, provider, _) = createManagerWithInstantResponse()
+            val requests = mutableListOf<ChatRequestContext>()
+            coEvery { provider.chat(any<ChatRequestContext>()) } coAnswers {
+                requests += firstArg<ChatRequestContext>()
+                ChatResponse(model = "test", message = Message("assistant", "Reviewed"), done = true)
+            }
+            val todo = manager.todoManager.add("Completed review", "1")
+
+            manager.todoManager.updateStatus(todo.id, TodoStatus.COMPLETED)
+
+            coVerify(timeout = 2_000) { provider.chat(any<ChatRequestContext>()) }
+            assertEquals("user", requests.last().messages.last().role)
+            assertEquals(TODO_CHANGE_REVIEW_INSTRUCTION, requests.last().messages.last().content)
+            manager.destroy()
+        }
+
+    @Test
+    fun `cancelled todo review request ends with an explicit user instruction`(): Unit =
+        runBlocking {
+            val (manager, provider, _) = createManagerWithInstantResponse()
+            val requests = mutableListOf<ChatRequestContext>()
+            coEvery { provider.chat(any<ChatRequestContext>()) } coAnswers {
+                requests += firstArg<ChatRequestContext>()
+                ChatResponse(model = "test", message = Message("assistant", "Reviewed"), done = true)
+            }
+            val todo = manager.todoManager.add("Cancelled review", "1")
+
+            manager.todoManager.updateStatus(todo.id, TodoStatus.CANCELLED)
+
+            coVerify(timeout = 2_000) { provider.chat(any<ChatRequestContext>()) }
+            assertEquals("user", requests.last().messages.last().role)
+            assertEquals(TODO_CHANGE_REVIEW_INSTRUCTION, requests.last().messages.last().content)
+            manager.destroy()
+        }
+
+    @Test
+    fun `todo review input follows history ending in every supported role`() {
+        listOf("user", "assistant", "system").forEach { finalRole ->
+            val history = appendTodoChangeReviewInput(listOf(Message(finalRole, "Existing message")))
+
+            assertEquals("user", history.last().role)
+            assertEquals(TODO_CHANGE_REVIEW_INSTRUCTION, history.last().content)
+        }
+    }
 
     @Test
     fun `non-terminal status change does not persist completion message`(): Unit =
