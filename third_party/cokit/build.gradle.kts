@@ -1,7 +1,6 @@
 import com.vanniktech.maven.publish.MavenPublishBaseExtension
 import org.gradle.api.artifacts.ProjectDependency
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
-import org.jetbrains.kotlin.gradle.dsl.abi.AbiValidationMultiplatformExtension
 import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
 import org.gradle.api.publish.PublishingExtension
 import org.gradle.api.publish.maven.MavenPublication
@@ -76,11 +75,9 @@ configure(publishedArtifactProjects.get()) {
 configure(publishedLibraryProjects.get()) {
     pluginManager.withPlugin("org.jetbrains.kotlin.multiplatform") {
         extensions.configure<KotlinMultiplatformExtension>("kotlin") {
-            extensions.configure<AbiValidationMultiplatformExtension>("abiValidation") {
-                @OptIn(ExperimentalAbiValidation::class)
-                enabled.set(true)
-                @OptIn(ExperimentalAbiValidation::class)
-                legacyDump.referenceDumpDir.set(layout.projectDirectory.dir("abi"))
+            @OptIn(ExperimentalAbiValidation::class)
+            abiValidation {
+                referenceDumpDir.set(layout.projectDirectory.dir("abi"))
             }
         }
     }
