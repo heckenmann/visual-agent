@@ -1,9 +1,9 @@
 [versions]
-kotlin = "2.3.21"
-coroutines = "1.10.2"
+kotlin = "2.4.10"
+coroutines = "1.11.0"
 serialization = "1.11.0"
 ktor = "3.5.2"
-kover = "0.9.8"
+kover = "0.9.9"
 clikt = "5.1.0"
 mavenPublish = "0.37.0"
 
