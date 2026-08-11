@@ -39,6 +39,8 @@ jobs:
                 ;;
             esac
           done
+          echo "changed_files=$changed_files"
+          echo "dependency_only=$all_allowed"
           echo "dependency_only=$all_allowed" >> "$GITHUB_OUTPUT"
 
       - name: Check for no-auto-merge label

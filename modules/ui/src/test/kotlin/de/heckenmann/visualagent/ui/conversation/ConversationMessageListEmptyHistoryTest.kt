@@ -144,10 +144,11 @@ class ConversationMessageListEmptyHistoryTest {
                 }
             }
             composeTestRule.waitUntil(1_000) {
-                composeTestRule
-                    .onAllNodesWithText("Streaming response...")
-                    .fetchSemanticsNodes()
-                    .isNotEmpty()
+                composeTestRule.onAllNodesWithText("Hello!").fetchSemanticsNodes().isNotEmpty() &&
+                    composeTestRule
+                        .onAllNodesWithText("Streaming response...")
+                        .fetchSemanticsNodes()
+                        .isNotEmpty()
             }
 
             composeTestRule.onNodeWithText("Hello!").assertExists()
