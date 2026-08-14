@@ -62,6 +62,7 @@ Always run, in this order:
 
 ## Development Workflow
 
+- Prefer database-level guarantees for consistency, ordering, locking, and persistence races whenever the database can solve the problem. Do not add a UI or Spring-server workaround for a problem that is already solvable at the database layer.
 - Before starting work on a problem, check whether a GitHub issue and a documented use case exist for it. Link both in the PR description and commit messages where applicable.
 - Before implementing any new function, research [klibs.io](https://klibs.io) and GitHub to determine whether a maintained library already implements the required capability. Evaluate protocol coverage, license, release maturity, compatibility with this project, and security implications before deciding to add a dependency or write a custom implementation. Record the decision in the relevant issue or use case when it materially affects the design.
 - All changes must be developed on a topic branch (`codex/issue-<number>-short-description` or similar) and merged into `master` through a pull request. Never commit directly to `master`.
