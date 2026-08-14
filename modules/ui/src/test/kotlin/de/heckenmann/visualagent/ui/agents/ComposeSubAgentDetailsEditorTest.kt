@@ -4,7 +4,9 @@ package de.heckenmann.visualagent.ui.agents
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
@@ -28,7 +30,9 @@ import io.mockk.every
 import io.mockk.mockk
 import org.junit.Rule
 import org.junit.Test
+import kotlin.test.assertTrue
 
+@org.junit.experimental.categories.Category(de.heckenmann.visualagent.testsupport.DatabaseTestCategory::class)
 class ComposeSubAgentDetailsEditorTest {
     @get:Rule
     val composeTestRule = createComposeRule()
@@ -66,7 +70,7 @@ class ComposeSubAgentDetailsEditorTest {
     }
 
     @Test
-    fun `sub agents panel renders creation controls and empty state`() {
+    fun `sub agents panel exposes creation dialog trigger and empty state`() {
         val db = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
         val provider = mockk<de.heckenmann.visualagent.agent.LLMProvider>(relaxed = true)
         val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
@@ -76,6 +80,7 @@ class ComposeSubAgentDetailsEditorTest {
         val catalog = mockk<ProviderCatalogService>()
         every { catalog.enabledProviders() } returns emptyList()
 
+        var requestedModal: de.heckenmann.visualagent.ui.modal.ComposeModal? = null
         composeTestRule.setContent {
             MaterialTheme {
                 SubAgentsPanel(
@@ -83,13 +88,34 @@ class ComposeSubAgentDetailsEditorTest {
                     agentToolConfigService = toolConfigService,
                     toolRegistry = toolRegistry,
                     providerCatalogService = catalog,
-                    modalRequester = ComposeModalRequester { },
-                    inFlight = InFlightStateHolder(),
+                    modalRequester = ComposeModalRequester { requestedModal = it },
                     toolEventBus = ToolEventBus(),
                 )
             }
         }
 
-        composeTestRule.onNodeWithText("Task for selected sub-agent").assertExists()
+        composeTestRule.onNodeWithContentDescription("Create sub-agent").assertExists()
+        composeTestRule.onNodeWithText("Name").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Role").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Task for selected sub-agent").assertDoesNotExist()
+        composeTestRule.onNodeWithContentDescription("Create sub-agent").performClick()
+        assertTrue(requestedModal is de.heckenmann.visualagent.ui.modal.ComposeContentModal)
+    }
+
+    @Test
+    fun `sub agent creation form renders fields inside dialog content`() {
+        val db = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+        val provider = mockk<de.heckenmann.visualagent.agent.LLMProvider>(relaxed = true)
+        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
+
+        composeTestRule.setContent {
+            MaterialTheme {
+                SubAgentCreationForm(agentManager = manager, onCreated = {}, onCancel = {})
+            }
+        }
+
+        composeTestRule.onNodeWithText("Name").assertExists()
+        composeTestRule.onNodeWithText("Role").assertExists()
+        composeTestRule.onNodeWithText("Template").assertExists()
     }
 }

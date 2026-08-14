@@ -7,6 +7,7 @@ import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ParallelismProvider
 import de.heckenmann.visualagent.agent.SubAgent
+import de.heckenmann.visualagent.agent.SubAgentExecutionControl
 import de.heckenmann.visualagent.agent.SubAgentJobScheduler
 import de.heckenmann.visualagent.agent.SubAgentOpsProvider
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
@@ -43,6 +44,7 @@ class AutonomousCoordinator
         private val todoEventBus: TodoEventBus,
         private val conversationOps: ConversationOpsProvider,
         private val subAgentOps: SubAgentOpsProvider,
+        private val executionControl: SubAgentExecutionControl? = null,
     ) {
         private val logger = KotlinLogging.logger {}
         private val subAgents: Map<String, SubAgent>
@@ -204,12 +206,14 @@ class AutonomousCoordinator
         private fun getTodosFromDb(): List<Todo> = todoStore.listTodos()
 
         private suspend fun pickAndProcessOneTodo() {
+            if (executionControl?.isGloballyPaused() == true) return
             val busyCount = subAgents.values.count { it.status == AgentStatus.BUSY }
             val parallelLimit = parallelismProvider.get().coerceAtLeast(1)
             if (busyCount >= parallelLimit) return
 
             val todo = findNextAssignableTodo() ?: return
             val agent = subAgents[todo.assignedAgentId] ?: return
+            if (executionControl?.isAgentPaused(agent.id) == true) return
             if (agent.status == AgentStatus.BUSY) {
                 if (recoverStuckAgentIfNeeded(agent)) {
                     todoManager.updateStatus(todo.id, TodoStatus.PENDING)
@@ -233,7 +237,7 @@ class AutonomousCoordinator
             subAgentOps.notifyAgent(agent.id, "STATUS:${agent.status.name}")
 
             scope.launch {
-                jobScheduler.run {
+                jobScheduler.run(agent.id) {
                     processTodoWithLLM(
                         agent = agent,
                         todoId = todo.id,
@@ -251,12 +255,16 @@ class AutonomousCoordinator
                         todoEventBus = todoEventBus,
                         scope = scope,
                         jobScheduler = jobScheduler,
+                        executionControl = executionControl,
                     )
                 }
             }
         }
 
         private fun recoverStuckAgentIfNeeded(agent: SubAgent): Boolean {
+            if (executionControl?.isAgentPaused(agent.id) == true || executionControl?.isGloballyPaused() == true) {
+                return false
+            }
             val busySince = agentBusySince[agent.id] ?: return false
             val timeoutMs = agent.config.timeout.coerceAtLeast(1) * 1000L
             if (System.currentTimeMillis() - busySince < timeoutMs) return false
@@ -280,7 +288,15 @@ class AutonomousCoordinator
             return true
         }
 
-        private fun findNextAssignableTodo(): Todo? = findNextAssignableTodo(getTodosFromDb(), subAgents, todoManager)
+        private fun findNextAssignableTodo(): Todo? =
+            findNextAssignableTodo(
+                getTodosFromDb(),
+                subAgents,
+                todoManager,
+                isAgentEligible = { agentId ->
+                    executionControl?.isExecutionAllowed(agentId) ?: true
+                },
+            )
 
         private companion object {
             const val LOOP_DELAY_MILLIS = 1500L

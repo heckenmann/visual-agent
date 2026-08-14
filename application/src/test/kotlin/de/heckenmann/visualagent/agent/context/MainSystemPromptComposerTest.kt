@@ -80,12 +80,12 @@ class MainSystemPromptComposerTest {
     }
 
     @Test
-    fun `prompt explains auto-pickup of todos`() {
+    fun `prompt explains explicit todo execution control`() {
         val prompt = MainSystemPromptComposer.compose(emptyTodos, null, toolConfigService)
         assertTrue("automatically set to PENDING" in prompt)
-        assertTrue("autonomous coordinator" in prompt)
-        assertTrue("automatically pick up" in prompt)
-        assertTrue("do NOT need to manually start" in prompt)
+        assertTrue("execution is stopped" in prompt)
+        assertTrue("start-all" in prompt)
+        assertTrue("explicitly asks" in prompt)
     }
 
     @Test

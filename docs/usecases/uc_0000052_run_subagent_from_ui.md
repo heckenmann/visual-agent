@@ -2,7 +2,11 @@
 
 ## Goal
 
-Let the user manually start a sub-agent job from the sub-agent card.
+Keep direct task entry out of the sub-agents panel; targeted work is started through persisted todos.
+
+## Status
+
+The former direct-run workflow is retired. The panel no longer exposes a task input or a direct run action.
 
 ## Primary Actor
 
@@ -10,34 +14,33 @@ Desktop user.
 
 ## Preconditions
 
-- At least one sub-agent exists.
-- The sub-agent panel is visible.
+- A todo can be assigned to a sub-agent.
+- Todo execution controls are available.
 
 ## Main Flow
 
-1. The user enters task text in the sub-agent panel task field.
-2. The user clicks the run action on a sub-agent card.
-3. The panel sends the task text and selected agent ID to the agent manager.
-4. The agent manager schedules execution for the selected sub-agent.
-5. Status and active job count update in the UI.
+1. The user or main agent creates a todo and assigns it to a sub-agent.
+2. The user or main agent starts the todo explicitly.
+3. The autonomous coordinator schedules the assigned sub-agent.
+4. Status and active job count update in the UI.
 
 ## Result
 
-The user can run targeted work on a specific sub-agent without waiting for autonomous todo assignment.
+Targeted sub-agent work follows the same persisted todo workflow as autonomous execution.
 
 ## Tool Calls
 
-- None.
+- `todos`: create, assign, and explicitly start the todo.
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.compose.SubAgentsPanel`
-- `de.heckenmann.visualagent.ui.compose.ActionIconButton`
-- `de.heckenmann.visualagent.agent.AgentManager.runAgentJob`
+- `de.heckenmann.visualagent.ui.application.SubAgentsPanel`
+- `de.heckenmann.visualagent.ui.todo.TodoPanel`
+- `de.heckenmann.visualagent.orchestration.AutonomousCoordinator`
 
 ## Acceptance Criteria
 
-- The selected agent receives the requested work.
-- The run action is disabled until task text is available.
+- The panel contains no direct task input or run action.
+- Assigned work starts only through an explicit todo start action.
 - Runtime status changes are reflected in the card.
 - Failures are surfaced to the conversation or UI.

@@ -48,6 +48,12 @@ interface AgentToolPort {
 
     /** Creates a configuration from a template. */
     fun template(templateName: String): ToolAgentConfig
+
+    /** Returns or changes the global/per-agent execution gates. */
+    fun control(
+        action: String,
+        agentId: String?,
+    ): ToolAgentExecutionStatus
 }
 
 /** Tool-owned sub-agent projection. */
@@ -81,6 +87,16 @@ data class ToolAgentConfig(
 data class ToolAgentQueue(
     val active: Int,
     val queued: Int,
+)
+
+/** Tool-facing projection of the shared sub-agent execution gates. */
+data class ToolAgentExecutionStatus(
+    val agentId: String?,
+    val globalState: String,
+    val agentState: String?,
+    val effectiveState: String,
+    val pauseReason: String,
+    val pausedAgentIds: List<String>,
 )
 
 /** One persisted sub-agent work-log entry. */

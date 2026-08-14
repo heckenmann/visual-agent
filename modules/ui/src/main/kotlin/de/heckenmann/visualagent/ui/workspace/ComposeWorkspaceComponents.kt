@@ -295,7 +295,6 @@ internal fun WindowBody(
                 toolRegistry = panelServices.toolRegistry,
                 providerCatalogService = panelServices.providerCatalogService,
                 modalRequester = panelServices.modalRequester,
-                inFlight = panelServices.inFlight,
                 toolEventBus = panelServices.toolEventBus,
             )
         "settings" ->

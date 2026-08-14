@@ -3,8 +3,10 @@ package de.heckenmann.visualagent.agent
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
@@ -89,4 +91,45 @@ class SubAgentJobSchedulerTest {
             first.await()
             assertEquals("queued-result", completion.await().getOrThrow())
         }
+
+    @Test
+    fun `paused jobs remain queued until their gate resumes`() =
+        runBlocking {
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+            val provider =
+                object : ParallelismProvider() {
+                    override fun get(): Int = 1
+                }
+            val control = SubAgentExecutionControl(TestPreferenceStore())
+            control.pauseAll()
+            val scheduler = SubAgentJobScheduler(scope, provider, control)
+            val started = CompletableDeferred<Unit>()
+            val job =
+                async {
+                    scheduler.run("agent-1") {
+                        started.complete(Unit)
+                    }
+                }
+
+            delay(150)
+            assertFalse(started.isCompleted)
+            assertEquals(SubAgentJobQueueSnapshot(active = 0, queued = 1), scheduler.snapshot())
+            job.cancelAndJoin()
+            assertEquals(SubAgentJobQueueSnapshot(active = 0, queued = 0), scheduler.snapshot())
+            control.resumeAll()
+            scope.coroutineContext[Job]?.cancel()
+        }
+
+    private class TestPreferenceStore : de.heckenmann.visualagent.knowledge.PreferenceStore {
+        private val values = mutableMapOf<String, String>()
+
+        override fun getPreference(key: String): String? = values[key]
+
+        override fun setPreference(
+            key: String,
+            value: String,
+        ) {
+            values[key] = value
+        }
+    }
 }

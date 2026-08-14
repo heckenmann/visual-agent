@@ -13,28 +13,34 @@ import de.heckenmann.visualagent.todo.TodoStatus
  * @param todos Current todo list
  * @param subAgents Available sub-agents keyed by id
  * @param todoManager Manager used to persist an auto-assignment
+ * @param isAgentEligible Gate checked before an assigned or auto-selected agent is used
  * @return The next todo ready for execution, or null if none is available
  */
 internal fun findNextAssignableTodo(
     todos: List<Todo>,
     subAgents: Map<String, SubAgent>,
     todoManager: TodoManager,
+    isAgentEligible: (String) -> Boolean = { true },
 ): Todo? =
     todos
         .filter { it.status == TodoStatus.PENDING }
         .sortedWith(compareBy({ it.position }, { it.id }))
-        .firstNotNullOfOrNull { assignAndReturnIfReady(it, subAgents, todoManager) }
+        .firstNotNullOfOrNull { assignAndReturnIfReady(it, subAgents, todoManager, isAgentEligible) }
 
 private fun assignAndReturnIfReady(
     todo: Todo,
     subAgents: Map<String, SubAgent>,
     todoManager: TodoManager,
+    isAgentEligible: (String) -> Boolean,
 ): Todo? =
     when {
         !todo.assignedAgentId.isNullOrBlank() ->
-            todo.takeIf { subAgents[todo.assignedAgentId]?.status == AgentStatus.IDLE }
+            todo.takeIf {
+                val agentId = todo.assignedAgentId ?: return@takeIf false
+                isAgentEligible(agentId) && subAgents[agentId]?.status == AgentStatus.IDLE
+            }
         else ->
-            subAgents.values.firstOrNull { it.status == AgentStatus.IDLE }?.let { idle ->
+            subAgents.values.firstOrNull { it.status == AgentStatus.IDLE && isAgentEligible(it.id) }?.let { idle ->
                 todoManager.updateAssignedAgent(todo.id, idle.id)
                 todo.copy(assignedAgentId = idle.id)
             }
