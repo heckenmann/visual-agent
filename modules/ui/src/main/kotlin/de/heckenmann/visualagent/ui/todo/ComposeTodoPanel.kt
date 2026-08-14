@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,7 +46,9 @@ import de.heckenmann.visualagent.ui.settings.*
 import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import sh.calvin.reorderable.ReorderableColumn
 
 /**
@@ -66,15 +69,23 @@ internal fun TodoPanel(
     todoEventBus: TodoEventBus,
     toolEventBus: ToolEventBus,
 ) {
-    var todos by remember { mutableStateOf(agentManager.getTodosFromDb()) }
+    var todos by remember { mutableStateOf<List<Todo>>(emptyList()) }
     var streamedResponses by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     val scope = rememberCoroutineScope()
-    val refresh = { todos = agentManager.getTodosFromDb() }
+
+    /** Loads persisted todos without blocking the Compose dispatcher. */
+    suspend fun refreshTodos() {
+        todos = withContext(Dispatchers.IO) { agentManager.getTodosFromDb() }
+    }
+    val refresh: () -> Unit = {
+        scope.launch { refreshTodos() }
+    }
+    LaunchedEffect(agentManager) { refreshTodos() }
     DisposableEffect(todoEventBus) {
         val todoHandle =
             todoEventBus.addListener { change ->
                 scope.launch {
-                    refresh()
+                    refreshTodos()
                     val todo = change.todo
                     if (todo != null && todo.status != TodoStatus.IN_PROGRESS) {
                         streamedResponses = streamedResponses - todo.id
