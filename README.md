@@ -1,7 +1,7 @@
 # Visual Agent
 
 <p align="center">
-  <img src="application/src/main/resources/icons/visual-agent.svg" alt="Visual Agent icon" width="160">
+  <img src="modules/ui/src/main/resources/icons/visual-agent.svg" alt="Visual Agent icon" width="160">
 </p>
 
 Visual Agent is a Kotlin desktop application. Its goal is to provide the model with as many tools as possible so it can visualize its own output — today that includes a canvas, workspace files, and a todo/sub-agent system; future work will add more rendering and interaction surfaces.
