@@ -40,7 +40,9 @@ gradle.projectsEvaluated {
         }
     tasks.named<Test>("test") {
         dependsOn(":application:testClasses", ":ui:testClasses", ":providers:testClasses")
-        useJUnitPlatform()
+        useJUnitPlatform {
+            excludeTags("database")
+        }
         mustRunAfter(":application:databaseTest", ":ui:databaseTest")
         workingDir = rootProject.projectDir
         systemProperty("visualagent.ollama.smoke", System.getProperty("visualagent.ollama.smoke", "false"))
@@ -55,6 +57,11 @@ gradle.projectsEvaluated {
     }
     tasks.jacocoTestReport {
         dependsOn(tasks.test, ":application:databaseTest", ":ui:databaseTest")
+        executionData(
+            layout.buildDirectory.file("jacoco/test.exec"),
+            project(":application").layout.buildDirectory.file("jacoco/databaseTest.exec"),
+            project(":ui").layout.buildDirectory.file("jacoco/databaseTest.exec"),
+        )
         classDirectories.setFrom(files(moduleMainSourceSets.map { it.output.classesDirs }))
         reports {
             xml.required.set(true)
@@ -63,6 +70,11 @@ gradle.projectsEvaluated {
     }
     tasks.jacocoTestCoverageVerification {
         dependsOn(tasks.test, ":application:databaseTest", ":ui:databaseTest")
+        executionData(
+            layout.buildDirectory.file("jacoco/test.exec"),
+            project(":application").layout.buildDirectory.file("jacoco/databaseTest.exec"),
+            project(":ui").layout.buildDirectory.file("jacoco/databaseTest.exec"),
+        )
         classDirectories.setFrom(files(moduleMainSourceSets.map { it.output.classesDirs }))
         violationRules {
             rule {
