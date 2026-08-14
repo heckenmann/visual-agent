@@ -61,31 +61,35 @@ internal suspend fun processTodoWithLLM(
             try {
                 executionControl?.awaitExecutionAllowed(agent.id)
                 val result =
-                    agent.performTodo(
-                        todoId,
-                        taskDescription,
-                        llmProvider,
-                        memoryStore,
-                        agentToolConfigService.toolsFor(agent),
-                        token,
-                        onChunk = { delta ->
-                            todoEventBus.publishProgress(
-                                TodoProgressUpdate(
-                                    todoId = todoId,
-                                    delta = delta,
-                                ),
-                            )
-                        },
-                    )
+                    jobScheduler.run(agent.id) {
+                        agent.performTodo(
+                            todoId,
+                            taskDescription,
+                            llmProvider,
+                            memoryStore,
+                            agentToolConfigService.toolsFor(agent),
+                            token,
+                            onChunk = { delta ->
+                                todoEventBus.publishProgress(
+                                    TodoProgressUpdate(
+                                        todoId = todoId,
+                                        delta = delta,
+                                    ),
+                                )
+                            },
+                        )
+                    }
                 executionControl?.awaitExecutionAllowed(agent.id)
-                if (
-                    taskPlanner.reviewWorkerResult(
-                        todoId,
-                        taskDescription,
-                        result,
-                        conversationOps.buildMainSystemContextPrompt(),
-                    )
-                ) {
+                val approved =
+                    jobScheduler.run(agent.id) {
+                        taskPlanner.reviewWorkerResult(
+                            todoId,
+                            taskDescription,
+                            result,
+                            conversationOps.buildMainSystemContextPrompt(),
+                        )
+                    }
+                if (approved) {
                     persistSubAgentMessage(
                         agent = agent,
                         content =
@@ -159,27 +163,25 @@ internal suspend fun processTodoWithLLM(
                 notifyAgent = subAgentOps::notifyAgent,
                 onDescriptionChanged = { changedAgent, todo ->
                     scope.launch {
-                        jobScheduler.run(changedAgent.id) {
-                            processTodoWithLLM(
-                                changedAgent,
-                                todo.id,
-                                taskPlanner.buildWorkerInstruction(todo),
-                                llmProvider,
-                                memoryStore,
-                                agentToolConfigService,
-                                taskPlanner,
-                                conversationOps,
-                                todoManager,
-                                subAgentOps,
-                                activeCancellationTokens,
-                                agentBusySince,
-                                pendingTodoChanges,
-                                todoEventBus,
-                                scope,
-                                jobScheduler,
-                                executionControl,
-                            )
-                        }
+                        processTodoWithLLM(
+                            changedAgent,
+                            todo.id,
+                            taskPlanner.buildWorkerInstruction(todo),
+                            llmProvider,
+                            memoryStore,
+                            agentToolConfigService,
+                            taskPlanner,
+                            conversationOps,
+                            todoManager,
+                            subAgentOps,
+                            activeCancellationTokens,
+                            agentBusySince,
+                            pendingTodoChanges,
+                            todoEventBus,
+                            scope,
+                            jobScheduler,
+                            executionControl,
+                        )
                     }
                 },
             )

@@ -229,7 +229,10 @@ class AutonomousCoordinator
 
         private suspend fun pickAndProcessOneTodo(requestedTodoId: String? = null) {
             if (executionControl?.isGloballyPaused() == true) return
-            val busyCount = subAgents.values.count { it.status == AgentStatus.BUSY }
+            val busyCount =
+                subAgents.values.count {
+                    it.status == AgentStatus.BUSY && executionControl?.isExecutionAllowed(it.id) != false
+                }
             val parallelLimit = parallelismProvider.get().coerceAtLeast(1)
             if (busyCount >= parallelLimit) return
 
@@ -259,27 +262,25 @@ class AutonomousCoordinator
             subAgentOps.notifyAgent(agent.id, "STATUS:${agent.status.name}")
 
             scope.launch {
-                jobScheduler.run(agent.id) {
-                    processTodoWithLLM(
-                        agent = agent,
-                        todoId = todo.id,
-                        taskDescription = taskPlanner.buildWorkerInstruction(todo),
-                        llmProvider = llmProvider,
-                        memoryStore = memoryStore,
-                        agentToolConfigService = agentToolConfigService,
-                        taskPlanner = taskPlanner,
-                        conversationOps = conversationOps,
-                        todoManager = todoManager,
-                        subAgentOps = subAgentOps,
-                        activeCancellationTokens = activeCancellationTokens,
-                        agentBusySince = agentBusySince,
-                        pendingTodoChanges = pendingTodoChanges,
-                        todoEventBus = todoEventBus,
-                        scope = scope,
-                        jobScheduler = jobScheduler,
-                        executionControl = executionControl,
-                    )
-                }
+                processTodoWithLLM(
+                    agent = agent,
+                    todoId = todo.id,
+                    taskDescription = taskPlanner.buildWorkerInstruction(todo),
+                    llmProvider = llmProvider,
+                    memoryStore = memoryStore,
+                    agentToolConfigService = agentToolConfigService,
+                    taskPlanner = taskPlanner,
+                    conversationOps = conversationOps,
+                    todoManager = todoManager,
+                    subAgentOps = subAgentOps,
+                    activeCancellationTokens = activeCancellationTokens,
+                    agentBusySince = agentBusySince,
+                    pendingTodoChanges = pendingTodoChanges,
+                    todoEventBus = todoEventBus,
+                    scope = scope,
+                    jobScheduler = jobScheduler,
+                    executionControl = executionControl,
+                )
             }
         }
 

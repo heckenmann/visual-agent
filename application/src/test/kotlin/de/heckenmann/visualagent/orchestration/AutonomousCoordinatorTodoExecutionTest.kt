@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.todo.TodoStatus
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -84,6 +85,29 @@ class AutonomousCoordinatorTodoExecutionTest {
 
                 assertEquals(TodoStatus.PENDING, fixture.todoManager.getById(todo.id)?.status)
                 assertFalse(fixture.subAgents.values.any { it.name.contains("analyst", ignoreCase = true) })
+            } finally {
+                fixture.cancel()
+            }
+        }
+
+    @Test
+    fun `paused worker does not hold the scheduler slot at the next execution boundary`() =
+        runBlocking {
+            val fixture = buildFixture(parallelism = 1, chatDelayMs = 5000)
+            fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
+            fixture.putSubAgent(SubAgent(id = "agent-2", name = "Tester", role = "Testing", status = AgentStatus.IDLE))
+            fixture.todoManager.add("First task", "agent-1")
+            fixture.todoManager.add("Second task", "agent-2")
+
+            try {
+                fixture.coordinator.startAllTodos()
+                delay(500)
+                fixture.executionControl.pauseAgent("agent-1")
+
+                withTimeout(8_000) {
+                    while (fixture.subAgents["agent-2"]?.status != AgentStatus.BUSY) delay(100)
+                }
+                assertEquals(AgentStatus.BUSY, fixture.subAgents["agent-1"]?.status)
             } finally {
                 fixture.cancel()
             }
