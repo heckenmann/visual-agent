@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.agent.CancellationToken
 import de.heckenmann.visualagent.agent.ConversationOpsProvider
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.SubAgent
+import de.heckenmann.visualagent.agent.SubAgentExecutionControl
 import de.heckenmann.visualagent.agent.SubAgentJobScheduler
 import de.heckenmann.visualagent.agent.SubAgentOpsProvider
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
@@ -13,8 +14,10 @@ import de.heckenmann.visualagent.knowledge.MemoryStore
 import de.heckenmann.visualagent.todo.TodoChange
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoManager
+import de.heckenmann.visualagent.todo.TodoProgressUpdate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import mu.KotlinLogging
 import java.util.concurrent.ConcurrentHashMap
@@ -42,6 +45,7 @@ internal suspend fun processTodoWithLLM(
     todoEventBus: TodoEventBus,
     scope: CoroutineScope,
     jobScheduler: SubAgentJobScheduler,
+    executionControl: SubAgentExecutionControl? = null,
 ) {
     val logger = KotlinLogging.logger {}
     val token = CancellationToken()
@@ -51,9 +55,11 @@ internal suspend fun processTodoWithLLM(
     val maxRetries = agent.config.maxRetries.coerceAtLeast(1)
     var cancelledByChange = false
     try {
+        executionControl?.awaitExecutionAllowed(agent.id)
         delay(300)
         while (attempt < maxRetries) {
             try {
+                executionControl?.awaitExecutionAllowed(agent.id)
                 val result =
                     agent.performTodo(
                         todoId,
@@ -62,7 +68,16 @@ internal suspend fun processTodoWithLLM(
                         memoryStore,
                         agentToolConfigService.toolsFor(agent),
                         token,
+                        onChunk = { delta ->
+                            todoEventBus.publishProgress(
+                                TodoProgressUpdate(
+                                    todoId = todoId,
+                                    delta = delta,
+                                ),
+                            )
+                        },
                     )
+                executionControl?.awaitExecutionAllowed(agent.id)
                 if (
                     taskPlanner.reviewWorkerResult(
                         todoId,
@@ -128,10 +143,11 @@ internal suspend fun processTodoWithLLM(
             persistMessage = { conversationOps.persist(it) },
         )
     } finally {
+        todoEventBus.publishProgress(TodoProgressUpdate(todoId = todoId, completed = true))
         watcher.close()
         activeCancellationTokens.remove(todoId)
         agentBusySince.remove(agent.id)
-        if (cancelledByChange) {
+        if (cancelledByChange && scope.isActive) {
             handleTodoChangeAfterCancellation(
                 agent = agent,
                 todoId = todoId,
@@ -143,7 +159,7 @@ internal suspend fun processTodoWithLLM(
                 notifyAgent = subAgentOps::notifyAgent,
                 onDescriptionChanged = { changedAgent, todo ->
                     scope.launch {
-                        jobScheduler.run {
+                        jobScheduler.run(changedAgent.id) {
                             processTodoWithLLM(
                                 changedAgent,
                                 todo.id,
@@ -161,12 +177,13 @@ internal suspend fun processTodoWithLLM(
                                 todoEventBus,
                                 scope,
                                 jobScheduler,
+                                executionControl,
                             )
                         }
                     }
                 },
             )
-        } else {
+        } else if (scope.isActive) {
             agent.status = AgentStatus.IDLE
             agent.currentTask = null
             agent.currentTodoId = null

@@ -14,4 +14,12 @@ internal class AgentManagerAutonomyOps(
     fun startAutonomousProcessing(seed: Boolean = true) = owner.autonomousCoordinator.startAutonomousProcessing(seed)
 
     fun startAutonomousMode(goal: String) = owner.autonomousCoordinator.startAutonomousMode(goal)
+
+    fun startTodo(todoId: String): Boolean = owner.autonomousCoordinator.startTodo(todoId)
+
+    fun startAllTodos(): Int = owner.autonomousCoordinator.startAllTodos()
+
+    fun stopTodo(todoId: String): Boolean = owner.autonomousCoordinator.stopTodo(todoId)
+
+    fun stopAllTodos(): Int = owner.autonomousCoordinator.stopAllTodos()
 }

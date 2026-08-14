@@ -2,6 +2,10 @@ package de.heckenmann.visualagent.agent.tools
 
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
+import de.heckenmann.visualagent.agent.startAllTodos
+import de.heckenmann.visualagent.agent.startTodo
+import de.heckenmann.visualagent.agent.stopAllTodos
+import de.heckenmann.visualagent.agent.stopTodo
 import de.heckenmann.visualagent.agent.tools.api.TodoToolPort
 import de.heckenmann.visualagent.agent.tools.api.ToolSettings
 import de.heckenmann.visualagent.agent.tools.api.ToolSettingsPort
@@ -92,6 +96,14 @@ class TodoToolPortAdapter(
             TodoStatus.CANCELLED -> todoManager.cancelTodo(id)
             else -> todoManager.updateStatus(id, TodoStatus.valueOf(status))
         }
+
+    override fun start(id: String): Boolean = agentManagerProvider().startTodo(id)
+
+    override fun startAll(): Int = agentManagerProvider().startAllTodos()
+
+    override fun stop(id: String): Boolean = agentManagerProvider().stopTodo(id)
+
+    override fun stopAll(): Int = agentManagerProvider().stopAllTodos()
 
     override fun remove(id: String): Boolean = todoManager.remove(id)
 

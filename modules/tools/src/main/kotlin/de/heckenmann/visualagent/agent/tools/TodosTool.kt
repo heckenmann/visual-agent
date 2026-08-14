@@ -5,138 +5,9 @@ import de.heckenmann.visualagent.agent.tools.api.TodoToolPort
 import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
-import de.heckenmann.visualagent.agent.tools.api.ToolSettingsPort
-import de.heckenmann.visualagent.agent.tools.api.ToolSettingsUpdate
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
-
-/**
- * Tool that exposes safe UI/session settings to the model.
- *
- * API keys are reported only as configured/not configured and are never included
- * in the returned content.
- *
- * Use cases: UC-0000061.
- */
-@AgentTool
-class UiTool(
-    private val settings: ToolSettingsPort,
-) : VisualAgentTool {
-    override val definition =
-        ToolDefinition(
-            id = ToolId("ui"),
-            name = ToolId("ui").toFunctionName(),
-            description =
-                "Read or update Visual Agent UI settings. Actions: get, set. " +
-                    "Input: {\"action\":\"get|set\",\"fontSize\":14,\"provider\":\"ollama\"," +
-                    "\"model\":\"llama3\",\"streamingEnabled\":true,\"thinkingEnabled\":false}. " +
-                    "Font size range: 10-24. API keys are reported as configured/not configured only.",
-            inputSchema = STRING_SCHEMA,
-        )
-
-    override fun execute(
-        inputJson: String,
-        context: Map<String, Any>,
-    ): ToolResult {
-        val input = parseObject(inputJson)
-        when (input.string("action") ?: "get") {
-            "set" -> {
-                settings.update(
-                    ToolSettingsUpdate(
-                        fontSize = input.int("fontSize")?.coerceIn(10, 24),
-                        provider = input.string("provider"),
-                        model = input.string("model"),
-                        openAiBaseUrl = input.string("openAiBaseUrl"),
-                        streamingEnabled = input.boolean("streamingEnabled"),
-                        thinkingEnabled = input.boolean("thinkingEnabled"),
-                    ),
-                )
-            }
-            "get" -> Unit
-            else -> return failure("ui", "Unsupported ui action")
-        }
-        val current = settings.read()
-        return success(
-            "ui",
-            """
-            Current UI Settings:
-              Font size: ${current.fontSize}px
-              Provider: ${current.provider}
-              Model: ${current.model}
-              OpenAI Base URL: ${current.openAiBaseUrl}
-              OpenAI API key configured: ${current.openAiApiKeyConfigured}
-              Streaming: ${current.streamingEnabled}
-              Thinking: ${current.thinkingEnabled}
-            Font size range: 10-24
-            """.trimIndent(),
-        )
-    }
-}
-
-/**
- * Tool that returns the workspace root used for file and terminal operations.
- *
- * Use cases: UC-0000060.
- */
-@AgentTool
-class PwdTool : VisualAgentTool {
-    override val definition =
-        ToolDefinition(
-            id = ToolId("pwd"),
-            name = ToolId("pwd").toFunctionName(),
-            description =
-                "Return the current Visual Agent workspace directory. " +
-                    "No input parameters required. " +
-                    "Input: {}.",
-            inputSchema = STRING_SCHEMA,
-        )
-
-    override fun execute(
-        inputJson: String,
-        context: Map<String, Any>,
-    ): ToolResult = success("pwd", workspaceRoot().toString())
-}
-
-/**
- * Tool that summarizes request metadata, workspace state, and active provider selection.
- *
- * Use cases: UC-0000059.
- */
-@AgentTool
-class ContextTool(
-    private val settings: ToolSettingsPort,
-) : VisualAgentTool {
-    override val definition =
-        ToolDefinition(
-            id = ToolId("context"),
-            name = ToolId("context").toFunctionName(),
-            description =
-                "Return current model, session, agent, workspace, and enabled tool context. " +
-                    "No input parameters required. " +
-                    "Input: {}.",
-            inputSchema = STRING_SCHEMA,
-        )
-
-    override fun execute(
-        inputJson: String,
-        context: Map<String, Any>,
-    ): ToolResult =
-        success(
-            "context",
-            buildString {
-                appendLine("Workspace: ${workspaceRoot()}")
-                val current = settings.read()
-                appendLine("Provider: ${current.provider}")
-                appendLine("Model: ${current.model}")
-                appendLine("OpenAI Base URL: ${current.openAiBaseUrl}")
-                appendLine("OpenAI API key configured: ${current.openAiApiKeyConfigured}")
-                context.entries.sortedBy { it.key }.forEach { (key, value) ->
-                    appendLine("$key: $value")
-                }
-            }.trim(),
-        )
-}
 
 /**
  * Tool that lets the model inspect and mutate persisted todo records.
@@ -152,6 +23,7 @@ class TodosTool(
             description =
                 "Manage the task plan (work items / to-do list). " +
                     "This tool is ONLY for tracking work items — NEVER use it to store code, data, file contents, or results. " +
+                    "Sub-agents have read-only access; todo lifecycle changes are controlled by the main agent and orchestrator. " +
                     "Use file:write to save code and data to files, and use todos only to describe what work needs to be done.\n" +
                     "Actions and their required input parameters:\n" +
                     "- list: no parameters. Returns all todos with status, description, id, position, assigned agent.\n" +
@@ -164,6 +36,10 @@ class TodosTool(
                     "All fields except id are optional.\n" +
                     "- complete: {\"action\":\"complete\",\"id\":\"...\"}. Marks a todo as COMPLETED.\n" +
                     "- cancel: {\"action\":\"cancel\",\"id\":\"...\"}. Marks a todo as CANCELLED.\n" +
+                    "- start: {\"action\":\"start\",\"id\":\"...\"}. Starts one pending or cancelled todo.\n" +
+                    "- start-all: {\"action\":\"start-all\"}. Starts all pending and cancelled todos.\n" +
+                    "- stop: {\"action\":\"stop\",\"id\":\"...\"}. Stops one pending or in-progress todo.\n" +
+                    "- stop-all: {\"action\":\"stop-all\"}. Stops all pending and in-progress todos.\n" +
                     "- remove: {\"action\":\"remove\",\"id\":\"...\"}. Deletes a todo permanently.\n" +
                     "- reorder: {\"action\":\"reorder\",\"id\":\"...\",\"position\":0}. " +
                     "Moves a todo to a new position (0 = first).\n" +
@@ -177,13 +53,24 @@ class TodosTool(
         context: Map<String, Any>,
     ): ToolResult {
         val input = parseObject(inputJson)
-        return when (input.string("action") ?: "list") {
+        val action = input.string("action") ?: "list"
+        if (isSubAgentRequest(context) && action !in SUB_AGENT_READ_ONLY_ACTIONS) {
+            return failure(
+                "todos",
+                "Sub-agents may only read todos; lifecycle changes are controlled by the main agent.",
+            )
+        }
+        return when (action) {
             "list" -> listTodos()
             "count" -> countTodos()
             "add" -> addTodo(input)
             "update" -> updateTodo(input)
             "complete" -> updateStatus(input, "COMPLETED")
             "cancel" -> updateStatus(input, "CANCELLED")
+            "start" -> startTodo(input)
+            "start-all" -> startAllTodos()
+            "stop" -> stopTodo(input)
+            "stop-all" -> stopAllTodos()
             "remove" -> removeTodo(input)
             "reorder" -> reorderTodos(input)
             "get-result" -> getTodoResult(input)
@@ -259,6 +146,22 @@ class TodosTool(
         }
     }
 
+    private fun startTodo(input: JsonObject): ToolResult {
+        val id = input.requiredString("id")
+        if (todos.list().none { it.id == id }) return failure("todos", "Todo not found")
+        return if (todos.start(id)) success("todos", "Started todo $id") else failure("todos", "Todo cannot be started")
+    }
+
+    private fun startAllTodos(): ToolResult = success("todos", "Started ${todos.startAll()} todos")
+
+    private fun stopTodo(input: JsonObject): ToolResult {
+        val id = input.requiredString("id")
+        if (todos.list().none { it.id == id }) return failure("todos", "Todo not found")
+        return if (todos.stop(id)) success("todos", "Stopped todo $id") else failure("todos", "Todo cannot be stopped")
+    }
+
+    private fun stopAllTodos(): ToolResult = success("todos", "Stopped ${todos.stopAll()} todos")
+
     private fun removeTodo(input: JsonObject): ToolResult {
         val id = input.requiredString("id")
         return if (todos.remove(id)) {
@@ -296,6 +199,12 @@ class TodosTool(
     }
 
     private fun agentExists(agentId: String): Boolean = todos.agentExists(agentId)
+
+    private fun isSubAgentRequest(context: Map<String, Any>): Boolean = context["agentId"]?.toString()?.isNotBlank() == true
+
+    private companion object {
+        val SUB_AGENT_READ_ONLY_ACTIONS = setOf("list", "count", "get-result")
+    }
 
     private fun extractSummary(content: String): String {
         val parsed = runCatching { parseObject(content) }.getOrNull()

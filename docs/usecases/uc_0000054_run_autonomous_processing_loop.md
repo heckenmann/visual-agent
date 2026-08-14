@@ -15,15 +15,16 @@ Desktop user or main orchestration agent.
 
 ## Main Flow
 
-1. The autonomous coordinator loop starts automatically when `AgentManager` initializes.
-2. The task planner decomposes complex pending todos when needed.
-3. The loop continuously picks the first pending todo by `position` whose agent is idle.
+1. The autonomous coordinator remains stopped when `AgentManager` and the Compose application initialize.
+2. The main agent or desktop user explicitly starts one todo or all unfinished todos.
+3. The task planner decomposes complex pending todos when needed.
+4. The loop continuously picks the first pending todo by `position` whose agent is idle.
    - If the todo has no `assignedAgentId`, the coordinator assigns the first idle sub-agent before starting it.
-4. The selected agent is marked busy, the todo moves to `IN_PROGRESS`, and a start message is persisted.
-5. The scheduler enforces `maxParallelSubAgents`; excess work waits until a slot frees.
-6. Worker results are reviewed; approved results complete the todo and rejected or failed results cancel it.
-7. Completion and cancellation messages are persisted to the conversation.
-8. The loop exits when there are no pending, in-progress, or busy-agent tasks.
+5. The selected agent is marked busy, the todo moves to `IN_PROGRESS`, and a start message is persisted.
+6. The scheduler enforces `maxParallelSubAgents`; excess work waits until a slot frees.
+7. Worker results are reviewed; approved results complete the todo and rejected or failed results cancel it.
+8. Completion and cancellation messages are persisted to the conversation.
+9. The loop exits when there are no pending, in-progress, or busy-agent tasks.
 
 ## Result
 
@@ -42,7 +43,9 @@ The application can process a backlog without manual assignment for every task. 
 
 ## Acceptance Criteria
 
-- The autonomous loop starts automatically when the Compose application launches.
+- The autonomous loop is stopped when the Compose application launches.
+- The main agent can start one todo or all unfinished todos through the `todos` tool.
+- The Todo panel exposes the same start and stop actions.
 - Newly created todos are persisted and visible to the loop.
 - Todos with a valid `assignedAgentId` are picked up by that agent.
 - Todos without an assignment are auto-assigned to an idle sub-agent.

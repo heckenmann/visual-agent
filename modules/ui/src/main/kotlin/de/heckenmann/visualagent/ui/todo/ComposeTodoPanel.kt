@@ -13,6 +13,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,11 +22,14 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.agent.AgentManager
+import de.heckenmann.visualagent.agent.startAllTodos
+import de.heckenmann.visualagent.agent.stopAllTodos
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoEventBus
@@ -40,6 +45,7 @@ import de.heckenmann.visualagent.ui.settings.*
 import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
+import kotlinx.coroutines.launch
 import sh.calvin.reorderable.ReorderableColumn
 
 /**
@@ -61,19 +67,48 @@ internal fun TodoPanel(
     toolEventBus: ToolEventBus,
 ) {
     var todos by remember { mutableStateOf(agentManager.getTodosFromDb()) }
-    var statusFilter by remember { mutableStateOf(ALL_TODO_STATUSES) }
+    var streamedResponses by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    val scope = rememberCoroutineScope()
     val refresh = { todos = agentManager.getTodosFromDb() }
     DisposableEffect(todoEventBus) {
-        val handle = todoEventBus.addListener { refresh() }
-        onDispose { handle.close() }
+        val todoHandle =
+            todoEventBus.addListener { change ->
+                scope.launch {
+                    refresh()
+                    val todo = change.todo
+                    if (todo != null && todo.status != TodoStatus.IN_PROGRESS) {
+                        streamedResponses = streamedResponses - todo.id
+                    }
+                }
+            }
+        val progressHandle =
+            todoEventBus.addProgressListener { update ->
+                scope.launch {
+                    streamedResponses =
+                        if (update.completed) {
+                            streamedResponses - update.todoId
+                        } else {
+                            streamedResponses +
+                                (
+                                    update.todoId to
+                                        streamedResponses[update.todoId].orEmpty() + update.delta
+                                )
+                        }
+                }
+            }
+        onDispose {
+            todoHandle.close()
+            progressHandle.close()
+        }
     }
     ToolEventRefreshEffect(
         toolEventBus = toolEventBus,
         toolIds = setOf("todos", "agent:assign-todo", "agent:assign-next-todo", "agent:assign-all-todos"),
         onRefresh = refresh,
     )
-    val visibleTodos = todos.filter { statusFilter == ALL_TODO_STATUSES || it.status.name == statusFilter }
-    val nextTodoId = remember(visibleTodos) { visibleTodos.firstOrNull { it.status == TodoStatus.PENDING }?.id }
+    val nextTodoId = remember(todos) { todos.firstOrNull { it.status == TodoStatus.PENDING }?.id }
+    val hasStartableTodos = todos.any { it.status == TodoStatus.PENDING || it.status == TodoStatus.CANCELLED }
+    val hasStoppableTodos = todos.any { it.status == TodoStatus.PENDING || it.status == TodoStatus.IN_PROGRESS }
     val todoListScrollState = rememberScrollState()
     RegisterPanelVerticalScrollbar(todoListScrollState)
 
@@ -83,6 +118,24 @@ internal fun TodoPanel(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth(),
         ) {
+            ActionIconButton(
+                icon = Icons.Filled.PlayArrow,
+                description = "Start all todos",
+                enabled = hasStartableTodos,
+                onClick = {
+                    agentManager.startAllTodos()
+                    refresh()
+                },
+            )
+            ActionIconButton(
+                icon = Icons.Filled.Stop,
+                description = "Stop all todos",
+                enabled = hasStoppableTodos,
+                onClick = {
+                    agentManager.stopAllTodos()
+                    refresh()
+                },
+            )
             ActionIconButton(
                 icon = Icons.Filled.Add,
                 description = "Add todo",
@@ -108,31 +161,15 @@ internal fun TodoPanel(
                 },
             )
         }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = "Filter",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            PanelDropdownField(
-                label = "Status",
-                selectedValue = statusFilter,
-                options =
-                    listOf(PanelSelectOption(ALL_TODO_STATUSES, "All statuses")) +
-                        TodoStatus.entries.map { PanelSelectOption(it.name, it.name.labelizeEnumName()) },
-                onSelected = { statusFilter = it },
-                modifier = Modifier.weight(1f),
-            )
-        }
         Text(
-            text = "Total ${todos.size} · showing ${visibleTodos.size}",
+            text = "Total ${todos.size}",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         ReorderableColumn(
-            list = visibleTodos,
+            list = todos,
             onSettle = { fromIndex, toIndex ->
-                val reordered = visibleTodos.toMutableList().apply { add(toIndex, removeAt(fromIndex)) }
+                val reordered = todos.toMutableList().apply { add(toIndex, removeAt(fromIndex)) }
                 agentManager.todoManager.reorder(reordered.map { it.id })
                 refresh()
             },
@@ -143,6 +180,7 @@ internal fun TodoPanel(
                 todo = todo,
                 isNext = todo.id == nextTodoId,
                 isDragging = isDragging,
+                streamedResponse = streamedResponses[todo.id].orEmpty(),
                 agentManager = agentManager,
                 modalRequester = modalRequester,
                 refresh = refresh,

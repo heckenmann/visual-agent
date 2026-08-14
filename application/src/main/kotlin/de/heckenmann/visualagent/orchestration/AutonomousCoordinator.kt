@@ -129,6 +129,62 @@ class AutonomousCoordinator
         }
 
         /**
+         * Queues one todo for autonomous execution and restarts the loop if needed.
+         * Cancelled todos are reset to pending; completed todos are not restarted.
+         *
+         * @param todoId Identifier of the todo to start
+         * @return true when the todo can be started
+         */
+        fun startTodo(todoId: String): Boolean {
+            val todo = getTodosFromDb().firstOrNull { it.id == todoId } ?: return false
+            if (todo.status == TodoStatus.COMPLETED || todo.status == TodoStatus.IN_PROGRESS) return false
+            if (todo.status == TodoStatus.CANCELLED) todoManager.updateStatus(todoId, TodoStatus.PENDING)
+            startAutonomousProcessing(seed = false)
+            return true
+        }
+
+        /**
+         * Queues every unfinished todo for autonomous execution.
+         *
+         * @return Number of todos newly queued for execution
+         */
+        fun startAllTodos(): Int {
+            val startableTodos = getTodosFromDb().filter { it.status == TodoStatus.PENDING || it.status == TodoStatus.CANCELLED }
+            startableTodos.filter { it.status == TodoStatus.CANCELLED }.forEach {
+                todoManager.updateStatus(it.id, TodoStatus.PENDING)
+            }
+            if (startableTodos.isNotEmpty()) startAutonomousProcessing(seed = false)
+            return startableTodos.size
+        }
+
+        /**
+         * Stops one unfinished todo and cancels its in-flight worker cooperatively.
+         *
+         * @param todoId Identifier of the todo to stop
+         * @return true when the todo was cancelled
+         */
+        fun stopTodo(todoId: String): Boolean {
+            val todo = getTodosFromDb().firstOrNull { it.id == todoId } ?: return false
+            if (todo.status == TodoStatus.COMPLETED || todo.status == TodoStatus.CANCELLED) return false
+            activeCancellationTokens[todoId]?.cancel()
+            return todoManager.cancelTodo(todoId)
+        }
+
+        /**
+         * Stops every unfinished todo and cancels active workers cooperatively.
+         *
+         * @return Number of todos cancelled
+         */
+        fun stopAllTodos(): Int {
+            val stoppableTodos = getTodosFromDb().filter { it.status == TodoStatus.PENDING || it.status == TodoStatus.IN_PROGRESS }
+            stoppableTodos.forEach { todo ->
+                activeCancellationTokens[todo.id]?.cancel()
+                todoManager.cancelTodo(todo.id)
+            }
+            return stoppableTodos.size
+        }
+
+        /**
          * Cancels the in-progress todo assigned to the given agent.
          */
         fun cancelAgentTodo(agentId: String) {

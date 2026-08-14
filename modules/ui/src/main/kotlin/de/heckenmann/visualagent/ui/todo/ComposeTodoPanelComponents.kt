@@ -2,6 +2,7 @@
 
 package de.heckenmann.visualagent.ui.todo
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,6 +22,7 @@ import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -38,6 +40,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.SubAgent
+import de.heckenmann.visualagent.agent.startTodo
+import de.heckenmann.visualagent.agent.stopTodo
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoStatus
 import de.heckenmann.visualagent.ui.agents.*
@@ -59,6 +63,7 @@ internal fun ReorderableColumnScope.TodoRow(
     todo: Todo,
     isNext: Boolean,
     isDragging: Boolean,
+    streamedResponse: String,
     agentManager: AgentManager,
     modalRequester: ComposeModalRequester,
     refresh: () -> Unit,
@@ -74,7 +79,7 @@ internal fun ReorderableColumnScope.TodoRow(
     val agentName = todo.assignedAgentId?.let { id -> agents.firstOrNull { it.id == id }?.name }
     ReorderableItem {
         PanelContentCard(
-            modifier = Modifier.fillMaxWidth().alpha(alpha),
+            modifier = Modifier.fillMaxWidth().alpha(alpha).animateContentSize(),
             backgroundColor = containerColor,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -88,6 +93,10 @@ internal fun ReorderableColumnScope.TodoRow(
                         overflow = TextOverflow.Ellipsis,
                     )
                     TodoMetaLine(todo = todo, isNext = isNext, agentName = agentName)
+                    TodoStreamingResponse(
+                        visible = todo.status == TodoStatus.IN_PROGRESS,
+                        response = streamedResponse,
+                    )
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
                     ActionIconButton(
@@ -110,6 +119,24 @@ internal fun ReorderableColumnScope.TodoRow(
                                     )
                                 },
                             )
+                        },
+                    )
+                    ActionIconButton(
+                        icon = Icons.Filled.PlayArrow,
+                        description = "Start todo",
+                        enabled = todo.status == TodoStatus.PENDING || todo.status == TodoStatus.CANCELLED,
+                        onClick = {
+                            agentManager.startTodo(todo.id)
+                            refresh()
+                        },
+                    )
+                    ActionIconButton(
+                        icon = Icons.Filled.Stop,
+                        description = "Stop todo",
+                        enabled = todo.status == TodoStatus.PENDING || todo.status == TodoStatus.IN_PROGRESS,
+                        onClick = {
+                            agentManager.stopTodo(todo.id)
+                            refresh()
                         },
                     )
                     ActionIconButton(
@@ -261,5 +288,3 @@ internal fun TodoEditor(
 }
 
 internal const val UNASSIGNED_AGENT_ID = "__unassigned__"
-
-internal const val ALL_TODO_STATUSES = "__all__"

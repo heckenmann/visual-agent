@@ -23,6 +23,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.flowOf
 
 /**
  * Test fixture for [AutonomousCoordinator] tests.
@@ -101,6 +102,24 @@ internal fun buildFixture(
             model = "test",
             message = Message("assistant", content),
             done = true,
+        )
+    }
+    coEvery { provider.stream(any<ChatRequestContext>()) } coAnswers {
+        val ctx = it.invocation.args[0] as ChatRequestContext
+        val isReview = ctx.metadata["sessionId"] == "review"
+        if (chatDelayMs > 0 && !isReview) {
+            val start = System.currentTimeMillis()
+            while (System.currentTimeMillis() - start < chatDelayMs) {
+                if (ctx.cancellationToken?.isCancelled == true) throw kotlinx.coroutines.CancellationException("cancelled")
+                kotlinx.coroutines.delay(50)
+            }
+        }
+        flowOf(
+            ChatResponse(
+                model = "test",
+                message = Message("assistant", if (isReview) reviewContent else responseContent),
+                done = true,
+            ),
         )
     }
     val notifications = mutableListOf<String>()

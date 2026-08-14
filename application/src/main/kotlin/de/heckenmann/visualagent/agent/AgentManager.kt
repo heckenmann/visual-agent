@@ -101,7 +101,7 @@ class AgentManager
         private var toolEventListenerHandle: AutoCloseable? = null
         private val lifecycleOps = AgentManagerLifecycleOps(this)
         internal val conversationOps = AgentManagerConversationOps(this)
-        private val autonomyOps = AgentManagerAutonomyOps(this)
+        internal val autonomyOps = AgentManagerAutonomyOps(this)
         internal lateinit var todoTrigger: AgentTodoTrigger
 
         init {
