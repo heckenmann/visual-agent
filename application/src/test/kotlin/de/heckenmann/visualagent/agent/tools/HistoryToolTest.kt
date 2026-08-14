@@ -7,6 +7,7 @@ import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+@de.heckenmann.visualagent.testsupport.DatabaseTest
 class HistoryToolTest {
     @Test
     fun `history tool loads and searches session history`() {

@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+@de.heckenmann.visualagent.testsupport.DatabaseTest
 class AgentManagerAutonomyOpsTest {
     @Test
     fun `seed ux todos adds predefined tasks when absent`() {

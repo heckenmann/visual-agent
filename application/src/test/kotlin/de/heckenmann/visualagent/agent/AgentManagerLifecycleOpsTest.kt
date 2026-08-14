@@ -11,6 +11,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+@de.heckenmann.visualagent.testsupport.DatabaseTest
 class AgentManagerLifecycleOpsTest {
     @Test
     fun `getTodosFromDb returns stored todos`() {

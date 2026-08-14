@@ -25,6 +25,7 @@ import org.junit.Test
 import kotlin.test.assertTrue
 
 /** Verifies that a pinned composer cannot cover the active conversation indicator. */
+@org.junit.experimental.categories.Category(de.heckenmann.visualagent.testsupport.DatabaseTestCategory::class)
 class ConversationFixedComposerSpinnerTest {
     @get:Rule
     val composeTestRule = createComposeRule()

@@ -13,6 +13,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+@de.heckenmann.visualagent.testsupport.DatabaseTest
 class AgentManagerConversationOpsTest {
     @Test
     fun `clear history removes all messages from memory and store`() {

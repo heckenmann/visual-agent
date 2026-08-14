@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test
 import kotlin.io.path.createTempDirectory
 import kotlin.test.assertEquals
 
+@de.heckenmann.visualagent.testsupport.DatabaseTest
 class AgentManagerTodoPersistenceTest {
     @Test
     fun `todos survive manager restart via database persistence`() {

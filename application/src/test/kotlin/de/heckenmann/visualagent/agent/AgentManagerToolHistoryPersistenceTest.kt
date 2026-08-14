@@ -12,6 +12,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+@de.heckenmann.visualagent.testsupport.DatabaseTest
 class AgentManagerToolHistoryPersistenceTest {
     @Test
     fun `finished tool call is persisted in conversation history with metadata`() {

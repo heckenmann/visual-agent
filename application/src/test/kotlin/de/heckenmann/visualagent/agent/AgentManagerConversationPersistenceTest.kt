@@ -13,6 +13,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+@de.heckenmann.visualagent.testsupport.DatabaseTest
 class AgentManagerConversationPersistenceTest {
     @Test
     fun `conversation is persisted and reloaded on next manager instance`() {

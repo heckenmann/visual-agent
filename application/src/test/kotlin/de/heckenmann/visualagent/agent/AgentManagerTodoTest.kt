@@ -17,6 +17,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+@de.heckenmann.visualagent.testsupport.DatabaseTest
 class AgentManagerTodoTest {
     private suspend fun <R> useManager(block: suspend (AgentManager) -> R): R {
         val (manager, _, _) = createManager()

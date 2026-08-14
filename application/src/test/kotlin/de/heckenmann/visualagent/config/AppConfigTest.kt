@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test
 import java.io.File
 import kotlin.io.path.createTempDirectory
 
+@de.heckenmann.visualagent.testsupport.DatabaseTest
 class AppConfigTest {
     @Test
     fun `export and import preserve conversation input placement`() {

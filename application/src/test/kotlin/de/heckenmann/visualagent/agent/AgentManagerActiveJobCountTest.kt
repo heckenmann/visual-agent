@@ -12,6 +12,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+@de.heckenmann.visualagent.testsupport.DatabaseTest
 class AgentManagerActiveJobCountTest {
     @Test
     fun `active job count tracks concurrent executions for the same agent`() =

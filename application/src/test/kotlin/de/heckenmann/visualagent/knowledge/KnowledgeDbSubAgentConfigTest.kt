@@ -7,6 +7,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
+@de.heckenmann.visualagent.testsupport.DatabaseTest
 class KnowledgeDbSubAgentConfigTest {
     @Test
     fun `sub agent config crud persists tool ids`() {

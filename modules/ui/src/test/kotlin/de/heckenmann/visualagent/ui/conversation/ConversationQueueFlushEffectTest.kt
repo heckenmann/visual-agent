@@ -31,6 +31,7 @@ import org.junit.Rule
 import org.junit.Test
 import kotlin.test.assertEquals
 
+@org.junit.experimental.categories.Category(de.heckenmann.visualagent.testsupport.DatabaseTestCategory::class)
 class ConversationQueueFlushEffectTest {
     @get:Rule
     val composeTestRule = createComposeRule()
