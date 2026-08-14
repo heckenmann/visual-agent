@@ -218,17 +218,17 @@ data class SubAgent(
         onChunk: (String) -> Unit,
     ): ChatResponse {
         val collected = StringBuilder()
-        var lastResponse: ChatResponse? = null
+        var terminalResponse: ChatResponse? = null
         provider.stream(buildRequest(messages, enabledTools, token)).collect { chunk ->
             token?.throwIfCancelled()
-            lastResponse = chunk
+            if (chunk.done) terminalResponse = chunk
             val part = chunk.message.content
             if (part.isNotEmpty()) {
                 collected.append(part)
                 onChunk(part)
             }
         }
-        val response = lastResponse ?: throw UnsupportedOperationException("stream returned no response")
+        val response = terminalResponse ?: throw IllegalStateException("stream returned no terminal response")
         val completeResponse = response.copy(message = Message("assistant", collected.toString()), done = true)
         appendChatHistory(messages, completeResponse)
         return completeResponse

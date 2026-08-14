@@ -63,6 +63,30 @@ class SubAgentTest {
         }
 
     @Test
+    fun `performTodo falls back when stream ends without a terminal response`() =
+        runBlocking {
+            val provider = mockk<LLMProvider>()
+            coEvery { provider.stream(any<ChatRequestContext>()) } returns
+                flowOf(ChatResponse("test", Message("assistant", "partial"), false))
+            coEvery { provider.chat(any<ChatRequestContext>()) } returns
+                ChatResponse("test", Message("assistant", "complete response"), true)
+            val memoryStore = mockk<MemoryStore>(relaxed = true)
+            val chunks = mutableListOf<String>()
+
+            val result =
+                SubAgent("agent-1", "Coder", "Implementation").performTodo(
+                    todoId = "todo-1",
+                    description = "Complete the task",
+                    provider = provider,
+                    memoryStore = memoryStore,
+                    onChunk = chunks::add,
+                )
+
+            assertEquals("complete response", result)
+            assertEquals(listOf("partial"), chunks)
+        }
+
+    @Test
     fun `performTodo instructions reserve todo lifecycle for the orchestrator`() =
         runBlocking {
             val provider = mockk<LLMProvider>()

@@ -130,7 +130,9 @@ class ComposeTodoPanelTest {
 
         manager.todoManager.updateStatus(todo.id, TodoStatus.CANCELLED)
 
-        composeTestRule.waitForIdle()
+        composeTestRule.waitUntil(timeoutMillis = 5_000) {
+            composeTestRule.onAllNodesWithText("Cancelled").fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule.onNodeWithText("Cancel me").assertExists()
         composeTestRule.onNodeWithText("Cancelled").assertExists()
     }
