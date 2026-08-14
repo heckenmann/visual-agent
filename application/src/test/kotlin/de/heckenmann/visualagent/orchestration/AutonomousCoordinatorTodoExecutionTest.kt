@@ -75,6 +75,40 @@ class AutonomousCoordinatorTodoExecutionTest {
         }
 
     @Test
+    fun `concurrent starts atomically claim one todo per idle agent`() =
+        runBlocking {
+            val fixture = buildFixture(chatDelayMs = 5000)
+            fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
+            val first = fixture.todoManager.add("First task", "agent-1")
+            val second = fixture.todoManager.add("Second task", "agent-1")
+
+            try {
+                assertTrue(fixture.coordinator.startTodo(first.id))
+                assertTrue(fixture.coordinator.startTodo(second.id))
+
+                withTimeout(3_000) {
+                    while (fixture.todoManager.getById(first.id)?.status != TodoStatus.IN_PROGRESS &&
+                        fixture.todoManager.getById(second.id)?.status != TodoStatus.IN_PROGRESS
+                    ) {
+                        delay(50)
+                    }
+                }
+                delay(300)
+
+                val inProgress =
+                    listOf(first, second).filter {
+                        fixture.todoManager.getById(it.id)?.status == TodoStatus.IN_PROGRESS
+                    }
+                assertEquals(1, inProgress.size)
+                assertEquals(inProgress.single().id, fixture.subAgents["agent-1"]?.currentTodoId)
+                val pendingTodo = (listOf(first, second) - inProgress.single()).single()
+                assertEquals(TodoStatus.PENDING, fixture.todoManager.getById(pendingTodo.id)?.status)
+            } finally {
+                fixture.cancel()
+            }
+        }
+
+    @Test
     fun `global pause prevents decomposition from invoking an analyst`() =
         runBlocking {
             val fixture = buildFixture()

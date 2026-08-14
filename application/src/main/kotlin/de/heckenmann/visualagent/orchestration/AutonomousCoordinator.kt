@@ -24,6 +24,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import mu.KotlinLogging
 import java.util.concurrent.ConcurrentHashMap
 
@@ -56,6 +58,7 @@ class AutonomousCoordinator
         private val activeTodoJobs = ConcurrentHashMap<String, Job>()
         private val agentBusySince = ConcurrentHashMap<String, Long>()
         private val individualTodoRequests = ConcurrentHashMap.newKeySet<String>()
+        private val pickupMutex = Mutex()
         private var loopJob: kotlinx.coroutines.Job? = null
         private var loopStarted = false
         private val taskPlanner =
@@ -82,15 +85,9 @@ class AutonomousCoordinator
                             change.type == TodoChangeType.ADDED ||
                                 change.type == TodoChangeType.UPDATED
                         )
-                if (todoBecamePending && todo.id !in individualTodoRequests) {
-                    restartLoopIfStopped()
+                if (todoBecamePending && todo.id !in individualTodoRequests && loopStarted && loopJob?.isActive != true) {
+                    startAutonomousProcessing(seed = false)
                 }
-            }
-        }
-
-        private fun restartLoopIfStopped() {
-            if (loopStarted && loopJob?.isActive != true) {
-                startAutonomousProcessing(seed = false)
             }
         }
 
@@ -98,7 +95,7 @@ class AutonomousCoordinator
          * Seeds the default UX improvement todos if they do not already exist in the database.
          */
         fun seedUxTodos() {
-            val existingDescriptions = getTodosFromDb().mapTo(mutableSetOf()) { it.description }
+            val existingDescriptions = todoStore.listTodos().mapTo(mutableSetOf()) { it.description }
             UxSeedTasks.all().filterNot { it in existingDescriptions }.forEach { desc -> todoManager.add(desc) }
         }
 
@@ -115,11 +112,11 @@ class AutonomousCoordinator
                 scope.launch {
                     while (true) {
                         if (executionControl?.isExecutionAllowed() != false) {
-                            taskPlanner.expandComplexTodoIfNeeded(getTodosFromDb())
+                            taskPlanner.expandComplexTodoIfNeeded(todoStore.listTodos())
                         }
                         pickAndProcessOneTodo()
-                        val pending = getTodosFromDb().filter { it.status == TodoStatus.PENDING }
-                        val inProgress = getTodosFromDb().any { it.status == TodoStatus.IN_PROGRESS }
+                        val pending = todoStore.listTodos().filter { it.status == TodoStatus.PENDING }
+                        val inProgress = todoStore.listTodos().any { it.status == TodoStatus.IN_PROGRESS }
                         val anyAgentBusy = subAgents.values.any { it.status == AgentStatus.BUSY }
                         if (pending.isEmpty() && !inProgress && !anyAgentBusy) break
                         delay(LOOP_DELAY_MILLIS)
@@ -144,7 +141,7 @@ class AutonomousCoordinator
          * @return true when the todo can be started
          */
         fun startTodo(todoId: String): Boolean {
-            val todo = getTodosFromDb().firstOrNull { it.id == todoId } ?: return false
+            val todo = todoStore.listTodos().firstOrNull { it.id == todoId } ?: return false
             if (todo.status == TodoStatus.COMPLETED || todo.status == TodoStatus.IN_PROGRESS) return false
             if (loopJob?.isActive == true || !individualTodoRequests.add(todoId)) return false
             try {
@@ -152,10 +149,10 @@ class AutonomousCoordinator
                 scope.launch {
                     try {
                         while (isActive) {
-                            val current = getTodosFromDb().firstOrNull { it.id == todoId } ?: return@launch
+                            val current = todoStore.listTodos().firstOrNull { it.id == todoId } ?: return@launch
                             if (current.status != TodoStatus.PENDING) return@launch
                             pickAndProcessOneTodo(requestedTodoId = todoId)
-                            if (getTodosFromDb().firstOrNull { it.id == todoId }?.status == TodoStatus.IN_PROGRESS) return@launch
+                            if (todoStore.listTodos().firstOrNull { it.id == todoId }?.status == TodoStatus.IN_PROGRESS) return@launch
                             delay(LOOP_DELAY_MILLIS)
                         }
                     } finally {
@@ -175,7 +172,7 @@ class AutonomousCoordinator
          * @return Number of todos newly queued for execution
          */
         fun startAllTodos(): Int {
-            val startableTodos = getTodosFromDb().filter { it.status == TodoStatus.PENDING || it.status == TodoStatus.CANCELLED }
+            val startableTodos = todoStore.listTodos().filter { it.status == TodoStatus.PENDING || it.status == TodoStatus.CANCELLED }
             startableTodos.filter { it.status == TodoStatus.CANCELLED }.forEach {
                 todoManager.updateStatus(it.id, TodoStatus.PENDING)
             }
@@ -190,7 +187,7 @@ class AutonomousCoordinator
          * @return true when the todo was cancelled
          */
         fun stopTodo(todoId: String): Boolean {
-            val todo = getTodosFromDb().firstOrNull { it.id == todoId } ?: return false
+            val todo = todoStore.listTodos().firstOrNull { it.id == todoId } ?: return false
             if (todo.status == TodoStatus.COMPLETED || todo.status == TodoStatus.CANCELLED) return false
             activeCancellationTokens[todoId]?.cancel()
             activeTodoJobs[todoId]?.cancel()
@@ -203,7 +200,7 @@ class AutonomousCoordinator
          * @return Number of todos cancelled
          */
         fun stopAllTodos(): Int {
-            val stoppableTodos = getTodosFromDb().filter { it.status == TodoStatus.PENDING || it.status == TodoStatus.IN_PROGRESS }
+            val stoppableTodos = todoStore.listTodos().filter { it.status == TodoStatus.PENDING || it.status == TodoStatus.IN_PROGRESS }
             stoppableTodos.forEach { todo ->
                 activeCancellationTokens[todo.id]?.cancel()
                 activeTodoJobs[todo.id]?.cancel()
@@ -218,7 +215,7 @@ class AutonomousCoordinator
         fun cancelAgentTodo(agentId: String) {
             val agent = subAgents[agentId] ?: return
             val todoId = agent.currentTodoId ?: return
-            val todo = getTodosFromDb().firstOrNull { it.id == todoId } ?: return
+            val todo = todoStore.listTodos().firstOrNull { it.id == todoId } ?: return
             if (todo.status != TodoStatus.IN_PROGRESS) return
             todoManager.cancelTodo(todoId)
             persistSubAgentMessage(
@@ -229,74 +226,74 @@ class AutonomousCoordinator
             )
         }
 
-        private fun getTodosFromDb(): List<Todo> = todoStore.listTodos()
-
         private suspend fun pickAndProcessOneTodo(requestedTodoId: String? = null) {
-            if (executionControl?.isGloballyPaused() == true) return
-            val busyCount =
-                subAgents.values.count {
-                    it.status == AgentStatus.BUSY && executionControl?.isExecutionAllowed(it.id) != false
-                }
-            val parallelLimit = parallelismProvider.get().coerceAtLeast(1)
-            if (busyCount >= parallelLimit) return
-
-            val todo = findNextAssignableTodo(requestedTodoId) ?: return
-            val agent = subAgents[todo.assignedAgentId] ?: return
-            if (executionControl?.isAgentPaused(agent.id) == true) return
-            if (agent.status == AgentStatus.BUSY) {
-                if (recoverStuckAgentIfNeeded(agent)) {
-                    todoManager.updateStatus(todo.id, TodoStatus.PENDING)
-                }
-                return
-            }
-            if (agent.status != AgentStatus.IDLE) return
-
-            agent.status = AgentStatus.BUSY
-            agent.currentTodoId = todo.id
-            agent.currentTask = todo.description
-            agentBusySince[agent.id] = System.currentTimeMillis()
-            subAgentOps.saveSubAgent(agent)
-            todoManager.updateStatus(todo.id, TodoStatus.IN_PROGRESS)
-            conversationOps.persist(
-                Message(
-                    role = "system",
-                    content = "Started todo ${todo.id} (${todo.description.take(80)}) with agent ${agent.id} (${agent.name}).",
-                ),
-            )
-            subAgentOps.notifyAgent(agent.id, "STATUS:${agent.status.name}")
-
-            val token = CancellationToken()
-            activeCancellationTokens[todo.id] = token
-            val processingJob =
-                scope.launch {
-                    if (token.isCancelled || todoManager.getById(todo.id)?.status != TodoStatus.IN_PROGRESS) {
-                        activeCancellationTokens.remove(todo.id, token)
-                        releaseUnstartedTodo(agent, todo.id)
-                        return@launch
+            pickupMutex.withLock {
+                if (executionControl?.isGloballyPaused() == true) return
+                val busyCount =
+                    subAgents.values.count {
+                        it.status == AgentStatus.BUSY && executionControl?.isExecutionAllowed(it.id) != false
                     }
-                    processTodoWithLLM(
-                        agent = agent,
-                        todoId = todo.id,
-                        taskDescription = taskPlanner.buildWorkerInstruction(todo),
-                        llmProvider = llmProvider,
-                        memoryStore = memoryStore,
-                        agentToolConfigService = agentToolConfigService,
-                        taskPlanner = taskPlanner,
-                        conversationOps = conversationOps,
-                        todoManager = todoManager,
-                        subAgentOps = subAgentOps,
-                        activeCancellationTokens = activeCancellationTokens,
-                        agentBusySince = agentBusySince,
-                        pendingTodoChanges = pendingTodoChanges,
-                        todoEventBus = todoEventBus,
-                        scope = scope,
-                        jobScheduler = jobScheduler,
-                        executionControl = executionControl,
-                        cancellationToken = token,
-                    )
+                val parallelLimit = parallelismProvider.get().coerceAtLeast(1)
+                if (busyCount >= parallelLimit) return
+
+                val todo = findNextAssignableTodo(requestedTodoId) ?: return
+                val agent = subAgents[todo.assignedAgentId] ?: return
+                if (executionControl?.isAgentPaused(agent.id) == true) return
+                if (agent.status == AgentStatus.BUSY) {
+                    if (recoverStuckAgentIfNeeded(agent)) {
+                        todoManager.updateStatus(todo.id, TodoStatus.PENDING)
+                    }
+                    return
                 }
-            activeTodoJobs[todo.id] = processingJob
-            processingJob.invokeOnCompletion { activeTodoJobs.remove(todo.id, processingJob) }
+                if (agent.status != AgentStatus.IDLE) return
+
+                agent.status = AgentStatus.BUSY
+                agent.currentTodoId = todo.id
+                agent.currentTask = todo.description
+                agentBusySince[agent.id] = System.currentTimeMillis()
+                subAgentOps.saveSubAgent(agent)
+                todoManager.updateStatus(todo.id, TodoStatus.IN_PROGRESS)
+                conversationOps.persist(
+                    Message(
+                        role = "system",
+                        content = "Started todo ${todo.id} (${todo.description.take(80)}) with agent ${agent.id} (${agent.name}).",
+                    ),
+                )
+                subAgentOps.notifyAgent(agent.id, "STATUS:${agent.status.name}")
+
+                val token = CancellationToken()
+                activeCancellationTokens[todo.id] = token
+                val processingJob =
+                    scope.launch {
+                        if (token.isCancelled || todoManager.getById(todo.id)?.status != TodoStatus.IN_PROGRESS) {
+                            activeCancellationTokens.remove(todo.id, token)
+                            releaseUnstartedTodo(agent, todo.id)
+                            return@launch
+                        }
+                        processTodoWithLLM(
+                            agent = agent,
+                            todoId = todo.id,
+                            taskDescription = taskPlanner.buildWorkerInstruction(todo),
+                            llmProvider = llmProvider,
+                            memoryStore = memoryStore,
+                            agentToolConfigService = agentToolConfigService,
+                            taskPlanner = taskPlanner,
+                            conversationOps = conversationOps,
+                            todoManager = todoManager,
+                            subAgentOps = subAgentOps,
+                            activeCancellationTokens = activeCancellationTokens,
+                            agentBusySince = agentBusySince,
+                            pendingTodoChanges = pendingTodoChanges,
+                            todoEventBus = todoEventBus,
+                            scope = scope,
+                            jobScheduler = jobScheduler,
+                            executionControl = executionControl,
+                            cancellationToken = token,
+                        )
+                    }
+                activeTodoJobs[todo.id] = processingJob
+                processingJob.invokeOnCompletion { activeTodoJobs.remove(todo.id, processingJob) }
+            }
         }
 
         private fun releaseUnstartedTodo(
@@ -341,7 +338,7 @@ class AutonomousCoordinator
 
         private fun findNextAssignableTodo(requestedTodoId: String? = null): Todo? =
             findNextAssignableTodo(
-                getTodosFromDb(),
+                todoStore.listTodos(),
                 subAgents,
                 todoManager,
                 requestedTodoId = requestedTodoId,
