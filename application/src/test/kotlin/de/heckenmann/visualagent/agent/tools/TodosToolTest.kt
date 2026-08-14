@@ -17,6 +17,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+@de.heckenmann.visualagent.testsupport.DatabaseTest
 class TodosToolTest {
     private fun createTool(db: TestPersistence): TodosTool {
         val manager = mockk<AgentManager>()

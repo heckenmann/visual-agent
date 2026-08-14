@@ -10,6 +10,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+@de.heckenmann.visualagent.testsupport.DatabaseTest
 class AgentManagerRefreshHistoryToLatestTest {
     @Test
     fun `refreshHistoryToLatest clears memory and loads latest db page`() {

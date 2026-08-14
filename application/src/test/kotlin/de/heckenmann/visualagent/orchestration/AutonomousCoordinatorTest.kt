@@ -138,6 +138,59 @@ class AutonomousCoordinatorTest {
         }
 
     @Test
+    fun `start all todos resets cancelled work and schedules it`() =
+        runBlocking {
+            val fixture = buildFixture(chatDelayMs = 5000)
+            fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
+            val todo = fixture.todoManager.add("Retry task", "agent-1")
+            fixture.todoManager.cancelTodo(todo.id)
+
+            try {
+                assertEquals(1, fixture.coordinator.startAllTodos())
+                delay(1500)
+
+                assertEquals(TodoStatus.IN_PROGRESS, fixture.todoManager.getById(todo.id)?.status)
+                assertEquals(AgentStatus.BUSY, fixture.subAgents["agent-1"]?.status)
+            } finally {
+                fixture.cancel()
+            }
+        }
+
+    @Test
+    fun `stop todo cancels an in progress worker`() =
+        runBlocking {
+            val fixture = buildFixture(chatDelayMs = 5000)
+            fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
+            val todo = fixture.todoManager.add("Stop task", "agent-1")
+
+            try {
+                assertTrue(fixture.coordinator.startTodo(todo.id))
+                delay(1500)
+                assertEquals(TodoStatus.IN_PROGRESS, fixture.todoManager.getById(todo.id)?.status)
+
+                assertTrue(fixture.coordinator.stopTodo(todo.id))
+                assertEquals(TodoStatus.CANCELLED, fixture.todoManager.getById(todo.id)?.status)
+            } finally {
+                fixture.cancel()
+            }
+        }
+
+    @Test
+    fun `stop all todos cancels pending work`() =
+        runBlocking {
+            val fixture = buildFixture()
+            fixture.todoManager.add("Task one")
+            fixture.todoManager.add("Task two")
+
+            try {
+                assertEquals(2, fixture.coordinator.stopAllTodos())
+                assertTrue(fixture.todoManager.getAll().all { it.status == TodoStatus.CANCELLED })
+            } finally {
+                fixture.cancel()
+            }
+        }
+
+    @Test
     fun `completion message contains only todo id and get-result hint`() =
         runBlocking {
             val fixture = buildFixture()

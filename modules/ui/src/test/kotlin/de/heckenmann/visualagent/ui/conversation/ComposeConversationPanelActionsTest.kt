@@ -36,6 +36,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+@de.heckenmann.visualagent.testsupport.DatabaseTest
 class ComposeConversationPanelActionsTest {
     @Test
     fun `conversation placement persistence runs off the caller thread`() =

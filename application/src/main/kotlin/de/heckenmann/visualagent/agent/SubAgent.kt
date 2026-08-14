@@ -1,5 +1,9 @@
 package de.heckenmann.visualagent.agent
 
+import de.heckenmann.visualagent.knowledge.MemoryStore
+import kotlinx.coroutines.flow.collect
+import mu.KotlinLogging
+
 /**
  * Runtime availability shown in the sub-agent list and used for scheduling.
  */
@@ -37,6 +41,8 @@ data class SubAgent(
     val createdAt: Long = System.currentTimeMillis(),
     var updatedAt: Long = System.currentTimeMillis(),
 ) {
+    private val logger = KotlinLogging.logger {}
+
     /**
      * Returns true when the other object is a [SubAgent] with the same identity and mutable state.
      * Timestamps are intentionally excluded so equality reflects business state, not creation time.
@@ -111,30 +117,15 @@ data class SubAgent(
         enabledTools: Set<ToolId> = emptySet(),
         token: CancellationToken? = null,
     ): ChatResponse {
-        val combined = chatHistory + messages
-        val modelSelection = config.modelSelection()
-        val response =
-            provider.chat(
-                ChatRequestContext(
-                    messages = combined,
-                    provider = modelSelection.provider,
-                    model = modelSelection.model,
-                    variant = modelSelection.variant,
-                    parameters = modelSelection.parameters,
-                    options = modelSelection.options,
-                    enabledTools = enabledTools,
-                    metadata = mapOf("agentId" to id, "agentName" to name, "agentRole" to role),
-                    cancellationToken = token,
-                ),
-            )
-        // Save a brief record of the task and the assistant response in the agent's chat history.
-        chatHistory.add(Message("user", "Please complete the following task:\n${messages.joinToString("\n") { it.content }}"))
-        chatHistory.add(response.message)
+        val response = provider.chat(buildRequest(messages, enabledTools, token))
+        appendChatHistory(messages, response)
         return response
     }
 
     /**
-     * Perform a todo autonomously: call the LLM, and write a result to the knowledge DB if available.
+     * Perform a todo autonomously: call the LLM and persist its result in the knowledge DB.
+     * A persistence failure aborts the operation so the caller cannot mark the todo complete
+     * without a retrievable result.
      * The caller should set status/assignment before invoking this.
      *
      * @param todoId Todo identifier used for memory storage
@@ -143,15 +134,17 @@ data class SubAgent(
      * @param memoryStore Knowledge store for result and agent log persistence
      * @param enabledTools Tool IDs exposed to this sub-agent
      * @param token Optional cancellation token honoured during the LLM call
+     * @param onChunk Optional callback for streamed response deltas
      * @return Assistant response content
      */
     suspend fun performTodo(
         todoId: String,
         description: String,
         provider: LLMProvider,
-        memoryStore: de.heckenmann.visualagent.knowledge.MemoryStore,
+        memoryStore: MemoryStore,
         enabledTools: Set<ToolId> = emptySet(),
         token: CancellationToken? = null,
+        onChunk: ((String) -> Unit)? = null,
     ): String {
         val messages =
             listOf(
@@ -159,29 +152,116 @@ data class SubAgent(
                     "system",
                     buildString {
                         append("You are $name. Your role is $role.")
-                        append(" The todo you are working on may be edited or cancelled while you work.")
-                        append(" If the task becomes unclear, use the `todos` tool to re-read the current description.")
-                        append(" Provide a concise result and next steps.")
+                        append(" The main agent and orchestrator control the todo lifecycle.")
+                        append(
+                            " You may inspect todos and stored results, but do not add, update, complete, " +
+                                "cancel, start, stop, remove, or reorder todos.",
+                        )
+                        append(" If the task becomes unclear, use the read-only `todos` actions to re-read the current description.")
+                        append(
+                            " Report a concise result and next steps; the orchestrator persists the result " +
+                                "and decides the final status.",
+                        )
                     },
                 ),
                 Message("user", description),
             )
 
-        val resp = chat(messages, provider, enabledTools, token)
+        val resp = responseForTodo(messages, provider, enabledTools, token, onChunk)
 
-        // Persist result summary in knowledge DB (best-effort)
+        val summary =
+            resp.message.content
+                .trim()
+                .take(1000)
+                .ifBlank { "(No text response; inspect the persisted tool results.)" }
         try {
-            val summary = resp.message.content.take(1000)
             val nextSteps = "Review and implement improvements as needed."
             memoryStore.saveStructuredKnowledge(subject = "todo:$todoId", summary = summary, nextSteps = nextSteps)
+        } catch (error: Exception) {
+            logger.error(error) { "Failed to persist result for todo $todoId" }
+            throw IllegalStateException("Failed to persist result for todo $todoId", error)
+        }
+        runCatching {
             memoryStore.saveStructuredKnowledge(
                 subject = "agent:$id:log",
                 summary = "Worked on todo $todoId: ${description.take(120)}",
                 nextSteps = summary,
             )
-        } catch (e: Exception) {
-            // swallow persistence errors to avoid blocking agent progress
+        }.onFailure { error ->
+            logger.warn(error) { "Failed to persist agent log for todo $todoId" }
         }
         return resp.message.content
     }
+
+    private suspend fun responseForTodo(
+        messages: List<Message>,
+        provider: LLMProvider,
+        enabledTools: Set<ToolId>,
+        token: CancellationToken?,
+        onChunk: ((String) -> Unit)?,
+    ): ChatResponse {
+        if (onChunk == null) return chat(messages, provider, enabledTools, token)
+        return try {
+            stream(messages, provider, enabledTools, token, onChunk)
+        } catch (error: Exception) {
+            if (!isStreamingUnavailable(error)) throw error
+            logger.info { "Streaming is unavailable for sub-agent $id; using a complete response instead" }
+            chat(messages, provider, enabledTools, token)
+        }
+    }
+
+    private suspend fun stream(
+        messages: List<Message>,
+        provider: LLMProvider,
+        enabledTools: Set<ToolId>,
+        token: CancellationToken?,
+        onChunk: (String) -> Unit,
+    ): ChatResponse {
+        val collected = StringBuilder()
+        var terminalResponse: ChatResponse? = null
+        provider.stream(buildRequest(messages, enabledTools, token)).collect { chunk ->
+            token?.throwIfCancelled()
+            if (chunk.done) terminalResponse = chunk
+            val part = chunk.message.content
+            if (part.isNotEmpty()) {
+                collected.append(part)
+                onChunk(part)
+            }
+        }
+        val response = terminalResponse ?: throw IllegalStateException("stream returned no terminal response")
+        val completeResponse = response.copy(message = Message("assistant", collected.toString()), done = true)
+        appendChatHistory(messages, completeResponse)
+        return completeResponse
+    }
+
+    private fun buildRequest(
+        messages: List<Message>,
+        enabledTools: Set<ToolId>,
+        token: CancellationToken?,
+    ): ChatRequestContext {
+        val modelSelection = config.modelSelection()
+        return ChatRequestContext(
+            messages = chatHistory + messages,
+            provider = modelSelection.provider,
+            model = modelSelection.model,
+            variant = modelSelection.variant,
+            parameters = modelSelection.parameters,
+            options = modelSelection.options,
+            enabledTools = enabledTools,
+            metadata = mapOf("agentId" to id, "agentName" to name, "agentRole" to role),
+            cancellationToken = token,
+        )
+    }
+
+    private fun appendChatHistory(
+        messages: List<Message>,
+        response: ChatResponse,
+    ) {
+        chatHistory.add(Message("user", "Please complete the following task:\n${messages.joinToString("\n") { it.content }}"))
+        chatHistory.add(response.message)
+    }
+
+    private fun isStreamingUnavailable(error: Exception): Boolean =
+        error is UnsupportedOperationException ||
+            (error is IllegalStateException && error.message?.contains("stream", ignoreCase = true) == true)
 }

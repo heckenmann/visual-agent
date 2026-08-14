@@ -9,6 +9,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
+@de.heckenmann.visualagent.testsupport.DatabaseTest
 class KnowledgeDbWorkspaceFileTest {
     @Test
     fun `workspace file store saves lists finds and deletes metadata`() {

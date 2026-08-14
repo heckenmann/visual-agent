@@ -10,6 +10,7 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
+@de.heckenmann.visualagent.testsupport.DatabaseTest
 class AgentManagerTodoCountQueryTest {
     @Test
     fun `sendMessage uses model path for todo count question`() =

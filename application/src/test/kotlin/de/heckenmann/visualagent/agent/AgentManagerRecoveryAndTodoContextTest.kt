@@ -13,6 +13,7 @@ import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
+@de.heckenmann.visualagent.testsupport.DatabaseTest
 class AgentManagerRecoveryAndTodoContextTest {
     @Test
     fun `main request includes current todo list in system context`() =

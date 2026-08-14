@@ -50,6 +50,7 @@ class AgentManager
         internal val scope: CoroutineScope,
         internal val parallelismProvider: ParallelismProvider,
         internal val agentStatusCallbackAdapter: AgentStatusCallbackAdapter,
+        val subAgentExecutionControl: SubAgentExecutionControl,
     ) : DisposableBean {
         internal constructor(
             stores: PersistenceStores,
@@ -61,6 +62,7 @@ class AgentManager
             scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
             parallelismProvider: ParallelismProvider = ParallelismProvider(appConfig),
             agentStatusCallbackAdapter: AgentStatusCallbackAdapter = AgentStatusCallbackAdapter(),
+            subAgentExecutionControl: SubAgentExecutionControl = SubAgentExecutionControl(stores),
         ) : this(
             stores,
             stores,
@@ -74,6 +76,7 @@ class AgentManager
             scope,
             parallelismProvider,
             agentStatusCallbackAdapter,
+            subAgentExecutionControl,
         )
 
         companion object {
@@ -88,7 +91,7 @@ class AgentManager
         internal var todoManager: TodoManager = TodoManager(todoStore, todoEventBus)
         internal val welcomeMessageComposer = WelcomeMessageComposer(llmProvider, appConfig)
         internal val subAgentJobScheduler =
-            SubAgentJobScheduler(scope, parallelismProvider)
+            SubAgentJobScheduler(scope, parallelismProvider, subAgentExecutionControl)
         internal val conversationOpsProvider = ConversationOpsProvider(toolEventBus)
         internal val subAgentOpsProvider = SubAgentOpsProvider()
         internal val subAgents: Map<String, SubAgent>
@@ -101,7 +104,7 @@ class AgentManager
         private var toolEventListenerHandle: AutoCloseable? = null
         private val lifecycleOps = AgentManagerLifecycleOps(this)
         internal val conversationOps = AgentManagerConversationOps(this)
-        private val autonomyOps = AgentManagerAutonomyOps(this)
+        internal val autonomyOps = AgentManagerAutonomyOps(this)
         internal lateinit var todoTrigger: AgentTodoTrigger
 
         init {
@@ -130,6 +133,7 @@ class AgentManager
                     todoEventBus = todoEventBus,
                     conversationOps = conversationOpsProvider,
                     subAgentOps = subAgentOpsProvider,
+                    executionControl = subAgentExecutionControl,
                 )
             todoTrigger =
                 AgentTodoTrigger(
@@ -203,7 +207,11 @@ class AgentManager
         /**
          * Deletes a sub-agent by ID. Returns true if the agent was found and deleted.
          */
-        fun deleteAgent(id: String): Boolean = lifecycleOps.deleteAgent(id)
+        fun deleteAgent(id: String): Boolean {
+            val deleted = lifecycleOps.deleteAgent(id)
+            if (deleted) subAgentExecutionControl.removeAgent(id)
+            return deleted
+        }
 
         /**
          * Sends a chat message to a sub-agent and returns its text response.
@@ -211,7 +219,10 @@ class AgentManager
         suspend fun sendMessageToAgent(
             agentId: String,
             content: String,
-        ): String = conversationOps.sendMessageToAgent(agentId, content)
+        ): String {
+            subAgentExecutionControl.awaitExecutionAllowed(agentId)
+            return conversationOps.sendMessageToAgent(agentId, content)
+        }
 
         /**
          * Runs a sub-agent job synchronously (awaits completion) and returns the result.
@@ -220,7 +231,7 @@ class AgentManager
             agentId: String,
             content: String,
         ): AgentJobResult =
-            subAgentJobScheduler.run {
+            subAgentJobScheduler.run(agentId) {
                 conversationOps.runAgentJob(agentId, content)
             }
 
@@ -232,6 +243,7 @@ class AgentManager
             content: String,
         ): String =
             subAgentJobScheduler.enqueue(
+                agentId = agentId,
                 block = { conversationOps.runAgentJob(agentId, content) },
                 onFinished = conversationOps::notifyMainAgentOfJobCompletion,
             )

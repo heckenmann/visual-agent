@@ -35,6 +35,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
+@org.junit.experimental.categories.Category(de.heckenmann.visualagent.testsupport.DatabaseTestCategory::class)
 class ComposeSplitWorkspaceTest {
     @get:Rule
     val composeTestRule = createComposeRule()

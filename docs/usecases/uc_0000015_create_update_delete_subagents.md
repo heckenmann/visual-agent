@@ -16,7 +16,7 @@ Desktop user and main orchestration agent.
 ## Main Flow
 
 1. A user or tool requests create, update, or delete.
-2. For user-created sub-agents, the UI captures name, role, and a template selected from the template dropdown.
+2. For user-created sub-agents, the UI opens a creation dialog that captures name, role, and a template selected from the template dropdown.
 3. For updates, the details dialog exposes bounded dropdowns for template, provider override, and model override while leaving custom variant/options fields explicit.
 4. For user-triggered delete actions, the UI shows an internal confirmation modal before deletion.
 5. The agent manager validates and applies the lifecycle change.
@@ -40,6 +40,7 @@ The available sub-agent pool can be shaped for the current workspace needs.
 - `de.heckenmann.visualagent.agent.tools.AgentUpdateTool`
 - `de.heckenmann.visualagent.agent.tools.AgentDeleteTool`
 - `de.heckenmann.visualagent.ui.compose.SubAgentsPanel`
+- `de.heckenmann.visualagent.ui.agents.SubAgentCreationForm`
 - `de.heckenmann.visualagent.ui.compose.ComposeModalHost`
 - `de.heckenmann.visualagent.ui.compose.ActionIconButton`
 
@@ -48,5 +49,6 @@ The available sub-agent pool can be shaped for the current workspace needs.
 - If all sub-agents are deleted, startup can seed defaults when required by lifecycle policy.
 - Deleted agents are removed from persisted tool configuration.
 - UI reflects changes without restart.
+- The panel opens a form dialog for creating a sub-agent instead of rendering creation fields inline.
 - UI delete actions require internal modal confirmation.
 - Provider and model overrides are selected from the active provider catalog when possible.

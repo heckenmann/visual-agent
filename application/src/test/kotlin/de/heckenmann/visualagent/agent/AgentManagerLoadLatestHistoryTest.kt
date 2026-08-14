@@ -10,6 +10,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+@de.heckenmann.visualagent.testsupport.DatabaseTest
 class AgentManagerLoadLatestHistoryTest {
     @Test
     fun `loadLatestHistory appends newest db messages missing from in-memory history`() {

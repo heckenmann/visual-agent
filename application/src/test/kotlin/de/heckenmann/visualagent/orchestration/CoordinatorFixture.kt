@@ -7,11 +7,13 @@ import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ParallelismProvider
 import de.heckenmann.visualagent.agent.SubAgent
+import de.heckenmann.visualagent.agent.SubAgentExecutionControl
 import de.heckenmann.visualagent.agent.SubAgentJobScheduler
 import de.heckenmann.visualagent.agent.SubAgentOpsProvider
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.knowledge.MemoryStore
+import de.heckenmann.visualagent.knowledge.PreferenceStore
 import de.heckenmann.visualagent.knowledge.TodoStore
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoEventBus
@@ -23,6 +25,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.flowOf
 
 /**
  * Test fixture for [AutonomousCoordinator] tests.
@@ -44,6 +47,8 @@ internal class CoordinatorFixture(
     val notifications: MutableList<String>,
     val savedAgents: MutableList<SubAgent>,
     val messages: MutableList<Message>,
+    val executionControl: SubAgentExecutionControl,
+    val scheduler: SubAgentJobScheduler,
     private val scope: CoroutineScope,
 ) {
     fun cancel() {
@@ -103,15 +108,34 @@ internal fun buildFixture(
             done = true,
         )
     }
+    coEvery { provider.stream(any<ChatRequestContext>()) } coAnswers {
+        val ctx = it.invocation.args[0] as ChatRequestContext
+        val isReview = ctx.metadata["sessionId"] == "review"
+        if (chatDelayMs > 0 && !isReview) {
+            val start = System.currentTimeMillis()
+            while (System.currentTimeMillis() - start < chatDelayMs) {
+                if (ctx.cancellationToken?.isCancelled == true) throw kotlinx.coroutines.CancellationException("cancelled")
+                kotlinx.coroutines.delay(50)
+            }
+        }
+        flowOf(
+            ChatResponse(
+                model = "test",
+                message = Message("assistant", if (isReview) reviewContent else responseContent),
+                done = true,
+            ),
+        )
+    }
     val notifications = mutableListOf<String>()
     val savedAgents = mutableListOf<SubAgent>()
     val messages = mutableListOf<Message>()
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    val executionControl = SubAgentExecutionControl(FixturePreferenceStore())
     val parallelismProvider =
         object : ParallelismProvider() {
             override fun get(): Int = parallelism
         }
-    val scheduler = SubAgentJobScheduler(scope, parallelismProvider)
+    val scheduler = SubAgentJobScheduler(scope, parallelismProvider, executionControl)
     val conversationOps =
         ConversationOpsProvider(mockk<ToolEventBus>(relaxed = true)).apply {
             setPersistMessage {
@@ -142,8 +166,33 @@ internal fun buildFixture(
             todoEventBus = todoEventBus,
             conversationOps = conversationOps,
             subAgentOps = subAgentOps,
+            executionControl = executionControl,
         )
-    return CoordinatorFixture(coordinator, todoManager, subAgents, subAgentOps::putSubAgent, notifications, savedAgents, messages, scope)
+    return CoordinatorFixture(
+        coordinator,
+        todoManager,
+        subAgents,
+        subAgentOps::putSubAgent,
+        notifications,
+        savedAgents,
+        messages,
+        executionControl,
+        scheduler,
+        scope,
+    )
+}
+
+private class FixturePreferenceStore : PreferenceStore {
+    private val values = mutableMapOf<String, String>()
+
+    override fun getPreference(key: String): String? = values[key]
+
+    override fun setPreference(
+        key: String,
+        value: String,
+    ) {
+        values[key] = value
+    }
 }
 
 internal class FakeTodoStore : TodoStore {

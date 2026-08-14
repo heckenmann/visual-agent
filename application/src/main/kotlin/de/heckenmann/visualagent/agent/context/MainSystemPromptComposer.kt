@@ -120,8 +120,8 @@ internal object MainSystemPromptComposer {
             - For every non-trivial user request, create one or more todos describing the work.
             - Assign each todo to a sub-agent using `todos` with `assignedAgentId`.
             - When you create a todo with `assignedAgentId`, it is automatically set to PENDING.
-            - The autonomous coordinator will automatically pick up the PENDING todo and start the assigned sub-agent.
-              You do NOT need to manually start agents or change todo statuses — just create the todo and the system handles the rest.
+            - Todo execution is stopped when the application starts. Use the `todos` tool with `start` or `start-all`
+              when the user explicitly asks you to begin work; use `stop` or `stop-all` to end unfinished work.
             - When a sub-agent completes or cancels a todo, a notification appears in the conversation.
               You will be automatically prompted to review the result and inform the user.
             - For simple questions that need no sub-agent, do not create a todo; answer directly.

@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -21,9 +22,10 @@ import java.util.concurrent.ConcurrentHashMap
 class SubAgentJobScheduler(
     private val scope: CoroutineScope,
     private val parallelismProvider: ParallelismProvider,
+    private val executionControl: SubAgentExecutionControl? = null,
 ) {
     private val lock = Any()
-    private val waiting = ArrayDeque<CompletableDeferred<Unit>>()
+    private val waiting = ArrayDeque<WaitingJob>()
     private var activeJobs = 0
     private val jobsById = ConcurrentHashMap<String, Job>()
 
@@ -42,19 +44,46 @@ class SubAgentJobScheduler(
      * @param block Job implementation
      * @return Job result
      */
-    suspend fun <T> run(block: suspend () -> T): T {
+    suspend fun <T> run(block: suspend () -> T): T = run(agentId = null, block = block)
+
+    /**
+     * Runs one job after a slot becomes available and after its execution gates allow it.
+     *
+     * @param agentId Persistent sub-agent identity, or null for a temporary worker
+     * @param block Job implementation
+     * @return Job result
+     */
+    suspend fun <T> run(
+        agentId: String?,
+        block: suspend () -> T,
+    ): T {
         val permit = CompletableDeferred<Unit>()
+        val waitingJob = WaitingJob(agentId, permit)
         synchronized(lock) {
-            waiting.addLast(permit)
+            waiting.addLast(waitingJob)
         }
         dispatchWaitingJobs()
-        permit.await()
+        try {
+            permit.await()
+        } catch (cancelled: CancellationException) {
+            val releaseSlot =
+                synchronized(lock) {
+                    val wasWaiting = waiting.remove(waitingJob)
+                    !wasWaiting && waitingJob.dispatched
+                }
+            if (releaseSlot) {
+                synchronized(lock) {
+                    activeJobs = (activeJobs - 1).coerceAtLeast(0)
+                }
+                dispatchWaitingJobs()
+            }
+            throw cancelled
+        }
         return try {
+            executionControl?.awaitExecutionAllowed(agentId)
             block()
         } finally {
-            synchronized(lock) {
-                activeJobs = (activeJobs - 1).coerceAtLeast(0)
-            }
+            releaseActiveSlot()
             dispatchWaitingJobs()
         }
     }
@@ -69,11 +98,25 @@ class SubAgentJobScheduler(
     fun <T> enqueue(
         block: suspend () -> T,
         onFinished: (jobId: String, result: Result<T>) -> Unit,
+    ): String = enqueue(agentId = null, block = block, onFinished = onFinished)
+
+    /**
+     * Queues a background job for an optional sub-agent and returns its stable ID.
+     *
+     * @param agentId Persistent sub-agent identity, or null for a temporary worker
+     * @param block Job implementation
+     * @param onFinished Completion callback receiving success or failure
+     * @return Queued job ID
+     */
+    fun <T> enqueue(
+        agentId: String?,
+        block: suspend () -> T,
+        onFinished: (jobId: String, result: Result<T>) -> Unit,
     ): String {
         val jobId = UUID.randomUUID().toString()
         val job =
             scope.launch {
-                val result = runCatching { run(block) }
+                val result = runCatching { run(agentId, block) }
                 jobsById.remove(jobId)
                 onFinished(jobId, result)
             }
@@ -120,12 +163,29 @@ class SubAgentJobScheduler(
         synchronized(lock) {
             val limit = parallelismProvider.get().coerceAtLeast(1)
             while (activeJobs < limit && waiting.isNotEmpty()) {
+                val next = waiting.firstOrNull { isExecutionAllowed(it.agentId) } ?: break
+                waiting.remove(next)
+                next.dispatched = true
                 activeJobs += 1
-                permits += waiting.removeFirst()
+                permits += next.permit
             }
         }
         permits.forEach { it.complete(Unit) }
     }
+
+    private fun isExecutionAllowed(agentId: String?): Boolean = executionControl?.isExecutionAllowed(agentId) != false
+
+    private fun releaseActiveSlot() {
+        synchronized(lock) {
+            activeJobs = (activeJobs - 1).coerceAtLeast(0)
+        }
+    }
+
+    private data class WaitingJob(
+        val agentId: String?,
+        val permit: CompletableDeferred<Unit>,
+        var dispatched: Boolean = false,
+    )
 
     private companion object {
         const val DISPATCH_INTERVAL_MILLIS = 100L

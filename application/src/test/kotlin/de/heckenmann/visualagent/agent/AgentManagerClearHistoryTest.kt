@@ -10,6 +10,7 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+@de.heckenmann.visualagent.testsupport.DatabaseTest
 class AgentManagerClearHistoryTest {
     private fun createManager(): AgentManager {
         val db =

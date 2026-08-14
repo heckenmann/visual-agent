@@ -7,6 +7,8 @@ import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.agent.SubAgentJobQueueSnapshot
 import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
+import de.heckenmann.visualagent.agent.tools.api.AgentToolPort
+import de.heckenmann.visualagent.agent.tools.api.ToolAgentExecutionStatus
 import de.heckenmann.visualagent.knowledge.Memory
 import io.mockk.every
 import io.mockk.mockk
@@ -213,5 +215,25 @@ class AgentControlToolsTest {
         val result = AgentShowTool(manager, agentToolConfigService).execute("""{"id":"missing"}""")
 
         assertFalse(result.success)
+    }
+
+    @Test
+    fun `execution tool controls global and individual gates`() {
+        val agents = mockk<AgentToolPort>()
+        every { agents.control("pause", "agent-1") } returns
+            ToolAgentExecutionStatus(
+                agentId = "agent-1",
+                globalState = "RUNNING",
+                agentState = "PAUSED",
+                effectiveState = "PAUSED",
+                pauseReason = "INDIVIDUAL",
+                pausedAgentIds = listOf("agent-1"),
+            )
+
+        val result = SubAgentsExecutionTool(agents).execute("""{"action":"pause","agentId":"agent-1"}""")
+
+        assertTrue(result.success)
+        assertTrue(result.content.contains("Agent agent-1 state: PAUSED"))
+        assertTrue(result.content.contains("Pause reason: INDIVIDUAL"))
     }
 }

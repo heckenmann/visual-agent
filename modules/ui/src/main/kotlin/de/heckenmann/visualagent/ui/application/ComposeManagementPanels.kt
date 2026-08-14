@@ -6,14 +6,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,12 +23,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import de.heckenmann.visualagent.agent.AgentConfig
 import de.heckenmann.visualagent.agent.AgentManager
+import de.heckenmann.visualagent.agent.SubAgentExecutionState
+import de.heckenmann.visualagent.agent.addSubAgentExecutionListener
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
+import de.heckenmann.visualagent.agent.getSubAgentExecutionSnapshot
+import de.heckenmann.visualagent.agent.pauseAllSubAgentsAsync
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
+import de.heckenmann.visualagent.agent.resumeAllSubAgentsAsync
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
+import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -39,12 +45,13 @@ import de.heckenmann.visualagent.ui.settings.*
 import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
+import kotlinx.coroutines.launch
 
 /**
- * Sub-agent management panel for creating, running, configuring, and deleting
+ * Sub-agent management panel for creating, configuring, and deleting
  * worker agents.
  *
- * Use cases: UC-0000015, UC-0000016, UC-0000018, UC-0000051, UC-0000052,
+ * Use cases: UC-0000015, UC-0000016, UC-0000018, UC-0000051,
  * UC-0000071.
  *
  * @param agentManager Source of sub-agent lifecycle and job execution
@@ -52,7 +59,6 @@ import de.heckenmann.visualagent.ui.workspace.*
  * @param toolRegistry Registry of available tools for configuration
  * @param providerCatalogService Provider catalog for inherited provider/model
  * @param modalRequester Modal requester used for destructive confirmations
- * @param inFlight In-flight state holder for running sub-agent jobs
  */
 @Composable
 internal fun SubAgentsPanel(
@@ -61,76 +67,84 @@ internal fun SubAgentsPanel(
     toolRegistry: ToolRegistry,
     providerCatalogService: ProviderCatalogService,
     modalRequester: ComposeModalRequester,
-    inFlight: InFlightStateHolder,
     toolEventBus: ToolEventBus,
+    todoEventBus: TodoEventBus,
 ) {
-    var agents by remember { mutableStateOf(agentManager.getSubAgents()) }
-    var name by remember { mutableStateOf("") }
-    var role by remember { mutableStateOf("") }
-    var templateName by remember { mutableStateOf(DEFAULT_AGENT_TEMPLATE) }
-    var task by remember { mutableStateOf("") }
-    var runningAgentIds by remember { mutableStateOf(emptySet<String>()) }
+    var agents by remember { mutableStateOf(agentManager.getSubAgents().map { it.copy() }) }
+    var executionSnapshot by remember { mutableStateOf(agentManager.getSubAgentExecutionSnapshot()) }
     var status by remember { mutableStateOf("Ready") }
     val scope = rememberCoroutineScope()
     val refresh = {
-        agents = agentManager.getSubAgents()
+        agents = agentManager.getSubAgents().map { it.copy() }
+        executionSnapshot = agentManager.getSubAgentExecutionSnapshot()
+    }
+    DisposableEffect(agentManager) {
+        val handle =
+            agentManager.addSubAgentExecutionListener { snapshot ->
+                scope.launch { executionSnapshot = snapshot }
+            }
+        onDispose { handle.close() }
+    }
+    DisposableEffect(todoEventBus) {
+        val handle = todoEventBus.addListener { scope.launch { refresh() } }
+        onDispose { handle.close() }
     }
     ToolEventRefreshEffect(
         toolEventBus = toolEventBus,
-        toolIds = setOf("agent:create", "agent:update", "agent:delete", "agent:list"),
+        toolIds = setOf("agent:create", "agent:update", "agent:delete", "agent:list", "subagents:execution"),
         onRefresh = refresh,
     )
     val agentListScrollState = rememberScrollState()
     RegisterPanelVerticalScrollbar(agentListScrollState)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Name") },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
+            ActionIconButton(
+                icon = if (executionSnapshot.globalState == SubAgentExecutionState.PAUSED) Icons.Filled.PlayArrow else Icons.Filled.Pause,
+                description =
+                    if (executionSnapshot.globalState == SubAgentExecutionState.PAUSED) {
+                        "Resume all sub-agents"
+                    } else {
+                        "Pause all sub-agents"
+                    },
+                onClick = {
+                    scope.launch {
+                        if (executionSnapshot.globalState == SubAgentExecutionState.PAUSED) {
+                            agentManager.resumeAllSubAgentsAsync()
+                        } else {
+                            agentManager.pauseAllSubAgentsAsync()
+                        }
+                        executionSnapshot = agentManager.getSubAgentExecutionSnapshot()
+                    }
+                },
             )
-            PanelDropdownField(
-                label = "Template",
-                selectedValue = templateName,
-                options =
-                    AgentConfig.TEMPLATES.keys
-                        .sorted()
-                        .map { PanelSelectOption(it, it.labelizeEnumName()) },
-                onSelected = { templateName = it },
-                modifier = Modifier.weight(0.75f),
-            )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = role,
-                onValueChange = { role = it },
-                label = { Text("Role") },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
+            Text(
+                if (executionSnapshot.globalState == SubAgentExecutionState.PAUSED) {
+                    "All sub-agents paused"
+                } else {
+                    "Sub-agents running"
+                },
+                style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
             )
             ActionIconButton(
                 icon = Icons.Filled.Add,
                 description = "Create sub-agent",
-                enabled = name.isNotBlank() && role.isNotBlank(),
                 onClick = {
-                    agentManager.createAgent(name.trim(), role.trim(), templateName)
-                    name = ""
-                    role = ""
-                    refresh()
-                    status = "Created sub-agent"
+                    modalRequester.request(
+                        ComposeContentModal(title = "Create sub-agent") { dismiss ->
+                            SubAgentCreationForm(
+                                agentManager = agentManager,
+                                onCreated = {
+                                    refresh()
+                                    status = "Created sub-agent"
+                                    dismiss()
+                                },
+                                onCancel = dismiss,
+                            )
+                        },
+                    )
                 },
             )
         }
-        OutlinedTextField(
-            value = task,
-            onValueChange = { task = it },
-            label = { Text("Task for selected sub-agent") },
-            minLines = 2,
-            maxLines = 4,
-            modifier = Modifier.fillMaxWidth(),
-        )
         Column(modifier = Modifier.weight(1f).verticalScroll(agentListScrollState)) {
             if (agents.isEmpty()) {
                 PanelEmptyState(
@@ -142,21 +156,17 @@ internal fun SubAgentsPanel(
                     SubAgentRow(
                         agent = agent,
                         activeJobCount = agentManager.getActiveJobCount(agent.id),
-                        task = task,
-                        running = agent.id in runningAgentIds,
+                        individuallyPaused = agent.id in executionSnapshot.pausedAgentIds,
+                        globallyPaused = executionSnapshot.globalState == SubAgentExecutionState.PAUSED,
                         agentManager = agentManager,
                         agentToolConfigService = agentToolConfigService,
                         toolRegistry = toolRegistry,
                         providerCatalogService = providerCatalogService,
                         modalRequester = modalRequester,
-                        onRunningChanged = { running ->
-                            runningAgentIds =
-                                if (running) runningAgentIds + agent.id else runningAgentIds - agent.id
-                            if (running) inFlight.markAgentStart(agent.id) else inFlight.markAgentEnd(agent.id)
-                        },
                         onStatusChanged = { status = it },
                         refresh = refresh,
                         scope = scope,
+                        onExecutionStateChanged = { executionSnapshot = agentManager.getSubAgentExecutionSnapshot() },
                     )
                 }
             }
@@ -164,5 +174,3 @@ internal fun SubAgentsPanel(
         PanelStatus(status)
     }
 }
-
-internal const val DEFAULT_AGENT_TEMPLATE = "researcher"

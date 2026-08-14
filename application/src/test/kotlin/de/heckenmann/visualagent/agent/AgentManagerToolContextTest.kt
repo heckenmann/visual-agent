@@ -12,6 +12,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+@de.heckenmann.visualagent.testsupport.DatabaseTest
 class AgentManagerToolContextTest {
     @Test
     fun `main agent only exposes sub-agent control tools`() =

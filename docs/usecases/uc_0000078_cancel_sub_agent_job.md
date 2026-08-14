@@ -2,7 +2,11 @@
 
 ## Goal
 
-Allow the user to stop a running queued sub-agent job without changing the assigned todo state.
+Keep direct sub-agent job cancellation out of the management panel; unfinished work is stopped through todo controls.
+
+## Status
+
+The former direct-job workflow is retired. Sub-agent rows no longer expose a task-run or direct-job-stop action.
 
 ## Primary Actor
 
@@ -10,38 +14,31 @@ Desktop user.
 
 ## Preconditions
 
-- The sub-agents management panel is visible.
-- A sub-agent has been started with the play button and a job is running or queued.
+- The Todo panel is visible.
+- A todo is pending or in progress.
 
 ## Main Flow
 
-1. The user clicks the run button on a sub-agent row.
-2. The panel enqueues a job via [AgentManager.enqueueAgentJob] and stores the returned job id.
-3. A stop button appears next to the run button.
-4. The user clicks the stop button.
-5. The panel calls [AgentManager.cancelSubAgentJob] with the stored job id.
-6. [SubAgentJobScheduler] cancels the underlying coroutine and removes it from the registry.
-7. The job finishes with a cancellation exception; the status line shows that the job was stopped.
+1. The user clicks the stop action for one todo or all unfinished todos.
+2. The coordinator cancels the assigned worker cooperatively.
+3. The todo is persisted as `CANCELLED` and can be started again later.
 
 ## Result
 
-The user can abort stuck or unnecessary sub-agent work while leaving the assigned todo open for retry.
+The user can stop unfinished sub-agent work while keeping completed todos unchanged.
 
 ## Tool Calls
 
-- None.
+- `todos`: stop one todo or all unfinished todos.
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.agent.AgentManager.cancelSubAgentJob`
-- `de.heckenmann.visualagent.agent.SubAgentJobScheduler`
-- `de.heckenmann.visualagent.ui.compose.ComposeSubAgentRow`
-- `de.heckenmann.visualagent.ui.compose.SubAgentsPanel`
+- `de.heckenmann.visualagent.orchestration.AutonomousCoordinator`
+- `de.heckenmann.visualagent.ui.todo.TodoPanel`
 
 ## Acceptance Criteria
 
-- A stop button is visible on a sub-agent row while its job is active or queued.
-- Clicking it stops that job and updates the active-job count.
-- The assigned todo is not marked failed.
+- Todo stop controls are visible for pending and in-progress work.
+- Completed todos are not affected by stop-all actions.
 - `./gradlew ktlintCheck check test` passes.
 - `jacocoTestCoverageVerification` (≥ 0.80 LINE) continues to pass.

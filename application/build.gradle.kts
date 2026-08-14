@@ -1,3 +1,4 @@
+import org.gradle.api.tasks.testing.Test
 import java.nio.file.Files
 import kotlin.io.path.extension
 
@@ -67,6 +68,7 @@ dependencies {
 }
 
 val coroutinesVersion = libs.versions.coroutines.get()
+val databaseTestTag = "database"
 
 dependencyManagement {
     dependencies {
@@ -80,8 +82,30 @@ dependencyManagement {
     }
 }
 
+val databaseTest =
+    tasks.register<Test>("databaseTest") {
+        description = "Runs SQLite-backed tests serially."
+        group = "verification"
+        useJUnitPlatform {
+            includeTags(databaseTestTag)
+        }
+        testClassesDirs = sourceSets["test"].output.classesDirs
+        classpath = sourceSets["test"].runtimeClasspath
+        maxParallelForks = 1
+        filter {
+            isFailOnNoMatchingTests = false
+        }
+        workingDir = rootProject.projectDir
+        systemProperty("visualagent.ollama.smoke", System.getProperty("visualagent.ollama.smoke", "false"))
+        systemProperty("visualagent.codex.smoke", System.getProperty("visualagent.codex.smoke", "false"))
+        jvmArgs("-Xshare:off", "-Xmx2g", "-Dkotlinx.coroutines.debug=off")
+    }
+databaseTest.configure { mustRunAfter(tasks.test) }
+
 tasks.test {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        excludeTags(databaseTestTag)
+    }
     filter {
         isFailOnNoMatchingTests = false
     }
@@ -95,7 +119,11 @@ tasks.test {
 val jacocoExcludedClasses = emptyList<String>()
 
 tasks.jacocoTestReport {
-    dependsOn(tasks.test)
+    dependsOn(tasks.test, databaseTest)
+    executionData(
+        layout.buildDirectory.file("jacoco/test.exec"),
+        layout.buildDirectory.file("jacoco/databaseTest.exec"),
+    )
     classDirectories.setFrom(
         files(
             classDirectories.files.map {
@@ -115,7 +143,11 @@ tasks.jacocoTestReport {
 }
 
 tasks.jacocoTestCoverageVerification {
-    dependsOn(tasks.test)
+    dependsOn(tasks.test, databaseTest)
+    executionData(
+        layout.buildDirectory.file("jacoco/test.exec"),
+        layout.buildDirectory.file("jacoco/databaseTest.exec"),
+    )
     classDirectories.setFrom(
         files(
             classDirectories.files.map {

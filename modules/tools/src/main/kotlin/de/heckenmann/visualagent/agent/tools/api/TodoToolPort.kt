@@ -28,6 +28,18 @@ interface TodoToolPort {
         status: String,
     ): Boolean
 
+    /** Starts one pending or cancelled todo. */
+    fun start(id: String): Boolean
+
+    /** Starts all pending and cancelled todos. */
+    fun startAll(): Int
+
+    /** Stops one pending or in-progress todo. */
+    fun stop(id: String): Boolean
+
+    /** Stops all pending and in-progress todos. */
+    fun stopAll(): Int
+
     /** Removes a todo. */
     fun remove(id: String): Boolean
 

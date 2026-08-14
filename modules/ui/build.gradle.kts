@@ -1,3 +1,4 @@
+import org.gradle.api.tasks.testing.Test
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.net.URI
 
@@ -125,8 +126,30 @@ tasks.withType<JavaExec>().configureEach {
     jvmArgs(applicationIdentityArgs + macApplicationArgs)
 }
 
+val databaseTestTag = "database"
+val databaseTestCategoryTag = "de.heckenmann.visualagent.testsupport.DatabaseTestCategory"
+val databaseTest =
+    tasks.register<Test>("databaseTest") {
+        description = "Runs SQLite-backed UI tests serially."
+        group = "verification"
+        useJUnitPlatform {
+            includeTags(databaseTestTag, databaseTestCategoryTag)
+        }
+        testClassesDirs = sourceSets["test"].output.classesDirs
+        classpath = sourceSets["test"].runtimeClasspath
+        maxParallelForks = 1
+        filter {
+            isFailOnNoMatchingTests = false
+        }
+        workingDir = rootProject.projectDir
+        jvmArgs("-Xshare:off", "-Xmx2g", "-Dkotlinx.coroutines.debug=off")
+    }
+databaseTest.configure { mustRunAfter(tasks.test) }
+
 tasks.test {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        excludeTags(databaseTestTag, databaseTestCategoryTag)
+    }
     filter {
         isFailOnNoMatchingTests = false
     }
@@ -134,7 +157,11 @@ tasks.test {
 }
 
 tasks.jacocoTestReport {
-    dependsOn(tasks.test)
+    dependsOn(tasks.test, databaseTest)
+    executionData(
+        layout.buildDirectory.file("jacoco/test.exec"),
+        layout.buildDirectory.file("jacoco/databaseTest.exec"),
+    )
     reports {
         xml.required.set(true)
         html.required.set(true)

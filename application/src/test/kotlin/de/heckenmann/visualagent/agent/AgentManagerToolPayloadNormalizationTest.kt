@@ -11,6 +11,7 @@ import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+@de.heckenmann.visualagent.testsupport.DatabaseTest
 class AgentManagerToolPayloadNormalizationTest {
     @Test
     fun `sendMessage normalizes empty tool_calls payload to tool-only placeholder`() {

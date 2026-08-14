@@ -10,15 +10,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -26,7 +22,9 @@ import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
+import de.heckenmann.visualagent.agent.pauseSubAgentAsync
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
+import de.heckenmann.visualagent.agent.resumeSubAgentAsync
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
@@ -46,53 +44,45 @@ import kotlinx.coroutines.launch
 internal fun SubAgentRow(
     agent: SubAgent,
     activeJobCount: Int,
-    task: String,
-    running: Boolean,
+    individuallyPaused: Boolean,
+    globallyPaused: Boolean,
     agentManager: AgentManager,
     agentToolConfigService: AgentToolConfigService,
     toolRegistry: ToolRegistry,
     providerCatalogService: ProviderCatalogService,
     modalRequester: ComposeModalRequester,
-    onRunningChanged: (Boolean) -> Unit,
     onStatusChanged: (String) -> Unit,
     refresh: () -> Unit,
     scope: CoroutineScope,
+    onExecutionStateChanged: () -> Unit,
 ) {
-    var activeJobId by remember { mutableStateOf<String?>(null) }
     PanelContentCard(modifier = Modifier.fillMaxWidth().padding(bottom = 7.dp)) {
         Text(agent.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
         Text(
-            "${agent.status.name.labelizeEnumName()} · active jobs $activeJobCount",
+            buildString {
+                append(agent.status.name.labelizeEnumName())
+                if (globallyPaused) append(" · globally paused")
+                if (individuallyPaused) append(" · individually paused")
+                append(" · active jobs $activeJobCount")
+            },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.tertiary,
         )
         Text(agent.role, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             ActionIconButton(
-                icon = Icons.Filled.PlayArrow,
-                description = "Run sub-agent",
-                enabled = task.isNotBlank() && !running,
+                icon = if (individuallyPaused) Icons.Filled.PlayArrow else Icons.Filled.Pause,
+                description = if (individuallyPaused) "Resume sub-agent" else "Pause sub-agent",
                 onClick = {
-                    val requestedTask = task.trim()
-                    if (requestedTask.isBlank()) return@ActionIconButton
-                    onRunningChanged(true)
-                    onStatusChanged("Running ${agent.name}...")
-                    activeJobId = null
                     scope.launch {
-                        val jobId = agentManager.enqueueAgentJob(agent.id, requestedTask)
-                        activeJobId = jobId
-                    }
-                },
-            )
-            ActionIconButton(
-                icon = Icons.Filled.Stop,
-                description = "Stop sub-agent job",
-                enabled = activeJobId != null,
-                onClick = {
-                    activeJobId?.let { jobId ->
-                        agentManager.cancelSubAgentJob(jobId)
-                        onStatusChanged("Stopped ${agent.name} job")
-                        activeJobId = null
+                        if (individuallyPaused) {
+                            agentManager.resumeSubAgentAsync(agent.id)
+                            onStatusChanged("Resumed ${agent.name}")
+                        } else {
+                            agentManager.pauseSubAgentAsync(agent.id)
+                            onStatusChanged("Paused ${agent.name}")
+                        }
+                        onExecutionStateChanged()
                     }
                 },
             )

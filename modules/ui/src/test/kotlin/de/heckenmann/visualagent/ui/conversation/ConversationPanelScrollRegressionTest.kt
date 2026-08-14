@@ -44,6 +44,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** Exercises scroll-to-latest through the complete production conversation panel. */
+@org.junit.experimental.categories.Category(de.heckenmann.visualagent.testsupport.DatabaseTestCategory::class)
 class ConversationPanelScrollRegressionTest {
     @get:Rule
     val composeTestRule = createComposeRule()

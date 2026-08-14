@@ -30,4 +30,17 @@ class TodoEventBusTest {
 
         assertTrue(received.isEmpty())
     }
+
+    @Test
+    fun `progress listener receives transient response updates`() {
+        val bus = TodoEventBus()
+        val received = mutableListOf<TodoProgressUpdate>()
+        bus.addProgressListener { received += it }
+
+        bus.publishProgress(TodoProgressUpdate(todoId = "t1", delta = "Hello"))
+        bus.publishProgress(TodoProgressUpdate(todoId = "t1", completed = true))
+
+        assertEquals(listOf("Hello", ""), received.map { it.delta })
+        assertTrue(received.last().completed)
+    }
 }

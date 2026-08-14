@@ -1,13 +1,146 @@
 package de.heckenmann.visualagent.agent
 
+import de.heckenmann.visualagent.knowledge.MemoryStore
+import io.mockk.coEvery
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.slot
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SubAgentTest {
+    @Test
+    fun `performTodo streams response deltas when a callback is provided`() =
+        runBlocking {
+            val provider = mockk<LLMProvider>()
+            coEvery { provider.stream(any<ChatRequestContext>()) } returns
+                flowOf(
+                    ChatResponse("test", Message("assistant", "new "), false),
+                    ChatResponse("test", Message("assistant", "text"), true),
+                )
+            val memoryStore = mockk<MemoryStore>(relaxed = true)
+            val chunks = mutableListOf<String>()
+
+            val result =
+                SubAgent("agent-1", "Coder", "Implementation").performTodo(
+                    todoId = "todo-1",
+                    description = "Complete the task",
+                    provider = provider,
+                    memoryStore = memoryStore,
+                    onChunk = chunks::add,
+                )
+
+            assertEquals("new text", result)
+            assertEquals(listOf("new ", "text"), chunks)
+        }
+
+    @Test
+    fun `performTodo falls back to complete response when streaming is unavailable`() =
+        runBlocking {
+            val provider = mockk<LLMProvider>()
+            coEvery { provider.stream(any<ChatRequestContext>()) } throws UnsupportedOperationException("stream unsupported")
+            coEvery { provider.chat(any<ChatRequestContext>()) } returns
+                ChatResponse("test", Message("assistant", "complete response"), true)
+            val memoryStore = mockk<MemoryStore>(relaxed = true)
+
+            val result =
+                SubAgent("agent-1", "Coder", "Implementation").performTodo(
+                    todoId = "todo-1",
+                    description = "Complete the task",
+                    provider = provider,
+                    memoryStore = memoryStore,
+                    onChunk = {},
+                )
+
+            assertEquals("complete response", result)
+        }
+
+    @Test
+    fun `performTodo falls back when stream ends without a terminal response`() =
+        runBlocking {
+            val provider = mockk<LLMProvider>()
+            coEvery { provider.stream(any<ChatRequestContext>()) } returns
+                flowOf(ChatResponse("test", Message("assistant", "partial"), false))
+            coEvery { provider.chat(any<ChatRequestContext>()) } returns
+                ChatResponse("test", Message("assistant", "complete response"), true)
+            val memoryStore = mockk<MemoryStore>(relaxed = true)
+            val chunks = mutableListOf<String>()
+
+            val result =
+                SubAgent("agent-1", "Coder", "Implementation").performTodo(
+                    todoId = "todo-1",
+                    description = "Complete the task",
+                    provider = provider,
+                    memoryStore = memoryStore,
+                    onChunk = chunks::add,
+                )
+
+            assertEquals("complete response", result)
+            assertEquals(listOf("partial"), chunks)
+        }
+
+    @Test
+    fun `performTodo instructions reserve todo lifecycle for the orchestrator`() =
+        runBlocking {
+            val provider = mockk<LLMProvider>()
+            val request = slot<ChatRequestContext>()
+            coEvery { provider.chat(capture(request)) } returns
+                ChatResponse(
+                    model = "test",
+                    message = Message("assistant", "result"),
+                    done = true,
+                )
+            val memoryStore = mockk<MemoryStore>(relaxed = true)
+
+            SubAgent("agent-1", "Coder", "Implementation").performTodo(
+                todoId = "todo-1",
+                description = "Complete the task",
+                provider = provider,
+                memoryStore = memoryStore,
+            )
+
+            val systemPrompt =
+                request.captured.messages
+                    .first()
+                    .content
+            assertTrue(systemPrompt.contains("main agent and orchestrator control the todo lifecycle"))
+            assertTrue(systemPrompt.contains("do not add, update, complete, cancel, start, stop, remove, or reorder todos"))
+            assertTrue(systemPrompt.contains("orchestrator persists the result"))
+        }
+
+    @Test
+    fun `performTodo fails when the todo result cannot be persisted`() =
+        runBlocking {
+            val provider = mockk<LLMProvider>()
+            coEvery { provider.chat(any<ChatRequestContext>()) } returns
+                ChatResponse(
+                    model = "test",
+                    message = Message("assistant", "result"),
+                    done = true,
+                )
+            val memoryStore = mockk<MemoryStore>(relaxed = true)
+            every { memoryStore.saveStructuredKnowledge(any(), any(), any()) } throws IllegalStateException("database unavailable")
+
+            val error =
+                assertFailsWith<IllegalStateException> {
+                    SubAgent("agent-1", "Coder", "Implementation").performTodo(
+                        todoId = "todo-1",
+                        description = "Complete the task",
+                        provider = provider,
+                        memoryStore = memoryStore,
+                    )
+                }
+
+            assertEquals("Failed to persist result for todo todo-1", error.message)
+        }
+
     @Test
     fun `AgentStatus enum has expected values`() {
         val statuses = AgentStatus.values()

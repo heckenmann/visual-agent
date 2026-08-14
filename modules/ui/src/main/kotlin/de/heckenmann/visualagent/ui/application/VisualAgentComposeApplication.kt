@@ -183,7 +183,6 @@ private fun VisualAgentComposeApp(
         } + ComposeCommand("close-application", "Close application", "Close Visual Agent and persist workspace state", onCloseApplication)
     LaunchedEffect(Unit) {
         workspaceFocusRequester.requestFocus()
-        deps.agentManager.startAutonomousProcessing(seed = false)
     }
     RegisterAgentStatusCallback(inFlight, deps.agentStatusCallbackAdapter, deps.todoEventBus)
     DisposableEffect(deps.workspaceLayoutService) {

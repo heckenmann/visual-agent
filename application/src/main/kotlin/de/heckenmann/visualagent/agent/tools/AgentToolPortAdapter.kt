@@ -4,9 +4,15 @@ import de.heckenmann.visualagent.agent.AgentConfig
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
+import de.heckenmann.visualagent.agent.getSubAgentExecutionStatus
+import de.heckenmann.visualagent.agent.pauseAllSubAgents
+import de.heckenmann.visualagent.agent.pauseSubAgent
+import de.heckenmann.visualagent.agent.resumeAllSubAgents
+import de.heckenmann.visualagent.agent.resumeSubAgent
 import de.heckenmann.visualagent.agent.tools.api.AgentToolPort
 import de.heckenmann.visualagent.agent.tools.api.ToolAgent
 import de.heckenmann.visualagent.agent.tools.api.ToolAgentConfig
+import de.heckenmann.visualagent.agent.tools.api.ToolAgentExecutionStatus
 import de.heckenmann.visualagent.agent.tools.api.ToolAgentLog
 import de.heckenmann.visualagent.agent.tools.api.ToolAgentQueue
 import de.heckenmann.visualagent.knowledge.MemoryStore
@@ -58,6 +64,43 @@ class AgentToolPortAdapter(
     ): List<ToolAgentLog> = memoryStore.searchMemories("agent:$id:log", limit).map { ToolAgentLog(it.createdAt, it.content) }
 
     override fun template(templateName: String): ToolAgentConfig = AgentConfig.fromTemplate(templateName).toToolConfig()
+
+    override fun control(
+        action: String,
+        agentId: String?,
+    ): ToolAgentExecutionStatus {
+        val normalizedAgentId = agentId?.trim()?.takeIf(String::isNotBlank)
+        if (normalizedAgentId != null && agentManager.getSubAgent(normalizedAgentId) == null) {
+            throw IllegalArgumentException("Agent not found: $normalizedAgentId")
+        }
+        when (action.trim().lowercase()) {
+            "status" -> Unit
+            "pause" ->
+                if (normalizedAgentId == null) {
+                    agentManager.pauseAllSubAgents()
+                } else {
+                    agentManager.pauseSubAgent(normalizedAgentId)
+                }
+            "resume" ->
+                if (normalizedAgentId == null) {
+                    agentManager.resumeAllSubAgents()
+                } else {
+                    agentManager.resumeSubAgent(normalizedAgentId)
+                }
+            "pause-all" -> agentManager.pauseAllSubAgents()
+            "resume-all" -> agentManager.resumeAllSubAgents()
+            else -> throw IllegalArgumentException("Unsupported execution action: $action")
+        }
+        val status = agentManager.getSubAgentExecutionStatus(normalizedAgentId)
+        return ToolAgentExecutionStatus(
+            agentId = status.agentId,
+            globalState = status.globalState.name,
+            agentState = status.agentState?.name,
+            effectiveState = status.effectiveState.name,
+            pauseReason = status.pauseReason.name,
+            pausedAgentIds = status.pausedAgentIds.sorted(),
+        )
+    }
 }
 
 private fun toToolAgent(agent: SubAgent) =

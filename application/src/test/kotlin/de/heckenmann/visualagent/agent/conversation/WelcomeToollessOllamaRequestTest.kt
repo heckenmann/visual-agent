@@ -35,6 +35,7 @@ import kotlin.test.assertTrue
  * behaviour that caused HTTP 500 on some endpoints when an empty `tools: []`
  * was sent for tool-less requests.
  */
+@de.heckenmann.visualagent.testsupport.DatabaseTest
 class WelcomeToollessOllamaRequestTest {
     @Test
     fun `clean history welcome sends Ollama chat request without tools array`() {

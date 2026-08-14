@@ -4,6 +4,9 @@ package de.heckenmann.visualagent.ui.todo
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
@@ -11,6 +14,7 @@ import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
 import de.heckenmann.visualagent.todo.TodoEventBus
+import de.heckenmann.visualagent.todo.TodoProgressUpdate
 import de.heckenmann.visualagent.todo.TodoStatus
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
@@ -26,10 +30,12 @@ import de.heckenmann.visualagent.ui.workspace.*
 import io.mockk.mockk
 import org.junit.Rule
 import org.junit.Test
+import kotlin.test.assertEquals
 
 /**
  * Compose UI tests for the todo management panel.
  */
+@org.junit.experimental.categories.Category(de.heckenmann.visualagent.testsupport.DatabaseTestCategory::class)
 class ComposeTodoPanelTest {
     @get:Rule
     val composeTestRule = createComposeRule()
@@ -41,7 +47,7 @@ class ComposeTodoPanelTest {
     }
 
     @Test
-    fun `todo panel renders todos and filter controls`() {
+    fun `todo panel renders todos and execution controls`() {
         val manager = createManager()
         manager.todoManager.add("Task one")
         manager.todoManager.add("Task two")
@@ -55,7 +61,12 @@ class ComposeTodoPanelTest {
 
         composeTestRule.onNodeWithText("Task one").assertExists()
         composeTestRule.onNodeWithText("Task two").assertExists()
-        composeTestRule.onNodeWithText("Total 2 · showing 2").assertExists()
+        composeTestRule.onNodeWithText("Total 2").assertExists()
+        composeTestRule.onNodeWithText("Filter").assertDoesNotExist()
+        composeTestRule.onNodeWithContentDescription("Start all todos").assertExists()
+        composeTestRule.onNodeWithContentDescription("Stop all todos").assertExists()
+        assertEquals(2, composeTestRule.onAllNodesWithContentDescription("Start todo").fetchSemanticsNodes().size)
+        assertEquals(2, composeTestRule.onAllNodesWithContentDescription("Stop todo").fetchSemanticsNodes().size)
     }
 
     @Test
@@ -77,7 +88,7 @@ class ComposeTodoPanelTest {
             }
         }
 
-        composeTestRule.onNodeWithText("Total 2 · showing 2").assertExists()
+        composeTestRule.onNodeWithText("Total 2").assertExists()
         composeTestRule.onNodeWithText("Completed task").assertExists()
     }
 
@@ -98,7 +109,9 @@ class ComposeTodoPanelTest {
 
         manager.todoManager.updateStatus(todo.id, TodoStatus.COMPLETED)
 
-        composeTestRule.waitForIdle()
+        composeTestRule.waitUntil(timeoutMillis = 5_000) {
+            composeTestRule.onAllNodesWithText("Completed").fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule.onNodeWithText("Reactive task").assertExists()
         composeTestRule.onNodeWithText("Completed").assertExists()
     }
@@ -117,8 +130,29 @@ class ComposeTodoPanelTest {
 
         manager.todoManager.updateStatus(todo.id, TodoStatus.CANCELLED)
 
-        composeTestRule.waitForIdle()
+        composeTestRule.waitUntil(timeoutMillis = 5_000) {
+            composeTestRule.onAllNodesWithText("Cancelled").fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule.onNodeWithText("Cancel me").assertExists()
         composeTestRule.onNodeWithText("Cancelled").assertExists()
+    }
+
+    @Test
+    fun `processing todo displays streamed response line`() {
+        val manager = createManager()
+        val todo = manager.todoManager.add("Streaming task")
+        manager.todoManager.updateStatus(todo.id, TodoStatus.IN_PROGRESS)
+
+        val requester = ComposeModalRequester { }
+        composeTestRule.setContent {
+            MaterialTheme {
+                TodoPanel(manager, requester, manager.todoEventBus, ToolEventBus())
+            }
+        }
+
+        manager.todoEventBus.publishProgress(TodoProgressUpdate(todo.id, "New response text"))
+
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("New response text").assertExists()
     }
 }
