@@ -28,9 +28,9 @@ import de.heckenmann.visualagent.agent.SubAgentExecutionState
 import de.heckenmann.visualagent.agent.addSubAgentExecutionListener
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.getSubAgentExecutionSnapshot
-import de.heckenmann.visualagent.agent.pauseAllSubAgents
+import de.heckenmann.visualagent.agent.pauseAllSubAgentsAsync
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
-import de.heckenmann.visualagent.agent.resumeAllSubAgents
+import de.heckenmann.visualagent.agent.resumeAllSubAgentsAsync
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.ui.agents.*
@@ -101,10 +101,13 @@ internal fun SubAgentsPanel(
                         "Pause all sub-agents"
                     },
                 onClick = {
-                    if (executionSnapshot.globalState == SubAgentExecutionState.PAUSED) {
-                        agentManager.resumeAllSubAgents()
-                    } else {
-                        agentManager.pauseAllSubAgents()
+                    scope.launch {
+                        if (executionSnapshot.globalState == SubAgentExecutionState.PAUSED) {
+                            agentManager.resumeAllSubAgentsAsync()
+                        } else {
+                            agentManager.pauseAllSubAgentsAsync()
+                        }
+                        executionSnapshot = agentManager.getSubAgentExecutionSnapshot()
                     }
                 },
             )
@@ -156,6 +159,7 @@ internal fun SubAgentsPanel(
                         modalRequester = modalRequester,
                         onStatusChanged = { status = it },
                         refresh = refresh,
+                        scope = scope,
                         onExecutionStateChanged = { executionSnapshot = agentManager.getSubAgentExecutionSnapshot() },
                     )
                 }

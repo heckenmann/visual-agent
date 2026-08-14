@@ -22,9 +22,9 @@ import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
-import de.heckenmann.visualagent.agent.pauseSubAgent
+import de.heckenmann.visualagent.agent.pauseSubAgentAsync
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
-import de.heckenmann.visualagent.agent.resumeSubAgent
+import de.heckenmann.visualagent.agent.resumeSubAgentAsync
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
@@ -37,6 +37,8 @@ import de.heckenmann.visualagent.ui.settings.*
 import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun SubAgentRow(
@@ -51,6 +53,7 @@ internal fun SubAgentRow(
     modalRequester: ComposeModalRequester,
     onStatusChanged: (String) -> Unit,
     refresh: () -> Unit,
+    scope: CoroutineScope,
     onExecutionStateChanged: () -> Unit,
 ) {
     PanelContentCard(modifier = Modifier.fillMaxWidth().padding(bottom = 7.dp)) {
@@ -71,14 +74,16 @@ internal fun SubAgentRow(
                 icon = if (individuallyPaused) Icons.Filled.PlayArrow else Icons.Filled.Pause,
                 description = if (individuallyPaused) "Resume sub-agent" else "Pause sub-agent",
                 onClick = {
-                    if (individuallyPaused) {
-                        agentManager.resumeSubAgent(agent.id)
-                        onStatusChanged("Resumed ${agent.name}")
-                    } else {
-                        agentManager.pauseSubAgent(agent.id)
-                        onStatusChanged("Paused ${agent.name}")
+                    scope.launch {
+                        if (individuallyPaused) {
+                            agentManager.resumeSubAgentAsync(agent.id)
+                            onStatusChanged("Resumed ${agent.name}")
+                        } else {
+                            agentManager.pauseSubAgentAsync(agent.id)
+                            onStatusChanged("Paused ${agent.name}")
+                        }
+                        onExecutionStateChanged()
                     }
-                    onExecutionStateChanged()
                 },
             )
             ActionIconButton(

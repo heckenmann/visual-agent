@@ -2,6 +2,8 @@ package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.knowledge.PreferenceStore
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.springframework.stereotype.Service
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -94,8 +96,19 @@ class SubAgentExecutionControl(
     /** Pauses all sub-agent execution without changing individual pause flags. */
     fun pauseAll(): SubAgentExecutionSnapshot = mutate { globalPaused = true }
 
+    /**
+     * Pauses all sub-agent execution on the I/O dispatcher.
+     *
+     * This variant is intended for UI callers because the mutation persists two
+     * preferences and notifies listeners synchronously.
+     */
+    suspend fun pauseAllAsync(): SubAgentExecutionSnapshot = withContext(Dispatchers.IO) { pauseAll() }
+
     /** Resumes the global gate while preserving individual pause flags. */
     fun resumeAll(): SubAgentExecutionSnapshot = mutate { globalPaused = false }
+
+    /** Resumes global sub-agent execution on the I/O dispatcher. */
+    suspend fun resumeAllAsync(): SubAgentExecutionSnapshot = withContext(Dispatchers.IO) { resumeAll() }
 
     /** Pauses one sub-agent execution gate. */
     fun pauseAgent(agentId: String): SubAgentExecutionSnapshot =
@@ -104,11 +117,23 @@ class SubAgentExecutionControl(
             pausedAgentIds += agentId
         }
 
+    /** Pauses one sub-agent execution gate on the I/O dispatcher. */
+    suspend fun pauseAgentAsync(agentId: String): SubAgentExecutionSnapshot =
+        withContext(Dispatchers.IO) {
+            pauseAgent(agentId)
+        }
+
     /** Resumes one sub-agent execution gate. */
     fun resumeAgent(agentId: String): SubAgentExecutionSnapshot =
         mutate {
             require(agentId.isNotBlank()) { "Agent ID must not be blank" }
             pausedAgentIds -= agentId
+        }
+
+    /** Resumes one sub-agent execution gate on the I/O dispatcher. */
+    suspend fun resumeAgentAsync(agentId: String): SubAgentExecutionSnapshot =
+        withContext(Dispatchers.IO) {
+            resumeAgent(agentId)
         }
 
     /** Removes an agent's persisted pause state after the agent is deleted. */

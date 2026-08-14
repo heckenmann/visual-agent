@@ -62,6 +62,24 @@ class SubAgentExecutionControlTest {
         control.removeAgent("agent-1")
         assertFalse(control.isAgentPaused("agent-1"))
     }
+
+    @Test
+    fun `async mutations persist execution state`() =
+        runBlocking {
+            val preferences = MemoryPreferenceStore()
+            val control = SubAgentExecutionControl(preferences)
+
+            control.pauseAllAsync()
+            control.pauseAgentAsync("agent-1")
+
+            val restored = SubAgentExecutionControl(preferences)
+            assertEquals(SubAgentExecutionState.PAUSED, restored.status("agent-1").effectiveState)
+            assertEquals(SubAgentPauseReason.GLOBAL_AND_INDIVIDUAL, restored.status("agent-1").pauseReason)
+
+            control.resumeAgentAsync("agent-1")
+            control.resumeAllAsync()
+            assertTrue(control.isExecutionAllowed("agent-1"))
+        }
 }
 
 private class MemoryPreferenceStore : PreferenceStore {

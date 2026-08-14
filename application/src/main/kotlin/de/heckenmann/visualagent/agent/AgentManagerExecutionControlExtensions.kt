@@ -9,8 +9,14 @@ fun AgentManager.getSubAgentExecutionStatus(agentId: String? = null): SubAgentEx
 /** Pauses all sub-agent execution while preserving individual pause flags. */
 fun AgentManager.pauseAllSubAgents(): SubAgentExecutionSnapshot = subAgentExecutionControl.pauseAll()
 
+/** Pauses all sub-agent execution without blocking the caller thread. */
+suspend fun AgentManager.pauseAllSubAgentsAsync(): SubAgentExecutionSnapshot = subAgentExecutionControl.pauseAllAsync()
+
 /** Resumes global sub-agent execution while preserving individual pause flags. */
 fun AgentManager.resumeAllSubAgents(): SubAgentExecutionSnapshot = subAgentExecutionControl.resumeAll()
+
+/** Resumes global sub-agent execution without blocking the caller thread. */
+suspend fun AgentManager.resumeAllSubAgentsAsync(): SubAgentExecutionSnapshot = subAgentExecutionControl.resumeAllAsync()
 
 /** Pauses execution for one existing sub-agent. */
 fun AgentManager.pauseSubAgent(agentId: String): SubAgentExecutionSnapshot {
@@ -18,10 +24,22 @@ fun AgentManager.pauseSubAgent(agentId: String): SubAgentExecutionSnapshot {
     return subAgentExecutionControl.pauseAgent(agentId)
 }
 
+/** Pauses one existing sub-agent without blocking the caller thread. */
+suspend fun AgentManager.pauseSubAgentAsync(agentId: String): SubAgentExecutionSnapshot {
+    require(getSubAgent(agentId) != null) { "Agent not found: $agentId" }
+    return subAgentExecutionControl.pauseAgentAsync(agentId)
+}
+
 /** Resumes execution for one existing sub-agent. */
 fun AgentManager.resumeSubAgent(agentId: String): SubAgentExecutionSnapshot {
     require(getSubAgent(agentId) != null) { "Agent not found: $agentId" }
     return subAgentExecutionControl.resumeAgent(agentId)
+}
+
+/** Resumes one existing sub-agent without blocking the caller thread. */
+suspend fun AgentManager.resumeSubAgentAsync(agentId: String): SubAgentExecutionSnapshot {
+    require(getSubAgent(agentId) != null) { "Agent not found: $agentId" }
+    return subAgentExecutionControl.resumeAgentAsync(agentId)
 }
 
 /** Registers a listener for immediate pause/resume state refreshes. */
