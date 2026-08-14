@@ -167,7 +167,17 @@ internal fun buildFixture(
             subAgentOps = subAgentOps,
             executionControl = executionControl,
         )
-    return CoordinatorFixture(coordinator, todoManager, subAgents, subAgentOps::putSubAgent, notifications, savedAgents, messages, executionControl, scope)
+    return CoordinatorFixture(
+        coordinator,
+        todoManager,
+        subAgents,
+        subAgentOps::putSubAgent,
+        notifications,
+        savedAgents,
+        messages,
+        executionControl,
+        scope,
+    )
 }
 
 private class FixturePreferenceStore : PreferenceStore {
