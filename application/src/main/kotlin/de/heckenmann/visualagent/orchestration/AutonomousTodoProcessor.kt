@@ -145,6 +145,8 @@ internal suspend fun processTodoWithLLM(
                 }
             }
         }
+    } catch (_: kotlinx.coroutines.CancellationException) {
+        cancelledByChange = true
     } catch (error: Exception) {
         logger.error(error) { "Autonomous job for todo $todoId crashed unexpectedly" }
         todoManager.cancelTodo(todoId)

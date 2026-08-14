@@ -185,6 +185,30 @@ class AutonomousCoordinatorTodoExecutionTest {
         }
 
     @Test
+    fun `stopping a paused pre-run todo does not record a crash`() =
+        runBlocking {
+            val fixture = buildFixture(chatDelayMs = 5000)
+            fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
+            val todo = fixture.todoManager.add("Paused pre-run stop task", "agent-1")
+
+            try {
+                assertTrue(fixture.coordinator.startTodo(todo.id))
+                withTimeout(3_000) {
+                    while (fixture.todoManager.getById(todo.id)?.status != TodoStatus.IN_PROGRESS) delay(50)
+                }
+                fixture.executionControl.pauseAgent("agent-1")
+                assertTrue(fixture.coordinator.stopTodo(todo.id))
+
+                withTimeout(3_000) {
+                    while (fixture.subAgents["agent-1"]?.status != AgentStatus.IDLE) delay(50)
+                }
+                assertTrue(fixture.messages.none { it.content.contains("Crashed unexpectedly") })
+            } finally {
+                fixture.cancel()
+            }
+        }
+
+    @Test
     fun `stop all ignores completed todos`() =
         runBlocking {
             val fixture = buildFixture()
