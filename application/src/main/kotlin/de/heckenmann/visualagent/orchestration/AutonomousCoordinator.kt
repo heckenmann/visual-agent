@@ -21,6 +21,7 @@ import de.heckenmann.visualagent.todo.TodoManager
 import de.heckenmann.visualagent.todo.TodoStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import mu.KotlinLogging
 import java.util.concurrent.ConcurrentHashMap
@@ -52,6 +53,7 @@ class AutonomousCoordinator
         private val pendingTodoChanges = ConcurrentHashMap<String, TodoChange>()
         private val activeCancellationTokens = ConcurrentHashMap<String, CancellationToken>()
         private val agentBusySince = ConcurrentHashMap<String, Long>()
+        private val individualTodoRequests = ConcurrentHashMap.newKeySet<String>()
         private var loopJob: kotlinx.coroutines.Job? = null
         private var loopStarted = false
         private val taskPlanner =
@@ -78,7 +80,7 @@ class AutonomousCoordinator
                             change.type == TodoChangeType.ADDED ||
                                 change.type == TodoChangeType.UPDATED
                         )
-                if (todoBecamePending) {
+                if (todoBecamePending && todo.id !in individualTodoRequests) {
                     restartLoopIfStopped()
                 }
             }
@@ -140,8 +142,26 @@ class AutonomousCoordinator
         fun startTodo(todoId: String): Boolean {
             val todo = getTodosFromDb().firstOrNull { it.id == todoId } ?: return false
             if (todo.status == TodoStatus.COMPLETED || todo.status == TodoStatus.IN_PROGRESS) return false
-            if (todo.status == TodoStatus.CANCELLED) todoManager.updateStatus(todoId, TodoStatus.PENDING)
-            startAutonomousProcessing(seed = false)
+            if (loopJob?.isActive == true || !individualTodoRequests.add(todoId)) return false
+            try {
+                if (todo.status == TodoStatus.CANCELLED) todoManager.updateStatus(todoId, TodoStatus.PENDING)
+                scope.launch {
+                    try {
+                        while (isActive) {
+                            val current = getTodosFromDb().firstOrNull { it.id == todoId } ?: return@launch
+                            if (current.status != TodoStatus.PENDING) return@launch
+                            pickAndProcessOneTodo(requestedTodoId = todoId)
+                            if (getTodosFromDb().firstOrNull { it.id == todoId }?.status == TodoStatus.IN_PROGRESS) return@launch
+                            delay(LOOP_DELAY_MILLIS)
+                        }
+                    } finally {
+                        individualTodoRequests.remove(todoId)
+                    }
+                }
+            } catch (error: Exception) {
+                individualTodoRequests.remove(todoId)
+                throw error
+            }
             return true
         }
 
@@ -205,13 +225,13 @@ class AutonomousCoordinator
 
         private fun getTodosFromDb(): List<Todo> = todoStore.listTodos()
 
-        private suspend fun pickAndProcessOneTodo() {
+        private suspend fun pickAndProcessOneTodo(requestedTodoId: String? = null) {
             if (executionControl?.isGloballyPaused() == true) return
             val busyCount = subAgents.values.count { it.status == AgentStatus.BUSY }
             val parallelLimit = parallelismProvider.get().coerceAtLeast(1)
             if (busyCount >= parallelLimit) return
 
-            val todo = findNextAssignableTodo() ?: return
+            val todo = findNextAssignableTodo(requestedTodoId) ?: return
             val agent = subAgents[todo.assignedAgentId] ?: return
             if (executionControl?.isAgentPaused(agent.id) == true) return
             if (agent.status == AgentStatus.BUSY) {
@@ -288,11 +308,12 @@ class AutonomousCoordinator
             return true
         }
 
-        private fun findNextAssignableTodo(): Todo? =
+        private fun findNextAssignableTodo(requestedTodoId: String? = null): Todo? =
             findNextAssignableTodo(
                 getTodosFromDb(),
                 subAgents,
                 todoManager,
+                requestedTodoId = requestedTodoId,
                 isAgentEligible = { agentId ->
                     executionControl?.isExecutionAllowed(agentId) ?: true
                 },

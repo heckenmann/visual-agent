@@ -13,6 +13,7 @@ import de.heckenmann.visualagent.todo.TodoStatus
  * @param todos Current todo list
  * @param subAgents Available sub-agents keyed by id
  * @param todoManager Manager used to persist an auto-assignment
+ * @param requestedTodoId Optional todo id to restrict selection to one explicit request
  * @param isAgentEligible Gate checked before an assigned or auto-selected agent is used
  * @return The next todo ready for execution, or null if none is available
  */
@@ -20,10 +21,11 @@ internal fun findNextAssignableTodo(
     todos: List<Todo>,
     subAgents: Map<String, SubAgent>,
     todoManager: TodoManager,
+    requestedTodoId: String? = null,
     isAgentEligible: (String) -> Boolean = { true },
 ): Todo? =
     todos
-        .filter { it.status == TodoStatus.PENDING }
+        .filter { it.status == TodoStatus.PENDING && (requestedTodoId == null || it.id == requestedTodoId) }
         .sortedWith(compareBy({ it.position }, { it.id }))
         .firstNotNullOfOrNull { assignAndReturnIfReady(it, subAgents, todoManager, isAgentEligible) }
 

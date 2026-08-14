@@ -8,6 +8,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class AutonomousCoordinatorTodoExecutionTest {
     @Test
@@ -43,6 +44,28 @@ class AutonomousCoordinatorTodoExecutionTest {
 
                 assertEquals(TodoStatus.COMPLETED, fixture.todoManager.getById(completed.id)?.status)
                 assertEquals(TodoStatus.IN_PROGRESS, fixture.todoManager.getById(pending.id)?.status)
+            } finally {
+                fixture.cancel()
+            }
+        }
+
+    @Test
+    fun `starting one todo does not pick an earlier pending todo`() =
+        runBlocking {
+            val fixture = buildFixture(chatDelayMs = 5000)
+            fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
+            fixture.putSubAgent(SubAgent(id = "agent-2", name = "Tester", role = "Testing", status = AgentStatus.IDLE))
+            val first = fixture.todoManager.add("First task", "agent-1")
+            val second = fixture.todoManager.add("Second task", "agent-2")
+
+            try {
+                assertTrue(fixture.coordinator.startTodo(second.id))
+                delay(1500)
+
+                assertEquals(TodoStatus.PENDING, fixture.todoManager.getById(first.id)?.status)
+                assertEquals(TodoStatus.IN_PROGRESS, fixture.todoManager.getById(second.id)?.status)
+                assertEquals(AgentStatus.IDLE, fixture.subAgents["agent-1"]?.status)
+                assertEquals(AgentStatus.BUSY, fixture.subAgents["agent-2"]?.status)
             } finally {
                 fixture.cancel()
             }
