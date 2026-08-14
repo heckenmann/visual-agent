@@ -72,6 +72,24 @@ class AutonomousCoordinatorTodoExecutionTest {
         }
 
     @Test
+    fun `global pause prevents decomposition from invoking an analyst`() =
+        runBlocking {
+            val fixture = buildFixture()
+            val todo = fixture.todoManager.add("Implement a broad feature with tests, documentation, and rollout validation")
+            fixture.executionControl.pauseAll()
+
+            try {
+                fixture.coordinator.startAutonomousProcessing(seed = false)
+                delay(800)
+
+                assertEquals(TodoStatus.PENDING, fixture.todoManager.getById(todo.id)?.status)
+                assertFalse(fixture.subAgents.values.any { it.name.contains("analyst", ignoreCase = true) })
+            } finally {
+                fixture.cancel()
+            }
+        }
+
+    @Test
     fun `stop all ignores completed todos`() =
         runBlocking {
             val fixture = buildFixture()

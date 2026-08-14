@@ -112,7 +112,9 @@ class AutonomousCoordinator
             loopJob =
                 scope.launch {
                     while (true) {
-                        taskPlanner.expandComplexTodoIfNeeded(getTodosFromDb())
+                        if (executionControl?.isExecutionAllowed() != false) {
+                            taskPlanner.expandComplexTodoIfNeeded(getTodosFromDb())
+                        }
                         pickAndProcessOneTodo()
                         val pending = getTodosFromDb().filter { it.status == TodoStatus.PENDING }
                         val inProgress = getTodosFromDb().any { it.status == TodoStatus.IN_PROGRESS }
