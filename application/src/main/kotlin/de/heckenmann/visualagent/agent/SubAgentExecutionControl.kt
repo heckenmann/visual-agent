@@ -172,8 +172,18 @@ class SubAgentExecutionControl(
     private fun mutate(change: () -> Unit): SubAgentExecutionSnapshot {
         val next =
             synchronized(lock) {
-                change()
-                persistState()
+                val previousGlobalPaused = globalPaused
+                val previousPausedAgentIds = pausedAgentIds.toSet()
+                try {
+                    change()
+                    persistState()
+                } catch (error: Throwable) {
+                    globalPaused = previousGlobalPaused
+                    pausedAgentIds.clear()
+                    pausedAgentIds += previousPausedAgentIds
+                    runCatching { persistState(previousGlobalPaused, previousPausedAgentIds) }
+                    throw error
+                }
                 val previousSignal = stateChanged
                 stateChanged = CompletableDeferred()
                 previousSignal.complete(Unit)
@@ -189,7 +199,10 @@ class SubAgentExecutionControl(
             pausedAgentIds = pausedAgentIds.toSet(),
         )
 
-    private fun persistState() {
+    private fun persistState(
+        globalPaused: Boolean = this.globalPaused,
+        pausedAgentIds: Set<String> = this.pausedAgentIds,
+    ) {
         preferenceStore.setPreference(GLOBAL_PAUSED_KEY, globalPaused.toString())
         preferenceStore.setPreference(PAUSED_AGENTS_KEY, pausedAgentIds.sorted().joinToString("\n"))
     }
