@@ -33,6 +33,7 @@ import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.resumeAllSubAgentsAsync
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
+import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -67,13 +68,14 @@ internal fun SubAgentsPanel(
     providerCatalogService: ProviderCatalogService,
     modalRequester: ComposeModalRequester,
     toolEventBus: ToolEventBus,
+    todoEventBus: TodoEventBus,
 ) {
-    var agents by remember { mutableStateOf(agentManager.getSubAgents()) }
+    var agents by remember { mutableStateOf(agentManager.getSubAgents().map { it.copy() }) }
     var executionSnapshot by remember { mutableStateOf(agentManager.getSubAgentExecutionSnapshot()) }
     var status by remember { mutableStateOf("Ready") }
     val scope = rememberCoroutineScope()
     val refresh = {
-        agents = agentManager.getSubAgents()
+        agents = agentManager.getSubAgents().map { it.copy() }
         executionSnapshot = agentManager.getSubAgentExecutionSnapshot()
     }
     DisposableEffect(agentManager) {
@@ -81,6 +83,10 @@ internal fun SubAgentsPanel(
             agentManager.addSubAgentExecutionListener { snapshot ->
                 scope.launch { executionSnapshot = snapshot }
             }
+        onDispose { handle.close() }
+    }
+    DisposableEffect(todoEventBus) {
+        val handle = todoEventBus.addListener { scope.launch { refresh() } }
         onDispose { handle.close() }
     }
     ToolEventRefreshEffect(

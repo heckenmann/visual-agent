@@ -296,6 +296,7 @@ internal fun WindowBody(
                 providerCatalogService = panelServices.providerCatalogService,
                 modalRequester = panelServices.modalRequester,
                 toolEventBus = panelServices.toolEventBus,
+                todoEventBus = panelServices.todoEventBus,
             )
         "settings" ->
             SettingsPanel(
