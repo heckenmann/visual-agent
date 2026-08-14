@@ -20,6 +20,7 @@ import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoManager
 import de.heckenmann.visualagent.todo.TodoStatus
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -240,9 +241,7 @@ class AutonomousCoordinator
                 val agent = subAgents[todo.assignedAgentId] ?: return
                 if (executionControl?.isAgentPaused(agent.id) == true) return
                 if (agent.status == AgentStatus.BUSY) {
-                    if (recoverStuckAgentIfNeeded(agent)) {
-                        todoManager.updateStatus(todo.id, TodoStatus.PENDING)
-                    }
+                    if (recoverStuckAgentIfNeeded(agent)) todoManager.updateStatus(todo.id, TodoStatus.PENDING)
                     return
                 }
                 if (agent.status != AgentStatus.IDLE) return
@@ -261,13 +260,11 @@ class AutonomousCoordinator
                 )
                 subAgentOps.notifyAgent(agent.id, "STATUS:${agent.status.name}")
 
-                val token = CancellationToken()
-                activeCancellationTokens[todo.id] = token
+                val token = CancellationToken().also { activeCancellationTokens[todo.id] = it }
                 val processingJob =
-                    scope.launch {
+                    scope.launch(start = CoroutineStart.LAZY) {
                         if (token.isCancelled || todoManager.getById(todo.id)?.status != TodoStatus.IN_PROGRESS) {
                             activeCancellationTokens.remove(todo.id, token)
-                            releaseUnstartedTodo(agent, todo.id)
                             return@launch
                         }
                         processTodoWithLLM(
@@ -292,7 +289,11 @@ class AutonomousCoordinator
                         )
                     }
                 activeTodoJobs[todo.id] = processingJob
-                processingJob.invokeOnCompletion { activeTodoJobs.remove(todo.id, processingJob) }
+                processingJob.invokeOnCompletion {
+                    activeTodoJobs.remove(todo.id, processingJob)
+                    releaseUnstartedTodo(agent, todo.id)
+                }
+                processingJob.start()
             }
         }
 

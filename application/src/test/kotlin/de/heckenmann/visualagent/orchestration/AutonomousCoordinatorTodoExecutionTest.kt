@@ -177,6 +177,7 @@ class AutonomousCoordinatorTodoExecutionTest {
                     while (fixture.subAgents["agent-1"]?.status != AgentStatus.IDLE) delay(50)
                 }
                 assertEquals(0, fixture.scheduler.snapshot().queued)
+                assertEquals(null, fixture.subAgents["agent-1"]?.currentTodoId)
             } finally {
                 releaseBlocker.complete(Unit)
                 blocker.await()
