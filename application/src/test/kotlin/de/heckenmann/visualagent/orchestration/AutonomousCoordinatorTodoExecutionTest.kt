@@ -3,6 +3,8 @@ package de.heckenmann.visualagent.orchestration
 import de.heckenmann.visualagent.agent.AgentStatus
 import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.todo.TodoStatus
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -109,6 +111,41 @@ class AutonomousCoordinatorTodoExecutionTest {
                 }
                 assertEquals(AgentStatus.BUSY, fixture.subAgents["agent-1"]?.status)
             } finally {
+                fixture.cancel()
+            }
+        }
+
+    @Test
+    fun `stopping a queued todo cancels its processor before the scheduler slot opens`() =
+        runBlocking {
+            val fixture = buildFixture(parallelism = 1, chatDelayMs = 5000)
+            fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
+            val todo = fixture.todoManager.add("Queued stop task", "agent-1")
+            val blockerStarted = CompletableDeferred<Unit>()
+            val releaseBlocker = CompletableDeferred<Unit>()
+            val blocker =
+                async {
+                    fixture.scheduler.run("blocker") {
+                        blockerStarted.complete(Unit)
+                        releaseBlocker.await()
+                    }
+                }
+
+            try {
+                blockerStarted.await()
+                assertTrue(fixture.coordinator.startTodo(todo.id))
+                withTimeout(3_000) {
+                    while (fixture.todoManager.getById(todo.id)?.status != TodoStatus.IN_PROGRESS) delay(50)
+                }
+                assertTrue(fixture.coordinator.stopTodo(todo.id))
+
+                withTimeout(3_000) {
+                    while (fixture.subAgents["agent-1"]?.status != AgentStatus.IDLE) delay(50)
+                }
+                assertEquals(0, fixture.scheduler.snapshot().queued)
+            } finally {
+                releaseBlocker.complete(Unit)
+                blocker.await()
                 fixture.cancel()
             }
         }

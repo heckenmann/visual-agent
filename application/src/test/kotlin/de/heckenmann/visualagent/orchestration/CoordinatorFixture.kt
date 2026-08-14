@@ -48,6 +48,7 @@ internal class CoordinatorFixture(
     val savedAgents: MutableList<SubAgent>,
     val messages: MutableList<Message>,
     val executionControl: SubAgentExecutionControl,
+    val scheduler: SubAgentJobScheduler,
     private val scope: CoroutineScope,
 ) {
     fun cancel() {
@@ -176,6 +177,7 @@ internal fun buildFixture(
         savedAgents,
         messages,
         executionControl,
+        scheduler,
         scope,
     )
 }

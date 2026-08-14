@@ -15,7 +15,10 @@ import de.heckenmann.visualagent.todo.TodoChange
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoManager
 import de.heckenmann.visualagent.todo.TodoProgressUpdate
+import de.heckenmann.visualagent.todo.TodoStatus
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -46,15 +49,20 @@ internal suspend fun processTodoWithLLM(
     scope: CoroutineScope,
     jobScheduler: SubAgentJobScheduler,
     executionControl: SubAgentExecutionControl? = null,
+    cancellationToken: CancellationToken? = null,
 ) {
     val logger = KotlinLogging.logger {}
-    val token = CancellationToken()
+    val token = cancellationToken ?: CancellationToken()
     activeCancellationTokens[todoId] = token
+    val processingJob = currentCoroutineContext()[Job]
+    token.onCancelled { processingJob?.cancel() }
     val watcher = startTodoChangeWatcher(todoId, agent.id, taskDescription, token, todoEventBus)
     var attempt = 0
     val maxRetries = agent.config.maxRetries.coerceAtLeast(1)
     var cancelledByChange = false
     try {
+        token.throwIfCancelled()
+        if (todoManager.getById(todoId)?.status != TodoStatus.IN_PROGRESS) return
         executionControl?.awaitExecutionAllowed(agent.id)
         delay(300)
         while (attempt < maxRetries) {
@@ -149,7 +157,7 @@ internal suspend fun processTodoWithLLM(
     } finally {
         todoEventBus.publishProgress(TodoProgressUpdate(todoId = todoId, completed = true))
         watcher.close()
-        activeCancellationTokens.remove(todoId)
+        activeCancellationTokens.remove(todoId, token)
         agentBusySince.remove(agent.id)
         if (cancelledByChange && scope.isActive) {
             handleTodoChangeAfterCancellation(
