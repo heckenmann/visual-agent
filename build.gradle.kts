@@ -45,6 +45,10 @@ gradle.projectsEvaluated {
         useJUnitPlatform {
             excludeTags("database", "de.heckenmann.visualagent.testsupport.DatabaseTestCategory")
         }
+        // The aggregate test task produces JaCoCo execution data consumed by the root
+        // coverage verification. Reusing its cached result can pair stale execution data
+        // with current classes and make the coverage gate nondeterministic.
+        outputs.cacheIf { false }
         mustRunAfter(":application:databaseTest")
         workingDir = rootProject.projectDir
         systemProperty("visualagent.ollama.smoke", System.getProperty("visualagent.ollama.smoke", "false"))
