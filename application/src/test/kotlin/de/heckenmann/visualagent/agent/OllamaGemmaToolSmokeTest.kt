@@ -17,7 +17,7 @@ import kotlin.test.assertTrue
  * This test is opt-in because it requires a running Ollama daemon and the
  * `gemma4:e2b` model to be present locally.
  */
-@SpringBootTest(properties = ["visual-agent.ui.enabled=false"])
+@SpringBootTest(properties = ["visual-agent.ui.enabled=false", "visual-agent.db.path=jdbc:sqlite::memory:"])
 @EnabledIfSystemProperty(named = "visualagent.ollama.smoke", matches = "true")
 class OllamaGemmaToolSmokeTest {
     @Autowired

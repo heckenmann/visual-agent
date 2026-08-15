@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 
-@SpringBootTest(properties = ["visual-agent.ui.enabled=false"])
+@SpringBootTest(properties = ["visual-agent.ui.enabled=false", "visual-agent.db.path=jdbc:sqlite::memory:"])
 @Disabled("Exploratory autonomous-processing test; depends on local LLM availability and is not part of the core regression suite")
 class AutonomousAgentProcessingTest {
     @Autowired
