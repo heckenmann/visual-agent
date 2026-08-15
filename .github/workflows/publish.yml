@@ -59,11 +59,11 @@ jobs:
         run: gradle wrapper --gradle-version 9.6.0 --no-daemon
 
       - name: Build JAR without tests
-        run: ./gradlew --no-daemon :ui:bootJar
+        run: ./gradlew --no-daemon :desktop:bootJar
         shell: bash
 
       - name: Publish to GitHub Packages
-        run: ./gradlew --no-daemon :ui:publish
+        run: ./gradlew --no-daemon :desktop:publish
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
