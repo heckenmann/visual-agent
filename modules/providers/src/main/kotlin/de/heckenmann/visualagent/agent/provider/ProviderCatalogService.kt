@@ -4,6 +4,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.springframework.context.annotation.DependsOn
 import org.springframework.stereotype.Service
 
 /**
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service
  * Use cases: UC-0000007, UC-0000008, UC-0000009.
  */
 @Service
+@DependsOn("appConfigPersistenceBinder")
 class ProviderCatalogService(
     private val preferenceStore: ProviderPreferenceStore,
     private val appConfig: ProviderRuntimeConfig = DefaultProviderRuntimeConfig(),

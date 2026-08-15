@@ -15,6 +15,9 @@ class WorkspaceLayoutService(
     private var stage: StageState? = null
 
     @Volatile
+    private var stagePosition: StagePosition? = null
+
+    @Volatile
     private var desktop: DesktopState? = null
 
     @Volatile
@@ -38,6 +41,7 @@ class WorkspaceLayoutService(
         val persisted = persistence.load()
         return WorkspaceLayoutReport(
             stage = stage ?: persisted.stage,
+            stagePosition = stagePosition ?: persisted.stagePosition,
             desktop = desktop,
             screens = emptyList(),
             windows = liveWindows ?: persisted.windows,
@@ -55,7 +59,8 @@ class WorkspaceLayoutService(
         states: List<WorkspaceWindowState>,
         notifyListeners: Boolean = true,
     ): WorkspaceLayout {
-        val layout = WorkspaceLayout(states, persistence.load().stage)
+        val persisted = persistence.load()
+        val layout = WorkspaceLayout(states, persisted.stage, persisted.stagePosition)
         liveWindows = states
         persistence.save(layout)
         if (notifyListeners) {
@@ -69,9 +74,12 @@ class WorkspaceLayoutService(
      *
      * @param stage Main window width and height in pixels
      */
-    fun saveStage(stage: StageState) {
+    fun saveStage(
+        stage: StageState,
+        position: StagePosition? = null,
+    ) {
         val current = persistence.load()
-        persistence.save(current.copy(stage = stage))
+        persistence.save(current.copy(stage = stage, stagePosition = position ?: current.stagePosition))
     }
 
     /**
@@ -93,6 +101,8 @@ class WorkspaceLayoutService(
 data class WorkspaceLayoutReport(
     /** Main window dimensions, if a live window is available. */
     val stage: StageState? = null,
+    /** Main window position, if persisted or available from the live desktop host. */
+    val stagePosition: StagePosition? = null,
     /** Internal desktop dimensions, if the live UI is available. */
     val desktop: DesktopState? = null,
     /** Available display screens and their usable bounds. */

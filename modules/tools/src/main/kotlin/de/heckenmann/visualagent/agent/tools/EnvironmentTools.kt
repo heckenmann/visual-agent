@@ -6,9 +6,9 @@ import de.heckenmann.visualagent.agent.tools.api.ToolResult
 import de.heckenmann.visualagent.agent.tools.api.ToolSettingsPort
 import de.heckenmann.visualagent.agent.tools.api.ToolSettingsUpdate
 
-/** Tool that exposes safe UI/session settings to the model. */
+/** Tool that exposes safe application/session settings to the model. */
 @AgentTool
-class UiTool(
+class SettingsTool(
     private val settings: ToolSettingsPort,
 ) : VisualAgentTool {
     override val definition =

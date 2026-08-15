@@ -29,9 +29,12 @@ dependencies {
     implementation(libs.kotlin.reflect)
     implementation(project(":providers"))
     implementation(project(":tools"))
+    implementation(project(":protocol"))
 
     // Spring Boot & AI
     implementation(libs.spring.boot.starter)
+    implementation(libs.grpc.inprocess)
+    implementation(libs.grpc.netty.shaded)
     implementation(libs.spring.boot.starter.data.jpa)
     implementation(platform(libs.spring.ai.bom))
     implementation(libs.spring.ai.ollama)
@@ -64,11 +67,11 @@ dependencies {
     testImplementation(libs.spring.boot.starter.test)
     testImplementation(libs.mockk)
     testImplementation(libs.coroutines.test)
-    testRuntimeOnly(libs.junit.vintage.engine)
 }
 
 val coroutinesVersion = libs.versions.coroutines.get()
 val databaseTestTag = "database"
+val databaseCategoryTag = "de.heckenmann.visualagent.testsupport.DatabaseTestCategory"
 
 dependencyManagement {
     dependencies {
@@ -87,7 +90,7 @@ val databaseTest =
         description = "Runs SQLite-backed tests serially."
         group = "verification"
         useJUnitPlatform {
-            includeTags(databaseTestTag)
+            includeTags(databaseTestTag, databaseCategoryTag)
         }
         testClassesDirs = sourceSets["test"].output.classesDirs
         classpath = sourceSets["test"].runtimeClasspath
@@ -104,7 +107,7 @@ databaseTest.configure { mustRunAfter(tasks.test) }
 
 tasks.test {
     useJUnitPlatform {
-        excludeTags(databaseTestTag)
+        excludeTags(databaseTestTag, databaseCategoryTag)
     }
     filter {
         isFailOnNoMatchingTests = false
@@ -175,10 +178,15 @@ springBoot {
     mainClass.set("de.heckenmann.visualagent.VisualAgentApplicationKt")
 }
 
-tasks.register("run") {
+tasks.register("runServer") {
     group = "application"
-    description = "Runs the Compose desktop host from the :ui module."
-    dependsOn(":ui:run")
+    description = "Runs the standalone Spring Boot server without the Compose desktop host."
+    dependsOn(tasks.named("bootRun"))
+}
+
+tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
+    workingDir(rootProject.projectDir)
+    systemProperty("spring.output.ansi.enabled", "ALWAYS")
 }
 
 kotlin {
@@ -190,7 +198,7 @@ kotlin {
 }
 
 tasks.register<Copy>("copyAllDependencies") {
-    from(configurations.compileClasspath, configurations.runtimeClasspath, project(":ui").configurations.named("runtimeClasspath"))
+    from(configurations.compileClasspath, configurations.runtimeClasspath)
     into(rootProject.projectDir.resolve("lib"))
 }
 

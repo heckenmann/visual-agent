@@ -10,7 +10,6 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
-import java.util.Base64
 import java.util.UUID
 import kotlin.io.path.createDirectories
 import kotlin.io.path.deleteIfExists
@@ -18,7 +17,6 @@ import kotlin.io.path.extension
 import kotlin.io.path.fileSize
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.name
-import kotlin.io.path.readBytes
 import kotlin.io.path.readText
 import kotlin.io.path.writeBytes
 import kotlin.streams.asSequence
@@ -56,6 +54,24 @@ class WorkspaceFileService(
         val destination = WorkspaceFilePaths.uniqueDestination(importsDir, source.name)
         Files.copy(source.toPath(), destination)
         return recordManagedFile(destination, source.name)
+    }
+
+    /**
+     * Imports file bytes supplied by a presentation or transport adapter.
+     *
+     * @param originalName User-provided source filename
+     * @param bytes Complete source file contents
+     * @return Persisted metadata for the imported copy
+     */
+    fun importFile(
+        originalName: String,
+        bytes: ByteArray,
+    ): WorkspaceFileRecord {
+        require(bytes.size <= MAX_IMPORT_BYTES) { "File is larger than ${MAX_IMPORT_BYTES / 1024 / 1024} MB" }
+        val importsDir = workspaceRoot().resolve("imports").also { it.createDirectories() }
+        val destination = WorkspaceFilePaths.uniqueDestination(importsDir, originalName)
+        destination.writeBytes(bytes)
+        return recordManagedFile(destination, originalName)
     }
 
     /**
@@ -310,29 +326,12 @@ class WorkspaceFileService(
     /**
      * Reads image dimensions and metadata.
      */
-    fun imageInfo(record: WorkspaceFileRecord): WorkspaceImageInfo {
-        val path = resolveManagedPath(record.relativePath)
-        val dimensions = ImageHeaderReader.dimensions(path)
-        return WorkspaceImageInfo(
-            width = dimensions.width,
-            height = dimensions.height,
-            mimeType = WorkspaceFilePaths.detectMimeType(path),
-            sizeBytes = path.fileSize(),
-            sha256 = WorkspaceFilePaths.sha256(path),
-        )
-    }
+    fun imageInfo(record: WorkspaceFileRecord): WorkspaceImageInfo = WorkspaceImageMetadata.info(resolveManagedPath(record.relativePath))
 
     /**
      * Returns bounded base64 bytes for image/tool transport.
      */
-    fun imageBytes(record: WorkspaceFileRecord): WorkspaceImageBytes {
-        val path = resolveManagedPath(record.relativePath)
-        require(path.fileSize() <= MAX_BASE64_BYTES) { "Image is larger than ${MAX_BASE64_BYTES / 1024 / 1024} MB" }
-        return WorkspaceImageBytes(
-            mimeType = WorkspaceFilePaths.detectMimeType(path),
-            base64 = Base64.getEncoder().encodeToString(path.readBytes()),
-        )
-    }
+    fun imageBytes(record: WorkspaceFileRecord): WorkspaceImageBytes = WorkspaceImageMetadata.bytes(resolveManagedPath(record.relativePath))
 
     /**
      * Resolves a workspace-relative path and guarantees it stays inside the managed workspace.
@@ -383,7 +382,6 @@ class WorkspaceFileService(
 
     private companion object {
         const val MAX_IMPORT_BYTES = 50L * 1024L * 1024L
-        const val MAX_BASE64_BYTES = 8L * 1024L * 1024L
         const val MAX_TEXT_CHARS = 120_000
         const val MAX_SEARCH_RESULTS = 50
     }
