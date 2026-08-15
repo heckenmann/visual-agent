@@ -9,10 +9,13 @@ import de.heckenmann.visualagent.protocol.v1.ServerFrame
 import io.grpc.stub.StreamObserver
 import io.mockk.coEvery
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -153,6 +156,61 @@ class VisualAgentGrpcSessionServiceTest {
                 .chatCompleted.successful,
         )
     }
+
+    @Test
+    fun `replacing a streaming request keeps cancellation state scoped to each request`() =
+        runTest {
+            val firstStarted = CompletableDeferred<Unit>()
+            val releaseFirst = CompletableDeferred<Unit>()
+            val secondCompleted = CompletableDeferred<Unit>()
+            val conversationPort = mockk<ConversationPort>(relaxed = true)
+            coEvery { conversationPort.stream(any(), any(), any()) } coAnswers {
+                when (firstArg<String>()) {
+                    "first" -> {
+                        firstStarted.complete(Unit)
+                        releaseFirst.await()
+                    }
+                    "second" -> {
+                        thirdArg<(String) -> Unit>().invoke("second-result")
+                        secondCompleted.complete(Unit)
+                    }
+                }
+            }
+            val sessionService = VisualAgentGrpcSessionService(conversationPort, scope)
+            val observer = RecordingObserver<ServerFrame>()
+            val requestObserver = sessionService.openSession(observer)
+            requestObserver.onNext(
+                ClientFrame
+                    .newBuilder()
+                    .setSessionId("test-session")
+                    .setHello(Hello.newBuilder().setProtocolVersion(ProtocolVersion.CURRENT).build())
+                    .build(),
+            )
+            requestObserver.onNext(
+                ClientFrame
+                    .newBuilder()
+                    .setSessionId("test-session")
+                    .setRequestId("request-1")
+                    .setChatRequest(ChatRequest.newBuilder().setContent("first").build())
+                    .build(),
+            )
+            withTimeout(1_000) { firstStarted.await() }
+            requestObserver.onNext(
+                ClientFrame
+                    .newBuilder()
+                    .setSessionId("test-session")
+                    .setRequestId("request-2")
+                    .setChatRequest(ChatRequest.newBuilder().setContent("second").build())
+                    .build(),
+            )
+            releaseFirst.complete(Unit)
+            withTimeout(1_000) { secondCompleted.await() }
+
+            val secondFrames = observer.values.filter { it.requestId == "request-2" }
+            assertEquals("second-result", secondFrames.single { it.hasChatDelta() }.chatDelta.text)
+            assertEquals(true, secondFrames.any { it.hasChatCompleted() })
+            assertEquals(true, observer.values.filter { it.hasError() }.all { it.requestId == "request-1" })
+        }
 
     private class RecordingObserver<T> : StreamObserver<T> {
         val values = mutableListOf<T>()

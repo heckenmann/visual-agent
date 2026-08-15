@@ -19,16 +19,16 @@ import de.heckenmann.visualagent.canvas.CanvasSnapshot as ApplicationCanvasSnaps
 class SpringCanvasPort(
     private val canvasOperations: CanvasOperations,
 ) : CanvasPort {
-    override fun snapshot(): CanvasSnapshot = canvasOperations.snapshot().toProtocol()
+    override fun snapshot(): CanvasSnapshot = protocolBoundary { canvasOperations.snapshot().toProtocol() }
 
-    override fun clear(): CanvasSnapshot = canvasOperations.clear().toProtocol()
+    override fun clear(): CanvasSnapshot = protocolBoundary { canvasOperations.clear().toProtocol() }
 
     override fun drawText(
         text: String,
         x: Double,
         y: Double,
         color: String,
-    ): CanvasSnapshot = canvasOperations.drawText(text, x, y, color).toProtocol()
+    ): CanvasSnapshot = protocolBoundary { canvasOperations.drawText(text, x, y, color).toProtocol() }
 
     override fun drawRect(
         x: Double,
@@ -37,7 +37,7 @@ class SpringCanvasPort(
         height: Double,
         fillColor: String,
         strokeColor: String?,
-    ): CanvasSnapshot = canvasOperations.drawRect(x, y, width, height, fillColor, strokeColor).toProtocol()
+    ): CanvasSnapshot = protocolBoundary { canvasOperations.drawRect(x, y, width, height, fillColor, strokeColor).toProtocol() }
 
     override fun drawLine(
         x1: Double,
@@ -46,52 +46,56 @@ class SpringCanvasPort(
         y2: Double,
         color: String,
         width: Double,
-    ): CanvasSnapshot = canvasOperations.drawLine(x1, y1, x2, y2, color, width).toProtocol()
+    ): CanvasSnapshot = protocolBoundary { canvasOperations.drawLine(x1, y1, x2, y2, color, width).toProtocol() }
 
     override fun drawStroke(
         points: List<CanvasPoint>,
         color: String,
         width: Double,
-    ): CanvasSnapshot = canvasOperations.drawStroke(points.map(CanvasPoint::toApplication), color, width).toProtocol()
+    ): CanvasSnapshot = protocolBoundary { canvasOperations.drawStroke(points.map(CanvasPoint::toApplication), color, width).toProtocol() }
 
     override fun drawCircle(
         centerX: Double,
         centerY: Double,
         radius: Double,
         fillColor: String,
-    ): CanvasSnapshot = canvasOperations.drawCircle(centerX, centerY, radius, fillColor).toProtocol()
+    ): CanvasSnapshot = protocolBoundary { canvasOperations.drawCircle(centerX, centerY, radius, fillColor).toProtocol() }
 
-    override fun insertImage(path: String): CanvasSnapshot = canvasOperations.insertImage(path).toProtocol()
+    override fun insertImage(path: String): CanvasSnapshot = protocolBoundary { canvasOperations.insertImage(path).toProtocol() }
 
-    override fun selectFigures(indices: Set<Int>): CanvasSnapshot = canvasOperations.selectFigures(indices).toProtocol()
+    override fun selectFigures(indices: Set<Int>): CanvasSnapshot =
+        protocolBoundary { canvasOperations.selectFigures(indices).toProtocol() }
 
     override fun selectAt(
         x: Double,
         y: Double,
-    ): CanvasSnapshot = canvasOperations.selectAt(x, y).toProtocol()
+    ): CanvasSnapshot = protocolBoundary { canvasOperations.selectAt(x, y).toProtocol() }
 
     override fun moveFigure(
         index: Int,
         deltaX: Double,
         deltaY: Double,
-    ): CanvasSnapshot = canvasOperations.moveFigure(index, deltaX, deltaY).toProtocol()
+    ): CanvasSnapshot = protocolBoundary { canvasOperations.moveFigure(index, deltaX, deltaY).toProtocol() }
 
     override fun resizeFigure(
         index: Int,
         width: Double,
         height: Double,
-    ): CanvasSnapshot = canvasOperations.resizeFigure(index, width, height).toProtocol()
+    ): CanvasSnapshot = protocolBoundary { canvasOperations.resizeFigure(index, width, height).toProtocol() }
 
-    override fun deleteSelectedFigures(): CanvasSnapshot = canvasOperations.deleteSelectedFigures().toProtocol()
+    override fun deleteSelectedFigures(): CanvasSnapshot = protocolBoundary { canvasOperations.deleteSelectedFigures().toProtocol() }
 
-    override fun saveDocument(requestedName: String): CanvasDocumentReference = canvasOperations.saveDocument(requestedName).toProtocol()
+    override fun saveDocument(requestedName: String): CanvasDocumentReference =
+        protocolBoundary {
+            canvasOperations.saveDocument(requestedName).toProtocol()
+        }
 
     override fun openDocument(
         id: String?,
         path: String?,
-    ): CanvasSnapshot = canvasOperations.openDocument(id, path).toProtocol()
+    ): CanvasSnapshot = protocolBoundary { canvasOperations.openDocument(id, path).toProtocol() }
 
-    override fun captureImage(format: String): CanvasImageSnapshot = canvasOperations.captureImage(format).toProtocol()
+    override fun captureImage(format: String): CanvasImageSnapshot = protocolBoundary { canvasOperations.captureImage(format).toProtocol() }
 }
 
 private fun ApplicationCanvasSnapshot.toProtocol(): CanvasSnapshot =

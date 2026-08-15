@@ -101,10 +101,13 @@ class SpringConversationPortTest {
         runTest {
             every { manager.clearHistory() } returns Unit
             coEvery { manager.addWelcomeMessageAfterReset() } returns
-                WelcomeResult.Fallback("fallback", IllegalStateException("provider unavailable"))
+                WelcomeResult.Fallback("fallback", IllegalStateException("Provider not reachable"))
 
             val result = port.clearAndCreateWelcome()
 
-            assertEquals("provider unavailable", result.warning)
+            assertEquals(
+                "The provider could not be reached. Check the connection and provider base URL.",
+                result.warning,
+            )
         }
 }

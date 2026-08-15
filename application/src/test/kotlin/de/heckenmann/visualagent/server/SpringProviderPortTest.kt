@@ -133,4 +133,13 @@ class SpringProviderPortTest {
 
         assertEquals(ProviderAdapter.CODEX_CLI, port.getProvider("codex")?.adapter)
     }
+
+    @Test
+    fun `provider change listeners are delegated to the catalog`() {
+        val handle = AutoCloseable { }
+        every { catalog.addChangeListener(any()) } returns handle
+
+        assertEquals(handle, port.addChangeListener { })
+        verify { catalog.addChangeListener(any()) }
+    }
 }

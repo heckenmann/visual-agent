@@ -21,42 +21,49 @@ class SpringProviderPort(
     private val providerCatalog: ProviderCatalogService,
     private val llmProvider: LLMProvider,
 ) : ProviderPort {
-    override fun listProviders(): List<ProviderProfile> = providerCatalog.listProviders().map(ApplicationProviderProfile::toProtocol)
+    override fun listProviders(): List<ProviderProfile> =
+        protocolBoundary {
+            providerCatalog.listProviders().map(ApplicationProviderProfile::toProtocol)
+        }
 
-    override fun enabledProviders(): List<ProviderProfile> = providerCatalog.enabledProviders().map(ApplicationProviderProfile::toProtocol)
+    override fun enabledProviders(): List<ProviderProfile> =
+        protocolBoundary {
+            providerCatalog.enabledProviders().map(ApplicationProviderProfile::toProtocol)
+        }
 
-    override fun getProvider(id: String): ProviderProfile? = providerCatalog.getProvider(id)?.toProtocol()
+    override fun getProvider(id: String): ProviderProfile? = protocolBoundary { providerCatalog.getProvider(id)?.toProtocol() }
 
     override fun selectableModels(providerId: String): List<ProviderModel> =
-        providerCatalog.selectableModels(providerId).map(ProviderModelConfig::toProtocol)
+        protocolBoundary { providerCatalog.selectableModels(providerId).map(ProviderModelConfig::toProtocol) }
 
-    override fun activeProviderId(): String = providerCatalog.activeProviderId()
+    override fun activeProviderId(): String = protocolBoundary { providerCatalog.activeProviderId() }
 
-    override fun activeModelId(): String = providerCatalog.activeModelId()
+    override fun activeModelId(): String = protocolBoundary { providerCatalog.activeModelId() }
 
-    override fun setActiveProvider(providerId: String) = providerCatalog.setActiveProvider(providerId)
+    override fun setActiveProvider(providerId: String) = protocolBoundary { providerCatalog.setActiveProvider(providerId) }
 
     override fun setActiveSelection(
         providerId: String,
         modelId: String,
-    ) = providerCatalog.setActiveSelection(providerId, modelId)
+    ) = protocolBoundary { providerCatalog.setActiveSelection(providerId, modelId) }
 
-    override fun saveProvider(profile: ProviderProfile) = providerCatalog.saveProvider(profile.toApplication())
+    override fun saveProvider(profile: ProviderProfile) = protocolBoundary { providerCatalog.saveProvider(profile.toApplication()) }
 
-    override fun deleteProvider(providerId: String): Boolean = providerCatalog.deleteProvider(providerId)
+    override fun deleteProvider(providerId: String): Boolean = protocolBoundary { providerCatalog.deleteProvider(providerId) }
 
-    override suspend fun refreshModels(providerId: String): List<ProviderModel> {
-        val discovered = llmProvider.getModels(providerId)
-        providerCatalog.updateDiscoveredModels(providerId, discovered)
-        return selectableModels(providerId)
-    }
+    override suspend fun refreshModels(providerId: String): List<ProviderModel> =
+        protocolBoundary {
+            val discovered = llmProvider.getModels(providerId)
+            providerCatalog.updateDiscoveredModels(providerId, discovered)
+            selectableModels(providerId)
+        }
 
     override suspend fun modelDetails(
         providerId: String,
         modelId: String,
-    ): ModelDetails = llmProvider.getModelDetails(providerId, modelId).toProtocol()
+    ): ModelDetails = protocolBoundary { llmProvider.getModelDetails(providerId, modelId).toProtocol() }
 
-    override fun addChangeListener(listener: () -> Unit): AutoCloseable = AutoCloseable {}
+    override fun addChangeListener(listener: () -> Unit): AutoCloseable = providerCatalog.addChangeListener(listener)
 }
 
 private fun ApplicationProviderProfile.toProtocol(): ProviderProfile =

@@ -6,6 +6,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.springframework.context.annotation.DependsOn
 import org.springframework.stereotype.Service
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Stores provider profiles, model catalogs, and active selection in SQLite.
@@ -21,6 +22,7 @@ class ProviderCatalogService(
     private val appConfig: ProviderRuntimeConfig = DefaultProviderRuntimeConfig(),
 ) {
     private val json = Json { ignoreUnknownKeys = true }
+    private val changeListeners = CopyOnWriteArrayList<() -> Unit>()
 
     init {
         migrateLegacyConfiguration()
@@ -93,6 +95,12 @@ class ProviderCatalogService(
         save(state.copy(activeProviderId = nextActive, activeModelId = nextActiveModel, providers = remaining))
         appConfig.llmProvider = nextActive
         return true
+    }
+
+    /** Registers a listener invoked after the persisted provider catalog changes. */
+    fun addChangeListener(listener: () -> Unit): AutoCloseable {
+        changeListeners += listener
+        return AutoCloseable { changeListeners.remove(listener) }
     }
 
     /**
@@ -329,6 +337,7 @@ class ProviderCatalogService(
 
     private fun save(state: CatalogState) {
         preferenceStore.setPreference(KEY_CATALOG, json.encodeToString(state))
+        changeListeners.forEach { listener -> runCatching(listener) }
     }
 
     @Serializable

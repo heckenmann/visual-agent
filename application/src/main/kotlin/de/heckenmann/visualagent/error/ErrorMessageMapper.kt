@@ -105,7 +105,8 @@ internal object ErrorMessageMapper {
 
     private fun isTimeout(detail: String): Boolean = "timeout" in detail || "timed out" in detail
 
-    private fun isConnection(detail: String): Boolean = "connection refused" in detail || "unknown host" in detail || "dns" in detail
+    private fun isConnection(detail: String): Boolean =
+        "connection refused" in detail || "unknown host" in detail || "dns" in detail || "provider not reachable" in detail
 
     private fun extractHttpStatus(throwable: Throwable): Int? {
         var current: Throwable? = throwable

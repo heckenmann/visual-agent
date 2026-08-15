@@ -27,6 +27,7 @@ class SpringApplicationPortTest {
 
         port.cancelActiveWork()
 
-        verify(exactly = 1) { manager.cancelActiveWork() }
+        verify(exactly = 1) { manager.cancelAllRunningActions() }
+        verify(exactly = 1) { manager.cancelAllActiveTodos() }
     }
 }

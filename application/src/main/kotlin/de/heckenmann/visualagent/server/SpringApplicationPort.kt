@@ -28,6 +28,7 @@ class SpringApplicationPort(
     private val agentManager: de.heckenmann.visualagent.agent.AgentManager,
 ) : ApplicationPort {
     override fun cancelActiveWork() {
-        agentManager.cancelActiveWork()
+        agentManager.cancelAllRunningActions()
+        agentManager.cancelAllActiveTodos()
     }
 }

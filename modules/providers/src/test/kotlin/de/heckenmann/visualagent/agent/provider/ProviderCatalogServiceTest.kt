@@ -19,6 +19,34 @@ class ProviderCatalogServiceTest {
     }
 
     @Test
+    fun `listeners are notified after catalog changes and can be removed`() {
+        val catalog = ProviderCatalogService(MapPreferenceStore())
+        var notifications = 0
+        val handle = catalog.addChangeListener { notifications++ }
+
+        catalog.saveProvider(
+            ProviderProfile(
+                id = "listener-test",
+                name = "Listener test",
+                adapter = ProviderAdapter.OPENAI_COMPATIBLE,
+                baseUrl = "https://example.test",
+            ),
+        )
+        assertEquals(1, notifications)
+
+        handle.close()
+        catalog.saveProvider(
+            ProviderProfile(
+                id = "listener-test",
+                name = "Listener test updated",
+                adapter = ProviderAdapter.OPENAI_COMPATIBLE,
+                baseUrl = "https://example.test",
+            ),
+        )
+        assertEquals(1, notifications)
+    }
+
+    @Test
     fun `model filters exclude disabled deprecated and blacklisted models`() {
         val catalog = ProviderCatalogService(MapPreferenceStore())
         catalog.saveProvider(

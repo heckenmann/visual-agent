@@ -3,6 +3,7 @@ package de.heckenmann.visualagent.server
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.config.AppConfigBean
+import de.heckenmann.visualagent.error.ErrorMessageMapper
 import de.heckenmann.visualagent.protocol.CancellationToken
 import de.heckenmann.visualagent.protocol.ConversationClearResult
 import de.heckenmann.visualagent.protocol.ConversationHistoryPage
@@ -22,10 +23,10 @@ class SpringConversationPort(
     private val appConfig: AppConfigBean,
 ) : ConversationPort {
     override suspend fun latest(): ConversationHistoryPage =
-        withContext(Dispatchers.IO) { agentManager.readLatestHistoryPage().toConversationPage() }
+        withContext(Dispatchers.IO) { protocolBoundary { agentManager.readLatestHistoryPage().toConversationPage() } }
 
     override suspend fun older(offset: Int): ConversationHistoryPage =
-        withContext(Dispatchers.IO) { agentManager.readOlderHistoryPage(offset).toConversationPage() }
+        withContext(Dispatchers.IO) { protocolBoundary { agentManager.readOlderHistoryPage(offset).toConversationPage() } }
 
     override suspend fun stream(
         content: String,
@@ -33,43 +34,53 @@ class SpringConversationPort(
         onChunk: (String) -> Unit,
     ) {
         withContext(Dispatchers.IO) {
-            val applicationToken = ApplicationCancellationToken()
-            token.onCancelled(applicationToken::cancel)
-            agentManager.streamMessage(content, applicationToken, onChunk)
+            protocolBoundary {
+                val applicationToken = ApplicationCancellationToken()
+                token.onCancelled(applicationToken::cancel)
+                agentManager.streamMessage(content, applicationToken, onChunk)
+            }
         }
     }
 
-    override fun currentHistory(): List<ConversationMessage> = agentManager.getHistory().map(Message::toConversationMessage)
+    override fun currentHistory(): List<ConversationMessage> =
+        protocolBoundary {
+            agentManager.getHistory().map(Message::toConversationMessage)
+        }
 
-    override fun deleteMessage(id: String): Boolean {
-        agentManager.deleteMessageById(id)
-        return true
-    }
+    override fun deleteMessage(id: String): Boolean =
+        protocolBoundary {
+            agentManager.deleteMessageById(id)
+            true
+        }
 
     override fun updateMessage(
         id: String,
         content: String,
-    ): Boolean {
-        agentManager.updateMessageContentById(id, content)
-        return true
-    }
+    ): Boolean =
+        protocolBoundary {
+            agentManager.updateMessageContentById(id, content)
+            true
+        }
 
     override fun cancelActiveWork() {
-        agentManager.cancelAllRunningActions()
-        agentManager.cancelAllActiveTodos()
-    }
-
-    override suspend fun clearAndCreateWelcome(): ConversationClearResult {
-        agentManager.clearHistory()
-        val result = agentManager.addWelcomeMessageAfterReset()
-        return when (result) {
-            is de.heckenmann.visualagent.agent.conversation.WelcomeResult.Generated -> ConversationClearResult()
-            is de.heckenmann.visualagent.agent.conversation.WelcomeResult.Fallback ->
-                ConversationClearResult(
-                    result.error.message ?: result.error::class.simpleName,
-                )
+        protocolBoundary {
+            agentManager.cancelAllRunningActions()
+            agentManager.cancelAllActiveTodos()
         }
     }
+
+    override suspend fun clearAndCreateWelcome(): ConversationClearResult =
+        protocolBoundary {
+            agentManager.clearHistory()
+            val result = agentManager.addWelcomeMessageAfterReset()
+            when (result) {
+                is de.heckenmann.visualagent.agent.conversation.WelcomeResult.Generated -> ConversationClearResult()
+                is de.heckenmann.visualagent.agent.conversation.WelcomeResult.Fallback ->
+                    ConversationClearResult(
+                        ErrorMessageMapper.map(result.error).detail,
+                    )
+            }
+        }
 
     override fun preferences(): ConversationPreferences =
         ConversationPreferences(

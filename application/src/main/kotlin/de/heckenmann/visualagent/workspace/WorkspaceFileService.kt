@@ -2,6 +2,7 @@ package de.heckenmann.visualagent.workspace
 
 import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
 import de.heckenmann.visualagent.knowledge.WorkspaceFileStore
+import de.heckenmann.visualagent.protocol.MAX_WORKSPACE_FILE_IMPORT_BYTES
 import org.apache.pdfbox.Loader
 import org.apache.pdfbox.text.PDFTextStripper
 import org.springframework.beans.factory.annotation.Qualifier
@@ -49,7 +50,9 @@ class WorkspaceFileService(
      */
     fun importFile(source: File): WorkspaceFileRecord {
         require(source.isFile) { "File does not exist: ${source.name}" }
-        require(source.length() <= MAX_IMPORT_BYTES) { "File is larger than ${MAX_IMPORT_BYTES / 1024 / 1024} MB" }
+        require(source.length() <= MAX_WORKSPACE_FILE_IMPORT_BYTES) {
+            "File is larger than ${MAX_WORKSPACE_FILE_IMPORT_BYTES / 1024 / 1024} MB"
+        }
         val importsDir = workspaceRoot().resolve("imports").also { it.createDirectories() }
         val destination = WorkspaceFilePaths.uniqueDestination(importsDir, source.name)
         Files.copy(source.toPath(), destination)
@@ -67,7 +70,9 @@ class WorkspaceFileService(
         originalName: String,
         bytes: ByteArray,
     ): WorkspaceFileRecord {
-        require(bytes.size <= MAX_IMPORT_BYTES) { "File is larger than ${MAX_IMPORT_BYTES / 1024 / 1024} MB" }
+        require(bytes.size <= MAX_WORKSPACE_FILE_IMPORT_BYTES) {
+            "File is larger than ${MAX_WORKSPACE_FILE_IMPORT_BYTES / 1024 / 1024} MB"
+        }
         val importsDir = workspaceRoot().resolve("imports").also { it.createDirectories() }
         val destination = WorkspaceFilePaths.uniqueDestination(importsDir, originalName)
         destination.writeBytes(bytes)
@@ -90,7 +95,9 @@ class WorkspaceFileService(
         bytes: ByteArray,
         mimeType: String? = null,
     ): WorkspaceFileRecord {
-        require(bytes.size <= MAX_IMPORT_BYTES) { "File is larger than ${MAX_IMPORT_BYTES / 1024 / 1024} MB" }
+        require(bytes.size <= MAX_WORKSPACE_FILE_IMPORT_BYTES) {
+            "File is larger than ${MAX_WORKSPACE_FILE_IMPORT_BYTES / 1024 / 1024} MB"
+        }
         val directory = workspaceRoot().resolve(WorkspaceFilePaths.safeDirectoryName(directoryName)).also { it.createDirectories() }
         val destination = WorkspaceFilePaths.uniqueDestination(directory, requestedName)
         destination.writeBytes(bytes)
@@ -381,7 +388,6 @@ class WorkspaceFileService(
     }
 
     private companion object {
-        const val MAX_IMPORT_BYTES = 50L * 1024L * 1024L
         const val MAX_TEXT_CHARS = 120_000
         const val MAX_SEARCH_RESULTS = 50
     }
