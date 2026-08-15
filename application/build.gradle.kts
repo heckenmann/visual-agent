@@ -102,6 +102,9 @@ val databaseTest =
         systemProperty("visualagent.ollama.smoke", System.getProperty("visualagent.ollama.smoke", "false"))
         systemProperty("visualagent.codex.smoke", System.getProperty("visualagent.codex.smoke", "false"))
         jvmArgs("-Xshare:off", "-Xmx2g", "-Dkotlinx.coroutines.debug=off")
+        // JaCoCo execution data from this task is consumed by the root coverage gate.
+        // Reusing a cached database run can pair stale execution data with current classes.
+        outputs.cacheIf { false }
     }
 databaseTest.configure { mustRunAfter(tasks.test) }
 
