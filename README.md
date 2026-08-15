@@ -49,7 +49,7 @@ See [Setup Guide](docs/setup.md) for prerequisites, build/run commands, Ollama c
 
 ```bash
 ./gradlew build
-./gradlew :application:run
+./gradlew :desktop:run
 ```
 
 ## Gradle Modules
@@ -57,12 +57,14 @@ See [Setup Guide](docs/setup.md) for prerequisites, build/run commands, Ollama c
 The project uses an acyclic Gradle module graph:
 
 ```text
-:application
- ├── :ui
- └── :providers
+:desktop ──► :ui + :application + :protocol
+:application ──► :providers + :tools + :protocol
+:ui ──► :protocol
 ```
 
-`:application` is the only composition root and the only module allowed to depend on Visual Agent submodules. `:ui` and `:providers` are independent leaf modules: neither may depend on `:application`, the other leaf module, or a future sibling module.
+`:application` is the Spring server composition root. `:desktop` is the presentation/lifecycle
+host and starts one non-web Spring context from `:application` in local mode. `:ui` is a
+protocol-only presentation module; `:providers` and `:tools` remain server-side leaf modules.
 
 Filesystem ownership follows the same structure:
 
@@ -78,7 +80,8 @@ Run targeted module tasks from the repository root:
 ./gradlew :ui:build :ui:test
 ./gradlew :providers:build :providers:test
 ./gradlew :application:build :application:test
-./gradlew :application:run
+./gradlew :desktop:run
+./gradlew :application:runServer
 ```
 
 See the module READMEs for ownership and migration details: [`:application`](application/README.md), [`:ui`](modules/ui/README.md), and [`:providers`](modules/providers/README.md).

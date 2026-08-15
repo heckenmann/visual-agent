@@ -30,7 +30,7 @@ Agents can adjust safe runtime preferences without accessing raw credentials.
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.agent.tools.UiTool`
+- `de.heckenmann.visualagent.agent.tools.SettingsTool`
 - `de.heckenmann.visualagent.config.AppConfig`
 - `de.heckenmann.visualagent.agent.provider.ProviderCatalogService`
 

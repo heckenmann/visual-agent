@@ -42,7 +42,7 @@ The conversation panel follows the latest message automatically without overridi
 - `de.heckenmann.visualagent.ui.conversation.ConversationTimelineItem`
 - `de.heckenmann.visualagent.ui.conversation.ConversationScrollCoordinator`
 - `de.heckenmann.visualagent.ui.conversation.ConversationScrollOnChangeEffect`
-- `de.heckenmann.visualagent.ui.conversation.ConversationResizeScrollEffect`
+- `de.heckenmann.visualagent.ui.conversation.ConversationScrollEffects`
 - `de.heckenmann.visualagent.ui.conversation.ConversationStartupScrollEffect`
 
 ## Acceptance Criteria
