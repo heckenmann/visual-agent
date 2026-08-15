@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.knowledge.PersistedSubAgent
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoChangeType
+import kotlinx.coroutines.isActive
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import mu.KotlinLogging
@@ -92,6 +93,7 @@ internal class AgentManagerLifecycleOps(
     }
 
     fun saveAgentToDb(agent: SubAgent) {
+        if (!owner.scope.isActive) return
         val configJson = Json.encodeToString(agent.config)
         owner.subAgentStore.saveAgent(
             PersistedSubAgent(

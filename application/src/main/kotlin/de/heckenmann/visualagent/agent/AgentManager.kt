@@ -14,6 +14,8 @@ import de.heckenmann.visualagent.knowledge.PersistenceStores
 import de.heckenmann.visualagent.knowledge.SubAgentStore
 import de.heckenmann.visualagent.knowledge.TodoStore
 import de.heckenmann.visualagent.orchestration.AutonomousCoordinator
+import de.heckenmann.visualagent.protocol.LifecyclePort
+import de.heckenmann.visualagent.protocol.LifecycleState
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoChangeType
 import de.heckenmann.visualagent.todo.TodoEventBus
@@ -42,12 +44,13 @@ class AgentManager
         internal val todoStore: TodoStore,
         internal val subAgentStore: SubAgentStore,
         internal val memoryStore: MemoryStore,
-        internal val llmProvider: LLMProvider,
+        val llmProvider: LLMProvider,
         internal val agentToolConfigService: AgentToolConfigService,
         internal val toolEventBus: ToolEventBus,
         internal val todoEventBus: TodoEventBus,
         internal val appConfig: AppConfigBean,
         internal val scope: CoroutineScope,
+        internal val lifecycle: LifecyclePort,
         internal val parallelismProvider: ParallelismProvider,
         internal val agentStatusCallbackAdapter: AgentStatusCallbackAdapter,
         val subAgentExecutionControl: SubAgentExecutionControl,
@@ -60,6 +63,7 @@ class AgentManager
             todoEventBus: TodoEventBus,
             appConfig: AppConfigBean,
             scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+            lifecycle: LifecyclePort = LifecycleState(),
             parallelismProvider: ParallelismProvider = ParallelismProvider(appConfig),
             agentStatusCallbackAdapter: AgentStatusCallbackAdapter = AgentStatusCallbackAdapter(),
             subAgentExecutionControl: SubAgentExecutionControl = SubAgentExecutionControl(stores),
@@ -74,6 +78,7 @@ class AgentManager
             todoEventBus,
             appConfig,
             scope,
+            lifecycle,
             parallelismProvider,
             agentStatusCallbackAdapter,
             subAgentExecutionControl,
@@ -102,6 +107,7 @@ class AgentManager
         internal var loadedHistoryCount: Int = 0
         internal val finishedToolEventsByRequestId = ConcurrentHashMap<String, MutableList<ToolCallEvent>>()
         private var toolEventListenerHandle: AutoCloseable? = null
+
         private val lifecycleOps = AgentManagerLifecycleOps(this)
         internal val conversationOps = AgentManagerConversationOps(this)
         internal val autonomyOps = AgentManagerAutonomyOps(this)
@@ -142,8 +148,10 @@ class AgentManager
                     llmProvider = llmProvider,
                     responseCoordinator = responseCoordinator,
                     toolEventBus = toolEventBus,
+                    lifecycle = lifecycle,
                 )
             todoEventBus.addListener { change ->
+                if (lifecycle.closing) return@addListener
                 val todo = change.todo ?: return@addListener
                 if (change.type != TodoChangeType.UPDATED) return@addListener
                 when (todo.status) {
@@ -322,6 +330,17 @@ class AgentManager
                     it.status != de.heckenmann.visualagent.todo.TodoStatus.COMPLETED &&
                         it.status != de.heckenmann.visualagent.todo.TodoStatus.CANCELLED
                 }.forEach { todoManager.cancelTodo(it.id) }
+        }
+
+        /**
+         * Cancels all work owned by the manager before the application context is closed.
+         * Cancelling the manager scope first prevents cancellation finalizers from persisting
+         * agent state after the persistence layer has started shutting down.
+         */
+        fun cancelActiveWork() {
+            scope.cancel()
+            cancelAllRunningActions()
+            cancelAllActiveTodos()
         }
 
         /**
