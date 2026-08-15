@@ -215,11 +215,7 @@ class AgentManager
         /**
          * Deletes a sub-agent by ID. Returns true if the agent was found and deleted.
          */
-        fun deleteAgent(id: String): Boolean {
-            val deleted = lifecycleOps.deleteAgent(id)
-            if (deleted) subAgentExecutionControl.removeAgent(id)
-            return deleted
-        }
+        fun deleteAgent(id: String): Boolean = lifecycleOps.deleteAgent(id)
 
         /**
          * Sends a chat message to a sub-agent and returns its text response.
@@ -323,25 +319,14 @@ class AgentManager
         /**
          * Cancels all active (non-completed, non-cancelled) todos.
          */
-        fun cancelAllActiveTodos() {
-            todoManager
-                .getAll()
-                .filter {
-                    it.status != de.heckenmann.visualagent.todo.TodoStatus.COMPLETED &&
-                        it.status != de.heckenmann.visualagent.todo.TodoStatus.CANCELLED
-                }.forEach { todoManager.cancelTodo(it.id) }
-        }
+        fun cancelAllActiveTodos() = lifecycleOps.cancelAllActiveTodos()
 
         /**
          * Cancels all work owned by the manager before the application context is closed.
          * Cancelling the manager scope first prevents cancellation finalizers from persisting
          * agent state after the persistence layer has started shutting down.
          */
-        fun cancelActiveWork() {
-            scope.cancel()
-            cancelAllRunningActions()
-            cancelAllActiveTodos()
-        }
+        fun cancelActiveWork() = lifecycleOps.cancelActiveWork()
 
         /**
          * Clears the in-memory conversation history.
