@@ -7,8 +7,8 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import de.heckenmann.visualagent.error.ErrorCategory
-import de.heckenmann.visualagent.error.UserFacingError
+import de.heckenmann.visualagent.protocol.ProtocolErrorCategory
+import de.heckenmann.visualagent.protocol.UserFacingError
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -35,7 +35,7 @@ class ComposeErrorUiTest {
     fun `error modal renders summary and detail`() {
         val userError =
             UserFacingError(
-                category = ErrorCategory.PROVIDER,
+                category = ProtocolErrorCategory.PROVIDER,
                 summary = "Provider unreachable",
                 detail = "Check the base URL.",
                 retryable = true,
@@ -61,7 +61,7 @@ class ComposeErrorUiTest {
     fun `error modal retry action is shown for retryable errors`() {
         val userError =
             UserFacingError(
-                category = ErrorCategory.WORKSPACE,
+                category = ProtocolErrorCategory.WORKSPACE,
                 summary = "Import failed",
                 detail = "Try again.",
                 retryable = true,
@@ -90,7 +90,7 @@ class ComposeErrorUiTest {
     fun `error modal copy action invokes callback`() {
         val userError =
             UserFacingError(
-                category = ErrorCategory.CANVAS,
+                category = ProtocolErrorCategory.CANVAS,
                 summary = "Export failed",
                 detail = "Could not render.",
                 retryable = false,
@@ -119,7 +119,7 @@ class ComposeErrorUiTest {
     fun `error banner renders summary and detail`() {
         val userError =
             UserFacingError(
-                category = ErrorCategory.TOOL,
+                category = ProtocolErrorCategory.TOOL,
                 summary = "Tool input invalid",
                 detail = "Missing path.",
                 retryable = false,

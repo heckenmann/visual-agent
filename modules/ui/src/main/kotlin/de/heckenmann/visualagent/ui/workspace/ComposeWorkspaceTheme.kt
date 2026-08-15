@@ -11,7 +11,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
-import de.heckenmann.visualagent.config.ThemeMode
+import de.heckenmann.visualagent.protocol.ThemeMode
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -29,14 +29,14 @@ import de.heckenmann.visualagent.ui.workspace.*
  *
  * Uses the baseline Material3 light color scheme without custom colors.
  */
-internal fun visualAgentLightColorScheme(): ColorScheme = lightColorScheme()
+fun visualAgentLightColorScheme(): ColorScheme = lightColorScheme()
 
 /**
  * Dark Material3 color scheme for Visual Agent.
  *
  * Uses the baseline Material3 dark color scheme without custom colors.
  */
-internal fun visualAgentDarkColorScheme(): ColorScheme = darkColorScheme()
+fun visualAgentDarkColorScheme(): ColorScheme = darkColorScheme()
 
 /**
  * Resolves the effective dark-mode flag for the current platform.
@@ -48,7 +48,7 @@ internal fun visualAgentDarkColorScheme(): ColorScheme = darkColorScheme()
  * @param mode Theme mode selected by the user
  * @return True when the effective UI should render in dark colors
  */
-internal fun isSystemInDarkTheme(mode: ThemeMode): Boolean =
+fun isSystemInDarkTheme(mode: ThemeMode): Boolean =
     when (mode) {
         ThemeMode.LIGHT -> false
         ThemeMode.DARK -> true
@@ -109,7 +109,7 @@ private fun runProcess(vararg command: String): String? =
  * @param fontSize User-selected font size in pixels, coerced to the supported range
  * @return A [Typography] instance with all text styles scaled proportionally
  */
-internal fun visualAgentTypography(fontSize: Int): Typography {
+fun visualAgentTypography(fontSize: Int): Typography {
     val scale = fontSize.coerceIn(10, 24) / DEFAULT_FONT_SIZE.toFloat()
     val defaults = Typography()
     return defaults.copy(

@@ -1,6 +1,7 @@
 # UI Module
 
-`:ui` owns reusable Compose desktop UI code and UI-facing contracts.
+`:ui` owns reusable Compose desktop UI code. Every panel communicates through protocol-owned
+ports supplied by the desktop host.
 
 ## Responsibilities
 
@@ -10,10 +11,12 @@
 
 ## Dependency rule
 
-`:ui` is a leaf module. It must not have a Gradle project dependency on `:application`, `:providers`, or any future sibling module.
+`:ui` is a leaf module that depends only on `:protocol`. Spring startup, application adapters,
+and the splash lifecycle belong to `:desktop`.
 
 ```text
-:application -> :ui
+:desktop -> :ui -> :protocol
+:application -> :protocol
 ```
 
 ## Commands

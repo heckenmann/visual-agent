@@ -15,7 +15,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import de.heckenmann.visualagent.config.ConversationInputPlacement
+import de.heckenmann.visualagent.protocol.ConversationInputPlacement
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*

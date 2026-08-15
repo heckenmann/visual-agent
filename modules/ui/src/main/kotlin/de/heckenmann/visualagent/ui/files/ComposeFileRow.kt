@@ -28,8 +28,10 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import de.heckenmann.visualagent.canvas.CanvasOperations
-import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
+import de.heckenmann.visualagent.protocol.CANVAS_MIME_TYPE
+import de.heckenmann.visualagent.protocol.CanvasPort
+import de.heckenmann.visualagent.protocol.WorkspaceFile
+import de.heckenmann.visualagent.protocol.WorkspaceFilePort
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -41,17 +43,15 @@ import de.heckenmann.visualagent.ui.settings.*
 import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
-import de.heckenmann.visualagent.workspace.WorkspaceFilePaths
-import de.heckenmann.visualagent.workspace.WorkspaceFileService
 
 /**
  * Renders a single workspace file row with rename, copy, open-canvas, and delete actions.
  */
 @Composable
 internal fun WorkspaceFileRow(
-    file: WorkspaceFileRecord,
-    workspaceFileService: WorkspaceFileService,
-    canvasOperations: CanvasOperations,
+    file: WorkspaceFile,
+    workspaceFileService: WorkspaceFilePort,
+    canvasOperations: CanvasPort,
     modalRequester: ComposeModalRequester,
     refresh: () -> Unit,
     setStatus: (String) -> Unit,
@@ -84,10 +84,7 @@ internal fun WorkspaceFileRow(
                                             refresh()
                                             dismiss()
                                         }.onFailure {
-                                            val userError =
-                                                de.heckenmann.visualagent.error.ErrorMessageMapper
-                                                    .map(it)
-                                            setStatus("${userError.summary}: ${userError.detail}")
+                                            setStatus(it.toUiErrorMessage())
                                         }
                                 },
                             )
@@ -103,7 +100,7 @@ internal fun WorkspaceFileRow(
                     setStatus("Copied metadata for ${file.relativePath}")
                 },
             )
-            if (file.mimeType == WorkspaceFilePaths.CANVAS_MIME_TYPE) {
+            if (file.mimeType == CANVAS_MIME_TYPE) {
                 ActionIconButton(
                     icon = Icons.Filled.FileOpen,
                     description = "Open canvas document",
@@ -111,10 +108,7 @@ internal fun WorkspaceFileRow(
                         runCatching { canvasOperations.openDocument(file.id, null) }
                             .onSuccess { setStatus("Opened ${file.relativePath}") }
                             .onFailure {
-                                val userError =
-                                    de.heckenmann.visualagent.error.ErrorMessageMapper
-                                        .map(it)
-                                setStatus("${userError.summary}: ${userError.detail}")
+                                setStatus(it.toUiErrorMessage())
                             }
                     },
                 )
@@ -167,7 +161,7 @@ private fun RenameFileDialog(
     }
 }
 
-private fun WorkspaceFileRecord.toClipboardMetadata(): String =
+private fun WorkspaceFile.toClipboardMetadata(): String =
     buildString {
         appendLine("path=$relativePath")
         appendLine("mimeType=$mimeType")

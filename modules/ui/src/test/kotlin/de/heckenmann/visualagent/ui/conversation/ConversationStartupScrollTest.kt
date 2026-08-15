@@ -9,7 +9,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -24,6 +23,7 @@ import de.heckenmann.visualagent.ui.workspace.*
 import org.junit.Rule
 import org.junit.Test
 import kotlin.test.assertTrue
+import de.heckenmann.visualagent.protocol.ConversationMessage as Message
 
 class ConversationStartupScrollTest {
     @get:Rule

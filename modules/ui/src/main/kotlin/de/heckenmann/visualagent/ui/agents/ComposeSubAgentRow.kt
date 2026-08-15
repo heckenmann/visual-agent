@@ -19,13 +19,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import de.heckenmann.visualagent.agent.AgentManager
-import de.heckenmann.visualagent.agent.SubAgent
-import de.heckenmann.visualagent.agent.config.AgentToolConfigService
-import de.heckenmann.visualagent.agent.pauseSubAgentAsync
-import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
-import de.heckenmann.visualagent.agent.resumeSubAgentAsync
-import de.heckenmann.visualagent.agent.tools.ToolRegistry
+import de.heckenmann.visualagent.protocol.Agent
+import de.heckenmann.visualagent.protocol.AgentPort
+import de.heckenmann.visualagent.protocol.ProviderPort
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -42,14 +38,12 @@ import kotlinx.coroutines.launch
 
 @Composable
 internal fun SubAgentRow(
-    agent: SubAgent,
+    agent: Agent,
     activeJobCount: Int,
     individuallyPaused: Boolean,
     globallyPaused: Boolean,
-    agentManager: AgentManager,
-    agentToolConfigService: AgentToolConfigService,
-    toolRegistry: ToolRegistry,
-    providerCatalogService: ProviderCatalogService,
+    agentPort: AgentPort,
+    providerPort: ProviderPort,
     modalRequester: ComposeModalRequester,
     onStatusChanged: (String) -> Unit,
     refresh: () -> Unit,
@@ -76,10 +70,10 @@ internal fun SubAgentRow(
                 onClick = {
                     scope.launch {
                         if (individuallyPaused) {
-                            agentManager.resumeSubAgentAsync(agent.id)
+                            agentPort.resume(agent.id)
                             onStatusChanged("Resumed ${agent.name}")
                         } else {
-                            agentManager.pauseSubAgentAsync(agent.id)
+                            agentPort.pause(agent.id)
                             onStatusChanged("Paused ${agent.name}")
                         }
                         onExecutionStateChanged()
@@ -106,10 +100,8 @@ internal fun SubAgentRow(
                         ComposeContentModal(title = "Configure ${agent.name}") { dismiss ->
                             SubAgentDetailsEditor(
                                 agent = agent,
-                                agentManager = agentManager,
-                                agentToolConfigService = agentToolConfigService,
-                                toolRegistry = toolRegistry,
-                                providerCatalogService = providerCatalogService,
+                                agentPort = agentPort,
+                                providerPort = providerPort,
                                 onSaved = {
                                     refresh()
                                     onStatusChanged("Saved ${it.name}")
@@ -130,7 +122,7 @@ internal fun SubAgentRow(
                             message = "Delete '${agent.name}' and its persisted configuration.",
                             confirmDescription = "Delete sub-agent",
                         ) {
-                            agentManager.deleteAgent(agent.id)
+                            agentPort.delete(agent.id)
                             refresh()
                         },
                     )
@@ -141,7 +133,7 @@ internal fun SubAgentRow(
 }
 
 internal fun subAgentLogSummary(
-    agent: SubAgent,
+    agent: Agent,
     activeJobCount: Int,
 ): String =
     buildString {

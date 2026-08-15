@@ -21,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -35,6 +34,7 @@ import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import de.heckenmann.visualagent.protocol.ConversationMessage as Message
 
 /**
  * Scrolls the conversation list to the bottom once on composition when history is not empty.
@@ -136,7 +136,7 @@ internal fun ConversationQueueFlushEffect(
     onSendingChange: (Boolean) -> Unit,
     onStatusChange: (String) -> Unit,
     onHistoryChange: (List<Message>) -> Unit,
-    onActiveTokenChange: (de.heckenmann.visualagent.agent.CancellationToken?) -> Unit,
+    onActiveTokenChange: (de.heckenmann.visualagent.protocol.CancellationToken?) -> Unit,
     onPendingUserMessageChange: (String?) -> Unit,
     streamingFlow: MutableStateFlow<String>,
 ) {

@@ -4,7 +4,7 @@ package de.heckenmann.visualagent.ui.workspace
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.graphics.Color
-import de.heckenmann.visualagent.config.ThemeMode
+import de.heckenmann.visualagent.protocol.ThemeMode
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*

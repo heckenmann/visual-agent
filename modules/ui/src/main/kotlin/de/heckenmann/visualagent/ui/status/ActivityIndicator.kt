@@ -41,10 +41,10 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import de.heckenmann.visualagent.agent.tools.ToolCallEvent
-import de.heckenmann.visualagent.agent.tools.ToolCallPhase
-import de.heckenmann.visualagent.agent.tools.ToolEventBus
-import de.heckenmann.visualagent.todo.Todo
+import de.heckenmann.visualagent.protocol.ActivityPort
+import de.heckenmann.visualagent.protocol.TodoItem
+import de.heckenmann.visualagent.protocol.ToolActivity
+import de.heckenmann.visualagent.protocol.ToolActivityPhase
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -73,7 +73,7 @@ data class InFlightState(
     val runningAgentIds: Set<String> = emptySet(),
     val pendingToolIds: Set<String> = emptySet(),
     val settingsLoading: Boolean = false,
-    val currentTodoInProgress: Todo? = null,
+    val currentTodoInProgress: TodoItem? = null,
 ) {
     /** Total number of activities that are currently in flight. */
     val totalActive: Int
@@ -149,30 +149,30 @@ class InFlightStateHolder internal constructor() {
     }
 
     /** Sets the todo currently being processed by a running sub-agent. */
-    fun setCurrentTodoInProgress(todo: Todo?) {
+    fun setCurrentTodoInProgress(todo: TodoItem?) {
         val current = state.value
         if (current.currentTodoInProgress?.id == todo?.id && current.currentTodoInProgress?.status == todo?.status) return
         state.value = current.copy(currentTodoInProgress = todo)
     }
 
     /**
-     * Internal API used by [rememberInFlightState] to publish a [ToolCallEvent]
-     * received on the [ToolEventBus]. The event is keyed by `toolId@requestId` so
+     * Internal API used by [rememberInFlightState] to publish a [ToolActivity]
+     * received on the [ActivityPort]. The event is keyed by `toolId@requestId` so
      * concurrent calls of the same tool do not collapse into a single entry.
      *
      * A FINISHED event without a matching STARTED is ignored: the indicator
      * only reflects activities we know to be running.
      */
-    internal fun onToolEvent(event: ToolCallEvent) {
-        val key = event.toolId + "@" + (event.context["requestId"]?.toString() ?: event.functionName)
+    internal fun onToolEvent(event: ToolActivity) {
+        val key = event.toolId + "@" + (event.requestId ?: event.toolId)
         when (event.phase) {
-            ToolCallPhase.STARTED -> {
+            ToolActivityPhase.STARTED -> {
                 if (key !in pendingToolKeys) {
                     pendingToolKeys += key
                     publishTools()
                 }
             }
-            ToolCallPhase.FINISHED -> {
+            ToolActivityPhase.FINISHED -> {
                 if (pendingToolKeys.remove(key)) {
                     publishTools()
                 }
@@ -189,24 +189,24 @@ class InFlightStateHolder internal constructor() {
 }
 
 /**
- * Creates and remembers an [InFlightStateHolder] that listens to [toolEventBus]
+ * Creates and remembers an [InFlightStateHolder] that listens to [activityPort]
  * and keeps its tool-call set in sync.
  *
  * The holder is owned by the caller. Tool events flow through a coroutine on the
  * Compose main dispatcher so the underlying `mutableStateOf` writes happen on
  * the recomposition thread.
  *
- * @param toolEventBus Spring-managed tool event bus
+ * @param activityPort Transport-owned activity events
  * @return Mutable holder that panels can update
  */
 @Composable
-fun rememberInFlightState(toolEventBus: ToolEventBus): InFlightStateHolder {
+fun rememberInFlightState(activityPort: ActivityPort): InFlightStateHolder {
     val holder = remember { InFlightStateHolder() }
-    val collector = remember { MutableSharedFlow<ToolCallEvent>(extraBufferCapacity = 64) }
+    val collector = remember { MutableSharedFlow<ToolActivity>(extraBufferCapacity = 64) }
     val scope = rememberCoroutineScope()
-    DisposableEffect(toolEventBus, holder) {
+    DisposableEffect(activityPort, holder) {
         val handle =
-            toolEventBus.addListener { event ->
+            activityPort.addToolListener { event ->
                 collector.tryEmit(event)
             }
         val job =

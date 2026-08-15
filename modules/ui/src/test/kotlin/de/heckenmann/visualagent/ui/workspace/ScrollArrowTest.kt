@@ -14,6 +14,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
+import de.heckenmann.visualagent.protocol.LifecycleState
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -42,13 +43,13 @@ class ScrollArrowTest {
 
     @Test
     fun `application lifecycle starts not closing`() {
-        val lifecycle = ApplicationLifecycle()
+        val lifecycle = LifecycleState()
         assertFalse(lifecycle.closing)
     }
 
     @Test
     fun `application lifecycle marks closing after beginShutdown`() {
-        val lifecycle = ApplicationLifecycle()
+        val lifecycle = LifecycleState()
         lifecycle.beginShutdown()
         assertTrue(lifecycle.closing)
     }
@@ -91,7 +92,7 @@ class ScrollArrowTest {
     @Test
     fun `scroll arrow does not launch scroll when application is closing`() =
         runTest {
-            val lifecycle = ApplicationLifecycle()
+            val lifecycle = LifecycleState()
             lifecycle.beginShutdown()
             val scrollState = LazyListState(firstVisibleItemIndex = 0)
 
@@ -196,7 +197,7 @@ class ScrollArrowTest {
     @Test
     fun `continuous scroll returns when application is closing`(): Unit =
         runTest {
-            val lifecycle = ApplicationLifecycle()
+            val lifecycle = LifecycleState()
             lifecycle.beginShutdown()
             val scrollState = LazyListState(firstVisibleItemIndex = 0)
             val job = startContinuousScroll(direction = 1, scrollState = scrollState, scope = this, isClosing = { lifecycle.closing })

@@ -30,8 +30,8 @@ import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import de.heckenmann.visualagent.canvas.CanvasFigureSnapshot
-import de.heckenmann.visualagent.canvas.parseHexColor
+import de.heckenmann.visualagent.protocol.CanvasFigureSnapshot
+import de.heckenmann.visualagent.protocol.parseHexColor
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*

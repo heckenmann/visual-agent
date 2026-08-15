@@ -14,9 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -58,27 +55,6 @@ internal fun ConversationHistoryPagingEffect(
                     }
                 }
         }
-    }
-}
-
-/** Compatibility adapter retained while scroll-focused tests migrate to the direct list-state API. */
-@Composable
-internal fun ConversationHistoryPagingEffect(
-    isAtOldest: Boolean,
-    state: ConversationUiState,
-    listState: LazyListState,
-    gateway: ConversationHistoryGateway,
-    @Suppress("UNUSED_PARAMETER") scrollCoordinator: ConversationScrollCoordinator,
-) {
-    val currentIsAtOldest by rememberUpdatedState(isAtOldest)
-    LaunchedEffect(state, gateway, listState) {
-        snapshotFlow { currentIsAtOldest }
-            .distinctUntilChanged()
-            .collect { reachedOldest ->
-                if (reachedOldest) {
-                    loadOlderConversationPage(state, gateway)
-                }
-            }
     }
 }
 
@@ -126,24 +102,4 @@ internal fun ConversationScrollToLatestArea(
             )
         }
     }
-}
-
-/** Compatibility adapter retained while scroll-focused tests migrate to the direct list-state API. */
-@Composable
-internal fun ConversationScrollToLatestArea(
-    isAtLatest: Boolean,
-    state: ConversationUiState,
-    gateway: ConversationHistoryGateway,
-    scrollCoordinator: ConversationScrollCoordinator,
-    scope: CoroutineScope,
-    modifier: Modifier = Modifier,
-) {
-    ConversationScrollToLatestArea(
-        isAtLatest = isAtLatest,
-        state = state,
-        gateway = gateway,
-        listState = scrollCoordinator.legacyListState,
-        scope = scope,
-        modifier = modifier,
-    )
 }

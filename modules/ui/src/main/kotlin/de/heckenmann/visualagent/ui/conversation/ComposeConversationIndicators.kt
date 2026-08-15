@@ -30,7 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.unit.dp
-import de.heckenmann.visualagent.todo.Todo
+import de.heckenmann.visualagent.protocol.TodoItem
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -52,7 +52,7 @@ import de.heckenmann.visualagent.ui.workspace.*
  */
 @Composable
 internal fun TodoInProgressRow(
-    todo: Todo,
+    todo: TodoItem,
     agentName: String?,
     modifier: Modifier = Modifier,
 ) {

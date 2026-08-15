@@ -23,9 +23,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import de.heckenmann.visualagent.agent.tools.ToolEventBus
-import de.heckenmann.visualagent.canvas.CanvasOperations
-import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
+import de.heckenmann.visualagent.protocol.ActivityPort
+import de.heckenmann.visualagent.protocol.CANVAS_MIME_TYPE
+import de.heckenmann.visualagent.protocol.CanvasPort
+import de.heckenmann.visualagent.protocol.WorkspaceFile
+import de.heckenmann.visualagent.protocol.WorkspaceFilePort
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -37,8 +39,6 @@ import de.heckenmann.visualagent.ui.settings.*
 import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
-import de.heckenmann.visualagent.workspace.WorkspaceFilePaths
-import de.heckenmann.visualagent.workspace.WorkspaceFileService
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import java.io.File
@@ -55,10 +55,10 @@ import java.io.File
  */
 @Composable
 internal fun FilesPanel(
-    workspaceFileService: WorkspaceFileService,
-    canvasOperations: CanvasOperations,
+    workspaceFileService: WorkspaceFilePort,
+    canvasOperations: CanvasPort,
     modalRequester: ComposeModalRequester,
-    toolEventBus: ToolEventBus,
+    activityPort: ActivityPort,
 ) {
     var files by remember { mutableStateOf(workspaceFileService.listFiles()) }
     var path by remember { mutableStateOf("") }
@@ -69,7 +69,7 @@ internal fun FilesPanel(
         files = workspaceFileService.listFiles()
     }
     ToolEventRefreshEffect(
-        toolEventBus = toolEventBus,
+        activityPort = activityPort,
         toolIds = setOf("file:write", "file:edit", "workspace:file"),
         onRefresh = refresh,
     )
@@ -77,16 +77,13 @@ internal fun FilesPanel(
     val fileListScrollState = rememberScrollState()
     RegisterPanelVerticalScrollbar(fileListScrollState)
     val importFile: (File) -> Unit = { file ->
-        runCatching { workspaceFileService.importFile(file) }
+        runCatching { workspaceFileService.importFile(file.name, file.readBytes()) }
             .onSuccess {
                 status = "Imported ${it.relativePath}"
                 path = ""
                 refresh()
             }.onFailure {
-                val userError =
-                    de.heckenmann.visualagent.error.ErrorMessageMapper
-                        .map(it)
-                status = "${userError.summary}: ${userError.detail}"
+                status = it.toUiErrorMessage()
             }
     }
     val picker =
@@ -178,10 +175,10 @@ internal fun FilesPanel(
  * @return Filtered list in the original order
  */
 internal fun filterWorkspaceFiles(
-    files: List<WorkspaceFileRecord>,
+    files: List<WorkspaceFile>,
     query: String,
     typeFilter: String,
-): List<WorkspaceFileRecord> =
+): List<WorkspaceFile> =
     files.filter { file ->
         val matchesQuery =
             query.isBlank() ||
@@ -190,8 +187,8 @@ internal fun filterWorkspaceFiles(
                 file.sha256.contains(query, ignoreCase = true)
         val matchesType =
             typeFilter == ALL_FILE_TYPES ||
-                (typeFilter == CANVAS_FILE_TYPE && file.mimeType == WorkspaceFilePaths.CANVAS_MIME_TYPE) ||
-                (typeFilter == OTHER_FILE_TYPE && file.mimeType != WorkspaceFilePaths.CANVAS_MIME_TYPE)
+                (typeFilter == CANVAS_FILE_TYPE && file.mimeType == CANVAS_MIME_TYPE) ||
+                (typeFilter == OTHER_FILE_TYPE && file.mimeType != CANVAS_MIME_TYPE)
         matchesQuery && matchesType
     }
 

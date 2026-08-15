@@ -19,9 +19,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import de.heckenmann.visualagent.agent.AgentConfig
-import de.heckenmann.visualagent.agent.AgentManager
-import de.heckenmann.visualagent.agent.SubAgent
+import de.heckenmann.visualagent.protocol.Agent
+import de.heckenmann.visualagent.protocol.AgentConfig
+import de.heckenmann.visualagent.protocol.AgentPort
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -37,21 +37,21 @@ import de.heckenmann.visualagent.ui.workspace.*
 /**
  * Form for creating a persisted sub-agent from the creation dialog.
  *
- * @param agentManager Source of sub-agent persistence
+ * @param agentPort Source of sub-agent persistence
  * @param onCreated Called after the new sub-agent has been persisted
  * @param onCancel Dismisses the creation dialog
  */
 @Composable
 internal fun SubAgentCreationForm(
-    agentManager: AgentManager,
-    onCreated: (SubAgent) -> Unit,
+    agentPort: AgentPort,
+    onCreated: (Agent) -> Unit,
     onCancel: () -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
     var role by remember { mutableStateOf("") }
     var templateName by remember { mutableStateOf(DEFAULT_AGENT_TEMPLATE) }
     val templateOptions =
-        AgentConfig.TEMPLATES.keys
+        AgentConfig.templates.keys
             .sorted()
             .map { PanelSelectOption(it, it.labelizeEnumName()) }
 
@@ -87,7 +87,7 @@ internal fun SubAgentCreationForm(
                 description = "Create sub-agent",
                 enabled = name.isNotBlank() && role.isNotBlank(),
                 onClick = {
-                    onCreated(agentManager.createAgent(name.trim(), role.trim(), templateName))
+                    onCreated(agentPort.create(name.trim(), role.trim(), templateName))
                 },
             )
         }

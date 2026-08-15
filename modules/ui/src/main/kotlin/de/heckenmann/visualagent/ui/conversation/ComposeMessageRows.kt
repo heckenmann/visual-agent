@@ -37,7 +37,6 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -49,6 +48,7 @@ import de.heckenmann.visualagent.ui.settings.*
 import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
+import de.heckenmann.visualagent.protocol.ConversationMessage as Message
 
 @Composable
 internal fun MessageRow(

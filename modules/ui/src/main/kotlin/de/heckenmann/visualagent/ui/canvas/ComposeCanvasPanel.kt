@@ -28,9 +28,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import de.heckenmann.visualagent.agent.tools.ToolEventBus
-import de.heckenmann.visualagent.canvas.CanvasOperations
-import de.heckenmann.visualagent.canvas.CanvasSnapshot
+import de.heckenmann.visualagent.protocol.ActivityPort
+import de.heckenmann.visualagent.protocol.CanvasPort
+import de.heckenmann.visualagent.protocol.CanvasSnapshot
+import de.heckenmann.visualagent.protocol.WorkspaceFilePort
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -42,12 +43,8 @@ import de.heckenmann.visualagent.ui.settings.*
 import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
-import de.heckenmann.visualagent.workspace.WorkspaceFileService
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
-import java.nio.file.Path
-import kotlin.io.path.isRegularFile
-import kotlin.io.path.readBytes
 
 /**
  * Canvas panel for drawing figures, importing images, and saving captures.
@@ -61,10 +58,10 @@ import kotlin.io.path.readBytes
  */
 @Composable
 internal fun CanvasPanel(
-    canvasOperations: CanvasOperations,
-    workspaceFileService: WorkspaceFileService,
+    canvasOperations: CanvasPort,
+    workspaceFileService: WorkspaceFilePort,
     modalRequester: ComposeModalRequester,
-    toolEventBus: ToolEventBus,
+    activityPort: ActivityPort,
 ) {
     var snapshot by remember { mutableStateOf(canvasOperations.snapshot()) }
     var status by remember { mutableStateOf("Figures: ${snapshot.figureCount}") }
@@ -81,7 +78,7 @@ internal fun CanvasPanel(
             }
     }
     ToolEventRefreshEffect(
-        toolEventBus = toolEventBus,
+        activityPort = activityPort,
         toolIds = setOf("canvas"),
         onRefresh = { snapshot = canvasOperations.snapshot() },
     )
@@ -89,21 +86,16 @@ internal fun CanvasPanel(
         rememberFilePickerLauncher { selected: PlatformFile? ->
             selected?.file?.let { file ->
                 runCatching {
-                    val imported = workspaceFileService.importFile(file)
+                    val imported = workspaceFileService.importFile(file.name, file.readBytes())
                     canvasOperations.insertImage(imported.relativePath)
                 }.onSuccess { update(it) }
                     .onFailure {
-                        val userError =
-                            de.heckenmann.visualagent.error.ErrorMessageMapper
-                                .map(it)
-                        status = "${userError.summary}: ${userError.detail}"
+                        status = it.toUiErrorMessage()
                     }
             }
         }
     val imageBytesForPath: (String) -> ByteArray? = { path ->
-        runCatching { workspaceFileService.resolveManagedPath(path).readBytes() }
-            .recoverCatching { Path.of(path).takeIf { it.isRegularFile() }?.readBytes() ?: throw it }
-            .getOrNull()
+        runCatching { workspaceFileService.readBytes(path) }.getOrNull()
     }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -141,7 +133,7 @@ internal fun CanvasPanel(
 
 @Composable
 private fun CanvasDrawingToolbar(
-    canvasOperations: CanvasOperations,
+    canvasOperations: CanvasPort,
     modalRequester: ComposeModalRequester,
     snapshot: CanvasSnapshot,
     mode: CanvasInteractionMode,
@@ -211,8 +203,8 @@ private fun CanvasDrawingToolbar(
 
 @Composable
 private fun RowScope.CanvasPersistenceToolbar(
-    canvasOperations: CanvasOperations,
-    workspaceFileService: WorkspaceFileService,
+    canvasOperations: CanvasPort,
+    workspaceFileService: WorkspaceFilePort,
     documentName: String,
     onDocumentNameChange: (String) -> Unit,
     captureName: String,
@@ -234,10 +226,7 @@ private fun RowScope.CanvasPersistenceToolbar(
             runCatching { canvasOperations.saveDocument(documentName.trim()) }
                 .onSuccess { setStatus("Saved ${it.relativePath}") }
                 .onFailure {
-                    val userError =
-                        de.heckenmann.visualagent.error.ErrorMessageMapper
-                            .map(it)
-                    setStatus("${userError.summary}: ${userError.detail}")
+                    setStatus(it.toUiErrorMessage())
                 }
         },
     )
@@ -259,10 +248,7 @@ private fun RowScope.CanvasPersistenceToolbar(
             }.onSuccess {
                 setStatus("Saved ${it.relativePath}")
             }.onFailure {
-                val userError =
-                    de.heckenmann.visualagent.error.ErrorMessageMapper
-                        .map(it)
-                setStatus("${userError.summary}: ${userError.detail}")
+                setStatus(it.toUiErrorMessage())
             }
         },
     )

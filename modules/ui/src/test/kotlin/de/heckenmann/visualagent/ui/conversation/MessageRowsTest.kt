@@ -7,7 +7,6 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -22,6 +21,7 @@ import de.heckenmann.visualagent.ui.workspace.*
 import org.junit.Rule
 import org.junit.Test
 import kotlin.test.assertTrue
+import de.heckenmann.visualagent.protocol.ConversationMessage as Message
 
 /**
  * Tests for the assistant/user message row and edit modal.

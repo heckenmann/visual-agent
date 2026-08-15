@@ -61,9 +61,6 @@ internal enum class ConversationScrollMode {
 internal class ConversationScrollCoordinator(
     private val listState: LazyListState,
 ) {
-    /** Exposes the legacy test adapter's list state while production code uses direct list state. */
-    internal val legacyListState: LazyListState
-        get() = listState
     var mode: ConversationScrollMode by mutableStateOf(ConversationScrollMode.FOLLOWING_LATEST)
         private set
 

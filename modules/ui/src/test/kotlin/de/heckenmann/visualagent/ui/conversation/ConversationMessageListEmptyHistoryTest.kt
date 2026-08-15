@@ -13,7 +13,6 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
-import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -29,6 +28,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
 import kotlin.test.assertEquals
+import de.heckenmann.visualagent.protocol.ConversationMessage as Message
 
 /**
  * Verifies that [ConversationMessageList] renders pending user messages and

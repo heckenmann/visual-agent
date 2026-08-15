@@ -4,9 +4,10 @@ package de.heckenmann.visualagent.ui.status
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import de.heckenmann.visualagent.agent.AgentStatusCallbackAdapter
-import de.heckenmann.visualagent.todo.TodoEventBus
-import de.heckenmann.visualagent.todo.TodoStatus
+import de.heckenmann.visualagent.protocol.ActivityPort
+import de.heckenmann.visualagent.protocol.AgentActivityPhase
+import de.heckenmann.visualagent.protocol.TodoPort
+import de.heckenmann.visualagent.protocol.TodoState
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -20,7 +21,7 @@ import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
 
 /**
- * Connects the [AgentStatusCallbackAdapter] and [TodoEventBus] to the in-flight indicator.
+ * Connects transport-owned agent and todo events to the in-flight indicator.
  *
  * The coordinator emits `STATUS:BUSY` and `STATUS:IDLE` notifications while
  * autonomous work progresses. This effect translates those notifications into
@@ -28,31 +29,32 @@ import de.heckenmann.visualagent.ui.workspace.*
  * inline indicators show active sub-agents and todos.
  *
  * @param inFlight Mutable in-flight state holder owned by the Compose app
- * @param adapter Spring-managed callback adapter
- * @param todoEventBus Spring-managed todo event bus
+ * @param activityPort Transport-owned agent lifecycle events
+ * @param todoPort Transport-owned todo events
  */
 @Composable
 internal fun RegisterAgentStatusCallback(
     inFlight: InFlightStateHolder,
-    adapter: AgentStatusCallbackAdapter,
-    todoEventBus: TodoEventBus,
+    activityPort: ActivityPort,
+    todoPort: TodoPort,
 ) {
-    DisposableEffect(inFlight, adapter) {
-        adapter.register { agentId, message ->
-            when {
-                message.startsWith("STATUS:BUSY") -> inFlight.markAgentStart(agentId)
-                message.startsWith("STATUS:IDLE") -> inFlight.markAgentEnd(agentId)
-            }
-        }
-        onDispose { adapter.register { _, _ -> } }
-    }
-    DisposableEffect(inFlight, todoEventBus) {
+    DisposableEffect(inFlight, activityPort) {
         val handle =
-            todoEventBus.addListener { change ->
+            activityPort.addAgentListener { event ->
+                when (event.phase) {
+                    AgentActivityPhase.STARTED -> inFlight.markAgentStart(event.agentId)
+                    AgentActivityPhase.FINISHED -> inFlight.markAgentEnd(event.agentId)
+                }
+            }
+        onDispose { handle.close() }
+    }
+    DisposableEffect(inFlight, todoPort) {
+        val handle =
+            todoPort.addListener { change ->
                 val todo = change.todo ?: return@addListener
                 val currentTodo = inFlight.state.value.currentTodoInProgress
                 val currentTodoId = currentTodo?.id
-                if (todo.status == TodoStatus.IN_PROGRESS) {
+                if (todo.status == TodoState.IN_PROGRESS) {
                     inFlight.setCurrentTodoInProgress(todo)
                 } else if (currentTodoId == todo.id) {
                     inFlight.setCurrentTodoInProgress(null)

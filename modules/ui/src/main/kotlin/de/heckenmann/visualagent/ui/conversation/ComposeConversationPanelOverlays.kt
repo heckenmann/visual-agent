@@ -3,7 +3,7 @@
 package de.heckenmann.visualagent.ui.conversation
 
 import androidx.compose.runtime.Composable
-import de.heckenmann.visualagent.agent.CancellationToken
+import de.heckenmann.visualagent.protocol.CancellationToken
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -32,7 +32,7 @@ internal fun ConversationPanelQueueStrip(
     onInputChange: (String) -> Unit,
     onSendingChange: (Boolean) -> Unit,
     onStatusChange: (String) -> Unit,
-    onHistoryChange: (List<de.heckenmann.visualagent.agent.Message>) -> Unit,
+    onHistoryChange: (List<de.heckenmann.visualagent.protocol.ConversationMessage>) -> Unit,
     onActiveTokenChange: (CancellationToken?) -> Unit,
     onPendingUserMessageChange: (String?) -> Unit,
     streamingFlow: MutableStateFlow<String>,

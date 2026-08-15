@@ -3,7 +3,7 @@
 package de.heckenmann.visualagent.ui.modal
 
 import androidx.compose.runtime.Composable
-import de.heckenmann.visualagent.error.UserFacingError
+import de.heckenmann.visualagent.protocol.UserFacingError
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*

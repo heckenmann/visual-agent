@@ -25,14 +25,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Window
-import androidx.compose.ui.window.application
-import androidx.compose.ui.window.rememberWindowState
-import de.heckenmann.visualagent.AppIdentity
-import de.heckenmann.visualagent.VisualAgentApplication
-import de.heckenmann.visualagent.config.AppConfigBean
+import de.heckenmann.visualagent.protocol.LayoutSize
+import de.heckenmann.visualagent.protocol.LayoutWindowState
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -44,110 +39,46 @@ import de.heckenmann.visualagent.ui.settings.*
 import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
-import de.heckenmann.visualagent.workspace.layout.DesktopState
-import de.heckenmann.visualagent.workspace.layout.StageState
-import de.heckenmann.visualagent.workspace.layout.WorkspaceWindowState
 import kotlinx.coroutines.launch
-import org.springframework.boot.WebApplicationType
-import org.springframework.boot.builder.SpringApplicationBuilder
 import kotlin.math.roundToInt
 
-/**
- * Entry point for the Compose Multiplatform Visual Agent desktop application.
- *
- * Bootstraps Spring, resolves all beans via [ComposeApplicationDependencies], and launches
- * the Compose window.
- */
-fun runVisualAgentComposeApplication() {
-    AppIdentity.configureProcessProperties()
-    val springContext =
-        SpringApplicationBuilder(VisualAgentApplication::class.java)
-            .web(WebApplicationType.NONE)
-            .run()
-    val deps = springContext.getBean(ComposeApplicationDependencies::class.java)
-    val persistedStage = deps.workspaceLayoutService.report().stage
-    val defaultWidth = 1280.dp
-    val defaultHeight = 820.dp
-
-    application {
-        val panelLabelPersistence = remember { PanelLabelPersistence(deps.appConfig) }
-        val windowState =
-            rememberWindowState(
-                width = persistedStage?.width?.dp ?: defaultWidth,
-                height = persistedStage?.height?.dp ?: defaultHeight,
-            )
-        val saveStageOnExit = {
-            val size = windowState.size
-            val stageWidth = size.width.value.toDouble()
-            val stageHeight = size.height.value.toDouble()
-            deps.workspaceLayoutService.saveStage(StageState(width = stageWidth, height = stageHeight))
-        }
-        val closeApplication = {
-            closeVisualAgentApplication(deps, saveStageOnExit, panelLabelPersistence, ::exitApplication)
-        }
-        Window(
-            onCloseRequest = closeApplication,
-            title = AppIdentity.DISPLAY_NAME,
-            icon = @Suppress("DEPRECATION") painterResource("icons/visual-agent.png"),
-            state = windowState,
-        ) {
-            VisualAgentComposeApp(
-                deps = deps,
-                onCloseApplication = closeApplication,
-                panelLabelPersistence = panelLabelPersistence,
-            )
-        }
-    }
-}
-
+/** Renders the ready workspace using only the transport boundary supplied by the desktop host. */
 @Composable
-private fun VisualAgentComposeApp(
+fun VisualAgentComposeApp(
     deps: ComposeApplicationDependencies,
     onCloseApplication: () -> Unit,
-    panelLabelPersistence: PanelLabelPersistence,
+    persistedWindows: List<LayoutWindowState>,
 ) {
-    var windows by remember { mutableStateOf(restoreWorkspaceWindows(defaultWindows(), deps.workspaceLayoutService.report().windows)) }
+    var windows by remember { mutableStateOf(restoreWorkspaceWindows(defaultWindows(), persistedWindows)) }
     var modal by remember { mutableStateOf<ComposeModal?>(null) }
     var commandPaletteVisible by remember { mutableStateOf(false) }
-    var uiFontSize by remember { mutableStateOf(deps.appConfig.fontSize) }
-    var themeMode by remember { mutableStateOf(deps.appConfig.uiThemeMode) }
-    var showPanelLabels by remember { mutableStateOf(deps.appConfig.showPanelLabels) }
+    var settings by remember { mutableStateOf(deps.applicationPort.settings.snapshot()) }
     var settingsRevision by remember { mutableStateOf(0) }
     val workspaceFocusRequester = remember { FocusRequester() }
     val composeScope = rememberCoroutineScope()
-    val inFlight = rememberInFlightState(deps.toolEventBus)
+    val inFlight = rememberInFlightState(deps.applicationPort.activity)
     val panelServices =
         remember {
             ComposePanelServices(
-                config = deps.appConfig,
-                agentManager = deps.agentManager,
-                llmProvider = deps.llmProvider,
-                providerCatalogService = deps.providerCatalogService,
-                codexCliAccountService = deps.codexCliAccountService,
-                agentToolConfigService = deps.agentToolConfigService,
-                toolRegistry = deps.toolRegistry,
-                toolEventBus = deps.toolEventBus,
-                todoEventBus = deps.todoEventBus,
-                workspaceFileService = deps.workspaceFileService,
-                canvasOperations = deps.canvasOperations,
+                settings = deps.applicationPort.settings,
+                agents = deps.applicationPort.agents,
+                providers = deps.applicationPort.providers,
+                activity = deps.applicationPort.activity,
+                workspaceFiles = deps.applicationPort.workspaceFiles,
+                canvas = deps.applicationPort.canvas,
+                conversation = deps.applicationPort.conversation,
+                todos = deps.applicationPort.todos,
                 modalRequester = ComposeModalRequester { requested -> modal = requested },
                 onSettingsChanged = {
-                    uiFontSize = deps.appConfig.fontSize
-                    themeMode = deps.appConfig.uiThemeMode
-                    showPanelLabels = deps.appConfig.showPanelLabels
+                    settings = deps.applicationPort.settings.snapshot()
                     settingsRevision += 1
                 },
                 inFlight = inFlight,
-                lifecycle = deps.lifecycle,
+                lifecycle = deps.applicationPort.lifecycle,
             )
         }
-    DisposableEffect(deps.appConfig) {
-        val registration =
-            deps.appConfig.addChangeListener { change ->
-                if (change.key == AppConfigBean.KEY_UI_THEME_MODE) {
-                    themeMode = deps.appConfig.uiThemeMode
-                }
-            }
+    DisposableEffect(deps.applicationPort.settings) {
+        val registration = deps.applicationPort.settings.addChangeListener { next -> settings = next }
         onDispose { registration.close() }
     }
     val toggleWindow: (String) -> Unit = { id ->
@@ -184,10 +115,10 @@ private fun VisualAgentComposeApp(
     LaunchedEffect(Unit) {
         workspaceFocusRequester.requestFocus()
     }
-    RegisterAgentStatusCallback(inFlight, deps.agentStatusCallbackAdapter, deps.todoEventBus)
-    DisposableEffect(deps.workspaceLayoutService) {
+    RegisterAgentStatusCallback(inFlight, deps.applicationPort.activity, deps.applicationPort.todos)
+    DisposableEffect(deps.applicationPort.layout) {
         val handle =
-            deps.workspaceLayoutService.addWindowStateListener { states ->
+            deps.applicationPort.layout.addWindowStateListener { states ->
                 composeScope.launch {
                     windows = restoreWorkspaceWindows(windows, states)
                 }
@@ -195,10 +126,10 @@ private fun VisualAgentComposeApp(
         onDispose { handle.close() }
     }
 
-    val darkTheme = isSystemInDarkTheme(themeMode)
+    val darkTheme = isSystemInDarkTheme(settings.uiThemeMode)
     MaterialTheme(
         colorScheme = if (darkTheme) visualAgentDarkColorScheme() else visualAgentLightColorScheme(),
-        typography = visualAgentTypography(uiFontSize),
+        typography = visualAgentTypography(settings.fontSize),
     ) {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Box(modifier = Modifier.fillMaxSize()) {
@@ -226,11 +157,10 @@ private fun VisualAgentComposeApp(
                         onToggleWindow = toggleWindow,
                         onReorderWindows = reorderWindows,
                         onPanelWidthChanged = resizeWindow,
-                        showPanelLabels = showPanelLabels,
+                        showPanelLabels = settings.showPanelLabels,
                         onTogglePanelLabels = {
-                            showPanelLabels = !showPanelLabels
-                            deps.appConfig.showPanelLabels = showPanelLabels
-                            panelLabelPersistence.persist()
+                            settings = settings.copy(showPanelLabels = !settings.showPanelLabels)
+                            deps.applicationPort.settings.save(settings)
                         },
                         onCloseApplication = onCloseApplication,
                         modalRequester = panelServices.modalRequester,
@@ -247,28 +177,28 @@ private fun VisualAgentComposeApp(
                                 height = maxHeight.value.roundToInt(),
                             )
                         val minPanelWidth = ComposeWorkspaceWindowBounds.MIN_WIDTH
-                        val workspaceStates = windows.mapIndexed { index, window -> window.toWorkspaceWindowState(index) }
-                        deps.workspaceLayoutService.bind(
-                            stage = StageState(width = viewport.width.toDouble(), height = viewport.height.toDouble()),
-                            desktop = DesktopState(width = viewport.width.toDouble(), height = viewport.height.toDouble()),
+                        val workspaceStates = windows.mapIndexed { index, window -> window.toLayoutWindowState(index) }
+                        deps.applicationPort.layout.bind(
+                            stage = LayoutSize(width = viewport.width.toDouble(), height = viewport.height.toDouble()),
+                            desktop = LayoutSize(width = viewport.width.toDouble(), height = viewport.height.toDouble()),
                             windows = workspaceStates,
                         )
                         LaunchedEffect(workspaceStates) {
-                            deps.workspaceLayoutService.applyWindowStates(workspaceStates, notifyListeners = false)
+                            deps.applicationPort.layout.applyWindowStates(workspaceStates, notifyListeners = false)
                         }
                         val activeProvider =
                             remember(settingsRevision) {
-                                panelServices.providerCatalogService.getProvider(panelServices.providerCatalogService.activeProviderId())
+                                panelServices.providers.getProvider(panelServices.providers.activeProviderId())
                             }
                         Column(modifier = Modifier.fillMaxSize()) {
                             ComposeWorkspaceHeader(
-                                providerName = activeProvider?.id ?: deps.appConfig.llmProvider,
-                                modelName = panelServices.providerCatalogService.activeModelId().ifBlank { deps.appConfig.activeModel() },
+                                providerName = activeProvider?.id ?: panelServices.providers.activeProviderId(),
+                                modelName = panelServices.providers.activeModelId(),
                                 beanDefinitionCount = deps.beanDefinitionCount,
                                 inFlight = inFlight.state.value,
                                 onStopAll = {
                                     composeScope.launch {
-                                        panelServices.agentManager.cancelAllRunningActions()
+                                        deps.applicationPort.cancelActiveWork()
                                     }
                                 },
                             )
@@ -300,8 +230,8 @@ private fun VisualAgentComposeApp(
     }
 }
 
-private fun ComposeWorkspaceWindow.toWorkspaceWindowState(orderIndex: Int): WorkspaceWindowState =
-    WorkspaceWindowState(
+private fun ComposeWorkspaceWindow.toLayoutWindowState(orderIndex: Int): LayoutWindowState =
+    LayoutWindowState(
         id = id,
         order = orderIndex,
         visible = visible,

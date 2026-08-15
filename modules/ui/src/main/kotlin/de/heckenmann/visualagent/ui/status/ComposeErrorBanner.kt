@@ -23,8 +23,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import de.heckenmann.visualagent.error.ErrorCategory
-import de.heckenmann.visualagent.error.UserFacingError
+import de.heckenmann.visualagent.protocol.ProtocolErrorCategory
+import de.heckenmann.visualagent.protocol.UserFacingError
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -108,14 +108,14 @@ internal fun ErrorBanner(
 }
 
 @Composable
-private fun errorBannerColorForCategory(category: ErrorCategory): Color {
+private fun errorBannerColorForCategory(category: ProtocolErrorCategory): Color {
     val scheme = MaterialTheme.colorScheme
     return when (category) {
-        ErrorCategory.PROVIDER -> scheme.tertiary
-        ErrorCategory.WORKSPACE -> scheme.tertiary
-        ErrorCategory.CANVAS -> scheme.primary
-        ErrorCategory.TOOL -> scheme.secondary
-        ErrorCategory.PERSISTENCE -> scheme.error
-        ErrorCategory.UNKNOWN -> scheme.error
+        ProtocolErrorCategory.PROVIDER -> scheme.tertiary
+        ProtocolErrorCategory.WORKSPACE -> scheme.tertiary
+        ProtocolErrorCategory.CANVAS -> scheme.primary
+        ProtocolErrorCategory.TOOL -> scheme.secondary
+        ProtocolErrorCategory.PERSISTENCE -> scheme.error
+        ProtocolErrorCategory.UNKNOWN -> scheme.error
     }
 }

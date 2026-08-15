@@ -3,12 +3,9 @@
 package de.heckenmann.visualagent.ui.conversation
 
 import androidx.compose.runtime.Composable
-import de.heckenmann.visualagent.agent.AgentManager
-import de.heckenmann.visualagent.agent.CancellationToken
-import de.heckenmann.visualagent.agent.Message
-import de.heckenmann.visualagent.agent.conversation.WelcomeResult
-import de.heckenmann.visualagent.config.AppConfigBean
-import de.heckenmann.visualagent.error.ErrorMessageMapper
+import de.heckenmann.visualagent.protocol.CancellationToken
+import de.heckenmann.visualagent.protocol.CancellationTokenImpl
+import de.heckenmann.visualagent.protocol.ConversationPort
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -25,11 +22,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import de.heckenmann.visualagent.protocol.ConversationMessage as Message
 
 /** Persist conversation placement without blocking the Compose main dispatcher. */
-internal suspend fun persistConversationInputPlacement(config: AppConfigBean) {
+internal suspend fun persistConversationInputPlacement(
+    conversationPort: ConversationPort,
+    placement: de.heckenmann.visualagent.protocol.ConversationInputPlacement,
+) {
     withContext(Dispatchers.IO) {
-        config.save()
+        val current = conversationPort.preferences()
+        conversationPort.updatePreferences(current.copy(inputPlacement = placement))
     }
 }
 
@@ -39,7 +41,7 @@ internal suspend fun persistConversationInputPlacement(config: AppConfigBean) {
 internal fun handleClearConversation(
     scope: CoroutineScope,
     modalRequester: ComposeModalRequester,
-    agentManager: AgentManager,
+    conversationPort: ConversationPort,
     activeToken: () -> CancellationToken?,
     onSendingChange: (Boolean) -> Unit,
     onStatusChange: (String) -> Unit,
@@ -57,19 +59,11 @@ internal fun handleClearConversation(
                 onSendingChange(true)
                 onStatusChange("Stopping active work and clearing conversation...")
                 activeToken()?.cancel()
-                agentManager.cancelAllRunningActions()
-                agentManager.cancelAllActiveTodos()
+                conversationPort.cancelActiveWork()
                 runCatching {
-                    agentManager.clearHistory()
-                    agentManager.addWelcomeMessageAfterReset()
+                    conversationPort.clearAndCreateWelcome()
                 }.onSuccess { result ->
-                    onStatusChange(
-                        when (result) {
-                            is WelcomeResult.Generated -> "Conversation cleared"
-                            is WelcomeResult.Fallback ->
-                                "Welcome could not be generated: ${result.error.message ?: result.error::class.simpleName.orEmpty()}"
-                        },
-                    )
+                    onStatusChange(result.warning?.let { "Welcome could not be generated: $it" } ?: "Conversation cleared")
                 }.onFailure { error ->
                     onStatusChange("Welcome could not be generated: ${error.message ?: error::class.simpleName.orEmpty()}")
                 }
@@ -84,7 +78,7 @@ internal fun handleClearConversation(
 internal fun ConversationEditModal(
     editingId: String?,
     history: List<Message>,
-    agentManager: AgentManager,
+    conversationPort: ConversationPort,
     onDismiss: () -> Unit,
     onHistoryRefresh: () -> Unit,
 ) {
@@ -95,7 +89,7 @@ internal fun ConversationEditModal(
         onDismiss = onDismiss,
         onSave = { newContent ->
             editingId.let { id ->
-                agentManager.updateMessageContentById(id, newContent)
+                conversationPort.updateMessage(id, newContent)
                 onHistoryRefresh()
             }
             onDismiss()
@@ -134,7 +128,7 @@ internal suspend fun executeSend(
         java.util.UUID
             .randomUUID()
             .toString()
-    val token = CancellationToken()
+    val token = CancellationTokenImpl()
     onActiveTokenChange(token)
     inFlight.markStreamStart(streamRequestId)
     val streamedContent = StringBuilder()
@@ -154,8 +148,7 @@ internal suspend fun executeSend(
             onStatusChange("Ready")
         }.onFailure {
             onHistoryChange(messageGateway.currentHistory())
-            val userError = ErrorMessageMapper.map(it)
-            onStatusChange("${userError.summary}: ${userError.detail}")
+            onStatusChange(it.toUiErrorMessage())
         }.also {
             inFlight.markStreamEnd(streamRequestId)
             onSendingChange(false)

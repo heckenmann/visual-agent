@@ -30,13 +30,12 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import de.heckenmann.visualagent.agent.AgentManager
-import de.heckenmann.visualagent.agent.CancellationToken
-import de.heckenmann.visualagent.agent.tools.ToolCallPhase
-import de.heckenmann.visualagent.agent.tools.ToolEventBus
-import de.heckenmann.visualagent.config.AppConfigBean
-import de.heckenmann.visualagent.config.ConversationInputPlacement
-import de.heckenmann.visualagent.todo.TodoEventBus
+import de.heckenmann.visualagent.protocol.ActivityPort
+import de.heckenmann.visualagent.protocol.CancellationToken
+import de.heckenmann.visualagent.protocol.ConversationInputPlacement
+import de.heckenmann.visualagent.protocol.ConversationPort
+import de.heckenmann.visualagent.protocol.TodoPort
+import de.heckenmann.visualagent.protocol.ToolActivityPhase
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -60,31 +59,31 @@ internal typealias ConversationScrollStateObserver = (ConversationUiState, LazyL
  */
 @Composable
 internal fun ConversationPanel(
-    agentManager: AgentManager,
     modalRequester: ComposeModalRequester,
     inFlight: InFlightStateHolder,
-    toolEventBus: ToolEventBus,
-    todoEventBus: TodoEventBus,
-    config: AppConfigBean,
+    activityPort: ActivityPort,
+    todoPort: TodoPort,
+    conversationPort: ConversationPort,
     onScrollStateObserved: ConversationScrollStateObserver? = null,
 ) {
     val scope = rememberCoroutineScope()
     val inputFocusRequester = remember { FocusRequester() }
     val listState = rememberLazyListState()
     val isAtLatest by remember(listState) { derivedStateOf { listState.conversationPosition().isAtLatest } }
-    val conversationGateway = remember(agentManager) { AgentManagerConversationGateway(agentManager) }
-    val conversationState = rememberConversationUiState(agentManager.getHistory())
+    val conversationGateway = remember(conversationPort) { ProtocolConversationGateway(conversationPort) }
+    val conversationState = rememberConversationUiState(conversationPort.currentHistory())
     onScrollStateObserved?.invoke(conversationState, listState)
     RegisterPanelScrollbar(rememberScrollbarAdapter(listState))
     var activeToken by remember { mutableStateOf<CancellationToken?>(null) }
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
-    var inputPlacement by remember { mutableStateOf(config.conversationInputPlacement) }
+    val preferences = remember(conversationPort) { conversationPort.preferences() }
+    var inputPlacement by remember { mutableStateOf(preferences.inputPlacement) }
     val streamingContent by conversationState.streaming.collectAsState()
     val queue = remember { MessageQueue() }
-    LaunchedEffect(config.queueFlushMode) {
+    LaunchedEffect(preferences.queueFlushMode) {
         queue.flushMode =
             try {
-                QueueFlushMode.valueOf(config.queueFlushMode)
+                QueueFlushMode.valueOf(preferences.queueFlushMode)
             } catch (_: IllegalArgumentException) {
                 QueueFlushMode.ONE_BY_ONE
             }
@@ -109,20 +108,20 @@ internal fun ConversationPanel(
         listState = listState,
         gateway = conversationGateway,
     )
-    DisposableEffect(toolEventBus) {
+    DisposableEffect(activityPort) {
         val handle =
-            toolEventBus.addListener { event ->
-                if (event.phase == ToolCallPhase.FINISHED && !conversationState.sending) {
-                    conversationState.replaceHistory(agentManager.getHistory())
+            activityPort.addToolListener { event ->
+                if (event.phase == ToolActivityPhase.FINISHED && !conversationState.sending) {
+                    conversationState.replaceHistory(conversationPort.currentHistory())
                 }
             }
         onDispose { handle.close() }
     }
-    DisposableEffect(todoEventBus) {
+    DisposableEffect(todoPort) {
         val handle =
-            todoEventBus.addListener {
+            todoPort.addListener {
                 if (!conversationState.sending) {
-                    conversationState.replaceHistory(agentManager.getHistory())
+                    conversationState.replaceHistory(conversationPort.currentHistory())
                 }
             }
         onDispose { handle.close() }
@@ -156,11 +155,11 @@ internal fun ConversationPanel(
         handleClearConversation(
             scope = scope,
             modalRequester = modalRequester,
-            agentManager = agentManager,
+            conversationPort = conversationPort,
             activeToken = { activeToken },
             onSendingChange = { conversationState.sending = it },
             onStatusChange = { conversationState.status = it },
-            onHistoryRefresh = { conversationState.replaceHistory(agentManager.getHistory()) },
+            onHistoryRefresh = { conversationState.replaceHistory(conversationPort.currentHistory()) },
         )
     }
     LaunchedEffect(Unit) {
@@ -193,8 +192,7 @@ internal fun ConversationPanel(
     )
     val onInputPlacementChange: (ConversationInputPlacement) -> Unit = { placement ->
         inputPlacement = placement
-        config.conversationInputPlacement = placement
-        scope.launch { persistConversationInputPlacement(config) }
+        scope.launch { persistConversationInputPlacement(conversationPort, placement) }
     }
     Column(modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.weight(1f).fillMaxWidth().onSizeChanged { viewportSize = it }) {
@@ -216,8 +214,8 @@ internal fun ConversationPanel(
                         conversationState.deletingMessageIds += id
                         scope.launch {
                             delay(DELETE_ANIMATION_DURATION_MS.toLong())
-                            agentManager.deleteMessageById(id)
-                            conversationState.replaceHistory(agentManager.getHistory())
+                            conversationPort.deleteMessage(id)
+                            conversationState.replaceHistory(conversationPort.currentHistory())
                             conversationState.deletingMessageIds -= id
                             conversationState.status = "Message deleted"
                         }
@@ -281,9 +279,9 @@ internal fun ConversationPanel(
         ConversationEditModal(
             editingId = conversationState.editingId,
             history = conversationState.history,
-            agentManager = agentManager,
+            conversationPort = conversationPort,
             onDismiss = { conversationState.editingId = null },
-            onHistoryRefresh = { conversationState.replaceHistory(agentManager.getHistory()) },
+            onHistoryRefresh = { conversationState.replaceHistory(conversationPort.currentHistory()) },
         )
     }
 }

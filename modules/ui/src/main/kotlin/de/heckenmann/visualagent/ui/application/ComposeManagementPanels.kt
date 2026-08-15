@@ -23,17 +23,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import de.heckenmann.visualagent.agent.AgentManager
-import de.heckenmann.visualagent.agent.SubAgentExecutionState
-import de.heckenmann.visualagent.agent.addSubAgentExecutionListener
-import de.heckenmann.visualagent.agent.config.AgentToolConfigService
-import de.heckenmann.visualagent.agent.getSubAgentExecutionSnapshot
-import de.heckenmann.visualagent.agent.pauseAllSubAgentsAsync
-import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
-import de.heckenmann.visualagent.agent.resumeAllSubAgentsAsync
-import de.heckenmann.visualagent.agent.tools.ToolEventBus
-import de.heckenmann.visualagent.agent.tools.ToolRegistry
-import de.heckenmann.visualagent.todo.TodoEventBus
+import de.heckenmann.visualagent.protocol.ActivityPort
+import de.heckenmann.visualagent.protocol.AgentPort
+import de.heckenmann.visualagent.protocol.ProviderPort
+import de.heckenmann.visualagent.protocol.TodoPort
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -54,43 +47,39 @@ import kotlinx.coroutines.launch
  * Use cases: UC-0000015, UC-0000016, UC-0000018, UC-0000051,
  * UC-0000071.
  *
- * @param agentManager Source of sub-agent lifecycle and job execution
- * @param agentToolConfigService Tool configuration service for sub-agents
- * @param toolRegistry Registry of available tools for configuration
- * @param providerCatalogService Provider catalog for inherited provider/model
+ * @param agentPort Source of sub-agent lifecycle and job execution
+ * @param providerPort Provider catalog for inherited provider/model
  * @param modalRequester Modal requester used for destructive confirmations
  */
 @Composable
 internal fun SubAgentsPanel(
-    agentManager: AgentManager,
-    agentToolConfigService: AgentToolConfigService,
-    toolRegistry: ToolRegistry,
-    providerCatalogService: ProviderCatalogService,
+    agentPort: AgentPort,
+    providerPort: ProviderPort,
     modalRequester: ComposeModalRequester,
-    toolEventBus: ToolEventBus,
-    todoEventBus: TodoEventBus,
+    activityPort: ActivityPort,
+    todoPort: TodoPort,
 ) {
-    var agents by remember { mutableStateOf(agentManager.getSubAgents().map { it.copy() }) }
-    var executionSnapshot by remember { mutableStateOf(agentManager.getSubAgentExecutionSnapshot()) }
+    var agents by remember { mutableStateOf(agentPort.list()) }
+    var executionSnapshot by remember { mutableStateOf(agentPort.executionSnapshot()) }
     var status by remember { mutableStateOf("Ready") }
     val scope = rememberCoroutineScope()
     val refresh = {
-        agents = agentManager.getSubAgents().map { it.copy() }
-        executionSnapshot = agentManager.getSubAgentExecutionSnapshot()
+        agents = agentPort.list()
+        executionSnapshot = agentPort.executionSnapshot()
     }
-    DisposableEffect(agentManager) {
+    DisposableEffect(agentPort) {
         val handle =
-            agentManager.addSubAgentExecutionListener { snapshot ->
+            agentPort.addExecutionListener { snapshot ->
                 scope.launch { executionSnapshot = snapshot }
             }
         onDispose { handle.close() }
     }
-    DisposableEffect(todoEventBus) {
-        val handle = todoEventBus.addListener { scope.launch { refresh() } }
+    DisposableEffect(todoPort) {
+        val handle = todoPort.addListener { scope.launch { refresh() } }
         onDispose { handle.close() }
     }
     ToolEventRefreshEffect(
-        toolEventBus = toolEventBus,
+        activityPort = activityPort,
         toolIds = setOf("agent:create", "agent:update", "agent:delete", "agent:list", "subagents:execution"),
         onRefresh = refresh,
     )
@@ -99,26 +88,26 @@ internal fun SubAgentsPanel(
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             ActionIconButton(
-                icon = if (executionSnapshot.globalState == SubAgentExecutionState.PAUSED) Icons.Filled.PlayArrow else Icons.Filled.Pause,
+                icon = if (executionSnapshot.globallyPaused) Icons.Filled.PlayArrow else Icons.Filled.Pause,
                 description =
-                    if (executionSnapshot.globalState == SubAgentExecutionState.PAUSED) {
+                    if (executionSnapshot.globallyPaused) {
                         "Resume all sub-agents"
                     } else {
                         "Pause all sub-agents"
                     },
                 onClick = {
                     scope.launch {
-                        if (executionSnapshot.globalState == SubAgentExecutionState.PAUSED) {
-                            agentManager.resumeAllSubAgentsAsync()
+                        if (executionSnapshot.globallyPaused) {
+                            agentPort.resumeAll()
                         } else {
-                            agentManager.pauseAllSubAgentsAsync()
+                            agentPort.pauseAll()
                         }
-                        executionSnapshot = agentManager.getSubAgentExecutionSnapshot()
+                        executionSnapshot = agentPort.executionSnapshot()
                     }
                 },
             )
             Text(
-                if (executionSnapshot.globalState == SubAgentExecutionState.PAUSED) {
+                if (executionSnapshot.globallyPaused) {
                     "All sub-agents paused"
                 } else {
                     "Sub-agents running"
@@ -132,7 +121,7 @@ internal fun SubAgentsPanel(
                     modalRequester.request(
                         ComposeContentModal(title = "Create sub-agent") { dismiss ->
                             SubAgentCreationForm(
-                                agentManager = agentManager,
+                                agentPort = agentPort,
                                 onCreated = {
                                     refresh()
                                     status = "Created sub-agent"
@@ -155,18 +144,16 @@ internal fun SubAgentsPanel(
                 agents.forEach { agent ->
                     SubAgentRow(
                         agent = agent,
-                        activeJobCount = agentManager.getActiveJobCount(agent.id),
+                        activeJobCount = agentPort.activeJobCount(agent.id),
                         individuallyPaused = agent.id in executionSnapshot.pausedAgentIds,
-                        globallyPaused = executionSnapshot.globalState == SubAgentExecutionState.PAUSED,
-                        agentManager = agentManager,
-                        agentToolConfigService = agentToolConfigService,
-                        toolRegistry = toolRegistry,
-                        providerCatalogService = providerCatalogService,
+                        globallyPaused = executionSnapshot.globallyPaused,
+                        agentPort = agentPort,
+                        providerPort = providerPort,
                         modalRequester = modalRequester,
                         onStatusChanged = { status = it },
                         refresh = refresh,
                         scope = scope,
-                        onExecutionStateChanged = { executionSnapshot = agentManager.getSubAgentExecutionSnapshot() },
+                        onExecutionStateChanged = { executionSnapshot = agentPort.executionSnapshot() },
                     )
                 }
             }

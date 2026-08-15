@@ -28,13 +28,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import de.heckenmann.visualagent.agent.AgentManager
-import de.heckenmann.visualagent.agent.startAllTodos
-import de.heckenmann.visualagent.agent.stopAllTodos
-import de.heckenmann.visualagent.agent.tools.ToolEventBus
-import de.heckenmann.visualagent.todo.Todo
-import de.heckenmann.visualagent.todo.TodoEventBus
-import de.heckenmann.visualagent.todo.TodoStatus
+import de.heckenmann.visualagent.protocol.TodoItem
+import de.heckenmann.visualagent.protocol.TodoPort
+import de.heckenmann.visualagent.protocol.TodoState
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -59,41 +55,39 @@ import sh.calvin.reorderable.ReorderableColumn
  *
  * Use cases: UC-0000013, UC-0000071.
  *
- * @param agentManager Source of todo persistence and updates
+ * @param todoPort Source of todo persistence and updates
  * @param modalRequester Modal requester used for destructive confirmations
  */
 @Composable
 internal fun TodoPanel(
-    agentManager: AgentManager,
+    todoPort: TodoPort,
     modalRequester: ComposeModalRequester,
-    todoEventBus: TodoEventBus,
-    toolEventBus: ToolEventBus,
 ) {
-    var todos by remember { mutableStateOf<List<Todo>>(emptyList()) }
+    var todos by remember { mutableStateOf<List<TodoItem>>(emptyList()) }
     var streamedResponses by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     val scope = rememberCoroutineScope()
 
     /** Loads persisted todos without blocking the Compose dispatcher. */
     suspend fun refreshTodos() {
-        todos = withContext(Dispatchers.IO) { agentManager.getTodosFromDb() }
+        todos = withContext(Dispatchers.IO) { todoPort.list() }
     }
     val refresh: () -> Unit = {
         scope.launch { refreshTodos() }
     }
-    LaunchedEffect(agentManager) { refreshTodos() }
-    DisposableEffect(todoEventBus) {
+    LaunchedEffect(todoPort) { refreshTodos() }
+    DisposableEffect(todoPort) {
         val todoHandle =
-            todoEventBus.addListener { change ->
+            todoPort.addListener { change ->
                 scope.launch {
                     refreshTodos()
                     val todo = change.todo
-                    if (todo != null && todo.status != TodoStatus.IN_PROGRESS) {
+                    if (todo != null && todo.status != TodoState.IN_PROGRESS) {
                         streamedResponses = streamedResponses - todo.id
                     }
                 }
             }
         val progressHandle =
-            todoEventBus.addProgressListener { update ->
+            todoPort.addProgressListener { update ->
                 scope.launch {
                     streamedResponses =
                         if (update.completed) {
@@ -112,14 +106,9 @@ internal fun TodoPanel(
             progressHandle.close()
         }
     }
-    ToolEventRefreshEffect(
-        toolEventBus = toolEventBus,
-        toolIds = setOf("todos", "agent:assign-todo", "agent:assign-next-todo", "agent:assign-all-todos"),
-        onRefresh = refresh,
-    )
-    val nextTodoId = remember(todos) { todos.firstOrNull { it.status == TodoStatus.PENDING }?.id }
-    val hasStartableTodos = todos.any { it.status == TodoStatus.PENDING || it.status == TodoStatus.CANCELLED }
-    val hasStoppableTodos = todos.any { it.status == TodoStatus.PENDING || it.status == TodoStatus.IN_PROGRESS }
+    val nextTodoId = remember(todos) { todos.firstOrNull { it.status == TodoState.PENDING }?.id }
+    val hasStartableTodos = todos.any { it.status == TodoState.PENDING || it.status == TodoState.CANCELLED }
+    val hasStoppableTodos = todos.any { it.status == TodoState.PENDING || it.status == TodoState.IN_PROGRESS }
     val todoListScrollState = rememberScrollState()
     RegisterPanelVerticalScrollbar(todoListScrollState)
 
@@ -134,7 +123,7 @@ internal fun TodoPanel(
                 description = "Start all todos",
                 enabled = hasStartableTodos,
                 onClick = {
-                    agentManager.startAllTodos()
+                    todoPort.startAll()
                     refresh()
                 },
             )
@@ -143,7 +132,7 @@ internal fun TodoPanel(
                 description = "Stop all todos",
                 enabled = hasStoppableTodos,
                 onClick = {
-                    agentManager.stopAllTodos()
+                    todoPort.stopAll()
                     refresh()
                 },
             )
@@ -154,14 +143,14 @@ internal fun TodoPanel(
                     modalRequester.request(
                         ComposeContentModal(title = "Add todo") { dismiss ->
                             TodoEditor(
-                                todo = Todo(id = "", description = "", status = TodoStatus.PENDING),
-                                agents = agentManager.getSubAgents(),
+                                todo = TodoItem(id = "", description = "", status = TodoState.PENDING),
+                                agents = todoPort.agents(),
                                 onCancel = dismiss,
                                 onSave = { newDescription, newStatus, newAgentId ->
-                                    val created = agentManager.todoManager.add(newDescription)
-                                    agentManager.todoManager.updateStatus(created.id, newStatus)
+                                    val created = todoPort.add(newDescription)
+                                    todoPort.updateStatus(created.id, newStatus)
                                     if (newAgentId != null) {
-                                        agentManager.todoManager.updateAssignedAgent(created.id, newAgentId)
+                                        todoPort.updateAssignedAgent(created.id, newAgentId)
                                     }
                                     refresh()
                                     dismiss()
@@ -181,7 +170,7 @@ internal fun TodoPanel(
             list = todos,
             onSettle = { fromIndex, toIndex ->
                 val reordered = todos.toMutableList().apply { add(toIndex, removeAt(fromIndex)) }
-                agentManager.todoManager.reorder(reordered.map { it.id })
+                todoPort.reorder(reordered.map { it.id })
                 refresh()
             },
             verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -192,7 +181,7 @@ internal fun TodoPanel(
                 isNext = todo.id == nextTodoId,
                 isDragging = isDragging,
                 streamedResponse = streamedResponses[todo.id].orEmpty(),
-                agentManager = agentManager,
+                todoPort = todoPort,
                 modalRequester = modalRequester,
                 refresh = refresh,
             )

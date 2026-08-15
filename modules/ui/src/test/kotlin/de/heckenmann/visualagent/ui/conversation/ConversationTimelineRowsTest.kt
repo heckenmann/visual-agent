@@ -6,7 +6,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -23,6 +22,7 @@ import kotlinx.serialization.json.put
 import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
+import de.heckenmann.visualagent.protocol.ConversationMessage as Message
 
 /**
  * Verifies role-specific rows rendered through the complete conversation timeline.
