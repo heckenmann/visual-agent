@@ -18,6 +18,8 @@ tasks.named("check") {
     dependsOn(
         ":application:check",
         ":ui:check",
+        ":protocol:check",
+        ":desktop:check",
         ":providers:check",
         ":tools:check",
         "verifyCentralizedVersions",
@@ -26,24 +28,24 @@ tasks.named("check") {
 }
 
 tasks.named("build") {
-    dependsOn(":application:build", ":ui:build", ":providers:build", ":tools:build")
+    dependsOn(":application:build", ":ui:build", ":protocol:build", ":desktop:build", ":providers:build", ":tools:build")
 }
 
 gradle.projectsEvaluated {
     val moduleMainSourceSets =
-        listOf(":application", ":ui", ":providers", ":tools").map { modulePath ->
+        listOf(":application", ":ui", ":protocol", ":desktop", ":providers", ":tools").map { modulePath ->
             project(modulePath).extensions.getByType<SourceSetContainer>().getByName("main")
         }
     val moduleTestSourceSets =
-        listOf(":application", ":ui", ":providers", ":tools").map { modulePath ->
+        listOf(":application", ":ui", ":protocol", ":desktop", ":providers", ":tools").map { modulePath ->
             project(modulePath).extensions.getByType<SourceSetContainer>().getByName("test")
         }
     tasks.named<Test>("test") {
-        dependsOn(":application:testClasses", ":ui:testClasses", ":providers:testClasses")
+        dependsOn(":application:testClasses", ":ui:testClasses", ":protocol:testClasses", ":desktop:testClasses", ":providers:testClasses")
         useJUnitPlatform {
-            excludeTags("database")
+            excludeTags("database", "de.heckenmann.visualagent.testsupport.DatabaseTestCategory")
         }
-        mustRunAfter(":application:databaseTest", ":ui:databaseTest")
+        mustRunAfter(":application:databaseTest")
         workingDir = rootProject.projectDir
         systemProperty("visualagent.ollama.smoke", System.getProperty("visualagent.ollama.smoke", "false"))
         systemProperty("visualagent.codex.smoke", System.getProperty("visualagent.codex.smoke", "false"))
@@ -52,30 +54,49 @@ gradle.projectsEvaluated {
         classpath = files(moduleTestSourceSets.map { it.runtimeClasspath })
         finalizedBy(tasks.jacocoTestReport)
     }
-    project(":ui").tasks.named<Test>("databaseTest") {
-        mustRunAfter(":application:databaseTest")
-    }
     tasks.jacocoTestReport {
-        dependsOn(tasks.test, ":application:databaseTest", ":ui:databaseTest")
+        dependsOn(tasks.test, ":application:databaseTest")
         executionData(
             layout.buildDirectory.file("jacoco/test.exec"),
             project(":application").layout.buildDirectory.file("jacoco/databaseTest.exec"),
-            project(":ui").layout.buildDirectory.file("jacoco/databaseTest.exec"),
         )
-        classDirectories.setFrom(files(moduleMainSourceSets.map { it.output.classesDirs }))
+        classDirectories.setFrom(
+            files(
+                moduleMainSourceSets.map { sourceSet ->
+                    sourceSet.output.classesDirs.map { classesDir ->
+                        fileTree(classesDir) {
+                            // Protobuf generates transport implementation classes; coverage belongs
+                            // to the handwritten protocol adapters, not generated builders/accessors.
+                            exclude("de/heckenmann/visualagent/protocol/v1/**")
+                        }
+                    }
+                },
+            ),
+        )
         reports {
             xml.required.set(true)
             html.required.set(true)
         }
     }
     tasks.jacocoTestCoverageVerification {
-        dependsOn(tasks.test, ":application:databaseTest", ":ui:databaseTest")
+        dependsOn(tasks.test, ":application:databaseTest")
         executionData(
             layout.buildDirectory.file("jacoco/test.exec"),
             project(":application").layout.buildDirectory.file("jacoco/databaseTest.exec"),
             project(":ui").layout.buildDirectory.file("jacoco/databaseTest.exec"),
         )
-        classDirectories.setFrom(files(moduleMainSourceSets.map { it.output.classesDirs }))
+        classDirectories.setFrom(
+            files(
+                moduleMainSourceSets.map { sourceSet ->
+                    sourceSet.output.classesDirs.map { classesDir ->
+                        fileTree(classesDir) {
+                            // Keep generated protobuf classes out of the aggregate quality gate.
+                            exclude("de/heckenmann/visualagent/protocol/v1/**")
+                        }
+                    }
+                },
+            ),
+        )
         violationRules {
             rule {
                 limit {
@@ -93,7 +114,7 @@ tasks.named("check") {
 }
 
 tasks.register("ktlintCheck") {
-    dependsOn(":application:ktlintCheck", ":ui:ktlintCheck", ":providers:ktlintCheck", ":tools:ktlintCheck")
+    dependsOn(":application:ktlintCheck", ":ui:ktlintCheck", ":protocol:ktlintCheck", ":desktop:ktlintCheck", ":providers:ktlintCheck", ":tools:ktlintCheck")
 }
 
 tasks.register("copyAllDependencies") {
@@ -105,9 +126,10 @@ tasks.register("verifyModuleDependencies") {
     description = "Verifies the directed dependency graph between Visual Agent modules."
     doLast {
         val moduleDependencies =
-            setOf(":application", ":ui", ":providers", ":tools").associateWith { modulePath ->
+            setOf(":application", ":ui", ":protocol", ":desktop", ":providers", ":tools").associateWith { modulePath ->
                 project(modulePath)
                     .configurations
+                    .filter { configuration -> !configuration.name.contains("test", ignoreCase = true) }
                     .flatMap { configuration ->
                         configuration.dependencies
                             .withType(org.gradle.api.artifacts.ProjectDependency::class.java)
@@ -116,8 +138,10 @@ tasks.register("verifyModuleDependencies") {
             }
         val expectedDependencies =
             mapOf(
-                ":application" to setOf(":providers", ":tools"),
-                ":ui" to setOf(":application", ":providers", ":tools"),
+                ":application" to setOf(":providers", ":tools", ":protocol"),
+                ":ui" to setOf(":protocol"),
+                ":protocol" to emptySet(),
+                ":desktop" to setOf(":ui", ":application", ":protocol"),
                 ":providers" to emptySet(),
                 ":tools" to emptySet(),
             )
@@ -129,7 +153,29 @@ tasks.register("verifyModuleDependencies") {
                     if (!expected.containsAll(actual)) add("$modulePath has forbidden dependencies ${actual - expected}")
                 }
             }
-        check(violations.isEmpty()) { "Module dependency graph violation:\n${violations.joinToString("\n")}" }
+        val forbiddenUiImports =
+            Regex("(?:org\\.springframework|de\\.heckenmann\\.visualagent\\.(agent|config|error|knowledge|server|todo|workspace))")
+        val uiSourceViolations =
+            fileTree(project(":ui").projectDir.resolve("src/main"))
+                .matching { include("**/*.kt") }
+                .files
+                .flatMap { source ->
+                    source.readLines().mapIndexedNotNull { index, line ->
+                        if (forbiddenUiImports.containsMatchIn(line)) "${source}:${index + 1}: $line" else null
+                    }
+                }
+        check(violations.isEmpty() && uiSourceViolations.isEmpty()) {
+            buildString {
+                if (violations.isNotEmpty()) {
+                    appendLine("Module dependency graph violation:")
+                    appendLine(violations.joinToString("\n"))
+                }
+                if (uiSourceViolations.isNotEmpty()) {
+                    appendLine("UI source must use protocol-owned types only:")
+                    appendLine(uiSourceViolations.joinToString("\n"))
+                }
+            }
+        }
     }
 }
 
@@ -140,6 +186,8 @@ tasks.register("verifyCentralizedVersions") {
         listOf(
             "application/build.gradle.kts",
             "modules/ui/build.gradle.kts",
+            "modules/protocol/build.gradle.kts",
+            "modules/desktop/build.gradle.kts",
             "modules/providers/build.gradle.kts",
             "modules/tools/build.gradle.kts",
         ).map(rootProject.projectDir::resolve)

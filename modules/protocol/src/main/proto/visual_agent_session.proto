@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package de.heckenmann.visualagent.protocol.v1;
+
+option java_multiple_files = true;
+option java_package = "de.heckenmann.visualagent.protocol.v1";
+option java_outer_classname = "VisualAgentSessionProto";
+
+/** Stable bidirectional session contract between the desktop shell and server. */
+service VisualAgentSessionService {
+  rpc OpenSession(stream ClientFrame) returns (stream ServerFrame);
+}
+
+message ClientFrame {
+  string session_id = 1;
+  string request_id = 2;
+  int64 client_revision = 3;
+  oneof payload {
+    Hello hello = 10;
+    ChatRequest chat_request = 11;
+    CancelRequest cancel_request = 12;
+    SnapshotAck snapshot_ack = 13;
+  }
+}
+
+message ServerFrame {
+  string session_id = 1;
+  string request_id = 2;
+  int64 server_revision = 3;
+  Snapshot snapshot = 5;
+  oneof payload {
+    HelloAck hello_ack = 10;
+    ChatDelta chat_delta = 11;
+    ChatCompleted chat_completed = 12;
+    OperationError error = 13;
+  }
+}
+
+message Hello {
+  string protocol_version = 1;
+  string client_name = 2;
+}
+
+message HelloAck {
+  string protocol_version = 1;
+  string server_name = 2;
+  string server_version = 3;
+}
+
+message ChatRequest {
+  string content = 1;
+}
+
+message ChatDelta {
+  string text = 1;
+}
+
+message ChatCompleted {
+  bool successful = 1;
+}
+
+message CancelRequest {
+  string reason = 1;
+}
+
+message SnapshotAck {
+  int64 revision = 1;
+}
+
+message Snapshot {
+  int64 revision = 1;
+  string json = 2;
+}
+
+message OperationError {
+  string code = 1;
+  string message = 2;
+  bool retryable = 3;
+}
