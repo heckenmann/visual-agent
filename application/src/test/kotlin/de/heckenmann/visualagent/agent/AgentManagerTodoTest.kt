@@ -7,10 +7,11 @@ import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoStatus
 import io.mockk.coEvery
-import io.mockk.coVerify
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -224,17 +225,16 @@ class AgentManagerTodoTest {
     fun `completed todo review request ends with an explicit user instruction`(): Unit =
         runBlocking {
             val (manager, provider, _) = createManagerWithInstantResponse()
-            val requests = mutableListOf<ChatRequestContext>()
+            val request = CompletableDeferred<ChatRequestContext>()
             coEvery { provider.chat(any<ChatRequestContext>()) } coAnswers {
-                requests += firstArg<ChatRequestContext>()
+                request.complete(firstArg<ChatRequestContext>())
                 ChatResponse(model = "test", message = Message("assistant", "Reviewed"), done = true)
             }
             val todo = manager.todoManager.add("Completed review", "1")
 
             manager.todoManager.updateStatus(todo.id, TodoStatus.COMPLETED)
 
-            coVerify(timeout = 2_000) { provider.chat(any<ChatRequestContext>()) }
-            val completedRequest = requests.last()
+            val completedRequest = withTimeout(2_000) { request.await() }
             val completedMessages = completedRequest.messages
             val completedMessage = completedMessages.last()
             assertEquals(
@@ -253,17 +253,16 @@ class AgentManagerTodoTest {
     fun `cancelled todo review request ends with an explicit user instruction`(): Unit =
         runBlocking {
             val (manager, provider, _) = createManagerWithInstantResponse()
-            val requests = mutableListOf<ChatRequestContext>()
+            val request = CompletableDeferred<ChatRequestContext>()
             coEvery { provider.chat(any<ChatRequestContext>()) } coAnswers {
-                requests += firstArg<ChatRequestContext>()
+                request.complete(firstArg<ChatRequestContext>())
                 ChatResponse(model = "test", message = Message("assistant", "Reviewed"), done = true)
             }
             val todo = manager.todoManager.add("Cancelled review", "1")
 
             manager.todoManager.updateStatus(todo.id, TodoStatus.CANCELLED)
 
-            coVerify(timeout = 2_000) { provider.chat(any<ChatRequestContext>()) }
-            val cancelledRequest = requests.last()
+            val cancelledRequest = withTimeout(2_000) { request.await() }
             val cancelledMessages = cancelledRequest.messages
             val cancelledMessage = cancelledMessages.last()
             assertEquals(
