@@ -47,8 +47,10 @@ import de.heckenmann.visualagent.ui.settings.*
 import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 internal typealias ConversationScrollStateObserver = (ConversationUiState, LazyListState) -> Unit
 
@@ -111,8 +113,13 @@ internal fun ConversationPanel(
     DisposableEffect(activityPort) {
         val handle =
             activityPort.addToolListener { event ->
-                if (event.phase == ToolActivityPhase.FINISHED && !conversationState.sending) {
-                    conversationState.replaceHistory(conversationPort.currentHistory())
+                if (event.phase == ToolActivityPhase.FINISHED) {
+                    scope.launch(Dispatchers.Main.immediate) {
+                        if (!conversationState.sending) {
+                            val history = withContext(Dispatchers.IO) { conversationPort.currentHistory() }
+                            conversationState.replaceHistory(history)
+                        }
+                    }
                 }
             }
         onDispose { handle.close() }
@@ -120,8 +127,11 @@ internal fun ConversationPanel(
     DisposableEffect(todoPort) {
         val handle =
             todoPort.addListener {
-                if (!conversationState.sending) {
-                    conversationState.replaceHistory(conversationPort.currentHistory())
+                scope.launch(Dispatchers.Main.immediate) {
+                    if (!conversationState.sending) {
+                        val history = withContext(Dispatchers.IO) { conversationPort.currentHistory() }
+                        conversationState.replaceHistory(history)
+                    }
                 }
             }
         onDispose { handle.close() }
