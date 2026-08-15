@@ -204,7 +204,7 @@ interface LLMProvider {
 
 ## Status
 
-This project is under active Compose migration on branch `codex/issue-48-compose-migration`. The current desktop runtime is Compose Multiplatform; the desktop JavaFX/FXML/JHotDraw path has been removed. See `docs/compose-migration-audit.md` for the requirement audit and the in-progress items.
+The Compose migration is complete. The current desktop runtime is Compose Multiplatform and the desktop JavaFX/FXML/JHotDraw path has been removed. See `docs/compose-migration-audit.md` for the historical requirement audit and remaining follow-up work.
 
 ## Known Bugs
 

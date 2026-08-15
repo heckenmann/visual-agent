@@ -11,9 +11,9 @@ Users close the entire Visual Agent desktop application from the left navigation
 
 ## Main Flow
 1. The user clicks the rail close button.
-2. The application runs the normal stage close path.
-3. The current workspace panel layout is persisted by the existing close handler.
-4. Compose Multiplatform exits and the Spring application context is shut down by the application stop hook.
+2. The desktop host begins the protocol shutdown lifecycle and cancels active work.
+3. The current window size and position are persisted through the layout port.
+4. The application connection and its embedded Spring application context are closed before Compose Multiplatform exits.
 
 ## Alternative Flows
 - If the close request is consumed by a future confirmation flow, the application remains open.
@@ -24,12 +24,12 @@ Users close the entire Visual Agent desktop application from the left navigation
 - None.
 
 ## Code Entry Points
-- `application/src/main/kotlin/de/heckenmann/visualagent/ui/compose/VisualAgentComposeApplication.kt`
-- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
-- `de.heckenmann.visualagent.Main`
+- `modules/desktop/src/main/kotlin/de/heckenmann/visualagent/desktop/DesktopMain.kt`
+- `modules/desktop/src/main/kotlin/de/heckenmann/visualagent/desktop/ComposeStartupHost.kt`
+- `de.heckenmann.visualagent.protocol.LifecyclePort`
 
 ## Acceptance Criteria
 - The left rail contains an icon-only close button with a tooltip.
 - Clicking the button closes the entire application, not only the active workspace panel.
-- The existing stage close handler persists the workspace panel layout.
-- The application stop hook closes the Spring context.
+- Closing persists the current window size and position through the server-owned layout port.
+- The desktop host closes the application connection and embedded Spring context before exiting.

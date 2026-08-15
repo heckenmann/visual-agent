@@ -33,8 +33,8 @@ Users can correct typos or refine earlier messages without re-typing.
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.compose.ConversationPanel`
-- `de.heckenmann.visualagent.ui.compose.EditMessageModal`
+- `de.heckenmann.visualagent.ui.conversation.ConversationPanel`
+- `de.heckenmann.visualagent.ui.conversation.EditMessageModal`
 
 ## Acceptance Criteria
 

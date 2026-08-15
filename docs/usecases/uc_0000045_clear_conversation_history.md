@@ -32,8 +32,8 @@ The main conversation is reset without requiring an application restart, and no 
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.compose.ConversationPanel`
-- `de.heckenmann.visualagent.ui.compose.ComposeModalHost`
+- `de.heckenmann.visualagent.ui.conversation.ConversationPanel`
+- `de.heckenmann.visualagent.ui.modal.ComposeModalHost`
 - `de.heckenmann.visualagent.agent.AgentManager.cancelAllRunningActions`
 - `de.heckenmann.visualagent.agent.AgentManager.cancelAllActiveTodos`
 - `de.heckenmann.visualagent.agent.AgentManager.clearHistory`

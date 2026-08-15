@@ -38,7 +38,7 @@ The file becomes durable application workspace data with a stable ID and hash.
 ## Code Entry Points
 
 - `de.heckenmann.visualagent.workspace.WorkspaceFileService.importFile`
-- `de.heckenmann.visualagent.ui.compose.FilesPanel`
+- `de.heckenmann.visualagent.ui.files.FilesPanel`
 - `io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher`
 - `de.heckenmann.visualagent.knowledge.WorkspaceFileStore`
 

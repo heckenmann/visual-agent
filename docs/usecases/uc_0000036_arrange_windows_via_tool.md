@@ -37,7 +37,7 @@ The agent can reason about and adjust the visible workspace layout without relyi
 
 - `de.heckenmann.visualagent.agent.tools.WorkspaceLayoutTool`
 - `de.heckenmann.visualagent.workspace.layout.WorkspaceLayoutService`
-- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.application.VisualAgentComposeApp`
 
 ## Acceptance Criteria
 

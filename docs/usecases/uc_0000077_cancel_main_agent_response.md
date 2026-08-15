@@ -40,8 +40,8 @@ The user regains control immediately and the conversation keeps whatever the mod
 - `de.heckenmann.visualagent.agent.OllamaClient`
 - `de.heckenmann.visualagent.agent.openai.OpenAiClient`
 - `de.heckenmann.visualagent.agent.ToolCallingLoop`
-- `de.heckenmann.visualagent.ui.compose.ComposeConversationPanel`
-- `de.heckenmann.visualagent.ui.compose.ConversationInputArea`
+- `de.heckenmann.visualagent.ui.conversation.ConversationPanel`
+- `de.heckenmann.visualagent.ui.conversation.ConversationInputArea`
 
 ## Acceptance Criteria
 

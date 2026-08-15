@@ -34,10 +34,10 @@ The user can recover from a pile-up of parallel work with a single click.
 
 - `de.heckenmann.visualagent.agent.AgentManager.cancelAllRunningActions`
 - `de.heckenmann.visualagent.agent.SubAgentJobScheduler`
-- `de.heckenmann.visualagent.ui.compose.ActivityIndicator`
-- `de.heckenmann.visualagent.ui.compose.InFlightIndicator`
-- `de.heckenmann.visualagent.ui.compose.ComposeWorkspaceHeader`
-- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.status.ActivityIndicator`
+- `de.heckenmann.visualagent.ui.status.InFlightIndicator`
+- `de.heckenmann.visualagent.ui.workspace.ComposeWorkspaceHeader`
+- `de.heckenmann.visualagent.desktop.ComposeStartupHost`
 
 ## Acceptance Criteria
 

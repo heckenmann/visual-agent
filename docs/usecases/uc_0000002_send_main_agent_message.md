@@ -20,8 +20,8 @@ Desktop user.
 2. The user toggles the sticky pin button beside the clear button to switch between the two input placements; the choice is persisted.
 3. The user sends the message with the send icon button or presses Enter while the input is focused.
 4. Shift+Enter inserts a newline instead of sending.
-5. The chat panel forwards the message callback to the main window.
-6. The main window delegates the request to the agent manager.
+5. The chat panel sends the request through the protocol-owned conversation port.
+6. The server adapter delegates the request to the agent manager.
 7. The agent manager builds a request context from recent history, todo state, active provider/model, enabled tools, and runtime metadata.
 8. The configured provider sends the request to the selected backend.
 9. The assistant response is rendered in the conversation.
@@ -37,8 +37,9 @@ The user receives a complete response and the conversation survives application 
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
-- `de.heckenmann.visualagent.ui.compose.ConversationPanel`
+- `de.heckenmann.visualagent.ui.application.VisualAgentComposeApp`
+- `de.heckenmann.visualagent.ui.conversation.ConversationPanel`
+- `de.heckenmann.visualagent.protocol.ConversationPort`
 - `de.heckenmann.visualagent.agent.AgentManager`
 - `de.heckenmann.visualagent.agent.conversation.AgentManagerConversationOps`
 

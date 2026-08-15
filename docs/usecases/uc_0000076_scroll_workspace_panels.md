@@ -38,10 +38,10 @@ Users can reach panels that are outside the current viewport quickly via click s
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.compose.ComposeSplitWorkspace`
-- `de.heckenmann.visualagent.ui.compose.ScrollArrow`
-- `de.heckenmann.visualagent.ui.compose.scrollArrowHandler`
-- `de.heckenmann.visualagent.ui.compose.ApplicationLifecycle`
+- `de.heckenmann.visualagent.ui.workspace.ComposeSplitWorkspace`
+- `de.heckenmann.visualagent.ui.workspace.ScrollArrow`
+- `de.heckenmann.visualagent.ui.workspace.scrollArrowHandler`
+- `de.heckenmann.visualagent.protocol.LifecyclePort`
 
 ## Acceptance Criteria
 

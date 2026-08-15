@@ -33,9 +33,9 @@ Canvas objects can be stored, searched, renamed, deleted, hashed, and reopened l
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.compose.CanvasPanel`
-- `de.heckenmann.visualagent.ui.compose.FilesPanel`
-- `de.heckenmann.visualagent.ui.compose.ActionIconButton`
+- `de.heckenmann.visualagent.ui.canvas.CanvasPanel`
+- `de.heckenmann.visualagent.ui.files.FilesPanel`
+- `de.heckenmann.visualagent.ui.components.ActionIconButton`
 - `de.heckenmann.visualagent.canvas.InMemoryCanvasService`
 - `de.heckenmann.visualagent.canvas.CanvasDocumentCodec`
 - `de.heckenmann.visualagent.agent.tools.canvas.CanvasTool`

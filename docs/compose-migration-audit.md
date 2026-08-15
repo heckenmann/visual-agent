@@ -2,7 +2,9 @@
 
 ## Summary
 
-Issue 48 evaluated whether Visual Agent can move from JavaFX to Compose Multiplatform. The local branch now implements the production desktop runtime with Compose Multiplatform and removes the former JavaFX/FXML/JHotDraw UI path from the source tree.
+Issue 48 evaluated whether Visual Agent can move from JavaFX to Compose Multiplatform. The
+migration is complete: the production desktop runtime uses Compose Multiplatform and the former
+JavaFX/FXML/JHotDraw UI path has been removed from the source tree.
 
 Decision: proceed with Compose Multiplatform for the desktop runtime.
 
@@ -12,11 +14,14 @@ The migration replaces the Visual Agent desktop UI toolkit. It does not implemen
 
 ## Current Evidence
 
-- `Main.kt` starts the Compose desktop application.
-- `build.gradle.kts` uses Compose Multiplatform, Material3, `sh.calvin.reorderable:reorderable`, FileKit, and InfiniteCanvas dependencies with no OpenJFX, AtlantaFX, Ikonli JavaFX, or JHotDraw dependencies.
-- `desktopApiUsageCheck` is part of `check` and rejects legacy desktop image/toolkit API usage below `application/src/main` and `application/src/test`.
-- `gradle --no-daemon test` passes locally after the latest UX/layout documentation updates.
-- `./gradlew run --no-daemon` starts the Spring context and Compose desktop runtime locally.
+- `modules/desktop/.../DesktopMain.kt` starts the Compose desktop host, while
+  `:application` exposes the separate standalone Spring server entry point.
+- `modules/desktop/build.gradle.kts` configures the Compose desktop runtime; the modular build
+  has no OpenJFX, AtlantaFX, Ikonli JavaFX, or JHotDraw dependencies.
+- `desktopApiUsageCheck` is part of `check` and rejects legacy desktop image/toolkit API usage.
+- `./gradlew test --no-daemon` passes locally.
+- `./gradlew :desktop:run --no-daemon` starts the desktop host and its one embedded non-web
+  Spring context; `./gradlew :application:runServer --no-daemon` starts the server alone.
 
 ## Requirement Audit
 
@@ -46,13 +51,13 @@ The migration replaces the Visual Agent desktop UI toolkit. It does not implemen
 
 ## Runtime Note
 
-Compose Desktop itself uses the JVM `java.desktop` stack internally. Visual Agent source code does not use AWT/Swing APIs, but Gradle run/native application tasks set `java.awt.headless=false` so Compose can discover screen density and start in desktop mode.
+Compose Desktop itself uses the JVM `java.desktop` stack internally. Visual Agent source code does not use AWT/Swing APIs, but the `:desktop` Gradle run/native application tasks set `java.awt.headless=false` so Compose can discover screen density and start in desktop mode.
 
 ## Remaining Non-Blocking Work
 
 - Full browser and web-search backend implementation: issues #16 and #40.
 - Packaging/release automation for native installers: tracked separately.
-- Additional GUI integration/screenshot coverage can be added after the migration branch stabilizes.
+- Additional GUI integration/screenshot coverage can be added as the desktop UI evolves.
 
 ## Use-Case Coverage Gaps Found After Migration
 

@@ -32,8 +32,8 @@ The user gets contextual, non-blocking feedback about failures within the panel.
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.compose.ErrorBanner`
-- `de.heckenmann.visualagent.ui.compose.ComposeErrorBanner`
+- `de.heckenmann.visualagent.ui.status.ErrorBanner`
+- `de.heckenmann.visualagent.ui.status.ErrorBanner`
 - `de.heckenmann.visualagent.error.ErrorMessageMapper`
 
 ## Acceptance Criteria

@@ -33,9 +33,9 @@ Conversation content can be reused, edited, deleted, and retried quickly from th
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.compose.ConversationPanel`
-- `de.heckenmann.visualagent.ui.compose.ComposeMarkdown`
-- `de.heckenmann.visualagent.ui.compose.EditMessageModal`
+- `de.heckenmann.visualagent.ui.conversation.ConversationPanel`
+- `de.heckenmann.visualagent.ui.components.ComposeMarkdown`
+- `de.heckenmann.visualagent.ui.conversation.EditMessageModal`
 
 ## Acceptance Criteria
 

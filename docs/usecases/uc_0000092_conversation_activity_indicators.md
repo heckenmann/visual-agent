@@ -17,8 +17,8 @@ switching to other panels.
 ## Preconditions
 
 - The conversation panel is visible.
-- `InFlightStateHolder` is wired to the `ToolEventBus` and the agent status
-  callback adapter.
+- `InFlightStateHolder` is wired to the protocol-owned `ActivityPort` and the
+  agent status callback adapter.
 
 ## Main Flow
 
@@ -31,7 +31,7 @@ switching to other panels.
    the agent id.
 5. If a matching sub-agent result row is already visible, an animated
    "Agent '...' is working…" chip appears inside it.
-6. The sub-agent calls a tool. The `ToolEventBus` emits a `STARTED` event,
+6. The sub-agent calls a tool. `ActivityPort` emits a `STARTED` event,
    adding the tool id to `InFlightState.pendingToolIds`.
 7. The corresponding `ToolMessageRow` chip shows a rotating spinner and the
    text "running…" instead of the duration.

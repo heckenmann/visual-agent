@@ -31,11 +31,11 @@ The UI renders with the chosen light or dark Material3 color scheme, or follows 
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.config.ThemeMode`
+- `de.heckenmann.visualagent.protocol.ThemeMode`
 - `de.heckenmann.visualagent.config.AppConfig`
-- `de.heckenmann.visualagent.ui.compose.ComposeWorkspaceTheme`
-- `de.heckenmann.visualagent.ui.compose.ComposeSettingsExecutionAndAppearanceSection`
-- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.workspace.ComposeWorkspaceTheme`
+- `de.heckenmann.visualagent.ui.settings.RuntimeSettingsSection`
+- `de.heckenmann.visualagent.ui.application.VisualAgentComposeApp`
 
 ## Acceptance Criteria
 

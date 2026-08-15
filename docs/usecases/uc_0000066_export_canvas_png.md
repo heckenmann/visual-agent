@@ -31,7 +31,7 @@ The current canvas can be inspected and reused as a PNG image in the managed wor
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.compose.CanvasPanel`
+- `de.heckenmann.visualagent.ui.canvas.CanvasPanel`
 - `de.heckenmann.visualagent.canvas.InMemoryCanvasService`
 - `de.heckenmann.visualagent.canvas.CanvasPngRenderer`
 - `de.heckenmann.visualagent.image.RgbaPngEncoder`

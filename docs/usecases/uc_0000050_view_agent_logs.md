@@ -30,10 +30,10 @@ Sub-agent behavior can be inspected without switching to raw database or log fil
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.compose.SubAgentsPanel`
-- `de.heckenmann.visualagent.ui.compose.ComposeInfoModal`
+- `de.heckenmann.visualagent.ui.application.SubAgentsPanel`
+- `de.heckenmann.visualagent.ui.modal.ComposeInfoModal`
 - `de.heckenmann.visualagent.agent.AgentManager`
-- `de.heckenmann.visualagent.ui.compose.ComposeModalHost`
+- `de.heckenmann.visualagent.ui.modal.ComposeModalHost`
 
 ## Acceptance Criteria
 

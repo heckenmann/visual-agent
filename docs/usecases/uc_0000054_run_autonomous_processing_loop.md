@@ -39,7 +39,7 @@ The application can process a backlog without manual assignment for every task. 
 - `de.heckenmann.visualagent.orchestration.AutonomousCoordinator.startAutonomousProcessing`
 - `de.heckenmann.visualagent.orchestration.AutonomousTaskPlanner`
 - `de.heckenmann.visualagent.agent.AgentManager.startAutonomousProcessing`
-- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.todo.TodoPanel`
 
 ## Acceptance Criteria
 

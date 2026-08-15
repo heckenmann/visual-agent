@@ -36,7 +36,7 @@ The user sees progress during longer responses, stays at the bottom by default, 
 - `de.heckenmann.visualagent.agent.LLMProvider.stream`
 - `de.heckenmann.visualagent.agent.AgentManager.streamMessage`
 - `de.heckenmann.visualagent.agent.text.AgentResponseCoordinator`
-- `de.heckenmann.visualagent.ui.compose.ConversationPanel`
+- `de.heckenmann.visualagent.ui.conversation.ConversationPanel`
 
 ## Acceptance Criteria
 

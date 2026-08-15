@@ -366,9 +366,9 @@ Implemented:
 - `de.heckenmann.visualagent.agent.codex.CodexCliChatModel`
 - `de.heckenmann.visualagent.agent.codex.CodexCliProvider`
 - `de.heckenmann.visualagent.agent.codex.CodexModelCatalogInitializer`
-- `de.heckenmann.visualagent.ui.compose.ComposeProviderProfileEditor`
-- `de.heckenmann.visualagent.ui.compose.ComposeSettingsPanel`
-- `de.heckenmann.visualagent.ui.compose.ComposeSettingsProviderSection`
+- `de.heckenmann.visualagent.ui.settings.ProviderProfileEditor`
+- `de.heckenmann.visualagent.ui.settings.SettingsPanel`
+- `de.heckenmann.visualagent.ui.settings.ProviderProfileEditor`
 
 Planned follow-ups:
 

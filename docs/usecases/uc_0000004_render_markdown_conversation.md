@@ -37,10 +37,10 @@ Markdown formatting is displayed in the conversation while preserving the origin
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
-- `de.heckenmann.visualagent.ui.compose.ConversationPanel`
-- `de.heckenmann.visualagent.ui.compose.ComposeMarkdown`
-- `de.heckenmann.visualagent.ui.compose.ComposeMarkdownParser`
+- `de.heckenmann.visualagent.ui.application.VisualAgentComposeApp`
+- `de.heckenmann.visualagent.ui.conversation.ConversationPanel`
+- `de.heckenmann.visualagent.ui.components.ComposeMarkdown`
+- `com.mikepenz.markdown.m3.Markdown`
 
 ## Acceptance Criteria
 

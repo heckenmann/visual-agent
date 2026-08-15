@@ -32,11 +32,11 @@ Destructive UI actions are deliberate and stay inside the Visual Agent workspace
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.compose.ComposeModalHost`
-- `de.heckenmann.visualagent.ui.compose.ComposeConfirmationModal`
-- `de.heckenmann.visualagent.ui.compose.ComposeModalRequester`
-- `de.heckenmann.visualagent.ui.compose.ActionIconButton`
-- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.modal.ComposeModalHost`
+- `de.heckenmann.visualagent.ui.modal.ComposeConfirmationModal`
+- `de.heckenmann.visualagent.ui.modal.ComposeModalRequester`
+- `de.heckenmann.visualagent.ui.components.ActionIconButton`
+- `de.heckenmann.visualagent.ui.application.VisualAgentComposeApp`
 
 ## Acceptance Criteria
 

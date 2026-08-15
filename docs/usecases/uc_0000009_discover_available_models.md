@@ -32,7 +32,7 @@ The user sees a usable model list rather than raw provider inventory.
 ## Code Entry Points
 
 - `de.heckenmann.visualagent.agent.LLMProvider.getModels`
-- `de.heckenmann.visualagent.ui.compose.SettingsPanel`
+- `de.heckenmann.visualagent.ui.settings.SettingsPanel`
 - `de.heckenmann.visualagent.agent.provider.ProviderCatalogService`
 - `de.heckenmann.visualagent.agent.openai.OpenAiModelCatalog`
 - `de.heckenmann.visualagent.agent.openai.OpenAiModelFilter`
