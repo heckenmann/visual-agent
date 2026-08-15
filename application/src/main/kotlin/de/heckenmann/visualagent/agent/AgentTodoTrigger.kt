@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.agent.text.AgentResponseCoordinator
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
+import de.heckenmann.visualagent.protocol.LifecyclePort
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoStatus
 import kotlinx.coroutines.CoroutineScope
@@ -23,6 +24,7 @@ internal class AgentTodoTrigger(
     private val llmProvider: LLMProvider,
     private val responseCoordinator: AgentResponseCoordinator,
     private val toolEventBus: ToolEventBus,
+    private val lifecycle: LifecyclePort,
 ) {
     private val logger = KotlinLogging.logger {}
 
@@ -33,7 +35,9 @@ internal class AgentTodoTrigger(
      * A synthetic [ToolCallEvent] is always published so the UI refreshes.
      */
     fun trigger(todo: Todo) {
+        if (lifecycle.closing) return
         scope.launch {
+            if (lifecycle.closing) return@launch
             val action =
                 when (todo.status) {
                     TodoStatus.COMPLETED ->

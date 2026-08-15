@@ -33,8 +33,8 @@ Main-agent requests use the user-selected provider and model unless an agent-spe
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.compose.SettingsPanel`
-- `de.heckenmann.visualagent.ui.compose.ComposeSettingsPanelSupport`
+- `de.heckenmann.visualagent.ui.settings.SettingsPanel`
+- `de.heckenmann.visualagent.ui.settings.ComposeProtocolSettingsSupport`
 - `de.heckenmann.visualagent.config.AppConfig`
 - `de.heckenmann.visualagent.agent.provider.ProviderCatalogService`
 - `de.heckenmann.visualagent.agent.ConfiguredLLMProvider`

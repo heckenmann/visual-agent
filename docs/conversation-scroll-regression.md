@@ -34,7 +34,7 @@ page.
 ## Regression Coverage
 
 - `ConversationUiStateTest` verifies latest-page merging and history-reset paging.
-- `ConversationHistoryScrollbarPositionTest` covers a delayed older-page request
+- `ConversationHistoryPagingRequestTest` covers a delayed older-page request
   across a latest jump.
 - `ConversationPanelScrollRegressionTest` uses the production panel and performs
   the sequence: wheel to oldest, click scroll-to-latest, then wheel to oldest again.

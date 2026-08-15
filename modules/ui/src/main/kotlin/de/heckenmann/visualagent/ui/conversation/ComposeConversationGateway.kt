@@ -2,10 +2,10 @@
 
 package de.heckenmann.visualagent.ui.conversation
 
-import de.heckenmann.visualagent.agent.AgentManager
-import de.heckenmann.visualagent.agent.CancellationToken
-import de.heckenmann.visualagent.agent.Message
-import de.heckenmann.visualagent.agent.conversation.ConversationHistoryPage
+import de.heckenmann.visualagent.protocol.CancellationToken
+import de.heckenmann.visualagent.protocol.ConversationHistoryPage
+import de.heckenmann.visualagent.protocol.ConversationMessage
+import de.heckenmann.visualagent.protocol.ConversationPort
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -33,25 +33,24 @@ internal interface ConversationMessageGateway {
         onChunk: (String) -> Unit,
     )
 
-    fun currentHistory(): List<Message>
+    fun currentHistory(): List<ConversationMessage>
 }
 
-internal class AgentManagerConversationGateway(
-    private val agentManager: AgentManager,
+internal class ProtocolConversationGateway(
+    private val conversationPort: ConversationPort,
 ) : ConversationHistoryGateway,
     ConversationMessageGateway {
-    override suspend fun latest(): ConversationHistoryPage = withContext(Dispatchers.IO) { agentManager.readLatestHistoryPage() }
+    override suspend fun latest(): ConversationHistoryPage = withContext(Dispatchers.IO) { conversationPort.latest() }
 
-    override suspend fun older(offset: Int): ConversationHistoryPage =
-        withContext(Dispatchers.IO) { agentManager.readOlderHistoryPage(offset) }
+    override suspend fun older(offset: Int): ConversationHistoryPage = withContext(Dispatchers.IO) { conversationPort.older(offset) }
 
     override suspend fun stream(
         content: String,
         token: CancellationToken,
         onChunk: (String) -> Unit,
     ) {
-        withContext(Dispatchers.IO) { agentManager.streamMessage(content, token, onChunk) }
+        withContext(Dispatchers.IO) { conversationPort.stream(content, token, onChunk) }
     }
 
-    override fun currentHistory(): List<Message> = agentManager.getHistory()
+    override fun currentHistory(): List<ConversationMessage> = conversationPort.currentHistory()
 }

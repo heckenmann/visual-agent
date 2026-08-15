@@ -3,7 +3,8 @@
 ## Build & Run
 
 - Build: `./gradlew build` (or `gradle build` after regenerating the wrapper).
-- Run desktop app: `./gradlew :application:run` (Compose desktop).
+- Run desktop app: `./gradlew :desktop:run` (Compose desktop; starts one embedded non-web Spring context with ANSI-colored Spring logs).
+- Run standalone server: `./gradlew :application:runServer` (Spring Boot without Compose).
 - Run all tests: `./gradlew test`.
 - Run one test class/method: `./gradlew test --tests "de.heckenmann.visualagent.<path>.<TestClass>.<method>"`.
 - Run smoke tests against real Ollama: `./gradlew test -Dvisualagent.ollama.smoke=true` (default `false`).
@@ -87,9 +88,7 @@ Never commit API keys, tokens, passwords, private keys, or user PII. Provider AP
 
 ```text
 application/src/main/kotlin/de/heckenmann/visualagent/
-├── Main.kt                          # compose.desktop + springBoot main class
-├── VisualAgentApplication.kt        # @SpringBootApplication (used by tests)
-├── AppIdentity.kt                   # macOS About-menu + icon constants
+├── VisualAgentApplication.kt        # @SpringBootApplication and standalone server entry point
 ├── agent/                           # AgentManager, sub-agents, tools, conversation
 │   ├── context/                     # MainSystemPromptComposer
 │   ├── conversation/                # AgentConversationHistoryOps
@@ -103,7 +102,15 @@ application/src/main/kotlin/de/heckenmann/visualagent/
 ├── todo/                            # Todo/TodoPriority/TodoStatus + TodoManager + Spring wiring
 ├── workspace/                       # File service, image header reader, PDF page renderer
 │   └── layout/                      # Toolkit-neutral panel layout service + persistence
-└── ui/compose/                      # 19-file Compose desktop shell (no ViewModel layer)
+└── server/                          # Protocol ports and gRPC server adapters
+
+modules/ui/src/main/kotlin/de/heckenmann/visualagent/
+├── AppIdentity.kt                   # desktop identity and icon constants
+└── ui/                              # Compose presentation-only panels (no ViewModel layer)
+
+modules/desktop/src/main/kotlin/de/heckenmann/visualagent/desktop/
+├── DesktopMain.kt                   # Compose desktop entry point
+└── ComposeStartupHost.kt            # splash, endpoint selection, and local server ownership
 
 modules/providers/src/main/kotlin/de/heckenmann/visualagent/agent/
 ├── LLMProvider.kt                   # unified chat/stream/vision/embeddings/getModels/getModelDetails
@@ -113,25 +120,27 @@ modules/providers/src/main/kotlin/de/heckenmann/visualagent/agent/
 ├── ollama/                          # Ollama API client + bearer-auth filter
 └── codex/                           # Codex CLI subscription provider
 
-modules/ui/src/main/kotlin/de/heckenmann/visualagent/ui/compose/
-└── ComposeThinkingRow.kt             # UI leaf-module component
+modules/ui/src/main/kotlin/de/heckenmann/visualagent/ui/
+└── ui/application/VisualAgentComposeApplication.kt # protocol-only Compose shell
 ```
 
 See `README.md` for the full tree and the feature status table.
 
 ## Architecture (essentials)
 
-- **Entry point**: `de.heckenmann.visualagent.Main` (declared by both `compose.desktop.application.mainClass` and `springBoot.mainClass`). Desktop launches Compose + Spring from `runVisualAgentComposeApplication()` in `ui/compose/VisualAgentComposeApplication.kt`; `VisualAgentApplication.main` exists for tests.
+- **Entry points**: `de.heckenmann.visualagent.desktop.DesktopMain` launches the Compose desktop host from `:desktop`; `de.heckenmann.visualagent.VisualAgentApplicationKt` launches the standalone Spring server from `:application`. In desktop mode, only one non-web Spring context from `:application` is created in the same JVM; the standalone entry point is an alternative process, not a second desktop server. The desktop host renders the splash first and starts or connects to the server asynchronously.
 - **Agent core**: `agent/AgentManager.kt` is the facade (conversation ops + lifecycle ops + autonomy ops). `modules/providers/.../agent/ConfiguredLLMProvider.kt` is the `@Primary` Spring `LLMProvider`; it routes via `modules/providers/.../agent/provider/ProviderCatalogService` (DB-backed preference `llm.provider.catalog.v1`) to `OllamaClient` or `OpenAiClient`. Provider adapters: `OLLAMA`, `OPENAI_COMPATIBLE`.
 - **Tooling**: every tool is a `@Component` implementing `agent/tools/VisualAgentTool`. `ToolRegistry` adapts them to Spring AI `ToolCallback`s with STARTED/FINISHED events on `ToolEventBus`. `VisualAgentTool.managesExecution = true` opts out of the generic async/timeout wrapper (used by sub-agent execution tools).
 - **Tool inventory** (canonical IDs): `ui`, `history`, `todos`, `context`, `pwd`, `manual`, `usecases`, `file:read`, `file:list`, `file:glob`, `file:grep`, `file:write`, `file:edit`, `terminal`, `sleep`, `browser` (placeholder, returns "not configured"), `search` (placeholder, returns "not configured"), `workspace:layout`, `workspace:file`, `canvas`, `agent:list`, `agent:show`, `agent:create`, `agent:update`, `agent:delete`, `agent:log`. The main agent gets `agent:*` definition tools plus `todos`; sub-agents get role-based sets from `AgentToolConfigService` (default: `researcher`, `coder`, `analyst`). `tools.disabled.global` (preference) is a newline-separated blocklist applied to all agents.
 - **Orchestration**: `orchestration/AutonomousCoordinator.kt` (constructed by `AgentManager`, reachable only through `AgentManagerAutonomyOps`). It uses `AutonomousTaskPlanner` (todo expansion + worker selection) and `UxSeedTasks.all()` (default UX backlog). Per-job retry loop is bounded by `agent.config.maxRetries`; result review calls the main LLM and expects `APPROVED` / `RETRY`. Concurrency is gated by `SubAgentJobScheduler` keyed off `AppConfig.maxParallelSubAgents`.
 - **Persistence**: `knowledge/PersistenceStores.kt` defines domain `data class`es + `*Store` interfaces. `knowledge/PersistenceEntities.kt` holds the `@Entity internal class`es. `knowledge/JpaPersistenceStores.kt` + `JpaWorkspaceFileStore.kt` adapt Spring Data repositories to the domain interfaces. `KnowledgePersistenceConfig` creates the SQLite `DataSource` (Hikari, maxPool=1, WAL, `busy_timeout=5000`). `application/src/main/resources/db/migration/` holds `V1__initial_knowledge_schema.sql` and `V2__workspace_files.sql`. `application/src/main/resources/config/app.properties` is bootstrap-only and should contain only `database.path`; runtime config is in SQLite `user_preferences`. Conversation search uses SQLite FTS5 with a `LIKE` fallback for invalid FTS input.
+- **Stable data root**: Gradle desktop and standalone-server run tasks use the repository root as their working directory, so `./data/visual-agent.db` remains the single database across modules and refactors. Do not create module-local `application/data` or `modules/desktop/data` stores.
 - **Workspace files**: `workspace/WorkspaceFileService.kt` imports/reads files in `./data/workspace/`. `workspace/ImageHeaderReader.kt` reads PNG/JPEG/GIF dimensions without AWT. `workspace/PdfPagePreviewRenderer.kt` renders PDF page text to PNG using a built-in 5×7 bitmap font + `image/RgbaPngEncoder.kt` (in-house RGBA encoder).
 - **Workspace layout**: `workspace/layout/WorkspaceLayoutService.kt` + `WorkspaceLayoutPersistence.kt` keep the toolkit-neutral panel layout under preference key `ui.workspace.layout.v1` (JSON, versioned).
 - **Canvas**: `canvas/CanvasOperations.kt` is the toolkit-neutral model-facing contract. `InMemoryCanvasService` is the current Compose-migration backend; `CanvasPngRenderer` rasterizes figures, `CanvasDocumentCodec` encodes editable `.canvas` JSON (versioned). The default document lives at `data/workspace/canvas/current.canvas` and is auto-saved on every mutation.
-- **UI**: `application/src/main/kotlin/.../ui/compose/` contains the application-owned Compose shell, while `modules/ui/.../ui/compose/` contains extracted UI leaf components. There is no `ViewModel` layer; panels receive a `ComposePanelServices` bundle (resolved once via `SpringContext`) and call `AgentManager` / Spring beans directly. `ComposeSplitWorkspace` lays out panels deterministically (1 = full, 2–4 = stage + right inspector, 5+ = balanced columns, 16 dp gap). `Cmd/Ctrl+1..6` focuses panels, `Cmd/Ctrl+K` opens the command palette, `Esc` closes it.
-- **In-flight indicator**: `InFlightStateHolder` is the single mutable holder for "agent is waiting on something" (chat stream, sub-agent job, tool call, settings refresh). Panels call `markStreamStart/End`, `markAgentStart/End`, `setSettingsLoading(true/false)` from their coroutines; `rememberInFlightState(toolEventBus)` keeps the tool-call set in sync via the `ToolEventBus` listener. The header `InFlightIndicator` renders nothing when `totalActive == 0` and shows 1–3 pulsing dots whose period shortens with the number of in-flight activities.
+- **UI**: `modules/ui/.../ui/` contains the protocol-only Compose shell. There is no `ViewModel` layer; panels receive a `ComposePanelServices` bundle containing only protocol ports and presentation state. The desktop host resolves the server-side `ApplicationPort` and supplies that boundary to the UI. `ComposeSplitWorkspace` lays out panels deterministically (1 = full, 2–4 = stage + right inspector, 5+ = balanced columns, 16 dp gap). `Cmd/Ctrl+1..6` focuses panels, `Cmd/Ctrl+K` opens the command palette, `Esc` closes it.
+- **Server proxy boundary**: every connection outside the presentation process (provider/network calls, persistence, workspace filesystem, tools, and remote services) is owned by `:application` and exposed through `:protocol` ports. `:ui` must never access those systems directly. `:desktop` may only select and connect to the configured local in-process or remote server endpoint; it must not duplicate server-side adapters or provider access.
+- **In-flight indicator**: `InFlightStateHolder` is the UI-owned holder for "agent is waiting on something". Activity and agent lifecycle events arrive through `ActivityPort`; chat and todo progress use protocol callbacks. The header `InFlightIndicator` renders nothing when `totalActive == 0` and shows 1–3 pulsing dots whose period shortens with the number of in-flight activities.
 
 ## Patterns & Conventions
 
@@ -144,7 +153,7 @@ See `README.md` for the full tree and the feature status table.
 - **Icon-only actions**: Compose workspace action buttons use icons with descriptive tooltips and accessibility descriptions; do not reintroduce text-only action controls where an existing icon-only pattern applies.
 - **No legacy desktop toolkit**: do not add `java.awt` / `javax.swing` / `javafx` / `pdfbox.rendering` / `apple.awt` imports. `desktopApiUsageCheck` will fail the build. The single `-Djava.awt.headless=false` JVM arg in `build.gradle.kts` is whitelisted.
 - **No AWT-based image I/O**: use `image/RgbaPngEncoder.kt` and `workspace/ImageHeaderReader.kt` instead of `ImageIO` / `BufferedImage`. PDFBox is used only for text extraction; `pdfbox.rendering` is forbidden.
-- **API-key handling**: never log, return, or include API keys in tool results or model context. `UiTool` reports only "configured / not configured". `AppConfig.exportTo()` strips API keys.
+- **API-key handling**: never log, return, or include API keys in tool results or model context. `SettingsTool` reports only "configured / not configured". `AppConfig.exportTo()` strips API keys.
 - **Provider key live updates**: non-blank `ollama.api.key` is sent as `Authorization: Bearer <key>` on every request; key changes apply without restart. Base URL changes still require restart.
 - **Tool-name guard**: `OllamaPromptFactory` and `OpenAiPromptFactory` emit a system message listing the exact allowed function names for the request, so the model cannot invent variants.
 - **File LOC policy**: 300 effective LOC per `.kt` file, 3000 per package. `locAndPackageSizeCheck` blocks on violations; no grandfathering or exceptions are allowed. Split files before they exceed the limit.
@@ -195,7 +204,7 @@ interface LLMProvider {
 
 ## Status
 
-This project is under active Compose migration on branch `codex/issue-48-compose-migration`. The current desktop runtime is Compose Multiplatform; the desktop JavaFX/FXML/JHotDraw path has been removed. See `docs/compose-migration-audit.md` for the requirement audit and the in-progress items.
+The Compose migration is complete. The current desktop runtime is Compose Multiplatform and the desktop JavaFX/FXML/JHotDraw path has been removed. See `docs/compose-migration-audit.md` for the historical requirement audit and remaining follow-up work.
 
 ## Known Bugs
 

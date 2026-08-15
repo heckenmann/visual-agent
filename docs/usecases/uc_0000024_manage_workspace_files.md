@@ -36,9 +36,9 @@ Workspace files can be managed without leaving the application.
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.compose.FilesPanel`
-- `de.heckenmann.visualagent.ui.compose.ComposeModalHost`
-- `de.heckenmann.visualagent.ui.compose.ActionIconButton`
+- `de.heckenmann.visualagent.ui.files.FilesPanel`
+- `de.heckenmann.visualagent.ui.modal.ComposeModalHost`
+- `de.heckenmann.visualagent.ui.components.ActionIconButton`
 - `de.heckenmann.visualagent.workspace.WorkspaceFileService`
 - `de.heckenmann.visualagent.knowledge.WorkspaceFileStore`
 

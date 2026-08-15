@@ -10,19 +10,16 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.unit.dp
-import de.heckenmann.visualagent.agent.Message
-import de.heckenmann.visualagent.agent.conversation.ConversationHistoryPage
 import kotlinx.coroutines.CompletableDeferred
 import org.junit.Rule
 import org.junit.Test
 import kotlin.test.assertTrue
+import de.heckenmann.visualagent.protocol.ConversationHistoryPage as ConversationHistoryPage
+import de.heckenmann.visualagent.protocol.ConversationMessage as Message
 
 /** Verifies that a loading-row viewport update does not cancel an older-page request. */
 class ConversationHistoryPagingRequestTest {
@@ -35,13 +32,11 @@ class ConversationHistoryPagingRequestTest {
         val olderHistory = (1..10).map { Message("user", "older $it", id = "older-$it") }
         val olderLoadStarted = CompletableDeferred<Unit>()
         val releaseOlderLoad = CompletableDeferred<Unit>()
-        var reachedOldest by mutableStateOf(false)
         lateinit var observedState: ConversationUiState
 
         composeTestRule.setContent {
             val listState = rememberLazyListState()
             val state = rememberConversationUiState(recentHistory)
-            val coordinator = remember(listState) { ConversationScrollCoordinator(listState) }
             observedState = state
             val gateway =
                 remember {
@@ -56,8 +51,8 @@ class ConversationHistoryPagingRequestTest {
                         }
                     }
                 }
-            LaunchedEffect(state.isLoadingOlder) {
-                if (state.isLoadingOlder) reachedOldest = false
+            LaunchedEffect(Unit) {
+                listState.scrollToItem(recentHistory.lastIndex)
             }
             MaterialTheme {
                 LazyColumn(
@@ -70,10 +65,9 @@ class ConversationHistoryPagingRequestTest {
                     }
                     if (state.isLoadingOlder) item(key = "loading-older") { Text("Loading", Modifier.height(40.dp)) }
                 }
-                ConversationHistoryPagingEffect(reachedOldest, state, listState, gateway, coordinator)
+                ConversationHistoryPagingEffect(state, listState, gateway)
             }
         }
-        composeTestRule.runOnIdle { reachedOldest = true }
         composeTestRule.waitUntil(timeoutMillis = 5_000) { olderLoadStarted.isCompleted }
         composeTestRule.waitForIdle()
 

@@ -4,7 +4,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 
 /**
- * Spring Boot application root used to assemble persistence, provider, tool, and UI beans.
+ * Spring Boot application root used to assemble persistence, provider, tool, and server beans.
  */
 @SpringBootApplication
 class VisualAgentApplication

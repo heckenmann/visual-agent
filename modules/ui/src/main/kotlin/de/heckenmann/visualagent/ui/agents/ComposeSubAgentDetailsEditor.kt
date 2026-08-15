@@ -25,12 +25,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import de.heckenmann.visualagent.agent.AgentConfig
-import de.heckenmann.visualagent.agent.AgentManager
-import de.heckenmann.visualagent.agent.SubAgent
-import de.heckenmann.visualagent.agent.config.AgentToolConfigService
-import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
-import de.heckenmann.visualagent.agent.tools.ToolRegistry
+import de.heckenmann.visualagent.protocol.Agent
+import de.heckenmann.visualagent.protocol.AgentConfig
+import de.heckenmann.visualagent.protocol.AgentPort
+import de.heckenmann.visualagent.protocol.ProviderPort
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -45,12 +43,10 @@ import de.heckenmann.visualagent.ui.workspace.*
 
 @Composable
 internal fun SubAgentDetailsEditor(
-    agent: SubAgent,
-    agentManager: AgentManager,
-    agentToolConfigService: AgentToolConfigService,
-    toolRegistry: ToolRegistry,
-    providerCatalogService: ProviderCatalogService,
-    onSaved: (SubAgent) -> Unit,
+    agent: Agent,
+    agentPort: AgentPort,
+    providerPort: ProviderPort,
+    onSaved: (Agent) -> Unit,
 ) {
     var name by remember { mutableStateOf(agent.name) }
     var role by remember { mutableStateOf(agent.role) }
@@ -85,21 +81,21 @@ internal fun SubAgentDetailsEditor(
     var optionsText by remember { mutableStateOf(agent.config.options.toOptionsText()) }
     var selectedTools by remember {
         mutableStateOf(
-            agent.config.tools?.toSet() ?: agentToolConfigService.toolsFor(agent).map { it.value }.toSet(),
+            agent.config.tools?.toSet() ?: agentPort.toolsFor(agent.id),
         )
     }
-    val toolDefinitions = remember(toolRegistry) { toolRegistry.toolDefinitions() }
+    val toolDefinitions = remember(agentPort) { agentPort.toolDefinitions() }
     val providerOptions =
-        remember(providerCatalogService) {
+        remember(providerPort) {
             listOf(PanelSelectOption(INHERIT_SELECTION, "Inherit session provider")) +
-                providerCatalogService.enabledProviders().map { PanelSelectOption(it.id, "${it.name} (${it.id})") }
+                providerPort.enabledProviders().map { PanelSelectOption(it.id, "${it.name} (${it.id})") }
         }
     val modelOptions =
-        remember(provider, model, providerCatalogService) {
+        remember(provider, model, providerPort) {
             if (provider.isBlank()) {
                 listOf(PanelSelectOption(INHERIT_SELECTION, "Inherit session model"))
             } else {
-                val catalogModels = providerCatalogService.selectableModels(provider).map { PanelSelectOption(it.id, it.name) }
+                val catalogModels = providerPort.selectableModels(provider).map { PanelSelectOption(it.id, it.name) }
                 val customModel =
                     model
                         .takeIf { current -> current.isNotBlank() && catalogModels.none { it.value == current } }
@@ -137,7 +133,7 @@ internal fun SubAgentDetailsEditor(
                 selectedValue = templateName.ifBlank { KEEP_AGENT_CONFIG },
                 options =
                     listOf(PanelSelectOption(KEEP_AGENT_CONFIG, "Keep current")) +
-                        AgentConfig.TEMPLATES.keys
+                        AgentConfig.templates.keys
                             .sorted()
                             .map { PanelSelectOption(it, it.labelizeEnumName()) },
                 onSelected = { selected -> templateName = selected.takeUnless { it == KEEP_AGENT_CONFIG }.orEmpty() },
@@ -238,18 +234,18 @@ internal fun SubAgentDetailsEditor(
         toolDefinitions.forEach { definition ->
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Checkbox(
-                    checked = definition.id.value in selectedTools,
+                    checked = definition.id in selectedTools,
                     onCheckedChange = { checked ->
                         selectedTools =
                             if (checked) {
-                                selectedTools + definition.id.value
+                                selectedTools + definition.id
                             } else {
-                                selectedTools - definition.id.value
+                                selectedTools - definition.id
                             }
                     },
                 )
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(definition.id.value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    Text(definition.id, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                     Text(
                         definition.description,
                         style = MaterialTheme.typography.bodySmall,
@@ -280,9 +276,7 @@ internal fun SubAgentDetailsEditor(
                         options = optionsText.toOptionsMapOrNull().orEmpty(),
                         tools = selectedTools.sorted(),
                     )
-                if (agentManager.updateAgent(agent.id, name.trim(), role.trim(), config)) {
-                    onSaved(agent.copy(name = name.trim(), role = role.trim(), config = config))
-                }
+                agentPort.update(agent.id, name.trim(), role.trim(), config)?.let(onSaved)
             },
         )
     }

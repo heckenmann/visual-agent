@@ -1,8 +1,8 @@
 package de.heckenmann.visualagent.ui.conversation
 
-import de.heckenmann.visualagent.agent.Message
 import org.junit.Test
 import kotlin.test.assertEquals
+import de.heckenmann.visualagent.protocol.ConversationMessage as Message
 
 /**
  * Verifies the presentation-only grouping rules for conversation messages.

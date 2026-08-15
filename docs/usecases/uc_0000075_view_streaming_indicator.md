@@ -17,11 +17,10 @@ Desktop user.
 
 1. The user sends a message.
 2. The conversation panel immediately shows the user message.
-3. While the assistant response streams in, a fixed status line with an animated "Thinking…" label and three pulsing dots appears between the message list and the input field.
-4. The status line does not add or remove items from the message list, so the list does not jump when the indicator appears or disappears.
-5. As content chunks arrive, the assistant row updates incrementally.
-6. When the stream completes, the status line is replaced by the final persisted assistant message.
-7. If the stream fails, the status line is replaced by the persisted error or retry state.
+3. Before the first response chunk arrives, the conversation timeline shows an inline animated "Thinking…" row.
+4. As content chunks arrive, the temporary assistant row updates incrementally in the message list.
+5. When the stream completes, the temporary row is replaced by the final persisted assistant message.
+6. If the stream fails, the timeline is refreshed from persisted history and shows the safe error or retry state.
 
 ## Result
 
@@ -33,15 +32,15 @@ Users always know that a response is in progress, and the streaming state does n
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.compose.ConversationPanel`
-- `de.heckenmann.visualagent.ui.compose.StreamingStatusLine`
-- `de.heckenmann.visualagent.agent.AgentManager.streamMessage`
+- `de.heckenmann.visualagent.ui.conversation.ConversationPanel`
+- `de.heckenmann.visualagent.ui.conversation.ComposeConversationMessageList`
+- `de.heckenmann.visualagent.protocol.ConversationPort`
 
 ## Acceptance Criteria
 
-- A status line is shown while the assistant is streaming.
-- The status line shows three dots that pulse with a staggered animation.
-- The status line is positioned between the message list and the input field, not inside the list.
-- The status line is removed after success, failure, or retry.
+- An inline thinking row is shown until the first assistant chunk arrives.
+- The thinking row shows three dots that pulse with a staggered animation.
+- Streaming text is rendered in a temporary assistant row in the message list.
+- The thinking and temporary rows are removed after success, failure, or retry.
 - Streaming state is not persisted in the database.
-- The indicator does not change the message list height.
+- The timeline keeps the newest streaming state visible without persisting it.

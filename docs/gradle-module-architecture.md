@@ -2,13 +2,18 @@
 
 ## Purpose
 
-This document records the incremental Gradle modularisation planned in issues #157 and #165. It establishes dependency directions before source files are relocated.
+This document records the incremental Gradle modularisation planned in issues #157, #165, #178, and #65. It establishes dependency directions before source files are relocated.
 
 ## Initial module graph
 
 ```text
-:application
+:desktop
  ├── :ui
+ ├── :application
+ └── :protocol
+
+:application
+ ├── :protocol
  ├── :providers
  └── :tools
 ```
@@ -18,6 +23,8 @@ The filesystem layout mirrors the ownership boundary without changing Gradle pro
 ```text
 application/          # :application, the composition root
 modules/ui/           # :ui, a leaf module
+modules/protocol/     # :protocol, versioned gRPC contract
+modules/desktop/      # :desktop, Compose/server endpoint host
 modules/providers/    # :providers, a leaf module
 modules/tools/        # :tools, a leaf module
 ```
@@ -32,9 +39,13 @@ The Foojay toolchain resolver is the sole settings-only plugin and remains decla
 
 When adding a main-build module, apply plugins and dependencies through aliases from the root catalog and set its project version to `libs.versions.visual.agent.get()`; do not copy a version literal into its build script.
 
-`:application` is the only composition root. It owns desktop startup, Spring bootstrap, runtime wiring, and all logic that has not yet been extracted into a cohesive module.
+`:application` owns standalone Spring bootstrap and server runtime wiring. `:desktop` owns
+desktop startup and endpoint selection, and embeds one non-web application context from
+`:application` for the local same-JVM deployment.
 
-`:ui` owns Compose desktop UI code and UI-facing contracts. It has no Gradle project dependency on `:application`, `:providers`, or any future sibling module. Application-specific operations are supplied through narrow UI contracts implemented by `:application`.
+`:ui` owns Compose desktop UI code and consumes only protocol-owned contracts. All panels use
+the same `ApplicationPort` boundary after `ApplicationConnection` reports readiness; the desktop
+host owns Spring startup and converts the server-side adapters into the protocol bundle.
 
 `:providers` owns LLM-provider integrations and provider-facing contracts. It has no Gradle project dependency on `:application`, `:ui`, `:tools`, or any future sibling module. Application-specific configuration, tools, persistence, and request context are supplied through narrow provider contracts implemented by `:application`.
 
@@ -44,21 +55,25 @@ The `:tools` extraction is tracked by issue #165. Concrete tools are Spring-disc
 
 ## Dependency rules
 
-- `:application` is the parent and may depend on every submodule.
-- A submodule must not depend on `:application`.
-- A submodule must not depend on any other submodule.
-- The dependency graph is strictly one-way: `:application` to its submodules only.
+- `:application` is the server composition root and may depend on `:protocol`, `:providers`, and `:tools`.
+- `:desktop` may depend on `:ui`, `:protocol`, and the server bootstrap artifact.
+- `:ui` may depend only on `:protocol`; it must not depend on Spring, `:application`, providers,
+  tools, persistence, or application implementation types.
+- `:protocol`, `:providers`, and `:tools` must not depend on `:application` or `:ui`.
+- The dependency graph is strictly one-way from hosts to contracts and implementations.
 - A submodule declares any contract it needs; `:application` supplies the contract implementation and composes the modules.
 - Spring and Compose composition remains in `:application` until a later module owns a complete independent runtime boundary.
 
 ## Migration sequence
 
-1. Create the three projects and preserve the existing application runtime in `:application`.
-2. Introduce narrow contracts at current dependency seams.
-3. Relocate one coherent UI or provider slice at a time with `git mv`, together with its tests and required resources.
-4. Verify each new module directly with `:<module>:build` and `:<module>:test` before extracting another slice.
-5. Keep all unextracted agent, persistence, workspace, canvas, todo, knowledge, orchestration, and configuration logic in `:application`.
-6. Extract tool contracts and infrastructure into `:tools`, then move implementations behind ports one coherent tool family at a time.
+1. Create the protocol and desktop host projects and preserve the application runtime in `:application`.
+2. Keep all cross-boundary operations in protocol ports and DTOs.
+3. Start Spring from `:desktop` while Compose renders the splash, then construct the UI dependency bundle from protocol beans.
+4. Verify each module directly with `:<module>:build` and `:<module>:test`.
+5. Keep agent, persistence, workspace, canvas, todo, knowledge, orchestration, and configuration logic in `:application`.
+6. Keep remote endpoint handshakes explicit and fail-safe; replace the local adapter with a
+   complete remote gRPC `ApplicationPort` client only as a separate deployment change.
+   The standalone server remains loopback-only when networking is explicitly enabled.
 
 ## File-move rule
 
@@ -73,7 +88,8 @@ The final initial layout must support:
 ./gradlew :providers:build :providers:test
 ./gradlew :tools:build :tools:test
 ./gradlew :application:build :application:test
-./gradlew :application:run
+./gradlew :desktop:run
+./gradlew :application:runServer
 ```
 
 The root quality gate must continue to run the full multi-module verification suite.

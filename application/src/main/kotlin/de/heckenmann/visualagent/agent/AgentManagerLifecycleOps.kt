@@ -5,6 +5,8 @@ import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.knowledge.PersistedSubAgent
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoChangeType
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.isActive
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import mu.KotlinLogging
@@ -92,6 +94,7 @@ internal class AgentManagerLifecycleOps(
     }
 
     fun saveAgentToDb(agent: SubAgent) {
+        if (!owner.scope.isActive) return
         val configJson = Json.encodeToString(agent.config)
         owner.subAgentStore.saveAgent(
             PersistedSubAgent(
@@ -115,6 +118,21 @@ internal class AgentManagerLifecycleOps(
     fun getSubAgent(id: String): SubAgent? = owner.subAgentOpsProvider.getSubAgent(id)
 
     fun getTodosFromDb(): List<Todo> = owner.todoStore.listTodos()
+
+    fun cancelAllActiveTodos() {
+        owner.todoManager
+            .getAll()
+            .filter {
+                it.status != de.heckenmann.visualagent.todo.TodoStatus.COMPLETED &&
+                    it.status != de.heckenmann.visualagent.todo.TodoStatus.CANCELLED
+            }.forEach { owner.todoManager.cancelTodo(it.id) }
+    }
+
+    fun cancelActiveWork() {
+        owner.scope.cancel()
+        owner.cancelAllRunningActions()
+        cancelAllActiveTodos()
+    }
 
     fun getTodoSummaryFromDb(): TodoSummary {
         val todos = owner.todoStore.listTodos()
@@ -164,6 +182,7 @@ internal class AgentManagerLifecycleOps(
                 owner.autonomousCoordinator.cancelAgentTodo(id)
             }
             owner.subAgentStore.deleteAgent(id)
+            owner.subAgentExecutionControl.removeAgent(id)
             persistTodoChangeMessage("Deleted sub-agent $id (${removed.name})")
             logger.info { "Deleted agent: $id" }
             return true

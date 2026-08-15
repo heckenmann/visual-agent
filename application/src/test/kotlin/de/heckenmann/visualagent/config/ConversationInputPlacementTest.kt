@@ -56,6 +56,19 @@ class ConversationInputPlacementTest {
         assertEquals(1, store.values.size)
     }
 
+    @Test
+    fun `queue flush mode is restored from the server preference store`() {
+        val store = InMemoryPreferenceStore()
+        val config = AppConfigBean(store)
+        config.queueFlushMode = "ALL"
+        config.save()
+
+        val restored = AppConfigBean(store)
+        AppConfigPersistenceBinder(store, restored, "./data/visual-agent.db").bind()
+
+        assertEquals("ALL", restored.queueFlushMode)
+    }
+
     private class InMemoryPreferenceStore : PreferenceStore {
         val values = mutableMapOf<String, String>()
 

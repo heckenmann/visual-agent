@@ -1,0 +1,113 @@
+package de.heckenmann.visualagent.server
+
+import de.heckenmann.visualagent.agent.AgentManager
+import de.heckenmann.visualagent.agent.Message
+import de.heckenmann.visualagent.agent.conversation.ConversationHistoryPage
+import de.heckenmann.visualagent.agent.conversation.WelcomeResult
+import de.heckenmann.visualagent.config.AppConfigBean
+import de.heckenmann.visualagent.protocol.CancellationTokenImpl
+import de.heckenmann.visualagent.protocol.ConversationInputPlacement
+import de.heckenmann.visualagent.protocol.ConversationPreferences
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.verify
+import kotlinx.coroutines.test.runTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+
+/** Verifies mapping and cancellation at the Spring-to-protocol conversation seam. */
+class SpringConversationPortTest {
+    private val manager = mockk<AgentManager>()
+    private val port = SpringConversationPort(manager, AppConfigBean())
+
+    @Test
+    fun `latest page maps application messages to protocol messages`() =
+        runTest {
+            every { manager.readLatestHistoryPage() } returns
+                ConversationHistoryPage(
+                    messages = listOf(Message("assistant", "ready", id = "m1")),
+                    offset = 0,
+                    hasMore = false,
+                )
+
+            val page = port.latest()
+
+            assertEquals("assistant", page.messages.single().role)
+            assertEquals("ready", page.messages.single().content)
+            assertEquals("m1", page.messages.single().id)
+        }
+
+    @Test
+    fun `stream cancellation is bridged to application token`() =
+        runTest {
+            coEvery { manager.streamMessage(any(), any(), any()) } coAnswers {
+                thirdArg<(String) -> Unit>().invoke("delta")
+                "delta"
+            }
+            val token = CancellationTokenImpl()
+            val chunks = mutableListOf<String>()
+
+            port.stream("hello", token) { chunks += it }
+            token.cancel()
+
+            assertEquals(listOf("delta"), chunks)
+            coVerify(exactly = 1) { manager.streamMessage("hello", any(), any()) }
+        }
+
+    @Test
+    fun `message edits and cancellation are delegated to the application`() {
+        every { manager.deleteMessageById("message-1") } returns Unit
+        every { manager.updateMessageContentById("message-1", "updated") } returns Unit
+        every { manager.cancelAllRunningActions() } returns emptySet()
+        every { manager.cancelAllActiveTodos() } returns Unit
+
+        assertEquals(true, port.deleteMessage("message-1"))
+        assertEquals(true, port.updateMessage("message-1", "updated"))
+        port.cancelActiveWork()
+
+        verify(exactly = 1) { manager.deleteMessageById("message-1") }
+        verify(exactly = 1) { manager.updateMessageContentById("message-1", "updated") }
+        verify(exactly = 1) { manager.cancelAllRunningActions() }
+        verify(exactly = 1) { manager.cancelAllActiveTodos() }
+    }
+
+    @Test
+    fun `conversation preferences are mapped without exposing application enums`() {
+        val config = AppConfigBean()
+        config.conversationInputPlacement = de.heckenmann.visualagent.config.ConversationInputPlacement.FIXED
+        config.queueFlushMode = "ALL"
+        val configPort = SpringConversationPort(manager, config)
+
+        assertEquals(ConversationInputPlacement.FIXED, configPort.preferences().inputPlacement)
+        assertEquals("ALL", configPort.preferences().queueFlushMode)
+
+        configPort.updatePreferences(
+            ConversationPreferences(
+                inputPlacement = ConversationInputPlacement.CONVERSATION_MESSAGE,
+                queueFlushMode = "ONE_BY_ONE",
+            ),
+        )
+        assertEquals(
+            de.heckenmann.visualagent.config.ConversationInputPlacement.CONVERSATION_MESSAGE,
+            config.conversationInputPlacement,
+        )
+        assertEquals("ONE_BY_ONE", config.queueFlushMode)
+    }
+
+    @Test
+    fun `welcome fallback is returned as a protocol warning`() =
+        runTest {
+            every { manager.clearHistory() } returns Unit
+            coEvery { manager.addWelcomeMessageAfterReset() } returns
+                WelcomeResult.Fallback("fallback", IllegalStateException("Provider not reachable"))
+
+            val result = port.clearAndCreateWelcome()
+
+            assertEquals(
+                "The provider could not be reached. Check the connection and provider base URL.",
+                result.warning,
+            )
+        }
+}

@@ -24,8 +24,6 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
-import de.heckenmann.visualagent.agent.Message
-import de.heckenmann.visualagent.agent.conversation.ConversationHistoryPage
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -40,6 +38,8 @@ import de.heckenmann.visualagent.ui.workspace.*
 import org.junit.Rule
 import org.junit.Test
 import kotlin.test.assertFalse
+import de.heckenmann.visualagent.protocol.ConversationHistoryPage as ConversationHistoryPage
+import de.heckenmann.visualagent.protocol.ConversationMessage as Message
 
 /** Verifies scroll-to-latest from a partially browsed conversation history. */
 class ConversationScrollToLatestInteractionTest {
@@ -90,7 +90,7 @@ class ConversationScrollToLatestInteractionTest {
                         isAtLatest = isAtLatest,
                         state = state,
                         gateway = gateway,
-                        scrollCoordinator = coordinator,
+                        listState = listState,
                         scope = rememberCoroutineScope(),
                     )
                 }

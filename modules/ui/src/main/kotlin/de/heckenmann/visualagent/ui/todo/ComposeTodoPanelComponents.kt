@@ -38,12 +38,10 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import de.heckenmann.visualagent.agent.AgentManager
-import de.heckenmann.visualagent.agent.SubAgent
-import de.heckenmann.visualagent.agent.startTodo
-import de.heckenmann.visualagent.agent.stopTodo
-import de.heckenmann.visualagent.todo.Todo
-import de.heckenmann.visualagent.todo.TodoStatus
+import de.heckenmann.visualagent.protocol.AgentSummary
+import de.heckenmann.visualagent.protocol.TodoItem
+import de.heckenmann.visualagent.protocol.TodoPort
+import de.heckenmann.visualagent.protocol.TodoState
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -60,11 +58,11 @@ import sh.calvin.reorderable.ReorderableItem
 
 @Composable
 internal fun ReorderableColumnScope.TodoRow(
-    todo: Todo,
+    todo: TodoItem,
     isNext: Boolean,
     isDragging: Boolean,
     streamedResponse: String,
-    agentManager: AgentManager,
+    todoPort: TodoPort,
     modalRequester: ComposeModalRequester,
     refresh: () -> Unit,
 ) {
@@ -75,7 +73,7 @@ internal fun ReorderableColumnScope.TodoRow(
         } else {
             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.12f)
         }
-    val agents = remember { agentManager.getSubAgents() }
+    val agents = remember { todoPort.agents() }
     val agentName = todo.assignedAgentId?.let { id -> agents.firstOrNull { it.id == id }?.name }
     ReorderableItem {
         PanelContentCard(
@@ -94,7 +92,7 @@ internal fun ReorderableColumnScope.TodoRow(
                     )
                     TodoMetaLine(todo = todo, isNext = isNext, agentName = agentName)
                     TodoStreamingResponse(
-                        visible = todo.status == TodoStatus.IN_PROGRESS,
+                        visible = todo.status == TodoState.IN_PROGRESS,
                         response = streamedResponse,
                     )
                 }
@@ -107,12 +105,12 @@ internal fun ReorderableColumnScope.TodoRow(
                                 ComposeContentModal(title = "Edit todo") { dismiss ->
                                     TodoEditor(
                                         todo = todo,
-                                        agents = agentManager.getSubAgents(),
+                                        agents = todoPort.agents(),
                                         onCancel = dismiss,
                                         onSave = { updatedDescription, updatedStatus, updatedAgentId ->
-                                            agentManager.todoManager.update(todo.id, updatedDescription)
-                                            agentManager.todoManager.updateStatus(todo.id, updatedStatus)
-                                            agentManager.todoManager.updateAssignedAgent(todo.id, updatedAgentId)
+                                            todoPort.updateDescription(todo.id, updatedDescription)
+                                            todoPort.updateStatus(todo.id, updatedStatus)
+                                            todoPort.updateAssignedAgent(todo.id, updatedAgentId)
                                             refresh()
                                             dismiss()
                                         },
@@ -124,27 +122,27 @@ internal fun ReorderableColumnScope.TodoRow(
                     ActionIconButton(
                         icon = Icons.Filled.PlayArrow,
                         description = "Start todo",
-                        enabled = todo.status == TodoStatus.PENDING || todo.status == TodoStatus.CANCELLED,
+                        enabled = todo.status == TodoState.PENDING || todo.status == TodoState.CANCELLED,
                         onClick = {
-                            agentManager.startTodo(todo.id)
+                            todoPort.start(todo.id)
                             refresh()
                         },
                     )
                     ActionIconButton(
                         icon = Icons.Filled.Stop,
                         description = "Stop todo",
-                        enabled = todo.status == TodoStatus.PENDING || todo.status == TodoStatus.IN_PROGRESS,
+                        enabled = todo.status == TodoState.PENDING || todo.status == TodoState.IN_PROGRESS,
                         onClick = {
-                            agentManager.stopTodo(todo.id)
+                            todoPort.stop(todo.id)
                             refresh()
                         },
                     )
                     ActionIconButton(
                         icon = Icons.Filled.Done,
                         description = "Complete todo",
-                        enabled = todo.status != TodoStatus.COMPLETED && todo.status != TodoStatus.CANCELLED,
+                        enabled = todo.status != TodoState.COMPLETED && todo.status != TodoState.CANCELLED,
                         onClick = {
-                            agentManager.todoManager.updateStatus(todo.id, TodoStatus.COMPLETED)
+                            todoPort.updateStatus(todo.id, TodoState.COMPLETED)
                             refresh()
                         },
                     )
@@ -158,7 +156,7 @@ internal fun ReorderableColumnScope.TodoRow(
                                     message = "Delete '${todo.description}' from the persisted todo list.",
                                     confirmDescription = "Delete todo",
                                 ) {
-                                    agentManager.todoManager.remove(todo.id)
+                                    todoPort.remove(todo.id)
                                     refresh()
                                 },
                             )
@@ -172,16 +170,16 @@ internal fun ReorderableColumnScope.TodoRow(
 
 @Composable
 internal fun TodoMetaLine(
-    todo: Todo,
+    todo: TodoItem,
     isNext: Boolean,
     agentName: String?,
 ) {
     val statusColor =
         when (todo.status) {
-            TodoStatus.PENDING -> MaterialTheme.colorScheme.tertiary
-            TodoStatus.IN_PROGRESS -> MaterialTheme.colorScheme.primary
-            TodoStatus.COMPLETED -> MaterialTheme.colorScheme.secondary
-            TodoStatus.CANCELLED -> MaterialTheme.colorScheme.error
+            TodoState.PENDING -> MaterialTheme.colorScheme.tertiary
+            TodoState.IN_PROGRESS -> MaterialTheme.colorScheme.primary
+            TodoState.COMPLETED -> MaterialTheme.colorScheme.secondary
+            TodoState.CANCELLED -> MaterialTheme.colorScheme.error
         }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         if (isNext) {
@@ -193,13 +191,13 @@ internal fun TodoMetaLine(
             )
         }
         when (todo.status) {
-            TodoStatus.PENDING ->
+            TodoState.PENDING ->
                 Icon(Icons.Filled.Schedule, contentDescription = "Pending", tint = statusColor, modifier = Modifier.size(14.dp))
-            TodoStatus.IN_PROGRESS ->
+            TodoState.IN_PROGRESS ->
                 Icon(Icons.Filled.PlayArrow, contentDescription = "In progress", tint = statusColor, modifier = Modifier.size(14.dp))
-            TodoStatus.COMPLETED ->
+            TodoState.COMPLETED ->
                 Icon(Icons.Filled.CheckCircle, contentDescription = "Completed", tint = statusColor, modifier = Modifier.size(14.dp))
-            TodoStatus.CANCELLED ->
+            TodoState.CANCELLED ->
                 Icon(Icons.Filled.Cancel, contentDescription = "Cancelled", tint = statusColor, modifier = Modifier.size(14.dp))
         }
         Text(
@@ -241,10 +239,10 @@ internal fun TodoDragHandle(modifier: Modifier = Modifier) {
 
 @Composable
 internal fun TodoEditor(
-    todo: Todo,
-    agents: List<SubAgent>,
+    todo: TodoItem,
+    agents: List<AgentSummary>,
     onCancel: () -> Unit,
-    onSave: (String, TodoStatus, String?) -> Unit,
+    onSave: (String, TodoState, String?) -> Unit,
 ) {
     var description by remember(todo.id) { mutableStateOf(todo.description) }
     var status by remember(todo.id) { mutableStateOf(todo.status) }
@@ -263,8 +261,8 @@ internal fun TodoEditor(
         PanelDropdownField(
             label = "Status",
             selectedValue = status.name,
-            options = TodoStatus.entries.map { PanelSelectOption(it.name, it.name.labelizeEnumName()) },
-            onSelected = { status = TodoStatus.valueOf(it) },
+            options = TodoState.entries.map { PanelSelectOption(it.name, it.name.labelizeEnumName()) },
+            onSelected = { status = TodoState.valueOf(it) },
         )
         PanelDropdownField(
             label = "Assigned agent",

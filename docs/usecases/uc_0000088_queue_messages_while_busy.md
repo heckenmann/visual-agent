@@ -33,10 +33,10 @@ Messages are never lost when the main agent is busy. The user can prioritize mes
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.compose.ConversationPanel`
-- `de.heckenmann.visualagent.ui.compose.MessageQueue`
-- `de.heckenmann.visualagent.ui.compose.MessageQueueStrip`
-- `de.heckenmann.visualagent.ui.compose.executeSend`
+- `de.heckenmann.visualagent.ui.conversation.ConversationPanel`
+- `de.heckenmann.visualagent.ui.conversation.MessageQueue`
+- `de.heckenmann.visualagent.ui.conversation.MessageQueueStrip`
+- `de.heckenmann.visualagent.ui.conversation.executeSend`
 
 ## Acceptance Criteria
 

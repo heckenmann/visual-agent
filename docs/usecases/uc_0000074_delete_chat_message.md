@@ -32,7 +32,7 @@ Users can remove accidental or unwanted messages from the conversation.
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.compose.ConversationPanel`
+- `de.heckenmann.visualagent.ui.conversation.ConversationPanel`
 - `de.heckenmann.visualagent.agent.AgentManager.deleteMessageById`
 
 ## Acceptance Criteria

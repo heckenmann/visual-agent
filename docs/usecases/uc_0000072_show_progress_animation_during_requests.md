@@ -13,8 +13,8 @@ Desktop user running the main agent or operating a sub-agent.
 
 ## Preconditions
 
-- The Compose desktop shell is running with `ToolEventBus` and `AgentManager`
-  Spring beans available.
+- The Compose desktop shell has received an `ApplicationPort` from the desktop
+  host, including its protocol-owned `ActivityPort`.
 - The activity indicator is mounted in the workspace header.
 
 ## Main Flow
@@ -25,7 +25,7 @@ Desktop user running the main agent or operating a sub-agent.
    `InFlightState` (stream id, sub-agent id, or settings loading flag).
 3. The header indicator animates three pulsing dots whose pulse period shortens
    with the number of concurrent in-flight activities.
-4. While the LLM streams, the `ToolEventBus` emits `STARTED` and `FINISHED`
+4. While the LLM streams, `ActivityPort` publishes `STARTED` and `FINISHED`
    events for every tool call. Each `STARTED` adds the tool id to the pending
    set; each `FINISHED` removes it.
 5. When the originating coroutine completes (success or failure), the panel
@@ -44,16 +44,16 @@ text. The indicator never occupies layout space when nothing is in flight.
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.compose.InFlightState`
-- `de.heckenmann.visualagent.ui.compose.InFlightIndicator`
-- `de.heckenmann.visualagent.ui.compose.rememberInFlightState`
-- `de.heckenmann.visualagent.ui.compose.ComposeWorkspaceHeader`
-- `de.heckenmann.visualagent.ui.compose.ComposePanelServices`
-- `de.heckenmann.visualagent.ui.compose.ConversationPanel`
-- `de.heckenmann.visualagent.ui.compose.SubAgentsPanel`
-- `de.heckenmann.visualagent.ui.compose.SettingsPanel`
-- `de.heckenmann.visualagent.ui.compose.ActionIconButton`
-- `de.heckenmann.visualagent.agent.tools.ToolEventBus`
+- `de.heckenmann.visualagent.ui.status.InFlightState`
+- `de.heckenmann.visualagent.ui.status.InFlightIndicator`
+- `de.heckenmann.visualagent.ui.status.rememberInFlightState`
+- `de.heckenmann.visualagent.ui.workspace.ComposeWorkspaceHeader`
+- `de.heckenmann.visualagent.ui.application.ComposePanelServices`
+- `de.heckenmann.visualagent.ui.conversation.ConversationPanel`
+- `de.heckenmann.visualagent.ui.application.SubAgentsPanel`
+- `de.heckenmann.visualagent.ui.settings.SettingsPanel`
+- `de.heckenmann.visualagent.ui.components.ActionIconButton`
+- `de.heckenmann.visualagent.protocol.ActivityPort`
 
 ## Acceptance Criteria
 

@@ -33,7 +33,7 @@ Users and agents can find relevant workspace files without loading all file cont
 
 - `de.heckenmann.visualagent.workspace.WorkspaceFileService.searchFiles`
 - `de.heckenmann.visualagent.agent.tools.WorkspaceFileTool`
-- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.files.FilesPanel`
 
 ## Acceptance Criteria
 

@@ -63,6 +63,19 @@ class WorkspaceLayoutServiceTest {
     }
 
     @Test
+    fun `stage size and position survive persistence`() {
+        val persistence = WorkspaceLayoutPersistence(MapPreferenceStore())
+        val service = WorkspaceLayoutService(persistence)
+
+        service.saveStage(StageState(width = 1440.0, height = 900.0), StagePosition(x = 120.0, y = 80.0))
+
+        val report = service.report()
+
+        assertEquals(StageState(width = 1440.0, height = 900.0), report.stage)
+        assertEquals(StagePosition(x = 120.0, y = 80.0), report.stagePosition)
+    }
+
+    @Test
     fun `apply window states persists and updates live report`() {
         val persistence = WorkspaceLayoutPersistence(MapPreferenceStore())
         val service = WorkspaceLayoutService(persistence)

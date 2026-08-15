@@ -16,8 +16,11 @@ Visual Agent now uses Spring Data JPA on SQLite with Flyway migrations for persi
 
 ```bash
 ./gradlew build
-./gradlew run
+./gradlew :desktop:run
 ```
+
+For a standalone Spring server without the desktop host, run
+`./gradlew :application:runServer`.
 
 ## Important Links
 

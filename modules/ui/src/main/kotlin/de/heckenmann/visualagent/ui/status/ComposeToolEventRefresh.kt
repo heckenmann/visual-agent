@@ -7,9 +7,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import de.heckenmann.visualagent.agent.tools.ToolCallEvent
-import de.heckenmann.visualagent.agent.tools.ToolCallPhase
-import de.heckenmann.visualagent.agent.tools.ToolEventBus
+import de.heckenmann.visualagent.protocol.ActivityPort
+import de.heckenmann.visualagent.protocol.ToolActivity
+import de.heckenmann.visualagent.protocol.ToolActivityPhase
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -26,14 +26,14 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.debounce
 
 /**
- * Composable that subscribes to [ToolEventBus] and calls [onRefresh] when a
+ * Composable that subscribes to [ActivityPort] and calls [onRefresh] when a
  * tool call matching [toolIds] completes successfully.
  *
  * Multiple matching events within [debounceMs] are collapsed into a single
  * refresh call. Only FINISHED events with `result.success == true` trigger
  * a refresh (unless [requireSuccess] is false).
  *
- * @param toolEventBus Spring-managed tool event bus
+ * @param activityPort Transport-owned activity events
  * @param toolIds Set of tool IDs that should trigger a refresh
  * @param requireSuccess When true (default), only successful tool calls trigger refresh
  * @param debounceMs Debounce window in milliseconds
@@ -41,19 +41,19 @@ import kotlinx.coroutines.flow.debounce
  */
 @Composable
 internal fun ToolEventRefreshEffect(
-    toolEventBus: ToolEventBus,
+    activityPort: ActivityPort,
     toolIds: Set<String>,
     requireSuccess: Boolean = true,
     debounceMs: Long = 150L,
     onRefresh: () -> Unit,
 ) {
-    val events = remember { MutableSharedFlow<ToolCallEvent>(extraBufferCapacity = 64) }
-    DisposableEffect(toolEventBus) {
+    val events = remember { MutableSharedFlow<ToolActivity>(extraBufferCapacity = 64) }
+    DisposableEffect(activityPort) {
         val handle =
-            toolEventBus.addListener { event ->
-                if (event.phase == ToolCallPhase.FINISHED &&
+            activityPort.addToolListener { event ->
+                if (event.phase == ToolActivityPhase.FINISHED &&
                     event.toolId in toolIds &&
-                    (!requireSuccess || event.result.success)
+                    (!requireSuccess || event.success)
                 ) {
                     events.tryEmit(event)
                 }

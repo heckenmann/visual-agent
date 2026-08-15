@@ -33,8 +33,8 @@ The queue delivery behavior matches the user's preference.
 
 - `de.heckenmann.visualagent.config.AppConfigBean.queueFlushMode`
 - `de.heckenmann.visualagent.config.AppConfig.queueFlushMode`
-- `de.heckenmann.visualagent.ui.compose.SettingsExecutionAndAppearanceSection`
-- `de.heckenmann.visualagent.ui.compose.SettingsPanel`
+- `de.heckenmann.visualagent.ui.settings.RuntimeSettingsSection`
+- `de.heckenmann.visualagent.ui.settings.SettingsPanel`
 
 ## Acceptance Criteria
 

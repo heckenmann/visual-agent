@@ -2,8 +2,6 @@
 
 package de.heckenmann.visualagent.ui.conversation
 
-import de.heckenmann.visualagent.agent.Message
-import de.heckenmann.visualagent.agent.conversation.ConversationHistoryPage
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -20,6 +18,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import de.heckenmann.visualagent.protocol.ConversationHistoryPage as ConversationHistoryPage
+import de.heckenmann.visualagent.protocol.ConversationMessage as Message
 
 class ConversationUiStateTest {
     @Test

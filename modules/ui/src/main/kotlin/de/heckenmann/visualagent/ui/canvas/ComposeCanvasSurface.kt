@@ -43,10 +43,10 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
-import de.heckenmann.visualagent.canvas.CanvasFigureSnapshot
-import de.heckenmann.visualagent.canvas.CanvasOperations
-import de.heckenmann.visualagent.canvas.CanvasPoint
-import de.heckenmann.visualagent.canvas.CanvasSnapshot
+import de.heckenmann.visualagent.protocol.CanvasFigureSnapshot
+import de.heckenmann.visualagent.protocol.CanvasPort
+import de.heckenmann.visualagent.protocol.CanvasPoint
+import de.heckenmann.visualagent.protocol.CanvasSnapshot
 import io.github.xingray.compose.infinitecanvas.CanvasNode
 import io.github.xingray.compose.infinitecanvas.CanvasNodeState
 import io.github.xingray.compose.infinitecanvas.InfiniteCanvas
@@ -58,7 +58,7 @@ import kotlin.math.abs
 @Composable
 internal fun CanvasSurface(
     snapshot: CanvasSnapshot,
-    canvasOperations: CanvasOperations,
+    canvasOperations: CanvasPort,
     mode: CanvasInteractionMode,
     imageBytesForPath: (String) -> ByteArray?,
     onSnapshotChanged: (CanvasSnapshot) -> Unit,
@@ -190,7 +190,7 @@ internal fun CanvasSurface(
 private fun canvasNodes(
     snapshot: CanvasSnapshot,
     nodeStates: SnapshotStateMap<Int, CanvasNodeState>,
-    canvasOperations: CanvasOperations,
+    canvasOperations: CanvasPort,
     imageBytesForPath: (String) -> ByteArray?,
     onSnapshotChanged: (CanvasSnapshot) -> Unit,
     scheme: androidx.compose.material3.ColorScheme,

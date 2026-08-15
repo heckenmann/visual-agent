@@ -39,9 +39,9 @@ Long conversations can be reviewed incrementally without loading all history on 
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.compose.ConversationPanel`
-- `de.heckenmann.visualagent.ui.compose.ConversationOlderHistoryLoader`
-- `de.heckenmann.visualagent.ui.compose.OlderHistoryLoadingIndicator`
+- `de.heckenmann.visualagent.ui.conversation.ConversationPanel`
+- `de.heckenmann.visualagent.ui.conversation.ComposeConversationHistoryEffects`
+- `de.heckenmann.visualagent.ui.conversation.OlderHistoryLoadingIndicator`
 - `de.heckenmann.visualagent.agent.AgentManager.loadOlderHistory`
 - `de.heckenmann.visualagent.knowledge.ConversationStore.getConversationMessagesPage`
 

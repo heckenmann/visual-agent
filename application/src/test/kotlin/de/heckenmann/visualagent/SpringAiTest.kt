@@ -6,7 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import kotlin.test.assertNotNull
 
-@SpringBootTest(properties = ["visual-agent.ui.enabled=false"])
+@SpringBootTest(properties = ["visual-agent.ui.enabled=false", "visual-agent.db.path=jdbc:sqlite::memory:"])
 class SpringAiTest {
     @Autowired
     private lateinit var chatModel: ChatModel

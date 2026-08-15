@@ -31,9 +31,9 @@ The UI reflects user-selected visual preferences using Material3 light/dark colo
 ## Code Entry Points
 
 - `de.heckenmann.visualagent.config.ThemeMode`
-- `de.heckenmann.visualagent.ui.compose.ComposeWorkspaceTheme`
-- `de.heckenmann.visualagent.ui.compose.SettingsPanel`
-- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
+- `de.heckenmann.visualagent.ui.workspace.ComposeWorkspaceTheme`
+- `de.heckenmann.visualagent.ui.settings.SettingsPanel`
+- `de.heckenmann.visualagent.ui.application.VisualAgentComposeApp`
 
 ## Acceptance Criteria
 

@@ -34,9 +34,9 @@ The user sees a concise, actionable explanation of what went wrong instead of a 
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.compose.ComposeErrorModal`
-- `de.heckenmann.visualagent.ui.compose.ComposeModalHost`
-- `de.heckenmann.visualagent.ui.compose.ComposeModalRequester.requestError`
+- `de.heckenmann.visualagent.ui.modal.ComposeErrorModal`
+- `de.heckenmann.visualagent.ui.modal.ComposeModalHost`
+- `de.heckenmann.visualagent.ui.modal.ComposeModalRequester.requestError`
 - `de.heckenmann.visualagent.error.ErrorMessageMapper`
 
 ## Acceptance Criteria

@@ -30,9 +30,9 @@ The user can inspect model thinking output without polluting the final answer te
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
-- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
-- `de.heckenmann.visualagent.config.AppConfig.thinkingEnabled`
+- `de.heckenmann.visualagent.ui.application.VisualAgentComposeApp`
+- `de.heckenmann.visualagent.ui.conversation.ThinkingRow`
+- `de.heckenmann.visualagent.protocol.SettingsSnapshot.thinkingEnabled`
 
 ## Acceptance Criteria
 

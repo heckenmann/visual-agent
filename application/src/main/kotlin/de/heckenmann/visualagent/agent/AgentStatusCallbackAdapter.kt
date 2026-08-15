@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.agent
 
 import org.springframework.stereotype.Component
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Spring-managed adapter that replaces the static [AgentManager.Companion.globalAgentCallback].
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Component
 @Component
 class AgentStatusCallbackAdapter {
     private var callback: ((String, String) -> Unit)? = null
+    private val listeners = CopyOnWriteArrayList<(String, String) -> Unit>()
 
     /**
      * Registers the UI callback that receives sub-agent lifecycle notifications.
@@ -19,6 +21,12 @@ class AgentStatusCallbackAdapter {
      */
     fun register(callback: (String, String) -> Unit) {
         this.callback = callback
+    }
+
+    /** Registers an additive listener for the transport boundary. */
+    fun addListener(listener: (String, String) -> Unit): AutoCloseable {
+        listeners += listener
+        return AutoCloseable { listeners.remove(listener) }
     }
 
     /**
@@ -32,5 +40,6 @@ class AgentStatusCallbackAdapter {
         message: String,
     ) {
         callback?.invoke(agentId, message)
+        listeners.forEach { listener -> runCatching { listener(agentId, message) } }
     }
 }

@@ -19,13 +19,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import de.heckenmann.visualagent.agent.tools.ToolEventBus
-import de.heckenmann.visualagent.canvas.CanvasOperations
-import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
+import de.heckenmann.visualagent.protocol.ActivityPort
+import de.heckenmann.visualagent.protocol.CANVAS_MIME_TYPE
+import de.heckenmann.visualagent.protocol.CanvasPort
+import de.heckenmann.visualagent.protocol.MAX_WORKSPACE_FILE_IMPORT_BYTES
+import de.heckenmann.visualagent.protocol.WorkspaceFile
+import de.heckenmann.visualagent.protocol.WorkspaceFilePort
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -37,10 +41,11 @@ import de.heckenmann.visualagent.ui.settings.*
 import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
-import de.heckenmann.visualagent.workspace.WorkspaceFilePaths
-import de.heckenmann.visualagent.workspace.WorkspaceFileService
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
@@ -55,43 +60,54 @@ import java.io.File
  */
 @Composable
 internal fun FilesPanel(
-    workspaceFileService: WorkspaceFileService,
-    canvasOperations: CanvasOperations,
+    workspaceFileService: WorkspaceFilePort,
+    canvasOperations: CanvasPort,
     modalRequester: ComposeModalRequester,
-    toolEventBus: ToolEventBus,
+    activityPort: ActivityPort,
 ) {
     var files by remember { mutableStateOf(workspaceFileService.listFiles()) }
     var path by remember { mutableStateOf("") }
     var query by remember { mutableStateOf("") }
     var typeFilter by remember { mutableStateOf(ALL_FILE_TYPES) }
     var status by remember { mutableStateOf("Workspace: ${workspaceFileService.workspaceRoot()}") }
+    val scope = rememberCoroutineScope()
     val refresh = {
         files = workspaceFileService.listFiles()
     }
     ToolEventRefreshEffect(
-        toolEventBus = toolEventBus,
+        activityPort = activityPort,
         toolIds = setOf("file:write", "file:edit", "workspace:file"),
         onRefresh = refresh,
     )
     val visibleFiles = filterWorkspaceFiles(files, query, typeFilter)
     val fileListScrollState = rememberScrollState()
     RegisterPanelVerticalScrollbar(fileListScrollState)
-    val importFile: (File) -> Unit = { file ->
-        runCatching { workspaceFileService.importFile(file) }
-            .onSuccess {
-                status = "Imported ${it.relativePath}"
-                path = ""
-                refresh()
-            }.onFailure {
-                val userError =
-                    de.heckenmann.visualagent.error.ErrorMessageMapper
-                        .map(it)
-                status = "${userError.summary}: ${userError.detail}"
-            }
+
+    /** Validates and imports one file asynchronously without allocating oversized input on Main. */
+    fun importFile(file: File) {
+        when {
+            !file.isFile -> status = "Operation failed: File does not exist"
+            file.length() > MAX_WORKSPACE_FILE_IMPORT_BYTES ->
+                status = "Operation failed: File is larger than 50 MB"
+            else ->
+                scope.launch {
+                    runCatching {
+                        withContext(Dispatchers.IO) {
+                            workspaceFileService.importFile(file.name, file.readBytes())
+                        }
+                    }.onSuccess {
+                        status = "Imported ${it.relativePath}"
+                        path = ""
+                        refresh()
+                    }.onFailure {
+                        status = it.toUiErrorMessage()
+                    }
+                }
+        }
     }
     val picker =
         rememberFilePickerLauncher { selected: PlatformFile? ->
-            selected?.file?.let(importFile)
+            selected?.file?.let(::importFile)
         }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -178,10 +194,10 @@ internal fun FilesPanel(
  * @return Filtered list in the original order
  */
 internal fun filterWorkspaceFiles(
-    files: List<WorkspaceFileRecord>,
+    files: List<WorkspaceFile>,
     query: String,
     typeFilter: String,
-): List<WorkspaceFileRecord> =
+): List<WorkspaceFile> =
     files.filter { file ->
         val matchesQuery =
             query.isBlank() ||
@@ -190,8 +206,8 @@ internal fun filterWorkspaceFiles(
                 file.sha256.contains(query, ignoreCase = true)
         val matchesType =
             typeFilter == ALL_FILE_TYPES ||
-                (typeFilter == CANVAS_FILE_TYPE && file.mimeType == WorkspaceFilePaths.CANVAS_MIME_TYPE) ||
-                (typeFilter == OTHER_FILE_TYPE && file.mimeType != WorkspaceFilePaths.CANVAS_MIME_TYPE)
+                (typeFilter == CANVAS_FILE_TYPE && file.mimeType == CANVAS_MIME_TYPE) ||
+                (typeFilter == OTHER_FILE_TYPE && file.mimeType != CANVAS_MIME_TYPE)
         matchesQuery && matchesType
     }
 

@@ -11,7 +11,14 @@
 
 ```bash
 ./gradlew build
-./gradlew run
+./gradlew :desktop:run
+```
+
+Run the Spring server without the Compose desktop host when a standalone server is
+required:
+
+```bash
+./gradlew :application:runServer
 ```
 
 ## Quality Checks
@@ -19,17 +26,14 @@
 Standard checks:
 
 ```bash
-./gradlew build
-./gradlew test
-./gradlew check
-./gradlew ktlintCheck
+./gradlew ktlintCheck check test
 ```
 
 Additional enforced checks in current build:
 
 - `ktlintJavadocCheck` (public declaration KDoc guard)
 - `unusedCodeCheck` (flags removable unused private declarations)
-- `locAndPackageSizeCheck` (file/package size report; warning-only while modularization is in progress)
+- `locAndPackageSizeCheck` (blocking file/package size limit)
 
 ## Ollama Runtime
 
@@ -76,7 +80,8 @@ Leaving the key blank omits the `Authorization` header. Profile URL and key chan
 
 ### Compose Multiplatform module/runtime issues
 
-Use `./gradlew run` first; the project config applies required Compose Multiplatform args.
+Use `./gradlew :desktop:run` first; the `:desktop` module applies the required Compose
+Multiplatform arguments.
 
 ### Compose Multiplatform rendering performance
 

@@ -31,8 +31,8 @@ Large model catalogs are easier to navigate.
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.compose.SettingsPanel`
-- `de.heckenmann.visualagent.ui.compose.ActionIconButton`
+- `de.heckenmann.visualagent.ui.settings.SettingsPanel`
+- `de.heckenmann.visualagent.ui.components.ActionIconButton`
 - `de.heckenmann.visualagent.config.AppConfig.favoriteModels`
 
 ## Acceptance Criteria

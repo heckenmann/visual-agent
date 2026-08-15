@@ -39,10 +39,10 @@ The available sub-agent pool can be shaped for the current workspace needs.
 - `de.heckenmann.visualagent.agent.tools.AgentCreateTool`
 - `de.heckenmann.visualagent.agent.tools.AgentUpdateTool`
 - `de.heckenmann.visualagent.agent.tools.AgentDeleteTool`
-- `de.heckenmann.visualagent.ui.compose.SubAgentsPanel`
+- `de.heckenmann.visualagent.ui.application.SubAgentsPanel`
 - `de.heckenmann.visualagent.ui.agents.SubAgentCreationForm`
-- `de.heckenmann.visualagent.ui.compose.ComposeModalHost`
-- `de.heckenmann.visualagent.ui.compose.ActionIconButton`
+- `de.heckenmann.visualagent.ui.modal.ComposeModalHost`
+- `de.heckenmann.visualagent.ui.components.ActionIconButton`
 
 ## Acceptance Criteria
 

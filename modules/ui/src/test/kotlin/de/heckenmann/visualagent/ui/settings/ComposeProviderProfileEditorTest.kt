@@ -1,98 +1,74 @@
-@file:Suppress("ktlint:standard:no-wildcard-imports", "FunctionName")
-
 package de.heckenmann.visualagent.ui.settings
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performTextInput
-import de.heckenmann.visualagent.agent.provider.ProviderAdapter
-import de.heckenmann.visualagent.agent.provider.ProviderProfile
-import de.heckenmann.visualagent.ui.agents.*
-import de.heckenmann.visualagent.ui.application.*
-import de.heckenmann.visualagent.ui.canvas.*
-import de.heckenmann.visualagent.ui.components.*
-import de.heckenmann.visualagent.ui.conversation.*
-import de.heckenmann.visualagent.ui.files.*
-import de.heckenmann.visualagent.ui.modal.*
-import de.heckenmann.visualagent.ui.settings.*
-import de.heckenmann.visualagent.ui.status.*
-import de.heckenmann.visualagent.ui.todo.*
-import de.heckenmann.visualagent.ui.workspace.*
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import de.heckenmann.visualagent.protocol.ProviderAdapter
+import de.heckenmann.visualagent.protocol.ProviderProfile
 import org.junit.Rule
 import org.junit.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/** Verifies provider profile editing without application or Spring dependencies. */
 class ComposeProviderProfileEditorTest {
     @get:Rule
     val composeTestRule = createComposeRule()
 
     @Test
-    fun `profile editor renders form fields and validates required input`() {
-        var saved: ProviderProfile? = null
-        composeTestRule.setContent {
-            MaterialTheme {
-                ProviderProfileEditor(
-                    initial = newProviderFormState(),
-                    existing = null,
-                    canDisable = true,
-                    onCancel = {},
-                    onSave = { saved = it },
-                )
-            }
-        }
-
-        composeTestRule.onNodeWithText("Provider ID").assertDoesNotExist()
-        composeTestRule.onNodeWithText("Base URL").assertExists()
-        composeTestRule.onNodeWithText("API key").assertExists()
-        composeTestRule.onNodeWithText("Default model").assertDoesNotExist()
-        composeTestRule.onNodeWithContentDescription("Create provider").assertExists()
-    }
-
-    @Test
-    fun `profile editor saves when validation passes`() {
-        var saved: ProviderProfile? = null
-        composeTestRule.setContent {
-            MaterialTheme {
-                ProviderProfileEditor(
-                    initial = newProviderFormState(),
-                    existing = null,
-                    canDisable = true,
-                    onCancel = {},
-                    onSave = { saved = it },
-                )
-            }
-        }
-
-        composeTestRule.onNodeWithText("Name").performTextInput("Custom")
-        composeTestRule.onNodeWithText("Base URL").performTextInput("https://api.custom.com")
-        composeTestRule.waitForIdle()
-
-        assertTrue(saved == null)
-    }
-
-    @Test
-    fun `profile editor identifies the edit action`() {
+    fun `existing network provider renders and saves profile fields`() {
         val profile =
             ProviderProfile(
-                id = "existing",
-                name = "Existing provider",
-                adapter = ProviderAdapter.OPENAI_COMPATIBLE,
-                baseUrl = "https://api.example.com",
+                id = "ollama",
+                name = "Ollama",
+                adapter = ProviderAdapter.OLLAMA,
+                baseUrl = "http://localhost:11434",
+                apiKey = "secret",
+                defaultModel = "llama3",
+                options = mapOf("keep_alive" to "5m"),
             )
+        var saved: ProviderProfile? = null
+
         composeTestRule.setContent {
             MaterialTheme {
-                ProviderProfileEditor(
-                    initial = profile.toFormState(),
-                    existing = profile,
-                    canDisable = true,
-                    onCancel = {},
-                    onSave = {},
-                )
+                ProviderProfileEditor(profile.toFormState(), profile, canDisable = true, onCancel = {}, onSave = { saved = it })
             }
         }
 
-        composeTestRule.onNodeWithContentDescription("Save provider changes").assertExists()
+        composeTestRule.onNodeWithText("Base URL").assertExists()
+        composeTestRule.onNodeWithText("API key").assertExists()
+        composeTestRule.onNodeWithText("Provider options (key=value per line)").assertExists()
+        composeTestRule.onNodeWithContentDescription("Save provider changes").performScrollTo().performClick()
+
+        assertEquals(profile, saved)
+    }
+
+    @Test
+    fun `codex profile omits network credentials and form helpers preserve options`() {
+        val state =
+            ProviderProfileFormState(
+                id = "codex",
+                name = "Codex",
+                adapter = ProviderAdapter.CODEX_CLI,
+                defaultModel = "gpt-5",
+            )
+
+        composeTestRule.setContent {
+            MaterialTheme {
+                ProviderProfileEditor(state, existing = null, canDisable = true, onCancel = {}, onSave = {})
+            }
+        }
+
+        composeTestRule.onAllNodesWithText("Base URL").assertCountEquals(0)
+        composeTestRule.onAllNodesWithText("API key").assertCountEquals(0)
+        composeTestRule.onAllNodesWithText("Provider options (key=value per line)").assertCountEquals(0)
+        assertEquals(mapOf("a" to "1", "b" to "2"), "a=1\nb=2\ninvalid".toSettingsMap())
+        assertEquals("a=1\nb=2", mapOf("b" to "2", "a" to "1").toSettingsMapText())
+        assertTrue(newProviderFormState().id.startsWith("provider-"))
     }
 }

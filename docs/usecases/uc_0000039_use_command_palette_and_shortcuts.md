@@ -33,9 +33,9 @@ The user can navigate without relying only on mouse interactions.
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.compose.VisualAgentComposeApplication`
-- `de.heckenmann.visualagent.ui.compose.ComposeWorkspaceShortcuts`
-- `de.heckenmann.visualagent.ui.compose.ComposeCommandPaletteHost`
+- `de.heckenmann.visualagent.ui.application.VisualAgentComposeApp`
+- `de.heckenmann.visualagent.ui.workspace.ComposeWorkspaceShortcuts`
+- `de.heckenmann.visualagent.ui.application.ComposeCommandPaletteHost`
 
 ## Acceptance Criteria
 

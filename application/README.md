@@ -1,21 +1,25 @@
 # Application Module
 
-`:application` is the Visual Agent composition root.
+`:application` is the Visual Agent Spring server composition root.
 
 ## Responsibilities
 
-- Starts the Compose desktop application and Spring Boot context.
-- Wires the UI and provider modules into the application runtime.
+- Owns the Spring Boot server composition root used by both standalone and embedded desktop startup.
+- Exposes application capabilities through the protocol ports consumed by the desktop UI.
 - Retains agent, persistence, workspace, canvas, todo, knowledge, orchestration, and configuration logic until those capabilities receive dedicated extraction increments.
 - Owns cross-module integration tests and the application JaCoCo verification rule.
 
+The desktop lifecycle host lives in `:desktop`. In local desktop mode it embeds exactly one
+non-web Spring context from this module; it does not create a second application server.
+
 ## Dependencies
 
-This is the only module allowed to depend on Visual Agent submodules:
+This module owns the server-side dependency direction:
 
 ```text
-:application -> :ui
 :application -> :providers
+:application -> :tools
+:application -> :protocol
 ```
 
 ## Source layout
@@ -34,5 +38,5 @@ Run from the repository root:
 ```bash
 ./gradlew :application:build
 ./gradlew :application:test
-./gradlew :application:run
+./gradlew :application:runServer
 ```

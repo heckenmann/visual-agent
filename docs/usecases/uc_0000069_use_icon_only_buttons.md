@@ -25,19 +25,19 @@ Users interact with compact action buttons that show only an icon. Hovering over
 - None.
 
 ## Code Entry Points
-- `de.heckenmann.visualagent.ui.compose.ActionIconButton`
-- `de.heckenmann.visualagent.ui.compose.ActionTooltip`
-- `de.heckenmann.visualagent.ui.compose.ComposeRail`
-- `de.heckenmann.visualagent.ui.compose.ComposeSplitWorkspace`
-- `de.heckenmann.visualagent.ui.compose.ScrollArrow`
-- `de.heckenmann.visualagent.ui.compose.PanelResizer`
-- `de.heckenmann.visualagent.ui.compose.ConversationPanel`
-- `de.heckenmann.visualagent.ui.compose.TodoPanel`
-- `de.heckenmann.visualagent.ui.compose.FilesPanel`
-- `de.heckenmann.visualagent.ui.compose.SubAgentsPanel`
-- `de.heckenmann.visualagent.ui.compose.SettingsPanel`
-- `de.heckenmann.visualagent.ui.compose.CanvasPanel`
-- `de.heckenmann.visualagent.ui.compose.ComposeModalHost`
+- `de.heckenmann.visualagent.ui.components.ActionIconButton`
+- `de.heckenmann.visualagent.ui.components.ActionTooltip`
+- `de.heckenmann.visualagent.ui.workspace.ComposeRail`
+- `de.heckenmann.visualagent.ui.workspace.ComposeSplitWorkspace`
+- `de.heckenmann.visualagent.ui.workspace.ScrollArrow`
+- `de.heckenmann.visualagent.ui.workspace.PanelResizer`
+- `de.heckenmann.visualagent.ui.conversation.ConversationPanel`
+- `de.heckenmann.visualagent.ui.todo.TodoPanel`
+- `de.heckenmann.visualagent.ui.files.FilesPanel`
+- `de.heckenmann.visualagent.ui.application.SubAgentsPanel`
+- `de.heckenmann.visualagent.ui.settings.SettingsPanel`
+- `de.heckenmann.visualagent.ui.canvas.CanvasPanel`
+- `de.heckenmann.visualagent.ui.modal.ComposeModalHost`
 
 ## Notes
 - The `PanelDragHandle` composable was removed; the entire panel header now acts as the draggable reorder handle, except for interactive buttons.

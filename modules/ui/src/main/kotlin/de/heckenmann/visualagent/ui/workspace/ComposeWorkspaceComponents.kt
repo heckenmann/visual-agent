@@ -267,54 +267,47 @@ internal fun WindowBody(
     when (window.id) {
         "chat" ->
             ConversationPanel(
-                agentManager = panelServices.agentManager,
                 modalRequester = panelServices.modalRequester,
                 inFlight = panelServices.inFlight,
-                toolEventBus = panelServices.toolEventBus,
-                todoEventBus = panelServices.todoEventBus,
-                config = panelServices.config,
+                activityPort = panelServices.activity,
+                todoPort = panelServices.todos,
+                conversationPort = panelServices.conversation,
             )
         "todos" ->
             TodoPanel(
-                agentManager = panelServices.agentManager,
+                todoPort = panelServices.todos,
                 modalRequester = panelServices.modalRequester,
-                todoEventBus = panelServices.todoEventBus,
-                toolEventBus = panelServices.toolEventBus,
             )
         "files" ->
             FilesPanel(
-                workspaceFileService = panelServices.workspaceFileService,
-                canvasOperations = panelServices.canvasOperations,
+                workspaceFileService = panelServices.workspaceFiles,
+                canvasOperations = panelServices.canvas,
                 modalRequester = panelServices.modalRequester,
-                toolEventBus = panelServices.toolEventBus,
+                activityPort = panelServices.activity,
             )
         "agents" ->
             SubAgentsPanel(
-                agentManager = panelServices.agentManager,
-                agentToolConfigService = panelServices.agentToolConfigService,
-                toolRegistry = panelServices.toolRegistry,
-                providerCatalogService = panelServices.providerCatalogService,
+                agentPort = panelServices.agents,
+                providerPort = panelServices.providers,
                 modalRequester = panelServices.modalRequester,
-                toolEventBus = panelServices.toolEventBus,
-                todoEventBus = panelServices.todoEventBus,
+                activityPort = panelServices.activity,
+                todoPort = panelServices.todos,
             )
         "settings" ->
             SettingsPanel(
-                config = panelServices.config,
-                llmProvider = panelServices.llmProvider,
-                providerCatalogService = panelServices.providerCatalogService,
-                codexCliAccountService = panelServices.codexCliAccountService,
+                settingsPort = panelServices.settings,
+                providerPort = panelServices.providers,
                 modalRequester = panelServices.modalRequester,
                 onSettingsChanged = panelServices.onSettingsChanged,
                 inFlight = panelServices.inFlight,
-                toolEventBus = panelServices.toolEventBus,
+                activityPort = panelServices.activity,
             )
         "canvas" ->
             CanvasPanel(
-                canvasOperations = panelServices.canvasOperations,
-                workspaceFileService = panelServices.workspaceFileService,
+                canvasOperations = panelServices.canvas,
+                workspaceFileService = panelServices.workspaceFiles,
                 modalRequester = panelServices.modalRequester,
-                toolEventBus = panelServices.toolEventBus,
+                activityPort = panelServices.activity,
             )
     }
 }

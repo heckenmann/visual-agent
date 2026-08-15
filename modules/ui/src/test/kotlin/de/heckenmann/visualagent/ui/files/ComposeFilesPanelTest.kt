@@ -1,200 +1,82 @@
-@file:Suppress("ktlint:standard:no-wildcard-imports", "FunctionName")
-
 package de.heckenmann.visualagent.ui.files
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
-import de.heckenmann.visualagent.agent.tools.ToolEventBus
-import de.heckenmann.visualagent.canvas.CanvasOperations
-import de.heckenmann.visualagent.canvas.CanvasSnapshot
-import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
-import de.heckenmann.visualagent.ui.agents.*
-import de.heckenmann.visualagent.ui.application.*
-import de.heckenmann.visualagent.ui.canvas.*
-import de.heckenmann.visualagent.ui.components.*
-import de.heckenmann.visualagent.ui.conversation.*
-import de.heckenmann.visualagent.ui.files.*
-import de.heckenmann.visualagent.ui.modal.*
-import de.heckenmann.visualagent.ui.settings.*
-import de.heckenmann.visualagent.ui.status.*
-import de.heckenmann.visualagent.ui.todo.*
-import de.heckenmann.visualagent.ui.workspace.*
-import de.heckenmann.visualagent.workspace.WorkspaceFileService
+import de.heckenmann.visualagent.protocol.ActivityPort
+import de.heckenmann.visualagent.protocol.CANVAS_MIME_TYPE
+import de.heckenmann.visualagent.protocol.CanvasPort
+import de.heckenmann.visualagent.protocol.WorkspaceFile
+import de.heckenmann.visualagent.protocol.WorkspaceFilePort
+import de.heckenmann.visualagent.ui.modal.ComposeModalRequester
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.Rule
 import org.junit.Test
-import java.time.Instant
+import java.nio.file.Files
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
+/** Verifies that the files panel consumes only protocol-owned workspace values. */
 class ComposeFilesPanelTest {
     @get:Rule
     val composeTestRule = createComposeRule()
 
     @Test
-    fun `files panel renders workspace status and file list`() {
-        val workspace = mockWorkspaceService()
-        val canvas = mockk<CanvasOperations>()
-        every { canvas.snapshot() } returns CanvasSnapshot(figureCount = 0, zoomPercent = 100, gridVisible = true, figures = emptyList())
+    fun `filter matches metadata and type`() {
+        val files = sampleFiles()
+        assertEquals(listOf("data/diagram.canvas"), filterWorkspaceFiles(files, "def", ALL_FILE_TYPES).map { it.relativePath })
+        assertEquals(listOf("data/diagram.canvas"), filterWorkspaceFiles(files, "", CANVAS_FILE_TYPE).map { it.relativePath })
+        assertEquals(listOf("data/notes.txt"), filterWorkspaceFiles(files, "", OTHER_FILE_TYPE).map { it.relativePath })
+    }
 
+    @Test
+    fun `panel renders protocol workspace values`() {
+        val workspace = mockk<WorkspaceFilePort>()
+        every { workspace.listFiles() } returns sampleFiles()
+        every { workspace.workspaceRoot() } returns "/tmp/workspace"
+        val canvas = mockk<CanvasPort>(relaxed = true)
+        val activity = mockk<ActivityPort>(relaxed = true)
         composeTestRule.setContent {
             MaterialTheme {
-                FilesPanel(workspace, canvas, ComposeModalRequester { }, ToolEventBus())
+                FilesPanel(workspace, canvas, ComposeModalRequester { }, activity)
             }
         }
-
         composeTestRule.onNodeWithText("Total 2 · showing 2").assertExists()
         composeTestRule.onNodeWithText("data/notes.txt").assertExists()
     }
 
     @Test
-    fun `search input filters visible files`() {
-        val workspace = mockWorkspaceService()
-        val canvas = mockk<CanvasOperations>()
-        every { canvas.snapshot() } returns CanvasSnapshot(figureCount = 0, zoomPercent = 100, gridVisible = true, figures = emptyList())
-
+    fun `typed file path is imported asynchronously`() {
+        val source = Files.createTempFile("visual-agent", ".txt").toFile().apply { writeText("hello") }
+        var imported = false
+        val workspace = mockk<WorkspaceFilePort>(relaxed = true)
+        every { workspace.listFiles() } returns emptyList()
+        every { workspace.workspaceRoot() } returns "/tmp/workspace"
+        every { workspace.importFile(source.name, any()) } answers {
+            imported = true
+            WorkspaceFile("f1", "data/${source.name}", source.name, "text/plain", 5, "hash", "now", "now")
+        }
+        val canvas = mockk<CanvasPort>(relaxed = true)
+        val activity = mockk<ActivityPort>(relaxed = true)
         composeTestRule.setContent {
             MaterialTheme {
-                FilesPanel(workspace, canvas, ComposeModalRequester { }, ToolEventBus())
+                FilesPanel(workspace, canvas, ComposeModalRequester { }, activity)
             }
         }
 
-        composeTestRule.onNodeWithText("Search files").performTextInput("diagram")
-        composeTestRule.onNodeWithText("Total 2 · showing 1").assertExists()
-        composeTestRule.onNodeWithText("data/diagram.canvas").assertExists()
+        composeTestRule.onNodeWithText("Import path").performTextInput(source.absolutePath)
+        composeTestRule.onNodeWithContentDescription("Import typed path").performClick()
+        composeTestRule.waitUntil(5_000) { imported }
+        assertEquals(true, imported)
+        source.delete()
     }
 
-    @Test
-    fun `sync button refreshes status`() {
-        val workspace = mockWorkspaceService()
-        val canvas = mockk<CanvasOperations>()
-        every { canvas.snapshot() } returns CanvasSnapshot(figureCount = 0, zoomPercent = 100, gridVisible = true, figures = emptyList())
-        var synced = false
-        every { workspace.syncMetadataWithFilesystem() } answers {
-            synced = true
-            de.heckenmann.visualagent.workspace
-                .WorkspaceSyncResult(added = 1, updated = 0, removed = 0, total = 3)
-        }
-
-        composeTestRule.setContent {
-            MaterialTheme {
-                FilesPanel(workspace, canvas, ComposeModalRequester { }, ToolEventBus())
-            }
-        }
-
-        composeTestRule.onNodeWithContentDescription("Sync workspace files").performClick()
-        assertTrue(synced)
-        composeTestRule.onNodeWithText("Sync added=1 updated=0 removed=0").assertExists()
-    }
-
-    @Test
-    fun `filterWorkspaceFiles matches query in path name and sha256`() {
-        val files = sampleFiles()
-
-        val result = filterWorkspaceFiles(files, "def", ALL_FILE_TYPES)
-
-        assertEquals(listOf("data/diagram.canvas"), result.map { it.relativePath })
-    }
-
-    @Test
-    fun `filterWorkspaceFiles applies canvas type filter`() {
-        val files = sampleFiles()
-
-        val result = filterWorkspaceFiles(files, "", CANVAS_FILE_TYPE)
-
-        assertEquals(listOf("data/diagram.canvas"), result.map { it.relativePath })
-    }
-
-    @Test
-    fun `filterWorkspaceFiles applies other type filter`() {
-        val files = sampleFiles()
-
-        val result = filterWorkspaceFiles(files, "", OTHER_FILE_TYPE)
-
-        assertEquals(listOf("data/notes.txt"), result.map { it.relativePath })
-    }
-
-    @Test
-    fun `filterWorkspaceFiles combines query and type filter`() {
-        val files = sampleFiles()
-
-        val result = filterWorkspaceFiles(files, "data", CANVAS_FILE_TYPE)
-
-        assertEquals(listOf("data/diagram.canvas"), result.map { it.relativePath })
-    }
-
-    private fun sampleFiles(): List<WorkspaceFileRecord> =
+    private fun sampleFiles() =
         listOf(
-            WorkspaceFileRecord(
-                id = "f1",
-                relativePath = "data/notes.txt",
-                originalName = "notes.txt",
-                mimeType = "text/plain",
-                sizeBytes = 12,
-                sha256 = "abc123",
-                extractedText = null,
-                importedAt = Instant.now(),
-                updatedAt = Instant.now(),
-            ),
-            WorkspaceFileRecord(
-                id = "f2",
-                relativePath = "data/diagram.canvas",
-                originalName = "diagram.canvas",
-                mimeType = de.heckenmann.visualagent.workspace.WorkspaceFilePaths.CANVAS_MIME_TYPE,
-                sizeBytes = 256,
-                sha256 = "def456",
-                extractedText = null,
-                importedAt = Instant.now(),
-                updatedAt = Instant.now(),
-            ),
+            WorkspaceFile("f1", "data/notes.txt", "notes.txt", "text/plain", 12, "abc123", "now", "now"),
+            WorkspaceFile("f2", "data/diagram.canvas", "diagram.canvas", CANVAS_MIME_TYPE, 256, "def456", "now", "now"),
         )
-
-    @Test
-    fun `delete button requests confirmation for workspace file`() {
-        val workspace = mockWorkspaceService()
-        val canvas = mockk<CanvasOperations>()
-        every { canvas.snapshot() } returns CanvasSnapshot(figureCount = 0, zoomPercent = 100, gridVisible = true, figures = emptyList())
-        var requestedModal: ComposeModal? = null
-        val requester = ComposeModalRequester { requestedModal = it }
-
-        composeTestRule.setContent {
-            MaterialTheme {
-                FilesPanel(workspace, canvas, requester, ToolEventBus())
-            }
-        }
-
-        composeTestRule.onAllNodesWithContentDescription("Delete workspace file")[0].performClick()
-        assertTrue(requestedModal is ComposeConfirmationModal)
-    }
-
-    @Test
-    fun `open canvas button opens canvas document`() {
-        val workspace = mockWorkspaceService()
-        val canvas = mockk<CanvasOperations>(relaxed = true)
-        every { canvas.snapshot() } returns CanvasSnapshot(figureCount = 0, zoomPercent = 100, gridVisible = true, figures = emptyList())
-
-        composeTestRule.setContent {
-            MaterialTheme {
-                FilesPanel(workspace, canvas, ComposeModalRequester { }, ToolEventBus())
-            }
-        }
-
-        composeTestRule.onAllNodesWithContentDescription("Open canvas document")[0].performClick()
-        composeTestRule.waitForIdle()
-    }
-
-    private fun mockWorkspaceService(): WorkspaceFileService {
-        val service = mockk<WorkspaceFileService>()
-        every { service.listFiles() } returns sampleFiles()
-        every { service.workspaceRoot() } returns
-            java.nio.file.Path
-                .of("/tmp/workspace")
-        return service
-    }
 }

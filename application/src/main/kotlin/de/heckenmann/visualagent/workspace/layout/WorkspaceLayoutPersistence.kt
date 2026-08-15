@@ -45,6 +45,15 @@ data class WorkspaceLayout(
     val windows: List<WorkspaceWindowState> = emptyList(),
     /** Persisted main application window size. */
     val stage: StageState? = null,
+    /** Persisted main application window position. */
+    val stagePosition: StagePosition? = null,
+)
+
+/** Main application window position in desktop coordinates. */
+@Serializable
+data class StagePosition(
+    val x: Double,
+    val y: Double,
 )
 
 /**

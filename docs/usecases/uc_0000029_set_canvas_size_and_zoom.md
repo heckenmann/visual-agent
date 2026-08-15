@@ -30,8 +30,8 @@ Workspace panel resizing does not move drawings into inaccessible space or blur 
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.compose.CanvasPanel`
-- `de.heckenmann.visualagent.ui.compose.ComposeSplitWorkspace`
+- `de.heckenmann.visualagent.ui.canvas.CanvasPanel`
+- `de.heckenmann.visualagent.ui.workspace.ComposeSplitWorkspace`
 - `de.heckenmann.visualagent.canvas.InMemoryCanvasService`
 - `de.heckenmann.visualagent.canvas.CanvasOperations`
 - `io.github.xingray.compose.infinitecanvas.InfiniteCanvas`

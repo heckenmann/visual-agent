@@ -64,5 +64,5 @@ Wheel input that was already active before the click cannot move the completed j
 - An active wheel scroll is cancelled before the explicit latest navigation is applied.
 - Inline mode scrolls through the newest message to the non-sticky composer at timeline index 0.
 - The user can browse older history immediately after a completed jump from either partial or fully loaded oldest history.
-- The behavior is covered by `ConversationUiStateTest`, `ConversationScrollCoordinatorTest`, `ConversationScrollToLatestInteractionTest`, `ConversationHistoryScrollbarPositionTest`, and `ConversationPanelScrollRegressionTest`.
+- The behavior is covered by `ConversationUiStateTest`, `ConversationScrollCoordinatorTest`, `ConversationScrollToLatestInteractionTest`, and `ConversationPanelScrollRegressionTest`.
 - The implementation stays within the 300 LOC per-file limit.
