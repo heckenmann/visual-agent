@@ -2,6 +2,9 @@ package de.heckenmann.visualagent.testsupport
 
 import org.junit.jupiter.api.Tag
 
+/** JUnit Vintage category translated to a JUnit Platform tag for Compose database tests. */
+interface DatabaseTestCategory
+
 /**
  * Marks a Jupiter test class that starts an SQLite-backed persistence context.
  *
@@ -12,10 +15,3 @@ import org.junit.jupiter.api.Tag
 @Retention(AnnotationRetention.RUNTIME)
 @Tag("database")
 annotation class DatabaseTest
-
-/**
- * JUnit 4 category used by Compose tests that still rely on the Vintage engine.
- *
- * The Vintage engine exposes this category as a JUnit Platform tag.
- */
-class DatabaseTestCategory
