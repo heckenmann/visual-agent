@@ -19,6 +19,8 @@ import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import com.mikepenz.markdown.model.ImageData
 import com.mikepenz.markdown.model.ImageTransformer
@@ -174,9 +176,15 @@ private fun ResolvedImageState.toImageData(): ImageData {
                     },
                 )
         }
+    val statusSemantics =
+        if (loaded == null) {
+            Modifier.clearAndSetSemantics { contentDescription = description }
+        } else {
+            Modifier
+        }
     return ImageData(
         painter = loaded?.painter ?: ColorPainter(Color.Transparent),
-        modifier = modifier,
+        modifier = modifier.then(statusSemantics),
         contentDescription = description,
         contentScale = ContentScale.Fit,
     )

@@ -234,6 +234,33 @@ class ComposeMarkdownRenderTest {
     }
 
     @Test
+    fun `announces rejected images instead of markdown alt text`() {
+        val source = "https://example.com/missing.png"
+        val conversationPort = mockk<ConversationPort>(relaxed = true)
+        coEvery { conversationPort.resolveImage(source) } returns
+            ConversationImageResolution.Rejected("Remote image unavailable")
+
+        composeTestRule.setContent {
+            MaterialTheme {
+                ComposeMarkdown(
+                    "![diagram]($source)",
+                    modifier = Modifier.fillMaxSize(),
+                    conversationPort = conversationPort,
+                )
+            }
+        }
+
+        val failureDescription = "Image unavailable: Remote image unavailable"
+        composeTestRule.waitUntil(timeoutMillis = 5_000) {
+            composeTestRule
+                .onAllNodesWithContentDescription(failureDescription)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeTestRule.onNodeWithContentDescription("Image unavailable: Remote image unavailable").assertExists()
+    }
+
+    @Test
     fun `routes client file images through the client boundary only`() {
         val source = "client-file:/home/user/diagram.png"
         val conversationPort = mockk<ConversationPort>(relaxed = true)
