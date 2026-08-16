@@ -27,6 +27,7 @@ import de.heckenmann.visualagent.protocol.ActivityPort
 import de.heckenmann.visualagent.protocol.ProviderPort
 import de.heckenmann.visualagent.protocol.ProviderProfile
 import de.heckenmann.visualagent.protocol.SettingsPort
+import de.heckenmann.visualagent.protocol.SettingsSnapshot
 import de.heckenmann.visualagent.ui.components.ActionIconButton
 import de.heckenmann.visualagent.ui.components.PanelCheckbox
 import de.heckenmann.visualagent.ui.components.PanelDropdownField
@@ -56,7 +57,7 @@ internal fun SettingsPanel(
     @Suppress("UNUSED_PARAMETER") activityPort: ActivityPort,
 ) {
     val scope = rememberCoroutineScope()
-    var snapshot by remember { mutableStateOf(settingsPort.snapshot()) }
+    var snapshot by remember { mutableStateOf(SettingsSnapshot()) }
     var providers by remember { mutableStateOf(providerPort.listProviders()) }
     var providerId by remember { mutableStateOf(providerPort.activeProviderId()) }
     var modelId by remember { mutableStateOf(providerPort.activeModelId()) }
@@ -68,6 +69,10 @@ internal fun SettingsPanel(
     val enabledProviders = providers.filter(ProviderProfile::enabled)
     val selectedProvider = providers.firstOrNull { it.id == providerId }
     val canSaveSelection = providerId.isNotBlank() && modelId.isNotBlank()
+
+    LaunchedEffect(settingsPort) {
+        snapshot = settingsPort.snapshotAsync()
+    }
 
     /** Reloads provider profiles and selects a valid model after a catalog change. */
     fun reloadProviderState(preferredProviderId: String = providerId) {

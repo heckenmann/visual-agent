@@ -1,9 +1,15 @@
 package de.heckenmann.visualagent.protocol
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
 /** Runtime and presentation settings exchanged with the application. */
 interface SettingsPort {
     /** Reads the current settings snapshot. */
     fun snapshot(): SettingsSnapshot
+
+    /** Reads the current settings snapshot without blocking the presentation dispatcher. */
+    suspend fun snapshotAsync(): SettingsSnapshot = withContext(Dispatchers.IO) { snapshot() }
 
     /** Persists the supplied settings snapshot. */
     fun save(settings: SettingsSnapshot)

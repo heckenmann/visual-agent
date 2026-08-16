@@ -28,6 +28,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.LayoutSize
 import de.heckenmann.visualagent.protocol.LayoutWindowState
+import de.heckenmann.visualagent.protocol.SettingsSnapshot
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -52,7 +53,7 @@ fun VisualAgentComposeApp(
     var windows by remember { mutableStateOf(restoreWorkspaceWindows(defaultWindows(), persistedWindows)) }
     var modal by remember { mutableStateOf<ComposeModal?>(null) }
     var commandPaletteVisible by remember { mutableStateOf(false) }
-    var settings by remember { mutableStateOf(deps.applicationPort.settings.snapshot()) }
+    var settings by remember { mutableStateOf(SettingsSnapshot()) }
     var settingsRevision by remember { mutableStateOf(0) }
     val workspaceFocusRequester = remember { FocusRequester() }
     val composeScope = rememberCoroutineScope()
@@ -71,16 +72,21 @@ fun VisualAgentComposeApp(
                 todos = deps.applicationPort.todos,
                 modalRequester = ComposeModalRequester { requested -> modal = requested },
                 onSettingsChanged = {
-                    settings = deps.applicationPort.settings.snapshot()
-                    settingsRevision += 1
+                    composeScope.launch {
+                        settings = deps.applicationPort.settings.snapshotAsync()
+                        settingsRevision += 1
+                    }
                 },
                 inFlight = inFlight,
                 lifecycle = deps.applicationPort.lifecycle,
             )
         }
     DisposableEffect(deps.applicationPort.settings) {
-        val registration = deps.applicationPort.settings.addChangeListener { next -> settings = next }
+        val registration = deps.applicationPort.settings.addChangeListener { next -> composeScope.launch { settings = next } }
         onDispose { registration.close() }
+    }
+    LaunchedEffect(deps.applicationPort.settings) {
+        settings = deps.applicationPort.settings.snapshotAsync()
     }
     val toggleWindow: (String) -> Unit = { id ->
         windows = toggleWorkspacePanel(windows, id)
