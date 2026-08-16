@@ -3,6 +3,8 @@ package de.heckenmann.visualagent.server
 import de.heckenmann.visualagent.protocol.ConversationImageResolution
 import de.heckenmann.visualagent.protocol.ConversationImageSources
 import de.heckenmann.visualagent.protocol.MAX_MARKDOWN_IMAGE_BYTES
+import de.heckenmann.visualagent.protocol.MAX_MARKDOWN_IMAGE_DIMENSION
+import de.heckenmann.visualagent.protocol.MAX_MARKDOWN_IMAGE_PIXELS
 import de.heckenmann.visualagent.workspace.ImageHeaderReader
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
 import okhttp3.Dns
@@ -12,6 +14,7 @@ import org.apache.tika.Tika
 import org.springframework.stereotype.Component
 import org.springframework.stereotype.Service
 import java.net.InetAddress
+import java.net.Proxy
 import java.net.URI
 import java.time.Duration
 import java.util.Base64
@@ -45,6 +48,7 @@ class OkHttpConversationImageFetcher(
             .callTimeout(Duration.ofSeconds(15))
             .followRedirects(false)
             .followSslRedirects(false)
+            .proxy(Proxy.NO_PROXY)
             .dns(PublicOnlyDns)
             .build(),
 ) : ConversationImageFetcher {
@@ -124,7 +128,7 @@ class ConversationMediaResolver(
 
     private fun resolveWorkspace(source: String): ConversationImageResolution {
         val path = source.removePrefix(ConversationImageSources.WORKSPACE_PREFIX).removePrefix("./").removePrefix("/")
-        if (path.isBlank() || path.contains("..")) return rejected("Workspace image path is invalid")
+        if (path.isBlank() || path.split('/', '\\').any { it == ".." }) return rejected("Workspace image path is invalid")
         val record =
             runCatching { workspaceFiles.requireFile(null, path) }
                 .getOrNull()
@@ -159,7 +163,7 @@ class ConversationMediaResolver(
         ) {
             return rejected("Image dimensions are too large")
         }
-        return ConversationImageResolution.Loaded(contentType, bytes)
+        return ConversationImageResolution.Loaded(contentType, bytes, dimensions.width, dimensions.height)
     }
 
     private fun hasUriScheme(source: String): Boolean = source.substringBefore('/', source).contains(':')
@@ -168,8 +172,6 @@ class ConversationMediaResolver(
 
     private companion object {
         const val HTTP_OK = 200
-        const val MAX_MARKDOWN_IMAGE_DIMENSION = 16_384
-        const val MAX_MARKDOWN_IMAGE_PIXELS = 64_000_000L
         const val MAX_MARKDOWN_IMAGE_BASE64_CHARS = ((MAX_MARKDOWN_IMAGE_BYTES * 4L) / 3L + 4L).toInt()
         val SUPPORTED_IMAGE_TYPES = setOf("image/png", "image/jpeg", "image/gif")
         val EMBEDDED_IMAGE_PATTERN = Regex("data:(image/(?:png|jpeg|gif));base64,([A-Za-z0-9+/=]+)", RegexOption.IGNORE_CASE)
