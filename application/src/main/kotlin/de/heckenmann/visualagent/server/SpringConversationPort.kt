@@ -15,8 +15,9 @@ import de.heckenmann.visualagent.protocol.ConversationPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import org.springframework.stereotype.Component
 import java.util.Base64
 import de.heckenmann.visualagent.agent.CancellationToken as ApplicationCancellationToken
@@ -54,6 +55,7 @@ class SpringConversationPort(
     override suspend fun currentHistory(): List<ConversationMessage> =
         withContext(Dispatchers.IO) {
             protocolBoundary {
+                agentManager.loadLatestHistory()
                 agentManager.getHistory().map { it.toConversationMessage(mediaResolver) }
             }
         }
@@ -137,13 +139,15 @@ private fun Message.toConversationMessage(mediaResolver: ConversationMediaResolv
         id = id,
     )
 
-private fun metadataImageDataUrls(metadata: String?): List<String> =
-    metadata
-        ?.let {
-            val element = runCatching { Json.parseToJsonElement(it) }.getOrNull() ?: return@let null
-            element.jsonObject["dataUrl"]?.jsonPrimitive?.content
-        }?.let(::listOf)
+private fun metadataImageDataUrls(metadata: String?): List<String> {
+    val element = metadata?.let { runCatching { Json.parseToJsonElement(it) }.getOrNull() } as? JsonObject ?: return emptyList()
+    val dataUrl = element["dataUrl"] as? JsonPrimitive ?: return emptyList()
+    return dataUrl
+        .contentOrNull
+        ?.takeIf(String::isNotBlank)
+        ?.let(::listOf)
         .orEmpty()
+}
 
 private fun ConversationImageResolution.asDataUrl(): String? =
     (this as? ConversationImageResolution.Loaded)?.let { loaded ->

@@ -54,6 +54,7 @@ class SpringConversationPortTest {
                         metadata = "{\"type\":\"image\",\"source\":\"canvas\",\"dataUrl\":\"$dataUrl\"}",
                     ),
                 )
+            every { manager.loadLatestHistory() } returns emptyList()
             every { mediaResolver.resolveEmbedded(dataUrl) } returns
                 ConversationImageResolution.Loaded("image/png", byteArrayOf(1, 2, 3))
 
@@ -62,6 +63,36 @@ class SpringConversationPortTest {
             assertNotNull(message.images)
             assertEquals(1, message.images!!.size)
             assertEquals("data:image/png;base64,AQID", message.images!!.single())
+        }
+
+    @Test
+    fun `current history reloads messages persisted by tools`() =
+        runTest {
+            val persistedCapture = Message("assistant", "Canvas snapshot (PNG)", id = "capture")
+            every { manager.loadLatestHistory() } returns listOf(persistedCapture)
+            every { manager.getHistory() } returns listOf(persistedCapture)
+
+            val history = port.currentHistory()
+
+            assertEquals("capture", history.single().id)
+            verify(exactly = 1) { manager.loadLatestHistory() }
+        }
+
+    @Test
+    fun `non-object or non-primitive image metadata does not break history mapping`() =
+        runTest {
+            every { manager.loadLatestHistory() } returns emptyList()
+            every { manager.getHistory() } returns
+                listOf(
+                    Message("assistant", "array metadata", metadata = "[]"),
+                    Message("assistant", "nested data url", metadata = "{\"dataUrl\":{\"value\":\"x\"}}"),
+                )
+
+            val history = port.currentHistory()
+
+            assertEquals(2, history.size)
+            assertEquals(null, history[0].images)
+            assertEquals(null, history[1].images)
         }
 
     @Test
