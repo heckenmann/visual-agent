@@ -31,9 +31,9 @@ internal class OllamaClientAuxiliary(
     suspend fun vision(
         image: ByteArray,
         prompt: String,
+        modelId: String = appConfig.ollamaModel,
     ): ChatResponse =
         withContext(Dispatchers.IO) {
-            val selectedModel = appConfig.ollamaModel
             val response =
                 chatModel.call(
                     Prompt(
@@ -44,7 +44,7 @@ internal class OllamaClientAuxiliary(
                                 .media(VisionSupport.media(image))
                                 .build(),
                         ),
-                        OllamaChatOptions.builder().model(selectedModel).build(),
+                        OllamaChatOptions.builder().model(modelId).build(),
                     ),
                 )
             ChatResponse(
@@ -66,10 +66,16 @@ internal class OllamaClientAuxiliary(
      * @param text Input text to embed
      * @return Embedding vector or an empty list if the call fails
      */
-    suspend fun embeddings(text: String): List<Double> =
+    suspend fun embeddings(text: String): List<Double> = embeddings(text, appConfig.ollamaModel)
+
+    /** Generates embeddings with the selected Ollama model. */
+    suspend fun embeddings(
+        text: String,
+        modelId: String,
+    ): List<Double> =
         withContext(Dispatchers.IO) {
             try {
-                val response = ollamaApi.embed(OllamaApi.EmbeddingsRequest(appConfig.ollamaModel, text))
+                val response = ollamaApi.embed(OllamaApi.EmbeddingsRequest(modelId, text))
                 response
                     .embeddings()
                     .firstOrNull()

@@ -1,6 +1,9 @@
 package de.heckenmann.visualagent.agent.tools
 
+import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.config.AppConfigBean
+import io.mockk.every
+import io.mockk.mockk
 import org.junit.jupiter.api.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -18,9 +21,11 @@ class CoreToolsProviderContextTest {
             appConfig.llmProvider = "openai"
             appConfig.openAiApiKey = "sk-secret-value"
             appConfig.openAiBaseUrl = "https://openai-compatible.example"
-            appConfig.openAiModel = "gpt-context"
+            appConfig.openAiModel = "legacy-model"
+            val catalog = mockk<ProviderCatalogService>()
+            every { catalog.activeModelId() } returns "gpt-context"
 
-            val result = ContextTool(appConfig = appConfig).execute("""{}""", emptyMap())
+            val result = ContextTool(appConfig = appConfig, providerCatalog = catalog).execute("""{}""", emptyMap())
 
             assertTrue(result.content.contains("Provider: openai"))
             assertTrue(result.content.contains("Model: gpt-context"))

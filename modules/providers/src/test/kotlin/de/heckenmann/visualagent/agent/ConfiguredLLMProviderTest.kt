@@ -202,16 +202,18 @@ class ConfiguredLLMProviderTest {
                 appConfig.llmProvider = "openai"
                 val ollama = mockk<OllamaClient>(relaxed = true)
                 val openAi = mockk<OpenAiClient>(relaxed = true)
-                coEvery { openAi.vision(any(), any()) } returns
+                val catalog = catalog()
+                catalog.setActiveSelection("openai", "gpt-vision")
+                coEvery { openAi.vision(any(), any(), "gpt-vision") } returns
                     ChatResponse("gpt", Message("assistant", "image ok"), done = true)
-                coEvery { openAi.embeddings("text") } returns listOf(0.1, 0.2)
-                val router = ConfiguredLLMProvider(ollama, openAi, catalog())
+                coEvery { openAi.embeddings("text", "gpt-vision") } returns listOf(0.1, 0.2)
+                val router = ConfiguredLLMProvider(ollama, openAi, catalog)
 
                 assertEquals("image ok", router.vision(ByteArray(0), "describe").message.content)
                 assertEquals(listOf(0.1, 0.2), router.embeddings("text"))
 
-                coVerify(exactly = 1) { openAi.vision(any(), any()) }
-                coVerify(exactly = 1) { openAi.embeddings("text") }
+                coVerify(exactly = 1) { openAi.vision(any(), any(), "gpt-vision") }
+                coVerify(exactly = 1) { openAi.embeddings("text", "gpt-vision") }
             } finally {
                 appConfig.llmProvider = originalProvider
             }

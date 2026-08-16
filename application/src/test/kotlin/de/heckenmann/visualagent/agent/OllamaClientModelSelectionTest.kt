@@ -14,6 +14,7 @@ import org.springframework.ai.chat.model.ChatModel
 import org.springframework.ai.chat.prompt.Prompt
 import org.springframework.ai.model.tool.ToolCallingChatOptions
 import org.springframework.ai.ollama.api.OllamaApi
+import org.springframework.ai.ollama.api.OllamaChatOptions
 import reactor.core.publisher.Flux
 import java.time.Instant
 import kotlin.test.assertEquals
@@ -238,12 +239,29 @@ class OllamaClientModelSelectionTest {
         }
 
     @Test
+    fun `vision uses explicitly selected auxiliary model`() =
+        runTest {
+            val chatModel = mockk<ChatModel>()
+            val ollamaApi = mockk<OllamaApi>(relaxed = true)
+            val promptSlot = io.mockk.slot<Prompt>()
+            every { chatModel.call(capture(promptSlot)) } returns springResponse("catalog-vision-model", "image description")
+            val client = createClient(chatModel, ollamaApi, ToolRegistry(emptyList(), ToolEventBus(), AppConfigBean()), appConfig)
+
+            client.vision(byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47), "describe", "catalog-vision-model")
+
+            val options = promptSlot.captured.options as OllamaChatOptions
+            assertEquals("catalog-vision-model", options.model)
+        }
+
+    @Test
     fun `ollama api helpers expose embeddings models and details`() =
         runTest {
             val chatModel = mockk<ChatModel>(relaxed = true)
             val ollamaApi = mockk<OllamaApi>()
+            val embeddingsSlot = io.mockk.slot<OllamaApi.EmbeddingsRequest>()
             val details = OllamaApi.Model.Details("parent", "gguf", "llama", listOf("llama"), "7B", "Q4")
-            every { ollamaApi.embed(any()) } returns OllamaApi.EmbeddingsResponse("embed", listOf(floatArrayOf(1f, 2f)), 1L, 1L, 1)
+            every { ollamaApi.embed(capture(embeddingsSlot)) } returns
+                OllamaApi.EmbeddingsResponse("embed", listOf(floatArrayOf(1f, 2f)), 1L, 1L, 1)
             every { ollamaApi.listModels() } returns
                 OllamaApi.ListModelResponse(
                     listOf(OllamaApi.Model("llama", "llama", Instant.EPOCH, 1L, "digest", details)),
@@ -264,7 +282,8 @@ class OllamaClientModelSelectionTest {
                 )
             val client = createClient(chatModel, ollamaApi, ToolRegistry(emptyList(), ToolEventBus(), AppConfigBean()), appConfig)
 
-            assertEquals(listOf(1.0, 2.0), client.embeddings("hello"))
+            assertEquals(listOf(1.0, 2.0), client.embeddings("hello", "catalog-embedding-model"))
+            assertEquals("catalog-embedding-model", embeddingsSlot.captured.model())
             assertEquals(listOf("llama"), client.getModels())
             val modelDetails = client.getModelDetails("llama")
             assertEquals("llama", modelDetails.details?.family)

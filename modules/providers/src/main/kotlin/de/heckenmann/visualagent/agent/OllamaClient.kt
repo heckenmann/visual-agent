@@ -171,7 +171,18 @@ class OllamaClient(
         prompt: String,
     ): ChatResponse = auxiliary.vision(image, prompt)
 
+    override suspend fun vision(
+        image: ByteArray,
+        prompt: String,
+        modelId: String,
+    ): ChatResponse = auxiliary.vision(image, prompt, modelId)
+
     override suspend fun embeddings(text: String): List<Double> = auxiliary.embeddings(text)
+
+    override suspend fun embeddings(
+        text: String,
+        modelId: String,
+    ): List<Double> = auxiliary.embeddings(text, modelId)
 
     override fun isConnected(): Boolean = ops.isConnected()
 

@@ -40,9 +40,15 @@ class ConfiguredLLMProvider(
     override suspend fun vision(
         image: ByteArray,
         prompt: String,
-    ): ChatResponse = activeProvider().vision(image, prompt)
+    ): ChatResponse {
+        val (provider, modelId) = activeProviderSelection()
+        return provider.vision(image, prompt, modelId)
+    }
 
-    override suspend fun embeddings(text: String): List<Double> = activeProvider().embeddings(text)
+    override suspend fun embeddings(text: String): List<Double> {
+        val (provider, modelId) = activeProviderSelection()
+        return provider.embeddings(text, modelId)
+    }
 
     override fun isConnected(): Boolean {
         val profile = providerCatalog.getProvider(providerCatalog.activeProviderId()) ?: return false
@@ -92,12 +98,13 @@ class ConfiguredLLMProvider(
         }
     }
 
-    private fun activeProvider(): LLMProvider {
+    private fun activeProviderSelection(): Pair<LLMProvider, String> {
         val providerId = providerCatalog.activeProviderId()
         val profile =
             providerCatalog.getProvider(providerId)
                 ?: error("Active provider profile is missing: $providerId")
-        return providerFor(profile)
+        val modelId = providerCatalog.activeModelId().ifBlank { profile.defaultModel }
+        return providerFor(profile) to modelId
     }
 
     private fun providerFor(profile: de.heckenmann.visualagent.agent.provider.ProviderProfile?): LLMProvider =

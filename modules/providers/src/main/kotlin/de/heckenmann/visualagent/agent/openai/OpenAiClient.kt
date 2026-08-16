@@ -116,11 +116,16 @@ class OpenAiClient(
     override suspend fun vision(
         image: ByteArray,
         prompt: String,
+    ): ChatResponse = vision(image, prompt, appConfig.openAiModel)
+
+    override suspend fun vision(
+        image: ByteArray,
+        prompt: String,
+        modelId: String,
     ): ChatResponse =
         withContext(Dispatchers.IO) {
-            val selectedModel = appConfig.openAiModel
             val response =
-                chatModel()
+                chatModel(modelId = modelId)
                     .call(
                         Prompt(
                             listOf(
@@ -130,7 +135,7 @@ class OpenAiClient(
                                     .media(VisionSupport.media(image))
                                     .build(),
                             ),
-                            OpenAiChatOptions.builder().model(selectedModel).build(),
+                            OpenAiChatOptions.builder().model(modelId).build(),
                         ),
                     )
             ChatResponse(
@@ -147,6 +152,11 @@ class OpenAiClient(
         }
 
     override suspend fun embeddings(text: String): List<Double> = emptyList()
+
+    override suspend fun embeddings(
+        text: String,
+        modelId: String,
+    ): List<Double> = embeddings(text)
 
     override fun isConnected(): Boolean = appConfig.openAiApiKey.isNotBlank()
 
