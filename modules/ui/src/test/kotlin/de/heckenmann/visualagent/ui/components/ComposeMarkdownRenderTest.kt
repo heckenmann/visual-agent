@@ -7,6 +7,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import de.heckenmann.visualagent.protocol.ClientImagePort
@@ -282,6 +283,9 @@ class ComposeMarkdownRenderTest {
 
         composeTestRule.waitUntil(timeoutMillis = 5_000) { resolveCalls.get() >= 1 }
         coVerify(atLeast = 1) { conversationPort.resolveImage(source) }
+        composeTestRule.waitUntil(timeoutMillis = 5_000) {
+            composeTestRule.onAllNodesWithContentDescription("Image").fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule.onNodeWithContentDescription("Image").assertExists()
     }
 

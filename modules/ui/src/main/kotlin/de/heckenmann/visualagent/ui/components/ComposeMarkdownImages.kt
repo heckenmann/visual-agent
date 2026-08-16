@@ -62,7 +62,7 @@ private class BoundaryImageTransformer(
                         resolveImage(source)
                     }
                 }.getOrElse { ConversationImageResolution.Rejected("Image could not be loaded") }
-            state = resolution.toImageState()
+            state = withContext(Dispatchers.Default) { resolution.toImageState() }
         }
         return state.toImageData()
     }
