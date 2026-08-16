@@ -145,7 +145,15 @@ class ManualTool(
         ## Links and Images
         [label](https://example.com)
         ![alt](https://example.com/image.png)
-        
+
+        ### Conversation Image Sources
+        Use a complete image node with meaningful alt text:
+        ![diagram](workspace:generated/diagram.png)
+        ![diagram](server-file:generated/diagram.png)
+        ![diagram](https://example.com/diagram.png)
+        ![diagram](data:image/png;base64,<validated-data>)
+        `workspace:` and `server-file:` refer to server-managed files. `client-file:` is reserved for an exact client-local path supplied by the user. Use only sources returned by a tool or supplied by the user; do not invent paths or base64 data. Remote URLs must point directly to image bytes. A canvas capture is stored as a conversation attachment automatically.
+
         ## Code
         `inline code`
         ```kotlin

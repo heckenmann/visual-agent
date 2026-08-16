@@ -239,7 +239,13 @@ expose an interactive `System.console()` even when its output is attached to a t
   for destructive confirmations.
 - Markdown rendering: messages are passed 1:1 to CommonMark with
   `AutolinkExtension`; no pre-normalization, rewriting, or heuristic
-  transformation.
+  transformation. Image nodes are resolved through the server-owned
+  `ConversationMediaResolver`; Apache Tika validates the payload MIME type
+  before the UI decodes it. `workspace:` and `server-file:` identify
+  server-managed files (unprefixed paths use the same server route), while
+  `client-file:` is the only source resolved by the desktop client. Persisted
+  canvas snapshots cross the same protocol boundary as validated image
+  attachments.
 - Workspace layout persistence is toolkit-neutral under
   `workspace/layout/`. Preference key `ui.workspace.layout.v1` stores a
   versioned JSON document. The `workspace:layout` tool is the

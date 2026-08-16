@@ -22,6 +22,9 @@ class ManualToolTest {
         assertTrue(result.content.contains("Markdown Quick Reference"))
         assertTrue(result.content.contains("CommonMark"))
         assertTrue(result.content.contains("```kotlin"))
+        assertTrue(result.content.contains("Conversation Image Sources"))
+        assertTrue(result.content.contains("![diagram](workspace:generated/diagram.png)"))
+        assertTrue(result.content.contains("client-file:"))
     }
 
     /**

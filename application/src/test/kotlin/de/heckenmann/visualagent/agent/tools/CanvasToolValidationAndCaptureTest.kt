@@ -33,6 +33,8 @@ class CanvasToolValidationAndCaptureTest {
         val store = FakeConversationStore()
         val tool = CanvasTool(canvas, store)
 
+        assertTrue(tool.definition.description.contains("conversation image attachment"))
+
         val result = tool.execute("""{"action":"captureImage","format":"png"}""", mapOf("sessionId" to "main"))
 
         assertTrue(result.success)
