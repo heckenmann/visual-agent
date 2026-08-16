@@ -8,11 +8,17 @@ import de.heckenmann.visualagent.testsupport.TestPng
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
 import io.mockk.every
 import io.mockk.mockk
+import okhttp3.Dns
+import okhttp3.OkHttpClient
 import org.apache.tika.Tika
+import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.URI
 import java.nio.file.Files
+import java.time.Duration
 import java.time.Instant
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -36,12 +42,54 @@ class ConversationMediaResolverTest {
         }
         server.start()
         try {
-            val result = JavaNetConversationImageFetcher().fetch(URI("http://127.0.0.1:${server.address.port}/image.png"))
+            val client =
+                OkHttpClient
+                    .Builder()
+                    .dns(
+                        Dns { hostname ->
+                            listOf(InetAddress.getByName(hostname))
+                        },
+                    ).build()
+            val result =
+                OkHttpConversationImageFetcher(client)
+                    .fetch(URI("http://127.0.0.1:${server.address.port}/image.png"))
             assertEquals(200, result.status)
             assertEquals("image/png", result.contentType)
             assertTrue(result.bytes.contentEquals(bytes))
             assertEquals("VisualAgent/0.1 (https://github.com/heckenmann/visual-agent)", userAgent.get())
         } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
+    fun `remote fetcher aborts a response body that stalls`() {
+        val release = CountDownLatch(1)
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/stalled.png") { exchange ->
+            exchange.responseHeaders.add("Content-Type", "image/png")
+            exchange.sendResponseHeaders(200, 0)
+            exchange.responseBody.write(byteArrayOf(0x89.toByte()))
+            exchange.responseBody.flush()
+            release.await(2, TimeUnit.SECONDS)
+            exchange.close()
+        }
+        server.start()
+        try {
+            val client =
+                OkHttpClient
+                    .Builder()
+                    .callTimeout(Duration.ofMillis(100))
+                    .readTimeout(Duration.ofMillis(100))
+                    .dns(Dns { hostname -> listOf(InetAddress.getByName(hostname)) })
+                    .build()
+            val result =
+                OkHttpConversationImageFetcher(client)
+                    .fetch(URI("http://127.0.0.1:${server.address.port}/stalled.png"))
+
+            assertEquals(0, result.status)
+        } finally {
+            release.countDown()
             server.stop(0)
         }
     }
@@ -74,6 +122,20 @@ class ConversationMediaResolverTest {
         val result = resolver.resolve("file:///etc/passwd")
 
         assertIs<ConversationImageResolution.Rejected>(result)
+        assertEquals(0, fetchCount)
+    }
+
+    @Test
+    fun `rejects private and loopback remote targets before invoking the fetcher`() {
+        var fetchCount = 0
+        val resolver =
+            newResolver {
+                fetchCount++
+                ConversationImageFetchResult(200, "image/png", pngBytes())
+            }
+
+        assertIs<ConversationImageResolution.Rejected>(resolver.resolve("http://127.0.0.1/image.png"))
+        assertIs<ConversationImageResolution.Rejected>(resolver.resolve("http://192.168.1.10/image.png"))
         assertEquals(0, fetchCount)
     }
 
@@ -125,6 +187,27 @@ class ConversationMediaResolverTest {
         val result = newResolver { error("data urls must not invoke the remote fetcher") }.resolve(source)
 
         assertIs<ConversationImageResolution.Rejected>(result)
+    }
+
+    @Test
+    fun `rejects images with unsafe decoded dimensions`() {
+        val oversized =
+            pngBytes().also {
+                it[16] = 0x00
+                it[17] = 0x00
+                it[18] = 0x40
+                it[19] = 0x00
+                it[20] = 0x00
+                it[21] = 0x00
+                it[22] = 0x40
+                it[23] = 0x00
+            }
+        val resolver =
+            newResolver {
+                ConversationImageFetchResult(200, "image/png", oversized)
+            }
+
+        assertIs<ConversationImageResolution.Rejected>(resolver.resolve("https://93.184.216.34/huge.png"))
     }
 
     @Test

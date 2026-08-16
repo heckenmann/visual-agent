@@ -3,14 +3,16 @@ package de.heckenmann.visualagent.server
 import de.heckenmann.visualagent.protocol.ConversationImageResolution
 import de.heckenmann.visualagent.protocol.ConversationImageSources
 import de.heckenmann.visualagent.protocol.MAX_MARKDOWN_IMAGE_BYTES
+import de.heckenmann.visualagent.workspace.ImageHeaderReader
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
+import okhttp3.Dns
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import org.apache.tika.Tika
 import org.springframework.stereotype.Component
 import org.springframework.stereotype.Service
+import java.net.InetAddress
 import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 import java.time.Duration
 import java.util.Base64
 import kotlin.io.path.fileSize
@@ -32,39 +34,37 @@ data class ConversationImageFetchResult(
     val bytes: ByteArray,
 )
 
-/** Java HTTP client adapter used by the server-side Markdown media resolver. */
+/** OkHttp adapter used by the server-side Markdown media resolver. */
 @Component
-class JavaNetConversationImageFetcher : ConversationImageFetcher {
-    private val client =
-        HttpClient
-            .newBuilder()
+class OkHttpConversationImageFetcher(
+    private val client: OkHttpClient =
+        OkHttpClient
+            .Builder()
             .connectTimeout(Duration.ofSeconds(5))
-            .followRedirects(HttpClient.Redirect.NEVER)
-            .build()
-
+            .readTimeout(Duration.ofSeconds(15))
+            .callTimeout(Duration.ofSeconds(15))
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .dns(PublicOnlyDns)
+            .build(),
+) : ConversationImageFetcher {
     override fun fetch(uri: URI): ConversationImageFetchResult =
         runCatching {
             val request =
-                HttpRequest
-                    .newBuilder(uri)
-                    .timeout(Duration.ofSeconds(15))
+                Request
+                    .Builder()
+                    .url(uri.toString())
                     .header("Accept", IMAGE_ACCEPT_HEADER)
                     .header("User-Agent", IMAGE_USER_AGENT)
-                    .GET()
+                    .get()
                     .build()
-            val response = client.send(request, HttpResponse.BodyHandlers.ofInputStream())
-            val bytes = response.body().use { it.readNBytes(MAX_MARKDOWN_IMAGE_BYTES.toInt() + 1) }
-            ConversationImageFetchResult(
-                status = response.statusCode(),
-                contentType =
-                    response
-                        .headers()
-                        .firstValue("Content-Type")
-                        .orElse(null)
-                        ?.substringBefore(';')
-                        ?.trim(),
-                bytes = bytes,
-            )
+            client.newCall(request).execute().use { response ->
+                ConversationImageFetchResult(
+                    status = response.code,
+                    contentType = response.header("Content-Type")?.substringBefore(';')?.trim(),
+                    bytes = response.body.byteStream().use { it.readNBytes(MAX_MARKDOWN_IMAGE_BYTES.toInt() + 1) },
+                )
+            }
         }.getOrElse {
             ConversationImageFetchResult(status = 0, contentType = null, bytes = ByteArray(0))
         }
@@ -115,6 +115,7 @@ class ConversationMediaResolver(
     private fun resolveRemote(source: String): ConversationImageResolution {
         val uri = runCatching { URI(source) }.getOrNull() ?: return rejected("Image URL is invalid")
         if (uri.host.isNullOrBlank() || uri.userInfo != null) return rejected("Image URL is invalid")
+        if (!PublicImageAddressPolicy.isAllowed(uri)) return rejected("Image URL points to a non-public address")
         val response = remoteFetcher.fetch(uri)
         if (response.status != HTTP_OK) return rejected("Image request failed")
         val contentType = response.contentType?.lowercase()
@@ -148,6 +149,16 @@ class ConversationMediaResolver(
         if (bytes.isEmpty() || bytes.size.toLong() > MAX_MARKDOWN_IMAGE_BYTES) return rejected("Image is too large or empty")
         val detectedType = runCatching { mimeDetector.detect(bytes).lowercase() }.getOrNull()
         if (detectedType != contentType) return rejected("Image content does not match its type")
+        val dimensions = runCatching { ImageHeaderReader.dimensions(bytes) }.getOrNull() ?: return rejected("Image dimensions are invalid")
+        if (
+            dimensions.width <= 0 ||
+            dimensions.height <= 0 ||
+            dimensions.width > MAX_MARKDOWN_IMAGE_DIMENSION ||
+            dimensions.height > MAX_MARKDOWN_IMAGE_DIMENSION ||
+            dimensions.width.toLong() * dimensions.height.toLong() > MAX_MARKDOWN_IMAGE_PIXELS
+        ) {
+            return rejected("Image dimensions are too large")
+        }
         return ConversationImageResolution.Loaded(contentType, bytes)
     }
 
@@ -157,8 +168,76 @@ class ConversationMediaResolver(
 
     private companion object {
         const val HTTP_OK = 200
+        const val MAX_MARKDOWN_IMAGE_DIMENSION = 16_384
+        const val MAX_MARKDOWN_IMAGE_PIXELS = 64_000_000L
         const val MAX_MARKDOWN_IMAGE_BASE64_CHARS = ((MAX_MARKDOWN_IMAGE_BYTES * 4L) / 3L + 4L).toInt()
         val SUPPORTED_IMAGE_TYPES = setOf("image/png", "image/jpeg", "image/gif")
         val EMBEDDED_IMAGE_PATTERN = Regex("data:(image/(?:png|jpeg|gif));base64,([A-Za-z0-9+/=]+)", RegexOption.IGNORE_CASE)
+    }
+}
+
+/** Validates all DNS answers immediately before a remote image fetch. */
+private object PublicImageAddressPolicy {
+    fun isAllowed(uri: URI): Boolean {
+        val host = uri.host ?: return false
+        val addresses = runCatching { InetAddress.getAllByName(host) }.getOrNull() ?: return false
+        return addresses.isNotEmpty() && addresses.all(::isPublicAddress)
+    }
+
+    fun isPublicAddress(address: InetAddress): Boolean {
+        if (
+            address.isAnyLocalAddress ||
+            address.isLoopbackAddress ||
+            address.isLinkLocalAddress ||
+            address.isSiteLocalAddress ||
+            address.isMulticastAddress
+        ) {
+            return false
+        }
+        val bytes = address.address
+        if (bytes.size == 4) return isPublicIpv4(bytes)
+        if (bytes.size == 16) {
+            if (
+                (bytes[0].toInt() and 0xfe) == 0xfc ||
+                ((bytes[0].toInt() and 0xff) == 0xfe && (bytes[1].toInt() and 0xc0) == 0x80)
+            ) {
+                return false
+            }
+            if (
+                bytes.copyOfRange(0, 10).all { it == 0.toByte() } &&
+                bytes[10] == 0xff.toByte() &&
+                bytes[11] == 0xff.toByte()
+            ) {
+                return isPublicIpv4(bytes.copyOfRange(12, 16))
+            }
+        }
+        return true
+    }
+
+    private fun isPublicIpv4(bytes: ByteArray): Boolean {
+        val first = bytes[0].toInt() and 0xff
+        val second = bytes[1].toInt() and 0xff
+        return when {
+            first == 0 || first == 10 || first == 127 -> false
+            first == 100 && second in 64..127 -> false
+            first == 169 && second == 254 -> false
+            first == 172 && second in 16..31 -> false
+            first == 192 && second == 168 -> false
+            first == 192 && second == 0 -> false
+            first == 198 && second in 18..19 -> false
+            first >= 224 -> false
+            else -> true
+        }
+    }
+}
+
+/** Resolves only public addresses so OkHttp connects to the same validated DNS result. */
+private object PublicOnlyDns : Dns {
+    override fun lookup(hostname: String): List<InetAddress> {
+        val addresses = InetAddress.getAllByName(hostname).toList()
+        require(addresses.isNotEmpty() && addresses.all(PublicImageAddressPolicy::isPublicAddress)) {
+            "Image host resolves to a non-public address"
+        }
+        return addresses
     }
 }
