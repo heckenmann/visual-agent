@@ -8,3 +8,9 @@ const val MAX_WORKSPACE_FILE_IMPORT_BYTES: Long = 50L * 1024L * 1024L
 
 /** Maximum image payload returned to the presentation for Markdown rendering. */
 const val MAX_MARKDOWN_IMAGE_BYTES: Long = 32L * 1024L * 1024L
+
+/** Maximum width or height accepted for a Markdown image. */
+const val MAX_MARKDOWN_IMAGE_DIMENSION: Int = 16_384
+
+/** Maximum decoded pixels accepted for a Markdown image. */
+const val MAX_MARKDOWN_IMAGE_PIXELS: Long = 64_000_000L

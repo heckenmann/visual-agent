@@ -4,6 +4,10 @@ import de.heckenmann.visualagent.protocol.ClientImagePort
 import de.heckenmann.visualagent.protocol.ConversationImageResolution
 import de.heckenmann.visualagent.protocol.ConversationImageSources
 import de.heckenmann.visualagent.protocol.MAX_MARKDOWN_IMAGE_BYTES
+import de.heckenmann.visualagent.protocol.MAX_MARKDOWN_IMAGE_DIMENSION
+import de.heckenmann.visualagent.protocol.MAX_MARKDOWN_IMAGE_PIXELS
+import de.heckenmann.visualagent.workspace.ImageDimensions
+import de.heckenmann.visualagent.workspace.ImageHeaderReader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.apache.tika.Tika
@@ -42,8 +46,17 @@ internal class LocalClientImagePort(
             runCatching { mimeDetector.detect(bytes).lowercase() }.getOrNull()
                 ?: return rejected("Image type could not be detected")
         if (mimeType !in SUPPORTED_IMAGE_TYPES) return rejected("Image type is not supported")
-        return ConversationImageResolution.Loaded(mimeType, bytes)
+        val dimensions = runCatching { ImageHeaderReader.dimensions(bytes) }.getOrNull() ?: return rejected("Image dimensions are invalid")
+        if (!dimensions.areSafe()) return rejected("Image dimensions are too large")
+        return ConversationImageResolution.Loaded(mimeType, bytes, dimensions.width, dimensions.height)
     }
+
+    private fun ImageDimensions.areSafe(): Boolean =
+        width > 0 &&
+            height > 0 &&
+            width <= MAX_MARKDOWN_IMAGE_DIMENSION &&
+            height <= MAX_MARKDOWN_IMAGE_DIMENSION &&
+            width.toLong() * height.toLong() <= MAX_MARKDOWN_IMAGE_PIXELS
 
     private fun rejected(reason: String): ConversationImageResolution.Rejected = ConversationImageResolution.Rejected(reason)
 

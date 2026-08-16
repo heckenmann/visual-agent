@@ -8,6 +8,10 @@ sealed interface ConversationImageResolution {
         val mimeType: String,
         /** Image bytes returned by the server. */
         val bytes: ByteArray,
+        /** Validated image width in pixels, or zero when a boundary cannot provide metadata. */
+        val width: Int = 0,
+        /** Validated image height in pixels, or zero when a boundary cannot provide metadata. */
+        val height: Int = 0,
     ) : ConversationImageResolution
 
     /** A safe, user-displayable rejection without server or network details. */

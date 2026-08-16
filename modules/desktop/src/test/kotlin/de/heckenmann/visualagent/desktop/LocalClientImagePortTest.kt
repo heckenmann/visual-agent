@@ -37,6 +37,33 @@ class LocalClientImagePortTest {
             Unit
         }
 
+    @Test
+    fun `rejects client images with unsafe decoded dimensions`() =
+        runBlocking {
+            val path = Files.createTempFile("client-image-huge", ".png")
+            try {
+                val oversized =
+                    PNG_BYTES.copyOf().also { bytes ->
+                        bytes[16] = 0x00
+                        bytes[17] = 0x00
+                        bytes[18] = 0x40
+                        bytes[19] = 0x00
+                        bytes[20] = 0x00
+                        bytes[21] = 0x00
+                        bytes[22] = 0x40
+                        bytes[23] = 0x00
+                    }
+                Files.write(path, oversized)
+
+                val result = LocalClientImagePort().resolveImage("client-file:$path")
+
+                assertIs<ConversationImageResolution.Rejected>(result)
+                Unit
+            } finally {
+                Files.deleteIfExists(path)
+            }
+        }
+
     private companion object {
         val PNG_BYTES =
             Base64.getDecoder().decode(
