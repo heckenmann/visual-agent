@@ -43,25 +43,26 @@ class SpringConversationPortTest {
         }
 
     @Test
-    fun `canvas data url is exposed as a validated protocol image`() {
-        val dataUrl = "data:image/png;base64,AAAA"
-        every { manager.getHistory() } returns
-            listOf(
-                Message(
-                    role = "assistant",
-                    content = "Canvas snapshot (PNG)",
-                    metadata = "{\"type\":\"image\",\"source\":\"canvas\",\"dataUrl\":\"$dataUrl\"}",
-                ),
-            )
-        every { mediaResolver.resolveEmbedded(dataUrl) } returns
-            ConversationImageResolution.Loaded("image/png", byteArrayOf(1, 2, 3))
+    fun `canvas data url is exposed as a validated protocol image`() =
+        runTest {
+            val dataUrl = "data:image/png;base64,AAAA"
+            every { manager.getHistory() } returns
+                listOf(
+                    Message(
+                        role = "assistant",
+                        content = "Canvas snapshot (PNG)",
+                        metadata = "{\"type\":\"image\",\"source\":\"canvas\",\"dataUrl\":\"$dataUrl\"}",
+                    ),
+                )
+            every { mediaResolver.resolveEmbedded(dataUrl) } returns
+                ConversationImageResolution.Loaded("image/png", byteArrayOf(1, 2, 3))
 
-        val message = port.currentHistory().single()
+            val message = port.currentHistory().single()
 
-        assertNotNull(message.images)
-        assertEquals(1, message.images!!.size)
-        assertEquals("data:image/png;base64,AQID", message.images!!.single())
-    }
+            assertNotNull(message.images)
+            assertEquals(1, message.images!!.size)
+            assertEquals("data:image/png;base64,AQID", message.images!!.single())
+        }
 
     @Test
     fun `stream cancellation is bridged to application token`() =

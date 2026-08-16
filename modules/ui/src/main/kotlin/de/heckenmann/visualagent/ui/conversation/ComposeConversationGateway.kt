@@ -33,7 +33,7 @@ internal interface ConversationMessageGateway {
         onChunk: (String) -> Unit,
     )
 
-    fun currentHistory(): List<ConversationMessage>
+    suspend fun currentHistory(): List<ConversationMessage>
 }
 
 internal class ProtocolConversationGateway(
@@ -52,5 +52,5 @@ internal class ProtocolConversationGateway(
         withContext(Dispatchers.IO) { conversationPort.stream(content, token, onChunk) }
     }
 
-    override fun currentHistory(): List<ConversationMessage> = conversationPort.currentHistory()
+    override suspend fun currentHistory(): List<ConversationMessage> = conversationPort.currentHistory()
 }

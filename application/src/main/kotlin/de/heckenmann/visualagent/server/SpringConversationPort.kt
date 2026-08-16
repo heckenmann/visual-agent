@@ -51,9 +51,11 @@ class SpringConversationPort(
     override suspend fun resolveImage(source: String): ConversationImageResolution =
         withContext(Dispatchers.IO) { mediaResolver.resolve(source) }
 
-    override fun currentHistory(): List<ConversationMessage> =
-        protocolBoundary {
-            agentManager.getHistory().map { it.toConversationMessage(mediaResolver) }
+    override suspend fun currentHistory(): List<ConversationMessage> =
+        withContext(Dispatchers.IO) {
+            protocolBoundary {
+                agentManager.getHistory().map { it.toConversationMessage(mediaResolver) }
+            }
         }
 
     override fun deleteMessage(id: String): Boolean =

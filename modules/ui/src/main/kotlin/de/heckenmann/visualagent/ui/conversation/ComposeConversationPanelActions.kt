@@ -45,7 +45,7 @@ internal fun handleClearConversation(
     activeToken: () -> CancellationToken?,
     onSendingChange: (Boolean) -> Unit,
     onStatusChange: (String) -> Unit,
-    onHistoryRefresh: () -> Unit,
+    onHistoryRefresh: suspend () -> Unit,
 ) {
     modalRequester.requestConfirmation(
         ComposeConfirmationModal(
@@ -80,17 +80,20 @@ internal fun ConversationEditModal(
     history: List<Message>,
     conversationPort: ConversationPort,
     onDismiss: () -> Unit,
-    onHistoryRefresh: () -> Unit,
+    onHistoryRefresh: suspend () -> Unit,
 ) {
     if (editingId == null) return
     val message = history.find { it.id == editingId } ?: return
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     EditMessageModal(
         content = message.content,
         onDismiss = onDismiss,
         onSave = { newContent ->
             editingId.let { id ->
-                conversationPort.updateMessage(id, newContent)
-                onHistoryRefresh()
+                scope.launch {
+                    withContext(Dispatchers.IO) { conversationPort.updateMessage(id, newContent) }
+                    onHistoryRefresh()
+                }
             }
             onDismiss()
         },

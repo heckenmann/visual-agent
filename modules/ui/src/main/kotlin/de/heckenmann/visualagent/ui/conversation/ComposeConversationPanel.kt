@@ -76,7 +76,8 @@ internal fun ConversationPanel(
     val listState = rememberLazyListState()
     val isAtLatest by remember(listState) { derivedStateOf { listState.conversationPosition().isAtLatest } }
     val conversationGateway = remember(conversationPort) { ProtocolConversationGateway(conversationPort) }
-    val conversationState = rememberConversationUiState(conversationPort.currentHistory())
+    val conversationState = rememberConversationUiState(emptyList())
+    loadConversationHistory(conversationPort, conversationState)
     onScrollStateObserved?.invoke(conversationState, listState)
     RegisterPanelScrollbar(rememberScrollbarAdapter(listState))
     var activeToken by remember { mutableStateOf<CancellationToken?>(null) }
