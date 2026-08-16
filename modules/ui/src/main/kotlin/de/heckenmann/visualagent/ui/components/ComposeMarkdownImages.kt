@@ -53,12 +53,13 @@ private class BoundaryImageTransformer(
 ) : ImageTransformer {
     @Composable
     override fun transform(link: String): ImageData {
-        var state by remember(link) { mutableStateOf<ResolvedImageState>(ResolvedImageState.Loading) }
-        LaunchedEffect(link) {
+        val source = link.removePrefix(INLINE_IMAGE_SOURCE_PREFIX)
+        var state by remember(source) { mutableStateOf<ResolvedImageState>(ResolvedImageState.Loading) }
+        LaunchedEffect(source) {
             val resolution =
                 runCatching {
                     withContext(Dispatchers.IO) {
-                        resolveImage(link)
+                        resolveImage(source)
                     }
                 }.getOrElse { ConversationImageResolution.Rejected("Image could not be loaded") }
             state = resolution.toImageState()
@@ -72,6 +73,14 @@ private class BoundaryImageTransformer(
         } else {
             serverPort?.resolveImage(link)
         } ?: ConversationImageResolution.Rejected("Image loading is not available")
+
+    private companion object {
+        /**
+         * The Markdown renderer uses this prefix as the inline-content key. It is not part of
+         * the actual image source and must not cross the server/client image boundary.
+         */
+        const val INLINE_IMAGE_SOURCE_PREFIX = "MARKDOWN_IMAGE_URL_"
+    }
 }
 
 private sealed interface ResolvedImageState {
