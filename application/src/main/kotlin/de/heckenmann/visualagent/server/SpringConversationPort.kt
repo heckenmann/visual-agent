@@ -7,13 +7,18 @@ import de.heckenmann.visualagent.error.ErrorMessageMapper
 import de.heckenmann.visualagent.protocol.CancellationToken
 import de.heckenmann.visualagent.protocol.ConversationClearResult
 import de.heckenmann.visualagent.protocol.ConversationHistoryPage
+import de.heckenmann.visualagent.protocol.ConversationImageResolution
 import de.heckenmann.visualagent.protocol.ConversationInputPlacement
 import de.heckenmann.visualagent.protocol.ConversationMessage
 import de.heckenmann.visualagent.protocol.ConversationPort
 import de.heckenmann.visualagent.protocol.ConversationPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.springframework.stereotype.Component
+import java.util.Base64
 import de.heckenmann.visualagent.agent.CancellationToken as ApplicationCancellationToken
 
 /** Spring-side adapter that keeps application models behind the conversation protocol port. */
@@ -21,12 +26,13 @@ import de.heckenmann.visualagent.agent.CancellationToken as ApplicationCancellat
 class SpringConversationPort(
     private val agentManager: AgentManager,
     private val appConfig: AppConfigBean,
+    private val mediaResolver: ConversationMediaResolver,
 ) : ConversationPort {
     override suspend fun latest(): ConversationHistoryPage =
-        withContext(Dispatchers.IO) { protocolBoundary { agentManager.readLatestHistoryPage().toConversationPage() } }
+        withContext(Dispatchers.IO) { protocolBoundary { agentManager.readLatestHistoryPage().toConversationPage(mediaResolver) } }
 
     override suspend fun older(offset: Int): ConversationHistoryPage =
-        withContext(Dispatchers.IO) { protocolBoundary { agentManager.readOlderHistoryPage(offset).toConversationPage() } }
+        withContext(Dispatchers.IO) { protocolBoundary { agentManager.readOlderHistoryPage(offset).toConversationPage(mediaResolver) } }
 
     override suspend fun stream(
         content: String,
@@ -42,9 +48,12 @@ class SpringConversationPort(
         }
     }
 
+    override suspend fun resolveImage(source: String): ConversationImageResolution =
+        withContext(Dispatchers.IO) { mediaResolver.resolve(source) }
+
     override fun currentHistory(): List<ConversationMessage> =
         protocolBoundary {
-            agentManager.getHistory().map(Message::toConversationMessage)
+            agentManager.getHistory().map { it.toConversationMessage(mediaResolver) }
         }
 
     override fun deleteMessage(id: String): Boolean =
@@ -105,7 +114,36 @@ class SpringConversationPort(
     }
 }
 
-private fun de.heckenmann.visualagent.agent.conversation.ConversationHistoryPage.toConversationPage(): ConversationHistoryPage =
-    ConversationHistoryPage(messages.map(Message::toConversationMessage), offset, hasMore)
+private fun de.heckenmann.visualagent.agent.conversation.ConversationHistoryPage.toConversationPage(
+    mediaResolver: ConversationMediaResolver,
+): ConversationHistoryPage =
+    ConversationHistoryPage(
+        messages.map { it.toConversationMessage(mediaResolver) },
+        offset,
+        hasMore,
+    )
 
-private fun Message.toConversationMessage(): ConversationMessage = ConversationMessage(role, content, metadata, images, id)
+private fun Message.toConversationMessage(mediaResolver: ConversationMediaResolver): ConversationMessage =
+    ConversationMessage(
+        role = role,
+        content = content,
+        metadata = metadata,
+        images =
+            (images.orEmpty() + metadataImageDataUrls(metadata))
+                .mapNotNull { image -> mediaResolver.resolveEmbedded(image).asDataUrl() }
+                .takeIf { it.isNotEmpty() },
+        id = id,
+    )
+
+private fun metadataImageDataUrls(metadata: String?): List<String> =
+    metadata
+        ?.let {
+            val element = runCatching { Json.parseToJsonElement(it) }.getOrNull() ?: return@let null
+            element.jsonObject["dataUrl"]?.jsonPrimitive?.content
+        }?.let(::listOf)
+        .orEmpty()
+
+private fun ConversationImageResolution.asDataUrl(): String? =
+    (this as? ConversationImageResolution.Loaded)?.let { loaded ->
+        "data:${loaded.mimeType};base64,${Base64.getEncoder().encodeToString(loaded.bytes)}"
+    }

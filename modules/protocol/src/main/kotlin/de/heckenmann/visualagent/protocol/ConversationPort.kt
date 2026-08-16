@@ -70,6 +70,9 @@ interface ConversationPort {
         onChunk: (String) -> Unit,
     )
 
+    /** Resolves one Markdown image source through the server-owned media boundary. */
+    suspend fun resolveImage(source: String): ConversationImageResolution
+
     /** Returns the currently visible conversation history. */
     fun currentHistory(): List<ConversationMessage>
 

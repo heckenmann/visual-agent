@@ -54,6 +54,7 @@ dependencies {
 
     // Workspace document analysis
     implementation(libs.pdfbox)
+    implementation(libs.tika.core)
 
     // Kotlin logging (wrapper for SLF4J)
     implementation(libs.kotlin.logging)
