@@ -117,7 +117,7 @@ internal fun ConversationPanel(
         val handle =
             activityPort.addToolListener { event ->
                 if (event.phase == ToolActivityPhase.FINISHED) {
-                    scope.launch(Dispatchers.Main.immediate) {
+                    scope.launch {
                         if (!conversationState.sending) {
                             val history = withContext(Dispatchers.IO) { conversationPort.currentHistory() }
                             conversationState.replaceHistory(history)
@@ -130,7 +130,7 @@ internal fun ConversationPanel(
     DisposableEffect(todoPort) {
         val handle =
             todoPort.addListener {
-                scope.launch(Dispatchers.Main.immediate) {
+                scope.launch {
                     if (!conversationState.sending) {
                         val history = withContext(Dispatchers.IO) { conversationPort.currentHistory() }
                         conversationState.replaceHistory(history)
