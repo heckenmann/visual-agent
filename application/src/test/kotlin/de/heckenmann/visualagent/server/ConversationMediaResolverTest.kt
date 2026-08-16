@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.server
 
+import com.sun.net.httpserver.HttpServer
 import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
 import de.heckenmann.visualagent.protocol.ConversationImageResolution
 import de.heckenmann.visualagent.protocol.MAX_MARKDOWN_IMAGE_BYTES
@@ -8,8 +9,11 @@ import de.heckenmann.visualagent.workspace.WorkspaceFileService
 import io.mockk.every
 import io.mockk.mockk
 import org.apache.tika.Tika
+import java.net.InetSocketAddress
+import java.net.URI
 import java.nio.file.Files
 import java.time.Instant
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -18,6 +22,29 @@ import kotlin.test.assertTrue
 /** Verifies server-owned Markdown media validation and source restrictions. */
 class ConversationMediaResolverTest {
     private val workspace = mockk<WorkspaceFileService>()
+
+    @Test
+    fun `remote fetcher identifies the application to strict image hosts`() {
+        val bytes = pngBytes()
+        val userAgent = AtomicReference<String>()
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/image.png") { exchange ->
+            userAgent.set(exchange.requestHeaders.getFirst("User-Agent"))
+            exchange.responseHeaders.add("Content-Type", "image/png")
+            exchange.sendResponseHeaders(200, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
+        }
+        server.start()
+        try {
+            val result = JavaNetConversationImageFetcher().fetch(URI("http://127.0.0.1:${server.address.port}/image.png"))
+            assertEquals(200, result.status)
+            assertEquals("image/png", result.contentType)
+            assertTrue(result.bytes.contentEquals(bytes))
+            assertEquals("VisualAgent/0.1 (https://github.com/heckenmann/visual-agent)", userAgent.get())
+        } finally {
+            server.stop(0)
+        }
+    }
 
     @Test
     fun `accepts a validated remote png without following redirects`() {

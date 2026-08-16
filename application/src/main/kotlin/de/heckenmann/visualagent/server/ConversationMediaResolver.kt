@@ -49,6 +49,7 @@ class JavaNetConversationImageFetcher : ConversationImageFetcher {
                     .newBuilder(uri)
                     .timeout(Duration.ofSeconds(15))
                     .header("Accept", IMAGE_ACCEPT_HEADER)
+                    .header("User-Agent", IMAGE_USER_AGENT)
                     .GET()
                     .build()
             val response = client.send(request, HttpResponse.BodyHandlers.ofInputStream())
@@ -70,6 +71,7 @@ class JavaNetConversationImageFetcher : ConversationImageFetcher {
 
     private companion object {
         const val IMAGE_ACCEPT_HEADER = "image/png,image/jpeg,image/gif"
+        const val IMAGE_USER_AGENT = "VisualAgent/0.1 (https://github.com/heckenmann/visual-agent)"
     }
 }
 
