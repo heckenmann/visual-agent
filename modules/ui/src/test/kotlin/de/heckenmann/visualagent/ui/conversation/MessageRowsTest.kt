@@ -196,4 +196,22 @@ class MessageRowsTest {
         }
         composeTestRule.onNodeWithText("Thinking…").assertExists()
     }
+
+    @Test
+    fun `renders a validated canvas image attachment`() {
+        val canvasImage =
+            "data:image/png;base64," +
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+
+        composeTestRule.setContent {
+            MaterialTheme {
+                ConversationImageAttachments(listOf(canvasImage))
+            }
+        }
+
+        composeTestRule.waitForIdle()
+        Thread.sleep(100)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithContentDescription("Embedded image 1").assertExists()
+    }
 }

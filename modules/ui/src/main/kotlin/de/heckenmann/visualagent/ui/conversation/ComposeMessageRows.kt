@@ -139,24 +139,27 @@ internal fun ConversationMessageContent(
     isStreamingPlaceholder: Boolean,
     isStreaming: Boolean,
 ) {
-    if (isStreamingPlaceholder) {
-        Text(
-            text = "Thinking…",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    } else if (isStreaming) {
-        SelectionContainer {
-            StreamingText(text = message.content, animate = false) { displayedText ->
-                Text(
-                    text = displayedText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (isStreamingPlaceholder) {
+            Text(
+                text = "Thinking…",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else if (isStreaming) {
+            SelectionContainer {
+                StreamingText(text = message.content, animate = false) { displayedText ->
+                    Text(
+                        text = displayedText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
             }
+        } else {
+            SelectionContainer { ComposeMarkdown(message.content) }
         }
-    } else {
-        SelectionContainer { ComposeMarkdown(message.content) }
+        ConversationImageAttachments(message.images.orEmpty())
     }
 }
 

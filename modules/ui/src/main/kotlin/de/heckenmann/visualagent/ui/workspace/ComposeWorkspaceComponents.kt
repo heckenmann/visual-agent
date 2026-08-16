@@ -272,6 +272,7 @@ internal fun WindowBody(
                 activityPort = panelServices.activity,
                 todoPort = panelServices.todos,
                 conversationPort = panelServices.conversation,
+                clientImagePort = panelServices.clientImagePort,
             )
         "todos" ->
             TodoPanel(

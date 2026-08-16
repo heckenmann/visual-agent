@@ -133,7 +133,12 @@ private fun ComposeStartupHost(exitApplication: () -> Unit) {
             serverConnection = connection
             startupStatus = StartupStatus.loadingRuntime()
             val applicationPort = withContext(Dispatchers.IO) { connection.application }
-            val loadedDependencies = ComposeApplicationDependencies(applicationPort, context.beanDefinitionCount)
+            val loadedDependencies =
+                ComposeApplicationDependencies(
+                    applicationPort = applicationPort,
+                    beanDefinitionCount = context.beanDefinitionCount,
+                    clientImagePort = LocalClientImagePort(),
+                )
             val loadedLayout = withContext(Dispatchers.IO) { applicationPort.layout.report() }
             dependencies = loadedDependencies
             persistedLayout = loadedLayout
