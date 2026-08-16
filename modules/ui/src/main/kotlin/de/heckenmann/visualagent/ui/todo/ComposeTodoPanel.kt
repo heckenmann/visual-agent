@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import de.heckenmann.visualagent.protocol.LifecyclePort
 import de.heckenmann.visualagent.protocol.TodoItem
 import de.heckenmann.visualagent.protocol.TodoPort
 import de.heckenmann.visualagent.protocol.TodoState
@@ -62,6 +63,7 @@ import sh.calvin.reorderable.ReorderableColumn
 internal fun TodoPanel(
     todoPort: TodoPort,
     modalRequester: ComposeModalRequester,
+    lifecycle: LifecyclePort,
 ) {
     var todos by remember { mutableStateOf<List<TodoItem>>(emptyList()) }
     var streamedResponses by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
@@ -69,15 +71,26 @@ internal fun TodoPanel(
 
     /** Loads persisted todos without blocking the Compose dispatcher. */
     suspend fun refreshTodos() {
-        todos = withContext(Dispatchers.IO) { todoPort.list() }
+        if (lifecycle.closing) return
+        val refreshed =
+            try {
+                withContext(Dispatchers.IO) { todoPort.list() }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                if (!lifecycle.closing) throw failure
+                return
+            }
+        if (!lifecycle.closing) todos = refreshed
     }
     val refresh: () -> Unit = {
-        scope.launch { refreshTodos() }
+        if (!lifecycle.closing) scope.launch { refreshTodos() }
     }
     LaunchedEffect(todoPort) { refreshTodos() }
     DisposableEffect(todoPort) {
         val todoHandle =
             todoPort.addListener { change ->
+                if (lifecycle.closing) return@addListener
                 scope.launch {
                     refreshTodos()
                     val todo = change.todo
@@ -88,6 +101,7 @@ internal fun TodoPanel(
             }
         val progressHandle =
             todoPort.addProgressListener { update ->
+                if (lifecycle.closing) return@addProgressListener
                 scope.launch {
                     streamedResponses =
                         if (update.completed) {

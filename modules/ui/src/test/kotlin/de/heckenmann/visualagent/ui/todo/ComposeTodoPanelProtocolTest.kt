@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import de.heckenmann.visualagent.protocol.LifecycleState
 import de.heckenmann.visualagent.protocol.TodoItem
 import de.heckenmann.visualagent.protocol.TodoPort
 import de.heckenmann.visualagent.protocol.TodoProgress
@@ -30,7 +31,7 @@ class ComposeTodoPanelProtocolTest {
                 TodoItem("completed", "Completed task", TodoState.COMPLETED),
             )
         val port = protocolPort(todos)
-        composeTestRule.setContent { MaterialTheme { TodoPanel(port, ComposeModalRequester { }) } }
+        composeTestRule.setContent { MaterialTheme { TodoPanel(port, ComposeModalRequester { }, LifecycleState()) } }
 
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("Total 2").assertExists()
@@ -45,7 +46,7 @@ class ComposeTodoPanelProtocolTest {
     @Test
     fun `panel forwards start and stop all actions`() {
         val port = protocolPort(listOf(TodoItem("todo", "Task")))
-        composeTestRule.setContent { MaterialTheme { TodoPanel(port, ComposeModalRequester { }) } }
+        composeTestRule.setContent { MaterialTheme { TodoPanel(port, ComposeModalRequester { }, LifecycleState()) } }
 
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithContentDescription("Start all todos").performClick()
@@ -63,7 +64,7 @@ class ComposeTodoPanelProtocolTest {
             progressListener = firstArg()
             AutoCloseable { }
         }
-        composeTestRule.setContent { MaterialTheme { TodoPanel(port, ComposeModalRequester { }) } }
+        composeTestRule.setContent { MaterialTheme { TodoPanel(port, ComposeModalRequester { }, LifecycleState()) } }
 
         composeTestRule.waitForIdle()
         progressListener!!.invoke(TodoProgress("todo", "New response"))
@@ -72,6 +73,18 @@ class ComposeTodoPanelProtocolTest {
         progressListener!!.invoke(TodoProgress("todo", completed = true))
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("New response").assertDoesNotExist()
+    }
+
+    @Test
+    fun `panel does not query server after shutdown starts`() {
+        val lifecycle = LifecycleState()
+        lifecycle.beginShutdown()
+        val port = protocolPort(listOf(TodoItem("todo", "Task")))
+
+        composeTestRule.setContent { MaterialTheme { TodoPanel(port, ComposeModalRequester { }, lifecycle) } }
+        composeTestRule.waitForIdle()
+
+        io.mockk.verify(exactly = 0) { port.list() }
     }
 
     private fun protocolPort(initial: List<TodoItem>): TodoPort {

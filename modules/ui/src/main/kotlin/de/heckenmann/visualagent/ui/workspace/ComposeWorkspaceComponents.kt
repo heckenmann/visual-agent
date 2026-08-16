@@ -278,6 +278,7 @@ internal fun WindowBody(
             TodoPanel(
                 todoPort = panelServices.todos,
                 modalRequester = panelServices.modalRequester,
+                lifecycle = panelServices.lifecycle,
             )
         "files" ->
             FilesPanel(

@@ -163,7 +163,7 @@ private fun ComposeStartupHost(exitApplication: () -> Unit) {
     Window(
         onCloseRequest = {
             if (readyDependencies != null) {
-                closeApplication(readyDependencies, windowState, serverConnection, currentContext, exitApplication)
+                closeApplication(readyDependencies, windowState, exitApplication)
             } else {
                 serverConnection?.close()
                 currentContext?.close()
@@ -197,7 +197,7 @@ private fun ComposeStartupHost(exitApplication: () -> Unit) {
             VisualAgentComposeApp(
                 deps = readyDependencies,
                 onCloseApplication = {
-                    closeApplication(readyDependencies, windowState, serverConnection, currentContext, exitApplication)
+                    closeApplication(readyDependencies, windowState, exitApplication)
                 },
                 persistedWindows = persistedWindows,
             )
@@ -251,8 +251,6 @@ internal fun selectEndpoint(): DesktopServerEndpoint {
 internal fun closeApplication(
     dependencies: ComposeApplicationDependencies,
     windowState: androidx.compose.ui.window.WindowState,
-    connection: ApplicationConnection?,
-    context: ConfigurableApplicationContext?,
     exitApplication: () -> Unit,
 ) {
     dependencies.applicationPort.lifecycle.beginShutdown()
@@ -267,9 +265,11 @@ internal fun closeApplication(
             LayoutSize(size.width.value.toDouble(), size.height.value.toDouble()),
             position,
         )
-        connection?.close()
-        context?.close()
     } finally {
+        // Exit the Compose application before the Spring context is closed. The root
+        // DisposableEffect cancels presentation coroutines and unregisters their listeners
+        // before it closes the context. Closing Spring here races with a final TodoPanel
+        // refresh and can leave it trying to create an EntityManager from a closed factory.
         exitApplication()
     }
 }
