@@ -18,11 +18,66 @@ env:
   GRADLE_OPTS: -Dorg.gradle.daemon=false
 
 jobs:
+  prepare-wrapper:
+    name: Prepare Gradle wrapper
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          lfs: true
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6.3.0
+        with:
+          cache-disabled: true
+
+      # Generate the wrapper outside the repository so settings.gradle.kts is not
+      # evaluated by the system Gradle before the wrapper exists.
+      - name: Generate Gradle wrapper
+        shell: bash
+        run: |
+          gradle_version="$(sed -n 's#^distributionUrl=.*gradle-\([0-9][0-9.]*\)-bin\.zip.*#\1#p' gradle/wrapper/gradle-wrapper.properties)"
+          test -n "$gradle_version"
+          wrapper_dir="$(mktemp -d)"
+          printf 'rootProject.name = "wrapper-bootstrap"\n' > "$wrapper_dir/settings.gradle.kts"
+          (
+            cd "$wrapper_dir"
+            gradle wrapper --gradle-version "$gradle_version" --no-daemon
+          )
+          cp "$wrapper_dir/gradlew" "$wrapper_dir/gradlew.bat" .
+          mkdir -p gradle/wrapper
+          cp "$wrapper_dir/gradle/wrapper/gradle-wrapper.jar" \
+            "$wrapper_dir/gradle/wrapper/gradle-wrapper.properties" \
+            gradle/wrapper/
+          chmod +x gradlew
+
+      - name: Upload Gradle wrapper
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-wrapper
+          if-no-files-found: error
+          path: |
+            gradlew
+            gradlew.bat
+            gradle/wrapper/gradle-wrapper.jar
+            gradle/wrapper/gradle-wrapper.properties
+
   publish:
     name: Build and publish ${{ matrix.platform }} master JAR
+    needs: prepare-wrapper
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: needs.prepare-wrapper.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -55,8 +110,15 @@ jobs:
         with:
           cache-disabled: true
 
-      - name: Generate Gradle wrapper
-        run: gradle wrapper --gradle-version 9.6.0 --no-daemon
+      - name: Download Gradle wrapper
+        uses: actions/download-artifact@v4
+        with:
+          name: gradle-wrapper
+
+      - name: Make Gradle wrapper executable
+        shell: bash
+        run: |
+          chmod +x gradlew
 
       - name: Build JAR without tests
         run: ./gradlew --no-daemon :desktop:bootJar
