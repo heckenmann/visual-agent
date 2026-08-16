@@ -10,7 +10,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -29,7 +28,6 @@ import de.heckenmann.visualagent.protocol.ProviderProfile
 import de.heckenmann.visualagent.protocol.SettingsPort
 import de.heckenmann.visualagent.protocol.SettingsSnapshot
 import de.heckenmann.visualagent.ui.components.ActionIconButton
-import de.heckenmann.visualagent.ui.components.PanelCheckbox
 import de.heckenmann.visualagent.ui.components.PanelDropdownField
 import de.heckenmann.visualagent.ui.components.PanelInfoBox
 import de.heckenmann.visualagent.ui.components.PanelSection
@@ -58,6 +56,7 @@ internal fun SettingsPanel(
 ) {
     val scope = rememberCoroutineScope()
     var snapshot by remember { mutableStateOf(SettingsSnapshot()) }
+    var snapshotLoaded by remember { mutableStateOf(false) }
     var providers by remember { mutableStateOf(providerPort.listProviders()) }
     var providerId by remember { mutableStateOf(providerPort.activeProviderId()) }
     var modelId by remember { mutableStateOf(providerPort.activeModelId()) }
@@ -72,6 +71,7 @@ internal fun SettingsPanel(
 
     LaunchedEffect(settingsPort) {
         snapshot = settingsPort.snapshotAsync()
+        snapshotLoaded = true
     }
 
     /** Reloads provider profiles and selects a valid model after a catalog change. */
@@ -89,7 +89,13 @@ internal fun SettingsPanel(
     }
 
     DisposableEffect(settingsPort, providerPort) {
-        val settingsHandle = settingsPort.addChangeListener { next -> scope.launch { snapshot = next } }
+        val settingsHandle =
+            settingsPort.addChangeListener { next ->
+                scope.launch {
+                    snapshot = next
+                    snapshotLoaded = true
+                }
+            }
         val providerHandle = providerPort.addChangeListener { reloadProviderState() }
         onDispose {
             settingsHandle.close()
@@ -102,6 +108,10 @@ internal fun SettingsPanel(
 
     /** Persists the complete settings snapshot through the application server. */
     fun saveSettings() {
+        if (!snapshotLoaded) {
+            status = "Settings are still loading."
+            return
+        }
         if (!canSaveSelection) {
             status = "Select a provider model before saving."
             return
@@ -123,6 +133,10 @@ internal fun SettingsPanel(
 
     /** Persists only the active provider/model selection. */
     fun saveSelection() {
+        if (!snapshotLoaded) {
+            status = "Settings are still loading."
+            return
+        }
         if (!canSaveSelection) {
             status = "Select a provider model before saving."
             return
@@ -256,49 +270,33 @@ internal fun SettingsPanel(
             }
             PanelInfoBox("Configure endpoint and credentials with Add or Edit. Changes are persisted by the application server.")
         }
-        PanelSection(title = "Main agent model") {
-            PanelDropdownField(
-                label = "Model",
-                selectedValue = modelId,
-                options = models.map { PanelSelectOption(it.id, it.name) },
-                onSelected = { modelId = it },
-                enabled = models.isNotEmpty(),
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                ActionIconButton(
-                    icon = Icons.Filled.Refresh,
-                    description = "Refresh models",
-                    enabled = !loadingModels,
-                    onClick = ::refreshModels,
-                )
-                ActionIconButton(
-                    icon = Icons.Filled.Refresh,
-                    description = "Refresh model details",
-                    enabled =
-                        !loadingDetails && modelId.isNotBlank(),
-                    onClick = ::refreshDetails,
-                )
-                PanelCheckbox(
-                    label = "Favorite",
-                    checked = modelId in snapshot.favoriteModels,
-                    enabled = modelId.isNotBlank(),
-                    onCheckedChange = { favorite ->
-                        val favorites = snapshot.favoriteModels.toMutableSet().apply { if (favorite) add(modelId) else remove(modelId) }
-                        snapshot = snapshot.copy(favoriteModels = favorites.sorted())
-                    },
-                )
-            }
-            PanelInfoBox(modelDetails)
-            ActionIconButton(
-                icon = Icons.Filled.Save,
-                description = "Save provider and model",
-                enabled = canSaveSelection,
-                onClick = ::saveSelection,
-            )
-        }
+        ModelSettingsSection(
+            providerId = providerId,
+            modelId = modelId,
+            models = models,
+            loadingModels = loadingModels,
+            loadingDetails = loadingDetails,
+            modelDetails = modelDetails,
+            favoriteModels = snapshot.favoriteModels,
+            snapshotLoaded = snapshotLoaded,
+            canSaveSelection = canSaveSelection,
+            onModelSelected = { modelId = it },
+            onRefreshModels = ::refreshModels,
+            onRefreshDetails = ::refreshDetails,
+            onFavoriteChanged = { favorite ->
+                val favorites = snapshot.favoriteModels.toMutableSet().apply { if (favorite) add(modelId) else remove(modelId) }
+                snapshot = snapshot.copy(favoriteModels = favorites.sorted())
+            },
+            onSaveSelection = ::saveSelection,
+        )
         RuntimeSettingsSection(snapshot) { snapshot = it }
         AppearanceSettingsSection(snapshot) { snapshot = it }
-        ActionIconButton(icon = Icons.Filled.Save, description = "Save settings", enabled = canSaveSelection, onClick = ::saveSettings)
+        ActionIconButton(
+            icon = Icons.Filled.Save,
+            description = "Save settings",
+            enabled = snapshotLoaded && canSaveSelection,
+            onClick = ::saveSettings,
+        )
         PanelStatus(status)
     }
 }

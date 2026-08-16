@@ -40,7 +40,9 @@ import de.heckenmann.visualagent.ui.settings.*
 import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 /** Renders the ready workspace using only the transport boundary supplied by the desktop host. */
@@ -54,6 +56,7 @@ fun VisualAgentComposeApp(
     var modal by remember { mutableStateOf<ComposeModal?>(null) }
     var commandPaletteVisible by remember { mutableStateOf(false) }
     var settings by remember { mutableStateOf(SettingsSnapshot()) }
+    var settingsLoaded by remember { mutableStateOf(false) }
     var settingsRevision by remember { mutableStateOf(0) }
     val workspaceFocusRequester = remember { FocusRequester() }
     val composeScope = rememberCoroutineScope()
@@ -74,6 +77,7 @@ fun VisualAgentComposeApp(
                 onSettingsChanged = {
                     composeScope.launch {
                         settings = deps.applicationPort.settings.snapshotAsync()
+                        settingsLoaded = true
                         settingsRevision += 1
                     }
                 },
@@ -82,11 +86,18 @@ fun VisualAgentComposeApp(
             )
         }
     DisposableEffect(deps.applicationPort.settings) {
-        val registration = deps.applicationPort.settings.addChangeListener { next -> composeScope.launch { settings = next } }
+        val registration =
+            deps.applicationPort.settings.addChangeListener { next ->
+                composeScope.launch {
+                    settings = next
+                    settingsLoaded = true
+                }
+            }
         onDispose { registration.close() }
     }
     LaunchedEffect(deps.applicationPort.settings) {
         settings = deps.applicationPort.settings.snapshotAsync()
+        settingsLoaded = true
     }
     val toggleWindow: (String) -> Unit = { id ->
         windows = toggleWorkspacePanel(windows, id)
@@ -166,8 +177,13 @@ fun VisualAgentComposeApp(
                         onPanelWidthChanged = resizeWindow,
                         showPanelLabels = settings.showPanelLabels,
                         onTogglePanelLabels = {
-                            settings = settings.copy(showPanelLabels = !settings.showPanelLabels)
-                            deps.applicationPort.settings.save(settings)
+                            if (settingsLoaded) {
+                                val next = settings.copy(showPanelLabels = !settings.showPanelLabels)
+                                settings = next
+                                composeScope.launch {
+                                    withContext(Dispatchers.IO) { deps.applicationPort.settings.save(next) }
+                                }
+                            }
                         },
                         onCloseApplication = onCloseApplication,
                         modalRequester = panelServices.modalRequester,
