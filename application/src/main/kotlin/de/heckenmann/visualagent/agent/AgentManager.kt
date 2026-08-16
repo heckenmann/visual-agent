@@ -4,6 +4,7 @@ import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.conversation.AgentManagerConversationOps
 import de.heckenmann.visualagent.agent.conversation.ConversationHistoryPage
 import de.heckenmann.visualagent.agent.conversation.WelcomeMessageComposer
+import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.text.AgentResponseCoordinator
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
@@ -54,6 +55,7 @@ class AgentManager
         internal val parallelismProvider: ParallelismProvider,
         internal val agentStatusCallbackAdapter: AgentStatusCallbackAdapter,
         val subAgentExecutionControl: SubAgentExecutionControl,
+        internal val providerCatalog: ProviderCatalogService,
     ) : DisposableBean {
         internal constructor(
             stores: PersistenceStores,
@@ -67,6 +69,7 @@ class AgentManager
             parallelismProvider: ParallelismProvider = ParallelismProvider(appConfig),
             agentStatusCallbackAdapter: AgentStatusCallbackAdapter = AgentStatusCallbackAdapter(),
             subAgentExecutionControl: SubAgentExecutionControl = SubAgentExecutionControl(stores),
+            providerCatalog: ProviderCatalogService = ProviderCatalogService(stores, appConfig),
         ) : this(
             stores,
             stores,
@@ -82,25 +85,24 @@ class AgentManager
             parallelismProvider,
             agentStatusCallbackAdapter,
             subAgentExecutionControl,
+            providerCatalog,
         )
 
         companion object {
             internal const val MAIN_SESSION_ID = "main"
             internal const val INITIAL_HISTORY_LOAD_LIMIT = 20
             internal const val HISTORY_PAGE_SIZE = 20
-            internal const val REPETITION_GUARD_RETRY_LIMIT = 1
         }
 
         internal lateinit var autonomousCoordinator: AutonomousCoordinator
         internal lateinit var responseCoordinator: AgentResponseCoordinator
         internal var todoManager: TodoManager = TodoManager(todoStore, todoEventBus)
-        internal val welcomeMessageComposer = WelcomeMessageComposer(llmProvider, appConfig)
+        internal val welcomeMessageComposer = WelcomeMessageComposer(llmProvider, appConfig, providerCatalog)
         internal val subAgentJobScheduler =
             SubAgentJobScheduler(scope, parallelismProvider, subAgentExecutionControl)
         internal val conversationOpsProvider = ConversationOpsProvider(toolEventBus)
         internal val subAgentOpsProvider = SubAgentOpsProvider()
-        internal val subAgents: Map<String, SubAgent>
-            get() = subAgentOpsProvider.allSubAgents
+        internal val subAgents: Map<String, SubAgent> get() = subAgentOpsProvider.allSubAgents
         internal val activeJobsByAgentId = ConcurrentHashMap<String, Int>()
         internal val conversationHistory = mutableListOf<Message>()
         internal var pendingResumeMessage: String? = null
