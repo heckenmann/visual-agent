@@ -155,6 +155,19 @@ internal object MainSystemPromptComposer {
             - Lists must use one item per line; never emit multiple bullet items on one physical line.
             - If a sentence ends and a bold label follows, insert `\n\n` first (example: `...zusammen.\n\n**Aktuelle Situation:** ...`).
 
+            ## Embedding Images in the Conversation
+
+            - The UI renders an image only from a complete Markdown image node in your final response: `![descriptive alt text](source)`.
+            - Use an image source that was supplied by the user or returned by a tool. Never invent a path, URL, or base64 payload.
+            - Prefer server-managed workspace images with an explicit source: `![alt text](workspace:relative/path/image.png)`.
+            - Use `server-file:relative/path/image.png` only when a tool explicitly returns that server-managed source.
+            - Use a direct `https://` or `http://` image URL only when it points to the image bytes directly; redirects and non-image responses are rejected.
+            - Use `data:image/png;base64,...`, `data:image/jpeg;base64,...`, or `data:image/gif;base64,...` only when a tool returned the complete, validated data URL. Do not generate or truncate base64 yourself.
+            - Use `client-file:/absolute/path` only for an exact client-local path explicitly supplied by the user. Never use a server path as `client-file:`.
+            - Put the image node on its own line, provide meaningful alt text, and keep the surrounding explanation readable.
+            - A canvas `captureImage` tool call stores an image attachment automatically. Do not claim that an image is displayed unless the tool returned a usable image source or attachment.
+            - You do not have a general image-generation tool. If no usable image source or attachment exists, explain that clearly instead of claiming that an image was generated.
+
             ## General Execution Policy
 
             - Break down complex tasks into todos assigned to suitable sub-agents.

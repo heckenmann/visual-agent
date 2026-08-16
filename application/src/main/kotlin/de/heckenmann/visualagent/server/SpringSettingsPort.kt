@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.server
 
+import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.protocol.SettingsPort
 import de.heckenmann.visualagent.protocol.SettingsSnapshot
@@ -11,13 +12,13 @@ import de.heckenmann.visualagent.config.ThemeMode as ApplicationThemeMode
 @Component
 class SpringSettingsPort(
     private val config: AppConfigBean,
+    private val providerCatalog: ProviderCatalogService,
 ) : SettingsPort {
-    override fun snapshot(): SettingsSnapshot = config.toProtocol()
+    override fun snapshot(): SettingsSnapshot = config.toProtocol(providerCatalog)
 
     override fun save(settings: SettingsSnapshot) {
+        providerCatalog.setActiveSelection(settings.providerId, settings.modelId)
         config.apply {
-            llmProvider = settings.providerId
-            setActiveModel(settings.modelId)
             uiThemeMode = settings.uiThemeMode.toApplication()
             fontSize = settings.fontSize
             showPanelLabels = settings.showPanelLabels
@@ -38,10 +39,10 @@ class SpringSettingsPort(
     override fun addChangeListener(listener: (SettingsSnapshot) -> Unit): AutoCloseable = config.addChangeListener { listener(snapshot()) }
 }
 
-private fun AppConfigBean.toProtocol(): SettingsSnapshot =
+private fun AppConfigBean.toProtocol(providerCatalog: ProviderCatalogService): SettingsSnapshot =
     SettingsSnapshot(
-        providerId = llmProvider,
-        modelId = activeModel(),
+        providerId = providerCatalog.activeProviderId(),
+        modelId = providerCatalog.activeModelId(),
         uiThemeMode = uiThemeMode.toProtocol(),
         fontSize = fontSize,
         showPanelLabels = showPanelLabels,

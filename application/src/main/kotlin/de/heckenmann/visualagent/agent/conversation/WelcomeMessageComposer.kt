@@ -4,6 +4,7 @@ import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
+import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.config.AppConfigBean
 import mu.KotlinLogging
 
@@ -18,6 +19,7 @@ import mu.KotlinLogging
 class WelcomeMessageComposer(
     private val llmProvider: LLMProvider,
     private val appConfig: AppConfigBean,
+    private val providerCatalog: ProviderCatalogService,
 ) {
     private val logger = KotlinLogging.logger {}
 
@@ -39,7 +41,7 @@ class WelcomeMessageComposer(
             return WelcomeResult.Fallback(fallback, IllegalStateException("Provider not reachable"))
         }
 
-        val configuredModel = appConfig.activeModel()
+        val configuredModel = providerCatalog.activeModelId()
         val availableModels = runCatching { llmProvider.getModels() }.getOrDefault(emptyList())
         if (configuredModel.isNotBlank() && configuredModel !in availableModels) {
             logger.warn { "Welcome generation skipped: model '$configuredModel' is not available" }
@@ -55,6 +57,7 @@ class WelcomeMessageComposer(
                 role = "system",
                 content = buildWelcomePrompt(userInstruction).trimIndent(),
             )
+        messages += Message(role = "user", content = "Generate the welcome message now.")
         val request =
             ChatRequestContext(
                 messages = messages,

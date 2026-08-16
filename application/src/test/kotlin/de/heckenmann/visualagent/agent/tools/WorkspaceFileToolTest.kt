@@ -42,6 +42,9 @@ class WorkspaceFileToolTest {
         val image = service.importFile(imageFile.toFile())
         val tool = WorkspaceFileTool(service, SingleObjectProvider(FakeVisionProvider()))
 
+        assertTrue(tool.definition.description.contains("![alt text](workspace:<path>)"))
+        assertTrue(tool.definition.description.contains("Do not invent paths"))
+
         val list = tool.execute("""{"action":"list"}""")
         val read = tool.execute("""{"action":"readText","id":"${text.id}"}""")
         val hash = Json.parseToJsonElement(tool.execute("""{"action":"hash","path":"${text.relativePath}"}""").content).jsonObject

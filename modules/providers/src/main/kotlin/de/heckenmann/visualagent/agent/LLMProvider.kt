@@ -71,6 +71,23 @@ interface LLMProvider {
     ): ChatResponse
 
     /**
+     * Process an image with an explicitly selected model.
+     *
+     * Providers that do not support model-specific auxiliary calls use their
+     * regular [vision] implementation as a safe fallback.
+     *
+     * @param image Raw image bytes to analyze
+     * @param prompt Text prompt for image analysis
+     * @param modelId Catalog model identifier selected for this operation
+     * @return Response describing the image content
+     */
+    suspend fun vision(
+        image: ByteArray,
+        prompt: String,
+        modelId: String,
+    ): ChatResponse = vision(image, prompt)
+
+    /**
      * Generate embeddings for text.
      *
      * @param text Text to generate embeddings for
@@ -78,6 +95,21 @@ interface LLMProvider {
      * @see docs/usecases/uc_0000010_chat_with_ollama_provider.md
      */
     suspend fun embeddings(text: String): List<Double>
+
+    /**
+     * Generate embeddings with an explicitly selected model.
+     *
+     * Providers that do not support model-specific auxiliary calls use their
+     * regular [embeddings] implementation as a safe fallback.
+     *
+     * @param text Input text to embed
+     * @param modelId Catalog model identifier selected for this operation
+     * @return List of embedding values
+     */
+    suspend fun embeddings(
+        text: String,
+        modelId: String,
+    ): List<Double> = embeddings(text)
 
     /**
      * Check if the provider is currently connected and available.

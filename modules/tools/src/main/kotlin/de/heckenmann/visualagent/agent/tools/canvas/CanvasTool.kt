@@ -56,7 +56,8 @@ class CanvasTool(
                     "- openDocument: {\"action\":\"openDocument\",\"id\":\"...\"} or " +
                     "{\"action\":\"openDocument\",\"path\":\"...\"}.\n" +
                     "- captureImage: {\"action\":\"captureImage\",\"format\":\"png\"}. " +
-                    "Saves snapshot to conversation. " +
+                    "Saves snapshot as a conversation image attachment; " +
+                    "do not invent a Markdown path or claim success if the action fails. " +
                     "Coordinates are canvas coordinates. Use get before making layout-sensitive changes.",
             inputSchema = STRING_SCHEMA,
         )

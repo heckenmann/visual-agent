@@ -5,6 +5,7 @@ package de.heckenmann.visualagent.agent.tools
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
+import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.tools.api.ToolSettings
 import de.heckenmann.visualagent.agent.tools.api.ToolSettingsPort
 import de.heckenmann.visualagent.agent.tools.api.ToolSettingsUpdate
@@ -71,8 +72,11 @@ fun AgentShowTool(
     config: AgentToolConfigService,
 ) = AgentShowTool(AgentToolPortAdapter(manager, config, manager.memoryStore))
 
-/** Compatibility factory for isolated context-tool tests without a provider catalog. */
-fun ContextTool(appConfig: AppConfigBean) = ContextTool(LegacySettingsPort(appConfig))
+/** Factory for isolated context-tool tests with the persisted provider catalog. */
+fun ContextTool(
+    appConfig: AppConfigBean,
+    providerCatalog: ProviderCatalogService,
+) = ContextTool(LegacySettingsPort(appConfig, providerCatalog))
 
 /** Compatibility factory supplying the mutable application timeout to the provider-neutral registry. */
 fun ToolRegistry(
@@ -84,12 +88,13 @@ fun ToolRegistry(
 
 private class LegacySettingsPort(
     private val config: AppConfigBean,
+    private val providerCatalog: ProviderCatalogService,
 ) : ToolSettingsPort {
     override fun read() =
         ToolSettings(
             config.fontSize,
             config.llmProvider,
-            config.activeModel(),
+            providerCatalog.activeModelId(),
             config.openAiBaseUrl,
             config.openAiApiKey.isNotBlank(),
             config.streamingEnabled,

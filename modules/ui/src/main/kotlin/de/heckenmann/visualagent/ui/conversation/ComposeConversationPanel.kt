@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -32,6 +33,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.ActivityPort
 import de.heckenmann.visualagent.protocol.CancellationToken
+import de.heckenmann.visualagent.protocol.ClientImagePort
 import de.heckenmann.visualagent.protocol.ConversationInputPlacement
 import de.heckenmann.visualagent.protocol.ConversationPort
 import de.heckenmann.visualagent.protocol.TodoPort
@@ -66,6 +68,7 @@ internal fun ConversationPanel(
     activityPort: ActivityPort,
     todoPort: TodoPort,
     conversationPort: ConversationPort,
+    clientImagePort: ClientImagePort? = null,
     onScrollStateObserved: ConversationScrollStateObserver? = null,
 ) {
     val scope = rememberCoroutineScope()
@@ -73,7 +76,8 @@ internal fun ConversationPanel(
     val listState = rememberLazyListState()
     val isAtLatest by remember(listState) { derivedStateOf { listState.conversationPosition().isAtLatest } }
     val conversationGateway = remember(conversationPort) { ProtocolConversationGateway(conversationPort) }
-    val conversationState = rememberConversationUiState(conversationPort.currentHistory())
+    val conversationState = rememberConversationUiState(emptyList())
+    loadConversationHistory(conversationPort, conversationState)
     onScrollStateObserved?.invoke(conversationState, listState)
     RegisterPanelScrollbar(rememberScrollbarAdapter(listState))
     var activeToken by remember { mutableStateOf<CancellationToken?>(null) }
@@ -114,7 +118,7 @@ internal fun ConversationPanel(
         val handle =
             activityPort.addToolListener { event ->
                 if (event.phase == ToolActivityPhase.FINISHED) {
-                    scope.launch(Dispatchers.Main.immediate) {
+                    scope.launch {
                         if (!conversationState.sending) {
                             val history = withContext(Dispatchers.IO) { conversationPort.currentHistory() }
                             conversationState.replaceHistory(history)
@@ -127,7 +131,7 @@ internal fun ConversationPanel(
     DisposableEffect(todoPort) {
         val handle =
             todoPort.addListener {
-                scope.launch(Dispatchers.Main.immediate) {
+                scope.launch {
                     if (!conversationState.sending) {
                         val history = withContext(Dispatchers.IO) { conversationPort.currentHistory() }
                         conversationState.replaceHistory(history)
@@ -204,94 +208,99 @@ internal fun ConversationPanel(
         inputPlacement = placement
         scope.launch { persistConversationInputPlacement(conversationPort, placement) }
     }
-    Column(modifier = Modifier.fillMaxSize()) {
-        Box(modifier = Modifier.weight(1f).fillMaxWidth().onSizeChanged { viewportSize = it }) {
-            LazyColumn(
-                state = listState,
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .semantics { contentDescription = "Conversation history" },
-                reverseLayout = true,
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                ConversationTimeline(
-                    items = timeline,
-                    sending = conversationState.sending,
-                    deletingMessageIds = conversationState.deletingMessageIds,
-                    onDeleteMessage = { id ->
-                        conversationState.deletingMessageIds += id
-                        scope.launch {
-                            delay(DELETE_ANIMATION_DURATION_MS.toLong())
-                            conversationPort.deleteMessage(id)
-                            conversationState.replaceHistory(conversationPort.currentHistory())
-                            conversationState.deletingMessageIds -= id
-                            conversationState.status = "Message deleted"
-                        }
-                    },
-                    onStatusChange = { conversationState.status = it },
-                    onEditMessage = { conversationState.editingId = it },
-                    sendContent = sendContent,
-                    inlineComposer = {
-                        ConversationInputCard(
-                            input = conversationState.input,
-                            sending = conversationState.sending,
-                            onInputChange = { conversationState.input = it },
-                            onSend = { sendContent(conversationState.input) },
-                            onCancel = { activeToken?.cancel() },
-                            onClear = clearConversation,
-                            inputPlacement = inputPlacement,
-                            onInputPlacementChange = onInputPlacementChange,
-                            inputFocusRequester = inputFocusRequester,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    },
+    CompositionLocalProvider(
+        LocalConversationPort provides conversationPort,
+        LocalClientImagePort provides clientImagePort,
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.weight(1f).fillMaxWidth().onSizeChanged { viewportSize = it }) {
+                LazyColumn(
+                    state = listState,
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .semantics { contentDescription = "Conversation history" },
+                    reverseLayout = true,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    ConversationTimeline(
+                        items = timeline,
+                        sending = conversationState.sending,
+                        deletingMessageIds = conversationState.deletingMessageIds,
+                        onDeleteMessage = { id ->
+                            conversationState.deletingMessageIds += id
+                            scope.launch {
+                                delay(DELETE_ANIMATION_DURATION_MS.toLong())
+                                conversationPort.deleteMessage(id)
+                                conversationState.replaceHistory(conversationPort.currentHistory())
+                                conversationState.deletingMessageIds -= id
+                                conversationState.status = "Message deleted"
+                            }
+                        },
+                        onStatusChange = { conversationState.status = it },
+                        onEditMessage = { conversationState.editingId = it },
+                        sendContent = sendContent,
+                        inlineComposer = {
+                            ConversationInputCard(
+                                input = conversationState.input,
+                                sending = conversationState.sending,
+                                onInputChange = { conversationState.input = it },
+                                onSend = { sendContent(conversationState.input) },
+                                onCancel = { activeToken?.cancel() },
+                                onClear = clearConversation,
+                                inputPlacement = inputPlacement,
+                                onInputPlacementChange = onInputPlacementChange,
+                                inputFocusRequester = inputFocusRequester,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        },
+                    )
+                }
+                ConversationPanelQueueStrip(
+                    queue,
+                    scope,
+                    inFlight,
+                    conversationGateway,
+                    inputFocusRequester,
+                    { activeToken },
+                    { conversationState.input = it },
+                    { conversationState.sending = it },
+                    { conversationState.status = it },
+                    conversationState::replaceHistory,
+                    { activeToken = it },
+                    { conversationState.pendingUserMessage = it },
+                    conversationState.streaming,
+                )
+                ConversationScrollToLatestArea(
+                    isAtLatest = isAtLatest,
+                    state = conversationState,
+                    gateway = conversationGateway,
+                    listState = listState,
+                    scope = scope,
                 )
             }
-            ConversationPanelQueueStrip(
-                queue,
-                scope,
-                inFlight,
-                conversationGateway,
-                inputFocusRequester,
-                { activeToken },
-                { conversationState.input = it },
-                { conversationState.sending = it },
-                { conversationState.status = it },
-                conversationState::replaceHistory,
-                { activeToken = it },
-                { conversationState.pendingUserMessage = it },
-                conversationState.streaming,
-            )
-            ConversationScrollToLatestArea(
-                isAtLatest = isAtLatest,
-                state = conversationState,
-                gateway = conversationGateway,
-                listState = listState,
-                scope = scope,
-            )
-        }
-        if (!inputIsConversationMessage) {
-            ConversationInputCard(
-                input = conversationState.input,
-                sending = conversationState.sending,
-                onInputChange = { conversationState.input = it },
-                onSend = { sendContent(conversationState.input) },
-                onCancel = { activeToken?.cancel() },
-                onClear = clearConversation,
-                inputPlacement = inputPlacement,
-                onInputPlacementChange = onInputPlacementChange,
-                inputFocusRequester = inputFocusRequester,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
+            if (!inputIsConversationMessage) {
+                ConversationInputCard(
+                    input = conversationState.input,
+                    sending = conversationState.sending,
+                    onInputChange = { conversationState.input = it },
+                    onSend = { sendContent(conversationState.input) },
+                    onCancel = { activeToken?.cancel() },
+                    onClear = clearConversation,
+                    inputPlacement = inputPlacement,
+                    onInputPlacementChange = onInputPlacementChange,
+                    inputFocusRequester = inputFocusRequester,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
+                )
+            }
+            ConversationEditModal(
+                editingId = conversationState.editingId,
+                history = conversationState.history,
+                conversationPort = conversationPort,
+                onDismiss = { conversationState.editingId = null },
+                onHistoryRefresh = { conversationState.replaceHistory(conversationPort.currentHistory()) },
             )
         }
-        ConversationEditModal(
-            editingId = conversationState.editingId,
-            history = conversationState.history,
-            conversationPort = conversationPort,
-            onDismiss = { conversationState.editingId = null },
-            onHistoryRefresh = { conversationState.replaceHistory(conversationPort.currentHistory()) },
-        )
     }
 }

@@ -80,6 +80,18 @@ class MainSystemPromptComposerTest {
     }
 
     @Test
+    fun `prompt contains reliable image embedding guidance`() {
+        val prompt = MainSystemPromptComposer.compose(emptyTodos, null, toolConfigService)
+        assertTrue("Embedding Images in the Conversation" in prompt)
+        assertTrue("![descriptive alt text](source)" in prompt)
+        assertTrue("workspace:relative/path/image.png" in prompt)
+        assertTrue("server-file:relative/path/image.png" in prompt)
+        assertTrue("client-file:/absolute/path" in prompt)
+        assertTrue("data:image/png;base64" in prompt)
+        assertTrue("Do not claim that an image is displayed" in prompt)
+    }
+
+    @Test
     fun `prompt explains explicit todo execution control`() {
         val prompt = MainSystemPromptComposer.compose(emptyTodos, null, toolConfigService)
         assertTrue("automatically set to PENDING" in prompt)

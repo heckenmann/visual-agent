@@ -6,6 +6,7 @@ import de.heckenmann.visualagent.agent.conversation.ConversationHistoryPage
 import de.heckenmann.visualagent.agent.conversation.WelcomeResult
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.protocol.CancellationTokenImpl
+import de.heckenmann.visualagent.protocol.ConversationImageResolution
 import de.heckenmann.visualagent.protocol.ConversationInputPlacement
 import de.heckenmann.visualagent.protocol.ConversationPreferences
 import io.mockk.coEvery
@@ -16,11 +17,13 @@ import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 
 /** Verifies mapping and cancellation at the Spring-to-protocol conversation seam. */
 class SpringConversationPortTest {
     private val manager = mockk<AgentManager>()
-    private val port = SpringConversationPort(manager, AppConfigBean())
+    private val mediaResolver = mockk<ConversationMediaResolver>(relaxed = true)
+    private val port = SpringConversationPort(manager, AppConfigBean(), mediaResolver)
 
     @Test
     fun `latest page maps application messages to protocol messages`() =
@@ -37,6 +40,59 @@ class SpringConversationPortTest {
             assertEquals("assistant", page.messages.single().role)
             assertEquals("ready", page.messages.single().content)
             assertEquals("m1", page.messages.single().id)
+        }
+
+    @Test
+    fun `canvas data url is exposed as a validated protocol image`() =
+        runTest {
+            val dataUrl = "data:image/png;base64,AAAA"
+            every { manager.getHistory() } returns
+                listOf(
+                    Message(
+                        role = "assistant",
+                        content = "Canvas snapshot (PNG)",
+                        metadata = "{\"type\":\"image\",\"source\":\"canvas\",\"dataUrl\":\"$dataUrl\"}",
+                    ),
+                )
+            every { manager.loadLatestHistory() } returns emptyList()
+            every { mediaResolver.resolveEmbedded(dataUrl) } returns
+                ConversationImageResolution.Loaded("image/png", byteArrayOf(1, 2, 3))
+
+            val message = port.currentHistory().single()
+
+            assertNotNull(message.images)
+            assertEquals(1, message.images!!.size)
+            assertEquals("data:image/png;base64,AQID", message.images!!.single())
+        }
+
+    @Test
+    fun `current history reloads messages persisted by tools`() =
+        runTest {
+            val persistedCapture = Message("assistant", "Canvas snapshot (PNG)", id = "capture")
+            every { manager.loadLatestHistory() } returns listOf(persistedCapture)
+            every { manager.getHistory() } returns listOf(persistedCapture)
+
+            val history = port.currentHistory()
+
+            assertEquals("capture", history.single().id)
+            verify(exactly = 1) { manager.loadLatestHistory() }
+        }
+
+    @Test
+    fun `non-object or non-primitive image metadata does not break history mapping`() =
+        runTest {
+            every { manager.loadLatestHistory() } returns emptyList()
+            every { manager.getHistory() } returns
+                listOf(
+                    Message("assistant", "array metadata", metadata = "[]"),
+                    Message("assistant", "nested data url", metadata = "{\"dataUrl\":{\"value\":\"x\"}}"),
+                )
+
+            val history = port.currentHistory()
+
+            assertEquals(2, history.size)
+            assertEquals(null, history[0].images)
+            assertEquals(null, history[1].images)
         }
 
     @Test
@@ -78,7 +134,7 @@ class SpringConversationPortTest {
         val config = AppConfigBean()
         config.conversationInputPlacement = de.heckenmann.visualagent.config.ConversationInputPlacement.FIXED
         config.queueFlushMode = "ALL"
-        val configPort = SpringConversationPort(manager, config)
+        val configPort = SpringConversationPort(manager, config, mediaResolver)
 
         assertEquals(ConversationInputPlacement.FIXED, configPort.preferences().inputPlacement)
         assertEquals("ALL", configPort.preferences().queueFlushMode)

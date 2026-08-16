@@ -40,6 +40,7 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.spring.boot.starter)
     implementation(platform(libs.spring.boot.bom))
+    implementation(libs.tika.core)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.compose.ui.test.junit4.desktop)
     testImplementation(libs.mockk)

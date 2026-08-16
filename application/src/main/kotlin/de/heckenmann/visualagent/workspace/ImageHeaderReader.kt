@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.workspace
 
 import de.heckenmann.visualagent.error.WorkspaceFileException
+import java.io.ByteArrayInputStream
 import java.io.DataInputStream
 import java.io.EOFException
 import java.io.InputStream
@@ -33,6 +34,28 @@ object ImageHeaderReader {
                     )
             }
         }
+
+    /**
+     * Reads dimensions from an already bounded PNG, JPEG, or GIF payload.
+     *
+     * @param bytes Image payload to inspect
+     * @return Image dimensions
+     * @throws IllegalArgumentException when the image format is unsupported
+     */
+    fun dimensions(bytes: ByteArray): ImageDimensions {
+        val header = bytes.copyOf(minOf(32, bytes.size))
+        return when {
+            header.isPngHeader() -> ImageDimensions(width = header.readInt(16), height = header.readInt(20))
+            header.isGifHeader() -> ImageDimensions(width = header.readLittleShort(6), height = header.readLittleShort(8))
+            header.isJpegHeader() -> ByteArrayInputStream(bytes).use(::readJpegDimensions)
+            else ->
+                throw WorkspaceFileException(
+                    summary = "Unsupported image file",
+                    detail = "Only PNG, JPEG, and GIF files can be inspected. Convert the image or choose a supported file.",
+                    retryable = false,
+                )
+        }
+    }
 
     private fun readJpegDimensions(input: InputStream): ImageDimensions {
         val data = DataInputStream(input)

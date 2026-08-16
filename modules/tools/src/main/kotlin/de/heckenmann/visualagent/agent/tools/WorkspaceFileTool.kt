@@ -221,6 +221,8 @@ class WorkspaceFileTool(
                 "- imageBytes: {\"action\":\"imageBytes\",\"id\":\"...\"}. Base64-encoded image bytes.\n" +
                 "- analyzeImage: {\"action\":\"analyzeImage\",\"id\":\"...\",\"prompt\":\"describe this\"}. " +
                 "Analyze image with vision model.\n" +
+                "For an image in the conversation, use the returned relative path as " +
+                "![alt text](workspace:<path>). Do not invent paths or paste imageBytes base64 into a response.\n" +
                 "- search: {\"action\":\"search\",\"query\":\"...\"}. Search file metadata.\n" +
                 "- sync: {\"action\":\"sync\"}. Sync metadata with filesystem. " +
                 "Use id or path to identify files."

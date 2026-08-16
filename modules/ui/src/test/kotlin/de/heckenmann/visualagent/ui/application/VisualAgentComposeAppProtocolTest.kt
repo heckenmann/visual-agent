@@ -60,7 +60,7 @@ class VisualAgentComposeAppProtocolTest {
 
     private fun protocolPort(): ApplicationPort {
         val conversation = mockk<ConversationPort>(relaxed = true)
-        every { conversation.currentHistory() } returns emptyList()
+        coEvery { conversation.currentHistory() } returns emptyList()
         every { conversation.preferences() } returns ConversationPreferences()
         coEvery { conversation.latest() } returns ConversationHistoryPage(emptyList(), 0, false)
         coEvery { conversation.older(any()) } returns ConversationHistoryPage(emptyList(), 0, false)
@@ -87,6 +87,7 @@ class VisualAgentComposeAppProtocolTest {
 
         val settings = mockk<SettingsPort>(relaxed = true)
         every { settings.snapshot() } returns SettingsSnapshot()
+        coEvery { settings.snapshotAsync() } returns SettingsSnapshot()
         every { settings.addChangeListener(any()) } returns AutoCloseable { }
 
         val files = mockk<WorkspaceFilePort>(relaxed = true)

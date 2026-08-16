@@ -28,6 +28,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.LayoutSize
 import de.heckenmann.visualagent.protocol.LayoutWindowState
+import de.heckenmann.visualagent.protocol.SettingsSnapshot
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -39,7 +40,9 @@ import de.heckenmann.visualagent.ui.settings.*
 import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 /** Renders the ready workspace using only the transport boundary supplied by the desktop host. */
@@ -52,7 +55,8 @@ fun VisualAgentComposeApp(
     var windows by remember { mutableStateOf(restoreWorkspaceWindows(defaultWindows(), persistedWindows)) }
     var modal by remember { mutableStateOf<ComposeModal?>(null) }
     var commandPaletteVisible by remember { mutableStateOf(false) }
-    var settings by remember { mutableStateOf(deps.applicationPort.settings.snapshot()) }
+    var settings by remember { mutableStateOf(SettingsSnapshot()) }
+    var settingsLoaded by remember { mutableStateOf(false) }
     var settingsRevision by remember { mutableStateOf(0) }
     val workspaceFocusRequester = remember { FocusRequester() }
     val composeScope = rememberCoroutineScope()
@@ -67,19 +71,33 @@ fun VisualAgentComposeApp(
                 workspaceFiles = deps.applicationPort.workspaceFiles,
                 canvas = deps.applicationPort.canvas,
                 conversation = deps.applicationPort.conversation,
+                clientImagePort = deps.clientImagePort,
                 todos = deps.applicationPort.todos,
                 modalRequester = ComposeModalRequester { requested -> modal = requested },
                 onSettingsChanged = {
-                    settings = deps.applicationPort.settings.snapshot()
-                    settingsRevision += 1
+                    composeScope.launch {
+                        settings = deps.applicationPort.settings.snapshotAsync()
+                        settingsLoaded = true
+                        settingsRevision += 1
+                    }
                 },
                 inFlight = inFlight,
                 lifecycle = deps.applicationPort.lifecycle,
             )
         }
     DisposableEffect(deps.applicationPort.settings) {
-        val registration = deps.applicationPort.settings.addChangeListener { next -> settings = next }
+        val registration =
+            deps.applicationPort.settings.addChangeListener { next ->
+                composeScope.launch {
+                    settings = next
+                    settingsLoaded = true
+                }
+            }
         onDispose { registration.close() }
+    }
+    LaunchedEffect(deps.applicationPort.settings) {
+        settings = deps.applicationPort.settings.snapshotAsync()
+        settingsLoaded = true
     }
     val toggleWindow: (String) -> Unit = { id ->
         windows = toggleWorkspacePanel(windows, id)
@@ -159,8 +177,13 @@ fun VisualAgentComposeApp(
                         onPanelWidthChanged = resizeWindow,
                         showPanelLabels = settings.showPanelLabels,
                         onTogglePanelLabels = {
-                            settings = settings.copy(showPanelLabels = !settings.showPanelLabels)
-                            deps.applicationPort.settings.save(settings)
+                            if (settingsLoaded) {
+                                val next = settings.copy(showPanelLabels = !settings.showPanelLabels)
+                                settings = next
+                                composeScope.launch {
+                                    withContext(Dispatchers.IO) { deps.applicationPort.settings.save(next) }
+                                }
+                            }
                         },
                         onCloseApplication = onCloseApplication,
                         modalRequester = panelServices.modalRequester,

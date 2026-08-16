@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.ui.application
 
+import de.heckenmann.visualagent.protocol.ClientImagePort
 import de.heckenmann.visualagent.protocol.LayoutWindowState
 import de.heckenmann.visualagent.ui.modal.ComposeModalRequester
 import de.heckenmann.visualagent.ui.status.InFlightStateHolder
@@ -39,6 +40,7 @@ data class ComposePanelServices(
     val workspaceFiles: de.heckenmann.visualagent.protocol.WorkspaceFilePort,
     val canvas: de.heckenmann.visualagent.protocol.CanvasPort,
     val conversation: de.heckenmann.visualagent.protocol.ConversationPort,
+    val clientImagePort: ClientImagePort,
     val todos: de.heckenmann.visualagent.protocol.TodoPort,
     val modalRequester: ComposeModalRequester,
     val onSettingsChanged: () -> Unit,

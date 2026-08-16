@@ -170,10 +170,12 @@ class AgentManagerConversationPersistenceTest {
 
             assertTrue(result is WelcomeResult.Generated)
             val messages = requestSlot.captured.messages
-            assertEquals(1, messages.size)
+            assertEquals(2, messages.size)
             assertEquals("system", messages[0].role)
             assertTrue(messages[0].content.contains("Greet the user after a conversation reset"))
             assertTrue(messages[0].content.contains("Always answer in German."))
+            assertEquals("user", messages[1].role)
+            assertEquals("Generate the welcome message now.", messages[1].content)
         } finally {
             appConfig.userModelInstruction = previousInstruction
         }

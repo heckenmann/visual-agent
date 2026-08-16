@@ -19,6 +19,7 @@ import de.heckenmann.visualagent.protocol.SettingsPort
 import de.heckenmann.visualagent.protocol.SettingsSnapshot
 import de.heckenmann.visualagent.ui.modal.ComposeModalRequester
 import de.heckenmann.visualagent.ui.status.InFlightStateHolder
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.Rule
@@ -34,6 +35,7 @@ class ComposeProtocolSettingsPanelTest {
     fun `panel renders provider and execution settings`() {
         val settings = mockk<SettingsPort>(relaxed = true)
         every { settings.snapshot() } returns SettingsSnapshot()
+        coEvery { settings.snapshotAsync() } returns SettingsSnapshot()
         every { settings.addChangeListener(any()) } returns AutoCloseable { }
         val providers = mockk<ProviderPort>(relaxed = true)
         every { providers.listProviders() } returns listOf(ProviderProfile("ollama", "Ollama", ProviderAdapter.OLLAMA, ""))
@@ -70,6 +72,7 @@ class ComposeProtocolSettingsPanelTest {
         var selectionSaved = false
         val settings = mockk<SettingsPort>(relaxed = true)
         every { settings.snapshot() } returns SettingsSnapshot()
+        coEvery { settings.snapshotAsync() } returns SettingsSnapshot()
         every { settings.addChangeListener(any()) } returns AutoCloseable { }
         every { settings.save(any()) } answers { settingsSaved = true }
         val providers = mockk<ProviderPort>(relaxed = true)
@@ -110,6 +113,7 @@ class ComposeProtocolSettingsPanelTest {
     fun `settings save is disabled when provider has no selectable model`() {
         val settings = mockk<SettingsPort>(relaxed = true)
         every { settings.snapshot() } returns SettingsSnapshot(modelId = "")
+        coEvery { settings.snapshotAsync() } returns SettingsSnapshot(modelId = "")
         every { settings.addChangeListener(any()) } returns AutoCloseable { }
         val providers = mockk<ProviderPort>(relaxed = true)
         every { providers.listProviders() } returns listOf(ProviderProfile("ollama", "Ollama", ProviderAdapter.OLLAMA, ""))

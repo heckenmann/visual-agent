@@ -3,7 +3,6 @@ package de.heckenmann.visualagent.desktop
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowState
-import de.heckenmann.visualagent.protocol.ApplicationConnection
 import de.heckenmann.visualagent.protocol.ApplicationPort
 import de.heckenmann.visualagent.protocol.LayoutPosition
 import de.heckenmann.visualagent.protocol.LayoutSize
@@ -13,35 +12,26 @@ import de.heckenmann.visualagent.ui.application.ComposeApplicationDependencies
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import org.springframework.context.ConfigurableApplicationContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
-/** Verifies that the desktop exits even when one shutdown component reports an error. */
+/** Verifies that desktop shutdown hands context disposal to the Compose lifecycle. */
 class ComposeStartupHostLifecycleTest {
     @Test
-    fun `exit callback is invoked when spring context close fails`() {
+    fun `exit callback is invoked before spring context disposal`() {
         val lifecycle = mockk<LifecyclePort>(relaxed = true)
         val layout = mockk<WorkspaceLayoutPort>(relaxed = true)
         val applicationPort = mockk<ApplicationPort>(relaxed = true)
         every { applicationPort.lifecycle } returns lifecycle
         every { applicationPort.layout } returns layout
-        val context = mockk<ConfigurableApplicationContext>(relaxed = true)
-        every { context.close() } throws IllegalStateException("context close failed")
-        val connection = mockk<ApplicationConnection>(relaxed = true)
         var exited = false
 
-        assertFailsWith<IllegalStateException> {
-            closeApplication(
-                dependencies = ComposeApplicationDependencies(applicationPort),
-                windowState = WindowState(size = DpSize(800.dp, 600.dp)),
-                connection = connection,
-                context = context,
-                exitApplication = { exited = true },
-            )
-        }
+        closeApplication(
+            dependencies = ComposeApplicationDependencies(applicationPort),
+            windowState = WindowState(size = DpSize(800.dp, 600.dp)),
+            exitApplication = { exited = true },
+        )
 
         assertTrue(exited)
         verify { lifecycle.beginShutdown() }
