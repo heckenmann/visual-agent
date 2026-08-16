@@ -69,7 +69,9 @@ internal class CodexCliCoKitTransport(
     }
 
     private companion object {
-        private const val MAX_JSON_LINE_LENGTH = 1_048_576
+        // A 32 MiB image becomes roughly 43 MiB when embedded as base64 in a JSON-RPC
+        // payload. Keep enough headroom for the JSON envelope and surrounding prompt text.
+        private const val MAX_JSON_LINE_LENGTH = 64 * 1024 * 1024
         private const val PRE_SUBSCRIPTION_REPLAY = 8
     }
 }
