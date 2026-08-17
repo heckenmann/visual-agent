@@ -2,16 +2,6 @@
 
 package de.heckenmann.visualagent.desktop
 
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -20,16 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.FrameWindowScope
-import androidx.compose.ui.window.Window
-import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
-import androidx.compose.ui.window.rememberWindowState
 import de.heckenmann.visualagent.AppIdentity
 import de.heckenmann.visualagent.VisualAgentApplication
 import de.heckenmann.visualagent.protocol.ApplicationConnection
@@ -40,13 +21,10 @@ import de.heckenmann.visualagent.protocol.LayoutWindowState
 import de.heckenmann.visualagent.protocol.WorkspaceLayoutSnapshot
 import de.heckenmann.visualagent.server.VisualAgentGrpcServer
 import de.heckenmann.visualagent.ui.application.ComposeApplicationDependencies
-import de.heckenmann.visualagent.ui.application.StartupPhase
 import de.heckenmann.visualagent.ui.application.StartupStatus
-import de.heckenmann.visualagent.ui.application.VisualAgentComposeApp
-import de.heckenmann.visualagent.ui.workspace.visualAgentDarkColorScheme
-import de.heckenmann.visualagent.ui.workspace.visualAgentTypography
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import org.springframework.boot.WebApplicationType
@@ -68,22 +46,25 @@ private fun ComposeStartupHost(exitApplication: () -> Unit) {
     var dependencies by remember { mutableStateOf<ComposeApplicationDependencies?>(null) }
     var persistedLayout by remember { mutableStateOf<WorkspaceLayoutSnapshot?>(null) }
     var persistedWindows by remember { mutableStateOf<List<LayoutWindowState>>(emptyList()) }
-    val currentContext by rememberUpdatedState(springContext)
-    val windowState =
-        rememberWindowState(
-            width = DEFAULT_WINDOW_WIDTH,
-            height = DEFAULT_WINDOW_HEIGHT,
-            position = WindowPosition.Aligned(Alignment.Center),
-        )
+    val currentContext = rememberUpdatedState(springContext)
+    val currentConnection = rememberUpdatedState(serverConnection)
+    val shutdownCoordinator = remember { DesktopShutdownCoordinator() }
 
     LaunchedEffect(startupAttempt) {
         startupStatus = StartupStatus.resolvingEndpoint()
         dependencies = null
         persistedLayout = null
-        serverConnection?.close()
+        val previousConnection = serverConnection
         serverConnection = null
+        val previousContext = springContext
         springContext = null
+        withContext(Dispatchers.IO) {
+            previousConnection?.close()
+            previousContext?.close()
+        }
         var endpoint: DesktopServerEndpoint? = null
+        var context: ConfigurableApplicationContext? = null
+        var contextPublished = false
         try {
             endpoint = withContext(Dispatchers.IO) { selectEndpoint() }
             val selectedEndpoint = endpoint
@@ -97,7 +78,7 @@ private fun ComposeStartupHost(exitApplication: () -> Unit) {
                 selectedEndpoint as? DesktopServerEndpoint.LocalInProcess
                     ?: error("Unsupported desktop server endpoint")
             startupStatus = StartupStatus.startingServer()
-            val context =
+            context =
                 runInterruptible(Dispatchers.IO) {
                     SpringApplicationBuilder(VisualAgentApplication::class.java)
                         .web(WebApplicationType.NONE)
@@ -105,10 +86,15 @@ private fun ComposeStartupHost(exitApplication: () -> Unit) {
                         .run()
                 }
             springContext = context
+            contextPublished = true
             startupStatus = StartupStatus.loadingRuntime()
         } catch (cancelled: CancellationException) {
+            if (!contextPublished) {
+                withContext(Dispatchers.IO + NonCancellable) { context?.close() }
+            }
             throw cancelled
         } catch (_: Exception) {
+            withContext(Dispatchers.IO + NonCancellable) { context?.close() }
             startupStatus =
                 if (endpoint is DesktopServerEndpoint.RemoteTls) {
                     StartupStatus.failed("The remote server could not be used by this desktop build")
@@ -120,12 +106,13 @@ private fun ComposeStartupHost(exitApplication: () -> Unit) {
 
     LaunchedEffect(springContext) {
         val context = springContext ?: return@LaunchedEffect
+        var connection: ApplicationConnection? = null
         try {
             val localServer =
                 withContext(Dispatchers.IO) {
                     context.getBean(VisualAgentGrpcServer::class.java)
                 }
-            val connection =
+            connection =
                 LocalApplicationConnection(localServer) {
                     context.getBean(ApplicationPort::class.java)
                 }
@@ -144,78 +131,54 @@ private fun ComposeStartupHost(exitApplication: () -> Unit) {
             persistedLayout = loadedLayout
             persistedWindows = loadedLayout.windows
             startupStatus = StartupStatus.ready()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (_: Exception) {
-            serverConnection?.close()
-            context.close()
+            serverConnection = null
             springContext = null
+            withContext(Dispatchers.IO + NonCancellable) {
+                connection?.close()
+                context.close()
+            }
             startupStatus = StartupStatus.failed()
         }
     }
 
     DisposableEffect(Unit) {
         onDispose {
-            serverConnection?.close()
-            currentContext?.close()
+            shutdownCoordinator.closeResources {
+                currentConnection.value?.close()
+                currentContext.value?.close()
+            }
         }
     }
 
     val readyDependencies = dependencies
-    Window(
-        onCloseRequest = {
-            if (readyDependencies != null) {
-                closeApplication(readyDependencies, windowState, exitApplication)
-            } else {
-                serverConnection?.close()
-                currentContext?.close()
-                exitApplication()
-            }
-        },
-        title = AppIdentity.DISPLAY_NAME,
-        icon = @Suppress("DEPRECATION") painterResource("icons/visual-agent.png"),
-        state = windowState,
-    ) {
-        LaunchedEffect(persistedLayout, startupStatus.phase) {
-            if (startupStatus.phase != StartupPhase.READY) return@LaunchedEffect
-            val layout = persistedLayout ?: return@LaunchedEffect
-            layout.stage?.let { stage -> windowState.size = DpSize(stage.width.dp, stage.height.dp) }
-            layout.stagePosition?.let { position ->
-                val size = windowState.size
-                val restored =
-                    currentScreenBounds()?.let { bounds ->
-                        clampWindowPosition(
-                            position,
-                            LayoutSize(size.width.value.toDouble(), size.height.value.toDouble()),
-                            bounds,
-                        )
-                    } ?: position
-                windowState.position = WindowPosition.Absolute(restored.x.dp, restored.y.dp)
-            }
-        }
-        if (readyDependencies == null || startupStatus.phase != StartupPhase.READY) {
-            ComposeStartupSplash(status = startupStatus, onRetry = { startupAttempt += 1 })
-        } else {
-            VisualAgentComposeApp(
-                deps = readyDependencies,
-                onCloseApplication = {
-                    closeApplication(readyDependencies, windowState, exitApplication)
-                },
-                persistedWindows = persistedWindows,
-            )
-        }
+    if (startupWindowMode(startupStatus, readyDependencies) == StartupWindowMode.SPLASH) {
+        ComposeStartupSplashWindow(
+            status = startupStatus,
+            onRetry = { startupAttempt += 1 },
+            onCloseRequest = {
+                if (shutdownCoordinator.requestExit()) {
+                    exitApplication()
+                }
+            },
+        )
+    } else {
+        ComposeMainWindow(
+            dependencies = checkNotNull(readyDependencies),
+            persistedLayout = checkNotNull(persistedLayout),
+            persistedWindows = persistedWindows,
+            onCloseApplication = { windowState ->
+                closeApplication(
+                    dependencies = checkNotNull(readyDependencies),
+                    windowState = windowState,
+                    exitApplication = exitApplication,
+                    shutdownCoordinator = shutdownCoordinator,
+                )
+            },
+        )
     }
-}
-
-/** Current screen bounds exposed by Compose's desktop window host. */
-private fun FrameWindowScope.currentScreenBounds(): ScreenBounds? {
-    val configuration = window.graphicsConfiguration ?: return null
-    val transform = configuration.defaultTransform
-    val bounds = configuration.bounds
-    return ScreenBounds(
-        x = bounds.x / transform.scaleX,
-        y = bounds.y / transform.scaleY,
-        width = bounds.width / transform.scaleX,
-        height = bounds.height / transform.scaleY,
-    )
 }
 
 /** Keeps a restored window position within the usable bounds of its current screen. */
@@ -252,9 +215,11 @@ internal fun closeApplication(
     dependencies: ComposeApplicationDependencies,
     windowState: androidx.compose.ui.window.WindowState,
     exitApplication: () -> Unit,
+    shutdownCoordinator: DesktopShutdownCoordinator = DesktopShutdownCoordinator(),
 ) {
-    dependencies.applicationPort.lifecycle.beginShutdown()
+    if (!shutdownCoordinator.requestExit()) return
     try {
+        dependencies.applicationPort.lifecycle.beginShutdown()
         dependencies.applicationPort.cancelActiveWork()
         val size = windowState.size
         val position =
@@ -265,6 +230,8 @@ internal fun closeApplication(
             LayoutSize(size.width.value.toDouble(), size.height.value.toDouble()),
             position,
         )
+    } catch (_: Exception) {
+        // A shutdown failure must not keep the native window or the Compose application alive.
     } finally {
         // Exit the Compose application before the Spring context is closed. The root
         // DisposableEffect cancels presentation coroutines and unregisters their listeners
@@ -273,39 +240,3 @@ internal fun closeApplication(
         exitApplication()
     }
 }
-
-@Composable
-internal fun ComposeStartupSplash(
-    status: StartupStatus,
-    onRetry: () -> Unit,
-) {
-    MaterialTheme(
-        colorScheme = visualAgentDarkColorScheme(),
-        typography = visualAgentTypography(DEFAULT_STARTUP_FONT_SIZE),
-    ) {
-        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Image(
-                    painter = @Suppress("DEPRECATION") painterResource("icons/visual-agent.png"),
-                    contentDescription = AppIdentity.DISPLAY_NAME,
-                    modifier = Modifier.padding(bottom = 20.dp),
-                )
-                Text(text = AppIdentity.DISPLAY_NAME, style = MaterialTheme.typography.headlineMedium)
-                Text(text = status.message(), modifier = Modifier.padding(top = 12.dp))
-                if (status.phase == StartupPhase.FAILED) {
-                    Button(onClick = onRetry, modifier = Modifier.padding(top = 20.dp)) { Text("Retry") }
-                } else {
-                    CircularProgressIndicator(modifier = Modifier.padding(top = 20.dp))
-                }
-            }
-        }
-    }
-}
-
-private const val DEFAULT_STARTUP_FONT_SIZE = 14
-private val DEFAULT_WINDOW_WIDTH = 1280.dp
-private val DEFAULT_WINDOW_HEIGHT = 820.dp

@@ -49,7 +49,7 @@ The UI receives only protocol ports; it never receives Spring beans.
 
 ## Current Implemented Flow
 
-1. The desktop shell opens immediately and renders a safe startup splash.
+1. The desktop shell opens immediately and renders a safe, centered, frameless splash window. The main window is not created until startup is ready.
 2. The host starts the local Spring server on a background dispatcher in the same JVM, resolves
    one `ApplicationPort`, and passes only protocol DTOs/ports to `:ui`. A future remote endpoint
    can replace this local adapter without changing panel code.

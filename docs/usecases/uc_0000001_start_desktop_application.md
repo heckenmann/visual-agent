@@ -17,12 +17,12 @@ Desktop user.
 ## Main Flow
 
 1. The user starts the application.
-2. The Compose Multiplatform launcher creates the primary window and shows startup status.
+2. The Compose Multiplatform launcher creates a dedicated, centered, frameless splash window and shows startup status.
 3. The desktop host resolves the configured endpoint before contacting a server.
 4. With no remote endpoint, it starts the local Spring Boot server in the same JVM; with a remote endpoint, it performs a TLS gRPC handshake and never falls back to local startup.
 5. Spring initializes configuration, persistence, activity, and protocol port adapters.
 6. The desktop host resolves the protocol application port and loads the initial workspace snapshot.
-7. UI panels are wired and the primary workspace replaces the splash screen.
+7. UI panels are wired, the splash window is disposed, and a separate main application window is created.
 
 ## Result
 
@@ -44,8 +44,11 @@ The user sees the Visual Agent main window and can interact with chat, session s
 ## Acceptance Criteria
 
 - Starting via the desktop host opens a splash screen before the main window.
+- The splash and main application are distinct native window instances; the splash has no frame and never owns main-window geometry.
 - Local startup does not open a TCP listener unless a remote server port is explicitly configured.
 - A configured remote endpoint is never silently replaced by a local server.
 - A protocol incompatibility or server failure is shown as a safe startup error with an explicit retry action.
 - The main workspace is created only after the local or remote readiness handshake and initial layout snapshot succeed.
+- A startup failure keeps only the actionable splash window open; retry does not create a main window prematurely.
+- Closing either window requests shutdown at most once and releases the server session without orphaned resources.
 - Startup does not lose persisted runtime state.
