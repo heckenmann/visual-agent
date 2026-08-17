@@ -19,8 +19,8 @@ Desktop user.
 2. The main window size, panel visibility, user-defined order, and preferred panel widths are captured.
 3. Layout state is persisted through the workspace layout service.
 4. When the application exits, the latest workspace state and window size have been saved.
-5. On startup, the stored main window size and workspace layout are loaded.
-6. The main window opens with the previously saved size.
+5. On startup, the stored main window size and workspace layout are loaded while the independent splash window remains visible.
+6. After server readiness, the splash is disposed and the main window opens with the previously saved size.
 7. Workspace panels are restored to their previous visibility state, user-defined order, and preferred widths.
 8. Restored panels are placed side by side in the horizontal workspace row.
 
@@ -45,9 +45,11 @@ The user's preferred main window size, panel set, panel order, and persisted pan
 ## Acceptance Criteria
 
 - The main window restores its previously saved width and height.
+- Splash geometry is never used for main-window restoration.
 - Restored panels use persisted IDs.
 - Restored panels preserve user-defined order.
 - Restored panels preserve user- or model-defined preferred sizes.
 - Panels hidden before shutdown stay hidden after restart.
 - Missing panels or invalid stored bounds do not prevent startup.
 - Restored panels are always placed inside the visible horizontal workspace row.
+- A persisted main-window position outside the current screen is clamped before the main window is presented.

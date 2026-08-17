@@ -8,7 +8,9 @@ import de.heckenmann.visualagent.protocol.LayoutPosition
 import de.heckenmann.visualagent.protocol.LayoutSize
 import de.heckenmann.visualagent.protocol.LifecyclePort
 import de.heckenmann.visualagent.protocol.WorkspaceLayoutPort
+import de.heckenmann.visualagent.protocol.WorkspaceLayoutSnapshot
 import de.heckenmann.visualagent.ui.application.ComposeApplicationDependencies
+import de.heckenmann.visualagent.ui.application.StartupStatus
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -48,5 +50,46 @@ class ComposeStartupHostLifecycleTest {
             )
 
         assertEquals(LayoutPosition(x = 0.0, y = 480.0), restored)
+    }
+
+    @Test
+    fun `main geometry restoration keeps persisted size and clamps position`() {
+        val state = WindowState(size = DpSize(640.dp, 480.dp))
+
+        restoreMainWindowGeometry(
+            windowState = state,
+            persistedLayout =
+                WorkspaceLayoutSnapshot(
+                    stage = LayoutSize(width = 800.0, height = 600.0),
+                    stagePosition = LayoutPosition(x = 1800.0, y = 900.0),
+                ),
+            screenBounds = ScreenBounds(x = 0.0, y = 0.0, width = 1920.0, height = 1080.0),
+        )
+
+        assertEquals(DpSize(800.dp, 600.dp), state.size)
+        assertEquals(1120.dp, state.position.x)
+        assertEquals(480.dp, state.position.y)
+    }
+
+    @Test
+    fun `startup creates only the splash until runtime and dependencies are ready`() {
+        val dependencies = ComposeApplicationDependencies(mockk(relaxed = true))
+
+        assertEquals(StartupWindowMode.SPLASH, startupWindowMode(StartupStatus.startingServer(), dependencies))
+        assertEquals(StartupWindowMode.SPLASH, startupWindowMode(StartupStatus.failed(), dependencies))
+        assertEquals(StartupWindowMode.MAIN, startupWindowMode(StartupStatus.ready(), dependencies))
+    }
+
+    @Test
+    fun `shutdown coordinator claims exit and closes resources exactly once`() {
+        val coordinator = DesktopShutdownCoordinator()
+        var closeCount = 0
+
+        assertTrue(coordinator.requestExit())
+        assertTrue(!coordinator.requestExit())
+        coordinator.closeResources { closeCount += 1 }
+        coordinator.closeResources { closeCount += 1 }
+
+        assertEquals(1, closeCount)
     }
 }
