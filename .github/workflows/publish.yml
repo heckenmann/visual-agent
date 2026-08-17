@@ -62,7 +62,7 @@ jobs:
           chmod +x gradlew
 
       - name: Upload Gradle wrapper
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: gradle-wrapper
           if-no-files-found: error
@@ -111,7 +111,7 @@ jobs:
           cache-disabled: true
 
       - name: Download Gradle wrapper
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: gradle-wrapper
 
