@@ -17,6 +17,7 @@ repositories {
 
 dependencies {
     api(platform(libs.grpc.bom))
+    api(platform(libs.protobuf.bom))
     api(libs.grpc.stub)
     api(libs.grpc.protobuf)
     api(libs.protobuf.java)
