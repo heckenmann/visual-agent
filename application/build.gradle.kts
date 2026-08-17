@@ -72,11 +72,27 @@ dependencies {
 }
 
 val coroutinesVersion = libs.versions.coroutines.get()
+val grpcVersion = libs.versions.grpc.get()
+val protobufJavaVersion =
+    libs.versions.protobuf.java
+        .get()
 val databaseTestTag = "database"
 val databaseCategoryTag = "de.heckenmann.visualagent.testsupport.DatabaseTestCategory"
 
 dependencyManagement {
     dependencies {
+        listOf(
+            "grpc-api",
+            "grpc-context",
+            "grpc-core",
+            "grpc-inprocess",
+            "grpc-netty-shaded",
+            "grpc-protobuf",
+            "grpc-protobuf-lite",
+            "grpc-stub",
+            "grpc-util",
+        ).forEach { dependency("io.grpc:$it:$grpcVersion") }
+        dependency("com.google.protobuf:protobuf-java:$protobufJavaVersion")
         dependency("org.jetbrains.kotlinx:kotlinx-coroutines-bom:$coroutinesVersion")
         dependency("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
         dependency("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:$coroutinesVersion")
