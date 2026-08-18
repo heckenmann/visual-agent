@@ -152,7 +152,7 @@ internal fun SettingsPanel(
         }
     }
 
-    /** Discovers models for the selected provider without blocking the UI thread. */
+    /** Refreshes the selected provider's configured or discovered models without blocking the UI thread. */
     fun refreshModels() {
         if (providerId.isBlank() || loadingModels) return
         loadingModels = true
@@ -189,6 +189,10 @@ internal fun SettingsPanel(
                 }.onFailure { modelDetails = it.toUiErrorMessage() }
             loadingDetails = false
         }
+    }
+
+    LaunchedEffect(providerId, modelId) {
+        if (providerId.isNotBlank() && modelId.isNotBlank()) refreshDetails()
     }
 
     /** Persists a provider profile edited in the modal dialog. */
@@ -275,14 +279,12 @@ internal fun SettingsPanel(
             modelId = modelId,
             models = models,
             loadingModels = loadingModels,
-            loadingDetails = loadingDetails,
             modelDetails = modelDetails,
             favoriteModels = snapshot.favoriteModels,
             snapshotLoaded = snapshotLoaded,
             canSaveSelection = canSaveSelection,
             onModelSelected = { modelId = it },
             onRefreshModels = ::refreshModels,
-            onRefreshDetails = ::refreshDetails,
             onFavoriteChanged = { favorite ->
                 val favorites = snapshot.favoriteModels.toMutableSet().apply { if (favorite) add(modelId) else remove(modelId) }
                 snapshot = snapshot.copy(favoriteModels = favorites.sorted())

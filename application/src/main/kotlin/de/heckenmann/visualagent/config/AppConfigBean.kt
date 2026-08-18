@@ -21,11 +21,11 @@ class AppConfigBean(
 ) : ProviderRuntimeConfig {
     override var llmProvider: String = "ollama"
     override var ollamaLocalUrl: String = "http://localhost:11434"
-    override var ollamaModel: String = "llava"
+    override var ollamaModel: String = ""
     override var ollamaApiKey = ""
     override var openAiApiKey = ""
     override var openAiBaseUrl: String = "https://api.openai.com"
-    override var openAiModel: String = "gpt-4o-mini"
+    override var openAiModel: String = ""
     var databasePath: String = "./data/visual-agent.db"
     var uiThemeMode: ThemeMode = ThemeMode.SYSTEM
     var fontSize: Int = 14

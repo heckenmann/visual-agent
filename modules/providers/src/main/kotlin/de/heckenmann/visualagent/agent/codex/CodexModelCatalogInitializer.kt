@@ -13,7 +13,7 @@ import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Component
 import java.util.logging.Logger
 
-/** Refreshes the active Codex model catalog independently from Compose panel visibility. */
+/** Refreshes the active Codex CLI model catalog after application startup. */
 @Component
 internal class CodexModelCatalogInitializer(
     private val providerCatalog: ProviderCatalogService,
@@ -21,12 +21,11 @@ internal class CodexModelCatalogInitializer(
     private val applicationScope: CoroutineScope,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
-    /** Starts model discovery after Spring has completed application startup. */
+    /** Loads the active Codex catalog after Spring has initialized all provider services. */
     @EventListener(ApplicationReadyEvent::class)
     fun initializeActiveCodexCatalog() {
         val providerId = providerCatalog.activeProviderId()
-        val profile = providerCatalog.getProvider(providerId) ?: return
-        if (profile.adapter != ProviderAdapter.CODEX_CLI) return
+        if (providerCatalog.getProvider(providerId)?.adapter != ProviderAdapter.CODEX_CLI) return
         applicationScope.launch(ioDispatcher) {
             runCatching { llmProvider.getModels(providerId) }
                 .onFailure { error -> logger.warning(ProviderErrorMessages.userFacing(error)) }

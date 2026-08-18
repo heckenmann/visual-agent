@@ -64,6 +64,8 @@ class ComposeProtocolSettingsPanelTest {
         composeTestRule.onNodeWithText("Context length").assertExists()
         composeTestRule.onNodeWithContentDescription("Save provider and model").assertExists()
         composeTestRule.onNodeWithContentDescription("Save settings").assertExists().assertIsEnabled()
+        composeTestRule.onNodeWithContentDescription("Refresh models").assertExists()
+        composeTestRule.onNodeWithContentDescription("Refresh model details").assertDoesNotExist()
     }
 
     @Test

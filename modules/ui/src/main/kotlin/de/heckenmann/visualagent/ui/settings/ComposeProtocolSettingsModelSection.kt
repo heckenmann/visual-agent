@@ -24,14 +24,12 @@ internal fun ModelSettingsSection(
     modelId: String,
     models: List<ProviderModel>,
     loadingModels: Boolean,
-    loadingDetails: Boolean,
     modelDetails: String,
     favoriteModels: List<String>,
     snapshotLoaded: Boolean,
     canSaveSelection: Boolean,
     onModelSelected: (String) -> Unit,
     onRefreshModels: () -> Unit,
-    onRefreshDetails: () -> Unit,
     onFavoriteChanged: (Boolean) -> Unit,
     onSaveSelection: () -> Unit,
 ) {
@@ -49,12 +47,6 @@ internal fun ModelSettingsSection(
                 description = "Refresh models",
                 enabled = !loadingModels,
                 onClick = onRefreshModels,
-            )
-            ActionIconButton(
-                icon = Icons.Filled.Refresh,
-                description = "Refresh model details",
-                enabled = !loadingDetails && modelId.isNotBlank(),
-                onClick = onRefreshDetails,
             )
             PanelCheckbox(
                 label = "Favorite",
