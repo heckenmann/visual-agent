@@ -1,30 +1,27 @@
 package de.heckenmann.visualagent.agent.codex
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 
+/** Verifies bounded command execution used for Codex CLI discovery. */
 class CodexCliProcessFactoryTest {
     @TempDir
     lateinit var temporaryDirectory: Path
 
     @Test
-    fun `app server process receives fixed arguments and terminates on close`() =
-        kotlinx.coroutines.test.runTest {
+    fun `captures command output and exit status`() =
+        runTest {
             val executable = temporaryDirectory.resolve("fake-codex")
-            Files.writeString(executable, "#!/bin/sh\nprintf '%s\\n' \"${'$'}1 ${'$'}2\"\nread ignored\n")
+            Files.writeString(executable, "#!/bin/sh\nprintf 'codex-cli test\\n'\n")
             check(executable.toFile().setExecutable(true)) { "Test executable permission could not be set" }
-            val child = CodexCliProcessFactory().startAppServer(executable, temporaryDirectory)
 
-            val arguments = withContext(Dispatchers.IO) { child.stdout.bufferedReader().readLine() }
-            child.close()
+            val result = CodexCliProcessFactory().run(listOf(executable.toString()), timeoutSeconds = 5)
 
-            assertEquals("app-server --stdio", arguments)
-            assertFalse(child.isAlive)
+            assertEquals(0, result.exitCode)
+            assertEquals("codex-cli test", result.stdout.text.trim())
         }
 }

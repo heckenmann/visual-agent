@@ -16,28 +16,6 @@ import java.util.concurrent.TimeUnit
 @Component
 internal class CodexCliProcessFactory {
     /**
-     * Starts the Codex app server with the mandatory sanitized environment.
-     *
-     * @param executable Validated Codex executable
-     * @param workingDirectory Deliberate app-server working directory
-     * @return Open child process streams owned by the caller until [CodexCliChildProcess.close]
-     */
-    suspend fun startAppServer(
-        executable: Path,
-        workingDirectory: Path,
-    ): CodexCliChildProcess =
-        withContext(Dispatchers.IO) {
-            val process =
-                ProcessBuilder(listOf(executable.toString(), "app-server", "--stdio"))
-                    .directory(workingDirectory.toFile())
-                    .apply {
-                        environment().remove(OPENAI_API_KEY)
-                        environment().remove(OPENAI_CODEX_API_KEY)
-                    }.start()
-            CodexCliChildProcess(process) { terminateTree(process) }
-        }
-
-    /**
      * Starts a command and captures bounded stdout and stderr without merging the streams.
      *
      * @param command Executable followed by literal arguments
@@ -50,10 +28,12 @@ internal class CodexCliProcessFactory {
         command: List<String>,
         workingDirectory: Path? = null,
         timeoutSeconds: Long,
+        maxOutputCharacters: Int = MAX_OUTPUT_CHARACTERS,
         onOutput: suspend (String) -> Unit = {},
     ): CodexCliProcessResult {
         require(command.isNotEmpty()) { "Codex command must include an executable" }
         require(timeoutSeconds > 0) { "Codex timeout must be positive" }
+        require(maxOutputCharacters > 0) { "Codex output limit must be positive" }
         return withContext(Dispatchers.IO) {
             coroutineScope {
                 val process =
@@ -68,13 +48,13 @@ internal class CodexCliProcessFactory {
                     val progressMutex = Mutex()
                     val publish: suspend (String) -> Unit = { chunk ->
                         progressMutex.withLock {
-                            val remaining = MAX_OUTPUT_CHARACTERS - progress.length
+                            val remaining = maxOutputCharacters - progress.length
                             if (remaining > 0) progress.append(chunk.take(remaining))
                             onOutput(progress.toString())
                         }
                     }
-                    val stdout = async(Dispatchers.IO) { process.inputStream.readBounded(publish) }
-                    val stderr = async(Dispatchers.IO) { process.errorStream.readBounded(publish) }
+                    val stdout = async(Dispatchers.IO) { process.inputStream.readBounded(publish, maxOutputCharacters) }
+                    val stderr = async(Dispatchers.IO) { process.errorStream.readBounded(publish, maxOutputCharacters) }
                     val completed = process.waitFor(timeoutSeconds, TimeUnit.SECONDS)
                     if (!completed) terminateTree(process)
                     CodexCliProcessResult(
@@ -104,14 +84,17 @@ internal class CodexCliProcessFactory {
         handles.filter(ProcessHandle::isAlive).forEach(ProcessHandle::destroyForcibly)
     }
 
-    private suspend fun java.io.InputStream.readBounded(onChunk: suspend (String) -> Unit): CodexCliProcessOutput {
+    private suspend fun java.io.InputStream.readBounded(
+        onChunk: suspend (String) -> Unit,
+        maxOutputCharacters: Int,
+    ): CodexCliProcessOutput {
         val bytes = ByteArray(BUFFER_SIZE)
         val output = StringBuilder()
         var truncated = false
         while (true) {
             val count = read(bytes)
             if (count < 0) break
-            val remaining = MAX_OUTPUT_CHARACTERS - output.length
+            val remaining = maxOutputCharacters - output.length
             if (remaining <= 0) {
                 truncated = true
                 continue
@@ -158,23 +141,6 @@ internal data class CodexCliProcessResult(
     val stdout: CodexCliProcessOutput,
     val stderr: CodexCliProcessOutput,
 )
-
-/**
- * Open streams belonging to one sanitized Codex app-server child process.
- */
-internal class CodexCliChildProcess(
-    private val process: Process,
-    private val terminate: () -> Unit,
-) : AutoCloseable {
-    val stdout = process.inputStream
-    val stdin = process.outputStream
-    val stderr = process.errorStream
-
-    val isAlive: Boolean
-        get() = process.isAlive
-
-    override fun close() = terminate()
-}
 
 /**
  * Validates a Codex executable by executing its version command in a safe child process.

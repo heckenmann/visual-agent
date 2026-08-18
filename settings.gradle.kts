@@ -1,6 +1,5 @@
 rootProject.name = "visual-agent"
 
-includeBuild("third_party/cokit")
 include(":application", ":ui", ":protocol", ":desktop", ":providers", ":tools")
 
 project(":ui").projectDir = file("modules/ui")

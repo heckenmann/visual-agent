@@ -51,7 +51,7 @@ class AgentListTool(
 
     private fun formatAgentLine(agent: ToolAgent): String {
         val tools = agents.tools(agent.id).sorted()
-        val model = agent.config.model?.ifBlank { null } ?: "default"
+        val model = agent.config.model?.ifBlank { null } ?: "inherited"
         val template = resolveTemplateName(agent)
         return buildString {
             append("- ${agent.id} | ${agent.name} | ${agent.role} | status=${agent.status} | model=$model | template=$template")
@@ -63,6 +63,6 @@ class AgentListTool(
 
     private fun resolveTemplateName(agent: ToolAgent): String {
         val configId = agents.configId(agent.id)
-        return configId ?: agent.config.model?.ifBlank { null } ?: "default"
+        return configId ?: agent.config.model?.ifBlank { null } ?: "inherited"
     }
 }
