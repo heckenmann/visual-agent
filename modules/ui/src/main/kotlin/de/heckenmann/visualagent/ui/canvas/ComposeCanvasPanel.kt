@@ -86,7 +86,7 @@ internal fun CanvasPanel(
         rememberFilePickerLauncher { selected: PlatformFile? ->
             selected?.file?.let { file ->
                 runCatching {
-                    val imported = workspaceFileService.importFile(file.name, file.readBytes())
+                    val imported = workspaceFileService.importFile("imports", file.name, file.readBytes())
                     canvasOperations.insertImage(imported.relativePath)
                 }.onSuccess { update(it) }
                     .onFailure {

@@ -2,7 +2,7 @@
 
 ## Goal
 
-Render conversation messages as Markdown without altering the model-provided message text before parsing. The renderer supports GFM (GitHub Flavored Markdown) including tables, strikethrough, block quotes, thematic breaks, italic, nested lists, and server-resolved images.
+Render conversation messages and model thinking blocks as Markdown without altering the model-provided text before parsing. The renderer supports GFM (GitHub Flavored Markdown) including tables, strikethrough, block quotes, thematic breaks, italic, nested lists, and server-resolved images.
 
 ## Primary Actor
 
@@ -31,6 +31,8 @@ Desktop user.
    - Validated canvas snapshots persisted with conversation metadata render as image attachments.
    - Loading, unsupported, missing, and failed images render an accessible local fallback while the surrounding message remains visible.
 4. The message row is inserted into the chat list.
+
+Thinking blocks use the same Markdown renderer inside the collapsible thinking row, so formatting remains consistent between model reasoning and the final answer.
 
 ## Result
 
@@ -73,7 +75,8 @@ The model must use only image sources supplied by the user or returned by a tool
 - Nested lists are visually indented per nesting level.
 - Empty table cells render gracefully without visible empty bordered boxes.
 - Standard Markdown image syntax renders inline after server-side validation; `client-file:` is the only client-local exception.
-- The original Markdown source remains the canonical persisted message content.
+- The original Markdown source remains the canonical persisted message content, including thinking markup.
+- Markdown formatting inside a thinking block is rendered when the block is expanded.
 - Unsafe schemes, unregistered workspace paths, redirects, unsupported media, and oversized payloads are rejected without hiding the message.
 - Payload MIME is detected from the bytes with Apache Tika and must match the declared image type.
 - Images are requested only after a complete Markdown image node is available.
