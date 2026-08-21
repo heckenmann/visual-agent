@@ -55,6 +55,9 @@ dependencies {
     implementation(libs.pdfbox)
     implementation(libs.tika.core)
     implementation(libs.okhttp.jvm)
+    implementation(libs.commons.net)
+    implementation(libs.mina.sshd.scp)
+    implementation(libs.spring.integration.sftp)
 
     // Kotlin logging (wrapper for SLF4J)
     implementation(libs.kotlin.logging)

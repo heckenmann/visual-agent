@@ -1,9 +1,11 @@
 package de.heckenmann.visualagent.server
 
 import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
+import de.heckenmann.visualagent.protocol.WorkspaceDownload
 import de.heckenmann.visualagent.protocol.WorkspaceFile
 import de.heckenmann.visualagent.protocol.WorkspaceFilePort
 import de.heckenmann.visualagent.protocol.WorkspaceSyncResult
+import de.heckenmann.visualagent.workspace.WorkspaceDownloadService
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
 import org.springframework.stereotype.Component
 
@@ -11,6 +13,7 @@ import org.springframework.stereotype.Component
 @Component
 class SpringWorkspaceFilePort(
     private val workspaceFileService: WorkspaceFileService,
+    private val workspaceDownloadService: WorkspaceDownloadService,
 ) : WorkspaceFilePort {
     override fun workspaceRoot(): String = protocolBoundary { workspaceFileService.workspaceRoot().toString() }
 
@@ -29,6 +32,16 @@ class SpringWorkspaceFilePort(
         name: String,
         bytes: ByteArray,
     ): WorkspaceFile = protocolBoundary { workspaceFileService.importFile(directory, name, bytes).toProtocol() }
+
+    override fun activeDownloads(): List<WorkspaceDownload> = protocolBoundary { workspaceDownloadService.activeDownloads() }
+
+    override fun pauseDownload(id: String) = protocolBoundary { workspaceDownloadService.pauseDownload(id) }
+
+    override fun resumeDownload(id: String) = protocolBoundary { workspaceDownloadService.resumeDownload(id) }
+
+    override fun cancelDownload(id: String) = protocolBoundary { workspaceDownloadService.cancelDownload(id) }
+
+    override fun addDownloadListener(listener: () -> Unit): AutoCloseable = workspaceDownloadService.addListener(listener)
 
     override fun createManagedFile(
         directoryName: String,

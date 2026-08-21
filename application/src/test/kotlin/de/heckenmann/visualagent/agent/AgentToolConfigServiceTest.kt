@@ -23,6 +23,8 @@ class AgentToolConfigServiceTest {
         assertTrue("agent:log" in tools)
         assertTrue("todos" in tools)
         assertTrue("workspace:file" in tools)
+        assertTrue("workspace:mime" in tools)
+        assertTrue("workspace:download" in tools)
         assertFalse("agent:start" in tools)
         assertFalse("agent:message" in tools)
         assertFalse("agent:assign-todo" in tools)

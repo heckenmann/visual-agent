@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.agent.tools
 
 import de.heckenmann.visualagent.agent.LLMProvider
+import de.heckenmann.visualagent.agent.tools.api.ToolDownloadRequest
 import de.heckenmann.visualagent.agent.tools.api.ToolExtractedText
 import de.heckenmann.visualagent.agent.tools.api.ToolImageAnalysis
 import de.heckenmann.visualagent.agent.tools.api.ToolImageBytes
@@ -14,6 +15,8 @@ import de.heckenmann.visualagent.agent.tools.api.ToolWorkspaceSync
 import de.heckenmann.visualagent.agent.tools.api.WorkspaceFileToolPort
 import de.heckenmann.visualagent.agent.tools.api.WorkspaceLayoutToolPort
 import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
+import de.heckenmann.visualagent.workspace.WorkspaceDownloadRequest
+import de.heckenmann.visualagent.workspace.WorkspaceDownloadService
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
 import de.heckenmann.visualagent.workspace.layout.WorkspaceLayoutService
 import de.heckenmann.visualagent.workspace.layout.WorkspaceWindowState
@@ -29,6 +32,7 @@ import java.util.Base64
 class WorkspaceFileToolPortAdapter(
     private val files: WorkspaceFileService,
     private val llmProvider: ObjectProvider<LLMProvider>,
+    private val downloads: WorkspaceDownloadService? = null,
 ) : WorkspaceFileToolPort {
     override fun list(): List<ToolWorkspaceFile> = files.listFiles().map(::toToolFile)
 
@@ -83,6 +87,11 @@ class WorkspaceFileToolPortAdapter(
 
     override fun detectMimeType(file: ToolWorkspaceFile): ToolMimeType =
         files.detectMimeType(requireRecord(file)).let { ToolMimeType(it.detectedMimeType, it.storedMimeType, it.sizeBytes, it.sha256) }
+
+    override fun download(request: ToolDownloadRequest): ToolWorkspaceFile =
+        requireNotNull(downloads) { "Workspace downloads are not configured" }
+            .download(WorkspaceDownloadRequest(request.source, request.directory, request.filename))
+            .let(::toToolFile)
 
     private fun requireRecord(file: ToolWorkspaceFile): WorkspaceFileRecord = files.requireFile(file.id, null)
 }

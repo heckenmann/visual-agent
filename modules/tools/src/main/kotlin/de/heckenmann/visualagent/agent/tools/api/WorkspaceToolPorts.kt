@@ -62,8 +62,7 @@ interface WorkspaceFileToolPort {
     fun detectMimeType(file: ToolWorkspaceFile): ToolMimeType
 
     /** Downloads a remote resource into the managed workspace. */
-    fun download(request: ToolDownloadRequest): ToolWorkspaceFile =
-        error("Workspace downloads are not configured")
+    fun download(request: ToolDownloadRequest): ToolWorkspaceFile = error("Workspace downloads are not configured")
 }
 
 /** Managed workspace-file projection. */

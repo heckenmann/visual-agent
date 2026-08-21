@@ -41,6 +41,8 @@ class AgentToolConfigService(
             "subagents:execution",
             "todos",
             "workspace:file",
+            "workspace:mime",
+            "workspace:download",
         ).let(::filterEnabledTools).map(::ToolId).toSet()
 
     /**
@@ -200,6 +202,8 @@ class AgentToolConfigService(
                         "sleep",
                         "workspace:layout",
                         "workspace:file",
+                        "workspace:mime",
+                        "workspace:download",
                         "canvas",
                     ),
             ),
@@ -225,6 +229,8 @@ class AgentToolConfigService(
                         "sleep",
                         "workspace:layout",
                         "workspace:file",
+                        "workspace:mime",
+                        "workspace:download",
                         "canvas",
                     ),
                 maxTurns = 8,
@@ -248,6 +254,8 @@ class AgentToolConfigService(
                         "sleep",
                         "workspace:layout",
                         "workspace:file",
+                        "workspace:mime",
+                        "workspace:download",
                         "canvas",
                     ),
             ),
