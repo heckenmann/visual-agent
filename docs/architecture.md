@@ -171,7 +171,8 @@ that returns "not configured"), `search` (placeholder that returns
 `workspace:download`, `canvas`.
 
 Managed workspace mutations are performed by server-owned workspace tools. In particular,
-`workspace:file` deletion removes the filesystem entry and its metadata; model runtimes must
+`workspace:file` deletion removes the filesystem entry and its metadata; `deleteDirectory` only
+removes empty directories unless `recursive=true` is explicitly requested. Model runtimes must
 not delete registered workspace files through shell commands.
 
 ## UI/Application Runtime Boundary

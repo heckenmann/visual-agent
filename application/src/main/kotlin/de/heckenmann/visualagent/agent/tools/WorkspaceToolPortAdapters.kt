@@ -8,6 +8,7 @@ import de.heckenmann.visualagent.agent.tools.api.ToolImageBytes
 import de.heckenmann.visualagent.agent.tools.api.ToolImageInfo
 import de.heckenmann.visualagent.agent.tools.api.ToolMimeType
 import de.heckenmann.visualagent.agent.tools.api.ToolWindowState
+import de.heckenmann.visualagent.agent.tools.api.ToolWorkspaceDirectoryDeletion
 import de.heckenmann.visualagent.agent.tools.api.ToolWorkspaceFile
 import de.heckenmann.visualagent.agent.tools.api.ToolWorkspaceMatch
 import de.heckenmann.visualagent.agent.tools.api.ToolWorkspaceSearch
@@ -57,6 +58,14 @@ class WorkspaceFileToolPortAdapter(
     ): ToolWorkspaceFile = toToolFile(files.requireFile(id, path))
 
     override fun delete(file: ToolWorkspaceFile): Boolean = files.deleteFile(file.id)
+
+    override fun deleteDirectory(
+        relativePath: String,
+        recursive: Boolean,
+    ): ToolWorkspaceDirectoryDeletion =
+        files.deleteDirectory(relativePath, recursive).let {
+            ToolWorkspaceDirectoryDeletion(it.relativePath, it.recursive, it.deletedFiles, it.deletedMetadata)
+        }
 
     override fun hash(file: ToolWorkspaceFile): String = files.hash(requireRecord(file))
 

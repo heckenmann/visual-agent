@@ -140,6 +140,23 @@ class WorkspaceFileToolTest {
         assertTrue(service.listFiles().none { it.id == imported.id })
     }
 
+    @Test
+    fun `workspace file tool deletes directories only when recursion is explicit`() {
+        val dbPath = tempDir().resolve("data/visual-agent.db").toString()
+        val service = WorkspaceFileService(FakeWorkspaceFileStore(), dbPath)
+        val imported = service.importFile("remove-me/nested", "file.txt", "remove".toByteArray())
+        val tool = WorkspaceFileTool(service, SingleObjectProvider(FakeVisionProvider()))
+
+        val result =
+            Json
+                .parseToJsonElement(tool.execute("""{"action":"deleteDirectory","path":"remove-me","recursive":true}""").content)
+                .jsonObject
+
+        assertEquals("true", result["recursive"]!!.jsonPrimitive.content)
+        assertEquals("1", result["deletedFiles"]!!.jsonPrimitive.content)
+        assertTrue(service.listFiles().none { it.id == imported.id })
+    }
+
     private fun tempDir(): Path = Files.createTempDirectory("visual-agent-workspace-tool-test")
 
     private fun writePdf(

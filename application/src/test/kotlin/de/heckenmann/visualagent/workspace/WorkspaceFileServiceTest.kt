@@ -17,6 +17,7 @@ import kotlin.io.path.isRegularFile
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
@@ -79,6 +80,35 @@ class WorkspaceFileServiceTest {
 
             assertEquals("projects/demo", service.createDirectory("projects", "demo"))
             assertEquals(listOf("projects", "projects/demo"), service.listDirectories())
+        }
+
+    @Test
+    fun `directory deletion requires explicit recursion and removes nested metadata`() =
+        withDatabasePath(tempDir().resolve("data/visual-agent.db").toString()) { dbPath ->
+            val store = FakeWorkspaceFileStore()
+            val service = WorkspaceFileService(store, dbPath)
+            val nested = service.importFile("projects/demo/nested", "notes.txt", "content".toByteArray())
+            val unmanaged = service.workspaceRoot().resolve("projects/demo/nested/unmanaged.bin")
+            unmanaged.writeText("unmanaged")
+
+            assertFailsWith<IllegalArgumentException> { service.deleteDirectory("projects/demo") }
+            assertTrue(service.resolveManagedPath(nested.relativePath).isRegularFile())
+
+            val deletion = service.deleteDirectory("projects/demo", recursive = true)
+
+            assertEquals(2, deletion.deletedFiles)
+            assertEquals(1, deletion.deletedMetadata)
+            assertTrue(service.listFiles().none { it.id == nested.id })
+            assertTrue(!unmanaged.toFile().exists())
+            assertTrue(service.listDirectories().none { it.startsWith("projects/demo") })
+        }
+
+    @Test
+    fun `directory deletion does not allow deleting the workspace root`() =
+        withDatabasePath(tempDir().resolve("data/visual-agent.db").toString()) { dbPath ->
+            val service = WorkspaceFileService(FakeWorkspaceFileStore(), dbPath)
+
+            assertFailsWith<IllegalArgumentException> { service.deleteDirectory("", recursive = true) }
         }
 
     @Test

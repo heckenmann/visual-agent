@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.server
 
 import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
+import de.heckenmann.visualagent.protocol.WorkspaceDirectoryDeletion
 import de.heckenmann.visualagent.protocol.WorkspaceDownload
 import de.heckenmann.visualagent.protocol.WorkspaceFile
 import de.heckenmann.visualagent.protocol.WorkspaceFilePort
@@ -64,6 +65,16 @@ class SpringWorkspaceFilePort(
     ): WorkspaceFile = protocolBoundary { workspaceFileService.renameFile(id, requestedName).toProtocol() }
 
     override fun deleteFile(id: String): Boolean = protocolBoundary { workspaceFileService.deleteFile(id) }
+
+    override fun deleteDirectory(
+        relativePath: String,
+        recursive: Boolean,
+    ): WorkspaceDirectoryDeletion =
+        protocolBoundary {
+            workspaceFileService.deleteDirectory(relativePath, recursive).let {
+                WorkspaceDirectoryDeletion(it.relativePath, it.recursive, it.deletedFiles, it.deletedMetadata)
+            }
+        }
 
     override fun readBytes(relativePath: String): ByteArray =
         protocolBoundary {

@@ -224,6 +224,7 @@ Supported actions:
 - `search`: requires `query`; searches metadata and bounded text/PDF content.
 - `info`: requires `id` or `path`; returns persisted metadata.
 - `delete`: requires `id` or `path`; removes the managed file and its persisted metadata through the server-owned workspace service. Use this instead of terminal commands.
+- `deleteDirectory`: requires `path`; deletes an empty managed directory. Add `recursive:true` explicitly to delete nested files and directories, including their persisted metadata. The workspace root cannot be deleted.
 - `sync`: reconciles workspace files on disk with persisted metadata and reports added, updated, and removed records.
 - `hash`: requires `id` or `path`; computes the current SHA-256 hash from file bytes.
 - `readText`: requires `id` or `path`; reads bounded UTF-8 text content.

@@ -37,6 +37,7 @@ Workspace files can be managed without leaving the application.
 - `workspace:file` with `{"action":"list"}` lists managed files and directories, including empty directories.
 - `workspace:file` with `{"action":"search","query":"...","entryType":"file|directory","mimeType":"..."}` searches both by default or only the requested entry type; `mimeType` filters file matches.
 - `workspace:file` with `{"action":"delete","id":"..."}` deletes a managed workspace file through the server-owned file service.
+- `workspace:file` with `{"action":"deleteDirectory","path":"...","recursive":true}` deletes a directory and its descendants only when recursion is explicitly requested.
 
 ## Code Entry Points
 
@@ -50,7 +51,7 @@ Workspace files can be managed without leaving the application.
 
 - Rename preserves extensions unless explicitly changed.
 - Canvas documents can be reopened from the files panel.
-- Delete removes both managed file and metadata after internal modal confirmation, or removes stale metadata when the physical file is already absent.
+- Delete removes both managed file and metadata after internal modal confirmation, or removes stale metadata when the physical file is already absent. Directory deletion rejects non-empty directories unless `recursive=true` is explicit and never accepts the workspace root.
 - Copy actions never expose raw secret values.
 - Search and type filters only affect the visible list; they do not mutate workspace metadata.
 - Active downloads show progress controls in their containing folder; opening is unavailable until completion.

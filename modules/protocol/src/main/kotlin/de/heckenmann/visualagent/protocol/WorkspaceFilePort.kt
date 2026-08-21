@@ -59,6 +59,12 @@ interface WorkspaceFilePort {
     /** Deletes one managed file. */
     fun deleteFile(id: String): Boolean
 
+    /** Deletes a managed directory, optionally including all descendants. */
+    fun deleteDirectory(
+        relativePath: String,
+        recursive: Boolean = false,
+    ): WorkspaceDirectoryDeletion
+
     /** Reads bytes from a managed file by relative path. */
     fun readBytes(relativePath: String): ByteArray
 
@@ -84,6 +90,14 @@ data class WorkspaceSyncResult(
     val updated: Int,
     val removed: Int,
     val total: Int,
+)
+
+/** Result of deleting a managed workspace directory. */
+data class WorkspaceDirectoryDeletion(
+    val relativePath: String,
+    val recursive: Boolean,
+    val deletedFiles: Int,
+    val deletedMetadata: Int,
 )
 
 /** Server-owned download progress exposed to the file browser. */

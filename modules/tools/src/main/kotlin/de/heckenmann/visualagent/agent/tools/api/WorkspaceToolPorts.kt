@@ -31,6 +31,12 @@ interface WorkspaceFileToolPort {
     /** Deletes one managed file and its persisted metadata. */
     fun delete(file: ToolWorkspaceFile): Boolean
 
+    /** Deletes a managed workspace directory, optionally including descendants. */
+    fun deleteDirectory(
+        relativePath: String,
+        recursive: Boolean = false,
+    ): ToolWorkspaceDirectoryDeletion
+
     /** Hashes one file. */
     fun hash(file: ToolWorkspaceFile): String
 
@@ -97,6 +103,14 @@ data class ToolWorkspaceSync(
     val updated: Int,
     val removed: Int,
     val total: Int,
+)
+
+/** Result of deleting a managed workspace directory. */
+data class ToolWorkspaceDirectoryDeletion(
+    val relativePath: String,
+    val recursive: Boolean,
+    val deletedFiles: Int,
+    val deletedMetadata: Int,
 )
 
 /** Extracted PDF text and cache state. */

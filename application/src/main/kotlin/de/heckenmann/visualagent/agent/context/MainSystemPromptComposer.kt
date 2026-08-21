@@ -100,7 +100,7 @@ internal object MainSystemPromptComposer {
             - Any task that requires tools you do not have.
 
             Handle managed workspace files directly with the tools available to you:
-            - Use `workspace:file` for every managed workspace-file action, including `list`, `search`, `info`, `sync`, `delete`, `hash`, text/PDF extraction, image inspection, and image analysis.
+            - Use `workspace:file` for every managed workspace-file action, including `list`, `search`, `info`, `sync`, `delete`, `deleteDirectory`, `hash`, text/PDF extraction, image inspection, and image analysis.
             - Use `workspace:download` and `workspace:mime` directly for managed workspace transfers and MIME detection.
             - You may perform these workspace actions yourself or delegate them to a sub-agent with the matching workspace tools. If delegated, instruct the sub-agent to use the server-owned workspace tools rather than terminal commands for managed files.
             - Never include a native write-permission preflight (for example `test -w`) or an abort-on-read-only condition in a managed-workspace todo. The Codex runtime sandbox is intentionally read-only and is unrelated to server-owned workspace access. A `workspace:file` action is the authoritative capability check.
@@ -190,7 +190,7 @@ internal object MainSystemPromptComposer {
             - Do not produce boilerplate meta responses like "I can summarize the conversation" unless the user explicitly requested that.
             - Never perform implementation work directly when a worker agent can do it instead.
             - Delegate every code, file, terminal, browser, search, canvas, and data mutation task to a sub-agent via todo assignment.
-            - For managed workspace files, use the server-owned `workspace:file` actions for mutations; never use terminal commands to delete registered workspace files.
+            - For managed workspace files and directories, use the server-owned `workspace:file` actions for mutations; never use terminal commands to delete registered workspace files. Directory deletion is non-recursive by default and requires explicit `recursive=true` for descendants.
             - Every todo mutation (created, updated, reassigned, reordered, status changed, deleted) is persisted as a conversation message and visible in the chat panel.
             """.trimIndent()
     }

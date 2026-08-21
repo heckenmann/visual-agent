@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.knowledge.WorkspaceFileStore
 import de.heckenmann.visualagent.protocol.MAX_WORKSPACE_FILE_IMPORT_BYTES
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
@@ -216,7 +217,7 @@ class WorkspaceFileService(
         filesByRelative.forEach { (relativePath, path) ->
             val current = pathsByRelative[relativePath]
             if (current == null) {
-                store.saveWorkspaceFile(recordForExistingFile(path, path.name))
+                store.saveWorkspaceFile(recordForExistingFile(path, path.name, databasePath, mimeDetector))
                 added++
             } else {
                 val currentHash = WorkspaceFilePaths.sha256(path)
@@ -274,6 +275,7 @@ class WorkspaceFileService(
      * @return true when a file was deleted
      * @see docs/usecases/uc_0000024_manage_workspace_files.md
      */
+    @Transactional
     fun deleteFile(id: String): Boolean {
         val record = store.getWorkspaceFile(id) ?: return false
         val path = WorkspaceFilePaths.resolveWorkspacePath(record.relativePath, databasePath)
@@ -285,6 +287,26 @@ class WorkspaceFileService(
             if (deleted) recordActivity("Workspace file deleted: ${record.relativePath}.")
         }
     }
+
+    /** Deletes a workspace directory, optionally including all nested files and directories. */
+    @Transactional
+    fun deleteDirectory(
+        relativePath: String,
+        recursive: Boolean = false,
+    ): WorkspaceDirectoryDeletion =
+        deleteWorkspaceDirectory(
+            root = workspaceRoot(),
+            requestedPath = relativePath,
+            databasePath = databasePath,
+            recursive = recursive,
+            records = listFiles(),
+            deleteMetadata = store::deleteWorkspaceFile,
+        ).also { result ->
+            recordActivity(
+                "Workspace directory deleted: ${result.relativePath} " +
+                    "(recursive=${result.recursive}, files=${result.deletedFiles}).",
+            )
+        }
 
     /**
      * Renames a managed file and updates persisted metadata.
@@ -378,24 +400,6 @@ class WorkspaceFileService(
 
     private fun recordActivity(message: String) {
         activityEvents?.publish(WorkspaceFileActivity(message))
-    }
-
-    private fun recordForExistingFile(
-        path: Path,
-        originalName: String,
-    ): WorkspaceFileRecord {
-        val now = Instant.now()
-        return WorkspaceFileRecord(
-            id = UUID.randomUUID().toString(),
-            relativePath = WorkspaceFilePaths.relativePath(path, databasePath),
-            originalName = WorkspaceFilePaths.safeFileName(originalName),
-            mimeType = mimeDetector.detect(path),
-            sizeBytes = path.fileSize(),
-            sha256 = WorkspaceFilePaths.sha256(path),
-            extractedText = null,
-            importedAt = now,
-            updatedAt = now,
-        )
     }
 
     private companion object {
