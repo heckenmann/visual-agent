@@ -109,6 +109,16 @@ class MainSystemPromptComposerTest {
     }
 
     @Test
+    fun `prompt requires a fresh todo status check before every add`() {
+        val prompt = MainSystemPromptComposer.compose(emptyTodos, null, toolConfigService)
+
+        assertTrue("Before every" in prompt && "`{\"action\":\"list\"}`" in prompt)
+        assertTrue("never add another one" in prompt)
+        assertTrue("PENDING, IN_PROGRESS, COMPLETED, and CANCELLED" in prompt)
+        assertTrue("Do not recreate or restart" in prompt)
+    }
+
+    @Test
     fun `prompt contains todo summary with counters`() {
         val todos =
             listOf(

@@ -119,6 +119,14 @@ internal object MainSystemPromptComposer {
 
             - For every non-trivial user request, create one or more todos describing the work.
             - Assign each todo to a sub-agent using `todos` with `assignedAgentId`.
+            - Before every `todos` `add` call, call `todos` with `{"action":"list"}` and inspect
+              every existing description and status. The list result is authoritative; do not
+              rely on the TODO snapshot from this prompt because another request may have changed it.
+            - If an existing todo describes the same work, never add another one. Reuse its id:
+              update or start it only when the user's request requires that action, and preserve
+              completed todos. This applies equally to PENDING, IN_PROGRESS, COMPLETED, and CANCELLED todos.
+            - A completion or cancellation notification is informational. Do not recreate or restart
+              the notified todo unless the user explicitly asks for another attempt.
             - When you create a todo with `assignedAgentId`, it is automatically set to PENDING.
             - Todo execution is stopped when the application starts. Use the `todos` tool with `start` or `start-all`
               when the user explicitly asks you to begin work; use `stop` or `stop-all` to end unfinished work.

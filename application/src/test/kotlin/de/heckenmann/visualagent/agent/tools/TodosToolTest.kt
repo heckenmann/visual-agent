@@ -157,6 +157,34 @@ class TodosToolTest {
     }
 
     @Test
+    fun `add reuses an existing todo instead of creating a duplicate`() {
+        val tempDb =
+            createTempDirectory("visual-agent-todos-tool-dedup")
+                .resolve("todos-tool.db")
+                .toString()
+        val db = KnowledgeDbTestFactory.create(tempDb)
+        try {
+            val tool = createTool(db)
+            val first = tool.execute(json("action" to "add", "description" to "Download Alpine ISO", "assignedAgentId" to "agent-1"))
+            val firstId = first.content.removePrefix("Added todo ")
+            val duplicate =
+                tool.execute(
+                    json(
+                        "action" to "add",
+                        "description" to "  download   alpine iso ",
+                        "assignedAgentId" to "agent-1",
+                    ),
+                )
+
+            assertTrue(duplicate.success)
+            assertTrue(duplicate.content.contains("Todo already exists: $firstId [PENDING]"))
+            assertEquals(1, db.listTodos().size)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
     fun `update rejects assignedAgentId referencing missing agent`() {
         val tempDb =
             createTempDirectory("visual-agent-todos-tool-update-validation")
