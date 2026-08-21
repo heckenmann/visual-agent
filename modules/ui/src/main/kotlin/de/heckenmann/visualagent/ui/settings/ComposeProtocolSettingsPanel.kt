@@ -169,30 +169,23 @@ internal fun SettingsPanel(
         }
     }
 
-    /** Loads details for the selected model without blocking the UI thread. */
-    fun refreshDetails() {
-        if (providerId.isBlank() || modelId.isBlank() || loadingDetails) return
+    LaunchedEffect(providerId, modelId) {
+        if (providerId.isBlank() || modelId.isBlank()) return@LaunchedEffect
         loadingDetails = true
         modelDetails = "Loading model details..."
-        scope.launch {
-            runCatching { withContext(Dispatchers.IO) { providerPort.modelDetails(providerId, modelId) } }
-                .onSuccess { details ->
-                    modelDetails =
-                        buildString {
-                            appendLine("Model: ${details.model}")
-                            appendLine("Modified: ${details.modifiedAt.ifBlank { "unknown" }}")
-                            appendLine("Family: ${details.family ?: "unknown"}")
-                            appendLine("Size: ${details.parameterSize ?: "unknown"}")
-                            appendLine("Format: ${details.format ?: "unknown"}")
-                            append("Quantization: ${details.quantizationLevel ?: "unknown"}")
-                        }
-                }.onFailure { modelDetails = it.toUiErrorMessage() }
-            loadingDetails = false
-        }
-    }
-
-    LaunchedEffect(providerId, modelId) {
-        if (providerId.isNotBlank() && modelId.isNotBlank()) refreshDetails()
+        runCatching { withContext(Dispatchers.IO) { providerPort.modelDetails(providerId, modelId) } }
+            .onSuccess { details ->
+                modelDetails =
+                    buildString {
+                        appendLine("Model: ${details.model}")
+                        appendLine("Modified: ${details.modifiedAt.ifBlank { "unknown" }}")
+                        appendLine("Family: ${details.family ?: "unknown"}")
+                        appendLine("Size: ${details.parameterSize ?: "unknown"}")
+                        appendLine("Format: ${details.format ?: "unknown"}")
+                        append("Quantization: ${details.quantizationLevel ?: "unknown"}")
+                    }
+            }.onFailure { modelDetails = it.toUiErrorMessage() }
+        loadingDetails = false
     }
 
     /** Persists a provider profile edited in the modal dialog. */
