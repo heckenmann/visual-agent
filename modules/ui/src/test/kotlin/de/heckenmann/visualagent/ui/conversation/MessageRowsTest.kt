@@ -4,6 +4,7 @@ package de.heckenmann.visualagent.ui.conversation
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -20,6 +21,7 @@ import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
 import org.junit.Rule
 import org.junit.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import de.heckenmann.visualagent.protocol.ConversationMessage as Message
 
@@ -195,6 +197,69 @@ class MessageRowsTest {
             }
         }
         composeTestRule.onNodeWithText("Thinking…").assertExists()
+    }
+
+    @Test
+    fun `thinking markup is rendered separately from the assistant answer`() {
+        composeTestRule.setContent {
+            MaterialTheme {
+                MessageRow(
+                    message = Message(role = "assistant", content = "<think>**planning**</think>answer", id = "msg-1"),
+                    isStreamingPlaceholder = false,
+                    isStreaming = true,
+                    canRetry = false,
+                    canEdit = false,
+                    canDelete = false,
+                    isDeleting = false,
+                    onCopied = {},
+                    onRetry = {},
+                    onEdit = {},
+                    onDelete = {},
+                )
+            }
+        }
+        composeTestRule.onNodeWithText("Thinking…").assertExists()
+        composeTestRule.onNodeWithText("answer").assertExists()
+        composeTestRule.onNodeWithText("**planning**").assertExists()
+        composeTestRule.onNodeWithContentDescription("Expand thinking").performClick()
+        composeTestRule.waitUntil(timeoutMillis = 5_000) {
+            composeTestRule.onAllNodesWithText("planning").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("planning").assertExists()
+        composeTestRule.onNodeWithText("**planning**").assertDoesNotExist()
+        composeTestRule.onNodeWithText("<think>**planning**</think>answer").assertDoesNotExist()
+    }
+
+    @Test
+    fun `persisted thinking markup remains visible after streaming completes`() {
+        composeTestRule.setContent {
+            MaterialTheme {
+                MessageRow(
+                    message = Message(role = "assistant", content = "<think>first\n\nsecond</think>answer", id = "msg-2"),
+                    isStreamingPlaceholder = false,
+                    isStreaming = false,
+                    canRetry = false,
+                    canEdit = false,
+                    canDelete = false,
+                    isDeleting = false,
+                    onCopied = {},
+                    onRetry = {},
+                    onEdit = {},
+                    onDelete = {},
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Thinking").assertExists()
+        composeTestRule.onNodeWithText("answer").assertExists()
+    }
+
+    @Test
+    fun `separate thinking blocks are separated by a blank line`() {
+        val parsed = parseThinkingMarkup("<think>first</think>answer<think>second</think>")
+
+        assertEquals("first\n\nsecond", parsed.thinking)
+        assertEquals("answer", parsed.answer)
     }
 
     @Test

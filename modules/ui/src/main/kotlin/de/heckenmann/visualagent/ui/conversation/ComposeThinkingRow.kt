@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
@@ -45,9 +46,8 @@ import de.heckenmann.visualagent.ui.workspace.*
 /**
  * Collapsible row for model thinking blocks.
  *
- * The row is collapsed by default. While a stream is active the row can be shown
- * expanded with an animated "Thinking…" label. Once the stream completes the
- * row collapses and the thinking text remains available behind the expand toggle.
+ * The row is collapsed by default and shows the latest non-empty thinking line as a preview.
+ * The complete thinking text remains available behind the expand toggle.
  *
  * @param content Thinking text to display
  * @param isStreaming Whether the thinking content is still being produced
@@ -59,7 +59,13 @@ fun ThinkingRow(
     isStreaming: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    var expanded by remember { mutableStateOf(isStreaming) }
+    var expanded by remember { mutableStateOf(false) }
+    val latestLine =
+        content
+            .lineSequence()
+            .lastOrNull { it.isNotBlank() }
+            ?.trim()
+            .orEmpty()
     Column(
         modifier = modifier.fillMaxWidth().animateContentSize(),
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -88,15 +94,23 @@ fun ThinkingRow(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        if (!expanded && latestLine.isNotBlank()) {
+            Text(
+                text = latestLine,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 22.dp, top = 2.dp),
+            )
+        }
         AnimatedVisibility(
             visible = expanded,
             enter = fadeIn(animationSpec = tween(180)),
             exit = fadeOut(animationSpec = tween(180)),
         ) {
-            Text(
-                text = content,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            ComposeMarkdown(
+                markdown = content,
                 modifier = Modifier.padding(start = 22.dp, top = 2.dp),
             )
         }

@@ -139,7 +139,11 @@ internal fun ConversationMessageContent(
     isStreamingPlaceholder: Boolean,
     isStreaming: Boolean,
 ) {
+    val parsed = parseThinkingMarkup(message.content)
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (parsed.thinking.isNotBlank()) {
+            ThinkingRow(content = parsed.thinking, isStreaming = isStreaming)
+        }
         if (isStreamingPlaceholder) {
             Text(
                 text = "Thinking…",
@@ -148,7 +152,7 @@ internal fun ConversationMessageContent(
             )
         } else if (isStreaming) {
             SelectionContainer {
-                StreamingText(text = message.content, animate = false) { displayedText ->
+                StreamingText(text = parsed.answer, animate = false) { displayedText ->
                     Text(
                         text = displayedText,
                         style = MaterialTheme.typography.bodyMedium,
@@ -157,11 +161,32 @@ internal fun ConversationMessageContent(
                 }
             }
         } else {
-            SelectionContainer { ComposeMarkdown(message.content) }
+            SelectionContainer { ComposeMarkdown(parsed.answer) }
         }
         ConversationImageAttachments(message.images.orEmpty())
     }
 }
+
+internal data class ParsedThinkingMarkup(
+    val thinking: String,
+    val answer: String,
+)
+
+internal fun parseThinkingMarkup(content: String): ParsedThinkingMarkup {
+    val thinking = THINKING_BLOCK_PATTERN.findAll(content).map { it.groupValues[1] }.toMutableList()
+    var answer = content.replace(THINKING_BLOCK_PATTERN, "")
+    val openTag = OPEN_THINKING_TAG_PATTERN.find(answer)
+    if (openTag != null) {
+        thinking += answer.substring(openTag.range.last + 1)
+        answer = answer.substring(0, openTag.range.first)
+    }
+    answer = answer.replace(CLOSE_THINKING_TAG_PATTERN, "")
+    return ParsedThinkingMarkup(thinking.joinToString("\n\n").trim(), answer.trim())
+}
+
+private val THINKING_BLOCK_PATTERN = Regex("(?is)<think>(.*?)</think>")
+private val OPEN_THINKING_TAG_PATTERN = Regex("(?i)<think>")
+private val CLOSE_THINKING_TAG_PATTERN = Regex("(?i)</think>")
 
 @Composable
 internal fun SystemMessageRow(
