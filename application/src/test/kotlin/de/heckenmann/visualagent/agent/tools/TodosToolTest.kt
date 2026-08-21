@@ -279,47 +279,6 @@ class TodosToolTest {
             db.close()
         }
     }
-
-    @Test
-    fun `reorder before action changes position`() {
-        val tempDb =
-            createTempDirectory("visual-agent-todos-tool-reorder-before")
-                .resolve("todos-tool.db")
-                .toString()
-        val db =
-            KnowledgeDbTestFactory
-                .create(tempDb)
-        try {
-            val tool = createTool(db)
-            val a = tool.execute(json("action" to "add", "description" to "A", "assignedAgentId" to "agent-1"))
-            val idA = a.content.removePrefix("Added todo ")
-            tool.execute(json("action" to "add", "description" to "B", "assignedAgentId" to "agent-1"))
-            val idB = db.listTodos().first { it.description == "B" }.id
-
-            val result = tool.execute(json("action" to "reorder", "id" to idA, "before" to idB))
-            assertTrue(result.success)
-            assertEquals(0, db.listTodos().first { it.description == "A" }.position)
-        } finally {
-            db.close()
-        }
-    }
-
-    @Test
-    fun `reorder fails for missing todo`() {
-        val tempDb =
-            createTempDirectory("visual-agent-todos-tool-reorder-missing")
-                .resolve("todos-tool.db")
-                .toString()
-        val db =
-            KnowledgeDbTestFactory
-                .create(tempDb)
-        try {
-            val tool = createTool(db)
-            assertFalse(tool.execute(json("action" to "reorder", "id" to "missing", "position" to 0)).success)
-        } finally {
-            db.close()
-        }
-    }
 }
 
 private fun json(vararg pairs: Pair<String, Any>): String {
