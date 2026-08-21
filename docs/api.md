@@ -163,9 +163,14 @@ role-based sets above and the global blocklist:
 - `workspace:layout`: actions `get` (screens, main window, desktop,
   panel positions) and `set` (replace panel positions). Persists
   changes and notifies the live Compose workspace.
-- `workspace:file`: list/search/info/sync/hash/readText/extractPdfText/
+- `workspace:file`: list/search/info/sync/delete/hash/readText/extractPdfText/
   renderPdfPage/imageInfo/imageBytes/analyzeImage against the
   managed workspace directory.
+- `workspace:mime`: detect a registered workspace file MIME type from
+  bounded content bytes with Apache Tika.
+- `workspace:download`: download an HTTP(S), FTP, SFTP, or SCP
+  resource into `workspace/downloads` or another workspace-relative
+  directory, then register it with managed metadata.
 
 ### Canvas Tool
 
@@ -218,6 +223,7 @@ Supported actions:
 - `list`: returns imported file IDs, relative paths, MIME types, sizes, timestamps, and SHA-256 hashes.
 - `search`: requires `query`; searches metadata and bounded text/PDF content.
 - `info`: requires `id` or `path`; returns persisted metadata.
+- `delete`: requires `id` or `path`; removes the managed file and its persisted metadata through the server-owned workspace service. Use this instead of terminal commands.
 - `sync`: reconciles workspace files on disk with persisted metadata and reports added, updated, and removed records.
 - `hash`: requires `id` or `path`; computes the current SHA-256 hash from file bytes.
 - `readText`: requires `id` or `path`; reads bounded UTF-8 text content.
@@ -229,6 +235,17 @@ Supported actions:
 
 Imported files are not injected into model context automatically. The model must request content explicitly through this tool.
 Saved canvas documents are regular managed workspace files with MIME type `application/vnd.visual-agent.canvas+xml`, so they can be listed, searched, hashed, renamed, deleted, read, and reopened like other workspace files.
+
+### Workspace Transfer Tools
+
+`workspace:mime` accepts a managed file `id` or relative `path` and reports
+the content-derived MIME type, stored MIME type, byte size, and SHA-256 hash.
+`workspace:download` accepts a remote `source` plus optional workspace-relative
+`directory` and safe `filename`. It rejects credentials in model-provided
+sources, redirects, private network targets, unsupported protocols, and
+incomplete transfers. Downloads have no application-imposed size limit. SFTP
+and SCP remain separate protocols;
+both are supported with their matching server-side adapter.
 
 ### Use Cases Tool
 

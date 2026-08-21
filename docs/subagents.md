@@ -63,7 +63,8 @@ agent's `name` or `role` against the default templates:
 
 - `researcher`: read-only file tools, `history`, `context`, `pwd`,
   `todos`, `manual`, `usecases`, `sleep`, `browser`, `search`,
-  `workspace:layout`, `workspace:file`, `canvas`.
+  `workspace:layout`, `workspace:file`, `workspace:mime`,
+  `workspace:download`, `canvas`.
 - `coder`: adds `file:write`, `file:edit`, and `terminal`; raises
   the default `maxTurns` to 8.
 - `analyst`: same as `researcher` minus `browser` and `search`,

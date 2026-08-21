@@ -154,7 +154,7 @@ the runtime split is:
 
 Main-agent tool set (`agentToolConfigService.mainAgentTools()`):
 `agent:list`, `agent:show`, `agent:create`, `agent:update`, `agent:delete`,
-`agent:log`, and `todos`.
+`agent:log`, `todos`, `workspace:mime`, and `workspace:download`.
 
 Sub-agent role-based sets (`AgentToolConfigService.toolsFor(agent)`,
 default templates `researcher`, `coder`, `analyst`): `todos` plus the
@@ -167,7 +167,12 @@ Common tools: `ui`, `history`, `todos`, `context`, `pwd`, `manual`,
 `usecases`, `file:read`, `file:list`, `file:glob`, `file:grep`,
 `file:write`, `file:edit`, `terminal`, `sleep`, `browser` (placeholder
 that returns "not configured"), `search` (placeholder that returns
-"not configured"), `workspace:layout`, `workspace:file`, `canvas`.
+"not configured"), `workspace:layout`, `workspace:file`, `workspace:mime`,
+`workspace:download`, `canvas`.
+
+Managed workspace mutations are performed by server-owned workspace tools. In particular,
+`workspace:file` deletion removes the filesystem entry and its metadata; model runtimes must
+not delete registered workspace files through shell commands.
 
 ## UI/Application Runtime Boundary
 
