@@ -21,7 +21,6 @@ dependencies {
     implementation(platform(libs.spring.ai.bom))
     implementation(libs.spring.ai.ollama)
     implementation(libs.spring.ai.openai)
-    implementation(libs.spring.ai.agent.codex)
     implementation(libs.coroutines.core)
     implementation(libs.coroutines.reactor)
     implementation(libs.serialization.json)
