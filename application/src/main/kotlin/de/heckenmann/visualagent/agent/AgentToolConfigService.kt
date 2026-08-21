@@ -40,6 +40,7 @@ class AgentToolConfigService(
             "agent:log",
             "subagents:execution",
             "todos",
+            "workspace:file",
         ).let(::filterEnabledTools).map(::ToolId).toSet()
 
     /**

@@ -46,12 +46,16 @@ class MainSystemPromptComposerTest {
         val prompt = MainSystemPromptComposer.compose(emptyTodos, null, toolConfigService)
         assertTrue("When to Delegate" in prompt || "When to delegate" in prompt)
         assertTrue("Answer directly" in prompt)
-        assertTrue("File operations" in prompt)
+        assertTrue("Repository file operations" in prompt)
         assertTrue("Terminal commands" in prompt)
         assertTrue("Browser or search" in prompt)
         assertTrue("Canvas operations" in prompt)
         assertTrue("Research or analysis" in prompt)
         assertTrue("History search" in prompt)
+        assertTrue("workspace:file" in prompt)
+        assertTrue("You may perform these workspace actions yourself or delegate them" in prompt)
+        assertTrue("Never include a native write-permission preflight" in prompt)
+        assertTrue("A `workspace:file` action is the authoritative capability check" in prompt)
     }
 
     @Test

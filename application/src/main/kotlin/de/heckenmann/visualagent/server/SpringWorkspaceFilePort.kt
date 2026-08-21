@@ -17,10 +17,18 @@ class SpringWorkspaceFilePort(
     override fun listFiles(): List<WorkspaceFile> =
         protocolBoundary { workspaceFileService.listFiles().map(WorkspaceFileRecord::toProtocol) }
 
+    override fun listDirectories(): List<String> = protocolBoundary { workspaceFileService.listDirectories() }
+
+    override fun createDirectory(
+        parentDirectory: String,
+        name: String,
+    ): String = protocolBoundary { workspaceFileService.createDirectory(parentDirectory, name) }
+
     override fun importFile(
+        directory: String,
         name: String,
         bytes: ByteArray,
-    ): WorkspaceFile = protocolBoundary { workspaceFileService.importFile(name, bytes).toProtocol() }
+    ): WorkspaceFile = protocolBoundary { workspaceFileService.importFile(directory, name, bytes).toProtocol() }
 
     override fun createManagedFile(
         directoryName: String,

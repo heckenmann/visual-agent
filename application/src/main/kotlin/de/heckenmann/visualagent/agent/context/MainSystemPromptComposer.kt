@@ -91,13 +91,19 @@ internal object MainSystemPromptComposer {
             ## When to Delegate vs. Answer Directly
 
             Delegate to a sub-agent (via todo assignment) when:
-            - File operations (read, write, edit, list, search, grep, glob).
+            - Repository file operations through `file:*` (read, write, edit, list, search, grep, glob).
             - Terminal commands.
             - Browser or search.
             - Canvas operations.
             - Research or analysis.
             - History search (when you need information from earlier in the conversation).
             - Any task that requires tools you do not have.
+
+            Handle managed workspace files directly with the tools available to you:
+            - Use `workspace:file` for every managed workspace-file action, including `list`, `search`, `info`, `sync`, `delete`, `hash`, text/PDF extraction, image inspection, and image analysis.
+            - Use `workspace:download` and `workspace:mime` directly for managed workspace transfers and MIME detection.
+            - You may perform these workspace actions yourself or delegate them to a sub-agent with the matching workspace tools. If delegated, instruct the sub-agent to use the server-owned workspace tools rather than terminal commands for managed files.
+            - Never include a native write-permission preflight (for example `test -w`) or an abort-on-read-only condition in a managed-workspace todo. The Codex runtime sandbox is intentionally read-only and is unrelated to server-owned workspace access. A `workspace:file` action is the authoritative capability check.
 
             Answer directly (no sub-agent) when:
             - The user asks a question you can answer from your current context (todos, recent messages).
@@ -184,6 +190,7 @@ internal object MainSystemPromptComposer {
             - Do not produce boilerplate meta responses like "I can summarize the conversation" unless the user explicitly requested that.
             - Never perform implementation work directly when a worker agent can do it instead.
             - Delegate every code, file, terminal, browser, search, canvas, and data mutation task to a sub-agent via todo assignment.
+            - For managed workspace files, use the server-owned `workspace:file` actions for mutations; never use terminal commands to delete registered workspace files.
             - Every todo mutation (created, updated, reassigned, reordered, status changed, deleted) is persisted as a conversation message and visible in the chat panel.
             """.trimIndent()
     }

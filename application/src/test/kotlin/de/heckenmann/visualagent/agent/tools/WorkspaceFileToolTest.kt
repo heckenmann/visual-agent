@@ -8,6 +8,8 @@ import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
 import de.heckenmann.visualagent.knowledge.WorkspaceFileStore
 import de.heckenmann.visualagent.testsupport.TestPng
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.serialization.json.Json
@@ -44,6 +46,9 @@ class WorkspaceFileToolTest {
 
         assertTrue(tool.definition.description.contains("![alt text](workspace:<path>)"))
         assertTrue(tool.definition.description.contains("Do not invent paths"))
+        assertTrue(tool.definition.description.contains("native filesystem sandbox is read-only"))
+        assertTrue(tool.definition.description.contains("do not run native or terminal permission preflight checks"))
+        assertTrue(tool.definition.description.contains("its result is authoritative"))
 
         val list = tool.execute("""{"action":"list"}""")
         val read = tool.execute("""{"action":"readText","id":"${text.id}"}""")
@@ -52,6 +57,7 @@ class WorkspaceFileToolTest {
         val analysis = tool.execute("""{"action":"analyzeImage","id":"${image.id}","prompt":"describe"}""")
 
         assertTrue(list.content.contains(text.relativePath))
+        assertTrue(list.content.contains("imports"))
         assertTrue(read.content.contains("Alpha"))
         assertEquals("sha256", hash["algorithm"]!!.jsonPrimitive.content)
         assertEquals("1", info["width"]!!.jsonPrimitive.content)
@@ -89,11 +95,49 @@ class WorkspaceFileToolTest {
         unmanaged.writeText("manual")
         val tool = WorkspaceFileTool(service, SingleObjectProvider(FakeVisionProvider()))
 
+        service.createDirectory("", "needle-directory")
         val search = tool.execute("""{"action":"search","query":"needle"}""")
+        val directorySearch = tool.execute("""{"action":"search","query":"needle","entryType":"directory"}""")
+        val mimeSearch = tool.execute("""{"action":"search","query":"needle","entryType":"file","mimeType":"text/plain"}""")
+        val nonMatchingMimeSearch =
+            tool.execute("""{"action":"search","query":"needle","entryType":"file","mimeType":"image/png"}""")
         val sync = Json.parseToJsonElement(tool.execute("""{"action":"sync"}""").content).jsonObject
 
         assertTrue(search.content.contains(imported.relativePath))
+        assertTrue(search.content.contains("needle-directory"))
+        assertTrue(directorySearch.content.contains("needle-directory"))
+        assertFalse(directorySearch.content.contains(imported.relativePath))
+        assertTrue(mimeSearch.content.contains(imported.relativePath))
+        assertFalse(nonMatchingMimeSearch.content.contains(imported.relativePath))
         assertEquals("1", sync["added"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun `workspace file tool creates an empty directory through the server port`() {
+        val port = mockk<de.heckenmann.visualagent.agent.tools.api.WorkspaceFileToolPort>()
+        every { port.createDirectory("projects", "demo") } returns "projects/demo"
+        val tool = WorkspaceFileTool(port)
+
+        val result = tool.execute("""{"action":"createDirectory","parentDirectory":"projects","name":"demo"}""")
+
+        assertTrue(result.success)
+        assertTrue(result.content.contains("projects/demo"))
+    }
+
+    @Test
+    fun `workspace file delete uses the server tool and removes metadata`() {
+        val dbPath = tempDir().resolve("data/visual-agent.db").toString()
+        val service = WorkspaceFileService(FakeWorkspaceFileStore(), dbPath)
+        val source = tempDir().resolve("remove-me.txt")
+        Files.writeString(source, "remove")
+        val imported = service.importFile(source.toFile())
+        val tool = WorkspaceFileTool(service, SingleObjectProvider(FakeVisionProvider()))
+
+        val result = Json.parseToJsonElement(tool.execute("""{"action":"delete","id":"${imported.id}"}""").content).jsonObject
+
+        assertEquals("true", result["deleted"]!!.jsonPrimitive.content)
+        assertFalse(Files.exists(service.workspaceRoot().resolve(imported.relativePath)))
+        assertTrue(service.listFiles().none { it.id == imported.id })
     }
 
     private fun tempDir(): Path = Files.createTempDirectory("visual-agent-workspace-tool-test")

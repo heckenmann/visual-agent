@@ -8,11 +8,36 @@ interface WorkspaceFilePort {
     /** Lists persisted workspace file metadata. */
     fun listFiles(): List<WorkspaceFile>
 
-    /** Imports an external file from its name and bytes. */
+    /** Lists workspace-relative directories, including empty directories. */
+    fun listDirectories(): List<String>
+
+    /** Creates a directory below the supplied workspace-relative parent directory. */
+    fun createDirectory(
+        parentDirectory: String,
+        name: String,
+    ): String
+
+    /** Imports an external file into a workspace-relative directory. */
     fun importFile(
+        directory: String,
         name: String,
         bytes: ByteArray,
     ): WorkspaceFile
+
+    /** Returns downloads that are currently running or paused. */
+    fun activeDownloads(): List<WorkspaceDownload> = emptyList()
+
+    /** Pauses one active download. */
+    fun pauseDownload(id: String) = Unit
+
+    /** Resumes one paused download. */
+    fun resumeDownload(id: String) = Unit
+
+    /** Cancels one active download and removes its partial workspace data. */
+    fun cancelDownload(id: String) = Unit
+
+    /** Registers a listener for download progress changes. */
+    fun addDownloadListener(listener: () -> Unit): AutoCloseable
 
     /** Creates a generated managed file. */
     fun createManagedFile(
@@ -60,3 +85,18 @@ data class WorkspaceSyncResult(
     val removed: Int,
     val total: Int,
 )
+
+/** Server-owned download progress exposed to the file browser. */
+data class WorkspaceDownload(
+    val id: String,
+    val relativePath: String,
+    val state: WorkspaceDownloadState,
+    val downloadedBytes: Long,
+    val totalBytes: Long? = null,
+)
+
+/** State of one server-owned workspace download. */
+enum class WorkspaceDownloadState {
+    DOWNLOADING,
+    PAUSED,
+}

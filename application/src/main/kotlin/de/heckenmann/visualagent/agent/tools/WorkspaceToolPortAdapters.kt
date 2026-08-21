@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.agent.tools.api.ToolExtractedText
 import de.heckenmann.visualagent.agent.tools.api.ToolImageAnalysis
 import de.heckenmann.visualagent.agent.tools.api.ToolImageBytes
 import de.heckenmann.visualagent.agent.tools.api.ToolImageInfo
+import de.heckenmann.visualagent.agent.tools.api.ToolMimeType
 import de.heckenmann.visualagent.agent.tools.api.ToolWindowState
 import de.heckenmann.visualagent.agent.tools.api.ToolWorkspaceFile
 import de.heckenmann.visualagent.agent.tools.api.ToolWorkspaceMatch
@@ -31,6 +32,13 @@ class WorkspaceFileToolPortAdapter(
 ) : WorkspaceFileToolPort {
     override fun list(): List<ToolWorkspaceFile> = files.listFiles().map(::toToolFile)
 
+    override fun listDirectories(): List<String> = files.listDirectories()
+
+    override fun createDirectory(
+        parentDirectory: String,
+        name: String,
+    ): String = files.createDirectory(parentDirectory, name)
+
     override fun search(query: String): ToolWorkspaceSearch =
         files.searchFiles(query).let { result ->
             ToolWorkspaceSearch(result.query, result.matches.map { ToolWorkspaceMatch(it.matchType, it.snippet, toToolFile(it.record)) })
@@ -43,6 +51,8 @@ class WorkspaceFileToolPortAdapter(
         id: String?,
         path: String?,
     ): ToolWorkspaceFile = toToolFile(files.requireFile(id, path))
+
+    override fun delete(file: ToolWorkspaceFile): Boolean = files.deleteFile(file.id)
 
     override fun hash(file: ToolWorkspaceFile): String = files.hash(requireRecord(file))
 
@@ -70,6 +80,9 @@ class WorkspaceFileToolPortAdapter(
         val response = runBlocking { llmProvider.getObject().vision(Base64.getDecoder().decode(bytes.base64), prompt) }
         return ToolImageAnalysis(response.model, response.message.content)
     }
+
+    override fun detectMimeType(file: ToolWorkspaceFile): ToolMimeType =
+        files.detectMimeType(requireRecord(file)).let { ToolMimeType(it.detectedMimeType, it.storedMimeType, it.sizeBytes, it.sha256) }
 
     private fun requireRecord(file: ToolWorkspaceFile): WorkspaceFileRecord = files.requireFile(file.id, null)
 }

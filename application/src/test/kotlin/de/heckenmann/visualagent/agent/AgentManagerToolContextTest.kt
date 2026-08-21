@@ -45,6 +45,7 @@ class AgentManagerToolContextTest {
             assertFalse(ToolId("history") in requestSlot.captured.enabledTools)
             assertFalse(ToolId("workspace:layout") in requestSlot.captured.enabledTools)
             assertFalse(ToolId("canvas") in requestSlot.captured.enabledTools)
+            assertTrue(ToolId("workspace:file") in requestSlot.captured.enabledTools)
             assertEquals("main", requestSlot.captured.metadata["agent"])
         }
 }
