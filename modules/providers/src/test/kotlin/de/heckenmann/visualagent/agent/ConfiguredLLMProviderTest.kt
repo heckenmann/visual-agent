@@ -1,5 +1,7 @@
 package de.heckenmann.visualagent.agent
 
+import de.heckenmann.visualagent.agent.codex.CodexCliProvider
+import de.heckenmann.visualagent.agent.codex.CodexModelCatalog
 import de.heckenmann.visualagent.agent.openai.OpenAiClient
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
@@ -192,6 +194,36 @@ class ConfiguredLLMProviderTest {
             } finally {
                 appConfig.llmProvider = originalProvider
             }
+        }
+
+    @Test
+    fun `codex refresh persists the live model catalog`() =
+        runTest {
+            val catalog = catalog()
+            catalog.saveProvider(
+                ProviderProfile(
+                    id = "codex-custom",
+                    name = "Codex",
+                    adapter = ProviderAdapter.CODEX_CLI,
+                    baseUrl = "",
+                    defaultModel = "gpt-5.6-luna",
+                    models = listOf(ProviderModelConfig("gpt-5.6-luna", name = "Codex Luna")),
+                ),
+            )
+            val modelCatalog = mockk<CodexModelCatalog>()
+            coEvery { modelCatalog.load(any()) } returns listOf(ProviderModelConfig("gpt-5.6-luna", name = "Codex Luna"))
+            val router =
+                ConfiguredLLMProvider(
+                    mockk(relaxed = true),
+                    mockk(relaxed = true),
+                    catalog,
+                    codexCliProvider = CodexCliProvider(mockk()),
+                    codexModelCatalog = modelCatalog,
+                )
+
+            assertEquals(listOf("gpt-5.6-luna"), router.getModels("codex-custom"))
+            assertEquals("Codex Luna", catalog.selectableModels("codex-custom").single().name)
+            coVerify(exactly = 1) { modelCatalog.load(any()) }
         }
 
     @Test

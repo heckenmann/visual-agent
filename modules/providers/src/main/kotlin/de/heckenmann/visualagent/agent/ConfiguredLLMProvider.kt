@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.codex.CodexCliProvider
+import de.heckenmann.visualagent.agent.codex.CodexModelCatalog
 import de.heckenmann.visualagent.agent.ollama.fetchModelCapabilities
 import de.heckenmann.visualagent.agent.openai.OpenAiClient
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
@@ -22,6 +23,7 @@ class ConfiguredLLMProvider(
     private val providerCatalog: ProviderCatalogService,
     private val fetchCapabilities: suspend (ProviderProfile) -> Map<String, Set<String>> = ::fetchModelCapabilities,
     private val codexCliProvider: CodexCliProvider? = null,
+    private val codexModelCatalog: CodexModelCatalog? = null,
 ) : LLMProvider {
     override suspend fun chat(messages: List<Message>): ChatResponse = chat(ChatRequestContext(messages = messages))
 
@@ -67,7 +69,8 @@ class ConfiguredLLMProvider(
     override suspend fun getModels(providerId: String): List<String> {
         val profile = providerCatalog.getProvider(providerId) ?: error("Provider not found: $providerId")
         if (profile.adapter == ProviderAdapter.CODEX_CLI) {
-            providerCatalog.updateDiscoveredModelConfigs(providerId, requireCodexProvider().getModelConfigs(profile))
+            val models = requireCodexModelCatalog().load(profile)
+            providerCatalog.updateDiscoveredModelConfigs(providerId, models)
             return providerCatalog.selectableModels(providerId).map { it.id }
         }
         val discovered =
@@ -116,6 +119,9 @@ class ConfiguredLLMProvider(
         }
 
     private fun requireCodexProvider(): CodexCliProvider = requireNotNull(codexCliProvider) { "Codex CLI provider is unavailable" }
+
+    private fun requireCodexModelCatalog(): CodexModelCatalog =
+        requireNotNull(codexModelCatalog) { "Codex CLI model catalog is unavailable" }
 
     private fun ChatRequestContext.resolve(): ChatRequestContext {
         val explicitOptions =

@@ -223,8 +223,8 @@ class AgentShowTool(
         val tools = agents.tools(agent.id).sorted()
         val configId = agents.configId(agent.id)
         val description = configId?.let(agents::configDescription).orEmpty()
-        val model = agent.config.model?.ifBlank { null } ?: "default"
-        val template = configId ?: agent.config.model?.ifBlank { null } ?: "default"
+        val model = agent.config.model?.ifBlank { null } ?: "inherited"
+        val template = configId ?: agent.config.model?.ifBlank { null } ?: "inherited"
         val currentWork =
             when {
                 agent.status == "BUSY" && agent.currentTodoId != null ->

@@ -5,10 +5,10 @@ ktlint = "14.2.0"
 spring-boot = "4.1.0"
 spring-dependency-management = "1.1.7"
 spring-ai = "2.0.0"
+spring-ai-agents = "0.16.0"
 compose = "1.11.1"
 compose-material3 = "1.9.0"
 compose-material-icons = "1.7.3"
-cokit = "0.0.2"
 sqlite = "3.53.2.1"
 coroutines = "1.11.0"
 serialization = "1.11.0"
@@ -42,7 +42,7 @@ spring-context = { module = "org.springframework:spring-context" }
 spring-ai-bom = { module = "org.springframework.ai:spring-ai-bom", version.ref = "spring-ai" }
 spring-ai-ollama = { module = "org.springframework.ai:spring-ai-starter-model-ollama" }
 spring-ai-openai = { module = "org.springframework.ai:spring-ai-openai" }
-cokit-client = { module = "io.github.vupoint.cokit:cokit-client", version.ref = "cokit" }
+spring-ai-agent-codex = { module = "org.springaicommunity.agents:agent-codex", version.ref = "spring-ai-agents" }
 sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite" }
 coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 coroutines-reactor = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactor", version.ref = "coroutines" }

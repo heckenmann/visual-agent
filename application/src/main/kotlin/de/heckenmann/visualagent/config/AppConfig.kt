@@ -27,11 +27,11 @@ import java.util.concurrent.CopyOnWriteArrayList
 class AppConfig private constructor() {
     var llmProvider: String = "ollama"
     var ollamaLocalUrl: String = "http://localhost:11434"
-    var ollamaModel: String = "llava"
+    var ollamaModel: String = ""
     var ollamaApiKey: String = ""
     var openAiApiKey: String = ""
     var openAiBaseUrl: String = "https://api.openai.com"
-    var openAiModel: String = "gpt-4o-mini"
+    var openAiModel: String = ""
     var databasePath: String = "./data/visual-agent.db"
     var uiThemeMode: ThemeMode = ThemeMode.SYSTEM
     var fontSize: Int = 14

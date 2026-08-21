@@ -70,4 +70,16 @@ class CancellationTokenTest {
         assertTrue(first)
         assertTrue(second)
     }
+
+    @Test
+    fun `closed cancellation listener is not invoked`() {
+        val token = CancellationToken()
+        var invoked = false
+        val registration = token.onCancelled { invoked = true }
+
+        registration.close()
+        token.cancel()
+
+        assertFalse(invoked)
+    }
 }

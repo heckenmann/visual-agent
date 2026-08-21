@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import de.heckenmann.visualagent.protocol.ActivityPort
+import de.heckenmann.visualagent.protocol.ModelDetails
 import de.heckenmann.visualagent.protocol.ProviderAdapter
 import de.heckenmann.visualagent.protocol.ProviderModel
 import de.heckenmann.visualagent.protocol.ProviderPort
@@ -33,6 +34,7 @@ class ComposeProtocolSettingsPanelTest {
 
     @Test
     fun `panel renders provider and execution settings`() {
+        var detailsLoaded = false
         val settings = mockk<SettingsPort>(relaxed = true)
         every { settings.snapshot() } returns SettingsSnapshot()
         coEvery { settings.snapshotAsync() } returns SettingsSnapshot()
@@ -43,6 +45,10 @@ class ComposeProtocolSettingsPanelTest {
         every { providers.activeProviderId() } returns "ollama"
         every { providers.activeModelId() } returns "llama"
         every { providers.selectableModels("ollama") } returns listOf(ProviderModel("llama", "Llama"))
+        coEvery { providers.modelDetails("ollama", "llama") } answers {
+            detailsLoaded = true
+            ModelDetails("llama", "today")
+        }
         every { providers.addChangeListener(any()) } returns AutoCloseable { }
 
         composeTestRule.setContent {
@@ -64,6 +70,9 @@ class ComposeProtocolSettingsPanelTest {
         composeTestRule.onNodeWithText("Context length").assertExists()
         composeTestRule.onNodeWithContentDescription("Save provider and model").assertExists()
         composeTestRule.onNodeWithContentDescription("Save settings").assertExists().assertIsEnabled()
+        composeTestRule.onNodeWithContentDescription("Refresh models").assertExists()
+        composeTestRule.onNodeWithContentDescription("Refresh model details").assertDoesNotExist()
+        composeTestRule.waitUntil(5_000) { detailsLoaded }
     }
 
     @Test

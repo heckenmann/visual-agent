@@ -39,7 +39,6 @@ dependencies {
     implementation(platform(libs.spring.ai.bom))
     implementation(libs.spring.ai.ollama)
     implementation(libs.spring.ai.openai)
-    implementation(libs.cokit.client)
     implementation("org.hibernate.orm:hibernate-community-dialects")
     implementation("org.springframework.boot:spring-boot-starter-flyway")
 

@@ -28,6 +28,7 @@ class ProviderCatalogService(
         migrateLegacyConfiguration()
         ensureBuiltInProfiles()
         migrateBuiltInCodexProfile()
+        normalizeActiveCodexSelection()
     }
 
     /**
@@ -58,7 +59,8 @@ class ProviderCatalogService(
      */
     fun saveProvider(profile: ProviderProfile) {
         val state = load()
-        val providers = state.providers.filterNot { it.id == profile.id } + profile
+        val normalizedProfile = profile.withSelectableCodexDefault()
+        val providers = state.providers.filterNot { it.id == normalizedProfile.id } + normalizedProfile
         require(providers.any(ProviderProfile::enabled)) { "At least one provider profile must remain enabled" }
         val nextActiveProviderId =
             state.activeProviderId
@@ -276,7 +278,7 @@ class ProviderCatalogService(
                     baseUrl = config.ollamaLocalUrl,
                     apiKey = config.ollamaApiKey,
                     defaultModel = config.ollamaModel,
-                    models = listOf(ProviderModelConfig(config.ollamaModel)),
+                    models = config.ollamaModel.toModelConfigs(),
                 ),
                 ProviderProfile(
                     id = "openai",
@@ -285,7 +287,7 @@ class ProviderCatalogService(
                     baseUrl = config.openAiBaseUrl,
                     apiKey = config.openAiApiKey,
                     defaultModel = config.openAiModel,
-                    models = listOf(ProviderModelConfig(config.openAiModel)),
+                    models = config.openAiModel.toModelConfigs(),
                 ),
                 builtInCodexProfile(),
             )
@@ -311,6 +313,9 @@ class ProviderCatalogService(
             baseUrl = "",
         )
 
+    private fun String.toModelConfigs(): List<ProviderModelConfig> =
+        takeIf(String::isNotBlank)?.let(::ProviderModelConfig)?.let(::listOf).orEmpty()
+
     private fun migrateBuiltInCodexProfile() {
         val state = load()
         val providers =
@@ -328,6 +333,37 @@ class ProviderCatalogService(
             }
         if (providers != state.providers) save(state.copy(providers = providers))
     }
+
+    /** Makes the already selected Codex model selectable without inventing a model identifier. */
+    private fun normalizeActiveCodexSelection() {
+        val state = load()
+        val activeModel = state.activeModelId.takeIf(String::isNotBlank) ?: return
+        val providers =
+            state.providers.map { profile ->
+                if (
+                    profile.id == state.activeProviderId &&
+                    profile.adapter == ProviderAdapter.CODEX_CLI &&
+                    profile.defaultModel.isBlank() &&
+                    profile.models.none { it.id == activeModel }
+                ) {
+                    profile.copy(defaultModel = activeModel, models = listOf(ProviderModelConfig(activeModel)))
+                } else {
+                    profile
+                }
+            }
+        if (providers != state.providers) save(state.copy(providers = providers))
+    }
+
+    private fun ProviderProfile.withSelectableCodexDefault(): ProviderProfile =
+        if (
+            adapter == ProviderAdapter.CODEX_CLI &&
+            defaultModel.isNotBlank() &&
+            models.none { it.id == defaultModel }
+        ) {
+            copy(models = models + ProviderModelConfig(defaultModel))
+        } else {
+            this
+        }
 
     private fun load(): CatalogState =
         preferenceStore

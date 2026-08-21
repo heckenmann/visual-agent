@@ -17,7 +17,7 @@ Dependabot bot account (`dependabot[bot]`).
 ## Main Flow
 
 1. Dependabot opens a pull request targeting `master`.
-2. The `Tests` workflow triggers on the `pull_request` event and runs `gradle ktlintCheck check test` under Xvfb, followed by the CoKit WebSocket transport check.
+2. The `Tests` workflow triggers on the `pull_request` event and runs `gradle ktlintCheck check test` under Xvfb.
 3. The `dependabot-automerge` workflow triggers on the same `pull_request` event (only for `dependabot[bot]` author).
 4. The workflow fetches Dependabot metadata to determine the update type and package ecosystem.
 5. The workflow checks that only dependency files (`**/build.gradle*`, `**/gradle.properties`, `**/libs.versions.toml`, `.github/workflows/*.yml`) are touched.

@@ -43,6 +43,3 @@ jobs:
 
       - name: Run tests
         run: xvfb-run -a gradle ktlintCheck check test --build-cache --no-daemon --no-configuration-cache
-
-      - name: Verify CoKit WebSocket transport
-        run: gradle -p third_party/cokit :cokit-transport-websocket:check --build-cache --no-daemon --no-configuration-cache

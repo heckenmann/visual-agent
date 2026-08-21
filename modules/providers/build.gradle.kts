@@ -21,7 +21,7 @@ dependencies {
     implementation(platform(libs.spring.ai.bom))
     implementation(libs.spring.ai.ollama)
     implementation(libs.spring.ai.openai)
-    implementation(libs.cokit.client)
+    implementation(libs.spring.ai.agent.codex)
     implementation(libs.coroutines.core)
     implementation(libs.coroutines.reactor)
     implementation(libs.serialization.json)
@@ -39,6 +39,8 @@ tasks.test {
         isFailOnNoMatchingTests = false
     }
     systemProperty("visualagent.codex.smoke", System.getProperty("visualagent.codex.smoke", "false"))
+    systemProperty("visualagent.codex.smoke.executable", System.getProperty("visualagent.codex.smoke.executable", ""))
+    systemProperty("visualagent.codex.smoke.model", System.getProperty("visualagent.codex.smoke.model", ""))
     finalizedBy(tasks.jacocoTestReport)
 }
 

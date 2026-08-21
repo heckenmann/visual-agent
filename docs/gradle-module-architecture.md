@@ -35,7 +35,7 @@ modules/tools/        # :tools, a leaf module
 
 The Foojay toolchain resolver is the sole settings-only plugin and remains declared once in `settings.gradle.kts`, where Gradle evaluates it before the catalog is available. It is not applied by, or shared between, main-build modules.
 
-`third_party/cokit` is an included build maintained independently. Its `gradle/libs.versions.toml` remains its own authority and is intentionally not coupled to the main build's catalog. The main build consumes only the published `cokit-client` artifact, whose version is defined in the main catalog.
+Codex support is consumed as the published `org.springaicommunity.agents:agent-codex` JAR through the root version catalog. No third-party source tree or included build is part of this repository.
 
 When adding a main-build module, apply plugins and dependencies through aliases from the root catalog and set its project version to `libs.versions.visual.agent.get()`; do not copy a version literal into its build script.
 

@@ -45,11 +45,11 @@ interface ProviderRuntimeConfig {
 internal class DefaultProviderRuntimeConfig : ProviderRuntimeConfig {
     override var llmProvider = "ollama"
     override var ollamaLocalUrl = "http://localhost:11434"
-    override var ollamaModel = "llava"
+    override var ollamaModel = ""
     override var ollamaApiKey: ProviderCredential = ""
     override var openAiApiKey: ProviderCredential = ""
     override var openAiBaseUrl = "https://api.openai.com"
-    override var openAiModel = "gpt-4o-mini"
+    override var openAiModel = ""
     override var timeoutSeconds = 120
 
     override fun normalizedProvider(): String = if (llmProvider.equals("openai", ignoreCase = true)) "openai" else "ollama"
