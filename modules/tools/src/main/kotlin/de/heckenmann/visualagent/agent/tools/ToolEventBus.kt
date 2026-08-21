@@ -10,7 +10,7 @@ import java.util.concurrent.CopyOnWriteArrayList
  *
  * @property toolId Tool identifier such as `file:read`
  * @property functionName Provider-safe function callback name
- * @property inputJson Raw JSON input passed by the model
+ * @property inputJson Sanitized JSON input passed by the model
  * @property context Request-scoped context attached to the tool callback
  * @property result Structured tool execution result
  * @property startedAtUtc Start time in UTC
@@ -61,8 +61,9 @@ class ToolEventBus {
      * @param event Event payload to broadcast
      */
     fun publish(event: ToolCallEvent) {
+        val safeEvent = event.copy(inputJson = sanitizeToolInputForEvent(event.inputJson))
         listeners.forEach { listener ->
-            runCatching { listener(event) }
+            runCatching { listener(safeEvent) }
         }
     }
 }

@@ -2,8 +2,13 @@ package de.heckenmann.visualagent.agent.tools
 
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
@@ -13,6 +18,43 @@ import kotlin.io.path.absolute
 
 /** Shared JSON parser for tool input. */
 public val json = Json { ignoreUnknownKeys = true }
+
+private val sensitiveInputKey =
+    Regex("(?i)(password|passwd|token|secret|api[_-]?key|private[_-]?key|authorization|credential)")
+private val uriUserInfo = Regex("(?i)(\\b[a-z][a-z0-9+.-]*://)[^/@\\s]+@")
+private val sensitiveUriQuery =
+    Regex("(?i)([?&](?:password|passwd|token|secret|api[_-]?key|authorization)=)[^&#\\s]*")
+
+/**
+ * Removes credentials from tool input before it is published to lifecycle listeners.
+ *
+ * Tool input is still passed unchanged to the tool itself. This boundary only protects
+ * activity listeners and conversation persistence from recording model-provided secrets.
+ */
+internal fun sanitizeToolInputForEvent(inputJson: String): String {
+    val sanitized =
+        runCatching {
+            redactJson(json.parseToJsonElement(inputJson)).toString()
+        }.getOrElse { inputJson }
+    return redactUriSecrets(sanitized)
+}
+
+private fun redactJson(element: JsonElement): JsonElement =
+    when (element) {
+        is JsonObject ->
+            buildJsonObject {
+                element.forEach { (key, value) ->
+                    put(key, if (sensitiveInputKey.containsMatchIn(key)) JsonPrimitive("[redacted]") else redactJson(value))
+                }
+            }
+        is JsonArray -> buildJsonArray { element.forEach { add(redactJson(it)) } }
+        else -> element
+    }
+
+private fun redactUriSecrets(value: String): String =
+    sensitiveUriQuery.replace(uriUserInfo.replace(value) { "${it.groupValues[1]}[redacted]@" }) {
+        "${it.groupValues[1]}[redacted]"
+    }
 
 /** Default permissive JSON schema used by tools without a richer schema. */
 public const val STRING_SCHEMA = """{"type":"object","additionalProperties":true}"""
