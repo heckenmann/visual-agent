@@ -14,8 +14,10 @@ import org.springaicommunity.agents.codexsdk.types.ApprovalPolicy
 import org.springaicommunity.agents.codexsdk.types.ExecuteOptions
 import org.springaicommunity.agents.codexsdk.types.SandboxMode
 import org.springframework.ai.chat.prompt.Prompt
+import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Duration
+import java.util.UUID
 
 /** Adapts a Spring AI prompt to the published Spring AI Codex Agent API. */
 internal class CodexAgentBridge(
@@ -42,10 +44,22 @@ internal class CodexAgentBridge(
                     .timeout(OPERATION_TIMEOUT)
             if (model.isNotBlank()) clientOptionsBuilder.model(model)
             val clientOptions = clientOptionsBuilder.build()
-            CodexClient.create(clientOptions, workingDirectory, executable.toString()).use { client ->
-                val response = client.execute(prompt.toAgentGoal(), clientOptions)
-                check(response.isSuccessful) { "Codex agent execution failed (exit code ${response.exitCode})" }
-                CodexAgentResult(model.ifBlank { response.model }, response.output.extractAgentText())
+            SanitizedCodexExecutable(executable).use { sanitizedExecutable ->
+                CodexClient.create(clientOptions, workingDirectory, sanitizedExecutable.path.toString()).use { client ->
+                    val executingThread = Thread.currentThread()
+                    val cancellationRegistration = cancellationToken?.onCancelled { executingThread.interrupt() }
+                    try {
+                        cancellationToken?.throwIfCancelled()
+                        val response = client.execute(prompt.toAgentGoal(), clientOptions)
+                        check(response.isSuccessful) { "Codex agent execution failed (exit code ${response.exitCode})" }
+                        CodexAgentResult(
+                            response.model.takeIf(String::isNotBlank) ?: model,
+                            response.output.extractAgentText(),
+                        )
+                    } finally {
+                        cancellationRegistration?.close()
+                    }
+                }
             }
         }
 
@@ -62,6 +76,38 @@ internal class CodexAgentBridge(
     private companion object {
         private val OPERATION_TIMEOUT: Duration = Duration.ofMinutes(5)
     }
+}
+
+/** Provides a short-lived executable wrapper that strips API-key variables before Codex starts. */
+private class SanitizedCodexExecutable(
+    executable: Path,
+) : AutoCloseable {
+    val path: Path
+    private val directory: Path
+
+    init {
+        directory =
+            Files.createTempDirectory("visual-agent-codex-${UUID.randomUUID()}-")
+        path = directory.resolve(if (isWindows()) "codex.cmd" else "codex")
+        Files.writeString(path, script(executable))
+        check(path.toFile().setExecutable(true)) { "Codex executable wrapper could not be enabled" }
+    }
+
+    override fun close() {
+        Files.deleteIfExists(path)
+        Files.deleteIfExists(directory)
+    }
+
+    private fun script(executable: Path): String =
+        if (isWindows()) {
+            "@echo off\r\nset OPENAI_API_KEY=\r\nset OPENAI_CODEX_API_KEY=\r\ncall \"$executable\" %*\r\n"
+        } else {
+            "#!/bin/sh\nunset OPENAI_API_KEY OPENAI_CODEX_API_KEY\nexec ${shellQuote(executable.toString())} \"${'$'}@\"\n"
+        }
+
+    private fun isWindows(): Boolean = System.getProperty("os.name").contains("Windows", ignoreCase = true)
+
+    private fun shellQuote(value: String): String = "'${value.replace("'", "'\\''")}'"
 }
 
 private fun Prompt.toAgentGoal(): String =

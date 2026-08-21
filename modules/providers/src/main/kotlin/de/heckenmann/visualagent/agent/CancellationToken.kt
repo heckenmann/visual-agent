@@ -28,11 +28,8 @@ class CancellationToken {
     /** Cancels this token and notifies all registered listeners. Idempotent. */
     fun cancel() {
         if (!cancelled.compareAndSet(false, true)) return
-        synchronized(lock) {
-            listeners.forEach { listener ->
-                runCatching { listener() }.onFailure { }
-            }
-        }
+        val callbacks = synchronized(lock) { listeners.toList().also { listeners.clear() } }
+        callbacks.forEach { listener -> runCatching { listener() }.onFailure { } }
     }
 
     /**
@@ -41,8 +38,9 @@ class CancellationToken {
      * If the token is already cancelled the listener is invoked immediately.
      *
      * @param listener Callback executed exactly once on cancellation
+     * @return Registration that removes the listener when closed
      */
-    fun onCancelled(listener: () -> Unit) {
+    fun onCancelled(listener: () -> Unit): AutoCloseable {
         val shouldInvoke =
             synchronized(lock) {
                 if (isCancelled) {
@@ -55,6 +53,7 @@ class CancellationToken {
         if (shouldInvoke) {
             runCatching { listener() }.onFailure { }
         }
+        return AutoCloseable { synchronized(lock) { listeners.remove(listener) } }
     }
 
     /**
