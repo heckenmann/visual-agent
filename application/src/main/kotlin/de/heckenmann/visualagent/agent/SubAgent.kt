@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent
 
+import de.heckenmann.visualagent.agent.conversation.appendStreamPart
 import de.heckenmann.visualagent.knowledge.MemoryStore
 import kotlinx.coroutines.flow.collect
 import mu.KotlinLogging
@@ -224,8 +225,7 @@ data class SubAgent(
             if (chunk.done) terminalResponse = chunk
             val part = chunk.message.content
             if (part.isNotEmpty()) {
-                collected.append(part)
-                onChunk(part)
+                onChunk(appendStreamPart(collected, part))
             }
         }
         val response = terminalResponse ?: throw IllegalStateException("stream returned no terminal response")

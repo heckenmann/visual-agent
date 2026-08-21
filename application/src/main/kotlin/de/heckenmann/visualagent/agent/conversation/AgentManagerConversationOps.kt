@@ -135,8 +135,7 @@ internal class AgentManagerConversationOps(
                 token?.throwIfCancelled()
                 val part = chunk.message.content
                 if (part.isNotBlank()) {
-                    collected.append(part)
-                    onChunk(part)
+                    onChunk(appendStreamPart(collected, part))
                 }
             }
         } catch (_: kotlinx.coroutines.CancellationException) {
@@ -144,18 +143,23 @@ internal class AgentManagerConversationOps(
             logger.info { "Main agent request $requestId cancelled by user" }
         }
         var assistantText = collected.toString().trim()
+        var presentationText = owner.responseCoordinator.normalizeAssistantPresentationContent(assistantText)
         if (cancelled && assistantText.isNotBlank()) {
             assistantText += " (cancelled)"
+            presentationText += " (cancelled)"
         }
         if (ResponseRepetitionGuard.isRunawayRepetition(assistantText)) {
             logger.warn { "Repetition guard detected runaway streaming output; retrying once" }
             assistantText = owner.responseCoordinator.retryAfterRepetition()
+            presentationText = assistantText
         }
         assistantText = owner.responseCoordinator.normalizeAssistantContent(assistantText)
         if (assistantText == "(No text response. See tool results above.)") {
-            assistantText = owner.responseCoordinator.completeToolOnlyTurnWithFollowup(requestId) ?: assistantText
+            val followup = owner.responseCoordinator.completeToolOnlyTurnWithFollowup(requestId)
+            assistantText = followup?.let(owner.responseCoordinator::normalizeAssistantContent) ?: assistantText
+            presentationText = followup?.let(owner.responseCoordinator::normalizeAssistantPresentationContent) ?: assistantText
         }
-        val assistantMessage = Message("assistant", assistantText)
+        val assistantMessage = Message("assistant", presentationText)
         persist(assistantMessage)
         owner.finishedToolEventsByRequestId.remove(requestId)
         return assistantText
@@ -236,6 +240,7 @@ internal class AgentManagerConversationOps(
             mutableMapOf<String, Any>(
                 "sessionId" to AgentManager.MAIN_SESSION_ID,
                 "agent" to "main",
+                "thinkingEnabled" to owner.appConfig.thinkingEnabled,
             ).apply {
                 if (!requestId.isNullOrBlank()) put("requestId", requestId)
             }
@@ -261,6 +266,7 @@ internal class AgentManagerConversationOps(
         when (message.role) {
             "tool" -> message.copy(role = "assistant")
             "sub_agent" -> message.copy(role = "system")
+            "assistant" -> message.copy(content = owner.responseCoordinator.removeThinkingMarkup(message.content).trim())
             else -> message
         }
 

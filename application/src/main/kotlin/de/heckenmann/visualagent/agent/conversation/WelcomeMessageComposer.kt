@@ -62,7 +62,12 @@ class WelcomeMessageComposer(
             ChatRequestContext(
                 messages = messages,
                 enabledTools = emptySet(),
-                metadata = mapOf("sessionId" to AgentManager.MAIN_SESSION_ID, "agent" to "main"),
+                metadata =
+                    mapOf(
+                        "sessionId" to AgentManager.MAIN_SESSION_ID,
+                        "agent" to "main",
+                        "thinkingEnabled" to appConfig.thinkingEnabled,
+                    ),
             )
         val generated =
             runCatching {

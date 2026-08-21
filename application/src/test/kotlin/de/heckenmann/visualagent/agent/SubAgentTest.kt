@@ -42,6 +42,54 @@ class SubAgentTest {
         }
 
     @Test
+    fun `performTodo separates adjacent sentence chunks`() =
+        runBlocking {
+            val provider = mockk<LLMProvider>()
+            coEvery { provider.stream(any<ChatRequestContext>()) } returns
+                flowOf(
+                    ChatResponse("test", Message("assistant", "First."), false),
+                    ChatResponse("test", Message("assistant", "Second."), true),
+                )
+            val memoryStore = mockk<MemoryStore>(relaxed = true)
+            val chunks = mutableListOf<String>()
+
+            val result =
+                SubAgent("agent-1", "Coder", "Implementation").performTodo(
+                    todoId = "todo-1",
+                    description = "Complete the task",
+                    provider = provider,
+                    memoryStore = memoryStore,
+                    onChunk = chunks::add,
+                )
+
+            assertEquals("First.\nSecond.", result)
+            assertEquals(listOf("First.", "\nSecond."), chunks)
+        }
+
+    @Test
+    fun `performTodo does not split a filename extension across chunks`() =
+        runBlocking {
+            val provider = mockk<LLMProvider>()
+            coEvery { provider.stream(any<ChatRequestContext>()) } returns
+                flowOf(
+                    ChatResponse("test", Message("assistant", "archive."), false),
+                    ChatResponse("test", Message("assistant", "iso"), true),
+                )
+            val memoryStore = mockk<MemoryStore>(relaxed = true)
+
+            val result =
+                SubAgent("agent-1", "Coder", "Implementation").performTodo(
+                    todoId = "todo-1",
+                    description = "Complete the task",
+                    provider = provider,
+                    memoryStore = memoryStore,
+                    onChunk = {},
+                )
+
+            assertEquals("archive.iso", result)
+        }
+
+    @Test
     fun `performTodo falls back to complete response when streaming is unavailable`() =
         runBlocking {
             val provider = mockk<LLMProvider>()

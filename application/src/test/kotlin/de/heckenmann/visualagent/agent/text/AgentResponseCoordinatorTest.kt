@@ -46,6 +46,15 @@ class AgentResponseCoordinatorTest {
         )
         assertTrue(coordinator.normalizeAssistantContent("repeat pattern ".repeat(60)).contains("malformed"))
         assertEquals("answer", coordinator.normalizeAssistantContent("  answer  "))
+        assertEquals("answer", coordinator.normalizeAssistantContent("<think>planning</think>answer"))
+    }
+
+    @Test
+    fun `presentation normalization keeps separate thinking blocks`() {
+        val content = "<think>first</think><think>second</think>answer"
+
+        assertEquals(content, coordinator.normalizeAssistantPresentationContent(content))
+        assertEquals("answer", coordinator.removeThinkingMarkup(content))
     }
 
     @Test
