@@ -10,8 +10,6 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
 import org.graalvm.polyglot.Value
 import org.graalvm.polyglot.proxy.ProxyArray
 import org.graalvm.polyglot.proxy.ProxyExecutable
@@ -34,8 +32,10 @@ internal class JavaScriptToolBridge(
     /** Last bridge error, retained because Graal may erase host exception details in a Promise. */
     val lastFailure = AtomicReference<JavaScriptExecutionException?>()
     private val calls = AtomicInteger()
+    private val workspaceReadBytes = AtomicLong()
     private val workspaceBytes = AtomicLong()
     private val permits = Semaphore(limits.maxConcurrentToolCalls)
+    private val valueConverter = JavaScriptGuestValueConverter(limits)
 
     /** Returns the only host object made available to the guest context. */
     fun toolsObject(): ProxyObject =
@@ -74,10 +74,18 @@ internal class JavaScriptToolBridge(
                         try {
                             cancellationToken.throwIfCancelled()
                             consumeCall()
-                            workspaceWriter.read(workspacePath(arguments))
+                            val read =
+                                workspaceWriter.read(
+                                    workspacePath(arguments),
+                                    availableWorkspaceReadBytes(),
+                                )
+                            reserveWorkspaceReadBytes(read.sizeBytes)
+                            read.content
                         } catch (error: JavaScriptExecutionException) {
                             lastFailure.set(error)
                             throw error
+                        } catch (_: JavaScriptWorkspaceReadLimitExceededException) {
+                            throw workspaceFailure(JavaScriptErrorCategory.LIMIT_EXCEEDED, "Workspace read size limit exceeded")
                         } catch (error: IllegalArgumentException) {
                             throw workspaceFailure(JavaScriptErrorCategory.TOOL_ARGUMENTS, error.message ?: "Invalid workspace path")
                         } catch (error: Exception) {
@@ -126,7 +134,7 @@ internal class JavaScriptToolBridge(
         if (name !in enabledTools) throw failure(JavaScriptErrorCategory.TOOL_ACCESS, "Tool '$name' is not enabled")
         if (name == JAVASCRIPT_TOOL_ID) throw failure(JavaScriptErrorCategory.TOOL_ACCESS, "Recursive JavaScript execution is disabled")
         val input =
-            arguments.getOrNull(1)?.let(::toJsonObject)
+            arguments.getOrNull(1)?.let(valueConverter::toJsonObject)
                 ?: throw failure(JavaScriptErrorCategory.TOOL_ARGUMENTS, "Tool arguments must be an object")
         if ((input["async"] as? JsonPrimitive)?.content?.toBoolean() == true) {
             throw failure(JavaScriptErrorCategory.TOOL_ARGUMENTS, "Nested JavaScript tool calls must be awaited")
@@ -181,7 +189,7 @@ internal class JavaScriptToolBridge(
     private fun writeWorkspaceFile(arguments: Array<out Value>): Any {
         cancellationToken.throwIfCancelled()
         val input =
-            arguments.firstOrNull()?.let(::toJsonObject)
+            arguments.firstOrNull()?.let(valueConverter::toJsonObject)
                 ?: throw failure(JavaScriptErrorCategory.TOOL_ARGUMENTS, "Workspace write arguments must be an object")
         val path = workspacePath(input)
         val content = (input["content"] as? JsonPrimitive)?.content
@@ -211,7 +219,7 @@ internal class JavaScriptToolBridge(
 
     private fun workspacePath(arguments: Array<out Value>): String {
         val input =
-            arguments.firstOrNull()?.let(::toJsonObject)
+            arguments.firstOrNull()?.let(valueConverter::toJsonObject)
                 ?: throw failure(JavaScriptErrorCategory.TOOL_ARGUMENTS, "Workspace arguments must be an object")
         return workspacePath(input)
     }
@@ -240,10 +248,9 @@ internal class JavaScriptToolBridge(
         arguments: Array<out Value>,
     ): Any? {
         if (logs.size >= limits.maxLogEntries) return null
-        val text = arguments.joinToString(" ") { value -> if (value.isString) value.asString() else value.toString() }
         val remaining = (limits.maxLogCharacters - logs.sumOf { it.message.length }).coerceAtLeast(0)
         if (remaining == 0) return null
-        logs += JavaScriptLogEntry(level, text.take(remaining))
+        logs += JavaScriptLogEntry(level, valueConverter.logText(arguments, remaining))
         return null
     }
 
@@ -259,25 +266,6 @@ internal class JavaScriptToolBridge(
             is JsonArray -> ProxyArray.fromList(element.map(::jsonToGuest))
             is JsonObject -> ProxyObject.fromMap(element.mapValues { (_, value) -> jsonToGuest(value) })
         }
-
-    private fun toJsonObject(value: Value): JsonObject {
-        if (!value.hasMembers()) throw failure(JavaScriptErrorCategory.TOOL_ARGUMENTS, "Tool arguments must be an object")
-        return buildJsonObject {
-            value.memberKeys.forEach { key -> put(key, toJson(value.getMember(key))) }
-        }
-    }
-
-    private fun toJson(value: Value): JsonElement {
-        if (value.isNull) return JsonNull
-        if (value.isBoolean) return JsonPrimitive(value.asBoolean())
-        if (value.isNumber) return JsonPrimitive(value.asDouble())
-        if (value.isString) return JsonPrimitive(value.asString())
-        if (value.hasArrayElements()) {
-            return buildJsonArray { repeat(value.arraySize.toInt()) { add(toJson(value.getArrayElement(it.toLong()))) } }
-        }
-        if (value.hasMembers()) return toJsonObject(value)
-        throw failure(JavaScriptErrorCategory.TOOL_ARGUMENTS, "Tool arguments must contain JSON-compatible values")
-    }
 
     private fun executable(action: (Array<out Value>) -> Any?): ProxyExecutable = ProxyExecutable { arguments -> action(arguments) }
 
@@ -303,6 +291,26 @@ internal class JavaScriptToolBridge(
                 throw failure(JavaScriptErrorCategory.LIMIT_EXCEEDED, "Workspace write budget exceeded")
             }
             if (workspaceBytes.compareAndSet(current, next)) return
+        }
+    }
+
+    private fun availableWorkspaceReadBytes(): Long =
+        minOf(
+            limits.maxWorkspaceReadBytes,
+            (limits.maxWorkspaceReadTotalBytes - workspaceReadBytes.get()).coerceAtLeast(0),
+        )
+
+    private fun reserveWorkspaceReadBytes(bytes: Long) {
+        if (bytes < 0 || bytes > limits.maxWorkspaceReadBytes) {
+            throw failure(JavaScriptErrorCategory.LIMIT_EXCEEDED, "Workspace read size limit exceeded")
+        }
+        while (true) {
+            val current = workspaceReadBytes.get()
+            val next = current + bytes
+            if (next < current || next > limits.maxWorkspaceReadTotalBytes) {
+                throw failure(JavaScriptErrorCategory.LIMIT_EXCEEDED, "Workspace read budget exceeded")
+            }
+            if (workspaceReadBytes.compareAndSet(current, next)) return
         }
     }
 

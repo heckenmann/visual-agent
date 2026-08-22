@@ -245,6 +245,17 @@ class GraalJavaScriptExecutionServiceTest {
     }
 
     @Test
+    fun `bounds tool argument traversal before materializing guest arrays`() {
+        assertFailsWith<JavaScriptExecutionException> {
+            execute(
+                "return await tools.call('test:echo', {values: Array(10_000).fill(1)});",
+                enabled = setOf("test:echo"),
+                limits = JavaScriptExecutionLimits(maxToolArgumentCharacters = 100),
+            )
+        }.also { assertEquals(JavaScriptErrorCategory.LIMIT_EXCEEDED, it.category) }
+    }
+
+    @Test
     fun `rejects nested asynchronous tool calls`() {
         assertFailsWith<JavaScriptExecutionException> {
             execute(

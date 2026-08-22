@@ -52,19 +52,25 @@ class JavaScriptExecuteTool(
         val source = (input["source"] as? JsonPrimitive)?.content
         val path = (input["path"] as? JsonPrimitive)?.content
         if (source != null && path != null) return failure("Provide either source or path, not both")
-        val loadedSource =
-            source
-                ?: path?.let {
-                    runCatching { executionService.readWorkspaceSource(it) }
-                        .getOrElse { return toolFailure("Workspace script could not be read") }
-                }
-                ?: return failure("JavaScript source or path is required")
-        val enabledTools = enabledToolIds(context)
         val timeoutSeconds =
             (context["toolTimeoutSeconds"] as? Number)
                 ?.toLong()
                 ?.coerceIn(1L, MAX_TIMEOUT_SECONDS)
                 ?: DEFAULT_TIMEOUT_SECONDS
+        val limits = JavaScriptExecutionLimits(timeoutMillis = timeoutSeconds * MILLIS_PER_SECOND)
+        val loadedSource =
+            source
+                ?: path?.let {
+                    try {
+                        executionService.readWorkspaceSource(it, limits.maxWorkspaceReadBytes)
+                    } catch (_: JavaScriptWorkspaceReadLimitExceededException) {
+                        return limitExceeded("Workspace script size limit exceeded")
+                    } catch (_: Exception) {
+                        return toolFailure("Workspace script could not be read")
+                    }
+                }
+                ?: return failure("JavaScript source or path is required")
+        val enabledTools = enabledToolIds(context)
         return try {
             val result =
                 executionService.execute(
@@ -73,7 +79,7 @@ class JavaScriptExecuteTool(
                         enabledTools = enabledTools,
                         requestContext = context,
                         cancellationToken = context["cancellationToken"] as? CancellationToken,
-                        limits = JavaScriptExecutionLimits(timeoutMillis = timeoutSeconds * MILLIS_PER_SECOND),
+                        limits = limits,
                     ),
                 )
             ToolResult(TOOL_ID, true, resultContent(result.value))
@@ -107,6 +113,8 @@ class JavaScriptExecuteTool(
     private fun failure(message: String): ToolResult = ToolResult(TOOL_ID, false, "", "TOOL_ARGUMENTS: $message")
 
     private fun toolFailure(message: String): ToolResult = ToolResult(TOOL_ID, false, "", "TOOL_FAILURE: $message")
+
+    private fun limitExceeded(message: String): ToolResult = ToolResult(TOOL_ID, false, "", "LIMIT_EXCEEDED: $message")
 
     private companion object {
         const val TOOL_ID = "javascript:execute"

@@ -68,8 +68,11 @@ class GraalJavaScriptExecutionService(
         }
     }
 
-    /** Read a JavaScript source file through the hardened workspace boundary. */
-    fun readWorkspaceSource(relativePath: String): String = workspaceWriter.read(relativePath)
+    /** Read a bounded JavaScript source file through the hardened workspace boundary. */
+    fun readWorkspaceSource(
+        relativePath: String,
+        maxBytes: Long,
+    ): String = workspaceWriter.read(relativePath, maxBytes).content
 
     override fun close() {
         executor.shutdownNow()
@@ -201,8 +204,13 @@ class GraalJavaScriptExecutionService(
         if (request.limits.maxGuestHeapBytes <= 0 || request.limits.maxIsolateMemoryBytes < request.limits.maxGuestHeapBytes) {
             throw JavaScriptExecutionException(JavaScriptErrorCategory.INTERNAL, "Invalid JavaScript memory limits")
         }
-        if (request.limits.maxResultCharacters <= 0) {
-            throw JavaScriptExecutionException(JavaScriptErrorCategory.INTERNAL, "Invalid JavaScript result limits")
+        if (
+            request.limits.maxResultCharacters <= 0 ||
+            request.limits.maxWorkspaceReadBytes <= 0 ||
+            request.limits.maxWorkspaceReadTotalBytes <= 0 ||
+            request.limits.maxToolArgumentCharacters <= 0
+        ) {
+            throw JavaScriptExecutionException(JavaScriptErrorCategory.INTERNAL, "Invalid JavaScript execution limits")
         }
     }
 

@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.workspace
 
+import de.heckenmann.visualagent.agent.javascript.JavaScriptWorkspaceReadLimitExceededException
 import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
 import de.heckenmann.visualagent.knowledge.WorkspaceFileStore
 import de.heckenmann.visualagent.testsupport.TestPng
@@ -69,6 +70,19 @@ class WorkspaceFileServiceTest {
             assertEquals("new content", service.resolveManagedPath(first.relativePath).readText())
             assertEquals(11L, service.listFiles().single().sizeBytes)
             assertEquals(first.mimeType, second.mimeType)
+        }
+
+    @Test
+    fun `javascript workspace reads enforce their byte limit before string materialization`() =
+        withDatabasePath(tempDir().resolve("data/visual-agent.db").toString()) { dbPath ->
+            val service = WorkspaceFileService(FakeWorkspaceFileStore(), dbPath)
+            val writer = WorkspaceJavaScriptWriter(service, WorkspaceFileActivityEventBus())
+            writer.write("reports/large.txt", "0123456789")
+
+            assertFailsWith<JavaScriptWorkspaceReadLimitExceededException> {
+                writer.read("reports/large.txt", 4)
+            }
+            assertEquals("0123456789", writer.read("reports/large.txt", 10).content)
         }
 
     @Test

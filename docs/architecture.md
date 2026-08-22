@@ -184,10 +184,10 @@ file API, and bounded simulated console methods. Calls are delegated through the
 the normal allowlist, lifecycle events, cancellation, and tool safeguards.
 The context denies host classes, arbitrary host objects, IO, native access, process
 creation, networking, and polyglot access. Result, timeout, tool-call,
-concurrency, logging, guest-memory (on isolate-capable Graal runtimes), and recursion limits are enforced before the final
+concurrency, logging, guest-memory (on isolate-capable Graal runtimes), bounded workspace reads, and recursion limits are enforced before the final
 return value is sent to the model; script source length is not capped.
 Intermediate tool responses stay inside the guest runtime. The tool may load a
-workspace-relative JavaScript file through the hardened workspace boundary and execute
+workspace-relative JavaScript file through the hardened, byte-bounded workspace boundary and execute
 it in the same sandbox; absolute paths and traversal components are rejected.
 
 Managed workspace mutations are performed by server-owned workspace tools or the hardened

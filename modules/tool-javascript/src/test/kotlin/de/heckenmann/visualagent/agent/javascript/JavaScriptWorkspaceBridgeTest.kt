@@ -24,9 +24,15 @@ class JavaScriptWorkspaceBridgeTest {
                 return JavaScriptWorkspaceWriteResult(relativePath, content.length.toLong(), "text/plain")
             }
 
-            override fun read(relativePath: String): String {
+            override fun read(
+                relativePath: String,
+                maxBytes: Long,
+            ): JavaScriptWorkspaceReadResult {
                 validate(relativePath)
-                return workspaceFiles[relativePath] ?: error("Workspace file does not exist")
+                val content = workspaceFiles[relativePath] ?: error("Workspace file does not exist")
+                val size = content.toByteArray().size.toLong()
+                if (size > maxBytes) throw JavaScriptWorkspaceReadLimitExceededException()
+                return JavaScriptWorkspaceReadResult(relativePath, content, size)
             }
 
             override fun delete(relativePath: String): JavaScriptWorkspaceDeleteResult {
@@ -79,6 +85,34 @@ class JavaScriptWorkspaceBridgeTest {
     }
 
     @Test
+    fun `bounds individual and cumulative workspace reads before returning content`() {
+        workspaceFiles["first.txt"] = "1234"
+        workspaceFiles["second.txt"] = "5678"
+
+        assertFailsWith<JavaScriptExecutionException> {
+            execute(
+                "return workspace.read({path: 'first.txt'});",
+                JavaScriptExecutionLimits(maxWorkspaceReadBytes = 3, maxWorkspaceReadTotalBytes = 8),
+            )
+        }.also { assertEquals(JavaScriptErrorCategory.LIMIT_EXCEEDED, it.category) }
+        assertFailsWith<JavaScriptExecutionException> {
+            execute(
+                "workspace.read({path: 'first.txt'}); return workspace.read({path: 'second.txt'});",
+                JavaScriptExecutionLimits(maxWorkspaceReadBytes = 4, maxWorkspaceReadTotalBytes = 6),
+            )
+        }.also { assertEquals(JavaScriptErrorCategory.LIMIT_EXCEEDED, it.category) }
+    }
+
+    @Test
+    fun `bounds workspace JavaScript source reads`() {
+        workspaceFiles["scripts/large.js"] = "return 'too large';"
+
+        assertFailsWith<JavaScriptWorkspaceReadLimitExceededException> {
+            service.readWorkspaceSource("scripts/large.js", 3)
+        }
+    }
+
+    @Test
     fun `workspace failures do not expose server paths`() {
         val failingWriter =
             object : JavaScriptWorkspaceWriter {
@@ -91,8 +125,10 @@ class JavaScriptWorkspaceBridgeTest {
                     "text/plain",
                 )
 
-                override fun read(relativePath: String): String =
-                    throw NoSuchFileException("/srv/visual-agent/data/workspace/$relativePath")
+                override fun read(
+                    relativePath: String,
+                    maxBytes: Long,
+                ): JavaScriptWorkspaceReadResult = throw NoSuchFileException("/srv/visual-agent/data/workspace/$relativePath")
             }
         val failingService = GraalJavaScriptExecutionService({ registry }, failingWriter)
         try {
@@ -127,8 +163,10 @@ class JavaScriptWorkspaceBridgeTest {
                     content: String,
                 ) = JavaScriptWorkspaceWriteResult(relativePath, content.length.toLong(), "text/plain")
 
-                override fun read(relativePath: String): String =
-                    throw NoSuchFileException("/srv/visual-agent/data/workspace/$relativePath")
+                override fun read(
+                    relativePath: String,
+                    maxBytes: Long,
+                ): JavaScriptWorkspaceReadResult = throw NoSuchFileException("/srv/visual-agent/data/workspace/$relativePath")
             }
         val failingService = GraalJavaScriptExecutionService({ registry }, failingWriter)
         try {
@@ -153,6 +191,8 @@ class JavaScriptWorkspaceBridgeTest {
         }
     }
 
-    private fun execute(source: String): JavaScriptExecutionResult =
-        service.execute(JavaScriptExecutionRequest(source = source, enabledTools = emptySet()))
+    private fun execute(
+        source: String,
+        limits: JavaScriptExecutionLimits = JavaScriptExecutionLimits(),
+    ): JavaScriptExecutionResult = service.execute(JavaScriptExecutionRequest(source = source, enabledTools = emptySet(), limits = limits))
 }

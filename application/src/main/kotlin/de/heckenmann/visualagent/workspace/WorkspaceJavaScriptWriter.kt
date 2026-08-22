@@ -1,6 +1,8 @@
 package de.heckenmann.visualagent.workspace
 
 import de.heckenmann.visualagent.agent.javascript.JavaScriptWorkspaceDeleteResult
+import de.heckenmann.visualagent.agent.javascript.JavaScriptWorkspaceReadLimitExceededException
+import de.heckenmann.visualagent.agent.javascript.JavaScriptWorkspaceReadResult
 import de.heckenmann.visualagent.agent.javascript.JavaScriptWorkspaceWriteResult
 import de.heckenmann.visualagent.agent.javascript.JavaScriptWorkspaceWriter
 import org.springframework.stereotype.Service
@@ -10,6 +12,7 @@ import java.nio.file.LinkOption
 import java.nio.file.Path
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.isSymbolicLink
+import kotlin.math.min
 
 /** Persists JavaScript-generated text through a strict managed-workspace boundary. */
 @Service
@@ -54,10 +57,20 @@ class WorkspaceJavaScriptWriter(
         return JavaScriptWorkspaceWriteResult(record.relativePath, record.sizeBytes, record.mimeType)
     }
 
-    /** Read a UTF-8 workspace file after applying the same hardened path checks. */
-    override fun read(relativePath: String): String {
+    /** Read a bounded UTF-8 workspace file after applying the same hardened path checks. */
+    override fun read(
+        relativePath: String,
+        maxBytes: Long,
+    ): JavaScriptWorkspaceReadResult {
+        require(maxBytes > 0) { "Workspace read limit must be positive" }
         val path = resolveExistingFile(relativePath)
-        return Files.readString(path, StandardCharsets.UTF_8)
+        if (Files.size(path) > maxBytes) throw JavaScriptWorkspaceReadLimitExceededException()
+        val limit = min(maxBytes, Int.MAX_VALUE.toLong() - 1).toInt()
+        val bytes = Files.newInputStream(path).use { input -> input.readNBytes(limit + 1) }
+        if (bytes.size > limit) throw JavaScriptWorkspaceReadLimitExceededException()
+        val root = workspaceFiles.workspaceRoot().toAbsolutePath().normalize()
+        val normalized = root.relativize(path).toString().replace('\\', '/')
+        return JavaScriptWorkspaceReadResult(normalized, bytes.toString(StandardCharsets.UTF_8), bytes.size.toLong())
     }
 
     /** Delete a workspace file and remove its persisted metadata when present. */

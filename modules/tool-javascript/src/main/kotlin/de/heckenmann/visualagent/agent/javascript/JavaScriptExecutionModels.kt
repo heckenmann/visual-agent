@@ -7,10 +7,16 @@ import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 data class JavaScriptExecutionLimits(
     val timeoutMillis: Long = 15_000,
     /** Maximum retained guest heap for one execution. */
-    val maxGuestHeapBytes: Long = 128L * 1024L * 1024L,
+    val maxGuestHeapBytes: Long = 512L * 1024L * 1024L,
     /** Hard isolate heap ceiling for one execution. */
-    val maxIsolateMemoryBytes: Long = 256L * 1024L * 1024L,
+    val maxIsolateMemoryBytes: Long = 768L * 1024L * 1024L,
     val maxResultCharacters: Int = 500_000,
+    /** Maximum UTF-8 bytes copied from one workspace file into JavaScript. */
+    val maxWorkspaceReadBytes: Long = 256L * 1024L * 1024L,
+    /** Maximum aggregate UTF-8 bytes copied from workspace files into JavaScript. */
+    val maxWorkspaceReadTotalBytes: Long = 512L * 1024L * 1024L,
+    /** Maximum JSON-compatible tool argument characters materialized from JavaScript. */
+    val maxToolArgumentCharacters: Int = 256 * 1024 * 1024,
     val maxToolCalls: Int = 32,
     val maxConcurrentToolCalls: Int = 4,
     val maxWorkspaceWriteBytes: Long = 50L * 1024L * 1024L,
@@ -25,6 +31,16 @@ data class JavaScriptWorkspaceWriteResult(
     val sizeBytes: Long,
     val mimeType: String,
 )
+
+/** Content read through the hardened workspace boundary. */
+data class JavaScriptWorkspaceReadResult(
+    val relativePath: String,
+    val content: String,
+    val sizeBytes: Long,
+)
+
+/** Signals that a workspace file exceeds the byte budget allowed for JavaScript. */
+class JavaScriptWorkspaceReadLimitExceededException : RuntimeException()
 
 /** Result of a hardened JavaScript workspace deletion. */
 data class JavaScriptWorkspaceDeleteResult(
@@ -46,8 +62,11 @@ fun interface JavaScriptWorkspaceWriter {
         content: String,
     ): JavaScriptWorkspaceWriteResult
 
-    /** Read UTF-8 text from a workspace-relative file. */
-    fun read(relativePath: String): String = throw UnsupportedOperationException("Workspace reads are not available")
+    /** Read a bounded UTF-8 workspace file without exposing host filesystem APIs. */
+    fun read(
+        relativePath: String,
+        maxBytes: Long,
+    ): JavaScriptWorkspaceReadResult = throw UnsupportedOperationException("Workspace reads are not available")
 
     /** Delete a workspace-relative file. */
     fun delete(relativePath: String): JavaScriptWorkspaceDeleteResult =
