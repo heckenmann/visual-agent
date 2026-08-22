@@ -37,7 +37,6 @@ import de.heckenmann.visualagent.protocol.ClientImagePort
 import de.heckenmann.visualagent.protocol.ConversationInputPlacement
 import de.heckenmann.visualagent.protocol.ConversationPort
 import de.heckenmann.visualagent.protocol.TodoPort
-import de.heckenmann.visualagent.protocol.ToolActivityPhase
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -114,20 +113,7 @@ internal fun ConversationPanel(
         listState = listState,
         gateway = conversationGateway,
     )
-    DisposableEffect(activityPort) {
-        val handle =
-            activityPort.addToolListener { event ->
-                if (event.phase == ToolActivityPhase.FINISHED) {
-                    scope.launch {
-                        if (!conversationState.sending) {
-                            val history = withContext(Dispatchers.IO) { conversationPort.currentHistory() }
-                            conversationState.replaceHistory(history)
-                        }
-                    }
-                }
-            }
-        onDispose { handle.close() }
-    }
+    ConversationActivityHistoryEffect(activityPort, conversationPort, conversationState)
     DisposableEffect(todoPort) {
         val handle =
             todoPort.addListener {

@@ -9,4 +9,9 @@ class DesktopMainTest {
     fun `desktop main is available`() {
         assertNotNull(DesktopMain::class.java.getMethod("main", Array<String>::class.java))
     }
+
+    @Test
+    fun `desktop runtime contains queued message source`() {
+        assertNotNull(Class.forName("de.heckenmann.visualagent.ui.conversation.QueuedMessageSource"))
+    }
 }

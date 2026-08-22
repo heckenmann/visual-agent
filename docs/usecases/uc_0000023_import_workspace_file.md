@@ -16,16 +16,10 @@ Desktop user.
 ## Main Flow
 
 1. The user opens a file chooser.
-2. The selected file is copied into the managed workspace imports directory.
+2. The selected file is copied into the currently open browser directory.
 3. Metadata is recorded with ID, relative path, MIME type, size, SHA-256, and timestamps.
 4. The files panel refreshes.
 5. A concise history entry can reference the imported managed file.
-
-## Alternate Flow
-
-1. The user enters a local path in the Files panel fallback field.
-2. The user activates the import action.
-3. The same workspace copy and metadata flow is executed.
 
 ## Result
 
@@ -46,5 +40,6 @@ The file becomes durable application workspace data with a stable ID and hash.
 
 - Imports copy bytes rather than storing external paths.
 - The primary UI flow uses a Compose-compatible native file picker.
+- No local path field is required; imports target the currently open browser directory.
 - Duplicate names are handled with generated destination names.
 - SHA-256 is persisted.

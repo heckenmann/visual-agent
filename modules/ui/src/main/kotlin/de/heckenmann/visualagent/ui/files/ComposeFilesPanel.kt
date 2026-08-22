@@ -9,13 +9,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,6 +31,7 @@ import de.heckenmann.visualagent.protocol.ActivityPort
 import de.heckenmann.visualagent.protocol.CANVAS_MIME_TYPE
 import de.heckenmann.visualagent.protocol.CanvasPort
 import de.heckenmann.visualagent.protocol.MAX_WORKSPACE_FILE_IMPORT_BYTES
+import de.heckenmann.visualagent.protocol.WorkspaceDownload
 import de.heckenmann.visualagent.protocol.WorkspaceFile
 import de.heckenmann.visualagent.protocol.WorkspaceFilePort
 import de.heckenmann.visualagent.ui.agents.*
@@ -65,21 +69,49 @@ internal fun FilesPanel(
     modalRequester: ComposeModalRequester,
     activityPort: ActivityPort,
 ) {
-    var files by remember { mutableStateOf(workspaceFileService.listFiles()) }
-    var path by remember { mutableStateOf("") }
+    var files by remember { mutableStateOf(emptyList<WorkspaceFile>()) }
+    var directories by remember { mutableStateOf(emptyList<String>()) }
+    var currentDirectory by remember { mutableStateOf("") }
     var query by remember { mutableStateOf("") }
     var typeFilter by remember { mutableStateOf(ALL_FILE_TYPES) }
-    var status by remember { mutableStateOf("Workspace: ${workspaceFileService.workspaceRoot()}") }
+    var status by remember { mutableStateOf("Loading workspace…") }
+    var downloads by remember { mutableStateOf(emptyList<WorkspaceDownload>()) }
     val scope = rememberCoroutineScope()
-    val refresh = {
-        files = workspaceFileService.listFiles()
+
+    /** Refreshes workspace metadata and active download state off the UI thread. */
+    suspend fun refreshWorkspace() {
+        val snapshot =
+            withContext(Dispatchers.IO) {
+                WorkspaceBrowserSnapshot(
+                    workspaceFileService.listFiles(),
+                    workspaceFileService.listDirectories(),
+                    workspaceFileService.activeDownloads(),
+                    workspaceFileService.workspaceRoot(),
+                )
+            }
+        files = snapshot.files
+        directories = snapshot.directories
+        downloads = snapshot.downloads
+        if (status == "Loading workspace…") status = "Workspace: ${snapshot.root}"
+    }
+    val refresh: () -> Unit = {
+        scope.launch { refreshWorkspace() }
+    }
+    LaunchedEffect(workspaceFileService) { refreshWorkspace() }
+    DisposableEffect(workspaceFileService) {
+        val handle =
+            workspaceFileService.addDownloadListener {
+                refresh()
+            }
+        onDispose { handle.close() }
     }
     ToolEventRefreshEffect(
         activityPort = activityPort,
         toolIds = setOf("file:write", "file:edit", "workspace:file"),
         onRefresh = refresh,
     )
-    val visibleFiles = filterWorkspaceFiles(files, query, typeFilter)
+    val listing = browseWorkspaceFiles(files, currentDirectory, directories)
+    val visibleFiles = filterWorkspaceFiles(listing.files, query, typeFilter)
     val fileListScrollState = rememberScrollState()
     RegisterPanelVerticalScrollbar(fileListScrollState)
 
@@ -89,20 +121,21 @@ internal fun FilesPanel(
             !file.isFile -> status = "Operation failed: File does not exist"
             file.length() > MAX_WORKSPACE_FILE_IMPORT_BYTES ->
                 status = "Operation failed: File is larger than 50 MB"
-            else ->
+            else -> {
+                val targetDirectory = currentDirectory
                 scope.launch {
                     runCatching {
                         withContext(Dispatchers.IO) {
-                            workspaceFileService.importFile(file.name, file.readBytes())
+                            workspaceFileService.importFile(targetDirectory, file.name, file.readBytes())
                         }
                     }.onSuccess {
                         status = "Imported ${it.relativePath}"
-                        path = ""
                         refresh()
                     }.onFailure {
                         status = it.toUiErrorMessage()
                     }
                 }
+            }
         }
     }
     val picker =
@@ -111,38 +144,58 @@ internal fun FilesPanel(
         }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = path,
-                onValueChange = { path = it },
-                label = { Text("Import path") },
-                trailingIcon = {
-                    ActionIconButton(
-                        icon = Icons.Filled.Add,
-                        description = "Import typed path",
-                        onClick = {
-                            val typedPath = path.trim()
-                            if (typedPath.isNotBlank()) importFile(File(typedPath))
-                        },
-                        enabled = path.isNotBlank(),
-                    )
-                },
-                modifier = Modifier.weight(1f),
-            )
             ActionIconButton(
                 icon = Icons.Filled.FolderOpen,
-                description = "Open file picker",
+                description = "Import file into current folder",
                 onClick = { picker.launch() },
+            )
+            ActionIconButton(
+                icon = Icons.Filled.CreateNewFolder,
+                description = "Create folder in current folder",
+                onClick = {
+                    modalRequester.request(
+                        ComposeContentModal(title = "Create folder") { dismiss ->
+                            CreateWorkspaceFolderDialog(
+                                onCancel = dismiss,
+                                onCreate = { name ->
+                                    scope.launch {
+                                        runCatching {
+                                            withContext(Dispatchers.IO) {
+                                                workspaceFileService.createDirectory(currentDirectory, name)
+                                            }
+                                        }.onSuccess {
+                                            status = "Created folder $it"
+                                            directories = (directories + it).distinct().sorted()
+                                            dismiss()
+                                        }.onFailure { status = it.toUiErrorMessage() }
+                                    }
+                                },
+                            )
+                        },
+                    )
+                },
+            )
+            ActionIconButton(
+                icon = Icons.Filled.ArrowUpward,
+                description = "Open parent folder",
+                enabled = currentDirectory.isNotBlank(),
+                onClick = {
+                    currentDirectory = currentDirectory.substringBeforeLast('/', "")
+                },
             )
             ActionIconButton(
                 icon = Icons.Filled.Refresh,
                 description = "Sync workspace files",
                 onClick = {
-                    val result = workspaceFileService.syncMetadataWithFilesystem()
-                    status = "Sync added=${result.added} updated=${result.updated} removed=${result.removed}"
-                    refresh()
+                    scope.launch {
+                        val result = withContext(Dispatchers.IO) { workspaceFileService.syncMetadataWithFilesystem() }
+                        status = "Sync added=${result.added} updated=${result.updated} removed=${result.removed}"
+                        refreshWorkspace()
+                    }
                 },
             )
         }
+        WorkspaceBreadcrumbs(currentDirectory) { currentDirectory = it }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 value = query,
@@ -165,25 +218,57 @@ internal fun FilesPanel(
             )
         }
         Text(
-            text = "Total ${files.size} · showing ${visibleFiles.size}",
+            text = "Folder ${currentDirectory.ifBlank { "/" }} · ${files.size} total · ${visibleFiles.size} visible",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Column(modifier = Modifier.weight(1f).verticalScroll(fileListScrollState)) {
-            if (visibleFiles.isEmpty()) {
+            val currentDownloads = downloads.filter { it.relativePath.substringBeforeLast('/', "") == currentDirectory }
+            if (listing.directories.isEmpty() && visibleFiles.isEmpty() && currentDownloads.isEmpty()) {
                 PanelEmptyState(
                     title = "No matching files",
                     body = "Import a file, sync the workspace directory, or change the current filter.",
                 )
             } else {
+                listing.directories.forEach { directory ->
+                    WorkspaceDirectoryRow(
+                        directory = directory,
+                        activeDownloads = downloads.count { it.relativePath.substringBeforeLast('/', "") == directory.relativePath },
+                        onOpen = { currentDirectory = directory.relativePath },
+                    )
+                }
+                currentDownloads.forEach { download ->
+                    WorkspaceDownloadRow(
+                        download = download,
+                        onPause = { workspaceFileService.pauseDownload(download.id) },
+                        onResume = { workspaceFileService.resumeDownload(download.id) },
+                        onCancel = { workspaceFileService.cancelDownload(download.id) },
+                    )
+                }
                 visibleFiles.forEach { file ->
-                    WorkspaceFileRow(file, workspaceFileService, canvasOperations, modalRequester, refresh) { status = it }
+                    WorkspaceFileRow(
+                        file = file,
+                        workspaceFileService = workspaceFileService,
+                        canvasOperations = canvasOperations,
+                        modalRequester = modalRequester,
+                        refresh = refresh,
+                        setStatus = { status = it },
+                        locked = downloads.any { it.relativePath == file.relativePath },
+                    )
                 }
             }
         }
         PanelStatus(status)
     }
 }
+
+/** Snapshot used to refresh the browser from the server-owned workspace. */
+private data class WorkspaceBrowserSnapshot(
+    val files: List<WorkspaceFile>,
+    val directories: List<String>,
+    val downloads: List<WorkspaceDownload>,
+    val root: String,
+)
 
 /**
  * Filters workspace records by free-text query and type category.

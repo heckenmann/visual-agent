@@ -79,6 +79,45 @@ class ToolRegistryTest {
     }
 
     @Test
+    fun `tool lifecycle events redact credentials without changing execution input`() {
+        val events = mutableListOf<ToolCallEvent>()
+        val bus = ToolEventBus()
+        bus.addListener { events += it }
+        var receivedInput = ""
+        val tool =
+            object : VisualAgentTool {
+                override val definition =
+                    ToolDefinition(
+                        id = ToolId("workspace:download"),
+                        name = "workspace_download",
+                        description = "Fake download",
+                        inputSchema = "{}",
+                    )
+
+                override fun execute(
+                    inputJson: String,
+                    context: Map<String, Any>,
+                ): ToolResult {
+                    receivedInput = inputJson
+                    return ToolResult(definition.id.value, true, "ok")
+                }
+            }
+        val registry = ToolRegistry(listOf(tool), bus) { timeoutSeconds }
+        val input =
+            """{"source":"sftp://alice:super-secret@example.org/file.txt","password":"super-secret","token":"abc"}"""
+
+        registry.execute(tool, input, emptyMap())
+
+        assertEquals(input, receivedInput)
+        assertEquals(2, events.size)
+        events.forEach { event ->
+            assertFalse(event.inputJson.contains("super-secret"))
+            assertFalse(event.inputJson.contains("abc"))
+            assertTrue(event.inputJson.contains("[redacted]"))
+        }
+    }
+
+    @Test
     fun `tool call uses default timeout when not overridden`() {
         val previousTimeout = timeoutSeconds
         timeoutSeconds = 1

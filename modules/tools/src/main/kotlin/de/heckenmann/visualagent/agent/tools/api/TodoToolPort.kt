@@ -14,6 +14,12 @@ interface TodoToolPort {
         assignedAgentId: String,
     ): String
 
+    /** Atomically creates a todo or returns the existing normalized-description match. */
+    fun addIfAbsent(
+        description: String,
+        assignedAgentId: String,
+    ): ToolTodoCreation
+
     /** Updates supplied todo fields. */
     fun update(
         id: String,
@@ -60,4 +66,10 @@ data class ToolTodo(
     val status: String,
     val position: Int,
     val assignedAgentId: String?,
+)
+
+/** Result of an atomic todo creation attempt. */
+data class ToolTodoCreation(
+    val todo: ToolTodo,
+    val created: Boolean,
 )

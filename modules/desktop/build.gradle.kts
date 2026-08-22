@@ -12,6 +12,9 @@ plugins {
 
 // Keep relative application data paths stable when the Compose task is invoked from this module.
 tasks.withType<org.gradle.api.tasks.JavaExec>().configureEach {
+    // Compose's run task may otherwise reuse a stale UI artifact whose generated
+    // classes do not match the desktop sources.
+    dependsOn(":ui:jar")
     workingDir(rootProject.projectDir)
     jvmArgs("-Djava.awt.headless=false")
     if (name == "run") {

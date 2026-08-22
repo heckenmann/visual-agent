@@ -55,6 +55,7 @@ internal fun WorkspaceFileRow(
     modalRequester: ComposeModalRequester,
     refresh: () -> Unit,
     setStatus: (String) -> Unit,
+    locked: Boolean = false,
 ) {
     @Suppress("DEPRECATION")
     val clipboard = LocalClipboardManager.current
@@ -104,6 +105,7 @@ internal fun WorkspaceFileRow(
                 ActionIconButton(
                     icon = Icons.Filled.FileOpen,
                     description = "Open canvas document",
+                    enabled = !locked,
                     onClick = {
                         runCatching { canvasOperations.openDocument(file.id, null) }
                             .onSuccess { setStatus("Opened ${file.relativePath}") }

@@ -5,6 +5,9 @@ import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
+import de.heckenmann.visualagent.protocol.DownloadActivity
+import de.heckenmann.visualagent.protocol.DownloadActivityStatus
+import de.heckenmann.visualagent.workspace.WorkspaceDownloadEventBus
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -81,5 +84,28 @@ class SpringActivityPortTest {
             ),
             activities,
         )
+    }
+
+    @Test
+    fun `download status events cross the activity boundary`() {
+        val downloadBus = WorkspaceDownloadEventBus()
+        val port = SpringActivityPort(ToolEventBus(), AgentStatusCallbackAdapter(), downloadBus)
+        val activities = mutableListOf<DownloadActivity>()
+        val registration = port.addDownloadListener(activities::add)
+
+        downloadBus.publish(
+            DownloadActivity(
+                id = "download-1",
+                relativePath = "downloads/report.pdf",
+                status = DownloadActivityStatus.COMPLETED,
+                downloadedBytes = 42,
+                totalBytes = 42,
+            ),
+        )
+        registration.close()
+
+        assertEquals(1, activities.size)
+        assertEquals(DownloadActivityStatus.COMPLETED, activities.single().status)
+        assertEquals("downloads/report.pdf", activities.single().relativePath)
     }
 }

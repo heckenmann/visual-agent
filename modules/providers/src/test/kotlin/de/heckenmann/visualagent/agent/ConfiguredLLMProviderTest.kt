@@ -217,7 +217,7 @@ class ConfiguredLLMProviderTest {
                     mockk(relaxed = true),
                     mockk(relaxed = true),
                     catalog,
-                    codexCliProvider = CodexCliProvider(mockk()),
+                    codexCliProvider = CodexCliProvider(mockk(), mockk()),
                     codexModelCatalog = modelCatalog,
                 )
 

@@ -5,14 +5,15 @@ import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
 import de.heckenmann.visualagent.agent.tools.api.ToolWorkspaceFile
 import de.heckenmann.visualagent.agent.tools.api.WorkspaceFileToolPort
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * Tool that lets sub-agents inspect and analyze files imported into the managed workspace.
+ * Tool that lets sub-agents inspect, analyze, and manage files imported into the managed workspace.
  *
- * Use cases: UC-0000025, UC-0000026, UC-0000027.
+ * Use cases: UC-0000024, UC-0000025, UC-0000026, UC-0000027.
  */
 @AgentTool
 class WorkspaceFileTool(
@@ -34,9 +35,12 @@ class WorkspaceFileTool(
         return runCatching {
             when (input.string("action") ?: "list") {
                 "list" -> list()
-                "search" -> search(input.requiredString("query"))
+                "createDirectory" -> createDirectory(input.string("parentDirectory").orEmpty(), input.requiredString("name"))
+                "search" -> search(input.requiredString("query"), input.string("entryType"), input.string("mimeType"))
                 "info" -> info(file(input))
                 "sync" -> sync()
+                "delete" -> delete(file(input))
+                "deleteDirectory" -> deleteDirectory(input.requiredString("path"), input.boolean("recursive") ?: false)
                 "hash" -> hash(file(input))
                 "readText" -> readText(file(input))
                 "extractPdfText" -> extractPdfText(file(input))
@@ -61,28 +65,100 @@ class WorkspaceFileTool(
                         workspaceFiles.list().forEach { add(recordJson(it)) }
                     },
                 )
+                put(
+                    "directories",
+                    buildJsonArray {
+                        workspaceFiles.listDirectories().forEach { add(JsonPrimitive(it)) }
+                    },
+                )
+            }.toString(),
+        )
+
+    private fun createDirectory(
+        parentDirectory: String,
+        name: String,
+    ): ToolResult =
+        success(
+            TOOL_ID,
+            buildJsonObject {
+                put("path", workspaceFiles.createDirectory(parentDirectory, name))
             }.toString(),
         )
 
     private fun info(record: ToolWorkspaceFile): ToolResult = success(TOOL_ID, recordJson(record).toString())
 
-    private fun search(query: String): ToolResult {
-        val result = workspaceFiles.search(query)
+    private fun delete(record: ToolWorkspaceFile): ToolResult =
+        success(
+            TOOL_ID,
+            buildJsonObject {
+                put("id", record.id)
+                put("path", record.relativePath)
+                put("deleted", workspaceFiles.delete(record))
+            }.toString(),
+        )
+
+    private fun deleteDirectory(
+        path: String,
+        recursive: Boolean,
+    ): ToolResult =
+        workspaceFiles.deleteDirectory(path, recursive).let { result ->
+            success(
+                TOOL_ID,
+                buildJsonObject {
+                    put("path", result.relativePath)
+                    put("recursive", result.recursive)
+                    put("deletedFiles", result.deletedFiles)
+                    put("deletedMetadata", result.deletedMetadata)
+                }.toString(),
+            )
+        }
+
+    private fun search(
+        query: String,
+        entryType: String?,
+        mimeType: String?,
+    ): ToolResult {
+        require(entryType == null || entryType in setOf("file", "directory")) {
+            "entryType must be file or directory"
+        }
+        require(entryType != "directory" || mimeType == null) {
+            "mimeType cannot be combined with entryType directory"
+        }
+        val result = workspaceFiles.search(query, mimeType)
+        val directories =
+            workspaceFiles
+                .listDirectories()
+                .filter { it.contains(query, ignoreCase = true) }
         return success(
             TOOL_ID,
             buildJsonObject {
                 put("query", result.query)
+                entryType?.let { put("entryType", it) }
+                mimeType?.let { put("mimeType", it) }
                 put(
                     "matches",
                     buildJsonArray {
-                        result.matches.forEach { match ->
-                            add(
-                                buildJsonObject {
-                                    put("matchType", match.matchType)
-                                    put("snippet", match.snippet)
-                                    put("file", recordJson(match.file))
-                                },
-                            )
+                        if (entryType != "directory") {
+                            result.matches.forEach { match ->
+                                add(
+                                    buildJsonObject {
+                                        put("entryType", "file")
+                                        put("matchType", match.matchType)
+                                        put("snippet", match.snippet)
+                                        put("file", recordJson(match.file))
+                                    },
+                                )
+                            }
+                        }
+                        if (entryType != "file") {
+                            directories.forEach { directory ->
+                                add(
+                                    buildJsonObject {
+                                        put("entryType", "directory")
+                                        put("path", directory)
+                                    },
+                                )
+                            }
                         }
                     },
                 )
@@ -205,26 +281,5 @@ class WorkspaceFileTool(
 
     private companion object {
         const val TOOL_ID = "workspace:file"
-
-        /**
-         * Returns the tool description for workspace:file with all actions and their parameters.
-         */
-        fun workspaceFileToolDescription(): String =
-            "Inspect imported workspace files. Actions:\n" +
-                "- list: {\"action\":\"list\"}. Lists all imported files.\n" +
-                "- info: {\"action\":\"info\",\"id\":\"...\"} or {\"action\":\"info\",\"path\":\"...\"}. File metadata.\n" +
-                "- hash: {\"action\":\"hash\",\"id\":\"...\"}. SHA-256 hash.\n" +
-                "- readText: {\"action\":\"readText\",\"id\":\"...\"}. Read text content.\n" +
-                "- extractPdfText: {\"action\":\"extractPdfText\",\"id\":\"...\"}. Extract text from PDF.\n" +
-                "- renderPdfPage: {\"action\":\"renderPdfPage\",\"id\":\"...\",\"page\":1}. Render PDF page as image.\n" +
-                "- imageInfo: {\"action\":\"imageInfo\",\"id\":\"...\"}. Image dimensions and type.\n" +
-                "- imageBytes: {\"action\":\"imageBytes\",\"id\":\"...\"}. Base64-encoded image bytes.\n" +
-                "- analyzeImage: {\"action\":\"analyzeImage\",\"id\":\"...\",\"prompt\":\"describe this\"}. " +
-                "Analyze image with vision model.\n" +
-                "For an image in the conversation, use the returned relative path as " +
-                "![alt text](workspace:<path>). Do not invent paths or paste imageBytes base64 into a response.\n" +
-                "- search: {\"action\":\"search\",\"query\":\"...\"}. Search file metadata.\n" +
-                "- sync: {\"action\":\"sync\"}. Sync metadata with filesystem. " +
-                "Use id or path to identify files."
     }
 }

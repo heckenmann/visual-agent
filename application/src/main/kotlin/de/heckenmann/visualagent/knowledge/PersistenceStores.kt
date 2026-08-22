@@ -178,6 +178,9 @@ interface TodoStore {
     /** Inserts or replaces a todo. */
     fun saveTodo(todo: Todo)
 
+    /** Creates a todo only when no normalized description already exists. */
+    fun createTodoIfAbsent(todo: Todo): TodoCreation
+
     /** Returns all persisted todos. */
     fun listTodos(): List<Todo>
 
@@ -187,6 +190,12 @@ interface TodoStore {
     /** Deletes every persisted todo. */
     fun clearTodos()
 }
+
+/** Result of an atomic todo creation attempt. */
+data class TodoCreation(
+    val todo: Todo,
+    val created: Boolean,
+)
 
 /** Stores and retrieves sub-agent runtime state. Use cases: UC-0000015, UC-0000016, UC-0000017, UC-0000018. */
 interface SubAgentStore {

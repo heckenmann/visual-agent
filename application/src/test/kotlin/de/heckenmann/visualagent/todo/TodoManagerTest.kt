@@ -22,6 +22,18 @@ class TodoManagerTest {
                     saved += todo
                 }
 
+                override fun createTodoIfAbsent(todo: Todo): de.heckenmann.visualagent.knowledge.TodoCreation {
+                    val existing = saved.firstOrNull { it.description.equals(todo.description, ignoreCase = true) }
+                    return if (existing == null) {
+                        saveTodo(todo)
+                        de.heckenmann.visualagent.knowledge
+                            .TodoCreation(todo, created = true)
+                    } else {
+                        de.heckenmann.visualagent.knowledge
+                            .TodoCreation(existing, created = false)
+                    }
+                }
+
                 override fun listTodos(): List<Todo> = saved
 
                 override fun deleteTodo(todoId: String) {
@@ -282,6 +294,29 @@ private class InMemoryTodoStore : TodoStore {
     override fun saveTodo(todo: Todo) {
         todos.removeIf { it.id == todo.id }
         todos.add(todo)
+    }
+
+    override fun createTodoIfAbsent(todo: Todo): de.heckenmann.visualagent.knowledge.TodoCreation {
+        val normalized =
+            todo.description
+                .trim()
+                .replace(Regex("\\s+"), " ")
+                .lowercase()
+        val existing =
+            todos.firstOrNull {
+                it.description
+                    .trim()
+                    .replace(Regex("\\s+"), " ")
+                    .lowercase() == normalized
+            }
+        return if (existing == null) {
+            saveTodo(todo)
+            de.heckenmann.visualagent.knowledge
+                .TodoCreation(todo, created = true)
+        } else {
+            de.heckenmann.visualagent.knowledge
+                .TodoCreation(existing, created = false)
+        }
     }
 
     override fun listTodos(): List<Todo> = todos.toList()

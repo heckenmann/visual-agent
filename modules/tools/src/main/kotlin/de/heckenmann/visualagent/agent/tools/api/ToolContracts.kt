@@ -51,7 +51,7 @@ data class ToolResult(
  * @property toolId Stable tool identifier
  * @property functionName Provider-facing callback name
  * @property phase Lifecycle phase
- * @property inputJson Raw model input
+ * @property inputJson Sanitized model input from lifecycle events
  * @property context Request-scoped execution metadata
  * @property result Current structured result
  * @property startedAtUtc Start timestamp

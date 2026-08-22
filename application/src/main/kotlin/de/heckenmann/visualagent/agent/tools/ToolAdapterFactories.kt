@@ -14,6 +14,7 @@ import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.knowledge.ConversationStore
 import de.heckenmann.visualagent.knowledge.MemoryStore
 import de.heckenmann.visualagent.knowledge.TodoStore
+import de.heckenmann.visualagent.workspace.WorkspaceDownloadService
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
 import de.heckenmann.visualagent.workspace.layout.WorkspaceLayoutService
 import org.springframework.beans.factory.ObjectProvider
@@ -29,8 +30,9 @@ fun CanvasTool(
 fun WorkspaceFileTool(
     files: WorkspaceFileService,
     provider: ObjectProvider<LLMProvider>,
+    downloads: WorkspaceDownloadService? = null,
 ) = de.heckenmann.visualagent.agent.tools
-    .WorkspaceFileTool(WorkspaceFileToolPortAdapter(files, provider))
+    .WorkspaceFileTool(WorkspaceFileToolPortAdapter(files, provider, downloads))
 
 /** Compatibility factory routing application layout collaborators through the tool-owned port. */
 fun WorkspaceLayoutTool(layout: WorkspaceLayoutService) =

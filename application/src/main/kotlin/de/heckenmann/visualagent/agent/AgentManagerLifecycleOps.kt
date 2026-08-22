@@ -129,6 +129,7 @@ internal class AgentManagerLifecycleOps(
     }
 
     fun cancelActiveWork() {
+        owner.lifecycle.beginShutdown()
         owner.scope.cancel()
         owner.cancelAllRunningActions()
         cancelAllActiveTodos()

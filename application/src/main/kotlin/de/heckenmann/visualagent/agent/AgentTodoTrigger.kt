@@ -8,7 +8,10 @@ import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.protocol.LifecyclePort
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoStatus
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import mu.KotlinLogging
 import de.heckenmann.visualagent.agent.tools.api.ToolResult as ToolsToolResult
@@ -38,6 +41,7 @@ internal class AgentTodoTrigger(
         if (lifecycle.closing) return
         scope.launch {
             if (lifecycle.closing) return@launch
+            currentCoroutineContext().ensureActive()
             val action =
                 when (todo.status) {
                     TodoStatus.COMPLETED ->
@@ -52,6 +56,7 @@ internal class AgentTodoTrigger(
                             "and set it back to PENDING."
                     else -> return@launch
                 }
+            if (lifecycle.closing) return@launch
             conversationOps.persist(
                 Message(
                     role = "system",
@@ -79,13 +84,18 @@ internal class AgentTodoTrigger(
                     appendTodoChangeReviewInput(history, todo),
                     requestId,
                 )
-            val result =
-                runCatching {
-                    val response = llmProvider.chat(request)
-                    val content = responseCoordinator.normalizeAssistantContent(response.message.content)
-                    conversationOps.persist(Message(role = "assistant", content = content))
-                }
-            result.onFailure { error ->
+            try {
+                currentCoroutineContext().ensureActive()
+                val response = llmProvider.chat(request)
+                val content = responseCoordinator.normalizeAssistantPresentationContent(response.message.content)
+                if (lifecycle.closing) return@launch
+                conversationOps.persist(Message(role = "assistant", content = content))
+            } catch (cancelled: CancellationException) {
+                // Cancellation is expected while the application is shutting down. Do not
+                // log it as a failed trigger or attempt a database write after cancellation.
+                return@launch
+            } catch (error: Throwable) {
+                if (lifecycle.closing) return@launch
                 logger.warn(error) { "triggerMainAgentOnTodoChange failed" }
                 conversationOps.persist(
                     Message(
@@ -96,6 +106,7 @@ internal class AgentTodoTrigger(
                     ),
                 )
             }
+            if (lifecycle.closing) return@launch
             toolEventBus.publish(
                 ToolCallEvent(
                     toolId = "todos",

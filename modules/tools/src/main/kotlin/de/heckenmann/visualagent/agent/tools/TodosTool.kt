@@ -115,7 +115,16 @@ class TodosTool(
             )
         }
         val description = input.requiredString("description")
-        return success("todos", "Added todo ${todos.add(description, assignedAgentId)}")
+        val creation = todos.addIfAbsent(description, assignedAgentId)
+        if (!creation.created) {
+            val existing = creation.todo
+            return success(
+                "todos",
+                "Todo already exists: ${existing.id} [${existing.status}] " +
+                    "${existing.description}. Reuse this todo instead of creating a duplicate.",
+            )
+        }
+        return success("todos", "Added todo ${creation.todo.id}")
     }
 
     private fun updateTodo(input: JsonObject): ToolResult {

@@ -46,12 +46,16 @@ class MainSystemPromptComposerTest {
         val prompt = MainSystemPromptComposer.compose(emptyTodos, null, toolConfigService)
         assertTrue("When to Delegate" in prompt || "When to delegate" in prompt)
         assertTrue("Answer directly" in prompt)
-        assertTrue("File operations" in prompt)
+        assertTrue("Repository file operations" in prompt)
         assertTrue("Terminal commands" in prompt)
         assertTrue("Browser or search" in prompt)
         assertTrue("Canvas operations" in prompt)
         assertTrue("Research or analysis" in prompt)
         assertTrue("History search" in prompt)
+        assertTrue("workspace:file" in prompt)
+        assertTrue("You may perform these workspace actions yourself or delegate them" in prompt)
+        assertTrue("Never include a native write-permission preflight" in prompt)
+        assertTrue("A `workspace:file` action is the authoritative capability check" in prompt)
     }
 
     @Test
@@ -106,6 +110,16 @@ class MainSystemPromptComposerTest {
         assertTrue("completes or cancels" in prompt)
         assertTrue("notification appears" in prompt)
         assertTrue("automatically prompted" in prompt)
+    }
+
+    @Test
+    fun `prompt requires a fresh todo status check before every add`() {
+        val prompt = MainSystemPromptComposer.compose(emptyTodos, null, toolConfigService)
+
+        assertTrue("Before every" in prompt && "`{\"action\":\"list\"}`" in prompt)
+        assertTrue("never add another one" in prompt)
+        assertTrue("PENDING, IN_PROGRESS, COMPLETED, and CANCELLED" in prompt)
+        assertTrue("Do not recreate or restart" in prompt)
     }
 
     @Test

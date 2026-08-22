@@ -167,8 +167,8 @@ class AgentManager
         }
 
         override fun destroy() {
-            runCatching { toolEventListenerHandle?.close() }
-            scope.cancel()
+            lifecycle.beginShutdown()
+            runCatching { toolEventListenerHandle?.close() }.also { scope.cancel() }
         }
 
         /**

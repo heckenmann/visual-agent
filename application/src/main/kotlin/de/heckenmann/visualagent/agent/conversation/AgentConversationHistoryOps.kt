@@ -194,7 +194,7 @@ internal class AgentConversationHistoryOps(
                     )
                 val history = listOf(instruction) + loadRecentHistoryFromDb(AgentManager.INITIAL_HISTORY_LOAD_LIMIT)
                 val response = owner.llmProvider.chat(buildMainRequest(history, null))
-                persist(Message("assistant", owner.responseCoordinator.normalizeAssistantContent(response.message.content)))
+                persist(Message("assistant", owner.responseCoordinator.normalizeAssistantPresentationContent(response.message.content)))
                 owner.pendingResumeMessage = null
             }.onFailure { error ->
                 val detail = ProviderErrorMessages.userFacing(error)

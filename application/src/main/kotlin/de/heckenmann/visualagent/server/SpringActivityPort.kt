@@ -6,8 +6,10 @@ import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.protocol.ActivityPort
 import de.heckenmann.visualagent.protocol.AgentActivity
 import de.heckenmann.visualagent.protocol.AgentActivityPhase
+import de.heckenmann.visualagent.protocol.DownloadActivity
 import de.heckenmann.visualagent.protocol.ToolActivity
 import de.heckenmann.visualagent.protocol.ToolActivityPhase
+import de.heckenmann.visualagent.workspace.WorkspaceDownloadEventBus
 import org.springframework.stereotype.Component
 
 /** Translates application event buses into protocol-owned activity events. */
@@ -15,6 +17,7 @@ import org.springframework.stereotype.Component
 class SpringActivityPort(
     private val toolEventBus: ToolEventBus,
     private val agentStatusCallbackAdapter: AgentStatusCallbackAdapter,
+    private val workspaceDownloadEventBus: WorkspaceDownloadEventBus = WorkspaceDownloadEventBus(),
 ) : ActivityPort {
     override fun addToolListener(listener: (ToolActivity) -> Unit): AutoCloseable =
         toolEventBus.addListener { event ->
@@ -39,4 +42,6 @@ class SpringActivityPort(
                 message.startsWith("STATUS:IDLE") -> listener(AgentActivity(agentId, AgentActivityPhase.FINISHED))
             }
         }
+
+    override fun addDownloadListener(listener: (DownloadActivity) -> Unit): AutoCloseable = workspaceDownloadEventBus.addListener(listener)
 }

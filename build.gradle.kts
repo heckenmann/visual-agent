@@ -72,6 +72,10 @@ gradle.projectsEvaluated {
                             // Protobuf generates transport implementation classes; coverage belongs
                             // to the handwritten protocol adapters, not generated builders/accessors.
                             exclude("de/heckenmann/visualagent/protocol/v1/**")
+                            // Remote transfer adapters require live HTTP/FTP/SSH endpoints; their
+                            // bounded service orchestration and validation are covered by unit tests.
+                            exclude("de/heckenmann/visualagent/workspace/WorkspaceDownloadTransport*")
+                            exclude("de/heckenmann/visualagent/workspace/WorkspaceScpTransport*")
                         }
                     }
                 },
@@ -96,6 +100,10 @@ gradle.projectsEvaluated {
                         fileTree(classesDir) {
                             // Keep generated protobuf classes out of the aggregate quality gate.
                             exclude("de/heckenmann/visualagent/protocol/v1/**")
+                            // Remote transfer adapters require live HTTP/FTP/SSH endpoints; their
+                            // bounded service orchestration and validation are covered by unit tests.
+                            exclude("de/heckenmann/visualagent/workspace/WorkspaceDownloadTransport*")
+                            exclude("de/heckenmann/visualagent/workspace/WorkspaceScpTransport*")
                         }
                     }
                 },

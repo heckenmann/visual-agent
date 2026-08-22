@@ -7,8 +7,20 @@ interface WorkspaceFileToolPort {
     /** Lists managed files. */
     fun list(): List<ToolWorkspaceFile>
 
+    /** Lists managed workspace directories, including empty directories. */
+    fun listDirectories(): List<String>
+
+    /** Creates a directory in the managed workspace. */
+    fun createDirectory(
+        parentDirectory: String,
+        name: String,
+    ): String
+
     /** Searches managed files. */
-    fun search(query: String): ToolWorkspaceSearch
+    fun search(
+        query: String,
+        mimeType: String? = null,
+    ): ToolWorkspaceSearch
 
     /** Synchronizes persisted metadata. */
     fun sync(): ToolWorkspaceSync
@@ -18,6 +30,15 @@ interface WorkspaceFileToolPort {
         id: String?,
         path: String?,
     ): ToolWorkspaceFile
+
+    /** Deletes one managed file and its persisted metadata. */
+    fun delete(file: ToolWorkspaceFile): Boolean
+
+    /** Deletes a managed workspace directory, optionally including descendants. */
+    fun deleteDirectory(
+        relativePath: String,
+        recursive: Boolean = false,
+    ): ToolWorkspaceDirectoryDeletion
 
     /** Hashes one file. */
     fun hash(file: ToolWorkspaceFile): String
@@ -45,6 +66,12 @@ interface WorkspaceFileToolPort {
         file: ToolWorkspaceFile,
         prompt: String,
     ): ToolImageAnalysis
+
+    /** Detects a managed file MIME type from its content rather than its name. */
+    fun detectMimeType(file: ToolWorkspaceFile): ToolMimeType
+
+    /** Downloads a remote resource into the managed workspace. */
+    fun download(request: ToolDownloadRequest): ToolWorkspaceFile = error("Workspace downloads are not configured")
 }
 
 /** Managed workspace-file projection. */
@@ -81,6 +108,14 @@ data class ToolWorkspaceSync(
     val total: Int,
 )
 
+/** Result of deleting a managed workspace directory. */
+data class ToolWorkspaceDirectoryDeletion(
+    val relativePath: String,
+    val recursive: Boolean,
+    val deletedFiles: Int,
+    val deletedMetadata: Int,
+)
+
 /** Extracted PDF text and cache state. */
 data class ToolExtractedText(
     val cached: Boolean,
@@ -106,6 +141,21 @@ data class ToolImageBytes(
 data class ToolImageAnalysis(
     val model: String,
     val content: String,
+)
+
+/** Content-derived MIME metadata for a managed workspace file. */
+data class ToolMimeType(
+    val detectedMimeType: String,
+    val storedMimeType: String,
+    val sizeBytes: Long,
+    val sha256: String,
+)
+
+/** Model-requested remote workspace download. */
+data class ToolDownloadRequest(
+    val source: String,
+    val directory: String?,
+    val filename: String?,
 )
 
 /** Workspace-layout operations needed by the layout tool. */

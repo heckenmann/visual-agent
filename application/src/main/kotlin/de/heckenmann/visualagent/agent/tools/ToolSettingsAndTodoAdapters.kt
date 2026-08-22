@@ -11,6 +11,7 @@ import de.heckenmann.visualagent.agent.tools.api.ToolSettings
 import de.heckenmann.visualagent.agent.tools.api.ToolSettingsPort
 import de.heckenmann.visualagent.agent.tools.api.ToolSettingsUpdate
 import de.heckenmann.visualagent.agent.tools.api.ToolTodo
+import de.heckenmann.visualagent.agent.tools.api.ToolTodoCreation
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.knowledge.MemoryStore
 import de.heckenmann.visualagent.knowledge.TodoStore
@@ -73,6 +74,23 @@ class TodoToolPortAdapter(
         description: String,
         assignedAgentId: String,
     ): String = todoManager.add(description, assignedAgentId).id
+
+    override fun addIfAbsent(
+        description: String,
+        assignedAgentId: String,
+    ): ToolTodoCreation =
+        todoManager.addIfAbsent(description, assignedAgentId).let { creation ->
+            ToolTodoCreation(
+                ToolTodo(
+                    creation.todo.id,
+                    creation.todo.description,
+                    creation.todo.status.name,
+                    creation.todo.position,
+                    creation.todo.assignedAgentId,
+                ),
+                creation.created,
+            )
+        }
 
     override fun update(
         id: String,

@@ -1,11 +1,14 @@
 package de.heckenmann.visualagent.agent.tools
 
 import de.heckenmann.visualagent.agent.LLMProvider
+import de.heckenmann.visualagent.agent.tools.api.ToolDownloadRequest
 import de.heckenmann.visualagent.agent.tools.api.ToolExtractedText
 import de.heckenmann.visualagent.agent.tools.api.ToolImageAnalysis
 import de.heckenmann.visualagent.agent.tools.api.ToolImageBytes
 import de.heckenmann.visualagent.agent.tools.api.ToolImageInfo
+import de.heckenmann.visualagent.agent.tools.api.ToolMimeType
 import de.heckenmann.visualagent.agent.tools.api.ToolWindowState
+import de.heckenmann.visualagent.agent.tools.api.ToolWorkspaceDirectoryDeletion
 import de.heckenmann.visualagent.agent.tools.api.ToolWorkspaceFile
 import de.heckenmann.visualagent.agent.tools.api.ToolWorkspaceMatch
 import de.heckenmann.visualagent.agent.tools.api.ToolWorkspaceSearch
@@ -13,9 +16,12 @@ import de.heckenmann.visualagent.agent.tools.api.ToolWorkspaceSync
 import de.heckenmann.visualagent.agent.tools.api.WorkspaceFileToolPort
 import de.heckenmann.visualagent.agent.tools.api.WorkspaceLayoutToolPort
 import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
+import de.heckenmann.visualagent.workspace.WorkspaceDownloadRequest
+import de.heckenmann.visualagent.workspace.WorkspaceDownloadService
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
 import de.heckenmann.visualagent.workspace.layout.WorkspaceLayoutService
 import de.heckenmann.visualagent.workspace.layout.WorkspaceWindowState
+import de.heckenmann.visualagent.workspace.searchFiles
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -28,11 +34,22 @@ import java.util.Base64
 class WorkspaceFileToolPortAdapter(
     private val files: WorkspaceFileService,
     private val llmProvider: ObjectProvider<LLMProvider>,
+    private val downloads: WorkspaceDownloadService? = null,
 ) : WorkspaceFileToolPort {
     override fun list(): List<ToolWorkspaceFile> = files.listFiles().map(::toToolFile)
 
-    override fun search(query: String): ToolWorkspaceSearch =
-        files.searchFiles(query).let { result ->
+    override fun listDirectories(): List<String> = files.listDirectories()
+
+    override fun createDirectory(
+        parentDirectory: String,
+        name: String,
+    ): String = files.createDirectory(parentDirectory, name)
+
+    override fun search(
+        query: String,
+        mimeType: String?,
+    ): ToolWorkspaceSearch =
+        files.searchFiles(query, mimeType).let { result ->
             ToolWorkspaceSearch(result.query, result.matches.map { ToolWorkspaceMatch(it.matchType, it.snippet, toToolFile(it.record)) })
         }
 
@@ -43,6 +60,16 @@ class WorkspaceFileToolPortAdapter(
         id: String?,
         path: String?,
     ): ToolWorkspaceFile = toToolFile(files.requireFile(id, path))
+
+    override fun delete(file: ToolWorkspaceFile): Boolean = files.deleteFile(file.id)
+
+    override fun deleteDirectory(
+        relativePath: String,
+        recursive: Boolean,
+    ): ToolWorkspaceDirectoryDeletion =
+        files.deleteDirectory(relativePath, recursive).let {
+            ToolWorkspaceDirectoryDeletion(it.relativePath, it.recursive, it.deletedFiles, it.deletedMetadata)
+        }
 
     override fun hash(file: ToolWorkspaceFile): String = files.hash(requireRecord(file))
 
@@ -70,6 +97,14 @@ class WorkspaceFileToolPortAdapter(
         val response = runBlocking { llmProvider.getObject().vision(Base64.getDecoder().decode(bytes.base64), prompt) }
         return ToolImageAnalysis(response.model, response.message.content)
     }
+
+    override fun detectMimeType(file: ToolWorkspaceFile): ToolMimeType =
+        files.detectMimeType(requireRecord(file)).let { ToolMimeType(it.detectedMimeType, it.storedMimeType, it.sizeBytes, it.sha256) }
+
+    override fun download(request: ToolDownloadRequest): ToolWorkspaceFile =
+        requireNotNull(downloads) { "Workspace downloads are not configured" }
+            .download(WorkspaceDownloadRequest(request.source, request.directory, request.filename))
+            .let(::toToolFile)
 
     private fun requireRecord(file: ToolWorkspaceFile): WorkspaceFileRecord = files.requireFile(file.id, null)
 }

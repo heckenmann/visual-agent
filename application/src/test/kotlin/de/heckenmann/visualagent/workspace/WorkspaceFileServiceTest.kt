@@ -17,6 +17,7 @@ import kotlin.io.path.isRegularFile
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
@@ -48,6 +49,66 @@ class WorkspaceFileServiceTest {
             assertEquals("Alpha", service.resolveManagedPath(renamed.relativePath).readText())
             assertTrue(service.hash(renamed).matches(Regex("[a-f0-9]{64}")))
             assertTrue(service.deleteFile(renamed.id))
+        }
+
+    @Test
+    fun `delete removes stale metadata when the managed file is already missing`() =
+        withDatabasePath(tempDir().resolve("data/visual-agent.db").toString()) { dbPath ->
+            val store = FakeWorkspaceFileStore()
+            val service = WorkspaceFileService(store, dbPath)
+            val record = service.createManagedFile("imports", "stale.txt", "gone".toByteArray(), "text/plain")
+            service.resolveManagedPath(record.relativePath).deleteIfExists()
+
+            assertTrue(service.deleteFile(record.id))
+            assertTrue(service.listFiles().none { it.id == record.id })
+        }
+
+    @Test
+    fun `byte import targets the requested browser directory`() =
+        withDatabasePath(tempDir().resolve("data/visual-agent.db").toString()) { dbPath ->
+            val service = WorkspaceFileService(FakeWorkspaceFileStore(), dbPath)
+
+            val imported = service.importFile("projects/demo", "notes.txt", "hello".toByteArray())
+
+            assertEquals("projects/demo/notes.txt", imported.relativePath)
+        }
+
+    @Test
+    fun `create directory lists an empty workspace folder`() =
+        withDatabasePath(tempDir().resolve("data/visual-agent.db").toString()) { dbPath ->
+            val service = WorkspaceFileService(FakeWorkspaceFileStore(), dbPath)
+
+            assertEquals("projects/demo", service.createDirectory("projects", "demo"))
+            assertEquals(listOf("projects", "projects/demo"), service.listDirectories())
+        }
+
+    @Test
+    fun `directory deletion requires explicit recursion and removes nested metadata`() =
+        withDatabasePath(tempDir().resolve("data/visual-agent.db").toString()) { dbPath ->
+            val store = FakeWorkspaceFileStore()
+            val service = WorkspaceFileService(store, dbPath)
+            val nested = service.importFile("projects/demo/nested", "notes.txt", "content".toByteArray())
+            val unmanaged = service.workspaceRoot().resolve("projects/demo/nested/unmanaged.bin")
+            unmanaged.writeText("unmanaged")
+
+            assertFailsWith<IllegalArgumentException> { service.deleteDirectory("projects/demo") }
+            assertTrue(service.resolveManagedPath(nested.relativePath).isRegularFile())
+
+            val deletion = service.deleteDirectory("projects/demo", recursive = true)
+
+            assertEquals(2, deletion.deletedFiles)
+            assertEquals(1, deletion.deletedMetadata)
+            assertTrue(service.listFiles().none { it.id == nested.id })
+            assertTrue(!unmanaged.toFile().exists())
+            assertTrue(service.listDirectories().none { it.startsWith("projects/demo") })
+        }
+
+    @Test
+    fun `directory deletion does not allow deleting the workspace root`() =
+        withDatabasePath(tempDir().resolve("data/visual-agent.db").toString()) { dbPath ->
+            val service = WorkspaceFileService(FakeWorkspaceFileStore(), dbPath)
+
+            assertFailsWith<IllegalArgumentException> { service.deleteDirectory("", recursive = true) }
         }
 
     @Test
@@ -85,6 +146,20 @@ class WorkspaceFileServiceTest {
             assertEquals(3, info.height)
             assertEquals("image/png", bytes.mimeType)
             assertTrue(bytes.base64.isNotBlank())
+        }
+
+    @Test
+    fun `MIME detection uses content instead of extension or stored metadata`() =
+        withDatabasePath(tempDir().resolve("data/visual-agent.db").toString()) { dbPath ->
+            val service = WorkspaceFileService(FakeWorkspaceFileStore(), dbPath)
+            val imported = service.createManagedFile("imports", "notes.png", "plain text".toByteArray(), "image/png")
+
+            val detected = service.detectMimeType(imported)
+
+            assertEquals("text/plain", detected.detectedMimeType)
+            assertEquals("image/png", detected.storedMimeType)
+            assertEquals(imported.sizeBytes, detected.sizeBytes)
+            assertEquals(imported.sha256, detected.sha256)
         }
 
     @Test

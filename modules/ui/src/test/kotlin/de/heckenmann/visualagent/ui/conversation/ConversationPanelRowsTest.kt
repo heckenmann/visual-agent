@@ -275,12 +275,23 @@ class ConversationPanelRowsTest {
     @Test
     fun `thinking row is collapsed by default and expands`() {
         mount {
-            ThinkingRow(content = "reasoning steps", isStreaming = false)
+            ThinkingRow(content = "first line\nlatest line", isStreaming = false)
         }
         composeTestRule.onNodeWithText("Thinking").assertExists()
-        composeTestRule.onNodeWithText("reasoning steps").assertDoesNotExist()
+        composeTestRule.onNodeWithText("latest line").assertExists()
+        composeTestRule.onNodeWithText("first line").assertDoesNotExist()
         composeTestRule.onNodeWithContentDescription("Expand thinking").performClick()
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithText("reasoning steps").assertExists()
+        composeTestRule.onNodeWithText("first line", substring = true).assertExists()
+    }
+
+    @Test
+    fun `thinking preview follows the latest non-empty line`() {
+        mount {
+            ThinkingRow(content = "first\n\nlatest", isStreaming = true)
+        }
+
+        composeTestRule.onNodeWithText("latest").assertExists()
+        composeTestRule.onNodeWithText("first").assertDoesNotExist()
     }
 }

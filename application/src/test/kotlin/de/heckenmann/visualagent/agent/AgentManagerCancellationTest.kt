@@ -218,4 +218,43 @@ class AgentManagerCancellationTest {
                 stores.close()
             }
         }
+
+    @Test
+    fun `cancelling an active todo review does not persist a cancellation failure`() =
+        runBlocking {
+            val stores = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+            val provider = mockk<LLMProvider>(relaxed = true)
+            val started = CompletableDeferred<Unit>()
+            coEvery { provider.chat(any<ChatRequestContext>()) } coAnswers {
+                started.complete(Unit)
+                kotlinx.coroutines.awaitCancellation()
+            }
+            val lifecycle = LifecycleState()
+            val manager =
+                AgentManager(
+                    stores,
+                    provider,
+                    AgentToolConfigService(stores),
+                    ToolEventBus(),
+                    TodoEventBus(),
+                    AppConfigBean(stores),
+                    lifecycle = lifecycle,
+                )
+            try {
+                val todo = manager.todoManager.add("finished work")
+                manager.todoManager.updateStatus(todo.id, TodoStatus.COMPLETED)
+                started.await()
+                lifecycle.beginShutdown()
+                manager.cancelActiveWork()
+
+                delay(100)
+
+                val messages = stores.getConversationMessages("main")
+                assertTrue(messages.none { it.content.contains("main agent could not be triggered") })
+                coVerify(exactly = 1) { provider.chat(any<ChatRequestContext>()) }
+            } finally {
+                manager.destroy()
+                stores.close()
+            }
+        }
 }

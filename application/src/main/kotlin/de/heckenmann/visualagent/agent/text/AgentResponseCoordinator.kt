@@ -22,7 +22,7 @@ class AgentResponseCoordinator
          * payloads with a placeholder, and detects runaway repetition.
          */
         fun normalizeAssistantContent(content: String): String {
-            val trimmed = content.trim()
+            val trimmed = removeThinkingMarkup(content).trim()
             if (trimmed.isBlank() || isToolCallsOnlyPayload(trimmed)) {
                 return "(No text response. See tool results above.)"
             }
@@ -31,6 +31,42 @@ class AgentResponseCoordinator
             }
             return trimmed
         }
+
+        /**
+         * Normalizes assistant content for conversation presentation while retaining reasoning
+         * markup for the UI. Provider-facing history must use [normalizeAssistantContent], which
+         * removes the markup before sending the conversation back to a model.
+         *
+         * @param content Raw assistant content, potentially containing `<think>` blocks
+         * @return Trimmed presentation content with reasoning markup retained
+         */
+        fun normalizeAssistantPresentationContent(content: String): String {
+            val trimmed = content.trim()
+            if (trimmed.isBlank()) return "(No text response. See tool results above.)"
+            val withoutThinking = removeThinkingMarkup(trimmed).trim()
+            if (withoutThinking.isBlank() || isToolCallsOnlyPayload(withoutThinking)) {
+                return if (hasThinkingMarkup(trimmed)) trimmed else "(No text response. See tool results above.)"
+            }
+            if (ResponseRepetitionGuard.isRunawayRepetition(withoutThinking)) {
+                return "I generated a malformed repeated output. Please repeat your last request and I will answer it cleanly."
+            }
+            return trimmed
+        }
+
+        /**
+         * Removes model reasoning markup before a message is included in a provider prompt.
+         *
+         * @param content Message content that may contain reasoning markup
+         * @return Content without complete or partial reasoning tags
+         */
+        fun removeThinkingMarkup(content: String): String =
+            content
+                .replace(THINKING_BLOCK_PATTERN, "")
+                .replace(UNFINISHED_THINKING_BLOCK_PATTERN, "")
+                .replace(CLOSE_THINKING_TAG_PATTERN, "")
+
+        private fun hasThinkingMarkup(content: String): Boolean =
+            OPEN_THINKING_TAG_PATTERN.containsMatchIn(content) || CLOSE_THINKING_TAG_PATTERN.containsMatchIn(content)
 
         /**
          * Generates assistant content with repetition-guard retry logic. If the initial response
@@ -112,6 +148,13 @@ class AgentResponseCoordinator
             return compact == """{"tool_calls":[]}""" ||
                 compact == """```json{"tool_calls":[]}```""" ||
                 compact == """```{"tool_calls":[]}```"""
+        }
+
+        private companion object {
+            private val THINKING_BLOCK_PATTERN = Regex("(?is)<think>.*?</think>")
+            private val OPEN_THINKING_TAG_PATTERN = Regex("(?i)<think>")
+            private val UNFINISHED_THINKING_BLOCK_PATTERN = Regex("(?is)<think>.*$")
+            private val CLOSE_THINKING_TAG_PATTERN = Regex("(?i)</think>")
         }
 
         private suspend fun runRepetitionGuardRetry(token: CancellationToken? = null): String {

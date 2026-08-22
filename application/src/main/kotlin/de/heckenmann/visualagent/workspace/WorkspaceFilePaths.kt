@@ -33,10 +33,19 @@ internal object WorkspaceFilePaths {
         relativePath: String,
         databasePath: String = "./data/visual-agent.db",
     ): Path {
+        val resolved = resolveWorkspacePath(relativePath, databasePath)
+        require(resolved.exists() && resolved.isRegularFile()) { "Workspace file does not exist" }
+        return resolved
+    }
+
+    /** Resolves a workspace-relative path and rejects path traversal without requiring the file to exist. */
+    fun resolveWorkspacePath(
+        relativePath: String,
+        databasePath: String = "./data/visual-agent.db",
+    ): Path {
         val root = workspaceRoot(databasePath)
         val resolved = root.resolve(normalizeRelativePath(relativePath)).normalize()
         require(resolved.startsWith(root)) { "Path escapes workspace root" }
-        require(resolved.exists() && resolved.isRegularFile()) { "Workspace file does not exist" }
         return resolved
     }
 
