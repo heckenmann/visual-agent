@@ -72,6 +72,9 @@ class TodoManager(
      */
     fun getAll(): List<Todo> = todos.sortedBy { it.position }
 
+    /** Returns deleted snapshots retained for conversation reconstruction. */
+    fun getDeletedTodos(): List<Todo> = todoStore.listDeletedTodos()
+
     /**
      * Returns todos that are ready to be assigned to an agent, ordered by position.
      */
@@ -315,12 +318,11 @@ class TodoManager(
      * @return true if a todo was removed
      */
     fun remove(todoId: String): Boolean {
-        val removed = todos.removeIf { it.id == todoId }
-        if (removed) {
-            todoStore.deleteTodo(todoId)
-            publishChange(TodoChange(TodoChangeType.REMOVED, todoId = todoId))
-        }
-        return removed
+        val todo = todos.firstOrNull { it.id == todoId } ?: return false
+        todoStore.deleteTodoAndArchive(todo)
+        todos.removeIf { it.id == todoId }
+        publishChange(TodoChange(TodoChangeType.REMOVED, todoId = todoId))
+        return true
     }
 
     /**

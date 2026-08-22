@@ -68,4 +68,20 @@ class KnowledgeDbTodoTest {
         assertTrue(db.listTodos().isEmpty())
         db.close()
     }
+
+    @Test
+    fun `deleted todo snapshot survives active row removal`() {
+        val tempDb = createTempDirectory("visual-agent-db-deleted-todo-test").resolve("todos.db").toString()
+        val db =
+            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                .create(tempDb)
+        val todo = Todo(id = "todo-deleted", description = "Retain this snapshot", status = TodoStatus.COMPLETED)
+
+        db.saveTodo(todo)
+        db.deleteTodoAndArchive(todo)
+
+        assertTrue(db.listTodos().isEmpty())
+        assertEquals(todo, db.listDeletedTodos().single())
+        db.close()
+    }
 }

@@ -207,7 +207,11 @@ data class SubAgent(
         } catch (error: Exception) {
             if (!isStreamingUnavailable(error)) throw error
             logger.info { "Streaming is unavailable for sub-agent $id; using a complete response instead" }
-            chat(messages, provider, enabledTools, token)
+            val fallback = chat(messages, provider, enabledTools, token)
+            fallback.message.content
+                .takeIf(String::isNotEmpty)
+                ?.let(onChunk)
+            fallback
         }
     }
 

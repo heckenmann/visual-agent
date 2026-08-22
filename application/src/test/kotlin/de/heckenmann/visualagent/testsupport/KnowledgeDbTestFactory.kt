@@ -134,6 +134,10 @@ class TestPersistence internal constructor(
 
     override fun deleteTodo(todoId: String) = todoStore.deleteTodo(todoId)
 
+    override fun deleteTodoAndArchive(todo: Todo) = todoStore.deleteTodoAndArchive(todo)
+
+    override fun listDeletedTodos(): List<Todo> = todoStore.listDeletedTodos()
+
     override fun clearTodos() = todoStore.clearTodos()
 
     override fun saveMemory(

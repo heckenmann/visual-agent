@@ -126,6 +126,31 @@ internal class TodoEntity(
 )
 
 @Entity
+@Table(name = "deleted_todos")
+internal class DeletedTodoEntity(
+    @Id
+    var id: String = "",
+    @Column(nullable = false)
+    var description: String = "",
+    var status: String = "PENDING",
+    var position: Int = 0,
+    @Column(name = "assigned_agent_id")
+    var assignedAgentId: String? = null,
+    @Convert(converter = InstantStringConverter::class)
+    @Column(name = "created_at", columnDefinition = "TIMESTAMP")
+    var createdAt: Instant = Instant.EPOCH,
+    @Convert(converter = InstantStringConverter::class)
+    @Column(name = "updated_at", columnDefinition = "TIMESTAMP")
+    var updatedAt: Instant = Instant.EPOCH,
+    @Convert(converter = InstantStringConverter::class)
+    @Column(name = "completed_at", columnDefinition = "TIMESTAMP")
+    var completedAt: Instant? = null,
+    @Convert(converter = InstantStringConverter::class)
+    @Column(name = "due_date", columnDefinition = "TIMESTAMP")
+    var dueDate: Instant? = null,
+)
+
+@Entity
 @Table(name = "sub_agents")
 internal class SubAgentEntity(
     @Id

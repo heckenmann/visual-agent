@@ -25,6 +25,8 @@ class SpringTodoPort(
 ) : TodoPort {
     override fun list(): List<TodoItem> = agentManager.getTodosFromDb().map(Todo::toTodoItem)
 
+    override fun deletedSnapshots(): List<TodoItem> = agentManager.todoManager.getDeletedTodos().map(Todo::toTodoItem)
+
     override fun agents(): List<AgentSummary> = agentManager.getSubAgents().map(SubAgent::toAgentSummary)
 
     override fun add(description: String): TodoItem = agentManager.todoManager.add(description).toTodoItem()

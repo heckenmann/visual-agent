@@ -49,6 +49,9 @@ interface TodoPort {
     /** Reads the current persisted todo list. */
     fun list(): List<TodoItem>
 
+    /** Reads deleted todo snapshots retained for conversation reconstruction. */
+    fun deletedSnapshots(): List<TodoItem> = emptyList()
+
     /** Reads agents available for assignment. */
     fun agents(): List<AgentSummary>
 

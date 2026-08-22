@@ -55,10 +55,7 @@ internal suspend fun processTodoWithLLM(
     val token = cancellationToken ?: CancellationToken()
     activeCancellationTokens[todoId] = token
     val processingJob = currentCoroutineContext()[Job]
-    val executionId =
-        java.util.UUID
-            .randomUUID()
-            .toString()
+    var executionId = ""
     token.onCancelled { processingJob?.cancel() }
     val watcher = startTodoChangeWatcher(todoId, agent.id, taskDescription, token, todoEventBus)
     var attempt = 0
@@ -71,6 +68,10 @@ internal suspend fun processTodoWithLLM(
         delay(300)
         while (attempt < maxRetries) {
             try {
+                executionId =
+                    java.util.UUID
+                        .randomUUID()
+                        .toString()
                 executionControl?.awaitExecutionAllowed(agent.id)
                 val result =
                     jobScheduler.run(agent.id) {
