@@ -9,6 +9,8 @@ data class JavaScriptExecutionLimits(
     val maxResultCharacters: Int = 500_000,
     val maxToolCalls: Int = 32,
     val maxConcurrentToolCalls: Int = 4,
+    val maxWorkspaceWriteBytes: Long = 50L * 1024L * 1024L,
+    val maxWorkspaceBytes: Long = 100L * 1024L * 1024L,
     val maxLogEntries: Int = 100,
     val maxLogCharacters: Int = 10_000,
 )

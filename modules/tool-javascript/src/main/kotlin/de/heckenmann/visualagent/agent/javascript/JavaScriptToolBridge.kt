@@ -18,6 +18,7 @@ import org.graalvm.polyglot.proxy.ProxyExecutable
 import org.graalvm.polyglot.proxy.ProxyObject
 import java.util.concurrent.Semaphore
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
 /** Request-scoped bridge exposing only enabled registry tools to JavaScript. */
@@ -33,6 +34,7 @@ internal class JavaScriptToolBridge(
     /** Last bridge error, retained because Graal may erase host exception details in a Promise. */
     val lastFailure = AtomicReference<JavaScriptExecutionException?>()
     private val calls = AtomicInteger()
+    private val workspaceBytes = AtomicLong()
     private val permits = Semaphore(limits.maxConcurrentToolCalls)
 
     /** Returns the only host object made available to the guest context. */
@@ -71,6 +73,7 @@ internal class JavaScriptToolBridge(
                     executable { arguments ->
                         try {
                             cancellationToken.throwIfCancelled()
+                            consumeCall()
                             workspaceWriter.read(workspacePath(arguments))
                         } catch (error: JavaScriptExecutionException) {
                             lastFailure.set(error)
@@ -78,13 +81,14 @@ internal class JavaScriptToolBridge(
                         } catch (error: IllegalArgumentException) {
                             throw workspaceFailure(JavaScriptErrorCategory.TOOL_ARGUMENTS, error.message ?: "Invalid workspace path")
                         } catch (error: Exception) {
-                            throw workspaceFailure(JavaScriptErrorCategory.TOOL_FAILURE, safeMessage(error))
+                            throw workspaceFailure(JavaScriptErrorCategory.TOOL_FAILURE, "Workspace read failed")
                         }
                     },
                 "delete" to
                     executable { arguments ->
                         try {
                             cancellationToken.throwIfCancelled()
+                            consumeCall()
                             val result = workspaceWriter.delete(workspacePath(arguments))
                             ProxyObject.fromMap(mapOf("path" to result.relativePath, "deleted" to result.deleted))
                         } catch (error: JavaScriptExecutionException) {
@@ -93,7 +97,7 @@ internal class JavaScriptToolBridge(
                         } catch (error: IllegalArgumentException) {
                             throw workspaceFailure(JavaScriptErrorCategory.TOOL_ARGUMENTS, error.message ?: "Invalid workspace path")
                         } catch (error: Exception) {
-                            throw workspaceFailure(JavaScriptErrorCategory.TOOL_FAILURE, safeMessage(error))
+                            throw workspaceFailure(JavaScriptErrorCategory.TOOL_FAILURE, "Workspace delete failed")
                         }
                     },
             ),
@@ -124,9 +128,7 @@ internal class JavaScriptToolBridge(
         val input =
             arguments.getOrNull(1)?.let(::toJsonObject)
                 ?: throw failure(JavaScriptErrorCategory.TOOL_ARGUMENTS, "Tool arguments must be an object")
-        if (calls.incrementAndGet() > limits.maxToolCalls) {
-            throw failure(JavaScriptErrorCategory.LIMIT_EXCEEDED, "JavaScript tool-call limit exceeded")
-        }
+        consumeCall()
         if (!permits.tryAcquire()) throw failure(JavaScriptErrorCategory.LIMIT_EXCEEDED, "Concurrent JavaScript tool-call limit exceeded")
         return try {
             cancellationToken.throwIfCancelled()
@@ -183,6 +185,9 @@ internal class JavaScriptToolBridge(
         if (path.isBlank() || content == null) {
             throw failure(JavaScriptErrorCategory.TOOL_ARGUMENTS, "Workspace write requires string path and content")
         }
+        consumeCall()
+        val contentBytes = content.toByteArray(Charsets.UTF_8)
+        reserveWorkspaceBytes(contentBytes.size.toLong())
         return try {
             val result = workspaceWriter.write(path, content)
             ProxyObject.fromMap(
@@ -193,9 +198,11 @@ internal class JavaScriptToolBridge(
                 ),
             )
         } catch (error: IllegalArgumentException) {
+            workspaceBytes.addAndGet(-contentBytes.size.toLong())
             throw failure(JavaScriptErrorCategory.TOOL_ARGUMENTS, error.message ?: "Invalid workspace path")
         } catch (error: Exception) {
-            throw failure(JavaScriptErrorCategory.TOOL_FAILURE, safeMessage(error))
+            workspaceBytes.addAndGet(-contentBytes.size.toLong())
+            throw failure(JavaScriptErrorCategory.TOOL_FAILURE, "Workspace write failed")
         }
     }
 
@@ -275,6 +282,26 @@ internal class JavaScriptToolBridge(
         category: JavaScriptErrorCategory,
         message: String,
     ): JavaScriptExecutionException = JavaScriptExecutionException(category, message.take(MAX_ERROR_CHARACTERS))
+
+    private fun consumeCall() {
+        if (calls.incrementAndGet() > limits.maxToolCalls) {
+            throw failure(JavaScriptErrorCategory.LIMIT_EXCEEDED, "JavaScript tool-call limit exceeded")
+        }
+    }
+
+    private fun reserveWorkspaceBytes(bytes: Long) {
+        if (bytes > limits.maxWorkspaceWriteBytes) {
+            throw failure(JavaScriptErrorCategory.LIMIT_EXCEEDED, "Workspace write size limit exceeded")
+        }
+        while (true) {
+            val current = workspaceBytes.get()
+            val next = current + bytes
+            if (next < current || next > limits.maxWorkspaceBytes) {
+                throw failure(JavaScriptErrorCategory.LIMIT_EXCEEDED, "Workspace write budget exceeded")
+            }
+            if (workspaceBytes.compareAndSet(current, next)) return
+        }
+    }
 
     private fun safeMessage(error: Throwable): String =
         error.message

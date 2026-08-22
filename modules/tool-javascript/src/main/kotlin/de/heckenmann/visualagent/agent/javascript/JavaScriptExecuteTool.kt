@@ -19,6 +19,8 @@ import org.springframework.stereotype.Component
 class JavaScriptExecuteTool(
     private val executionService: GraalJavaScriptExecutionService,
 ) : VisualAgentTool {
+    override val managesExecution: Boolean = true
+
     override val definition =
         ToolDefinition(
             id = ToolId(TOOL_ID),

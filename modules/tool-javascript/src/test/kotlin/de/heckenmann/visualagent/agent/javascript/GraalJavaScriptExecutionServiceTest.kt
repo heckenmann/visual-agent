@@ -151,6 +151,20 @@ class GraalJavaScriptExecutionServiceTest {
     }
 
     @Test
+    fun `model facing registry path reports the JavaScript timeout category`() {
+        val tool = JavaScriptExecuteTool(service)
+        val modelRegistry = ToolRegistry(listOf(tool), ToolEventBus()) { 1 }
+        try {
+            val result = modelRegistry.execute(tool, """{"source":"while (true) {}"}""", emptyMap())
+
+            assertTrue(result.contains("\"success\":false"))
+            assertTrue(result.contains("TIMEOUT"))
+        } finally {
+            modelRegistry.close()
+        }
+    }
+
+    @Test
     fun `rejects disabled and recursive tools`() {
         assertFailsWith<JavaScriptExecutionException> {
             execute("await tools.call('test:echo', {});", enabled = emptySet())
@@ -176,6 +190,48 @@ class GraalJavaScriptExecutionServiceTest {
             )
 
         assertEquals("handled", result.value)
+    }
+
+    @Test
+    fun `reports a later promise failure after a handled bridge failure`() {
+        val error =
+            assertFailsWith<JavaScriptExecutionException> {
+                execute(
+                    """
+                    try { await tools.call('test:echo', 'not-an-object'); } catch (_) {}
+                    return await Promise.reject(new Error('later failure'));
+                    """.trimIndent(),
+                    enabled = setOf("test:echo"),
+                )
+            }
+
+        assertEquals(JavaScriptErrorCategory.RUNTIME, error.category)
+        assertTrue(error.message.contains("later failure"))
+        assertFalse(error.message.contains("Tool arguments"))
+    }
+
+    @Test
+    fun `bounds workspace helper calls and output bytes`() {
+        assertFailsWith<JavaScriptExecutionException> {
+            execute(
+                "workspace.write({path: 'one.txt', content: '123'}); workspace.write({path: 'two.txt', content: '456'});",
+                limits = JavaScriptExecutionLimits(maxWorkspaceBytes = 5),
+            )
+        }.also { assertEquals(JavaScriptErrorCategory.LIMIT_EXCEEDED, it.category) }
+
+        assertFailsWith<JavaScriptExecutionException> {
+            execute(
+                "workspace.write({path: 'large.txt', content: '123'});",
+                limits = JavaScriptExecutionLimits(maxWorkspaceWriteBytes = 2),
+            )
+        }.also { assertEquals(JavaScriptErrorCategory.LIMIT_EXCEEDED, it.category) }
+
+        assertFailsWith<JavaScriptExecutionException> {
+            execute(
+                "workspace.write({path: 'one.txt', content: '1'}); workspace.write({path: 'two.txt', content: '2'});",
+                limits = JavaScriptExecutionLimits(maxToolCalls = 1),
+            )
+        }.also { assertEquals(JavaScriptErrorCategory.LIMIT_EXCEEDED, it.category) }
     }
 
     @Test

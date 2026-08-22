@@ -108,7 +108,7 @@ class GraalJavaScriptExecutionService(
         } catch (error: JavaScriptExecutionException) {
             throw error
         } catch (error: PolyglotException) {
-            throw mapPolyglotFailure(error)
+            throw mapPolyglotFailure(error, bridge)
         } finally {
             context.close(true)
             contextReference.set(null)
@@ -161,7 +161,23 @@ class GraalJavaScriptExecutionService(
             }
         value.invokeMember("then", resolve, reject)
         while (!latch.await(25, TimeUnit.MILLISECONDS)) token.throwIfCancelled()
-        failure[0]?.let { throw bridge.lastFailure.get() ?: it }
+        failure[0]?.let { rejected ->
+            val bridgeFailure = bridge.lastFailure.getAndSet(null)
+            val rejectedMessage = rejected.message.orEmpty()
+            if (
+                bridgeFailure != null &&
+                (
+                    !looksLikeJavaScriptError(rejectedMessage) ||
+                        rejectedMessage == "JavaScript promise rejected" ||
+                        rejectedMessage == "[object Object]" ||
+                        rejectedMessage.contains(bridgeFailure.category.name) ||
+                        rejectedMessage.contains(bridgeFailure.message)
+                )
+            ) {
+                throw bridgeFailure
+            }
+            throw rejected
+        }
         return holder[0] ?: throw JavaScriptExecutionException(JavaScriptErrorCategory.RUNTIME, "JavaScript returned no result")
     }
 
@@ -211,10 +227,14 @@ class GraalJavaScriptExecutionService(
         return JavaScriptExecutionException(category, message.take(MAX_ERROR_CHARACTERS).ifBlank { "JavaScript execution failed" })
     }
 
-    private fun mapPolyglotFailure(error: PolyglotException): JavaScriptExecutionException {
+    private fun mapPolyglotFailure(
+        error: PolyglotException,
+        bridge: JavaScriptToolBridge? = null,
+    ): JavaScriptExecutionException {
         if (error.isHostException) {
             val host = runCatching { error.asHostException() }.getOrNull()
             if (host is JavaScriptExecutionException) return host
+            bridge?.lastFailure?.getAndSet(null)?.let { return it }
         }
         val category = if (error.isSyntaxError) JavaScriptErrorCategory.SYNTAX else JavaScriptErrorCategory.RUNTIME
         return JavaScriptExecutionException(category, safePolyglotMessage(error))
@@ -227,6 +247,9 @@ class GraalJavaScriptExecutionService(
             ?.take(MAX_ERROR_CHARACTERS)
             .orEmpty()
             .ifBlank { "JavaScript execution failed" }
+
+    private fun looksLikeJavaScriptError(message: String): Boolean =
+        message.matches(Regex("(?i)^(error|typeerror|referenceerror|rangeerror|syntaxerror):.*"))
 
     private companion object {
         const val MAX_ERROR_CHARACTERS = 500

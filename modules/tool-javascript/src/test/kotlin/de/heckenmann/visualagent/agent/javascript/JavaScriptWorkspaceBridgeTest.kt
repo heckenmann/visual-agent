@@ -3,6 +3,7 @@ package de.heckenmann.visualagent.agent.javascript
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import org.junit.jupiter.api.AfterEach
+import java.nio.file.NoSuchFileException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -75,6 +76,36 @@ class JavaScriptWorkspaceBridgeTest {
 
         assertTrue(result.value.toString().contains("traversal"))
         assertTrue(workspaceFiles.isEmpty())
+    }
+
+    @Test
+    fun `workspace failures do not expose server paths`() {
+        val failingWriter =
+            object : JavaScriptWorkspaceWriter {
+                override fun write(
+                    relativePath: String,
+                    content: String,
+                ) = JavaScriptWorkspaceWriteResult(
+                    relativePath,
+                    content.length.toLong(),
+                    "text/plain",
+                )
+
+                override fun read(relativePath: String): String =
+                    throw NoSuchFileException("/srv/visual-agent/data/workspace/$relativePath")
+            }
+        val failingService = GraalJavaScriptExecutionService({ registry }, failingWriter)
+        try {
+            val error =
+                assertFailsWith<JavaScriptExecutionException> {
+                    failingService.execute(JavaScriptExecutionRequest("return workspace.read({path: 'missing.txt'});", emptySet()))
+                }
+
+            assertTrue(error.message.contains("Workspace read failed"))
+            assertTrue("/srv/visual-agent" !in error.message)
+        } finally {
+            failingService.close()
+        }
     }
 
     @Test
