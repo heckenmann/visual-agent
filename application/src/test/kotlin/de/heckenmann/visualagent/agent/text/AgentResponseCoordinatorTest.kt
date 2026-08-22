@@ -58,6 +58,12 @@ class AgentResponseCoordinatorTest {
     }
 
     @Test
+    fun `provider history removes unfinished thinking blocks`() {
+        assertEquals("answer", coordinator.removeThinkingMarkup("answer<think>unfinished reasoning"))
+        assertEquals("before", coordinator.removeThinkingMarkup("before<think>unfinished reasoning"))
+    }
+
+    @Test
     fun `blank response is finalized from captured tool results`() =
         runTest {
             conversationOps.finishedToolEventsByRequestId["request-1"] = mutableListOf(toolEvent(success = true))

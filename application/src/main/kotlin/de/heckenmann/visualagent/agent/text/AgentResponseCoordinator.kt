@@ -62,7 +62,7 @@ class AgentResponseCoordinator
         fun removeThinkingMarkup(content: String): String =
             content
                 .replace(THINKING_BLOCK_PATTERN, "")
-                .replace(OPEN_THINKING_TAG_PATTERN, "")
+                .replace(UNFINISHED_THINKING_BLOCK_PATTERN, "")
                 .replace(CLOSE_THINKING_TAG_PATTERN, "")
 
         private fun hasThinkingMarkup(content: String): Boolean =
@@ -153,6 +153,7 @@ class AgentResponseCoordinator
         private companion object {
             private val THINKING_BLOCK_PATTERN = Regex("(?is)<think>.*?</think>")
             private val OPEN_THINKING_TAG_PATTERN = Regex("(?i)<think>")
+            private val UNFINISHED_THINKING_BLOCK_PATTERN = Regex("(?is)<think>.*$")
             private val CLOSE_THINKING_TAG_PATTERN = Regex("(?i)</think>")
         }
 
