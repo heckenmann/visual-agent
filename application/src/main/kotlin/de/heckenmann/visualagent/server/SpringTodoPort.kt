@@ -67,7 +67,15 @@ class SpringTodoPort(
 
     override fun addProgressListener(listener: (TodoProgress) -> Unit): AutoCloseable =
         todoEventBus.addProgressListener { update ->
-            listener(TodoProgress(todoId = update.todoId, delta = update.delta, completed = update.completed))
+            listener(
+                TodoProgress(
+                    todoId = update.todoId,
+                    delta = update.delta,
+                    completed = update.completed,
+                    executionId = update.executionId,
+                    agentId = update.agentId,
+                ),
+            )
         }
 }
 
@@ -79,6 +87,7 @@ private fun Todo.toTodoItem(): TodoItem =
         position = position,
         assignedAgentId = assignedAgentId,
         createdAt = createdAt,
+        updatedAt = updatedAt,
         completedAt = completedAt,
         dueDate = dueDate,
     )

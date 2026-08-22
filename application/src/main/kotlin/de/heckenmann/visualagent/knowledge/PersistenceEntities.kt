@@ -115,6 +115,9 @@ internal class TodoEntity(
     @Column(name = "created_at", columnDefinition = "TIMESTAMP")
     var createdAt: Instant = Instant.EPOCH,
     @Convert(converter = InstantStringConverter::class)
+    @Column(name = "updated_at", columnDefinition = "TIMESTAMP")
+    var updatedAt: Instant = Instant.EPOCH,
+    @Convert(converter = InstantStringConverter::class)
     @Column(name = "completed_at", columnDefinition = "TIMESTAMP")
     var completedAt: Instant? = null,
     @Convert(converter = InstantStringConverter::class)

@@ -55,6 +55,10 @@ internal suspend fun processTodoWithLLM(
     val token = cancellationToken ?: CancellationToken()
     activeCancellationTokens[todoId] = token
     val processingJob = currentCoroutineContext()[Job]
+    val executionId =
+        java.util.UUID
+            .randomUUID()
+            .toString()
     token.onCancelled { processingJob?.cancel() }
     val watcher = startTodoChangeWatcher(todoId, agent.id, taskDescription, token, todoEventBus)
     var attempt = 0
@@ -82,6 +86,8 @@ internal suspend fun processTodoWithLLM(
                                     TodoProgressUpdate(
                                         todoId = todoId,
                                         delta = delta,
+                                        executionId = executionId,
+                                        agentId = agent.id,
                                     ),
                                 )
                             },
@@ -157,7 +163,14 @@ internal suspend fun processTodoWithLLM(
             persistMessage = { conversationOps.persist(it) },
         )
     } finally {
-        todoEventBus.publishProgress(TodoProgressUpdate(todoId = todoId, completed = true))
+        todoEventBus.publishProgress(
+            TodoProgressUpdate(
+                todoId = todoId,
+                completed = true,
+                executionId = executionId,
+                agentId = agent.id,
+            ),
+        )
         watcher.close()
         activeCancellationTokens.remove(todoId, token)
         agentBusySince.remove(agent.id)

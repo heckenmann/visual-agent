@@ -31,6 +31,7 @@ class KnowledgeDbTodoTest {
                             while (columns.next()) add(columns.getString("name"))
                         }
                     assertFalse(names.contains("priority"))
+                    assertTrue(names.contains("updated_at"))
                 }
             }
         }
@@ -56,10 +57,12 @@ class KnowledgeDbTodoTest {
 
         todo.status = TodoStatus.IN_PROGRESS
         todo.assignedAgentId = "agent-1"
+        todo.updatedAt = Instant.ofEpochMilli(1234)
         db.saveTodo(todo)
         val updated = db.listTodos().first()
         assertEquals(TodoStatus.IN_PROGRESS, updated.status)
         assertEquals("agent-1", updated.assignedAgentId)
+        assertEquals(Instant.ofEpochMilli(1234), updated.updatedAt)
 
         db.deleteTodo("todo-1")
         assertTrue(db.listTodos().isEmpty())

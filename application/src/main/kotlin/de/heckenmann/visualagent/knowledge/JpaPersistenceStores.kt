@@ -286,7 +286,7 @@ private fun MemoryEntity.toDomain(): Memory =
 private fun ConversationEntity.toRecord(): ConversationRecord = ConversationRecord(id, role, content, metadata, createdAt)
 
 private fun Todo.toEntity(): TodoEntity =
-    TodoEntity(id, description, status.name, position, assignedAgentId, createdAt, completedAt, dueDate)
+    TodoEntity(id, description, status.name, position, assignedAgentId, createdAt, updatedAt, completedAt, dueDate)
 
 private fun TodoEntity.toDomain(): Todo =
     Todo(
@@ -296,6 +296,7 @@ private fun TodoEntity.toDomain(): Todo =
         position = position,
         assignedAgentId = assignedAgentId,
         createdAt = createdAt,
+        updatedAt = updatedAt,
         completedAt = completedAt,
         dueDate = dueDate,
     )

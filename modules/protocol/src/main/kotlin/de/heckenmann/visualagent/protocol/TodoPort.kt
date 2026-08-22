@@ -18,6 +18,7 @@ data class TodoItem(
     val position: Int = 0,
     val assignedAgentId: String? = null,
     val createdAt: Instant? = null,
+    val updatedAt: Instant? = null,
     val completedAt: Instant? = null,
     val dueDate: Instant? = null,
 )
@@ -39,6 +40,8 @@ data class TodoProgress(
     val todoId: String,
     val delta: String = "",
     val completed: Boolean = false,
+    val executionId: String? = null,
+    val agentId: String? = null,
 )
 
 /** Transport-neutral todo operations used by the todo panel. */

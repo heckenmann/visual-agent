@@ -21,6 +21,7 @@ enum class TodoStatus {
  * @property position Sort key defining the todo list order; lower values appear earlier
  * @property assignedAgentId Sub-agent currently responsible for the item; optional for legacy rows, required for new todos created by tools
  * @property createdAt Creation timestamp
+ * @property updatedAt Last mutation timestamp used for activity ordering
  * @property completedAt Completion timestamp, set only after completion
  * @property dueDate Optional deadline supplied by the user or planner
  */
@@ -31,6 +32,7 @@ data class Todo(
     var position: Int = 0,
     var assignedAgentId: String? = null,
     val createdAt: Instant = Instant.now(),
+    var updatedAt: Instant = createdAt,
     var completedAt: Instant? = null,
     val dueDate: Instant? = null,
 )
