@@ -43,8 +43,17 @@ class ConfiguredLLMProvider(
         image: ByteArray,
         prompt: String,
     ): ChatResponse {
-        val (provider, modelId) = activeProviderSelection()
-        return provider.vision(image, prompt, modelId)
+        val providerId = providerCatalog.activeProviderId()
+        val profile =
+            providerCatalog.getProvider(providerId)
+                ?: error("Active provider profile is missing: $providerId")
+        val modelId = providerCatalog.activeModelId().ifBlank { profile.defaultModel }
+        requireVisionCapability(profile, modelId)
+        return if (profile.adapter == ProviderAdapter.CODEX_CLI) {
+            requireCodexProvider().vision(image, prompt, modelId, profile)
+        } else {
+            providerFor(profile).vision(image, prompt, modelId)
+        }
     }
 
     override suspend fun embeddings(text: String): List<Double> {
@@ -122,6 +131,16 @@ class ConfiguredLLMProvider(
 
     private fun requireCodexModelCatalog(): CodexModelCatalog =
         requireNotNull(codexModelCatalog) { "Codex CLI model catalog is unavailable" }
+
+    private fun requireVisionCapability(
+        profile: ProviderProfile,
+        modelId: String,
+    ) {
+        val model = profile.models.firstOrNull { it.id == modelId } ?: return
+        if (model.capabilities.isNotEmpty() && model.capabilities.none { it.equals("vision", ignoreCase = true) }) {
+            error("Model ${profile.name}/$modelId does not support image input")
+        }
+    }
 
     private fun ChatRequestContext.resolve(): ChatRequestContext {
         val explicitOptions =
