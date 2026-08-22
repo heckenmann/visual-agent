@@ -130,7 +130,15 @@ private fun AgentConfig.toApplication(): ApplicationAgentConfig =
         templateName = templateName,
     )
 
-private fun ApplicationMessage.toProtocol(): ConversationMessage = ConversationMessage(role, content, metadata, images, id)
+private fun ApplicationMessage.toProtocol(): ConversationMessage =
+    ConversationMessage(
+        role = role,
+        content = content,
+        metadata = metadata,
+        images = images,
+        id = id,
+        createdAtEpochMillis = createdAtEpochMillis,
+    )
 
 private fun SubAgentExecutionSnapshot.toProtocol(): AgentExecutionSnapshot =
     AgentExecutionSnapshot(globalState.name == "PAUSED", pausedAgentIds)

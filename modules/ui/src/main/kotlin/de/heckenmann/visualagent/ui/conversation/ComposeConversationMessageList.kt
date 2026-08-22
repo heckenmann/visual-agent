@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import de.heckenmann.visualagent.protocol.TodoItem
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -27,72 +28,6 @@ import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
 import de.heckenmann.visualagent.protocol.ConversationMessage as Message
 
-internal sealed interface ConversationTimelineItem {
-    val stableKey: String
-
-    data object InlineComposer : ConversationTimelineItem {
-        override val stableKey = "conversation-input"
-    }
-
-    data object Waiting : ConversationTimelineItem {
-        override val stableKey = "streaming-indicator"
-    }
-
-    data class Streaming(
-        val content: String,
-    ) : ConversationTimelineItem {
-        override val stableKey = "streaming-assistant"
-    }
-
-    data class PendingUser(
-        val content: String,
-    ) : ConversationTimelineItem {
-        override val stableKey = "pending-user"
-    }
-
-    data class Persisted(
-        val message: Message,
-        val chronologicalIndex: Int,
-    ) : ConversationTimelineItem {
-        override val stableKey = message.id?.let { "message:$it" } ?: "temporary-message-$chronologicalIndex"
-    }
-
-    data class PersistedGroup(
-        val group: ConversationMessageGroup,
-    ) : ConversationTimelineItem {
-        override val stableKey = group.stableKey
-    }
-
-    data object OlderHistoryLoading : ConversationTimelineItem {
-        override val stableKey = "loading-older"
-    }
-
-    data object Empty : ConversationTimelineItem {
-        override val stableKey = "conversation-empty"
-    }
-}
-
-internal fun buildConversationTimeline(
-    history: List<Message>,
-    pendingUserMessage: String?,
-    streamingContent: String,
-    showWaitingIndicator: Boolean,
-    showOlderHistoryLoading: Boolean,
-    includeInlineComposer: Boolean,
-): List<ConversationTimelineItem> =
-    buildList {
-        if (includeInlineComposer) add(ConversationTimelineItem.InlineComposer)
-        if (showWaitingIndicator) add(ConversationTimelineItem.Waiting)
-        if (streamingContent.isNotEmpty()) add(ConversationTimelineItem.Streaming(streamingContent))
-        if (pendingUserMessage != null) add(ConversationTimelineItem.PendingUser(pendingUserMessage))
-        val persisted = history.indices.reversed().map { index -> ConversationTimelineItem.Persisted(history[index], index) }
-        groupConsecutiveConversationMessages(persisted).forEach { group -> add(ConversationTimelineItem.PersistedGroup(group)) }
-        if (showOlderHistoryLoading) add(ConversationTimelineItem.OlderHistoryLoading)
-        if (history.isEmpty() && pendingUserMessage == null && streamingContent.isEmpty() && !showWaitingIndicator) {
-            add(ConversationTimelineItem.Empty)
-        }
-    }
-
 internal fun LazyListScope.ConversationTimeline(
     items: List<ConversationTimelineItem>,
     sending: Boolean,
@@ -102,6 +37,7 @@ internal fun LazyListScope.ConversationTimeline(
     onEditMessage: (String?) -> Unit,
     sendContent: (String) -> Unit,
     inlineComposer: @Composable () -> Unit = {},
+    onOpenTodoResponse: (TodoItem, de.heckenmann.visualagent.ui.todo.TodoResponseState) -> Unit = { _, _ -> },
 ) {
     itemsIndexed(items, key = { _, item -> item.stableKey }) { index, item ->
         when (item) {
@@ -109,6 +45,14 @@ internal fun LazyListScope.ConversationTimeline(
             ConversationTimelineItem.Waiting -> ConversationWaitingIndicator()
             is ConversationTimelineItem.Streaming -> StreamingTimelineRow(item.content, onStatusChange)
             is ConversationTimelineItem.PendingUser -> PendingTimelineRow(item.content, onStatusChange)
+            is ConversationTimelineItem.TodoCard ->
+                ConversationTodoCard(
+                    todo = item.todo,
+                    responseState = item.responseState,
+                    deleted = item.deleted,
+                    onOpenResponse = { onOpenTodoResponse(item.todo, item.responseState) },
+                    modifier = Modifier.padding(top = 10.dp),
+                )
             is ConversationTimelineItem.PersistedGroup ->
                 PersistedTimelineGroup(
                     item = item,
@@ -154,6 +98,10 @@ internal fun LazyListScope.ConversationMessageList(
     onEditMessage: (String?) -> Unit,
     sendContent: (String) -> Unit,
     showWaitingIndicator: Boolean = inFlight.state.value.totalActive > 0 && streamingContent.isEmpty(),
+    todos: List<TodoItem> = emptyList(),
+    deletedTodoSnapshots: Map<String, TodoItem> = emptyMap(),
+    todoResponses: Map<String, de.heckenmann.visualagent.ui.todo.TodoResponseState> = emptyMap(),
+    onOpenTodoResponse: (TodoItem, de.heckenmann.visualagent.ui.todo.TodoResponseState) -> Unit = { _, _ -> },
 ) {
     ConversationTimeline(
         items =
@@ -164,6 +112,9 @@ internal fun LazyListScope.ConversationMessageList(
                 showWaitingIndicator = showWaitingIndicator,
                 showOlderHistoryLoading = false,
                 includeInlineComposer = false,
+                todos = todos,
+                deletedTodoSnapshots = deletedTodoSnapshots,
+                todoResponses = todoResponses,
             ),
         sending = sending,
         deletingMessageIds = deletingMessageIds,
@@ -171,6 +122,7 @@ internal fun LazyListScope.ConversationMessageList(
         onStatusChange = onStatusChange,
         onEditMessage = onEditMessage,
         sendContent = sendContent,
+        onOpenTodoResponse = onOpenTodoResponse,
     )
 }
 

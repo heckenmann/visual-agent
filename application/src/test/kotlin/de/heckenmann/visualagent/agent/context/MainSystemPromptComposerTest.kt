@@ -117,9 +117,20 @@ class MainSystemPromptComposerTest {
         val prompt = MainSystemPromptComposer.compose(emptyTodos, null, toolConfigService)
 
         assertTrue("Before every" in prompt && "`{\"action\":\"list\"}`" in prompt)
-        assertTrue("never add another one" in prompt)
-        assertTrue("PENDING, IN_PROGRESS, COMPLETED, and CANCELLED" in prompt)
+        assertTrue("same task" in prompt)
+        assertTrue("different" in prompt && "new todo" in prompt)
+        assertTrue("PENDING, IN_PROGRESS" in prompt && "COMPLETED" in prompt && "CANCELLED" in prompt)
         assertTrue("Do not recreate or restart" in prompt)
+    }
+
+    @Test
+    fun `prompt removes terminal todos when their result is no longer needed or incorporated`() {
+        val prompt = MainSystemPromptComposer.compose(emptyTodos, null, toolConfigService)
+
+        assertTrue("history and result are no longer needed" in prompt)
+        assertTrue("incorporated into the final answer" in prompt)
+        assertTrue("todo is terminal" in prompt)
+        assertTrue("user did not ask to retain" in prompt)
     }
 
     @Test

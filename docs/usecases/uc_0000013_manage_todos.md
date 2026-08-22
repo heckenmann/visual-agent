@@ -27,6 +27,7 @@ Desktop user.
 10. The todo store persists the authoritative state ordered by `position`.
 11. Agent prompts and tools read current todo summaries from persistence.
 12. When an autonomous todo reaches `COMPLETED` or `CANCELLED`, the main agent receives a request-local user instruction to review the persisted status notification.
+13. The main agent removes a terminal todo once its history and result are no longer needed, or after its result has been incorporated into the final answer, unless the user requested that it be retained.
 
 ## Result
 
@@ -60,3 +61,4 @@ Todos stay synchronized between UI, database, and agent context.
 - The `todos` tool supports a `reorder` action to change which task is next.
 - Sub-agents can read todo state and stored results, but only the main agent and orchestrator can change todo lifecycle state.
 - Autonomous terminal-status reviews always end with an explicit user instruction accepted by every configured provider.
+- Terminal todos are cleaned up after their history and result are no longer needed or have been incorporated into the final answer, unless they remain useful for follow-up, reporting, or a user-requested record.

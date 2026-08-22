@@ -39,8 +39,9 @@ switching to other panels.
   `pendingToolIds`; the chip settles to the final duration.
 9. The sub-agent completes. The agent id is removed from `runningAgentIds`,
    the "is working…" chip disappears, and the result row remains.
-10. The todo transitions to `COMPLETED` or `CANCELLED`. The in-progress
-    indicator disappears and the result row takes its place.
+10. The todo transitions to `COMPLETED` or `CANCELLED`. The card remains in the
+    conversation timeline with its latest response tail and terminal status;
+    only the animated working indicator disappears.
 11. The main agent streams a response. The last assistant row shows a subtle,
     animated left-edge accent bar in the primary color.
 12. Before the first streamed token arrives, a "Thinking" indicator is shown
@@ -57,7 +58,8 @@ switching to other panels.
 
 - **No matching row for a running tool:** the global header indicator still
   reflects the pending tool; only rows that exist get the inline spinner.
-- **Todo cancelled:** the in-progress row disappears immediately.
+- **Todo cancelled:** the working indicator disappears, while the todo card
+  remains available with its cancellation status and latest response tail.
 
 ## Tool Calls
 
@@ -89,7 +91,8 @@ switching to other panels.
 ## Acceptance Criteria
 
 - A "todo in progress" indicator appears when a todo is `IN_PROGRESS` and
-  disappears when it completes or is cancelled.
+  disappears when it completes or is cancelled; the associated todo card remains
+  in the timeline and reflects the terminal state.
 - A "sub-agent running" chip appears while an agent is `BUSY` and disappears
   when it becomes `IDLE`.
 - A tool-call chip shows a spinner and "running…" while the tool is executing

@@ -17,8 +17,10 @@ Desktop user.
 
 1. The model returns assistant text.
 2. The main window chat wiring extracts think blocks from the response.
-3. Extracted thinking events are added to the chat panel.
-4. The visible assistant answer is stripped of the raw think tags.
+3. Extracted thinking events are added to the chat panel as collapsible rows.
+4. A collapsed row previews the latest non-empty thinking line.
+5. When expanded, the complete thinking content is rendered as Markdown.
+6. The visible assistant answer is stripped of the raw think tags.
 
 ## Result
 
@@ -37,5 +39,9 @@ The user can inspect model thinking output without polluting the final answer te
 ## Acceptance Criteria
 
 - Thinking blocks are shown only when enabled.
+- Thinking rows are collapsed by default and show the latest non-empty line as
+  their preview.
+- Expanded thinking content uses the same Markdown renderer as conversation
+  answers.
 - Final assistant text does not contain raw `<think>` tags.
 - Blank thinking blocks are ignored.

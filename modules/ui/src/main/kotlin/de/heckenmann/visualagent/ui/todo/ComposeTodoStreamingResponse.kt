@@ -8,41 +8,41 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import de.heckenmann.visualagent.ui.conversation.StreamingText
-import kotlinx.coroutines.flow.collectLatest
+import de.heckenmann.visualagent.ui.modal.ComposeModalRequester
 
 private const val TODO_RESPONSE_WINDOW_CHARS = 180
 
 /**
  * Shows the latest response text while a todo is being processed.
  *
- * The row expands and contracts vertically, while each new one-line response window
- * enters from the right and pushes the previous window out to the left.
+ * The row expands and contracts vertically while the newest response window remains visible.
  *
  * @param visible Whether the todo is currently being processed
- * @param response Complete response text received so far
+ * @param responseState Complete response state received so far
  */
 @Composable
 internal fun TodoStreamingResponse(
     visible: Boolean,
-    response: String,
+    working: Boolean,
+    responseState: TodoResponseState,
+    modalRequester: ComposeModalRequester,
+    todo: de.heckenmann.visualagent.protocol.TodoItem,
+    currentTodo: () -> de.heckenmann.visualagent.protocol.TodoItem? = { todo },
 ) {
     AnimatedVisibility(
         visible = visible,
@@ -59,9 +59,9 @@ internal fun TodoStreamingResponse(
                     .padding(horizontal = 8.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
-            StreamingText(text = response, charsPerTick = 1) { displayedText ->
-                val window = todoResponseWindow(displayedText)
-                if (window.isBlank()) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (working) TodoWorkingIndicator()
+                if (responseState.text.isBlank()) {
                     Text(
                         text = "Waiting for response…",
                         style = MaterialTheme.typography.bodySmall,
@@ -69,23 +69,12 @@ internal fun TodoStreamingResponse(
                         maxLines = 1,
                     )
                 } else {
-                    val scrollState = rememberScrollState()
-                    LaunchedEffect(Unit) {
-                        snapshotFlow { scrollState.maxValue }.collectLatest { maxValue ->
-                            scrollState.scrollTo(maxValue)
-                        }
-                    }
-                    LaunchedEffect(window) {
-                        scrollState.scrollTo(scrollState.maxValue)
-                    }
-                    Text(
-                        text = window,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Clip,
-                        modifier = Modifier.fillMaxWidth().horizontalScroll(scrollState, enabled = false),
+                    TodoResponseSingleLine(
+                        responseState = responseState,
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .clickable { modalRequester.requestTodoResponse(todo, responseState, currentTodo) },
                     )
                 }
             }

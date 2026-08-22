@@ -70,4 +70,6 @@ data class TodoProgressUpdate(
     val todoId: String,
     val delta: String = "",
     val completed: Boolean = false,
+    val executionId: String? = null,
+    val agentId: String? = null,
 )

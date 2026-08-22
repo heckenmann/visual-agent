@@ -2,7 +2,6 @@ package de.heckenmann.visualagent.knowledge
 
 import de.heckenmann.visualagent.agent.config.SubAgentToolConfig
 import de.heckenmann.visualagent.todo.Todo
-import de.heckenmann.visualagent.todo.TodoStatus
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -163,6 +162,7 @@ internal class JpaConversationStore(
 @Service
 internal class JpaTodoStore(
     private val repository: TodoRepository,
+    private val deletedArchive: DeletedTodoArchive,
 ) : TodoStore {
     @Transactional
     override fun saveTodo(todo: Todo) {
@@ -189,7 +189,19 @@ internal class JpaTodoStore(
     override fun deleteTodo(todoId: String) = repository.deleteById(todoId)
 
     @Transactional
-    override fun clearTodos() = repository.deleteAllInBatch()
+    override fun deleteTodoAndArchive(todo: Todo) {
+        deletedArchive.archive(todo)
+        repository.deleteById(todo.id)
+    }
+
+    @Transactional(readOnly = true)
+    override fun listDeletedTodos(limit: Int): List<Todo> = deletedArchive.list(limit)
+
+    @Transactional
+    override fun clearTodos() {
+        repository.deleteAllInBatch()
+        deletedArchive.clear()
+    }
 
     private fun normalizeDescription(description: String): String = description.trim().replace(Regex("\\s+"), " ").lowercase()
 }
@@ -284,21 +296,6 @@ private fun MemoryEntity.toDomain(): Memory =
     )
 
 private fun ConversationEntity.toRecord(): ConversationRecord = ConversationRecord(id, role, content, metadata, createdAt)
-
-private fun Todo.toEntity(): TodoEntity =
-    TodoEntity(id, description, status.name, position, assignedAgentId, createdAt, completedAt, dueDate)
-
-private fun TodoEntity.toDomain(): Todo =
-    Todo(
-        id = id,
-        description = description,
-        status = runCatching { TodoStatus.valueOf(status) }.getOrDefault(TodoStatus.PENDING),
-        position = position,
-        assignedAgentId = assignedAgentId,
-        createdAt = createdAt,
-        completedAt = completedAt,
-        dueDate = dueDate,
-    )
 
 private fun PersistedSubAgent.toEntity(originalCreatedAt: Instant): SubAgentEntity =
     SubAgentEntity(

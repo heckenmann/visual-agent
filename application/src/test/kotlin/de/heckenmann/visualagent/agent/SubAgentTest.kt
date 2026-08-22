@@ -97,6 +97,7 @@ class SubAgentTest {
             coEvery { provider.chat(any<ChatRequestContext>()) } returns
                 ChatResponse("test", Message("assistant", "complete response"), true)
             val memoryStore = mockk<MemoryStore>(relaxed = true)
+            val chunks = mutableListOf<String>()
 
             val result =
                 SubAgent("agent-1", "Coder", "Implementation").performTodo(
@@ -104,10 +105,11 @@ class SubAgentTest {
                     description = "Complete the task",
                     provider = provider,
                     memoryStore = memoryStore,
-                    onChunk = {},
+                    onChunk = chunks::add,
                 )
 
             assertEquals("complete response", result)
+            assertEquals(listOf("complete response"), chunks)
         }
 
     @Test
@@ -131,7 +133,7 @@ class SubAgentTest {
                 )
 
             assertEquals("complete response", result)
-            assertEquals(listOf("partial"), chunks)
+            assertEquals(listOf("partial", "complete response"), chunks)
         }
 
     @Test

@@ -148,6 +148,10 @@ internal interface TodoRepository : JpaRepository<TodoEntity, String> {
     fun findAllByOrderByPositionAscIdAsc(): List<TodoEntity>
 }
 
+internal interface DeletedTodoRepository : JpaRepository<DeletedTodoEntity, String> {
+    fun findAllByOrderByUpdatedAtDescIdDesc(pageable: org.springframework.data.domain.Pageable): List<DeletedTodoEntity>
+}
+
 internal interface SubAgentRepository : JpaRepository<SubAgentEntity, String> {
     fun findAllByOrderByCreatedAtDescIdDesc(): List<SubAgentEntity>
 

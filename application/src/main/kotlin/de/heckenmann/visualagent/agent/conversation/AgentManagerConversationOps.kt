@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import mu.KotlinLogging
+import java.time.Instant
 
 /**
  * Handles conversation and history operations for [AgentManager].
@@ -25,6 +26,7 @@ internal class AgentManagerConversationOps(
     private val historyOps = AgentConversationHistoryOps(owner, ::buildMainRequest)
 
     internal fun persist(message: Message): Message {
+        val createdAt = Instant.now().toEpochMilli()
         val id =
             owner.conversationStore.saveConversationMessage(
                 AgentManager.MAIN_SESSION_ID,
@@ -32,7 +34,7 @@ internal class AgentManagerConversationOps(
                 message.content,
                 message.metadata,
             )
-        val persisted = message.copy(id = id)
+        val persisted = message.copy(id = id, createdAtEpochMillis = createdAt)
         owner.conversationHistory.add(persisted)
         return persisted
     }

@@ -178,6 +178,24 @@ class TodoManagerTest {
     }
 
     @Test
+    fun `todo activity timestamp changes only for a real update`() {
+        val changes = mutableListOf<TodoChange>()
+        val testManager = TodoManager(InMemoryTodoStore(), TodoEventBus())
+        testManager.addListener { changes += it }
+        val todo = testManager.add("Activity task")
+        val createdActivity = todo.updatedAt
+
+        assertTrue(testManager.update(todo.id, "Refined activity task"))
+        val updatedActivity = todo.updatedAt
+        assertTrue(updatedActivity >= createdActivity)
+        assertEquals(2, changes.size)
+
+        assertTrue(testManager.update(todo.id, "Refined activity task"))
+        assertEquals(updatedActivity, todo.updatedAt)
+        assertEquals(2, changes.size)
+    }
+
+    @Test
     fun `cancelTodo changes status to CANCELLED`() {
         val todo = manager.add("Cancel me")
         val result = manager.cancelTodo(todo.id)

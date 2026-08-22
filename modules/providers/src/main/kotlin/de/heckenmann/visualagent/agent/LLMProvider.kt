@@ -300,6 +300,8 @@ data class Message(
     val metadata: String? = null,
     val images: List<String>? = null,
     val id: String? = null,
+    @kotlinx.serialization.Transient
+    val createdAtEpochMillis: Long? = null,
 )
 
 /**

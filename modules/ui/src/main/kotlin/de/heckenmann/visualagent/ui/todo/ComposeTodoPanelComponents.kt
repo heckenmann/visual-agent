@@ -61,7 +61,8 @@ internal fun ReorderableColumnScope.TodoRow(
     todo: TodoItem,
     isNext: Boolean,
     isDragging: Boolean,
-    streamedResponse: String,
+    responseState: TodoResponseState,
+    currentTodo: () -> TodoItem? = { todo },
     todoPort: TodoPort,
     modalRequester: ComposeModalRequester,
     refresh: () -> Unit,
@@ -92,8 +93,12 @@ internal fun ReorderableColumnScope.TodoRow(
                     )
                     TodoMetaLine(todo = todo, isNext = isNext, agentName = agentName)
                     TodoStreamingResponse(
-                        visible = todo.status == TodoState.IN_PROGRESS,
-                        response = streamedResponse,
+                        visible = todo.status == TodoState.IN_PROGRESS || responseState.text.isNotBlank(),
+                        working = todo.status == TodoState.IN_PROGRESS,
+                        responseState = responseState,
+                        modalRequester = modalRequester,
+                        todo = todo,
+                        currentTodo = currentTodo,
                     )
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
