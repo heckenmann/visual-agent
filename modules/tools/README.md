@@ -1,8 +1,8 @@
-# Tools module
+# Standard Tools Module
 
-`:tools` owns provider-neutral tool contracts, implementations, and execution infrastructure extracted from the application composition root.
+`:tool-standard` owns provider-neutral tool contracts, implementations, and execution infrastructure extracted from the application composition root. The complete tool bundle is exposed by `:tools`.
 
-The module is intentionally a leaf: it must not depend on `:application`, `:ui`, or `:providers`. Application services are introduced through tool-owned ports and composed by `:application`.
+The module is intentionally a leaf: it must not depend on `:application`, `:ui`, providers, or the `:tools` aggregate. Application services are introduced through tool-owned ports and composed by `:application`.
 
 Concrete tools are annotated with `@AgentTool`, a Spring component stereotype. Spring is a compile-only dependency of this module; the consuming `:application` runtime supplies Spring and discovers the tool beans. UI integrations remain explicit and do not use tool discovery or reflection.
 

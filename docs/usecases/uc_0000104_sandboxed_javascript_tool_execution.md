@@ -56,9 +56,9 @@ Execution exceptions are returned to the model as actionable tool errors (for ex
 
 ## Code Entry Points
 
-- `application/.../agent/javascript/GraalJavaScriptExecutionService.kt`
-- `application/.../agent/javascript/JavaScriptToolBridge.kt`
-- `application/.../agent/javascript/JavaScriptExecuteTool.kt`
+- `modules/tool-javascript/.../agent/javascript/GraalJavaScriptExecutionService.kt`
+- `modules/tool-javascript/.../agent/javascript/JavaScriptToolBridge.kt`
+- `modules/tool-javascript/.../agent/javascript/JavaScriptExecuteTool.kt`
 - `application/.../agent/context/MainSystemPromptComposer.kt`
 - `application/.../agent/AgentToolConfigService.kt`
 
