@@ -46,12 +46,13 @@ internal fun handleClearConversation(
     onSendingChange: (Boolean) -> Unit,
     onStatusChange: (String) -> Unit,
     onHistoryRefresh: suspend () -> Unit,
+    onTodosCleared: () -> Unit,
 ) {
     modalRequester.requestConfirmation(
         ComposeConfirmationModal(
             title = "Clear conversation?",
             message =
-                "This will stop any active request, cancel all running sub-agent jobs and open todos, " +
+                "This will stop any active request and running sub-agent jobs, delete all todos, " +
                     "then remove the persisted conversation history.",
             confirmDescription = "Clear conversation",
         ) {
@@ -63,6 +64,7 @@ internal fun handleClearConversation(
                 runCatching {
                     conversationPort.clearAndCreateWelcome()
                 }.onSuccess { result ->
+                    onTodosCleared()
                     onStatusChange(result.warning?.let { "Welcome could not be generated: $it" } ?: "Conversation cleared")
                 }.onFailure { error ->
                     onStatusChange("Welcome could not be generated: ${error.message ?: error::class.simpleName.orEmpty()}")

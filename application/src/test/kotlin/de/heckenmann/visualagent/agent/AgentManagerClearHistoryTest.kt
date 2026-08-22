@@ -66,4 +66,19 @@ class AgentManagerClearHistoryTest {
                 manager.destroy()
             }
         }
+
+    @Test
+    fun `clearTodos removes persisted todos`(): Unit =
+        runBlocking {
+            val manager = createManager()
+            try {
+                manager.todoManager.add("Remove me")
+
+                manager.clearTodos()
+
+                assertEquals(emptyList(), manager.getTodosFromDb())
+            } finally {
+                manager.destroy()
+            }
+        }
 }

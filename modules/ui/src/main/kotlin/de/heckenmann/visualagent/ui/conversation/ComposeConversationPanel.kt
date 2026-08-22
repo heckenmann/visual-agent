@@ -149,6 +149,7 @@ internal fun ConversationPanel(
             onSendingChange = { conversationState.sending = it },
             onStatusChange = { conversationState.status = it },
             onHistoryRefresh = { conversationState.replaceHistory(conversationPort.currentHistory()) },
+            onTodosCleared = todoState::clear,
         )
     }
     LaunchedEffect(Unit) {
