@@ -178,7 +178,7 @@ class AgentManagerConversationOpsTest {
         }
 
     @Test
-    fun `stream message separates adjacent sentence chunks`() =
+    fun `stream message preserves adjacent sentence chunks`() =
         runBlocking {
             val db =
                 de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
@@ -194,9 +194,9 @@ class AgentManagerConversationOpsTest {
 
             val result = manager.streamMessage("hi") { chunks += it }
 
-            assertEquals("First.\nSecond.", result)
-            assertEquals(listOf("First.", "\nSecond."), chunks)
-            assertEquals("First.\nSecond.", manager.getHistory().last().content)
+            assertEquals("First.Second.", result)
+            assertEquals(listOf("First.", "Second."), chunks)
+            assertEquals("First.Second.", manager.getHistory().last().content)
         }
 
     @Test
@@ -215,7 +215,7 @@ class AgentManagerConversationOpsTest {
 
             assertEquals("answer", manager.streamMessage("hi") { })
             assertEquals(
-                "<think>first</think>\n<think>second</think>answer",
+                "<think>first</think><think>second</think>answer",
                 manager.getHistory().last().content,
             )
             val providerHistory =

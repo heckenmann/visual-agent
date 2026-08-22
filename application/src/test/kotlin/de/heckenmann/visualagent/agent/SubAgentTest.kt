@@ -42,7 +42,7 @@ class SubAgentTest {
         }
 
     @Test
-    fun `performTodo separates adjacent sentence chunks`() =
+    fun `performTodo preserves adjacent sentence chunks`() =
         runBlocking {
             val provider = mockk<LLMProvider>()
             coEvery { provider.stream(any<ChatRequestContext>()) } returns
@@ -62,8 +62,8 @@ class SubAgentTest {
                     onChunk = chunks::add,
                 )
 
-            assertEquals("First.\nSecond.", result)
-            assertEquals(listOf("First.", "\nSecond."), chunks)
+            assertEquals("First.Second.", result)
+            assertEquals(listOf("First.", "Second."), chunks)
         }
 
     @Test
