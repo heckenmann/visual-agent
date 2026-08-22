@@ -15,7 +15,11 @@ This document records the incremental Gradle modularisation planned in issues #1
 :application
  ├── :protocol
  ├── :providers
+ ├── :provider-openai-codex
  └── :tools
+
+:provider-openai-codex
+ └── :providers
 ```
 
 The filesystem layout mirrors the ownership boundary without changing Gradle project paths:
@@ -26,16 +30,17 @@ modules/ui/           # :ui, a leaf module
 modules/protocol/     # :protocol, versioned gRPC contract
 modules/desktop/      # :desktop, Compose/server endpoint host
 modules/providers/    # :providers, a leaf module
+modules/provider-openai-codex/ # :provider-openai-codex, OpenAI Codex CLI adapter
 modules/tools/        # :tools, a leaf module
 ```
 
 ## Version management
 
-`gradle/libs.versions.toml` is the authoritative source for the main Visual Agent build's project version, plugin versions, library versions, and BOM versions. Main-build module scripts must use its `libs` aliases and `libs.versions.visual.agent` instead of inline version literals. The root `verifyCentralizedVersions` check enforces this rule for `:application`, `:ui`, `:providers`, and `:tools`.
+`gradle/libs.versions.toml` is the authoritative source for the main Visual Agent build's project version, plugin versions, library versions, and BOM versions. Main-build module scripts must use its `libs` aliases and `libs.versions.visual.agent` instead of inline version literals. The root `verifyCentralizedVersions` check enforces this rule for every main-build module.
 
 The Foojay toolchain resolver is the sole settings-only plugin and remains declared once in `settings.gradle.kts`, where Gradle evaluates it before the catalog is available. It is not applied by, or shared between, main-build modules.
 
-Codex support is implemented in `:providers` as a clean-room Spring AI adapter over the public Codex app-server JSON-RPC protocol. No Codex connector source tree, copied implementation, or community connector dependency is part of this repository.
+Codex support is implemented in `:provider-openai-codex` as a clean-room Spring AI adapter over the public Codex app-server JSON-RPC protocol. No Codex connector source tree, copied implementation, or community connector dependency is part of this repository.
 
 When adding a main-build module, apply plugins and dependencies through aliases from the root catalog and set its project version to `libs.versions.visual.agent.get()`; do not copy a version literal into its build script.
 
@@ -47,7 +52,9 @@ desktop startup and endpoint selection, and embeds one non-web application conte
 the same `ApplicationPort` boundary after `ApplicationConnection` reports readiness; the desktop
 host owns Spring startup and converts the server-side adapters into the protocol bundle.
 
-`:providers` owns LLM-provider integrations and provider-facing contracts. It has no Gradle project dependency on `:application`, `:ui`, `:tools`, or any future sibling module. Application-specific configuration, tools, persistence, and request context are supplied through narrow provider contracts implemented by `:application`.
+`:providers` owns provider-facing contracts, the configured-provider router, and the built-in Ollama and OpenAI-compatible adapters. Dedicated integrations live in focused provider modules. `:providers` has no Gradle project dependency on `:application`, `:ui`, `:tools`, or any future sibling module. Application-specific configuration, tools, persistence, and request context are supplied through narrow provider contracts implemented by `:application`.
+
+`:provider-openai-codex` owns the OpenAI Codex CLI/app-server adapter. It depends only on `:providers`, which supplies provider contracts and the profile-aware adapter SPI. `:application` composes it with the other server-side modules.
 
 `:tools` owns provider-neutral tool contracts, registry infrastructure, lifecycle events, parsing helpers, and tool implementations. It has no Gradle project dependency on `:application`, `:ui`, or `:providers`. Application services are supplied through narrow tool-owned ports implemented and composed by `:application`.
 
@@ -55,11 +62,11 @@ The `:tools` extraction is tracked by issue #165. Concrete tools are Spring-disc
 
 ## Dependency rules
 
-- `:application` is the server composition root and may depend on `:protocol`, `:providers`, and `:tools`.
+- `:application` is the server composition root and may depend on `:protocol`, `:providers`, `:provider-openai-codex`, and `:tools`.
 - `:desktop` may depend on `:ui`, `:protocol`, and the server bootstrap artifact.
 - `:ui` may depend only on `:protocol`; it must not depend on Spring, `:application`, providers,
   tools, persistence, or application implementation types.
-- `:protocol`, `:providers`, and `:tools` must not depend on `:application` or `:ui`.
+- `:protocol`, `:providers`, `:provider-openai-codex`, and `:tools` must not depend on `:application` or `:ui`; `:provider-openai-codex` may depend on `:providers`.
 - The dependency graph is strictly one-way from hosts to contracts and implementations.
 - A submodule declares any contract it needs; `:application` supplies the contract implementation and composes the modules.
 - Spring and Compose composition remains in `:application` until a later module owns a complete independent runtime boundary.
@@ -86,6 +93,7 @@ The final initial layout must support:
 ```bash
 ./gradlew :ui:build :ui:test
 ./gradlew :providers:build :providers:test
+./gradlew :provider-openai-codex:build :provider-openai-codex:test
 ./gradlew :tools:build :tools:test
 ./gradlew :application:build :application:test
 ./gradlew :desktop:run

@@ -117,8 +117,10 @@ modules/providers/src/main/kotlin/de/heckenmann/visualagent/agent/
 ├── ConfiguredLLMProvider.kt         # @Primary provider router
 ├── provider/                        # ProviderCatalogService + catalog models + error messages
 ├── openai/                          # OpenAI-compatible adapter
-├── ollama/                          # Ollama API client + bearer-auth filter
-└── codex/                           # Codex CLI subscription provider
+└── ollama/                          # Ollama API client + bearer-auth filter
+
+modules/provider-openai-codex/src/main/kotlin/de/heckenmann/visualagent/agent/
+└── codex/                           # OpenAI Codex CLI subscription provider
 
 modules/ui/src/main/kotlin/de/heckenmann/visualagent/ui/
 └── ui/application/VisualAgentComposeApplication.kt # protocol-only Compose shell
@@ -129,7 +131,7 @@ See `README.md` for the full tree and the feature status table.
 ## Architecture (essentials)
 
 - **Entry points**: `de.heckenmann.visualagent.desktop.DesktopMain` launches the Compose desktop host from `:desktop`; `de.heckenmann.visualagent.VisualAgentApplicationKt` launches the standalone Spring server from `:application`. In desktop mode, only one non-web Spring context from `:application` is created in the same JVM; the standalone entry point is an alternative process, not a second desktop server. The desktop host renders the splash first and starts or connects to the server asynchronously.
-- **Agent core**: `agent/AgentManager.kt` is the facade (conversation ops + lifecycle ops + autonomy ops). `modules/providers/.../agent/ConfiguredLLMProvider.kt` is the `@Primary` Spring `LLMProvider`; it routes via `modules/providers/.../agent/provider/ProviderCatalogService` (DB-backed preference `llm.provider.catalog.v1`) to `OllamaClient` or `OpenAiClient`. Provider adapters: `OLLAMA`, `OPENAI_COMPATIBLE`.
+- **Agent core**: `agent/AgentManager.kt` is the facade (conversation ops + lifecycle ops + autonomy ops). `modules/providers/.../agent/ConfiguredLLMProvider.kt` is the `@Primary` Spring `LLMProvider`; it routes via `modules/providers/.../agent/provider/ProviderCatalogService` (DB-backed preference `llm.provider.catalog.v1`) to Ollama, OpenAI-compatible, or injected profile-aware provider adapters. The OpenAI Codex CLI adapter lives in `:provider-openai-codex`. Provider adapters: `OLLAMA`, `OPENAI_COMPATIBLE`, `CODEX_CLI`.
 - **Tooling**: every tool is a `@Component` implementing `agent/tools/VisualAgentTool`. `ToolRegistry` adapts them to Spring AI `ToolCallback`s with STARTED/FINISHED events on `ToolEventBus`. `VisualAgentTool.managesExecution = true` opts out of the generic async/timeout wrapper (used by sub-agent execution tools).
 - **Tool inventory** (canonical IDs): `ui`, `history`, `todos`, `context`, `pwd`, `manual`, `usecases`, `file:read`, `file:list`, `file:glob`, `file:grep`, `file:write`, `file:edit`, `terminal`, `sleep`, `browser` (placeholder, returns "not configured"), `search` (placeholder, returns "not configured"), `workspace:layout`, `workspace:file`, `workspace:mime`, `workspace:download`, `canvas`, `agent:list`, `agent:show`, `agent:create`, `agent:update`, `agent:delete`, `agent:log`. The main agent gets `agent:*` definition tools, `todos`, and the server-owned workspace transfer tools; sub-agents get role-based sets from `AgentToolConfigService` (default: `researcher`, `coder`, `analyst`). `tools.disabled.global` (preference) is a newline-separated blocklist applied to all agents.
 - **Orchestration**: `orchestration/AutonomousCoordinator.kt` (constructed by `AgentManager`, reachable only through `AgentManagerAutonomyOps`). It uses `AutonomousTaskPlanner` (todo expansion + worker selection) and `UxSeedTasks.all()` (default UX backlog). Per-job retry loop is bounded by `agent.config.maxRetries`; result review calls the main LLM and expects `APPROVED` / `RETRY`. Concurrency is gated by `SubAgentJobScheduler` keyed off `AppConfig.maxParallelSubAgents`.
