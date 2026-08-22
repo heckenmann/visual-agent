@@ -284,7 +284,7 @@ private fun LazyItemScope.SplitPanelItem(
                 modifier = Modifier.height(animatedHeight),
             )
             PanelResizer(
-                currentWidth = animatedWidthPx,
+                currentWidth = width,
                 onWidthChanged = onWidthChanged,
                 minPanelWidth = minPanelWidth,
             )
