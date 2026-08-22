@@ -24,5 +24,6 @@ class CodexCliModelCatalogTest {
 
         assertEquals(listOf("visible"), models.map { it.id })
         assertEquals("Visible", models.single().name)
+        assertEquals(setOf("vision"), models.single().capabilities)
     }
 }
