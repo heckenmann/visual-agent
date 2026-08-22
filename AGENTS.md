@@ -208,8 +208,7 @@ The Compose migration is complete. The current desktop runtime is Compose Multip
 
 ## Known Bugs
 
-1. `vision()` in the Spring AI bridge throws `UnsupportedOperationException`.
-2. `browser` and `search` tools are placeholders that always return "not configured" until a real backend is wired (issues #16, #40).
+1. `browser` and `search` tools are placeholders that always return "not configured" until a real backend is wired (issues #16, #40).
 
 ## Gotchas
 
