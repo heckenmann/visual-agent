@@ -92,7 +92,37 @@ class CodexCliProvider internal constructor(
     override suspend fun vision(
         image: ByteArray,
         prompt: String,
-    ): ChatResponse = error("Codex CLI vision is not supported by the Codex app-server adapter")
+    ): ChatResponse = error("Codex CLI vision requires a configured provider profile")
+
+    /** Sends an image through the configured Codex app-server profile. */
+    internal suspend fun vision(
+        image: ByteArray,
+        prompt: String,
+        modelId: String,
+        profile: ProviderProfile,
+    ): ChatResponse =
+        withContext(Dispatchers.IO) {
+            val model = effectiveModel(modelId.ifBlank { profile.defaultModel })
+            val response =
+                CodexAppServerChatModel(
+                    resolveExecutable(profile),
+                    model,
+                    emptyList(),
+                    workingDirectory.get(),
+                ).completeVision(image, prompt)
+            ChatResponse(
+                model = response.metadata.model.takeIf(String::isNotBlank) ?: model,
+                message =
+                    Message(
+                        "assistant",
+                        response.result
+                            ?.output
+                            ?.text
+                            .orEmpty(),
+                    ),
+                done = true,
+            )
+        }
 
     override suspend fun embeddings(text: String): List<Double> = emptyList()
 
