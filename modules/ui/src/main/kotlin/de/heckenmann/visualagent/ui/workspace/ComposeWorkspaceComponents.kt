@@ -2,6 +2,10 @@
 
 package de.heckenmann.visualagent.ui.workspace
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.HorizontalScrollbar
 import androidx.compose.foundation.ScrollbarStyle
 import androidx.compose.foundation.background
@@ -26,6 +30,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
@@ -50,6 +55,7 @@ import kotlinx.coroutines.launch
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.ReorderableLazyListState
 import sh.calvin.reorderable.rememberReorderableLazyListState
+import kotlin.math.roundToInt
 
 /**
  * Renders the visible workspace panels in a single horizontally scrollable row.
@@ -64,8 +70,7 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
  * @param windows All workspace panels in persistent order
  * @param panelServices Services required by the individual panel bodies
  * @param onToggleWindow Callback that toggles the visibility of a panel
- * @param onReorderWindows Callback that receives the visible panels in their
- *   new order after a drag gesture
+ * @param onReorderWindows Callback that receives all panels in their new order after a drag gesture
  * @param onResizeWindow Callback that receives an updated preferred width for a panel
  * @param minPanelWidth Minimum width for each panel in pixels
  * @param viewport Available workspace dimensions used by resizer math
@@ -86,6 +91,7 @@ internal fun ComposeSplitWorkspace(
     modifier: Modifier = Modifier,
 ) {
     val visibleWindows = windows.filter { it.visible }
+    val windowsState = rememberUpdatedState(windows)
     val resizeUpdatedState = rememberUpdatedState(onResizeWindow)
     val horizontalScrollState = rememberLazyListState()
     val scrollScope = rememberCoroutineScope()
@@ -94,7 +100,7 @@ internal fun ComposeSplitWorkspace(
             lazyListState = horizontalScrollState,
             onMove = { from, to ->
                 val reordered =
-                    visibleWindows.toMutableList().apply {
+                    windowsState.value.toMutableList().apply {
                         add(to.index, removeAt(from.index))
                     }
                 onReorderWindows(reordered)
@@ -102,10 +108,11 @@ internal fun ComposeSplitWorkspace(
         )
     Box(modifier = modifier.fillMaxSize()) {
         WorkspaceBackdrop()
-        if (visibleWindows.isEmpty()) {
+        if (windows.isEmpty()) {
             EmptyWorkspace()
         } else {
             val widths = rowPanelWidths(visibleWindows)
+            val widthsById = visibleWindows.mapIndexed { index, window -> window.id to widths[index] }.toMap()
             val rowWidthPx =
                 widths.sum() +
                     (visibleWindows.size * WORKSPACE_PANEL_RESIZER_WIDTH) +
@@ -138,21 +145,24 @@ internal fun ComposeSplitWorkspace(
                             modifier = Modifier.fillMaxHeight(),
                         ) {
                             items(
-                                items = visibleWindows,
+                                items = windows,
                                 key = { it.id },
                             ) { window ->
-                                val index = visibleWindows.indexOf(window)
-                                SplitPanelItem(
-                                    state = reorderableState,
-                                    window = window,
-                                    panelServices = panelServices,
-                                    width = widths.getOrElse(index) { minPanelWidth },
-                                    isLast = index == visibleWindows.lastIndex,
-                                    onWidthChanged = { next -> resizeUpdatedState.value.invoke(window.id, next) },
-                                    onCloseWindow = { onToggleWindow(window.id) },
-                                    minPanelWidth = minPanelWidth,
-                                    rowHeight = panelHeight,
-                                )
+                                WorkspacePanelVisibility(
+                                    visible = window.visible,
+                                ) {
+                                    SplitPanelItem(
+                                        state = reorderableState,
+                                        window = window,
+                                        panelServices = panelServices,
+                                        width = widthsById[window.id] ?: window.preferredWidth.coerceAtLeast(minPanelWidth),
+                                        isLast = window.id == visibleWindows.lastOrNull()?.id,
+                                        onWidthChanged = { next -> resizeUpdatedState.value.invoke(window.id, next) },
+                                        onCloseWindow = { onToggleWindow(window.id) },
+                                        minPanelWidth = minPanelWidth,
+                                        rowHeight = panelHeight,
+                                    )
+                                }
                             }
                         }
                     }
@@ -171,7 +181,12 @@ internal fun ComposeSplitWorkspace(
                         )
                     }
                 }
-                if (canScroll) {
+                AnimatedVisibility(
+                    visible = canScroll,
+                    enter = fadeIn(animationSpec = workspacePanelAnimationSpec()),
+                    exit = fadeOut(animationSpec = workspacePanelAnimationSpec()),
+                    label = "workspace scrollbar visibility",
+                ) {
                     HorizontalScrollbar(
                         adapter = rememberScrollbarAdapter(horizontalScrollState),
                         modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
@@ -186,6 +201,14 @@ internal fun ComposeSplitWorkspace(
                             ),
                     )
                 }
+            }
+            AnimatedVisibility(
+                visible = visibleWindows.isEmpty(),
+                enter = fadeIn(animationSpec = workspacePanelAnimationSpec()),
+                exit = fadeOut(animationSpec = workspacePanelAnimationSpec()),
+                label = "empty workspace visibility",
+            ) {
+                EmptyWorkspace()
             }
         }
     }
@@ -227,28 +250,41 @@ private fun LazyItemScope.SplitPanelItem(
     minPanelWidth: Int,
     rowHeight: Int,
 ) {
+    val animatedWidth by
+        animateDpAsState(
+            targetValue = width.coerceAtLeast(minPanelWidth).dp,
+            animationSpec = workspacePanelAnimationSpec(),
+            label = "workspace panel width",
+        )
+    val animatedHeight by
+        animateDpAsState(
+            targetValue = rowHeight.dp,
+            animationSpec = workspacePanelAnimationSpec(),
+            label = "workspace panel height",
+        )
+    val animatedWidthPx = animatedWidth.value.roundToInt()
     ReorderableItem(
         state = state,
         key = window.id,
-        modifier = Modifier.height((rowHeight + (2 * WORKSPACE_PANEL_GAP)).dp),
+        modifier = Modifier.height(animatedHeight + (2 * WORKSPACE_PANEL_GAP).dp),
     ) { isDragging ->
         Row(
             modifier =
                 Modifier
                     .padding(vertical = WORKSPACE_PANEL_GAP.dp)
-                    .height(rowHeight.dp),
+                    .height(animatedHeight),
         ) {
             SplitPanelContent(
                 window = window,
                 panelServices = panelServices,
                 isDragging = isDragging,
-                width = width,
+                width = animatedWidthPx,
                 onCloseWindow = onCloseWindow,
                 minPanelWidth = minPanelWidth,
-                modifier = Modifier.height(rowHeight.dp),
+                modifier = Modifier.height(animatedHeight),
             )
             PanelResizer(
-                currentWidth = width,
+                currentWidth = animatedWidthPx,
                 onWidthChanged = onWidthChanged,
                 minPanelWidth = minPanelWidth,
             )
@@ -256,61 +292,6 @@ private fun LazyItemScope.SplitPanelItem(
                 Spacer(modifier = Modifier.width(WORKSPACE_PANEL_GAP.dp))
             }
         }
-    }
-}
-
-@Composable
-internal fun WindowBody(
-    window: ComposeWorkspaceWindow,
-    panelServices: ComposePanelServices,
-) {
-    when (window.id) {
-        "chat" ->
-            ConversationPanel(
-                modalRequester = panelServices.modalRequester,
-                inFlight = panelServices.inFlight,
-                activityPort = panelServices.activity,
-                todoPort = panelServices.todos,
-                conversationPort = panelServices.conversation,
-                clientImagePort = panelServices.clientImagePort,
-            )
-        "todos" ->
-            TodoPanel(
-                todoPort = panelServices.todos,
-                modalRequester = panelServices.modalRequester,
-                lifecycle = panelServices.lifecycle,
-            )
-        "files" ->
-            FilesPanel(
-                workspaceFileService = panelServices.workspaceFiles,
-                canvasOperations = panelServices.canvas,
-                modalRequester = panelServices.modalRequester,
-                activityPort = panelServices.activity,
-            )
-        "agents" ->
-            SubAgentsPanel(
-                agentPort = panelServices.agents,
-                providerPort = panelServices.providers,
-                modalRequester = panelServices.modalRequester,
-                activityPort = panelServices.activity,
-                todoPort = panelServices.todos,
-            )
-        "settings" ->
-            SettingsPanel(
-                settingsPort = panelServices.settings,
-                providerPort = panelServices.providers,
-                modalRequester = panelServices.modalRequester,
-                onSettingsChanged = panelServices.onSettingsChanged,
-                inFlight = panelServices.inFlight,
-                activityPort = panelServices.activity,
-            )
-        "canvas" ->
-            CanvasPanel(
-                canvasOperations = panelServices.canvas,
-                workspaceFileService = panelServices.workspaceFiles,
-                modalRequester = panelServices.modalRequester,
-                activityPort = panelServices.activity,
-            )
     }
 }
 
