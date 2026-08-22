@@ -19,11 +19,12 @@ class CodexCliModelCatalogTest {
 
         val models =
             catalog.parse(
-                """{"models":[{"slug":"visible","display_name":"Visible","visibility":"list"},{"slug":"hidden","display_name":"Hidden","visibility":"hide"}]}""",
+                """{"models":[{"slug":"visible","display_name":"Visible","visibility":"list","input_modalities":["text","image"]},{"slug":"text-only","display_name":"Text only","visibility":"list","input_modalities":["text"]},{"slug":"hidden","display_name":"Hidden","visibility":"hide","input_modalities":["image"]}]}""",
             )
 
-        assertEquals(listOf("visible"), models.map { it.id })
-        assertEquals("Visible", models.single().name)
-        assertEquals(setOf("vision"), models.single().capabilities)
+        assertEquals(listOf("visible", "text-only"), models.map { it.id })
+        assertEquals("Visible", models.first().name)
+        assertEquals(setOf("vision"), models.first().capabilities)
+        assertEquals(emptySet(), models.last().capabilities)
     }
 }
