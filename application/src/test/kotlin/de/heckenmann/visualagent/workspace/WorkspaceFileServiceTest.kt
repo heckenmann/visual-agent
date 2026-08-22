@@ -13,6 +13,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
 import kotlin.io.path.deleteIfExists
+import kotlin.io.path.exists
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
@@ -68,6 +69,23 @@ class WorkspaceFileServiceTest {
             assertEquals("new content", service.resolveManagedPath(first.relativePath).readText())
             assertEquals(11L, service.listFiles().single().sizeBytes)
             assertEquals(first.mimeType, second.mimeType)
+        }
+
+    @Test
+    fun `javascript writer rejects symlinked ancestor before creating children`() =
+        withDatabasePath(tempDir().resolve("data/visual-agent.db").toString()) { dbPath ->
+            val service = WorkspaceFileService(FakeWorkspaceFileStore(), dbPath)
+            val events = WorkspaceFileActivityEventBus()
+            val writer = WorkspaceJavaScriptWriter(service, events)
+            val outside = tempDir().resolve("outside").also { it.createDirectories() }
+            val link = service.workspaceRoot().resolve("linked")
+            val linkCreated = runCatching { Files.createSymbolicLink(link, outside) }.isSuccess
+            if (!linkCreated) return@withDatabasePath
+
+            assertFailsWith<IllegalArgumentException> {
+                writer.write("linked/new/file.txt", "must stay inside")
+            }
+            assertTrue(!outside.resolve("new").exists())
         }
 
     @Test

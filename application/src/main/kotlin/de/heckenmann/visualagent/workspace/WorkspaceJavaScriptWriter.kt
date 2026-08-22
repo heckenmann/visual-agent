@@ -6,7 +6,8 @@ import de.heckenmann.visualagent.agent.javascript.JavaScriptWorkspaceWriter
 import org.springframework.stereotype.Service
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
-import kotlin.io.path.createDirectories
+import java.nio.file.LinkOption
+import java.nio.file.Path
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.isSymbolicLink
 
@@ -39,7 +40,7 @@ class WorkspaceJavaScriptWriter(
         val realRoot = root.toRealPath()
         val destination = root.resolve(normalized).normalize()
         require(destination.startsWith(root)) { "Workspace path escapes the workspace" }
-        destination.parent?.createDirectories()
+        destination.parent?.let { createSafeDirectories(root, it, realRoot) }
         val realParent = (destination.parent ?: root).toRealPath()
         require(realParent.startsWith(realRoot)) { "Workspace path escapes the workspace" }
         require(!destination.isSymbolicLink()) { "Workspace symbolic links are not writable" }
@@ -82,6 +83,30 @@ class WorkspaceJavaScriptWriter(
         require(Files.exists(path) && Files.isRegularFile(path)) { "Workspace file does not exist" }
         require(!path.isSymbolicLink()) { "Workspace symbolic links are not accessible" }
         return path
+    }
+
+    private fun createSafeDirectories(
+        root: Path,
+        parent: Path,
+        realRoot: Path,
+    ) {
+        val relativeParent = root.relativize(parent)
+        var current = root
+        relativeParent.forEach { component ->
+            current = current.resolve(component.toString())
+            when {
+                Files.exists(current, LinkOption.NOFOLLOW_LINKS) -> {
+                    require(!current.isSymbolicLink()) { "Workspace symbolic links are not writable" }
+                    require(Files.isDirectory(current, LinkOption.NOFOLLOW_LINKS)) { "Workspace parent is not a directory" }
+                    require(current.toRealPath().startsWith(realRoot)) { "Workspace path escapes the workspace" }
+                }
+                else -> {
+                    Files.createDirectory(current)
+                    require(!current.isSymbolicLink()) { "Workspace symbolic links are not writable" }
+                    require(current.toRealPath().startsWith(realRoot)) { "Workspace path escapes the workspace" }
+                }
+            }
+        }
     }
 
     private fun resolvePath(relativePath: String): java.nio.file.Path {
