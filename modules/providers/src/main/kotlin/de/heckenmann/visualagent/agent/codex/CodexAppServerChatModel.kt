@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.reactor.asFlux
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -77,66 +78,88 @@ internal class CodexAppServerChatModel(
                 transport.request("turn/start", turnParams(prompt, threadId))
                 var pendingDelta: String? = null
                 var receivedMultipleDeltas = false
-                while (true) {
-                    cancellationToken?.throwIfCancelled()
-                    when (val event = transport.receive()) {
-                        is CodexRpcMessage.Request ->
-                            handleServerRequest(transport, event)
-                        is CodexRpcMessage.Notification ->
-                            when (event.method) {
-                                "item/agentMessage/delta" -> {
-                                    val delta =
-                                        event.params["delta"]
-                                            ?.jsonPrimitive
-                                            ?.contentOrNull
-                                            .orEmpty()
-                                    if (delta.isNotEmpty()) {
-                                        pendingDelta?.let { emit(response(it, done = false)) }
-                                        receivedMultipleDeltas = receivedMultipleDeltas || pendingDelta != null
-                                        pendingDelta = delta
-                                    }
-                                }
-                                "item/reasoning/summaryTextDelta" -> {
-                                    if (showReasoningSummary) {
-                                        val summary =
+                withTimeout(TURN_TIMEOUT_MILLIS) {
+                    while (true) {
+                        cancellationToken?.throwIfCancelled()
+                        when (val event = transport.receive()) {
+                            is CodexRpcMessage.Request ->
+                                handleServerRequest(transport, event)
+                            is CodexRpcMessage.Notification ->
+                                when (event.method) {
+                                    "item/agentMessage/delta" -> {
+                                        val delta =
                                             event.params["delta"]
                                                 ?.jsonPrimitive
                                                 ?.contentOrNull
                                                 .orEmpty()
-                                        if (summary.isNotEmpty()) {
-                                            emit(response("<think>$summary</think>", done = false))
+                                        if (delta.isNotEmpty()) {
+                                            pendingDelta?.let { emit(response(it, done = false)) }
+                                            receivedMultipleDeltas = receivedMultipleDeltas || pendingDelta != null
+                                            pendingDelta = delta
                                         }
                                     }
-                                }
-                                "turn/completed" -> {
-                                    pendingDelta?.let { lastDelta ->
-                                        if (receivedMultipleDeltas) {
-                                            emit(response(lastDelta, done = false))
-                                        } else {
-                                            val chunks = lastDelta.simulatedChunks()
-                                            chunks.forEachIndexed { index, chunk ->
-                                                emit(response(chunk, done = false))
-                                                if (index < chunks.lastIndex) delay(SIMULATED_CHUNK_DELAY_MS)
+                                    "item/reasoning/summaryTextDelta" -> {
+                                        if (showReasoningSummary) {
+                                            val summary =
+                                                event.params["delta"]
+                                                    ?.jsonPrimitive
+                                                    ?.contentOrNull
+                                                    .orEmpty()
+                                            if (summary.isNotEmpty()) {
+                                                emit(response("<think>$summary</think>", done = false))
                                             }
                                         }
                                     }
-                                    emit(response("", done = true))
-                                    return@flow
+                                    "turn/completed" -> {
+                                        val turn = event.params["turn"]?.jsonObject
+                                        val status = turn?.get("status")?.jsonPrimitive?.contentOrNull ?: "completed"
+                                        if (status != "completed") {
+                                            val message =
+                                                turn
+                                                    ?.get("error")
+                                                    ?.jsonObject
+                                                    ?.get("message")
+                                                    ?.jsonPrimitive
+                                                    ?.contentOrNull
+                                                    ?: "Codex turn $status"
+                                            error(message)
+                                        }
+                                        pendingDelta?.let { lastDelta ->
+                                            if (receivedMultipleDeltas) {
+                                                emit(response(lastDelta, done = false))
+                                            } else {
+                                                val chunks = lastDelta.simulatedChunks()
+                                                chunks.forEachIndexed { index, chunk ->
+                                                    emit(response(chunk, done = false))
+                                                    if (index < chunks.lastIndex) delay(SIMULATED_CHUNK_DELAY_MS)
+                                                }
+                                            }
+                                        }
+                                        return@withTimeout
+                                    }
+                                    "error" -> {
+                                        val willRetry =
+                                            event.params["willRetry"]
+                                                ?.jsonPrimitive
+                                                ?.contentOrNull
+                                                ?.toBoolean() == true
+                                        if (!willRetry) {
+                                            val message =
+                                                event.params["error"]
+                                                    ?.jsonObject
+                                                    ?.get("message")
+                                                    ?.jsonPrimitive
+                                                    ?.contentOrNull
+                                                    ?: "Codex app-server request failed"
+                                            error(message)
+                                        }
+                                    }
                                 }
-                                "error" -> {
-                                    val message =
-                                        event.params["error"]
-                                            ?.jsonObject
-                                            ?.get("message")
-                                            ?.jsonPrimitive
-                                            ?.contentOrNull
-                                            ?: "Codex app-server request failed"
-                                    error(message)
-                                }
-                            }
-                        is CodexRpcMessage.Response -> Unit
+                            is CodexRpcMessage.Response -> Unit
+                        }
                     }
                 }
+                emit(response("", done = true))
             } finally {
                 cancellationRegistration?.close()
                 transport.close()
@@ -285,18 +308,6 @@ internal class CodexAppServerChatModel(
 
     private companion object {
         private const val SIMULATED_CHUNK_DELAY_MS = 16L
+        private const val TURN_TIMEOUT_MILLIS = 300_000L
     }
-}
-
-private fun String.simulatedChunks(): List<String> {
-    val chunkSize = 3
-    val chunks = mutableListOf<String>()
-    var start = 0
-    while (start < length) {
-        val count = codePointCount(start, length)
-        val end = offsetByCodePoints(start, minOf(chunkSize, count))
-        chunks += substring(start, end)
-        start = end
-    }
-    return chunks
 }

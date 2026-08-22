@@ -16,6 +16,7 @@ import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.io.path.createTempDirectory
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 /** Verifies the clean-room Codex app-server protocol adapter. */
@@ -111,10 +112,27 @@ class CodexAppServerChatModelTest {
             }
         }
 
+    @Test
+    fun `failed turns are propagated instead of marked complete`() =
+        runBlocking {
+            val directory = createTempDirectory("codex-app-server-failed-turn-test-")
+            val executable = fakeServer(directory, turnStatus = "failed")
+            try {
+                assertFailsWith<IllegalStateException> {
+                    CodexAppServerChatModel(executable, "gpt-test", emptyList(), directory)
+                        .streamFlow(Prompt("hello"))
+                        .toList()
+                }
+            } finally {
+                deleteRecursively(directory)
+            }
+        }
+
     private fun fakeServer(
         directory: Path,
         singleDelta: Boolean = false,
         reasoningSummary: Boolean = false,
+        turnStatus: String = "completed",
     ): Path {
         val executable = directory.resolve("codex")
         val deltaEvents =
@@ -148,7 +166,7 @@ class CodexAppServerChatModelTest {
                   printf '%s\n' '{"jsonrpc":"2.0","id":99,"method":"item/tool/call","params":{"arguments":{},"callId":"call-1","threadId":"thread-1","tool":"context","turnId":"turn-1"}}'
                   IFS= read -r tool_response
                   $deltaEvents
-                  printf '%s\n' '{"jsonrpc":"2.0","method":"turn/completed","params":{"threadId":"thread-1","turn":{"id":"turn-1"}}}'
+                  printf '%s\n' '{"jsonrpc":"2.0","method":"turn/completed","params":{"threadId":"thread-1","turn":{"id":"turn-1","status":"$turnStatus","error":{"message":"turn failed"}}}}'
                   ;;
               esac
             done
