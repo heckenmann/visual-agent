@@ -7,7 +7,7 @@ import org.springframework.util.MimeTypeUtils
 import java.util.Base64
 
 /** Builds provider-neutral image payloads for vision requests. */
-internal object VisionSupport {
+object VisionSupport {
     /**
      * Creates a Spring AI media object from raw image bytes.
      *

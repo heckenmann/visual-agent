@@ -13,14 +13,16 @@ version =
 
 repositories {
     mavenCentral()
-    maven { url = uri("https://repo.spring.io/milestone") }
 }
 
 dependencies {
+    implementation(project(":providers"))
     implementation(libs.kotlin.stdlib)
+    implementation(platform(libs.spring.boot.bom))
+    implementation(libs.spring.boot.starter)
     implementation(platform(libs.spring.ai.bom))
-    implementation(libs.spring.ai.ollama)
-    implementation(libs.spring.ai.openai)
+    implementation(libs.spring.ai.model)
+    implementation(libs.spring.context)
     implementation(libs.coroutines.core)
     implementation(libs.coroutines.reactor)
     implementation(libs.serialization.json)
@@ -37,6 +39,9 @@ tasks.test {
     filter {
         isFailOnNoMatchingTests = false
     }
+    systemProperty("visualagent.codex.smoke", System.getProperty("visualagent.codex.smoke", "false"))
+    systemProperty("visualagent.codex.smoke.executable", System.getProperty("visualagent.codex.smoke.executable", ""))
+    systemProperty("visualagent.codex.smoke.model", System.getProperty("visualagent.codex.smoke.model", ""))
     finalizedBy(tasks.jacocoTestReport)
 }
 

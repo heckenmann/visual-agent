@@ -28,6 +28,7 @@ dependencies {
     implementation(libs.kotlin.stdlib)
     implementation(libs.kotlin.reflect)
     implementation(project(":providers"))
+    implementation(project(":provider-openai-codex"))
     implementation(project(":tools"))
     implementation(project(":protocol"))
 
@@ -235,6 +236,7 @@ val kotlinMainSourceRoots =
         projectDir.toPath().resolve("src/main/kotlin"),
         rootProject.projectDir.toPath().resolve("modules/ui/src/main/kotlin"),
         rootProject.projectDir.toPath().resolve("modules/providers/src/main/kotlin"),
+        rootProject.projectDir.toPath().resolve("modules/provider-openai-codex/src/main/kotlin"),
         rootProject.projectDir.toPath().resolve("modules/tools/src/main/kotlin"),
     )
 val kotlinSourceRoots =
@@ -243,6 +245,7 @@ val kotlinSourceRoots =
             projectDir.toPath().resolve("src/test/kotlin"),
             rootProject.projectDir.toPath().resolve("modules/ui/src/test/kotlin"),
             rootProject.projectDir.toPath().resolve("modules/providers/src/test/kotlin"),
+            rootProject.projectDir.toPath().resolve("modules/provider-openai-codex/src/test/kotlin"),
             rootProject.projectDir.toPath().resolve("modules/tools/src/test/kotlin"),
         )
 
@@ -536,6 +539,8 @@ tasks.register("desktopApiUsageCheck") {
                 rootProject.projectDir.toPath().resolve("modules/ui/src/test"),
                 rootProject.projectDir.toPath().resolve("modules/providers/src/main"),
                 rootProject.projectDir.toPath().resolve("modules/providers/src/test"),
+                rootProject.projectDir.toPath().resolve("modules/provider-openai-codex/src/main"),
+                rootProject.projectDir.toPath().resolve("modules/provider-openai-codex/src/test"),
                 rootProject.projectDir.toPath().resolve("modules/tools/src/main"),
                 rootProject.projectDir.toPath().resolve("modules/tools/src/test"),
             )

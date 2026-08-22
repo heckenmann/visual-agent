@@ -1,6 +1,6 @@
 package de.heckenmann.visualagent.agent
 
-import de.heckenmann.visualagent.agent.codex.CodexCliProvider
+import de.heckenmann.visualagent.agent.provider.ProfiledProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
@@ -8,6 +8,7 @@ import de.heckenmann.visualagent.agent.provider.ProviderPreferenceStore
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
@@ -31,7 +32,8 @@ class ConfiguredLLMProviderVisionTest {
                 ),
             )
             catalog.setActiveSelection("codex-custom", "gpt-codex")
-            val codex = mockk<CodexCliProvider>()
+            val codex = mockk<ProfiledProviderAdapter>()
+            every { codex.adapter } returns ProviderAdapter.CODEX_CLI
             coEvery { codex.vision(any(), "describe", "gpt-codex", any()) } returns
                 ChatResponse("gpt-codex", Message("assistant", "codex image ok"), done = true)
             val router =
@@ -39,7 +41,7 @@ class ConfiguredLLMProviderVisionTest {
                     mockk(relaxed = true),
                     mockk(relaxed = true),
                     catalog,
-                    codexCliProvider = codex,
+                    profiledAdapters = listOf(codex),
                 )
 
             assertEquals("codex image ok", router.vision(byteArrayOf(1), "describe").message.content)

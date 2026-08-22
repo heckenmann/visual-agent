@@ -1,5 +1,8 @@
 package de.heckenmann.visualagent.agent.provider
 
+import de.heckenmann.visualagent.agent.ChatResponse
+import de.heckenmann.visualagent.agent.LLMProvider
+import de.heckenmann.visualagent.agent.ShowResponse
 import de.heckenmann.visualagent.agent.ToolId
 import org.springframework.ai.tool.ToolCallback
 import java.nio.file.Path
@@ -86,4 +89,32 @@ interface ProviderToolCallbacks {
 fun interface ProviderWorkingDirectory {
     /** Returns the normalized working directory for a provider process. */
     fun get(): Path
+}
+
+/**
+ * Provider-specific backend selected by a persisted [ProviderProfile].
+ *
+ * The configured provider facade depends on this contract instead of concrete
+ * adapter classes, which keeps independently packaged providers acyclic.
+ */
+interface ProfiledProviderAdapter : LLMProvider {
+    /** Runtime adapter type implemented by this backend. */
+    val adapter: ProviderAdapter
+
+    /** Loads selectable model definitions for one provider profile. */
+    suspend fun loadModels(profile: ProviderProfile): List<ProviderModelConfig>
+
+    /** Gets model details using the supplied provider profile. */
+    suspend fun getModelDetails(
+        profile: ProviderProfile,
+        modelName: String,
+    ): ShowResponse
+
+    /** Analyzes an image with an explicitly selected model and provider profile. */
+    suspend fun vision(
+        image: ByteArray,
+        prompt: String,
+        modelId: String,
+        profile: ProviderProfile,
+    ): ChatResponse
 }

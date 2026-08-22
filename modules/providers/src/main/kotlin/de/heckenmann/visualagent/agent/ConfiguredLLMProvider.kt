@@ -1,9 +1,8 @@
 package de.heckenmann.visualagent.agent
 
-import de.heckenmann.visualagent.agent.codex.CodexCliProvider
-import de.heckenmann.visualagent.agent.codex.CodexModelCatalog
 import de.heckenmann.visualagent.agent.ollama.fetchModelCapabilities
 import de.heckenmann.visualagent.agent.openai.OpenAiClient
+import de.heckenmann.visualagent.agent.provider.ProfiledProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderEnvironmentCredentials
@@ -22,8 +21,7 @@ class ConfiguredLLMProvider(
     private val openAiClient: OpenAiClient,
     private val providerCatalog: ProviderCatalogService,
     private val fetchCapabilities: suspend (ProviderProfile) -> Map<String, Set<String>> = ::fetchModelCapabilities,
-    private val codexCliProvider: CodexCliProvider? = null,
-    private val codexModelCatalog: CodexModelCatalog? = null,
+    private val profiledAdapters: List<ProfiledProviderAdapter> = emptyList(),
 ) : LLMProvider {
     override suspend fun chat(messages: List<Message>): ChatResponse = chat(ChatRequestContext(messages = messages))
 
@@ -50,7 +48,7 @@ class ConfiguredLLMProvider(
         val modelId = providerCatalog.activeModelId().ifBlank { profile.defaultModel }
         requireVisionCapability(profile, modelId)
         return if (profile.adapter == ProviderAdapter.CODEX_CLI) {
-            requireCodexProvider().vision(image, prompt, modelId, profile)
+            adapterFor(profile.adapter).vision(image, prompt, modelId, profile)
         } else {
             providerFor(profile).vision(image, prompt, modelId)
         }
@@ -66,7 +64,7 @@ class ConfiguredLLMProvider(
         return when (profile.adapter) {
             ProviderAdapter.OLLAMA -> true
             ProviderAdapter.OPENAI_COMPATIBLE -> ProviderEnvironmentCredentials.openAiApiKey(profile).isNotBlank()
-            ProviderAdapter.CODEX_CLI -> requireCodexProvider().isConnected()
+            ProviderAdapter.CODEX_CLI -> adapterFor(profile.adapter).isConnected()
         }
     }
 
@@ -78,7 +76,7 @@ class ConfiguredLLMProvider(
     override suspend fun getModels(providerId: String): List<String> {
         val profile = providerCatalog.getProvider(providerId) ?: error("Provider not found: $providerId")
         if (profile.adapter == ProviderAdapter.CODEX_CLI) {
-            val models = requireCodexModelCatalog().load(profile)
+            val models = adapterFor(profile.adapter).loadModels(profile)
             providerCatalog.updateDiscoveredModelConfigs(providerId, models)
             return providerCatalog.selectableModels(providerId).map { it.id }
         }
@@ -86,7 +84,7 @@ class ConfiguredLLMProvider(
             when (profile.adapter) {
                 ProviderAdapter.OLLAMA -> ollamaClient.getModels(profile)
                 ProviderAdapter.OPENAI_COMPATIBLE -> openAiClient.getModels(profile)
-                ProviderAdapter.CODEX_CLI -> error("Codex CLI models are handled above")
+                ProviderAdapter.CODEX_CLI -> error("Profiled provider models are handled above")
             }
         providerCatalog.updateDiscoveredModels(providerId, discovered)
         if (profile.adapter == ProviderAdapter.OLLAMA) {
@@ -106,7 +104,7 @@ class ConfiguredLLMProvider(
         return when (profile.adapter) {
             ProviderAdapter.OLLAMA -> ollamaClient.getModelDetails(profile, modelName)
             ProviderAdapter.OPENAI_COMPATIBLE -> openAiClient.getModelDetails(profile, modelName)
-            ProviderAdapter.CODEX_CLI -> requireCodexProvider().getModelDetails(profile, modelName)
+            ProviderAdapter.CODEX_CLI -> adapterFor(profile.adapter).getModelDetails(profile, modelName)
         }
     }
 
@@ -123,14 +121,13 @@ class ConfiguredLLMProvider(
         when (profile?.adapter) {
             ProviderAdapter.OPENAI_COMPATIBLE -> openAiClient
             ProviderAdapter.OLLAMA -> ollamaClient
-            ProviderAdapter.CODEX_CLI -> requireCodexProvider()
+            ProviderAdapter.CODEX_CLI -> adapterFor(profile.adapter)
             null -> error("Resolved provider profile is missing")
         }
 
-    private fun requireCodexProvider(): CodexCliProvider = requireNotNull(codexCliProvider) { "Codex CLI provider is unavailable" }
-
-    private fun requireCodexModelCatalog(): CodexModelCatalog =
-        requireNotNull(codexModelCatalog) { "Codex CLI model catalog is unavailable" }
+    private fun adapterFor(adapter: ProviderAdapter): ProfiledProviderAdapter =
+        profiledAdapters.singleOrNull { it.adapter == adapter }
+            ?: error("Provider adapter is unavailable: $adapter")
 
     private fun requireVisionCapability(
         profile: ProviderProfile,

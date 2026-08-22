@@ -1,8 +1,7 @@
 package de.heckenmann.visualagent.agent
 
-import de.heckenmann.visualagent.agent.codex.CodexCliProvider
-import de.heckenmann.visualagent.agent.codex.CodexModelCatalog
 import de.heckenmann.visualagent.agent.openai.OpenAiClient
+import de.heckenmann.visualagent.agent.provider.ProfiledProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
@@ -210,20 +209,20 @@ class ConfiguredLLMProviderTest {
                     models = listOf(ProviderModelConfig("gpt-5.6-luna", name = "Codex Luna")),
                 ),
             )
-            val modelCatalog = mockk<CodexModelCatalog>()
-            coEvery { modelCatalog.load(any()) } returns listOf(ProviderModelConfig("gpt-5.6-luna", name = "Codex Luna"))
+            val codex = mockk<ProfiledProviderAdapter>()
+            every { codex.adapter } returns ProviderAdapter.CODEX_CLI
+            coEvery { codex.loadModels(any()) } returns listOf(ProviderModelConfig("gpt-5.6-luna", name = "Codex Luna"))
             val router =
                 ConfiguredLLMProvider(
                     mockk(relaxed = true),
                     mockk(relaxed = true),
                     catalog,
-                    codexCliProvider = CodexCliProvider(mockk(), mockk()),
-                    codexModelCatalog = modelCatalog,
+                    profiledAdapters = listOf(codex),
                 )
 
             assertEquals(listOf("gpt-5.6-luna"), router.getModels("codex-custom"))
             assertEquals("Codex Luna", catalog.selectableModels("codex-custom").single().name)
-            coVerify(exactly = 1) { modelCatalog.load(any()) }
+            coVerify(exactly = 1) { codex.loadModels(any()) }
         }
 
     @Test

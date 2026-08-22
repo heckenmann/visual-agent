@@ -12,7 +12,7 @@ class CodexCliProviderTest {
     @Test
     fun `profileless operations fail explicitly`() =
         runBlocking {
-            val provider = CodexCliProvider(mockk(), mockk())
+            val provider = CodexCliProvider(mockk(), mockk(), mockk())
 
             assertFailsWith<IllegalStateException> { provider.chat(listOf(Message("user", "hello"))) }
             assertFailsWith<IllegalStateException> { provider.stream(listOf(Message("user", "hello"))) }

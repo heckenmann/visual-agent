@@ -2,10 +2,12 @@ package de.heckenmann.visualagent.agent.codex
 
 import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.ChatResponse
-import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ModelDetails
 import de.heckenmann.visualagent.agent.ShowResponse
+import de.heckenmann.visualagent.agent.provider.ProfiledProviderAdapter
+import de.heckenmann.visualagent.agent.provider.ProviderAdapter
+import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
 import de.heckenmann.visualagent.agent.provider.ProviderWorkingDirectory
@@ -27,8 +29,11 @@ import java.nio.file.Path
 class CodexCliProvider internal constructor(
     private val locator: CodexCliLocator,
     private val toolCallbacks: ProviderToolCallbacks,
+    private val modelCatalog: CodexModelCatalog,
     private val workingDirectory: ProviderWorkingDirectory = ProviderWorkingDirectory { Path.of(System.getProperty("user.dir")) },
-) : LLMProvider {
+) : ProfiledProviderAdapter {
+    override val adapter: ProviderAdapter = ProviderAdapter.CODEX_CLI
+
     override suspend fun chat(messages: List<Message>): ChatResponse = error("Codex CLI chat requires a configured provider profile")
 
     override suspend fun chat(request: ChatRequestContext): ChatResponse =
@@ -95,7 +100,7 @@ class CodexCliProvider internal constructor(
     ): ChatResponse = error("Codex CLI vision requires a configured provider profile")
 
     /** Sends an image through the configured Codex app-server profile. */
-    internal suspend fun vision(
+    override suspend fun vision(
         image: ByteArray,
         prompt: String,
         modelId: String,
@@ -135,10 +140,12 @@ class CodexCliProvider internal constructor(
     override suspend fun getModelDetails(modelName: String): ShowResponse =
         ShowResponse(model = modelName, modifiedAt = "", details = ModelDetails(family = "Codex CLI"))
 
-    internal suspend fun getModelDetails(
+    override suspend fun getModelDetails(
         profile: ProviderProfile,
         modelName: String,
     ): ShowResponse = getModelDetails(modelName)
+
+    override suspend fun loadModels(profile: ProviderProfile): List<ProviderModelConfig> = modelCatalog.load(profile)
 
     private suspend fun resolveExecutable(profile: ProviderProfile): Path =
         when (val result = locator.locate(profile.options[OPTION_EXECUTABLE_PATH])) {

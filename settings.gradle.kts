@@ -1,11 +1,12 @@
 rootProject.name = "visual-agent"
 
-include(":application", ":ui", ":protocol", ":desktop", ":providers", ":tools")
+include(":application", ":ui", ":protocol", ":desktop", ":providers", ":provider-openai-codex", ":tools")
 
 project(":ui").projectDir = file("modules/ui")
 project(":protocol").projectDir = file("modules/protocol")
 project(":desktop").projectDir = file("modules/desktop")
 project(":providers").projectDir = file("modules/providers")
+project(":provider-openai-codex").projectDir = file("modules/provider-openai-codex")
 project(":tools").projectDir = file("modules/tools")
 
 plugins {

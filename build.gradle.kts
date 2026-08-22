@@ -21,6 +21,7 @@ tasks.named("check") {
         ":protocol:check",
         ":desktop:check",
         ":providers:check",
+        ":provider-openai-codex:check",
         ":tools:check",
         "verifyCentralizedVersions",
         "verifyModuleDependencies",
@@ -28,20 +29,35 @@ tasks.named("check") {
 }
 
 tasks.named("build") {
-    dependsOn(":application:build", ":ui:build", ":protocol:build", ":desktop:build", ":providers:build", ":tools:build")
+    dependsOn(
+        ":application:build",
+        ":ui:build",
+        ":protocol:build",
+        ":desktop:build",
+        ":providers:build",
+        ":provider-openai-codex:build",
+        ":tools:build",
+    )
 }
 
 gradle.projectsEvaluated {
     val moduleMainSourceSets =
-        listOf(":application", ":ui", ":protocol", ":desktop", ":providers", ":tools").map { modulePath ->
+        listOf(":application", ":ui", ":protocol", ":desktop", ":providers", ":provider-openai-codex", ":tools").map { modulePath ->
             project(modulePath).extensions.getByType<SourceSetContainer>().getByName("main")
         }
     val moduleTestSourceSets =
-        listOf(":application", ":ui", ":protocol", ":desktop", ":providers", ":tools").map { modulePath ->
+        listOf(":application", ":ui", ":protocol", ":desktop", ":providers", ":provider-openai-codex", ":tools").map { modulePath ->
             project(modulePath).extensions.getByType<SourceSetContainer>().getByName("test")
         }
     tasks.named<Test>("test") {
-        dependsOn(":application:testClasses", ":ui:testClasses", ":protocol:testClasses", ":desktop:testClasses", ":providers:testClasses")
+        dependsOn(
+            ":application:testClasses",
+            ":ui:testClasses",
+            ":protocol:testClasses",
+            ":desktop:testClasses",
+            ":providers:testClasses",
+            ":provider-openai-codex:testClasses",
+        )
         useJUnitPlatform {
             excludeTags("database", "de.heckenmann.visualagent.testsupport.DatabaseTestCategory")
         }
@@ -126,7 +142,15 @@ tasks.named("check") {
 }
 
 tasks.register("ktlintCheck") {
-    dependsOn(":application:ktlintCheck", ":ui:ktlintCheck", ":protocol:ktlintCheck", ":desktop:ktlintCheck", ":providers:ktlintCheck", ":tools:ktlintCheck")
+    dependsOn(
+        ":application:ktlintCheck",
+        ":ui:ktlintCheck",
+        ":protocol:ktlintCheck",
+        ":desktop:ktlintCheck",
+        ":providers:ktlintCheck",
+        ":provider-openai-codex:ktlintCheck",
+        ":tools:ktlintCheck",
+    )
 }
 
 tasks.register("copyAllDependencies") {
@@ -138,7 +162,7 @@ tasks.register("verifyModuleDependencies") {
     description = "Verifies the directed dependency graph between Visual Agent modules."
     doLast {
         val moduleDependencies =
-            setOf(":application", ":ui", ":protocol", ":desktop", ":providers", ":tools").associateWith { modulePath ->
+            setOf(":application", ":ui", ":protocol", ":desktop", ":providers", ":provider-openai-codex", ":tools").associateWith { modulePath ->
                 project(modulePath)
                     .configurations
                     .filter { configuration -> !configuration.name.contains("test", ignoreCase = true) }
@@ -150,11 +174,12 @@ tasks.register("verifyModuleDependencies") {
             }
         val expectedDependencies =
             mapOf(
-                ":application" to setOf(":providers", ":tools", ":protocol"),
+                ":application" to setOf(":providers", ":provider-openai-codex", ":tools", ":protocol"),
                 ":ui" to setOf(":protocol"),
                 ":protocol" to emptySet(),
                 ":desktop" to setOf(":ui", ":application", ":protocol"),
                 ":providers" to emptySet(),
+                ":provider-openai-codex" to setOf(":providers"),
                 ":tools" to emptySet(),
             )
         val violations =
@@ -201,6 +226,7 @@ tasks.register("verifyCentralizedVersions") {
             "modules/protocol/build.gradle.kts",
             "modules/desktop/build.gradle.kts",
             "modules/providers/build.gradle.kts",
+            "modules/provider-openai-codex/build.gradle.kts",
             "modules/tools/build.gradle.kts",
         ).map(rootProject.projectDir::resolve)
     inputs.files(moduleBuildFiles)
