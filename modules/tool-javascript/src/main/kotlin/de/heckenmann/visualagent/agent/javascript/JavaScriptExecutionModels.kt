@@ -6,6 +6,10 @@ import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 /** Limits applied to one untrusted JavaScript execution. */
 data class JavaScriptExecutionLimits(
     val timeoutMillis: Long = 15_000,
+    /** Maximum retained guest heap for one execution. */
+    val maxGuestHeapBytes: Long = 128L * 1024L * 1024L,
+    /** Hard isolate heap ceiling for one execution. */
+    val maxIsolateMemoryBytes: Long = 256L * 1024L * 1024L,
     val maxResultCharacters: Int = 500_000,
     val maxToolCalls: Int = 32,
     val maxConcurrentToolCalls: Int = 4,

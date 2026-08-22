@@ -235,6 +235,29 @@ class GraalJavaScriptExecutionServiceTest {
     }
 
     @Test
+    fun `bounds result while traversing guest arrays`() {
+        assertFailsWith<JavaScriptExecutionException> {
+            execute(
+                "return Array(10_000).fill('0123456789');",
+                limits = JavaScriptExecutionLimits(maxResultCharacters = 100),
+            )
+        }.also { assertEquals(JavaScriptErrorCategory.LIMIT_EXCEEDED, it.category) }
+    }
+
+    @Test
+    fun `rejects nested asynchronous tool calls`() {
+        assertFailsWith<JavaScriptExecutionException> {
+            execute(
+                "await tools.call('test:echo', {async: true});",
+                enabled = setOf("test:echo"),
+            )
+        }.also {
+            assertEquals(JavaScriptErrorCategory.TOOL_ARGUMENTS, it.category)
+            assertTrue(it.message.contains("must be awaited"))
+        }
+    }
+
+    @Test
     fun `maps syntax runtime and resource-limit failures`() {
         assertFailsWith<JavaScriptExecutionException> {
             execute("return (")

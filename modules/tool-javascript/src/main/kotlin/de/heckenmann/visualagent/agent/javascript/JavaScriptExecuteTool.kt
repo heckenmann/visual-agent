@@ -56,7 +56,7 @@ class JavaScriptExecuteTool(
             source
                 ?: path?.let {
                     runCatching { executionService.readWorkspaceSource(it) }
-                        .getOrElse { error -> return failure("Workspace script could not be read: ${error.message ?: "unknown error"}") }
+                        .getOrElse { return toolFailure("Workspace script could not be read") }
                 }
                 ?: return failure("JavaScript source or path is required")
         val enabledTools = enabledToolIds(context)
@@ -105,6 +105,8 @@ class JavaScriptExecuteTool(
     private fun resultContent(value: Any?): String = if (value is String) value else resultToJson(value).toString()
 
     private fun failure(message: String): ToolResult = ToolResult(TOOL_ID, false, "", "TOOL_ARGUMENTS: $message")
+
+    private fun toolFailure(message: String): ToolResult = ToolResult(TOOL_ID, false, "", "TOOL_FAILURE: $message")
 
     private companion object {
         const val TOOL_ID = "javascript:execute"

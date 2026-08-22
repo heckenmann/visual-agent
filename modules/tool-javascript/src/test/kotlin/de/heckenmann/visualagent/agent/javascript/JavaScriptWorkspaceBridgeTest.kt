@@ -119,6 +119,30 @@ class JavaScriptWorkspaceBridgeTest {
     }
 
     @Test
+    fun `model facing tool sanitizes workspace script load failures`() {
+        val failingWriter =
+            object : JavaScriptWorkspaceWriter {
+                override fun write(
+                    relativePath: String,
+                    content: String,
+                ) = JavaScriptWorkspaceWriteResult(relativePath, content.length.toLong(), "text/plain")
+
+                override fun read(relativePath: String): String =
+                    throw NoSuchFileException("/srv/visual-agent/data/workspace/$relativePath")
+            }
+        val failingService = GraalJavaScriptExecutionService({ registry }, failingWriter)
+        try {
+            val result = JavaScriptExecuteTool(failingService).execute("{\"path\":\"missing/nested.js\"}", emptyMap())
+
+            assertTrue(!result.success)
+            assertEquals("TOOL_FAILURE: Workspace script could not be read", result.error)
+            assertTrue("/srv/visual-agent" !in result.error.orEmpty())
+        } finally {
+            failingService.close()
+        }
+    }
+
+    @Test
     fun `sandbox does not expose host filesystem environment or classes`() {
         listOf(
             "Java.type('java.lang.System')",

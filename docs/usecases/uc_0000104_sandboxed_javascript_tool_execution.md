@@ -25,7 +25,7 @@ Allow an enabled agent to run a JavaScript program for deterministic multi-tool 
 5. The script filters, aggregates, transforms, or combines results locally. For complex deterministic logic or large generated text (for example CSV exports and Markdown tables), it assembles the complete output before returning it. It can return a string, Markdown document, primitive, array, object, or null.
 6. Only the final `return` value becomes the model-visible tool result. Console diagnostics remain bounded execution metadata and never use the server's real stdout/stderr.
 7. If execution fails, the tool returns a compact category and message to the model. The model can correct the source or arguments and retry; an unchanged failing script must not be repeated.
-8. The server enforces time, result, call-count, concurrency, workspace-write, and recursion limits, then closes the context. Script source length is not capped; the normal tool-call timeout remains the execution bound.
+8. The server enforces time, guest-memory (when the Graal isolate runtime is available), result, call-count, concurrency, workspace-write, and recursion limits, then closes the context. Script source length is not capped; the normal tool-call timeout remains the execution bound.
 
 ## Tool Calls
 
@@ -53,6 +53,8 @@ Execution exceptions are returned to the model as actionable tool errors (for ex
 - A script may call only tools enabled in the current request; `javascript:execute` cannot call itself recursively.
 - Parent cancellation cancels the guest context and in-flight bridge calls.
 - Workspace writes count toward the request tool-call budget and are bounded per file and cumulatively for the execution. These output limits do not cap JavaScript source length.
+- The Oracle GraalVM isolate path applies hard isolate and retained guest-heap limits. Supported runtimes without the isolate image use Graal's constrained host-access policy plus the same bounded result traversal; no host filesystem or application classes are exposed.
+- Nested registry calls are always awaited; asynchronous scheduling is rejected so permits remain held until side effects finish.
 - Syntax, runtime, access, tool, timeout, cancellation, and limit failures are returned as compact safe categories without stack traces or internal paths.
 
 ## Code Entry Points

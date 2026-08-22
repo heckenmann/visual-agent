@@ -22,6 +22,23 @@ dependencies {
     implementation(libs.serialization.json)
     implementation(libs.graal.polyglot)
     implementation(libs.graal.js)
+    val platformIsolate =
+        when {
+            System.getProperty("os.name").contains("linux", ignoreCase = true) &&
+                System.getProperty("os.arch").lowercase() in setOf("amd64", "x86_64") -> "linux-amd64"
+            System.getProperty("os.name").contains("linux", ignoreCase = true) &&
+                System.getProperty("os.arch").lowercase() in setOf("aarch64", "arm64") -> "linux-aarch64"
+            System.getProperty("os.name").contains("mac", ignoreCase = true) &&
+                System.getProperty("os.arch").lowercase() in setOf("amd64", "x86_64") -> "darwin-amd64"
+            System.getProperty("os.name").contains("mac", ignoreCase = true) &&
+                System.getProperty("os.arch").lowercase() in setOf("aarch64", "arm64") -> "darwin-aarch64"
+            System.getProperty("os.name").contains("windows", ignoreCase = true) &&
+                System.getProperty("os.arch").lowercase() in setOf("amd64", "x86_64") -> "windows-amd64"
+            else -> null
+        }
+    platformIsolate?.let { classifier ->
+        runtimeOnly("org.graalvm.polyglot:js-isolate-$classifier:${libs.versions.graaljs.get()}")
+    }
     compileOnly(platform(libs.spring.boot.bom))
     compileOnly(libs.spring.context)
 

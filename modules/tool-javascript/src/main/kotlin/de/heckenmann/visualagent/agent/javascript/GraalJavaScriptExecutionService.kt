@@ -3,8 +3,6 @@ package de.heckenmann.visualagent.agent.javascript
 import de.heckenmann.visualagent.agent.CancellationToken
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import org.graalvm.polyglot.Context
-import org.graalvm.polyglot.HostAccess
-import org.graalvm.polyglot.PolyglotAccess
 import org.graalvm.polyglot.PolyglotException
 import org.graalvm.polyglot.Value
 import org.graalvm.polyglot.proxy.ProxyExecutable
@@ -20,6 +18,7 @@ class GraalJavaScriptExecutionService(
     private val workspaceWriter: JavaScriptWorkspaceWriter,
 ) : AutoCloseable {
     private val executor = Executors.newCachedThreadPool()
+    private val contextFactory = JavaScriptContextFactory()
 
     /** Execute one script and return only its final value plus bounded diagnostics. */
     fun execute(request: JavaScriptExecutionRequest): JavaScriptExecutionResult {
@@ -93,17 +92,13 @@ class GraalJavaScriptExecutionService(
                 limits = request.limits,
                 logs = logs,
             )
-        val context = newContext(bridge)
+        val context = contextFactory.create(bridge, request.limits)
         contextReference.set(context)
         return try {
             val source = "(async function() {\n${request.source}\n})()"
             val value = context.eval("js", source)
             val result = awaitResult(value, token, bridge)
-            val converted = convertFinalValue(result)
-            val encodedLength = converted?.toString()?.length ?: 4
-            if (encodedLength > request.limits.maxResultCharacters) {
-                throw JavaScriptExecutionException(JavaScriptErrorCategory.LIMIT_EXCEEDED, "JavaScript result size limit exceeded")
-            }
+            val converted = convertFinalValue(result, JavaScriptResultBudget(request.limits.maxResultCharacters))
             JavaScriptExecutionResult(converted, logs.toList())
         } catch (error: JavaScriptExecutionException) {
             throw error
@@ -114,25 +109,6 @@ class GraalJavaScriptExecutionService(
             contextReference.set(null)
         }
     }
-
-    @Suppress("DEPRECATION")
-    private fun newContext(bridge: JavaScriptToolBridge): Context =
-        Context
-            .newBuilder("js")
-            .allowHostAccess(HostAccess.NONE)
-            .allowHostClassLookup { false }
-            .allowHostClassLoading(false)
-            .allowIO(false)
-            .allowCreateThread(false)
-            .allowNativeAccess(false)
-            .allowPolyglotAccess(PolyglotAccess.NONE)
-            .option("js.ecmascript-version", "2023")
-            .build()
-            .also { context ->
-                context.getBindings("js").putMember("tools", bridge.toolsObject())
-                context.getBindings("js").putMember("workspace", bridge.workspaceObject())
-                context.getBindings("js").putMember("console", bridge.consoleObject())
-            }
 
     private fun awaitResult(
         value: Value,
@@ -181,13 +157,34 @@ class GraalJavaScriptExecutionService(
         return holder[0] ?: throw JavaScriptExecutionException(JavaScriptErrorCategory.RUNTIME, "JavaScript returned no result")
     }
 
-    private fun convertFinalValue(value: Value): Any? {
+    private fun convertFinalValue(
+        value: Value,
+        budget: JavaScriptResultBudget,
+    ): Any? {
         if (value.isNull) return null
-        if (value.isBoolean) return value.asBoolean()
-        if (value.isNumber) return value.asDouble()
-        if (value.isString) return value.asString()
-        if (value.hasArrayElements()) return (0 until value.arraySize.toInt()).map { convertFinalValue(value.getArrayElement(it.toLong())) }
-        if (value.hasMembers()) return value.memberKeys.associateWith { key -> convertFinalValue(value.getMember(key)) }
+        if (value.isBoolean) return value.asBoolean().also { budget.consume(it.toString().length) }
+        if (value.isNumber) return value.asDouble().also { budget.consume(it.toString().length) }
+        if (value.isString) return value.asString().also { budget.consume(it.length) }
+        if (value.hasArrayElements()) {
+            val arraySize = value.arraySize
+            if (arraySize > budget.remainingElements().toLong()) {
+                throw JavaScriptExecutionException(JavaScriptErrorCategory.LIMIT_EXCEEDED, "JavaScript result size limit exceeded")
+            }
+            val result = ArrayList<Any?>(arraySize.toInt())
+            repeat(arraySize.toInt()) { index ->
+                budget.consume(1)
+                result += convertFinalValue(value.getArrayElement(index.toLong()), budget)
+            }
+            return result
+        }
+        if (value.hasMembers()) {
+            val result = LinkedHashMap<String, Any?>()
+            value.memberKeys.forEach { key ->
+                budget.consume(key.length + 3)
+                result[key] = convertFinalValue(value.getMember(key), budget)
+            }
+            return result
+        }
         throw JavaScriptExecutionException(JavaScriptErrorCategory.RUNTIME, "JavaScript returned an unsupported value")
     }
 
@@ -200,6 +197,12 @@ class GraalJavaScriptExecutionService(
         }
         if (request.limits.timeoutMillis <= 0 || request.limits.maxToolCalls <= 0 || request.limits.maxConcurrentToolCalls <= 0) {
             throw JavaScriptExecutionException(JavaScriptErrorCategory.INTERNAL, "Invalid JavaScript execution limits")
+        }
+        if (request.limits.maxGuestHeapBytes <= 0 || request.limits.maxIsolateMemoryBytes < request.limits.maxGuestHeapBytes) {
+            throw JavaScriptExecutionException(JavaScriptErrorCategory.INTERNAL, "Invalid JavaScript memory limits")
+        }
+        if (request.limits.maxResultCharacters <= 0) {
+            throw JavaScriptExecutionException(JavaScriptErrorCategory.INTERNAL, "Invalid JavaScript result limits")
         }
     }
 
@@ -231,6 +234,9 @@ class GraalJavaScriptExecutionService(
         error: PolyglotException,
         bridge: JavaScriptToolBridge? = null,
     ): JavaScriptExecutionException {
+        if (error.isResourceExhausted) {
+            return JavaScriptExecutionException(JavaScriptErrorCategory.LIMIT_EXCEEDED, "JavaScript resource limit exceeded")
+        }
         if (error.isHostException) {
             val host = runCatching { error.asHostException() }.getOrNull()
             if (host is JavaScriptExecutionException) return host

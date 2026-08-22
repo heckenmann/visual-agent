@@ -182,9 +182,9 @@ GraalJS context for every request. The context exposes only request-scoped
 `tools.call`, `tools.list`, `tools.describe`, a hardened `workspace.write/read/delete`
 file API, and bounded simulated console methods. Calls are delegated through the existing `ToolRegistry`, preserving
 the normal allowlist, lifecycle events, cancellation, and tool safeguards.
-The context denies host classes, host objects, IO, native access, process
+The context denies host classes, arbitrary host objects, IO, native access, process
 creation, networking, and polyglot access. Result, timeout, tool-call,
-concurrency, logging, and recursion limits are enforced before the final
+concurrency, logging, guest-memory (on isolate-capable Graal runtimes), and recursion limits are enforced before the final
 return value is sent to the model; script source length is not capped.
 Intermediate tool responses stay inside the guest runtime. The tool may load a
 workspace-relative JavaScript file through the hardened workspace boundary and execute

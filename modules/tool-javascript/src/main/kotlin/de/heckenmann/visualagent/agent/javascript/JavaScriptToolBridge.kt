@@ -128,6 +128,9 @@ internal class JavaScriptToolBridge(
         val input =
             arguments.getOrNull(1)?.let(::toJsonObject)
                 ?: throw failure(JavaScriptErrorCategory.TOOL_ARGUMENTS, "Tool arguments must be an object")
+        if ((input["async"] as? JsonPrimitive)?.content?.toBoolean() == true) {
+            throw failure(JavaScriptErrorCategory.TOOL_ARGUMENTS, "Nested JavaScript tool calls must be awaited")
+        }
         consumeCall()
         if (!permits.tryAcquire()) throw failure(JavaScriptErrorCategory.LIMIT_EXCEEDED, "Concurrent JavaScript tool-call limit exceeded")
         return try {
