@@ -2,6 +2,7 @@ package de.heckenmann.visualagent.knowledge
 
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoStatus
+import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -17,7 +18,10 @@ internal class DeletedTodoArchive(
 
     /** Lists snapshots newest-first for conversation reconstruction. */
     @Transactional(readOnly = true)
-    fun list(): List<Todo> = repository.findAllByOrderByUpdatedAtDescIdDesc().map(DeletedTodoEntity::toDomain)
+    fun list(limit: Int = 100): List<Todo> =
+        repository
+            .findAllByOrderByUpdatedAtDescIdDesc(PageRequest.of(0, limit.coerceIn(1, 100)))
+            .map(DeletedTodoEntity::toDomain)
 
     /** Removes all snapshots as part of clearing the todo store. */
     fun clear() {

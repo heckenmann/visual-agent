@@ -189,10 +189,13 @@ internal class JpaTodoStore(
     override fun deleteTodo(todoId: String) = repository.deleteById(todoId)
 
     @Transactional
-    override fun deleteTodoAndArchive(todo: Todo) = deletedArchive.archive(todo)
+    override fun deleteTodoAndArchive(todo: Todo) {
+        deletedArchive.archive(todo)
+        repository.deleteById(todo.id)
+    }
 
     @Transactional(readOnly = true)
-    override fun listDeletedTodos(): List<Todo> = deletedArchive.list()
+    override fun listDeletedTodos(limit: Int): List<Todo> = deletedArchive.list(limit)
 
     @Transactional
     override fun clearTodos() {

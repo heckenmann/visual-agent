@@ -73,7 +73,7 @@ class TodoManager(
     fun getAll(): List<Todo> = todos.sortedBy { it.position }
 
     /** Returns deleted snapshots retained for conversation reconstruction. */
-    fun getDeletedTodos(): List<Todo> = todoStore.listDeletedTodos()
+    fun getDeletedTodos(limit: Int = 100): List<Todo> = todoStore.listDeletedTodos(limit)
 
     /**
      * Returns todos that are ready to be assigned to an agent, ordered by position.

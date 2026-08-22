@@ -146,6 +146,7 @@ data class SubAgent(
         enabledTools: Set<ToolId> = emptySet(),
         token: CancellationToken? = null,
         onChunk: ((String) -> Unit)? = null,
+        onStreamReset: (() -> Unit)? = null,
     ): String {
         val messages =
             listOf(
@@ -168,12 +169,11 @@ data class SubAgent(
                 Message("user", description),
             )
 
-        val resp = responseForTodo(messages, provider, enabledTools, token, onChunk)
+        val resp = responseForTodo(messages, provider, enabledTools, token, onChunk, onStreamReset)
 
         val summary =
             resp.message.content
                 .trim()
-                .take(1000)
                 .ifBlank { "(No text response; inspect the persisted tool results.)" }
         try {
             val nextSteps = "Review and implement improvements as needed."
@@ -200,6 +200,7 @@ data class SubAgent(
         enabledTools: Set<ToolId>,
         token: CancellationToken?,
         onChunk: ((String) -> Unit)?,
+        onStreamReset: (() -> Unit)?,
     ): ChatResponse {
         if (onChunk == null) return chat(messages, provider, enabledTools, token)
         return try {
@@ -208,6 +209,7 @@ data class SubAgent(
             if (!isStreamingUnavailable(error)) throw error
             logger.info { "Streaming is unavailable for sub-agent $id; using a complete response instead" }
             val fallback = chat(messages, provider, enabledTools, token)
+            onStreamReset?.invoke()
             fallback.message.content
                 .takeIf(String::isNotEmpty)
                 ?.let(onChunk)

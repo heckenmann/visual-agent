@@ -82,6 +82,16 @@ internal class TodoResponseState {
         agentId = null
         text = ""
     }
+
+    /** Restores persisted output when a conversation panel is opened. */
+    fun restore(
+        response: String,
+        restoredAgentId: String? = null,
+    ) {
+        executionId = null
+        agentId = restoredAgentId
+        text = response
+    }
 }
 
 /** Returns a bounded tail of a response for compact cards and list rows. */

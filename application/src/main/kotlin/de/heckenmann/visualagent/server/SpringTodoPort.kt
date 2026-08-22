@@ -11,10 +11,14 @@ import de.heckenmann.visualagent.protocol.TodoChange
 import de.heckenmann.visualagent.protocol.TodoItem
 import de.heckenmann.visualagent.protocol.TodoPort
 import de.heckenmann.visualagent.protocol.TodoProgress
+import de.heckenmann.visualagent.protocol.TodoResponseSnapshot
 import de.heckenmann.visualagent.protocol.TodoState
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoStatus
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.springframework.stereotype.Component
 
 /** Spring adapter that keeps todo persistence and agent execution behind [TodoPort]. */
@@ -25,7 +29,14 @@ class SpringTodoPort(
 ) : TodoPort {
     override fun list(): List<TodoItem> = agentManager.getTodosFromDb().map(Todo::toTodoItem)
 
-    override fun deletedSnapshots(): List<TodoItem> = agentManager.todoManager.getDeletedTodos().map(Todo::toTodoItem)
+    override fun deletedSnapshots(limit: Int): List<TodoItem> = agentManager.todoManager.getDeletedTodos(limit).map(Todo::toTodoItem)
+
+    override fun responseSnapshots(todoIds: Set<String>): List<TodoResponseSnapshot> =
+        todoIds.mapNotNull { todoId ->
+            agentManager.memoryStore.searchMemories("todo:$todoId", limit = 1).firstOrNull()?.let { memory ->
+                TodoResponseSnapshot(todoId = todoId, text = memory.todoResponseText())
+            }
+        }
 
     override fun agents(): List<AgentSummary> = agentManager.getSubAgents().map(SubAgent::toAgentSummary)
 
@@ -111,3 +122,12 @@ private fun TodoState.toTodoStatus(): TodoStatus =
         TodoState.COMPLETED -> TodoStatus.COMPLETED
         TodoState.CANCELLED -> TodoStatus.CANCELLED
     }
+
+private fun de.heckenmann.visualagent.knowledge.Memory.todoResponseText(): String =
+    runCatching {
+        Json
+            .parseToJsonElement(content)
+            .jsonObject["summary"]
+            ?.jsonPrimitive
+            ?.content
+    }.getOrNull()?.takeIf(String::isNotBlank) ?: content

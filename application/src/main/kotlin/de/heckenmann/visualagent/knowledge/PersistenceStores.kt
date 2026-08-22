@@ -191,7 +191,7 @@ interface TodoStore {
     fun deleteTodoAndArchive(todo: Todo) = deleteTodo(todo.id)
 
     /** Returns deleted todo snapshots that may still be shown in conversation history. */
-    fun listDeletedTodos(): List<Todo> = emptyList()
+    fun listDeletedTodos(limit: Int = 100): List<Todo> = emptyList()
 
     /** Deletes every persisted todo. */
     fun clearTodos()

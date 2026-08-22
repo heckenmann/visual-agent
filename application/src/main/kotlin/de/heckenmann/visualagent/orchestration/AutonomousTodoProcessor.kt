@@ -72,6 +72,13 @@ internal suspend fun processTodoWithLLM(
                     java.util.UUID
                         .randomUUID()
                         .toString()
+                todoEventBus.publishProgress(
+                    TodoProgressUpdate(
+                        todoId = todoId,
+                        executionId = executionId,
+                        agentId = agent.id,
+                    ),
+                )
                 executionControl?.awaitExecutionAllowed(agent.id)
                 val result =
                     jobScheduler.run(agent.id) {
@@ -87,6 +94,19 @@ internal suspend fun processTodoWithLLM(
                                     TodoProgressUpdate(
                                         todoId = todoId,
                                         delta = delta,
+                                        executionId = executionId,
+                                        agentId = agent.id,
+                                    ),
+                                )
+                            },
+                            onStreamReset = {
+                                executionId =
+                                    java.util.UUID
+                                        .randomUUID()
+                                        .toString()
+                                todoEventBus.publishProgress(
+                                    TodoProgressUpdate(
+                                        todoId = todoId,
                                         executionId = executionId,
                                         agentId = agent.id,
                                     ),

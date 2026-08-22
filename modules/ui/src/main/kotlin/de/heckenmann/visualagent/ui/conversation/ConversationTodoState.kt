@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 import de.heckenmann.visualagent.protocol.ConversationPort
 import de.heckenmann.visualagent.protocol.TodoItem
 import de.heckenmann.visualagent.protocol.TodoPort
+import de.heckenmann.visualagent.protocol.TodoResponseSnapshot
 import de.heckenmann.visualagent.ui.todo.TodoResponseState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -35,8 +36,14 @@ internal fun rememberConversationTodoState(
     val state = remember(todoPort) { ConversationTodoState() }
     val scope = rememberCoroutineScope()
     LaunchedEffect(todoPort) {
-        state.todos = withContext(Dispatchers.IO) { todoPort.list() }
-        state.deletedSnapshots = withContext(Dispatchers.IO) { todoPort.deletedSnapshots() }.associateBy { it.id }
+        val loadedTodos = withContext(Dispatchers.IO) { todoPort.list() }
+        val loadedDeleted = withContext(Dispatchers.IO) { todoPort.deletedSnapshots() }
+        state.todos = loadedTodos
+        state.deletedSnapshots = loadedDeleted.associateBy { it.id }
+        state.responses =
+            withContext(Dispatchers.IO) {
+                todoPort.responseSnapshots((loadedTodos + loadedDeleted).map { it.id }.toSet())
+            }.associate(TodoResponseSnapshot::toResponseEntry)
     }
     DisposableEffect(todoPort) {
         val todoHandle =
@@ -70,3 +77,6 @@ internal fun rememberConversationTodoState(
     }
     return state
 }
+
+private fun TodoResponseSnapshot.toResponseEntry(): Pair<String, TodoResponseState> =
+    todoId to TodoResponseState().also { it.restore(text, agentId) }

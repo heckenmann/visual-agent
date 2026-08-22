@@ -44,13 +44,23 @@ data class TodoProgress(
     val agentId: String? = null,
 )
 
+/** Persisted assistant output associated with a completed todo execution. */
+data class TodoResponseSnapshot(
+    val todoId: String,
+    val text: String,
+    val agentId: String? = null,
+)
+
 /** Transport-neutral todo operations used by the todo panel. */
 interface TodoPort {
     /** Reads the current persisted todo list. */
     fun list(): List<TodoItem>
 
     /** Reads deleted todo snapshots retained for conversation reconstruction. */
-    fun deletedSnapshots(): List<TodoItem> = emptyList()
+    fun deletedSnapshots(limit: Int = 100): List<TodoItem> = emptyList()
+
+    /** Reads persisted todo output for the supplied todo identifiers. */
+    fun responseSnapshots(todoIds: Set<String>): List<TodoResponseSnapshot> = emptyList()
 
     /** Reads agents available for assignment. */
     fun agents(): List<AgentSummary>
