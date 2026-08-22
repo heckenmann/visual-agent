@@ -47,14 +47,13 @@ internal class AgentTodoTrigger(
                     TodoStatus.COMPLETED ->
                         "was just completed by the sub-agent. " +
                             "Review the result. If the task was done correctly, inform the user. " +
-                            "Do NOT create a new todo for this task. " +
-                            "If the result is incomplete or incorrect but remains the same objective, " +
-                            "update the todo description with better instructions and set it back to PENDING. " +
-                            "If the required work is a different objective, create a new todo instead."
+                            "Do NOT create, update, restart, or reassign this terminal todo during this " +
+                            "automatic review. If the result is incomplete or incorrect, report that to the " +
+                            "user and wait for an explicit retry request."
                     TodoStatus.CANCELLED ->
                         "was cancelled. Inform the user. " +
-                            "If the same objective still needs to be done, update the todo description " +
-                            "and set it back to PENDING. If the required work changed, create a new todo."
+                            "Do NOT create, update, restart, or reassign this terminal todo during this " +
+                            "automatic review. A retry requires an explicit user request."
                     else -> return@launch
                 }
             if (lifecycle.closing) return@launch

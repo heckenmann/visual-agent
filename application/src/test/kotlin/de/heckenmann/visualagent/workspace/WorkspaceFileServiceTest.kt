@@ -13,6 +13,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
 import kotlin.io.path.deleteIfExists
+import kotlin.io.path.exists
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
@@ -49,6 +50,59 @@ class WorkspaceFileServiceTest {
             assertEquals("Alpha", service.resolveManagedPath(renamed.relativePath).readText())
             assertTrue(service.hash(renamed).matches(Regex("[a-f0-9]{64}")))
             assertTrue(service.deleteFile(renamed.id))
+        }
+
+    @Test
+    fun `recording a generated file updates existing metadata instead of inserting a duplicate`() =
+        withDatabasePath(tempDir().resolve("data/visual-agent.db").toString()) { dbPath ->
+            val store = FakeWorkspaceFileStore()
+            val service = WorkspaceFileService(store, dbPath)
+            val events = WorkspaceFileActivityEventBus()
+            val writer = WorkspaceJavaScriptWriter(service, events)
+
+            val first = writer.write("reports/result.md", "old")
+            val second = writer.write("reports/result.md", "new content")
+
+            assertEquals(first.relativePath, second.relativePath)
+            assertEquals(1, service.listFiles().size)
+            assertEquals(first.relativePath, service.listFiles().single().relativePath)
+            assertEquals("new content", service.resolveManagedPath(first.relativePath).readText())
+            assertEquals(11L, service.listFiles().single().sizeBytes)
+            assertEquals(first.mimeType, second.mimeType)
+        }
+
+    @Test
+    fun `javascript writer rejects symlinked ancestor before creating children`() =
+        withDatabasePath(tempDir().resolve("data/visual-agent.db").toString()) { dbPath ->
+            val service = WorkspaceFileService(FakeWorkspaceFileStore(), dbPath)
+            val events = WorkspaceFileActivityEventBus()
+            val writer = WorkspaceJavaScriptWriter(service, events)
+            val outside = tempDir().resolve("outside").also { it.createDirectories() }
+            val link = service.workspaceRoot().resolve("linked")
+            val linkCreated = runCatching { Files.createSymbolicLink(link, outside) }.isSuccess
+            if (!linkCreated) return@withDatabasePath
+
+            assertFailsWith<IllegalArgumentException> {
+                writer.write("linked/new/file.txt", "must stay inside")
+            }
+            assertTrue(!outside.resolve("new").exists())
+        }
+
+    @Test
+    fun `deleting a managed JavaScript file publishes one activity event`() =
+        withDatabasePath(tempDir().resolve("data/visual-agent.db").toString()) { dbPath ->
+            val events = WorkspaceFileActivityEventBus()
+            val messages = mutableListOf<String>()
+            val registration = events.addListener { messages += it.message }
+            val service = WorkspaceFileService(FakeWorkspaceFileStore(), dbPath, activityEvents = events)
+            val writer = WorkspaceJavaScriptWriter(service, events)
+
+            val file = writer.write("reports/result.md", "content")
+            writer.delete(file.relativePath)
+
+            assertEquals(2, messages.size, messages.toString())
+            assertEquals(1, messages.count { it.startsWith("Workspace file deleted") }, messages.toString())
+            registration.close()
         }
 
     @Test

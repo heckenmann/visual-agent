@@ -3,7 +3,7 @@ package de.heckenmann.visualagent.agent.provider
 /**
  * Resolves provider credentials from environment variables without persisting or exposing them.
  */
-internal object ProviderEnvironmentCredentials {
+object ProviderEnvironmentCredentials {
     /**
      * Returns the API key for an OpenAI-compatible profile.
      *

@@ -7,6 +7,7 @@ import de.heckenmann.visualagent.protocol.WorkspaceFile
 import de.heckenmann.visualagent.protocol.WorkspaceFilePort
 import de.heckenmann.visualagent.protocol.WorkspaceSyncResult
 import de.heckenmann.visualagent.workspace.WorkspaceDownloadService
+import de.heckenmann.visualagent.workspace.WorkspaceFileActivityEventBus
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
 import org.springframework.stereotype.Component
 
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Component
 class SpringWorkspaceFilePort(
     private val workspaceFileService: WorkspaceFileService,
     private val workspaceDownloadService: WorkspaceDownloadService,
+    private val workspaceActivityEvents: WorkspaceFileActivityEventBus,
 ) : WorkspaceFilePort {
     override fun workspaceRoot(): String = protocolBoundary { workspaceFileService.workspaceRoot().toString() }
 
@@ -81,7 +83,7 @@ class SpringWorkspaceFilePort(
             workspaceFileService.resolveManagedPath(relativePath).toFile().readBytes()
         }
 
-    override fun addListener(listener: () -> Unit): AutoCloseable = AutoCloseable {}
+    override fun addListener(listener: () -> Unit): AutoCloseable = workspaceActivityEvents.addListener { listener() }
 }
 
 private fun WorkspaceFileRecord.toProtocol(): WorkspaceFile =

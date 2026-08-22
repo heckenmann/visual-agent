@@ -25,11 +25,13 @@ Desktop user.
 8. The user drags any rail button vertically to reorder panels; the dragged button shows a smooth preview, the other buttons animate out of the way, and the workspace row animates to the same order on release.
 9. The user drags any workspace panel header horizontally to reorder the row; the rail buttons animate to the same order on release.
 10. The user can hide a panel from either the left rail or the panel header close icon button.
-11. When the combined panel widths exceed the viewport, the user can scroll horizontally with a horizontal mouse wheel, the on-screen scroll arrows, or the horizontal scrollbar.
-12. Scrollable panel bodies use a shared vertical scrollbar in the common panel chrome; the canvas remains free of a generic vertical scrollbar because it has direct surface interactions.
-13. Panel cards use consistent spacing, rounded chrome, subtle borders, and compact headers.
-14. Both the rail and the workspace row call the same reorder callback so the user-defined order stays synchronized.
-15. The Compose shell exposes panel order, visibility, and preferred width through the workspace layout service.
+11. Panel width changes interpolate smoothly to the new preferred width instead of jumping to the target size.
+12. Opening or hiding a panel animates its horizontal expansion or collapse and fades the panel content in or out.
+13. When the combined panel widths exceed the viewport, the user can scroll horizontally with a horizontal mouse wheel, the on-screen scroll arrows, or the horizontal scrollbar.
+14. Scrollable panel bodies use a shared vertical scrollbar in the common panel chrome; the canvas remains free of a generic vertical scrollbar because it has direct surface interactions.
+15. Panel cards use consistent spacing, rounded chrome, subtle borders, and compact headers.
+16. Both the rail and the workspace row call the same reorder callback so the user-defined order stays synchronized.
+17. The Compose shell exposes panel order, visibility, and preferred width through the workspace layout service.
 
 ## Result
 
@@ -59,6 +61,8 @@ The user can keep multiple panels visible and ordered for the current task witho
 - Dragging a panel header reorders the user-defined panel order with an animated settle.
 - Dragging a rail button vertically reorders the user-defined panel order with an animated preview and settle.
 - Reordering from either location updates the other view with an animated transition.
+- Opening and hiding panels uses a smooth horizontal expand/collapse and fade transition.
+- Resizing a panel interpolates its rendered width to the persisted preferred width.
 - Panel widths are attached to the panel identity, not to its position; reordering does not change panel widths.
 - Dragging a resizer on any panel's right edge, including the rightmost panel, changes only that panel's width and shifts all panels to the right instead of shrinking a neighbour; the resizer shows a visible three-bar grip.
 - Panel width changes can be made through a slider reachable from the rail button context menu.

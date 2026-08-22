@@ -7,6 +7,7 @@ import de.heckenmann.visualagent.knowledge.SubAgentConfigStore
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoStatus
 import org.junit.jupiter.api.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class MainSystemPromptComposerTest {
@@ -31,6 +32,32 @@ class MainSystemPromptComposerTest {
         assertTrue("search" in prompt)
         assertTrue("canvas" in prompt)
         assertTrue("history" in prompt)
+    }
+
+    @Test
+    fun `prompt guides javascript for complex logic and large textual output`() {
+        val prompt = MainSystemPromptComposer.compose(emptyTodos, null, toolConfigService)
+
+        assertTrue("complex deterministic logic" in prompt)
+        assertTrue("CSV exports" in prompt)
+        assertTrue("Markdown tables" in prompt)
+        assertTrue("actionable feedback" in prompt)
+        assertTrue("correct the source or arguments" in prompt)
+        assertTrue("do not repeat an unchanged failing script" in prompt)
+        assertTrue("workspace.write" in prompt)
+        assertTrue("workspace.read" in prompt)
+        assertTrue("workspace.delete" in prompt)
+    }
+
+    @Test
+    fun `prompt omits javascript guidance when the tool is disabled`() {
+        val store =
+            MapSubAgentConfigStore().also {
+                it.setPreference("tools.disabled.global", "javascript:execute")
+            }
+        val prompt = MainSystemPromptComposer.compose(emptyTodos, null, AgentToolConfigService(store))
+
+        assertFalse("## JavaScript Orchestration" in prompt)
     }
 
     @Test

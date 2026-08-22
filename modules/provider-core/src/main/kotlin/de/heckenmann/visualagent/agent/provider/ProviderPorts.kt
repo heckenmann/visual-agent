@@ -45,7 +45,8 @@ interface ProviderRuntimeConfig {
     fun normalizedProvider(): String
 }
 
-internal class DefaultProviderRuntimeConfig : ProviderRuntimeConfig {
+/** Default runtime configuration used when no application-backed configuration is available. */
+class DefaultProviderRuntimeConfig : ProviderRuntimeConfig {
     override var llmProvider = "ollama"
     override var ollamaLocalUrl = "http://localhost:11434"
     override var ollamaModel = ""

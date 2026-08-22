@@ -1,8 +1,9 @@
 package de.heckenmann.visualagent.agent.codex
 
-import de.heckenmann.visualagent.agent.ConfiguredLLMProvider
+import de.heckenmann.visualagent.agent.provider.ProfiledProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
+import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -21,16 +22,18 @@ internal class CodexModelCatalogInitializerTest {
     fun `loads the active codex catalog after startup`() =
         runTest {
             val catalog = mockk<ProviderCatalogService>()
-            val provider = mockk<ConfiguredLLMProvider>()
+            val provider = mockk<ProfiledProviderAdapter>()
             every { catalog.activeProviderId() } returns PROVIDER_ID
             every { catalog.getProvider(PROVIDER_ID) } returns codexProfile()
-            coEvery { provider.getModels(PROVIDER_ID) } returns listOf("live-model")
+            every { catalog.updateDiscoveredModelConfigs(PROVIDER_ID, any()) } returns Unit
+            every { provider.adapter } returns ProviderAdapter.CODEX_CLI
+            coEvery { provider.loadModels(any()) } returns listOf(ProviderModelConfig(id = "live-model"))
 
-            CodexModelCatalogInitializer(catalog, provider, this, StandardTestDispatcher(testScheduler))
+            CodexModelCatalogInitializer(catalog, listOf(provider), this, StandardTestDispatcher(testScheduler))
                 .initializeActiveCodexCatalog()
             advanceUntilIdle()
 
-            coVerify(exactly = 1) { provider.getModels(PROVIDER_ID) }
+            coVerify(exactly = 1) { provider.loadModels(any()) }
         }
 
     private fun codexProfile(): ProviderProfile =

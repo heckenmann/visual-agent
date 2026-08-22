@@ -170,7 +170,8 @@ class CodexCliProvider internal constructor(
         model: String,
     ) = toolCallbacks.functionCallbacks(
         request.enabledTools,
-        request.metadata + mapOf("model" to model, "provider" to "codex"),
+        request.metadata + mapOf("model" to model, "provider" to "codex") +
+            (request.cancellationToken?.let { mapOf("cancellationToken" to it) } ?: emptyMap()),
     )
 }
 

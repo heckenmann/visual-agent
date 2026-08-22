@@ -59,7 +59,8 @@ class OpenAiClient(
                             request.cancellationToken,
                             toolRegistry.functionCallbacks(
                                 request.enabledTools,
-                                request.metadata + mapOf("model" to selectedModel, "provider" to "openai"),
+                                request.metadata + mapOf("model" to selectedModel, "provider" to "openai") +
+                                    (request.cancellationToken?.let { mapOf("cancellationToken" to it) } ?: emptyMap()),
                             ),
                         )
                 }
@@ -79,7 +80,8 @@ class OpenAiClient(
             } else {
                 toolRegistry.functionCallbacks(
                     request.enabledTools,
-                    request.metadata + mapOf("model" to selectedModel, "provider" to "openai"),
+                    request.metadata + mapOf("model" to selectedModel, "provider" to "openai") +
+                        (request.cancellationToken?.let { mapOf("cancellationToken" to it) } ?: emptyMap()),
                 )
             }
         return flow {
