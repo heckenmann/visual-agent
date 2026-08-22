@@ -57,7 +57,7 @@ class ComposeTodoPanelProtocolTest {
     }
 
     @Test
-    fun `progress listener renders transient response only for active todo`() {
+    fun `progress listener keeps the latest response available after completion`() {
         var progressListener: ((TodoProgress) -> Unit)? = null
         val port = protocolPort(listOf(TodoItem("todo", "Streaming task", TodoState.IN_PROGRESS)))
         every { port.addProgressListener(any()) } answers {
@@ -68,11 +68,13 @@ class ComposeTodoPanelProtocolTest {
 
         composeTestRule.waitForIdle()
         progressListener!!.invoke(TodoProgress("todo", "New response"))
+        composeTestRule.mainClock.advanceTimeBy(250)
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("New response").assertExists()
+        composeTestRule.onNodeWithContentDescription("Todo working").assertExists()
         progressListener!!.invoke(TodoProgress("todo", completed = true))
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithText("New response").assertDoesNotExist()
+        composeTestRule.onNodeWithText("New response").assertExists()
     }
 
     @Test

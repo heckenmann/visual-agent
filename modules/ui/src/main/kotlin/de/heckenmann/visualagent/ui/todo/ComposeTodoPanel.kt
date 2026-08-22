@@ -66,7 +66,7 @@ internal fun TodoPanel(
     lifecycle: LifecyclePort,
 ) {
     var todos by remember { mutableStateOf<List<TodoItem>>(emptyList()) }
-    var streamedResponses by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var responseStates by remember { mutableStateOf<Map<String, TodoResponseState>>(emptyMap()) }
     val scope = rememberCoroutineScope()
 
     /** Loads persisted todos without blocking the Compose dispatcher. */
@@ -94,8 +94,9 @@ internal fun TodoPanel(
                 scope.launch {
                     refreshTodos()
                     val todo = change.todo
-                    if (todo != null && todo.status != TodoState.IN_PROGRESS) {
-                        streamedResponses = streamedResponses - todo.id
+                    if (todo == null) {
+                        val removedId = change.todoId ?: return@launch
+                        responseStates = responseStates - removedId
                     }
                 }
             }
@@ -103,16 +104,9 @@ internal fun TodoPanel(
             todoPort.addProgressListener { update ->
                 if (lifecycle.closing) return@addProgressListener
                 scope.launch {
-                    streamedResponses =
-                        if (update.completed) {
-                            streamedResponses - update.todoId
-                        } else {
-                            streamedResponses +
-                                (
-                                    update.todoId to
-                                        streamedResponses[update.todoId].orEmpty() + update.delta
-                                )
-                        }
+                    val state = responseStates[update.todoId] ?: TodoResponseState()
+                    state.apply(update.executionId, update.agentId, update.delta, update.completed)
+                    responseStates = responseStates + (update.todoId to state)
                 }
             }
         onDispose {
@@ -194,7 +188,7 @@ internal fun TodoPanel(
                 todo = todo,
                 isNext = todo.id == nextTodoId,
                 isDragging = isDragging,
-                streamedResponse = streamedResponses[todo.id].orEmpty(),
+                responseState = responseStates[todo.id] ?: remember(todo.id) { TodoResponseState() },
                 todoPort = todoPort,
                 modalRequester = modalRequester,
                 refresh = refresh,

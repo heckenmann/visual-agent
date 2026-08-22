@@ -10,6 +10,7 @@ data class ConversationMessage(
     val metadata: String? = null,
     val images: List<String>? = null,
     val id: String? = null,
+    val createdAtEpochMillis: Long? = null,
 )
 
 /** Page of persisted conversation messages returned by the server. */

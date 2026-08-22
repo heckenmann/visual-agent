@@ -137,6 +137,7 @@ private fun Message.toConversationMessage(mediaResolver: ConversationMediaResolv
                 .mapNotNull { image -> mediaResolver.resolveEmbedded(image).asDataUrl() }
                 .takeIf { it.isNotEmpty() },
         id = id,
+        createdAtEpochMillis = createdAtEpochMillis,
     )
 
 private fun metadataImageDataUrls(metadata: String?): List<String> {

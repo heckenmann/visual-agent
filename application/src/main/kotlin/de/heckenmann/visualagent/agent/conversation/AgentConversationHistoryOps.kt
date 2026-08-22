@@ -9,6 +9,7 @@ import de.heckenmann.visualagent.knowledge.ConversationRecord
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.time.Instant
 
 /**
  * Owns persisted conversation history, paging, tool records, and interrupted-run recovery.
@@ -205,6 +206,7 @@ internal class AgentConversationHistoryOps(
     }
 
     internal fun persist(message: Message) {
+        val createdAt = Instant.now().toEpochMilli()
         val id =
             owner.conversationStore.saveConversationMessage(
                 AgentManager.MAIN_SESSION_ID,
@@ -212,11 +214,19 @@ internal class AgentConversationHistoryOps(
                 message.content,
                 message.metadata,
             )
-        owner.conversationHistory.add(message.copy(id = id))
+        owner.conversationHistory.add(message.copy(id = id, createdAtEpochMillis = createdAt))
     }
 
     private fun toMessage(row: ConversationRecord): Message? =
         row
             .takeIf { it.role.isNotBlank() && it.content.isNotBlank() }
-            ?.let { Message(it.role, it.content, it.metadata?.ifBlank { null }, id = it.id) }
+            ?.let {
+                Message(
+                    role = it.role,
+                    content = it.content,
+                    metadata = it.metadata?.ifBlank { null },
+                    id = it.id,
+                    createdAtEpochMillis = it.createdAt.toEpochMilli(),
+                )
+            }
 }

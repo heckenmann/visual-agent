@@ -15,7 +15,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -48,10 +47,8 @@ import de.heckenmann.visualagent.ui.settings.*
 import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 internal typealias ConversationScrollStateObserver = (ConversationUiState, LazyListState) -> Unit
 
@@ -84,6 +81,7 @@ internal fun ConversationPanel(
     val preferences = remember(conversationPort) { conversationPort.preferences() }
     var inputPlacement by remember { mutableStateOf(preferences.inputPlacement) }
     val streamingContent by conversationState.streaming.collectAsState()
+    val todoState = rememberConversationTodoState(todoPort, conversationPort, conversationState)
     val queue = remember { MessageQueue() }
     LaunchedEffect(preferences.queueFlushMode) {
         queue.flushMode =
@@ -107,6 +105,9 @@ internal fun ConversationPanel(
                     conversationState.hasMoreHistory,
                 ),
             includeInlineComposer = inputIsConversationMessage,
+            todos = todoState.todos,
+            deletedTodoSnapshots = todoState.deletedSnapshots,
+            todoResponses = todoState.responses,
         )
     ConversationHistoryPagingEffect(
         state = conversationState,
@@ -114,18 +115,6 @@ internal fun ConversationPanel(
         gateway = conversationGateway,
     )
     ConversationActivityHistoryEffect(activityPort, conversationPort, conversationState)
-    DisposableEffect(todoPort) {
-        val handle =
-            todoPort.addListener {
-                scope.launch {
-                    if (!conversationState.sending) {
-                        val history = withContext(Dispatchers.IO) { conversationPort.currentHistory() }
-                        conversationState.replaceHistory(history)
-                    }
-                }
-            }
-        onDispose { handle.close() }
-    }
     val sendContent: (String) -> Unit = { rawContent ->
         val content = rawContent.trim()
         if (content.isNotBlank()) {
@@ -174,7 +163,11 @@ internal fun ConversationPanel(
         isAtLatest,
     )
     val hasConversationContent =
-        conversationState.history.isNotEmpty() || conversationState.pendingUserMessage != null || streamingContent.isNotEmpty()
+        conversationState.history.isNotEmpty() ||
+            todoState.todos.isNotEmpty() ||
+            todoState.deletedSnapshots.isNotEmpty() ||
+            conversationState.pendingUserMessage != null ||
+            streamingContent.isNotEmpty()
     ConversationResizeScrollEffect(viewportSize, hasConversationContent, listState, isAtLatest)
     ConversationQueueFlushEffect(
         sending = conversationState.sending,
@@ -227,6 +220,7 @@ internal fun ConversationPanel(
                         onStatusChange = { conversationState.status = it },
                         onEditMessage = { conversationState.editingId = it },
                         sendContent = sendContent,
+                        onOpenTodoResponse = { todo, responseState -> modalRequester.requestTodoResponse(todo, responseState) },
                         inlineComposer = {
                             ConversationInputCard(
                                 input = conversationState.input,
