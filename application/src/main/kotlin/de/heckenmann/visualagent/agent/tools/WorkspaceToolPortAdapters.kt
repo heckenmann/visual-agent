@@ -21,6 +21,7 @@ import de.heckenmann.visualagent.workspace.WorkspaceDownloadService
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
 import de.heckenmann.visualagent.workspace.layout.WorkspaceLayoutService
 import de.heckenmann.visualagent.workspace.layout.WorkspaceWindowState
+import de.heckenmann.visualagent.workspace.searchFiles
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -44,8 +45,11 @@ class WorkspaceFileToolPortAdapter(
         name: String,
     ): String = files.createDirectory(parentDirectory, name)
 
-    override fun search(query: String): ToolWorkspaceSearch =
-        files.searchFiles(query).let { result ->
+    override fun search(
+        query: String,
+        mimeType: String?,
+    ): ToolWorkspaceSearch =
+        files.searchFiles(query, mimeType).let { result ->
             ToolWorkspaceSearch(result.query, result.matches.map { ToolWorkspaceMatch(it.matchType, it.snippet, toToolFile(it.record)) })
         }
 

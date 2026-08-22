@@ -124,7 +124,7 @@ class WorkspaceFileTool(
         require(entryType != "directory" || mimeType == null) {
             "mimeType cannot be combined with entryType directory"
         }
-        val result = workspaceFiles.search(query)
+        val result = workspaceFiles.search(query, mimeType)
         val directories =
             workspaceFiles
                 .listDirectories()
@@ -139,18 +139,16 @@ class WorkspaceFileTool(
                     "matches",
                     buildJsonArray {
                         if (entryType != "directory") {
-                            result.matches
-                                .filter { mimeType == null || it.file.mimeType.equals(mimeType, ignoreCase = true) }
-                                .forEach { match ->
-                                    add(
-                                        buildJsonObject {
-                                            put("entryType", "file")
-                                            put("matchType", match.matchType)
-                                            put("snippet", match.snippet)
-                                            put("file", recordJson(match.file))
-                                        },
-                                    )
-                                }
+                            result.matches.forEach { match ->
+                                add(
+                                    buildJsonObject {
+                                        put("entryType", "file")
+                                        put("matchType", match.matchType)
+                                        put("snippet", match.snippet)
+                                        put("file", recordJson(match.file))
+                                    },
+                                )
+                            }
                         }
                         if (entryType != "file") {
                             directories.forEach { directory ->

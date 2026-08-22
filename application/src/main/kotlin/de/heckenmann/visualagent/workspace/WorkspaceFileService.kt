@@ -177,23 +177,6 @@ class WorkspaceFileService(
     fun listFiles(): List<WorkspaceFileRecord> = store.listWorkspaceFiles()
 
     /**
-     * Searches workspace metadata and bounded text/PDF content.
-     *
-     * @param query Case-insensitive query
-     * @return Matching records with compact match descriptions
-     * @see docs/usecases/uc_0000025_search_workspace_files.md
-     */
-    fun searchFiles(query: String): WorkspaceSearchResult {
-        val normalized = query.trim().lowercase()
-        require(normalized.isNotBlank()) { "Search query must not be blank" }
-        val matches =
-            listFiles()
-                .mapNotNull { record -> searchRecord(record, normalized) }
-                .take(MAX_SEARCH_RESULTS)
-        return WorkspaceSearchResult(query = query, matches = matches)
-    }
-
-    /**
      * Reconciles filesystem content below the managed workspace with persisted metadata.
      *
      * Use cases: UC-0000026.
@@ -400,10 +383,6 @@ class WorkspaceFileService(
 
     private fun recordActivity(message: String) {
         activityEvents?.publish(WorkspaceFileActivity(message))
-    }
-
-    private companion object {
-        const val MAX_SEARCH_RESULTS = 50
     }
 }
 

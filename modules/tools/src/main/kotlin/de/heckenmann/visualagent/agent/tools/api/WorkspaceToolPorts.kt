@@ -17,7 +17,10 @@ interface WorkspaceFileToolPort {
     ): String
 
     /** Searches managed files. */
-    fun search(query: String): ToolWorkspaceSearch
+    fun search(
+        query: String,
+        mimeType: String? = null,
+    ): ToolWorkspaceSearch
 
     /** Synchronizes persisted metadata. */
     fun sync(): ToolWorkspaceSync

@@ -113,6 +113,20 @@ class WorkspaceFileToolTest {
     }
 
     @Test
+    fun `workspace MIME search limits results after filtering`() {
+        val service = WorkspaceFileService(FakeWorkspaceFileStore(), tempDir().resolve("data/visual-agent.db").toString())
+        repeat(50) { index ->
+            service.createManagedFile("imports", "match-$index.bin", byteArrayOf(1), "application/octet-stream")
+        }
+        val text = service.createManagedFile("imports", "match-text.txt", "content".toByteArray(), "text/plain")
+        val tool = WorkspaceFileTool(service, SingleObjectProvider(FakeVisionProvider()))
+
+        val result = tool.execute("""{"action":"search","query":"match","mimeType":"text/plain"}""")
+
+        assertTrue(result.content.contains(text.relativePath))
+    }
+
+    @Test
     fun `workspace file tool creates an empty directory through the server port`() {
         val port = mockk<de.heckenmann.visualagent.agent.tools.api.WorkspaceFileToolPort>()
         every { port.createDirectory("projects", "demo") } returns "projects/demo"
