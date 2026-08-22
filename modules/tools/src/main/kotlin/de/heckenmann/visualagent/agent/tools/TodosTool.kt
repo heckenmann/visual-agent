@@ -33,7 +33,9 @@ class TodosTool(
                     "assignedAgentId is required and must reference an existing sub-agent.\n" +
                     "- update: {\"action\":\"update\",\"id\":\"...\",\"description\":\"...\"," +
                     "\"assignedAgentId\":\"...\",\"status\":\"PENDING|IN_PROGRESS|COMPLETED|CANCELLED\"}. " +
-                    "All fields except id are optional.\n" +
+                    "All fields except id are optional. Update only when the objective and scope " +
+                    "remain the same; list todos first. For a different task, use add and preserve " +
+                    "the old todo's history.\n" +
                     "- complete: {\"action\":\"complete\",\"id\":\"...\"}. Marks a todo as COMPLETED.\n" +
                     "- cancel: {\"action\":\"cancel\",\"id\":\"...\"}. Marks a todo as CANCELLED.\n" +
                     "- start: {\"action\":\"start\",\"id\":\"...\"}. Starts one pending or cancelled todo.\n" +

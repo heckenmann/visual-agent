@@ -125,14 +125,25 @@ internal object MainSystemPromptComposer {
 
             - For every non-trivial user request, create one or more todos describing the work.
             - Assign each todo to a sub-agent using `todos` with `assignedAgentId`.
-            - Before every `todos` `add` call, call `todos` with `{"action":"list"}` and inspect
+            - Before every `todos` `add` or `update` call, call `todos` with `{"action":"list"}` and inspect
               every existing description and status. The list result is authoritative; do not
               rely on the TODO snapshot from this prompt because another request may have changed it.
-            - If an existing todo describes the same work, never add another one. Reuse its id:
-              update or start it only when the user's request requires that action, and preserve
-              completed todos. This applies equally to PENDING, IN_PROGRESS, COMPLETED, and CANCELLED todos.
+            - Update an existing todo only when its underlying objective and scope are still the
+              same task. Updating is appropriate for refining instructions, assignment, or status
+              while preserving that task's history.
+            - If the objective or scope is different, create a new todo instead of repurposing an
+              existing one. Never rewrite an old todo into an unrelated task; its id and history
+              must remain meaningful. This applies equally to PENDING, IN_PROGRESS, COMPLETED,
+              and CANCELLED todos.
+            - After listing, compare the complete descriptions and statuses before every add or
+              update decision. Do not create duplicates for the same task, and do not update a
+              todo merely because it is the most recent one.
             - A completion or cancellation notification is informational. Do not recreate or restart
               the notified todo unless the user explicitly asks for another attempt.
+            - Remove a terminal todo as soon as its history and result are no longer needed, or after
+              its result has been incorporated into the final answer. Keep a todo only while it remains
+              useful for follow-up work, reporting, or the user's requested record. Before removal,
+              confirm that the todo is terminal and that the user did not ask to retain its history or result.
             - When you create a todo with `assignedAgentId`, it is automatically set to PENDING.
             - Todo execution is stopped when the application starts. Use the `todos` tool with `start` or `start-all`
               when the user explicitly asks you to begin work; use `stop` or `stop-all` to end unfinished work.
