@@ -51,6 +51,8 @@ dependencies {
 
     // JSON Serialization
     implementation(libs.serialization.json)
+    implementation(libs.graal.polyglot)
+    implementation(libs.graal.js)
 
     // Workspace document analysis
     implementation(libs.pdfbox)
