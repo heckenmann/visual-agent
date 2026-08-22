@@ -16,7 +16,8 @@ repositories {
 }
 
 dependencies {
-    implementation(project(":providers"))
+    api(project(":agent-core"))
+    api(project(":provider-core"))
     implementation(libs.kotlin.stdlib)
     implementation(platform(libs.spring.boot.bom))
     implementation(libs.spring.boot.starter)

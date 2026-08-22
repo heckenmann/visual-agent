@@ -28,7 +28,6 @@ dependencies {
     implementation(libs.kotlin.stdlib)
     implementation(libs.kotlin.reflect)
     implementation(project(":providers"))
-    implementation(project(":provider-openai-codex"))
     implementation(project(":tools"))
     implementation(project(":protocol"))
 
@@ -160,7 +159,7 @@ tasks.jacocoTestReport {
                     exclude(jacocoExcludedClasses)
                 }
             },
-            fileTree(project(":tools").layout.buildDirectory.dir("classes/kotlin/main")) {
+            fileTree(project(":tool-standard").layout.buildDirectory.dir("classes/kotlin/main")) {
                 exclude(jacocoExcludedClasses)
             },
         ),
@@ -184,7 +183,7 @@ tasks.jacocoTestCoverageVerification {
                     exclude(jacocoExcludedClasses)
                 }
             },
-            fileTree(project(":tools").layout.buildDirectory.dir("classes/kotlin/main")) {
+            fileTree(project(":tool-standard").layout.buildDirectory.dir("classes/kotlin/main")) {
                 exclude(jacocoExcludedClasses)
             },
         ),

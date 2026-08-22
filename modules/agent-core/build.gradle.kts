@@ -1,7 +1,5 @@
 plugins {
     alias(libs.plugins.kotlin.jvm)
-    alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.kotlin.spring)
     alias(libs.plugins.ktlint)
     jacoco
 }
@@ -13,32 +11,18 @@ version =
 
 repositories {
     mavenCentral()
-    maven { url = uri("https://repo.spring.io/milestone") }
 }
 
 dependencies {
-    api(project(":agent-core"))
-    api(project(":provider-core"))
     implementation(libs.kotlin.stdlib)
-    implementation(platform(libs.spring.ai.bom))
-    implementation(libs.spring.ai.ollama)
-    implementation(libs.spring.ai.openai)
     implementation(libs.coroutines.core)
-    implementation(libs.coroutines.reactor)
-    implementation(libs.serialization.json)
-    implementation(libs.kotlin.logging)
-
     testImplementation(libs.kotlin.test)
     testImplementation(libs.junit.jupiter)
-    testImplementation(libs.mockk)
-    testImplementation(libs.coroutines.test)
 }
 
 tasks.test {
     useJUnitPlatform()
-    filter {
-        isFailOnNoMatchingTests = false
-    }
+    filter { isFailOnNoMatchingTests = false }
     finalizedBy(tasks.jacocoTestReport)
 }
 

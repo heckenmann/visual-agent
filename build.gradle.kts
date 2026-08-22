@@ -20,8 +20,13 @@ tasks.named("check") {
         ":ui:check",
         ":protocol:check",
         ":desktop:check",
+        ":agent-core:check",
+        ":provider-core:check",
+        ":provider-standard:check",
         ":providers:check",
         ":provider-openai-codex:check",
+        ":tool-standard:check",
+        ":tool-javascript:check",
         ":tools:check",
         "verifyCentralizedVersions",
         "verifyModuleDependencies",
@@ -34,19 +39,24 @@ tasks.named("build") {
         ":ui:build",
         ":protocol:build",
         ":desktop:build",
+        ":agent-core:build",
+        ":provider-core:build",
+        ":provider-standard:build",
         ":providers:build",
         ":provider-openai-codex:build",
+        ":tool-standard:build",
+        ":tool-javascript:build",
         ":tools:build",
     )
 }
 
 gradle.projectsEvaluated {
     val moduleMainSourceSets =
-        listOf(":application", ":ui", ":protocol", ":desktop", ":providers", ":provider-openai-codex", ":tools").map { modulePath ->
+        listOf(":application", ":ui", ":protocol", ":desktop", ":agent-core", ":provider-core", ":provider-standard", ":provider-openai-codex", ":providers", ":tool-standard", ":tool-javascript", ":tools").map { modulePath ->
             project(modulePath).extensions.getByType<SourceSetContainer>().getByName("main")
         }
     val moduleTestSourceSets =
-        listOf(":application", ":ui", ":protocol", ":desktop", ":providers", ":provider-openai-codex", ":tools").map { modulePath ->
+        listOf(":application", ":ui", ":protocol", ":desktop", ":agent-core", ":provider-core", ":provider-standard", ":provider-openai-codex", ":providers", ":tool-standard", ":tool-javascript", ":tools").map { modulePath ->
             project(modulePath).extensions.getByType<SourceSetContainer>().getByName("test")
         }
     tasks.named<Test>("test") {
@@ -55,8 +65,13 @@ gradle.projectsEvaluated {
             ":ui:testClasses",
             ":protocol:testClasses",
             ":desktop:testClasses",
+            ":agent-core:testClasses",
+            ":provider-core:testClasses",
+            ":provider-standard:testClasses",
             ":providers:testClasses",
             ":provider-openai-codex:testClasses",
+            ":tool-standard:testClasses",
+            ":tool-javascript:testClasses",
         )
         useJUnitPlatform {
             excludeTags("database", "de.heckenmann.visualagent.testsupport.DatabaseTestCategory")
@@ -147,9 +162,12 @@ tasks.register("ktlintCheck") {
         ":ui:ktlintCheck",
         ":protocol:ktlintCheck",
         ":desktop:ktlintCheck",
-        ":providers:ktlintCheck",
+        ":agent-core:ktlintCheck",
+        ":provider-core:ktlintCheck",
+        ":provider-standard:ktlintCheck",
         ":provider-openai-codex:ktlintCheck",
-        ":tools:ktlintCheck",
+        ":tool-standard:ktlintCheck",
+        ":tool-javascript:ktlintCheck",
     )
 }
 
@@ -162,7 +180,7 @@ tasks.register("verifyModuleDependencies") {
     description = "Verifies the directed dependency graph between Visual Agent modules."
     doLast {
         val moduleDependencies =
-            setOf(":application", ":ui", ":protocol", ":desktop", ":providers", ":provider-openai-codex", ":tools").associateWith { modulePath ->
+            setOf(":application", ":ui", ":protocol", ":desktop", ":agent-core", ":provider-core", ":provider-standard", ":provider-openai-codex", ":providers", ":tool-standard", ":tool-javascript", ":tools").associateWith { modulePath ->
                 project(modulePath)
                     .configurations
                     .filter { configuration -> !configuration.name.contains("test", ignoreCase = true) }
@@ -174,13 +192,18 @@ tasks.register("verifyModuleDependencies") {
             }
         val expectedDependencies =
             mapOf(
-                ":application" to setOf(":providers", ":provider-openai-codex", ":tools", ":protocol"),
+                ":application" to setOf(":providers", ":tools", ":protocol"),
                 ":ui" to setOf(":protocol"),
                 ":protocol" to emptySet(),
                 ":desktop" to setOf(":ui", ":application", ":protocol"),
-                ":providers" to emptySet(),
-                ":provider-openai-codex" to setOf(":providers"),
-                ":tools" to emptySet(),
+                ":agent-core" to emptySet(),
+                ":provider-core" to setOf(":agent-core"),
+                ":provider-standard" to setOf(":agent-core", ":provider-core"),
+                ":provider-openai-codex" to setOf(":agent-core", ":provider-core"),
+                ":providers" to setOf(":provider-standard", ":provider-openai-codex"),
+                ":tool-standard" to emptySet(),
+                ":tool-javascript" to setOf(":agent-core", ":tool-standard"),
+                ":tools" to setOf(":tool-standard", ":tool-javascript"),
             )
         val violations =
             expectedDependencies.flatMap { (modulePath, expected) ->
@@ -225,9 +248,14 @@ tasks.register("verifyCentralizedVersions") {
             "modules/ui/build.gradle.kts",
             "modules/protocol/build.gradle.kts",
             "modules/desktop/build.gradle.kts",
+            "modules/agent-core/build.gradle.kts",
+            "modules/provider-core/build.gradle.kts",
             "modules/providers/build.gradle.kts",
             "modules/provider-openai-codex/build.gradle.kts",
+            "modules/providers-bundle/build.gradle.kts",
             "modules/tools/build.gradle.kts",
+            "modules/tool-javascript/build.gradle.kts",
+            "modules/tools-bundle/build.gradle.kts",
         ).map(rootProject.projectDir::resolve)
     inputs.files(moduleBuildFiles)
     doLast {

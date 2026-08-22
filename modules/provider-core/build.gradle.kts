@@ -17,12 +17,12 @@ repositories {
 }
 
 dependencies {
-    api(project(":agent-core"))
-    api(project(":provider-core"))
+    implementation(project(":agent-core"))
     implementation(libs.kotlin.stdlib)
+    implementation(platform(libs.spring.boot.bom))
     implementation(platform(libs.spring.ai.bom))
-    implementation(libs.spring.ai.ollama)
-    implementation(libs.spring.ai.openai)
+    implementation(libs.spring.ai.model)
+    implementation(libs.spring.context)
     implementation(libs.coroutines.core)
     implementation(libs.coroutines.reactor)
     implementation(libs.serialization.json)
@@ -36,9 +36,7 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
-    filter {
-        isFailOnNoMatchingTests = false
-    }
+    filter { isFailOnNoMatchingTests = false }
     finalizedBy(tasks.jacocoTestReport)
 }
 
