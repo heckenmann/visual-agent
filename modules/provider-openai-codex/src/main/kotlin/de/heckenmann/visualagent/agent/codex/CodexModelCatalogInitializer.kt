@@ -1,6 +1,6 @@
 package de.heckenmann.visualagent.agent.codex
 
-import de.heckenmann.visualagent.agent.ConfiguredLLMProvider
+import de.heckenmann.visualagent.agent.provider.ProfiledProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderErrorMessages
@@ -17,7 +17,7 @@ import java.util.logging.Logger
 @Component
 internal class CodexModelCatalogInitializer(
     private val providerCatalog: ProviderCatalogService,
-    private val llmProvider: ConfiguredLLMProvider,
+    private val profiledAdapters: List<ProfiledProviderAdapter>,
     private val applicationScope: CoroutineScope,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
@@ -25,10 +25,12 @@ internal class CodexModelCatalogInitializer(
     @EventListener(ApplicationReadyEvent::class)
     fun initializeActiveCodexCatalog() {
         val providerId = providerCatalog.activeProviderId()
-        if (providerCatalog.getProvider(providerId)?.adapter != ProviderAdapter.CODEX_CLI) return
+        val profile = providerCatalog.getProvider(providerId)?.takeIf { it.adapter == ProviderAdapter.CODEX_CLI } ?: return
+        val adapter = profiledAdapters.singleOrNull { it.adapter == ProviderAdapter.CODEX_CLI } ?: return
         applicationScope.launch(ioDispatcher) {
-            runCatching { llmProvider.getModels(providerId) }
-                .onFailure { error -> logger.warning(ProviderErrorMessages.userFacing(error)) }
+            runCatching {
+                adapter.loadModels(profile).also { providerCatalog.updateDiscoveredModelConfigs(providerId, it) }
+            }.onFailure { error -> logger.warning(ProviderErrorMessages.userFacing(error)) }
         }
     }
 

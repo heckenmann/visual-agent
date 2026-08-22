@@ -24,6 +24,13 @@ internal class ConversationTodoState {
     var todos: List<TodoItem> by mutableStateOf(emptyList())
     var deletedSnapshots: Map<String, TodoItem> by mutableStateOf(emptyMap())
     var responses: Map<String, TodoResponseState> by mutableStateOf(emptyMap())
+
+    /** Clears the rendered todo state after the server removes all todo records. */
+    fun clear() {
+        todos = emptyList()
+        deletedSnapshots = emptyMap()
+        responses = emptyMap()
+    }
 }
 
 /** Loads todo state and subscribes the Conversation panel to server-owned todo events. */

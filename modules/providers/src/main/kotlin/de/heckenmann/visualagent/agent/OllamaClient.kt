@@ -63,7 +63,8 @@ class OllamaClient(
                                 request.cancellationToken,
                                 toolRegistry.functionCallbacks(
                                     request.enabledTools,
-                                    request.metadata + mapOf("model" to selectedModel),
+                                    request.metadata + mapOf("model" to selectedModel) +
+                                        (request.cancellationToken?.let { mapOf("cancellationToken" to it) } ?: emptyMap()),
                                 ),
                             )
                     } else {
@@ -106,7 +107,8 @@ class OllamaClient(
             } else {
                 toolRegistry.functionCallbacks(
                     request.enabledTools,
-                    request.metadata + mapOf("model" to selectedModel),
+                    request.metadata + mapOf("model" to selectedModel) +
+                        (request.cancellationToken?.let { mapOf("cancellationToken" to it) } ?: emptyMap()),
                 )
             }
         return flow {

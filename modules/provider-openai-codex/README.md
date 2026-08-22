@@ -4,10 +4,12 @@
 
 ## Dependency rule
 
-The module depends only on `:providers` for provider contracts and the profile-aware adapter SPI. It must not depend on `:application`, `:ui`, `:desktop`, `:protocol`, or `:tools`.
+The module depends on `:provider-core` and `:agent-core` for provider contracts and shared
+cancellation. It must not depend on `:application`, `:ui`, `:desktop`, `:protocol`, `:tools`,
+or the `:providers` aggregate.
 
 ```text
-:application -> :provider-openai-codex -> :providers
+:application -> :providers -> :provider-openai-codex -> :provider-core
 ```
 
 ## Commands

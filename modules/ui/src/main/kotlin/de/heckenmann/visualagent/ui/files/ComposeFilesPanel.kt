@@ -99,15 +99,22 @@ internal fun FilesPanel(
     }
     LaunchedEffect(workspaceFileService) { refreshWorkspace() }
     DisposableEffect(workspaceFileService) {
-        val handle =
+        val downloadHandle =
             workspaceFileService.addDownloadListener {
                 refresh()
             }
-        onDispose { handle.close() }
+        val activityHandle =
+            workspaceFileService.addListener {
+                refresh()
+            }
+        onDispose {
+            downloadHandle.close()
+            activityHandle.close()
+        }
     }
     ToolEventRefreshEffect(
         activityPort = activityPort,
-        toolIds = setOf("file:write", "file:edit", "workspace:file"),
+        toolIds = setOf("file:write", "file:edit", "workspace:file", "javascript:execute"),
         onRefresh = refresh,
     )
     val listing = browseWorkspaceFiles(files, currentDirectory, directories)

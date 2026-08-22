@@ -17,6 +17,8 @@ repositories {
 }
 
 dependencies {
+    api(project(":agent-core"))
+    api(project(":provider-core"))
     implementation(libs.kotlin.stdlib)
     implementation(platform(libs.spring.ai.bom))
     implementation(libs.spring.ai.ollama)

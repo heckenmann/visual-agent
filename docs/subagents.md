@@ -64,7 +64,15 @@ agent's `name` or `role` against the default templates:
 - `researcher`: read-only file tools, `history`, `context`, `pwd`,
   `todos`, `manual`, `usecases`, `sleep`, `browser`, `search`,
   `workspace:layout`, `workspace:file`, `workspace:mime`,
-  `workspace:download`, `canvas`.
+`workspace:download`, `canvas`.
+
+Agents with `javascript:execute` enabled may use it for complex deterministic
+multi-tool filtering, aggregation, and large CSV, string, or Markdown assembly.
+The script must call only enabled canonical tools through `await tools.call(...)`,
+may use hardened `workspace.write/read/delete(...)` for workspace-relative text files,
+and return the complete final value; it cannot access the host directly. If the
+execution returns an exception, inspect the actionable category/message, correct
+the source or arguments, and retry without repeating the unchanged failure.
 - `coder`: adds `file:write`, `file:edit`, and `terminal`; raises
   the default `maxTurns` to 8.
 - `analyst`: same as `researcher` minus `browser` and `search`,

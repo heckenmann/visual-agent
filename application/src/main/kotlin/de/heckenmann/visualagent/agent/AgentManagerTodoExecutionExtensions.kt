@@ -11,3 +11,8 @@ fun AgentManager.stopTodo(todoId: String): Boolean = autonomyOps.stopTodo(todoId
 
 /** Stops all pending and in-progress todos and cancels their workers cooperatively. */
 fun AgentManager.stopAllTodos(): Int = autonomyOps.stopAllTodos()
+
+/** Deletes every persisted todo and publishes a single clear event. */
+fun AgentManager.clearTodos() {
+    todoManager.clear()
+}

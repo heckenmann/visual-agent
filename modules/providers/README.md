@@ -1,8 +1,8 @@
-# Providers Module
+# Standard Provider Module
 
-`:providers` owns the provider contracts, the configured-provider router, and the built-in
-Ollama and OpenAI-compatible adapters. Dedicated provider integrations live in their own
-modules, such as `:provider-openai-codex`.
+`:provider-standard` owns the configured-provider router and the built-in Ollama and
+OpenAI-compatible adapters. Shared contracts live in `:provider-core`; the complete provider
+bundle is exposed by `:providers`.
 
 ## Responsibilities
 
@@ -12,11 +12,12 @@ modules, such as `:provider-openai-codex`.
 
 ## Dependency rule
 
-`:providers` is a leaf module. It must not have a Gradle project dependency on `:application`, `:ui`, or any future sibling module.
+`:provider-standard` must not have a Gradle project dependency on `:application`, `:ui`, or
+the provider aggregate.
 
 ```text
-:application -> :provider-openai-codex -> :providers
-:application -> :providers
+:application -> :providers -> :provider-standard -> :provider-core
+                         └── :provider-openai-codex -> :provider-core
 ```
 
 ## Commands
@@ -24,6 +25,6 @@ modules, such as `:provider-openai-codex`.
 Run from the repository root:
 
 ```bash
-./gradlew :providers:build
-./gradlew :providers:test
+./gradlew :provider-standard:build
+./gradlew :provider-standard:test
 ```

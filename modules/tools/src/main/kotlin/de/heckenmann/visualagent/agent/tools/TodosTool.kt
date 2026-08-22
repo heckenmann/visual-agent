@@ -62,6 +62,13 @@ class TodosTool(
                 "Sub-agents may only read todos; lifecycle changes are controlled by the main agent.",
             )
         }
+        if (isAutomaticTerminalReview(context) && action !in SUB_AGENT_READ_ONLY_ACTIONS) {
+            return failure(
+                "todos",
+                "Automatic terminal-todo reviews cannot mutate todos. Report the result; " +
+                    "a new attempt requires an explicit user request.",
+            )
+        }
         return when (action) {
             "list" -> listTodos()
             "count" -> countTodos()
@@ -131,7 +138,7 @@ class TodosTool(
 
     private fun updateTodo(input: JsonObject): ToolResult {
         val id = input.requiredString("id")
-        todos.list().firstOrNull { it.id == id } ?: return failure("todos", "Todo not found")
+        val todo = todos.list().firstOrNull { it.id == id } ?: return failure("todos", "Todo not found")
         val newAssignedAgentId = input.string("assignedAgentId")
         if (newAssignedAgentId != null && !agentExists(newAssignedAgentId)) {
             return failure(
@@ -208,6 +215,9 @@ class TodosTool(
         val summary = extractSummary(result)
         return success("todos", "Result for todo $id:\n$summary")
     }
+
+    private fun isAutomaticTerminalReview(context: Map<String, Any>): Boolean =
+        context["requestId"]?.toString()?.startsWith("todo-trigger-") == true
 
     private fun agentExists(agentId: String): Boolean = todos.agentExists(agentId)
 

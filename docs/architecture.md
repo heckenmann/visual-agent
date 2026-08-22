@@ -154,7 +154,8 @@ the runtime split is:
 
 Main-agent tool set (`agentToolConfigService.mainAgentTools()`):
 `agent:list`, `agent:show`, `agent:create`, `agent:update`, `agent:delete`,
-`agent:log`, `todos`, `workspace:mime`, and `workspace:download`.
+`agent:log`, `todos`, `workspace:file`, `workspace:mime`,
+`workspace:download`, and `javascript:execute`.
 
 Sub-agent role-based sets (`AgentToolConfigService.toolsFor(agent)`,
 default templates `researcher`, `coder`, `analyst`): `todos` plus the
@@ -169,8 +170,28 @@ Common tools: `ui`, `history`, `todos`, `context`, `pwd`, `manual`,
 that returns "not configured"), `search` (placeholder that returns
 "not configured"), `workspace:layout`, `workspace:file`, `workspace:mime`,
 `workspace:download`, `canvas`.
+`javascript:execute` is available to the default role templates for complex
+deterministic multi-tool filtering, aggregation, and large CSV, string, or
+Markdown assembly. Execution errors are returned to the model as compact,
+actionable categories so it can correct the script or arguments.
 
-Managed workspace mutations are performed by server-owned workspace tools. In particular,
+### Sandboxed JavaScript tool execution
+
+`javascript:execute` is implemented in the application server with a fresh
+GraalJS context for every request. The context exposes only request-scoped
+`tools.call`, `tools.list`, `tools.describe`, a hardened `workspace.write/read/delete`
+file API, and bounded simulated console methods. Calls are delegated through the existing `ToolRegistry`, preserving
+the normal allowlist, lifecycle events, cancellation, and tool safeguards.
+The context denies host classes, arbitrary host objects, IO, native access, process
+creation, networking, and polyglot access. Result, timeout, tool-call,
+concurrency, logging, guest-memory (on isolate-capable Graal runtimes), bounded workspace reads, and recursion limits are enforced before the final
+return value is sent to the model; script source length is not capped.
+Intermediate tool responses stay inside the guest runtime. The tool may load a
+workspace-relative JavaScript file through the hardened, byte-bounded workspace boundary and execute
+it in the same sandbox; absolute paths and traversal components are rejected.
+
+Managed workspace mutations are performed by server-owned workspace tools or the hardened
+JavaScript workspace file API. In particular,
 `workspace:file` deletion removes the filesystem entry and its metadata; `deleteDirectory` only
 removes empty directories unless `recursive=true` is explicitly requested. Model runtimes must
 not delete registered workspace files through shell commands.

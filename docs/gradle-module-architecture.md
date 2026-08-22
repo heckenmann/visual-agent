@@ -4,7 +4,7 @@
 
 This document records the incremental Gradle modularisation planned in issues #157, #165, #178, and #65. It establishes dependency directions before source files are relocated.
 
-## Initial module graph
+## Current module graph
 
 ```text
 :desktop
@@ -14,12 +14,28 @@ This document records the incremental Gradle modularisation planned in issues #1
 
 :application
  ├── :protocol
- ├── :providers
- ├── :provider-openai-codex
- └── :tools
+ ├── :providers (provider aggregate)
+ └── :tools (tool aggregate)
+
+:providers
+ ├── :provider-standard
+ └── :provider-openai-codex
+
+:provider-standard
+ ├── :provider-core
+ └── :agent-core
 
 :provider-openai-codex
- └── :providers
+ ├── :provider-core
+ └── :agent-core
+
+:tools
+ ├── :tool-standard
+ └── :tool-javascript
+
+:tool-javascript
+ ├── :tool-standard
+ └── :agent-core
 ```
 
 The filesystem layout mirrors the ownership boundary without changing Gradle project paths:
@@ -29,9 +45,14 @@ application/          # :application, the composition root
 modules/ui/           # :ui, a leaf module
 modules/protocol/     # :protocol, versioned gRPC contract
 modules/desktop/      # :desktop, Compose/server endpoint host
-modules/providers/    # :providers, a leaf module
+modules/agent-core/   # :agent-core, shared cancellation primitives
+modules/provider-core/ # :provider-core, shared provider contracts and catalog
+modules/providers/    # :provider-standard, built-in Ollama/OpenAI-compatible adapters
 modules/provider-openai-codex/ # :provider-openai-codex, OpenAI Codex CLI adapter
-modules/tools/        # :tools, a leaf module
+modules/providers-bundle/ # :providers, provider aggregate
+modules/tools/        # :tool-standard, built-in tools
+modules/tool-javascript/ # :tool-javascript, GraalJS tool
+modules/tools-bundle/ # :tools, tool aggregate
 ```
 
 ## Version management
@@ -52,21 +73,23 @@ desktop startup and endpoint selection, and embeds one non-web application conte
 the same `ApplicationPort` boundary after `ApplicationConnection` reports readiness; the desktop
 host owns Spring startup and converts the server-side adapters into the protocol bundle.
 
-`:providers` owns provider-facing contracts, the configured-provider router, and the built-in Ollama and OpenAI-compatible adapters. Dedicated integrations live in focused provider modules. `:providers` has no Gradle project dependency on `:application`, `:ui`, `:tools`, or any future sibling module. Application-specific configuration, tools, persistence, and request context are supplied through narrow provider contracts implemented by `:application`.
+`:provider-core` owns provider-facing contracts, provider profiles/catalog models, and shared cancellation primitives. It has no dependency on a concrete provider implementation.
 
-`:provider-openai-codex` owns the OpenAI Codex CLI/app-server adapter. It depends only on `:providers`, which supplies provider contracts and the profile-aware adapter SPI. `:application` composes it with the other server-side modules.
+`:provider-standard` owns the configured-provider router and the built-in Ollama and OpenAI-compatible adapters. It depends on `:provider-core` and `:agent-core`.
 
-`:tools` owns provider-neutral tool contracts, registry infrastructure, lifecycle events, parsing helpers, and tool implementations. It has no Gradle project dependency on `:application`, `:ui`, or `:providers`. Application services are supplied through narrow tool-owned ports implemented and composed by `:application`.
+`:provider-openai-codex` owns the OpenAI Codex CLI/app-server adapter. It depends on the provider contracts in `:provider-core`, not on the provider aggregate. The `:providers` aggregate exposes it transitively together with `:provider-standard`.
 
-The `:tools` extraction is tracked by issue #165. Concrete tools are Spring-discovered through the `@AgentTool` stereotype, while Application services are supplied through narrow tool-owned ports implemented and composed by `:application`. The module uses Spring as a compile-only dependency; the consuming Application runtime supplies it.
+`:tool-standard` owns provider-neutral tool contracts, registry infrastructure, lifecycle events, parsing helpers, and the standard tool implementations. It has no Gradle project dependency on `:application`, `:ui`, or providers.
+
+`:tool-javascript` owns the GraalJS sandbox and depends on `:tool-standard` for tool execution. Its hardened workspace contract is implemented by `:application`. The `:tools` aggregate exposes both standard and JavaScript tools transitively.
 
 ## Dependency rules
 
-- `:application` is the server composition root and may depend on `:protocol`, `:providers`, `:provider-openai-codex`, and `:tools`.
+- `:application` is the server composition root and depends on the complete `:providers` and `:tools` aggregates plus `:protocol`.
 - `:desktop` may depend on `:ui`, `:protocol`, and the server bootstrap artifact.
 - `:ui` may depend only on `:protocol`; it must not depend on Spring, `:application`, providers,
   tools, persistence, or application implementation types.
-- `:protocol`, `:providers`, `:provider-openai-codex`, and `:tools` must not depend on `:application` or `:ui`; `:provider-openai-codex` may depend on `:providers`.
+- `:agent-core`, `:provider-core`, `:provider-standard`, `:provider-openai-codex`, `:providers`, `:tool-standard`, `:tool-javascript`, and `:tools` must not depend on `:application` or `:ui`.
 - The dependency graph is strictly one-way from hosts to contracts and implementations.
 - A submodule declares any contract it needs; `:application` supplies the contract implementation and composes the modules.
 - Spring and Compose composition remains in `:application` until a later module owns a complete independent runtime boundary.
@@ -92,9 +115,13 @@ The final initial layout must support:
 
 ```bash
 ./gradlew :ui:build :ui:test
-./gradlew :providers:build :providers:test
+./gradlew :providers:build
+./gradlew :provider-standard:build :provider-standard:test
+./gradlew :provider-core:build :provider-core:test
 ./gradlew :provider-openai-codex:build :provider-openai-codex:test
-./gradlew :tools:build :tools:test
+./gradlew :tools:build
+./gradlew :tool-standard:build :tool-standard:test
+./gradlew :tool-javascript:build :tool-javascript:test
 ./gradlew :application:build :application:test
 ./gradlew :desktop:run
 ./gradlew :application:runServer

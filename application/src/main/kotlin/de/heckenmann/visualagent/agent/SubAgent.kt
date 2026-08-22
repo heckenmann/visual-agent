@@ -164,6 +164,20 @@ data class SubAgent(
                             " Report a concise result and next steps; the orchestrator persists the result " +
                                 "and decides the final status.",
                         )
+                        if (enabledTools.any { it.value == "javascript:execute" }) {
+                            append(
+                                " Use javascript:execute for complex deterministic multi-tool filtering, aggregation, " +
+                                    "or large CSV/Markdown assembly; call only enabled tools through " +
+                                    "await tools.call(name, arguments), use workspace.write({path, content}) " +
+                                    "for generated text that must be persisted, workspace.read({path}) to read " +
+                                    "text, and workspace.delete({path}) to remove a file. Existing JavaScript files " +
+                                    "can be executed by passing their relative path to javascript:execute; " +
+                                    "return the complete final value. " +
+                                    "If execution returns an error, inspect it, correct the source or arguments, " +
+                                    "and retry without repeating the unchanged failure. The sandbox has no direct " +
+                                    "host, filesystem, network, process, or credential access.",
+                            )
+                        }
                     },
                 ),
                 Message("user", description),

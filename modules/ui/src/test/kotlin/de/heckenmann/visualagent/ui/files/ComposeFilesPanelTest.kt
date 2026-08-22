@@ -67,6 +67,7 @@ class ComposeFilesPanelTest {
         every { workspace.workspaceRoot() } returns "/tmp/workspace"
         every { workspace.activeDownloads() } returns emptyList()
         every { workspace.addDownloadListener(any()) } returns AutoCloseable { }
+        every { workspace.addListener(any()) } returns AutoCloseable { }
         val canvas = mockk<CanvasPort>(relaxed = true)
         val activity = mockk<ActivityPort>(relaxed = true)
         composeTestRule.setContent {

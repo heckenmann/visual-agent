@@ -58,8 +58,12 @@ The project uses an acyclic Gradle module graph:
 
 ```text
 :desktop ──► :ui + :application + :protocol
-:application ──► :providers + :provider-openai-codex + :tools + :protocol
-:provider-openai-codex ──► :providers
+:application ──► :providers + :tools + :protocol
+:providers ──► :provider-standard + :provider-openai-codex
+:provider-standard ──► :provider-core + :agent-core
+:provider-openai-codex ──► :provider-core + :agent-core
+:tools ──► :tool-standard + :tool-javascript
+:tool-javascript ──► :tool-standard + :agent-core
 :ui ──► :protocol
 ```
 
@@ -72,22 +76,33 @@ Filesystem ownership follows the same structure:
 ```text
 application/          # :application
 modules/ui/           # :ui
-modules/providers/    # :providers
+modules/agent-core/   # :agent-core
+modules/provider-core/ # :provider-core
+modules/providers/    # :provider-standard
 modules/provider-openai-codex/ # :provider-openai-codex
+modules/providers-bundle/ # :providers
+modules/tools/        # :tool-standard
+modules/tool-javascript/ # :tool-javascript
+modules/tools-bundle/ # :tools
 ```
 
 Run targeted module tasks from the repository root:
 
 ```bash
 ./gradlew :ui:build :ui:test
-./gradlew :providers:build :providers:test
+./gradlew :providers:build
+./gradlew :provider-standard:build :provider-standard:test
+./gradlew :provider-core:build :provider-core:test
 ./gradlew :provider-openai-codex:build :provider-openai-codex:test
+./gradlew :tools:build
+./gradlew :tool-standard:build :tool-standard:test
+./gradlew :tool-javascript:build :tool-javascript:test
 ./gradlew :application:build :application:test
 ./gradlew :desktop:run
 ./gradlew :application:runServer
 ```
 
-See the module READMEs for ownership and migration details: [`:application`](application/README.md), [`:ui`](modules/ui/README.md), [`:providers`](modules/providers/README.md), and [`:provider-openai-codex`](modules/provider-openai-codex/README.md).
+See the module READMEs for ownership and migration details: [`:application`](application/README.md), [`:ui`](modules/ui/README.md), [`:provider-standard`](modules/providers/README.md), and [`:provider-openai-codex`](modules/provider-openai-codex/README.md).
 
 ## Documentation
 

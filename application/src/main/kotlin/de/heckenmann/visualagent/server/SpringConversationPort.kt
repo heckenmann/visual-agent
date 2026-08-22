@@ -2,6 +2,7 @@ package de.heckenmann.visualagent.server
 
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.Message
+import de.heckenmann.visualagent.agent.clearTodos
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.error.ErrorMessageMapper
 import de.heckenmann.visualagent.protocol.CancellationToken
@@ -84,6 +85,7 @@ class SpringConversationPort(
 
     override suspend fun clearAndCreateWelcome(): ConversationClearResult =
         protocolBoundary {
+            agentManager.clearTodos()
             agentManager.clearHistory()
             val result = agentManager.addWelcomeMessageAfterReset()
             when (result) {

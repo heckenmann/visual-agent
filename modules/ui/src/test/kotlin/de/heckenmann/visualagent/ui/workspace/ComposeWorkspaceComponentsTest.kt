@@ -4,6 +4,9 @@ package de.heckenmann.visualagent.ui.workspace
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -118,5 +121,22 @@ class ComposeWorkspaceComponentsTest {
         composeTestRule.waitForIdle()
 
         assertTrue("Expected resized width > 300 but was $resizedWidth", resizedWidth > 300)
+    }
+
+    @Test
+    fun `workspace panel visibility removes content after closing transition`() {
+        var visible by mutableStateOf(true)
+        composeTestRule.setContent {
+            MaterialTheme {
+                WorkspacePanelVisibility(visible = visible) {
+                    Text("animated workspace panel")
+                }
+            }
+        }
+
+        composeTestRule.onNodeWithText("animated workspace panel").assertExists()
+        visible = false
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("animated workspace panel").assertDoesNotExist()
     }
 }

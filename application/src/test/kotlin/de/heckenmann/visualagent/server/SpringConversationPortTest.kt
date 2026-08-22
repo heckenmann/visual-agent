@@ -2,6 +2,7 @@ package de.heckenmann.visualagent.server
 
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.Message
+import de.heckenmann.visualagent.agent.clearTodos
 import de.heckenmann.visualagent.agent.conversation.ConversationHistoryPage
 import de.heckenmann.visualagent.agent.conversation.WelcomeResult
 import de.heckenmann.visualagent.config.AppConfigBean
@@ -14,6 +15,7 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import io.mockk.verifyOrder
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -155,6 +157,7 @@ class SpringConversationPortTest {
     @Test
     fun `welcome fallback is returned as a protocol warning`() =
         runTest {
+            every { manager.clearTodos() } returns Unit
             every { manager.clearHistory() } returns Unit
             coEvery { manager.addWelcomeMessageAfterReset() } returns
                 WelcomeResult.Fallback("fallback", IllegalStateException("Provider not reachable"))
@@ -165,5 +168,11 @@ class SpringConversationPortTest {
                 "The provider could not be reached. Check the connection and provider base URL.",
                 result.warning,
             )
+            verify(exactly = 1) { manager.clearTodos() }
+            verify(exactly = 1) { manager.clearHistory() }
+            verifyOrder {
+                manager.clearTodos()
+                manager.clearHistory()
+            }
         }
 }

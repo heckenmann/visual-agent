@@ -66,9 +66,9 @@ class ToolRegistry(
         context: Map<String, Any>,
     ): String {
         val definition = tool.definition
-        val effectiveContext = context
         val inputObject = parseObject(functionInput)
         val options = runtimeOptions(inputObject, defaultTimeoutSeconds())
+        val effectiveContext = context + mapOf("toolTimeoutSeconds" to options.timeoutSeconds)
         val startedAt = Instant.now()
         toolEventBus.publish(
             ToolCallEvent(
@@ -200,6 +200,10 @@ class ToolRegistry(
         } catch (_: TimeoutException) {
             future.cancel(true)
             failure(toolId, "Tool call timed out after ${timeoutSeconds}s")
+        } catch (_: InterruptedException) {
+            future.cancel(true)
+            Thread.currentThread().interrupt()
+            failure(toolId, "Tool call was cancelled")
         } catch (error: Exception) {
             val root = generateSequence(error as Throwable?) { it.cause }.lastOrNull()
             failure(toolId, root?.message ?: error.message ?: error::class.simpleName.orEmpty())
