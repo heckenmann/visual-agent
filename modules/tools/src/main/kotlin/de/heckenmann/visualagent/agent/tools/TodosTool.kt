@@ -62,11 +62,18 @@ class TodosTool(
                 "Sub-agents may only read todos; lifecycle changes are controlled by the main agent.",
             )
         }
+        if (isAutomaticTerminalReview(context) && action !in SUB_AGENT_READ_ONLY_ACTIONS) {
+            return failure(
+                "todos",
+                "Automatic terminal-todo reviews cannot mutate todos. Report the result; " +
+                    "a new attempt requires an explicit user request.",
+            )
+        }
         return when (action) {
             "list" -> listTodos()
             "count" -> countTodos()
-            "add" -> addTodo(input, context)
-            "update" -> updateTodo(input, context)
+            "add" -> addTodo(input)
+            "update" -> updateTodo(input)
             "complete" -> updateStatus(input, "COMPLETED")
             "cancel" -> updateStatus(input, "CANCELLED")
             "start" -> startTodo(input)
@@ -103,17 +110,7 @@ class TodosTool(
         )
     }
 
-    private fun addTodo(
-        input: JsonObject,
-        context: Map<String, Any>,
-    ): ToolResult {
-        if (isAutomaticTerminalReview(context)) {
-            return failure(
-                "todos",
-                "Automatic terminal-todo reviews cannot create or retry work items. " +
-                    "Report the result; a new attempt requires an explicit user request.",
-            )
-        }
+    private fun addTodo(input: JsonObject): ToolResult {
         val assignedAgentId =
             input.string("assignedAgentId")
                 ?: return failure(
@@ -139,19 +136,9 @@ class TodosTool(
         return success("todos", "Added todo ${creation.todo.id}")
     }
 
-    private fun updateTodo(
-        input: JsonObject,
-        context: Map<String, Any>,
-    ): ToolResult {
+    private fun updateTodo(input: JsonObject): ToolResult {
         val id = input.requiredString("id")
         val todo = todos.list().firstOrNull { it.id == id } ?: return failure("todos", "Todo not found")
-        if (isAutomaticTerminalReview(context) && todo.status in TERMINAL_STATUSES) {
-            return failure(
-                "todos",
-                "Automatic terminal-todo reviews cannot modify completed or cancelled todos. " +
-                    "Report the result; a retry requires an explicit user request.",
-            )
-        }
         val newAssignedAgentId = input.string("assignedAgentId")
         if (newAssignedAgentId != null && !agentExists(newAssignedAgentId)) {
             return failure(
@@ -238,7 +225,6 @@ class TodosTool(
 
     private companion object {
         val SUB_AGENT_READ_ONLY_ACTIONS = setOf("list", "count", "get-result")
-        val TERMINAL_STATUSES = setOf("COMPLETED", "CANCELLED")
     }
 
     private fun extractSummary(content: String): String {

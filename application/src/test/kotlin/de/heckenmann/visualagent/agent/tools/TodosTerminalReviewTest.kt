@@ -45,9 +45,24 @@ class TodosTerminalReviewTest {
                 )
 
             assertFalse(update.success)
-            assertTrue(update.error!!.contains("cannot modify completed or cancelled"))
+            assertTrue(update.error!!.contains("cannot mutate todos"))
             assertFalse(add.success)
-            assertTrue(add.error!!.contains("cannot create or retry"))
+            assertTrue(add.error!!.contains("cannot mutate todos"))
+
+            val lifecycleAttempts =
+                listOf(
+                    json("action" to "complete", "id" to id),
+                    json("action" to "cancel", "id" to id),
+                    json("action" to "start", "id" to id),
+                    json("action" to "start-all"),
+                    json("action" to "stop", "id" to id),
+                    json("action" to "stop-all"),
+                    json("action" to "remove", "id" to id),
+                    json("action" to "reorder", "id" to id, "position" to 0),
+                ).map { input -> tool.execute(input, reviewContext) }
+
+            assertTrue(lifecycleAttempts.all { !it.success })
+            assertTrue(lifecycleAttempts.all { it.error!!.contains("cannot mutate todos") })
             assertEquals(TodoStatus.COMPLETED, db.listTodos().single().status)
         } finally {
             db.close()
