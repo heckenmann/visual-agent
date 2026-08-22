@@ -157,16 +157,18 @@ class WorkspaceFileService(
         mimeType: String? = null,
     ): WorkspaceFileRecord {
         val now = Instant.now()
+        val relativePath = WorkspaceFilePaths.relativePath(destination, databasePath)
+        val existing = store.getWorkspaceFileByPath(WorkspaceFilePaths.normalizeRelativePath(relativePath))
         val record =
             WorkspaceFileRecord(
-                id = UUID.randomUUID().toString(),
-                relativePath = WorkspaceFilePaths.relativePath(destination, databasePath),
+                id = existing?.id ?: UUID.randomUUID().toString(),
+                relativePath = relativePath,
                 originalName = WorkspaceFilePaths.safeFileName(originalName),
                 mimeType = mimeType ?: mimeDetector.detect(destination),
                 sizeBytes = destination.fileSize(),
                 sha256 = WorkspaceFilePaths.sha256(destination),
                 extractedText = null,
-                importedAt = now,
+                importedAt = existing?.importedAt ?: now,
                 updatedAt = now,
             )
         store.saveWorkspaceFile(record)

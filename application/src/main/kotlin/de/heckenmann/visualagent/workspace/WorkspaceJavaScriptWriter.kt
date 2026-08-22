@@ -71,8 +71,9 @@ class WorkspaceJavaScriptWriter(
             } else {
                 path.deleteIfExists()
             }
-        if (record == null && deleted) workspaceFiles.syncMetadataWithFilesystem()
-        if (deleted) activityEvents.publish(WorkspaceFileActivity("Workspace file deleted by JavaScript: $normalized."))
+        if (record == null && deleted) {
+            activityEvents.publish(WorkspaceFileActivity("Workspace file deleted by JavaScript: $normalized."))
+        }
         return JavaScriptWorkspaceDeleteResult(normalized, deleted)
     }
 
