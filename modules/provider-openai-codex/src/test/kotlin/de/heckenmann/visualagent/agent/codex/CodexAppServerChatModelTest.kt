@@ -6,8 +6,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Test
 import org.springframework.ai.chat.model.ChatResponse
 import org.springframework.ai.chat.prompt.Prompt
@@ -82,37 +80,6 @@ class CodexAppServerChatModelTest {
                 deleteRecursively(directory)
             }
         }
-
-    @Test
-    fun `dynamic tool media results map to Codex image and audio content items`() {
-        val imageItems =
-            CodexDynamicToolResultMapper.contentItems(
-                """{"content":"{\"path\":\"diagram.png\",\"mimeType\":\"image/png\",\"base64\":\"AQI=\"}"}""",
-            )
-        val audioItems = CodexDynamicToolResultMapper.contentItems("""{"mimeType":"audio/wav","base64":"AQI="}""")
-
-        val imageType = imageItems[0].jsonObject["type"]?.jsonPrimitive?.content
-        val imageMediaType = imageItems[1].jsonObject["type"]?.jsonPrimitive?.content
-        val imageUrl = imageItems[1].jsonObject["imageUrl"]?.jsonPrimitive?.content
-        val audioType =
-            audioItems
-                .single()
-                .jsonObject["type"]
-                ?.jsonPrimitive
-                ?.content
-        val audioUrl =
-            audioItems
-                .single()
-                .jsonObject["audioUrl"]
-                ?.jsonPrimitive
-                ?.content
-
-        assertEquals("inputText", imageType)
-        assertEquals("inputImage", imageMediaType)
-        assertEquals("data:image/png;base64,AQI=", imageUrl)
-        assertEquals("inputAudio", audioType)
-        assertEquals("data:audio/wav;base64,AQI=", audioUrl)
-    }
 
     @Test
     fun `a single native delta is animated in small chunks`() =

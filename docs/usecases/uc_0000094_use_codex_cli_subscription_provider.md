@@ -17,7 +17,7 @@ Allow a desktop user to use an authenticated, user-local OpenAI Codex CLI instal
 3. The adapter negotiates `initialize`, starts an ephemeral thread, and starts one turn with the request's messages and enabled dynamic tools.
 4. Native `item/agentMessage/delta` notifications are mapped to incremental Spring AI responses while the turn is running.
 5. `item/tool/call` requests are validated against the request-scoped tool allowlist and delegated to the existing `ToolRegistry` callback.
-6. The tool result is returned to the same Codex turn through `DynamicToolCallResponse`; validated image and audio payloads become `inputImage` or `inputAudio` content items.
+6. The tool result is returned to the same Codex turn through `DynamicToolCallResponse`; the trusted workspace image action becomes an `inputImage` content item. Audio content remains textual until the negotiated app-server schema and selected model support it.
 7. Assistant deltas retain their Codex `itemId` in Spring AI response metadata so separate assistant items remain distinguishable.
 8. `turn/completed` emits the terminal Spring AI response and the process is closed.
 
@@ -42,14 +42,15 @@ The former `org.springaicommunity.agents:agent-codex` dependency was removed. It
 
 Visual Agent now contains a clean-room adapter implemented only against public Spring AI APIs and the public Codex app-server schema. It does not copy, translate, or derive code from the removed connector. The adapter implements the required Spring AI chat and streaming model contracts and owns a minimal JSON-RPC process transport.
 
-The app-server protocol supports request-scoped `dynamicTools`, server-initiated `item/tool/call` requests, textual and inline media tool results, and native `item/agentMessage/delta` streaming. Unknown notifications are ignored for forward compatibility; unsupported server requests receive a protocol error.
+The app-server protocol supports request-scoped `dynamicTools`, server-initiated `item/tool/call` requests, textual and inline image tool results, and native `item/agentMessage/delta` streaming. Audio content-item mapping is retained as a disabled forward-compatibility path because current Codex schemas and models do not support audio. Unknown notifications are ignored for forward compatibility; unsupported server requests receive a protocol error.
 
 ## Tool Calls
 
 - `item/tool/call` is handled by the server-owned Spring AI callback bridge.
 - Only tools in `ChatRequestContext.enabledTools` are advertised and executable.
 - Tool lifecycle events continue to use the existing `ToolRegistry` and `ToolEventBus`.
-- Workspace image/audio results are converted to data URLs and sent as protocol-native `inputImage`/`inputAudio` items.
+- The trusted `workspace:file` `imageBytes` action is converted to a data URL and sent as a protocol-native `inputImage` item.
+- Audio tool results remain text until Codex negotiates an audio-capable protocol and model; no audio tool is advertised currently.
 
 ## Code Entry Points
 
@@ -82,7 +83,7 @@ The app-server protocol supports request-scoped `dynamicTools`, server-initiated
 
 ## Verification
 
-- Protocol tests use a controlled fake app-server process and cover initialization, native delta streaming, assistant item boundaries, textual and inline media tool callbacks, terminal completion, and cleanup.
+- Protocol tests use a controlled fake app-server process and cover initialization, native delta streaming, assistant item boundaries, textual and inline image tool callbacks, structured tool failures, audio fallback, terminal completion, and cleanup.
 - Provider wiring tests cover the new dependency-free adapter.
 - The optional real-CLI smoke test remains outside the default suite because it requires a locally authenticated Codex account; enable it with `-Dvisualagent.codex.smoke=true` and `-Dvisualagent.codex.smoke.model=...`. An executable path can be supplied with `-Dvisualagent.codex.smoke.executable=...`.
 
