@@ -128,6 +128,25 @@ class CodexAppServerChatModelTest {
             }
         }
 
+    @Test
+    fun `vision sends an inline image user input with its MIME type`() =
+        runBlocking {
+            val directory = createTempDirectory("codex-app-server-vision-test-")
+            val executable = fakeServer(directory)
+            try {
+                val response =
+                    CodexAppServerChatModel(executable, "gpt-test", emptyList(), directory)
+                        .completeVision(pngBytes(), "describe this image")
+
+                assertEquals("hello", responseText(response))
+                val turnRequest = Files.readString(directory.resolve("turn-start.json"))
+                assertTrue(turnRequest.contains("\"type\":\"image\""))
+                assertTrue(turnRequest.contains("\"url\":\"data:image/png;base64,"))
+            } finally {
+                deleteRecursively(directory)
+            }
+        }
+
     private fun fakeServer(
         directory: Path,
         singleDelta: Boolean = false,
@@ -161,6 +180,7 @@ class CodexAppServerChatModelTest {
                   printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{"thread":{"id":"thread-1"}}}'
                   ;;
                 *'"method":"turn/start"'*)
+                  printf '%s' "${'$'}line" > '${directory.resolve("turn-start.json")}'
                   printf '%s\n' '{"jsonrpc":"2.0","id":3,"result":{"threadId":"thread-1","turn":{"id":"turn-1"}}}'
                   ${if (reasoningSummary) "printf '%s\\n' '{\"jsonrpc\":\"2.0\",\"method\":\"item/reasoning/summaryTextDelta\",\"params\":{\"delta\":\"planning\",\"itemId\":\"item-1\",\"summaryIndex\":0,\"threadId\":\"thread-1\",\"turnId\":\"turn-1\"}}'" else ""}
                   printf '%s\n' '{"jsonrpc":"2.0","id":99,"method":"item/tool/call","params":{"arguments":{},"callId":"call-1","threadId":"thread-1","tool":"context","turnId":"turn-1"}}'
@@ -204,4 +224,6 @@ class CodexAppServerChatModelTest {
                 },
             )
         }
+
+    private fun pngBytes(): ByteArray = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)
 }

@@ -58,13 +58,14 @@ The project uses an acyclic Gradle module graph:
 
 ```text
 :desktop ──► :ui + :application + :protocol
-:application ──► :providers + :tools + :protocol
+:application ──► :providers + :provider-openai-codex + :tools + :protocol
+:provider-openai-codex ──► :providers
 :ui ──► :protocol
 ```
 
 `:application` is the Spring server composition root. `:desktop` is the presentation/lifecycle
 host and starts one non-web Spring context from `:application` in local mode. `:ui` is a
-protocol-only presentation module; `:providers` and `:tools` remain server-side leaf modules.
+protocol-only presentation module; `:providers`, `:provider-openai-codex`, and `:tools` remain server-side modules.
 
 Filesystem ownership follows the same structure:
 
@@ -72,6 +73,7 @@ Filesystem ownership follows the same structure:
 application/          # :application
 modules/ui/           # :ui
 modules/providers/    # :providers
+modules/provider-openai-codex/ # :provider-openai-codex
 ```
 
 Run targeted module tasks from the repository root:
@@ -79,12 +81,13 @@ Run targeted module tasks from the repository root:
 ```bash
 ./gradlew :ui:build :ui:test
 ./gradlew :providers:build :providers:test
+./gradlew :provider-openai-codex:build :provider-openai-codex:test
 ./gradlew :application:build :application:test
 ./gradlew :desktop:run
 ./gradlew :application:runServer
 ```
 
-See the module READMEs for ownership and migration details: [`:application`](application/README.md), [`:ui`](modules/ui/README.md), and [`:providers`](modules/providers/README.md).
+See the module READMEs for ownership and migration details: [`:application`](application/README.md), [`:ui`](modules/ui/README.md), [`:providers`](modules/providers/README.md), and [`:provider-openai-codex`](modules/provider-openai-codex/README.md).
 
 ## Documentation
 

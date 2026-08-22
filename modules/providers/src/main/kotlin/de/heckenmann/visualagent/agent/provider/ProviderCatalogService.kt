@@ -130,10 +130,7 @@ class ProviderCatalogService(
     ) {
         val profile = getProvider(providerId) ?: return
         val existing = profile.models.associateBy(ProviderModelConfig::id)
-        val models =
-            discoveredModels
-                .distinctBy(ProviderModelConfig::id)
-                .map { discovered -> existing[discovered.id]?.copy(name = discovered.name) ?: discovered }
+        val models = discoveredModels.mergeWithExisting(existing)
         saveProvider(profile.copy(models = models))
     }
 
@@ -346,7 +343,10 @@ class ProviderCatalogService(
                     profile.defaultModel.isBlank() &&
                     profile.models.none { it.id == activeModel }
                 ) {
-                    profile.copy(defaultModel = activeModel, models = listOf(ProviderModelConfig(activeModel)))
+                    profile.copy(
+                        defaultModel = activeModel,
+                        models = listOf(ProviderModelConfig(activeModel, capabilities = setOf("vision"))),
+                    )
                 } else {
                     profile
                 }
@@ -360,7 +360,7 @@ class ProviderCatalogService(
             defaultModel.isNotBlank() &&
             models.none { it.id == defaultModel }
         ) {
-            copy(models = models + ProviderModelConfig(defaultModel))
+            copy(models = models + ProviderModelConfig(defaultModel, capabilities = setOf("vision")))
         } else {
             this
         }

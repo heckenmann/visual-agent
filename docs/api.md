@@ -10,7 +10,7 @@ Primary methods:
 - `chat(request: ChatRequestContext)`
 - `stream(messages: List<Message>)`
 - `stream(request: ChatRequestContext)`
-- `vision(image, prompt)` (currently not implemented in Spring AI bridge)
+- `vision(image, prompt)` for provider/model image analysis
 - `embeddings(text)`
 - `checkConnection()`
 - `getModels()`
@@ -283,7 +283,7 @@ All are provider-neutral at application boundaries.
 
 ## Known API Constraints
 
-- `vision()` requires a provider/model combination that supports image input; unsupported combinations return provider-level failures.
+- `vision()` requires a provider/model combination that supports image input; unsupported combinations return provider-level failures. The Codex CLI adapter sends inline `data:` image inputs through the Codex app-server protocol.
 - `browser` and `search` tools intentionally return unavailable results until backends are integrated.
 
 ## Activity Surface

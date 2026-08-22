@@ -41,3 +41,5 @@ Agents can work with imported files while content access remains explicit and au
 - Hash action supports SHA-256.
 - PDF page previews are stored as immutable generated workspace files with size and SHA-256 metadata.
 - Unsupported vision/model combinations return clear failures.
+- Codex CLI vision requests use the app-server image input protocol and preserve the detected image MIME type.
+- Image bytes and provider credentials are not written to logs or conversation history.

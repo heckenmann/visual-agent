@@ -1,6 +1,8 @@
 # Providers Module
 
-`:providers` owns LLM-provider integrations and provider-facing contracts.
+`:providers` owns the provider contracts, the configured-provider router, and the built-in
+Ollama and OpenAI-compatible adapters. Dedicated provider integrations live in their own
+modules, such as `:provider-openai-codex`.
 
 ## Responsibilities
 
@@ -13,6 +15,7 @@
 `:providers` is a leaf module. It must not have a Gradle project dependency on `:application`, `:ui`, or any future sibling module.
 
 ```text
+:application -> :provider-openai-codex -> :providers
 :application -> :providers
 ```
 

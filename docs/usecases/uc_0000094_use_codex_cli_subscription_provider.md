@@ -51,13 +51,13 @@ The app-server protocol supports request-scoped `dynamicTools`, server-initiated
 
 ## Code Entry Points
 
-- `modules/providers/src/main/kotlin/de/heckenmann/visualagent/agent/codex/CodexCliLocator.kt`
-- `modules/providers/src/main/kotlin/de/heckenmann/visualagent/agent/codex/CodexCliProcessFactory.kt`
-- `modules/providers/src/main/kotlin/de/heckenmann/visualagent/agent/codex/CodexAppServerProtocol.kt`
-- `modules/providers/src/main/kotlin/de/heckenmann/visualagent/agent/codex/CodexAppServerTransport.kt`
-- `modules/providers/src/main/kotlin/de/heckenmann/visualagent/agent/codex/CodexAppServerChatModel.kt`
-- `modules/providers/src/main/kotlin/de/heckenmann/visualagent/agent/codex/CodexCliProvider.kt`
-- `modules/providers/src/main/kotlin/de/heckenmann/visualagent/agent/codex/CodexCliModelCatalog.kt`
+- `modules/provider-openai-codex/src/main/kotlin/de/heckenmann/visualagent/agent/codex/CodexCliLocator.kt`
+- `modules/provider-openai-codex/src/main/kotlin/de/heckenmann/visualagent/agent/codex/CodexCliProcessFactory.kt`
+- `modules/provider-openai-codex/src/main/kotlin/de/heckenmann/visualagent/agent/codex/CodexAppServerProtocol.kt`
+- `modules/provider-openai-codex/src/main/kotlin/de/heckenmann/visualagent/agent/codex/CodexAppServerTransport.kt`
+- `modules/provider-openai-codex/src/main/kotlin/de/heckenmann/visualagent/agent/codex/CodexAppServerChatModel.kt`
+- `modules/provider-openai-codex/src/main/kotlin/de/heckenmann/visualagent/agent/codex/CodexCliProvider.kt`
+- `modules/provider-openai-codex/src/main/kotlin/de/heckenmann/visualagent/agent/codex/CodexCliModelCatalog.kt`
 
 ## Error Handling
 

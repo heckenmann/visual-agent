@@ -4,6 +4,7 @@ import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.agent.provider.ProviderWorkingDirectory
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -52,7 +53,19 @@ internal class CodexCliModelCatalog(
             .filter { it["visibility"]?.jsonPrimitive?.content != "hide" }
             .mapNotNull { model ->
                 model["slug"]?.jsonPrimitive?.content?.takeIf(String::isNotBlank)?.let { id ->
-                    ProviderModelConfig(id = id, name = model["display_name"]?.jsonPrimitive?.content ?: id)
+                    ProviderModelConfig(
+                        id = id,
+                        name = model["display_name"]?.jsonPrimitive?.content ?: id,
+                        capabilities =
+                            setOfNotNull(
+                                "vision".takeIf {
+                                    (model["input_modalities"] as? JsonArray)
+                                        ?.any { modality ->
+                                            modality.jsonPrimitive.content.equals("image", ignoreCase = true)
+                                        } == true
+                                },
+                            ),
+                    )
                 }
             }.distinctBy(ProviderModelConfig::id)
             .toList()

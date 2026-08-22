@@ -11,8 +11,6 @@ import kotlinx.coroutines.reactor.asFlux
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -20,8 +18,6 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.springframework.ai.chat.messages.AssistantMessage
-import org.springframework.ai.chat.messages.SystemMessage
-import org.springframework.ai.chat.messages.UserMessage
 import org.springframework.ai.chat.metadata.ChatGenerationMetadata
 import org.springframework.ai.chat.metadata.ChatResponseMetadata
 import org.springframework.ai.chat.model.ChatModel
@@ -48,10 +44,19 @@ internal class CodexAppServerChatModel(
     suspend fun complete(
         prompt: Prompt,
         cancellationToken: CancellationToken? = null,
-    ): SpringChatResponse {
+    ): SpringChatResponse = collectComplete(streamFlow(prompt, cancellationToken))
+
+    /** Executes a complete Codex turn with one inline image input. */
+    suspend fun completeVision(
+        image: ByteArray,
+        prompt: String,
+        cancellationToken: CancellationToken? = null,
+    ): SpringChatResponse = collectComplete(streamFlowInternal(Prompt(prompt), cancellationToken, image))
+
+    private suspend fun collectComplete(stream: Flow<SpringChatResponse>): SpringChatResponse {
         val content = StringBuilder()
         var last: SpringChatResponse? = null
-        streamFlow(prompt, cancellationToken).collect { response ->
+        stream.collect { response ->
             response.result
                 ?.output
                 ?.text
@@ -66,6 +71,12 @@ internal class CodexAppServerChatModel(
     fun streamFlow(
         prompt: Prompt,
         cancellationToken: CancellationToken? = null,
+    ): Flow<SpringChatResponse> = streamFlowInternal(prompt, cancellationToken, null)
+
+    private fun streamFlowInternal(
+        prompt: Prompt,
+        cancellationToken: CancellationToken?,
+        image: ByteArray?,
     ): Flow<SpringChatResponse> =
         flow {
             cancellationToken?.throwIfCancelled()
@@ -73,9 +84,16 @@ internal class CodexAppServerChatModel(
             val cancellationRegistration = cancellationToken?.onCancelled(transport::close)
             try {
                 transport.start()
-                val thread = transport.request("thread/start", threadParams(prompt))
-                val threadId = thread.threadId()
-                transport.request("turn/start", turnParams(prompt, threadId))
+                val thread =
+                    transport.request(
+                        "thread/start",
+                        CodexAppServerRequestParams.thread(prompt, model, workingDirectory, toolCallbacks),
+                    )
+                val threadId = thread.codexThreadId()
+                transport.request(
+                    "turn/start",
+                    CodexAppServerRequestParams.turn(prompt, threadId, model, showReasoningSummary, image),
+                )
                 var pendingDelta: String? = null
                 var receivedMultipleDeltas = false
                 withTimeout(TURN_TIMEOUT_MILLIS) {
@@ -221,56 +239,6 @@ internal class CodexAppServerChatModel(
         }
     }
 
-    private fun threadParams(prompt: Prompt): JsonObject =
-        buildJsonObject {
-            put("model", JsonPrimitive(model))
-            put("cwd", JsonPrimitive(workingDirectory.toAbsolutePath().toString()))
-            put("sandbox", JsonPrimitive("read-only"))
-            put("approvalPolicy", JsonPrimitive("never"))
-            put("ephemeral", JsonPrimitive(true))
-            prompt.systemText()?.let { put("developerInstructions", JsonPrimitive(it)) }
-            put(
-                "dynamicTools",
-                buildJsonArray {
-                    toolCallbacks.forEach { callback ->
-                        add(
-                            buildJsonObject {
-                                put("type", JsonPrimitive("function"))
-                                put("name", JsonPrimitive(callback.toolDefinition.name()))
-                                put("description", JsonPrimitive(callback.toolDefinition.description()))
-                                put("inputSchema", Json.parseToJsonElement(callback.toolDefinition.inputSchema()))
-                            },
-                        )
-                    }
-                },
-            )
-        }
-
-    private fun turnParams(
-        prompt: Prompt,
-        threadId: String,
-    ): JsonObject =
-        buildJsonObject {
-            put("threadId", JsonPrimitive(threadId))
-            put("model", JsonPrimitive(model))
-            put(
-                "input",
-                buildJsonArray {
-                    prompt.instructions
-                        .filter { it !is SystemMessage }
-                        .forEach { message ->
-                            add(
-                                buildJsonObject {
-                                    put("type", JsonPrimitive("text"))
-                                    put("text", JsonPrimitive(messageText(message)))
-                                },
-                            )
-                        }
-                },
-            )
-            put("summary", JsonPrimitive(if (showReasoningSummary) "detailed" else "none"))
-        }
-
     private fun response(
         text: String,
         done: Boolean,
@@ -284,27 +252,6 @@ internal class CodexAppServerChatModel(
             ),
             ChatResponseMetadata.builder().model(model).build(),
         )
-
-    private fun Prompt.systemText(): String? =
-        instructions
-            .filterIsInstance<SystemMessage>()
-            .joinToString("\n\n") { it.text.orEmpty() }
-            .takeIf(String::isNotBlank)
-
-    private fun messageText(message: org.springframework.ai.chat.messages.Message): String =
-        when (message) {
-            is AssistantMessage -> "[assistant]\n${message.text.orEmpty()}"
-            is UserMessage -> message.text.orEmpty()
-            else -> message.text.orEmpty()
-        }
-
-    private fun JsonObject.threadId(): String =
-        this["thread"]
-            ?.jsonObject
-            ?.get("id")
-            ?.jsonPrimitive
-            ?.contentOrNull
-            ?: error("Codex did not return a thread id")
 
     private companion object {
         private const val SIMULATED_CHUNK_DELAY_MS = 16L

@@ -3,6 +3,8 @@ package de.heckenmann.visualagent.agent.codex
 import de.heckenmann.visualagent.agent.ConfiguredLLMProvider
 import de.heckenmann.visualagent.agent.OllamaClient
 import de.heckenmann.visualagent.agent.openai.OpenAiClient
+import de.heckenmann.visualagent.agent.provider.ProfiledProviderAdapter
+import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.config.AppConfigBean
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -24,12 +26,13 @@ internal class CodexSpringWiringTest {
     @Autowired
     private lateinit var appConfig: AppConfigBean
 
+    @Autowired
+    private lateinit var profiledAdapters: List<ProfiledProviderAdapter>
+
     @Test
     fun `application consumes provider module beans with application adapters`() {
-        val codexField = ConfiguredLLMProvider::class.java.getDeclaredField("codexCliProvider")
-        codexField.isAccessible = true
-
-        assertNotNull(codexField.get(provider))
+        assertNotNull(profiledAdapters.singleOrNull { it.adapter == ProviderAdapter.CODEX_CLI })
+        assertNotNull(provider)
         assertSame(appConfig, injectedAppConfig(ollamaClient))
         assertSame(appConfig, injectedAppConfig(openAiClient))
     }
