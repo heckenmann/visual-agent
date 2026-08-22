@@ -99,12 +99,12 @@ Tools are defined through app-level `ToolDefinition` and executed through `Visua
 
 ### Main-agent tool set
 
-The main agent receives the sub-agent definition IDs (`agent:*`) plus
-`todos` through `AgentToolConfigService.mainAgentTools()`. It delegates
-work by assigning todos to sub-agents and cannot call file, terminal,
-browser, search, history, manual, usecases, workspace, or canvas tools
-directly. The `MainSystemPromptComposer` execution policy reinforces
-this in the system prompt.
+The main agent receives the sub-agent definition IDs (`agent:*`), `todos`,
+managed workspace tools, and `javascript:execute` through
+`AgentToolConfigService.mainAgentTools()`. It delegates repository file,
+terminal, browser, search, history, manual, use-case, and canvas work to
+sub-agents. JavaScript may call only tools enabled for this request through
+the shared registry; it does not bypass that delegation or permission policy.
 
 | Tool ID | Action | Purpose |
 |---|---|---|
@@ -115,6 +115,7 @@ this in the system prompt.
 | `agent:delete` | `delete` | Removes a sub-agent. |
 | `agent:log` | `get` | Returns up to 50 persisted work-log entries for one sub-agent. |
 | `todos` | multiple | Lists and manages todos, including assigning work to a sub-agent and retrieving a stored result. |
+| `javascript:execute` | `execute` | Runs sandboxed inline JavaScript or a workspace-relative JavaScript file for complex logic or large CSV/Markdown output; `workspace.write/read/delete` provides hardened text access, and actionable execution errors are returned to the model. |
 
 ### Sub-agent role-based tool sets
 
@@ -171,6 +172,11 @@ role-based sets above and the global blocklist:
 - `workspace:download`: download an HTTP(S), FTP, SFTP, or SCP
   resource into `workspace/downloads` or another workspace-relative
   directory, then register it with managed metadata.
+- `javascript:execute`: execute bounded JavaScript using only the tools
+  enabled for the current request. Use `tools.call(name, arguments)` for
+  multi-tool processing and return strings, Markdown, or JSON-compatible
+  values. The sandbox has no direct host, filesystem, process, network,
+  JVM, environment, or credential access.
 
 ### Canvas Tool
 
