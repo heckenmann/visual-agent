@@ -79,9 +79,30 @@ class WorkspaceDownloadServiceTest {
 
         assertFailsWith<RuntimeException> { service.download(WorkspaceDownloadRequest("https://example.org/file", "../outside")) }
         assertFailsWith<RuntimeException> { service.download(WorkspaceDownloadRequest("https://user:secret@example.org/file")) }
+        assertFailsWith<RuntimeException> { service.download(WorkspaceDownloadRequest("https://example.org/file?api_key=secret")) }
+        assertFailsWith<RuntimeException> { service.download(WorkspaceDownloadRequest("https://example.org/file?X-Amz-Signature=secret")) }
         assertFailsWith<RuntimeException> { service.download(WorkspaceDownloadRequest("gopher://example.org/file")) }
 
         assertEquals(0, calls)
+    }
+
+    @Test
+    fun `download progress notifications are coalesced`() {
+        val files = WorkspaceFileService(FakeWorkspaceFileStore(), tempDir().resolve("db.sqlite").toString())
+        val service =
+            WorkspaceDownloadService(
+                files,
+                WorkspaceDownloadTransfer { _, destination, control ->
+                    repeat(200) { control.recordProgress(8_192) }
+                    destination.writeBytes(byteArrayOf(1))
+                },
+            )
+        var notifications = 0
+        service.addListener { notifications++ }
+
+        service.download(WorkspaceDownloadRequest("https://example.org/file.bin"))
+
+        assertTrue(notifications < 10)
     }
 
     @Test

@@ -17,6 +17,7 @@ import java.nio.file.StandardCopyOption
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.io.path.createDirectories
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.fileSize
@@ -32,6 +33,7 @@ class WorkspaceDownloadService(
 ) {
     private val jobs = ConcurrentHashMap<String, WorkspaceDownloadJob>()
     private val listeners = CopyOnWriteArrayList<() -> Unit>()
+    private val lastProgressNotificationNanos = AtomicLong(0)
 
     /** Downloads, validates, atomically publishes, and registers one remote file. */
     fun download(request: WorkspaceDownloadRequest): WorkspaceFileRecord {
@@ -41,7 +43,7 @@ class WorkspaceDownloadService(
         lateinit var job: WorkspaceDownloadJob
         val control =
             WorkspaceDownloadControl(
-                onProgress = { notifyListeners() },
+                onProgress = { notifyProgressListeners() },
                 onTotal = { notifyListeners() },
             )
         job = WorkspaceDownloadJob(id, relativePath(target), control)
@@ -156,6 +158,13 @@ class WorkspaceDownloadService(
         listeners.forEach { listener -> runCatching(listener) }
     }
 
+    private fun notifyProgressListeners() {
+        val now = System.nanoTime()
+        val previous = lastProgressNotificationNanos.get()
+        if (now - previous < PROGRESS_NOTIFICATION_INTERVAL_NANOS || !lastProgressNotificationNanos.compareAndSet(previous, now)) return
+        notifyListeners()
+    }
+
     private fun publishStatus(
         job: WorkspaceDownloadJob,
         status: DownloadActivityStatus,
@@ -178,6 +187,7 @@ class WorkspaceDownloadService(
         require(source.scheme?.lowercase() in SUPPORTED_SCHEMES) { "Download protocol is not supported" }
         require(source.fragment == null) { "Remote source fragments are not supported" }
         require(source.host.isNullOrBlank().not()) { "Remote source host is missing" }
+        require(!hasCredentialQuery(source.rawQuery)) { "Credentials are not accepted in a remote source" }
         if (source.scheme.equals("http", true) || source.scheme.equals("https", true) || source.scheme.equals("ftp", true)) {
             require(source.userInfo == null) { "Credentials are not accepted in a remote source" }
         } else {
@@ -260,5 +270,13 @@ class WorkspaceDownloadService(
         const val MAX_MIME_DETECTION_BYTES = 1024 * 1024
         val SUPPORTED_SCHEMES = setOf("http", "https", "ftp", "sftp", "scp")
         val destinationLock = Any()
+        val CREDENTIAL_QUERY_KEY = Regex("(?i)(password|token|secret|api[_-]?key|credential|signature)")
+        const val PROGRESS_NOTIFICATION_INTERVAL_NANOS = 100_000_000L
     }
+
+    private fun hasCredentialQuery(rawQuery: String?): Boolean =
+        rawQuery
+            ?.split('&', ';')
+            ?.any { parameter -> CREDENTIAL_QUERY_KEY.containsMatchIn(parameter.substringBefore('=')) }
+            ?: false
 }

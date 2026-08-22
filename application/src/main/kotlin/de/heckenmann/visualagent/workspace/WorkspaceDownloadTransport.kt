@@ -152,7 +152,6 @@ class WorkspaceDownloadTransport(
                 .Builder()
                 .connectTimeout(Duration.ofSeconds(5))
                 .readTimeout(Duration.ofSeconds(15))
-                .callTimeout(Duration.ofSeconds(15))
                 .followRedirects(false)
                 .followSslRedirects(false)
                 .proxy(Proxy.NO_PROXY)
@@ -160,7 +159,7 @@ class WorkspaceDownloadTransport(
     }
 }
 
-private object PublicDownloadAddressPolicy {
+internal object PublicDownloadAddressPolicy {
     fun isAllowed(host: String): Boolean =
         runCatching { InetAddress.getAllByName(host).toList() }
             .getOrNull()
@@ -170,6 +169,22 @@ private object PublicDownloadAddressPolicy {
                     !address.isLoopbackAddress &&
                     !address.isLinkLocalAddress &&
                     !address.isSiteLocalAddress &&
-                    !address.isMulticastAddress
+                    !address.isMulticastAddress &&
+                    !address.isPrivateOrReserved()
             } == true
+
+    private fun InetAddress.isPrivateOrReserved(): Boolean {
+        val bytes = address
+        return when (bytes.size) {
+            4 -> toUnsigned(bytes[0]) == 100 && toUnsigned(bytes[1]) in 64..127
+            16 -> {
+                val first = toUnsigned(bytes[0])
+                first and 0xfe == 0xfc ||
+                    (first == 0x20 && toUnsigned(bytes[1]) == 0x01 && toUnsigned(bytes[2]) == 0x0d && toUnsigned(bytes[3]) == 0xb8)
+            }
+            else -> true
+        }
+    }
+
+    private fun toUnsigned(value: Byte): Int = value.toInt() and 0xff
 }

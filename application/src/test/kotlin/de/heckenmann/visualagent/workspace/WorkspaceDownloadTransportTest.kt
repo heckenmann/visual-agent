@@ -28,6 +28,9 @@ class WorkspaceDownloadTransportTest {
         assertFailsWith<IllegalArgumentException> {
             transport.download(URI("https://localhost/file"), destination, control)
         }
+        assertFailsWith<IllegalArgumentException> {
+            transport.download(URI("https://[fd00::1]/file"), destination, control)
+        }
     }
 
     @Test
