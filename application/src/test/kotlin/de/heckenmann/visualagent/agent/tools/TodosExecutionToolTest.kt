@@ -2,6 +2,7 @@ package de.heckenmann.visualagent.agent.tools
 
 import de.heckenmann.visualagent.agent.tools.api.TodoToolPort
 import de.heckenmann.visualagent.agent.tools.api.ToolTodo
+import de.heckenmann.visualagent.agent.tools.api.ToolTodoCreation
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -30,6 +31,11 @@ private class FakeTodoPort : TodoToolPort {
         description: String,
         assignedAgentId: String,
     ): String = "todo-1"
+
+    override fun addIfAbsent(
+        description: String,
+        assignedAgentId: String,
+    ): ToolTodoCreation = ToolTodoCreation(list().single(), created = true)
 
     override fun update(
         id: String,

@@ -133,6 +133,27 @@ class TodoManager(
         return todo
     }
 
+    /** Creates a uniquely described todo or returns the persisted matching todo. */
+    fun addIfAbsent(
+        description: String,
+        assignedAgentId: String,
+    ): de.heckenmann.visualagent.knowledge.TodoCreation {
+        val todo =
+            Todo(
+                id = UUID.randomUUID().toString(),
+                description = description,
+                status = TodoStatus.PENDING,
+                position = nextPosition(),
+                assignedAgentId = assignedAgentId,
+            )
+        val creation = todoStore.createTodoIfAbsent(todo)
+        if (creation.created) {
+            todos += creation.todo
+            publishChange(TodoChange(TodoChangeType.ADDED, todo = creation.todo))
+        }
+        return creation
+    }
+
     /**
      * Updates the description of a todo and publishes an update event.
      *
@@ -343,6 +364,10 @@ class TodoManager(
 /** In-memory no-op store used by the test-only [TodoManager] constructor. */
 internal class NoOpTodoStore : TodoStore {
     override fun saveTodo(todo: Todo) {}
+
+    override fun createTodoIfAbsent(todo: Todo): de.heckenmann.visualagent.knowledge.TodoCreation =
+        de.heckenmann.visualagent.knowledge
+            .TodoCreation(todo, created = true)
 
     override fun listTodos(): List<Todo> = emptyList()
 

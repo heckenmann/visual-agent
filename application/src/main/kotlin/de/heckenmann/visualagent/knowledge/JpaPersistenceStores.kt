@@ -169,6 +169,19 @@ internal class JpaTodoStore(
         repository.save(todo.toEntity())
     }
 
+    @Transactional
+    override fun createTodoIfAbsent(todo: Todo): TodoCreation {
+        val normalizedDescription = normalizeDescription(todo.description)
+        val existing =
+            repository.findAllByOrderByPositionAscIdAsc().firstOrNull {
+                normalizeDescription(it.description) ==
+                    normalizedDescription
+            }
+        if (existing != null) return TodoCreation(existing.toDomain(), created = false)
+        repository.save(todo.toEntity())
+        return TodoCreation(todo, created = true)
+    }
+
     @Transactional(readOnly = true)
     override fun listTodos(): List<Todo> = repository.findAllByOrderByPositionAscIdAsc().map(TodoEntity::toDomain)
 
@@ -177,6 +190,8 @@ internal class JpaTodoStore(
 
     @Transactional
     override fun clearTodos() = repository.deleteAllInBatch()
+
+    private fun normalizeDescription(description: String): String = description.trim().replace(Regex("\\s+"), " ").lowercase()
 }
 
 @Service

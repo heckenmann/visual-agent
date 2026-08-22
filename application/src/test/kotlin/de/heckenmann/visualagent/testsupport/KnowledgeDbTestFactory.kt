@@ -128,6 +128,8 @@ class TestPersistence internal constructor(
 
     override fun saveTodo(todo: Todo) = todoStore.saveTodo(todo)
 
+    override fun createTodoIfAbsent(todo: Todo) = todoStore.createTodoIfAbsent(todo)
+
     override fun listTodos(): List<Todo> = todoStore.listTodos()
 
     override fun deleteTodo(todoId: String) = todoStore.deleteTodo(todoId)

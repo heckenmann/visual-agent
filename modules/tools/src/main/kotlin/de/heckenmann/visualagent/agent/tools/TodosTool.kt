@@ -115,19 +115,16 @@ class TodosTool(
             )
         }
         val description = input.requiredString("description")
-        val normalizedDescription = normalizeDescription(description)
-        val existing =
-            todos
-                .list()
-                .firstOrNull { normalizeDescription(it.description) == normalizedDescription }
-        if (existing != null) {
+        val creation = todos.addIfAbsent(description, assignedAgentId)
+        if (!creation.created) {
+            val existing = creation.todo
             return success(
                 "todos",
                 "Todo already exists: ${existing.id} [${existing.status}] " +
                     "${existing.description}. Reuse this todo instead of creating a duplicate.",
             )
         }
-        return success("todos", "Added todo ${todos.add(description, assignedAgentId)}")
+        return success("todos", "Added todo ${creation.todo.id}")
     }
 
     private fun updateTodo(input: JsonObject): ToolResult {
@@ -211,12 +208,6 @@ class TodosTool(
     }
 
     private fun agentExists(agentId: String): Boolean = todos.agentExists(agentId)
-
-    private fun normalizeDescription(description: String): String =
-        description
-            .trim()
-            .replace(Regex("\\s+"), " ")
-            .lowercase()
 
     private fun isSubAgentRequest(context: Map<String, Any>): Boolean = context["agentId"]?.toString()?.isNotBlank() == true
 

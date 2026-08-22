@@ -203,6 +203,18 @@ internal class FakeTodoStore : TodoStore {
         todos.add(todo)
     }
 
+    override fun createTodoIfAbsent(todo: Todo): de.heckenmann.visualagent.knowledge.TodoCreation {
+        val existing = todos.firstOrNull { it.description.equals(todo.description, ignoreCase = true) }
+        return if (existing == null) {
+            saveTodo(todo)
+            de.heckenmann.visualagent.knowledge
+                .TodoCreation(todo, created = true)
+        } else {
+            de.heckenmann.visualagent.knowledge
+                .TodoCreation(existing, created = false)
+        }
+    }
+
     override fun listTodos(): List<Todo> = todos.toList()
 
     override fun deleteTodo(todoId: String) {
