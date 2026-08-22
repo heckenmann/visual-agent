@@ -58,6 +58,30 @@ class CodexAppServerChatModelTest {
         }
 
     @Test
+    fun `assistant item boundaries are preserved in response metadata`() =
+        runBlocking {
+            val directory = createTempDirectory("codex-app-server-item-boundary-test-")
+            val executable = fakeServer(directory, secondItem = true)
+            try {
+                val responses =
+                    CodexAppServerChatModel(executable, "gpt-test", emptyList(), directory)
+                        .streamFlow(Prompt("hello"))
+                        .toList()
+
+                assertEquals(
+                    listOf("item-1", "item-2"),
+                    responses.dropLast(1).map {
+                        it.metadata
+                            .get<String>("codexItemId")
+                            ?: error("item ID missing")
+                    },
+                )
+            } finally {
+                deleteRecursively(directory)
+            }
+        }
+
+    @Test
     fun `a single native delta is animated in small chunks`() =
         runBlocking {
             val directory = createTempDirectory("codex-app-server-single-delta-test-")
@@ -150,6 +174,7 @@ class CodexAppServerChatModelTest {
     private fun fakeServer(
         directory: Path,
         singleDelta: Boolean = false,
+        secondItem: Boolean = false,
         reasoningSummary: Boolean = false,
         turnStatus: String = "completed",
     ): Path {
@@ -157,6 +182,8 @@ class CodexAppServerChatModelTest {
         val deltaEvents =
             if (singleDelta) {
                 """printf '%s\n' '{"jsonrpc":"2.0","method":"item/agentMessage/delta","params":{"delta":"hello","itemId":"item-1","threadId":"thread-1","turnId":"turn-1"}}'"""
+            } else if (secondItem) {
+                deltaEvent("hel", "item-1") + "\n                  " + deltaEvent("lo", "item-2")
             } else {
                 deltaEvent("hel") + "\n                  " + deltaEvent("lo")
             }
@@ -208,9 +235,15 @@ class CodexAppServerChatModelTest {
             ?.text
             .orEmpty()
 
-    private fun deltaEvent(text: String): String = "printf '%s\\n' '${Json.encodeToString(JsonObject.serializer(), deltaMessage(text))}'"
+    private fun deltaEvent(
+        text: String,
+        itemId: String = "item-1",
+    ): String = "printf '%s\\n' '${Json.encodeToString(JsonObject.serializer(), deltaMessage(text, itemId))}'"
 
-    private fun deltaMessage(text: String): JsonObject =
+    private fun deltaMessage(
+        text: String,
+        itemId: String = "item-1",
+    ): JsonObject =
         buildJsonObject {
             put("jsonrpc", JsonPrimitive("2.0"))
             put("method", JsonPrimitive("item/agentMessage/delta"))
@@ -218,7 +251,7 @@ class CodexAppServerChatModelTest {
                 "params",
                 buildJsonObject {
                     put("delta", JsonPrimitive(text))
-                    put("itemId", JsonPrimitive("item-1"))
+                    put("itemId", JsonPrimitive(itemId))
                     put("threadId", JsonPrimitive("thread-1"))
                     put("turnId", JsonPrimitive("turn-1"))
                 },

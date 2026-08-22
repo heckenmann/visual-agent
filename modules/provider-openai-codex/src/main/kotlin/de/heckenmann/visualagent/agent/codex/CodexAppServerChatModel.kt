@@ -11,9 +11,7 @@ import kotlinx.coroutines.reactor.asFlux
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -56,15 +54,17 @@ internal class CodexAppServerChatModel(
     private suspend fun collectComplete(stream: Flow<SpringChatResponse>): SpringChatResponse {
         val content = StringBuilder()
         var last: SpringChatResponse? = null
+        var lastItemId: String? = null
         stream.collect { response ->
             response.result
                 ?.output
                 ?.text
                 ?.let(content::append)
+            response.metadata.get<String>(CODEX_ITEM_ID)?.let { lastItemId = it }
             last = response
         }
         val terminal = requireNotNull(last) { "Codex returned no response" }
-        return response(content.toString(), done = terminal.hasFinishReasons(setOf("stop")))
+        return response(content.toString(), done = terminal.hasFinishReasons(setOf("stop")), itemId = lastItemId)
     }
 
     /** Streams native assistant deltas as Spring AI responses. */
@@ -95,6 +95,7 @@ internal class CodexAppServerChatModel(
                     CodexAppServerRequestParams.turn(prompt, threadId, model, showReasoningSummary, image),
                 )
                 var pendingDelta: String? = null
+                var pendingItemId: String? = null
                 var receivedMultipleDeltas = false
                 withTimeout(TURN_TIMEOUT_MILLIS) {
                     while (true) {
@@ -105,15 +106,24 @@ internal class CodexAppServerChatModel(
                             is CodexRpcMessage.Notification ->
                                 when (event.method) {
                                     "item/agentMessage/delta" -> {
+                                        val itemId = event.params["itemId"]?.jsonPrimitive?.contentOrNull
                                         val delta =
                                             event.params["delta"]
                                                 ?.jsonPrimitive
                                                 ?.contentOrNull
                                                 .orEmpty()
                                         if (delta.isNotEmpty()) {
-                                            pendingDelta?.let { emit(response(it, done = false)) }
+                                            val previousDelta = pendingDelta
+                                            if (previousDelta != null && pendingItemId != itemId) {
+                                                emit(response(previousDelta, done = false, itemId = pendingItemId))
+                                                pendingDelta = null
+                                                pendingItemId = null
+                                                receivedMultipleDeltas = true
+                                            }
+                                            pendingDelta?.let { emit(response(it, done = false, itemId = pendingItemId)) }
                                             receivedMultipleDeltas = receivedMultipleDeltas || pendingDelta != null
                                             pendingDelta = delta
+                                            pendingItemId = itemId
                                         }
                                     }
                                     "item/reasoning/summaryTextDelta" -> {
@@ -124,7 +134,13 @@ internal class CodexAppServerChatModel(
                                                     ?.contentOrNull
                                                     .orEmpty()
                                             if (summary.isNotEmpty()) {
-                                                emit(response("<think>$summary</think>", done = false))
+                                                emit(
+                                                    response(
+                                                        "<think>$summary</think>",
+                                                        done = false,
+                                                        itemId = event.params["itemId"]?.jsonPrimitive?.contentOrNull,
+                                                    ),
+                                                )
                                             }
                                         }
                                     }
@@ -144,11 +160,11 @@ internal class CodexAppServerChatModel(
                                         }
                                         pendingDelta?.let { lastDelta ->
                                             if (receivedMultipleDeltas) {
-                                                emit(response(lastDelta, done = false))
+                                                emit(response(lastDelta, done = false, itemId = pendingItemId))
                                             } else {
                                                 val chunks = lastDelta.simulatedChunks()
                                                 chunks.forEachIndexed { index, chunk ->
-                                                    emit(response(chunk, done = false))
+                                                    emit(response(chunk, done = false, itemId = pendingItemId))
                                                     if (index < chunks.lastIndex) delay(SIMULATED_CHUNK_DELAY_MS)
                                                 }
                                             }
@@ -200,48 +216,40 @@ internal class CodexAppServerChatModel(
         }
         val arguments = request.params["arguments"]?.toString() ?: "{}"
         val result = withContext(Dispatchers.IO) { runCatching { callback.call(arguments) } }
-        if (result.isFailure) {
-            transport.respond(
-                request.id,
-                buildJsonObject {
-                    put("success", JsonPrimitive(false))
-                    put(
-                        "contentItems",
-                        buildJsonArray {
-                            add(
-                                buildJsonObject {
-                                    put("type", JsonPrimitive("inputText"))
-                                    put("text", JsonPrimitive(result.exceptionOrNull()?.message ?: "Tool execution failed"))
-                                },
-                            )
-                        },
-                    )
-                },
-            )
-        } else {
-            transport.respond(
-                request.id,
-                buildJsonObject {
-                    put("success", JsonPrimitive(true))
-                    put(
-                        "contentItems",
-                        buildJsonArray {
-                            add(
-                                buildJsonObject {
-                                    put("type", JsonPrimitive("inputText"))
-                                    put("text", JsonPrimitive(result.getOrThrow()))
-                                },
-                            )
-                        },
-                    )
-                },
-            )
-        }
+        val allowInlineImage = isWorkspaceImageRequest(toolName, arguments)
+        val response =
+            if (result.isFailure) {
+                CodexDynamicToolResultMapper.response(
+                    result.exceptionOrNull()?.message ?: "Tool execution failed",
+                    allowInlineImage = false,
+                    successOverride = false,
+                )
+            } else {
+                CodexDynamicToolResultMapper.response(
+                    result.getOrThrow(),
+                    allowInlineImage = allowInlineImage,
+                )
+            }
+        transport.respond(request.id, response)
     }
+
+    private fun isWorkspaceImageRequest(
+        toolName: String?,
+        arguments: String,
+    ): Boolean =
+        toolName == WORKSPACE_FILE_TOOL_NAME &&
+            runCatching {
+                Json
+                    .parseToJsonElement(arguments)
+                    .jsonObject["action"]
+                    ?.jsonPrimitive
+                    ?.contentOrNull == WORKSPACE_IMAGE_ACTION
+            }.getOrDefault(false)
 
     private fun response(
         text: String,
         done: Boolean,
+        itemId: String? = null,
     ): SpringChatResponse =
         SpringChatResponse(
             listOf(
@@ -250,10 +258,17 @@ internal class CodexAppServerChatModel(
                     ChatGenerationMetadata.builder().apply { if (done) finishReason("stop") }.build(),
                 ),
             ),
-            ChatResponseMetadata.builder().model(model).build(),
+            ChatResponseMetadata
+                .builder()
+                .model(model)
+                .apply { itemId?.let { keyValue("codexItemId", it) } }
+                .build(),
         )
 
     private companion object {
+        private const val CODEX_ITEM_ID = "codexItemId"
+        private const val WORKSPACE_FILE_TOOL_NAME = "workspace_file"
+        private const val WORKSPACE_IMAGE_ACTION = "imageBytes"
         private const val SIMULATED_CHUNK_DELAY_MS = 16L
         private const val TURN_TIMEOUT_MILLIS = 300_000L
     }

@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.springframework.ai.chat.messages.AssistantMessage
 import org.springframework.ai.chat.messages.SystemMessage
 import org.springframework.ai.chat.messages.UserMessage
@@ -50,14 +52,7 @@ class CodexCliProvider internal constructor(
                 ).complete(request.toPrompt(), request.cancellationToken)
             ChatResponse(
                 model = response.metadata.model.takeIf(String::isNotBlank) ?: model,
-                message =
-                    Message(
-                        "assistant",
-                        response.result
-                            ?.output
-                            ?.text
-                            .orEmpty(),
-                    ),
+                message = response.toCodexProviderMessage(),
                 done = true,
             )
         }
@@ -79,14 +74,7 @@ class CodexCliProvider internal constructor(
                 emit(
                     ChatResponse(
                         model = chunk.metadata.model.takeIf(String::isNotBlank) ?: model,
-                        message =
-                            Message(
-                                "assistant",
-                                chunk.result
-                                    ?.output
-                                    ?.text
-                                    .orEmpty(),
-                            ),
+                        message = chunk.toCodexProviderMessage(),
                         done = chunk.hasFinishReasons(setOf("stop")),
                     ),
                 )
@@ -117,14 +105,7 @@ class CodexCliProvider internal constructor(
                 ).completeVision(image, prompt)
             ChatResponse(
                 model = response.metadata.model.takeIf(String::isNotBlank) ?: model,
-                message =
-                    Message(
-                        "assistant",
-                        response.result
-                            ?.output
-                            ?.text
-                            .orEmpty(),
-                    ),
+                message = response.toCodexProviderMessage(),
                 done = true,
             )
         }
@@ -190,5 +171,25 @@ class CodexCliProvider internal constructor(
     ) = toolCallbacks.functionCallbacks(
         request.enabledTools,
         request.metadata + mapOf("model" to model, "provider" to "codex"),
+    )
+}
+
+/**
+ * Carries the Codex assistant item identifier across the provider-neutral boundary.
+ *
+ * @return Provider-neutral assistant message with optional Codex metadata
+ */
+internal fun org.springframework.ai.chat.model.ChatResponse.toCodexProviderMessage(): Message {
+    val itemId = metadata.get<String>("codexItemId")
+    val messageMetadata =
+        itemId?.let {
+            buildJsonObject {
+                put("codexItemId", it)
+            }.toString()
+        }
+    return Message(
+        role = "assistant",
+        content = result?.output?.text.orEmpty(),
+        metadata = messageMetadata,
     )
 }
