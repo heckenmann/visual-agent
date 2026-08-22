@@ -7,10 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DeleteOutline
@@ -21,8 +18,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
@@ -33,9 +28,10 @@ import de.heckenmann.visualagent.protocol.TodoItem
 import de.heckenmann.visualagent.protocol.TodoState
 import de.heckenmann.visualagent.ui.components.PanelContentCard
 import de.heckenmann.visualagent.ui.components.labelizeEnumName
+import de.heckenmann.visualagent.ui.todo.TODO_RESPONSE_PREVIEW_MAX_LINES
 import de.heckenmann.visualagent.ui.todo.TodoResponseState
 import de.heckenmann.visualagent.ui.todo.TodoWorkingIndicator
-import kotlinx.coroutines.flow.collectLatest
+import de.heckenmann.visualagent.ui.todo.todoResponseTail
 
 /** Renders a compact todo card anchored in the conversation timeline. */
 @Composable
@@ -84,28 +80,18 @@ private fun ConversationTodoResponsePreview(
     onOpen: () -> Unit,
 ) {
     if (responseState.text.isBlank()) return
-    val scrollState = rememberScrollState()
-    LaunchedEffect(Unit) {
-        snapshotFlow { scrollState.maxValue }.collectLatest { maxValue ->
-            scrollState.scrollTo(maxValue)
-        }
-    }
-    LaunchedEffect(responseState.text) {
-        scrollState.scrollTo(scrollState.maxValue)
-    }
     Column(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .heightIn(max = 96.dp)
-                .verticalScroll(scrollState)
                 .clickable(onClick = onOpen)
                 .semantics { contentDescription = "Open full todo response" },
     ) {
         Text(
-            text = responseState.text,
+            text = todoResponseTail(responseState.text),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = TODO_RESPONSE_PREVIEW_MAX_LINES,
         )
     }
 }

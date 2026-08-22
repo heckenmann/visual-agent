@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import de.heckenmann.visualagent.protocol.LifecycleState
+import de.heckenmann.visualagent.protocol.TodoChange
 import de.heckenmann.visualagent.protocol.TodoItem
 import de.heckenmann.visualagent.protocol.TodoPort
 import de.heckenmann.visualagent.protocol.TodoProgress
@@ -59,7 +60,14 @@ class ComposeTodoPanelProtocolTest {
     @Test
     fun `progress listener keeps the latest response available after completion`() {
         var progressListener: ((TodoProgress) -> Unit)? = null
-        val port = protocolPort(listOf(TodoItem("todo", "Streaming task", TodoState.IN_PROGRESS)))
+        var todoListener: ((TodoChange) -> Unit)? = null
+        var currentTodo = TodoItem("todo", "Streaming task", TodoState.IN_PROGRESS)
+        val port = protocolPort(listOf(currentTodo))
+        every { port.list() } answers { listOf(currentTodo) }
+        every { port.addListener(any()) } answers {
+            todoListener = firstArg()
+            AutoCloseable { }
+        }
         every { port.addProgressListener(any()) } answers {
             progressListener = firstArg()
             AutoCloseable { }
@@ -73,8 +81,11 @@ class ComposeTodoPanelProtocolTest {
         composeTestRule.onNodeWithText("New response").assertExists()
         composeTestRule.onNodeWithContentDescription("Todo working").assertExists()
         progressListener!!.invoke(TodoProgress("todo", completed = true))
+        currentTodo = currentTodo.copy(status = TodoState.COMPLETED)
+        todoListener!!.invoke(TodoChange(todo = currentTodo))
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("New response").assertExists()
+        assertEquals(0, composeTestRule.onAllNodesWithContentDescription("Todo working").fetchSemanticsNodes().size)
     }
 
     @Test

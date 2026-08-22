@@ -188,10 +188,11 @@ internal fun TodoResponseOverlay(
 internal fun ComposeModalRequester.requestTodoResponse(
     todo: TodoItem,
     responseState: TodoResponseState,
+    currentTodo: () -> TodoItem? = { todo },
 ) {
     request(
         ComposeContentModal(title = "Todo response") { dismiss ->
-            TodoResponseOverlay(todo = todo, responseState = responseState, onDismiss = dismiss)
+            TodoResponseOverlay(todo = currentTodo() ?: todo, responseState = responseState, onDismiss = dismiss)
         },
     )
 }

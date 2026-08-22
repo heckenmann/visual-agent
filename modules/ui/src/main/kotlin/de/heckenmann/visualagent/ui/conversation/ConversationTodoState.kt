@@ -36,6 +36,7 @@ internal fun rememberConversationTodoState(
     val scope = rememberCoroutineScope()
     LaunchedEffect(todoPort) {
         state.todos = withContext(Dispatchers.IO) { todoPort.list() }
+        state.deletedSnapshots = withContext(Dispatchers.IO) { todoPort.deletedSnapshots() }.associateBy { it.id }
     }
     DisposableEffect(todoPort) {
         val todoHandle =
@@ -47,7 +48,6 @@ internal fun rememberConversationTodoState(
                     } ?: change.todoId?.let { removedId ->
                         removedSnapshot?.let { state.deletedSnapshots = state.deletedSnapshots + (removedId to it) }
                         state.todos = state.todos.filterNot { it.id == removedId }
-                        state.responses = state.responses - removedId
                     }
                     if (!conversationState.sending) {
                         val history = withContext(Dispatchers.IO) { conversationPort.currentHistory() }

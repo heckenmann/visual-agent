@@ -20,7 +20,7 @@ Keep the user aware of autonomous todo work by showing each todo as a compact ca
 6. When execution starts, progress events update the same card with a bounded tail of the latest response lines.
 7. The Todo panel consumes the same response presentation behavior and can open the same full-response overlay.
 8. When execution completes, fails, is cancelled, or is paused, the card keeps the latest available response tail and updates its status.
-9. If the todo is deleted, the conversation keeps a compact unavailable card based on its retained snapshot.
+9. If the todo is deleted, the server atomically archives its snapshot before removing the active row; the conversation keeps a compact unavailable card based on that persisted snapshot.
 10. If an existing todo is genuinely updated, its activity timestamp changes and the same card moves down to the current position while retaining its stable id and history.
 11. Reloading the conversation reconstructs cards from persisted todos and history at the same chronological positions.
 
@@ -52,7 +52,7 @@ Keep the user aware of autonomous todo work by showing each todo as a compact ca
 - Existing todos are updated only when the objective and scope remain the same; a different objective gets a new todo so prior history remains meaningful.
 - One canonical execution stream is fanned out to Conversation, Todo, and the overlay.
 - Compact previews are bounded; the canonical full response is not truncated.
-- Deleting a todo never removes unrelated conversation content.
+- Deleting a todo never removes unrelated conversation content, and its retained snapshot survives panel reloads and application restarts.
 
 ## Related Issues
 

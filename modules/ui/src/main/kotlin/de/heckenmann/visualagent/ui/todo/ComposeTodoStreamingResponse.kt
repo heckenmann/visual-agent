@@ -38,9 +38,11 @@ private const val TODO_RESPONSE_WINDOW_CHARS = 180
 @Composable
 internal fun TodoStreamingResponse(
     visible: Boolean,
+    working: Boolean,
     responseState: TodoResponseState,
     modalRequester: ComposeModalRequester,
     todo: de.heckenmann.visualagent.protocol.TodoItem,
+    currentTodo: () -> de.heckenmann.visualagent.protocol.TodoItem? = { todo },
 ) {
     AnimatedVisibility(
         visible = visible,
@@ -58,7 +60,7 @@ internal fun TodoStreamingResponse(
             contentAlignment = Alignment.CenterStart,
         ) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                TodoWorkingIndicator()
+                if (working) TodoWorkingIndicator()
                 if (responseState.text.isBlank()) {
                     Text(
                         text = "Waiting for response…",
@@ -72,7 +74,7 @@ internal fun TodoStreamingResponse(
                         modifier =
                             Modifier
                                 .weight(1f)
-                                .clickable { modalRequester.requestTodoResponse(todo, responseState) },
+                                .clickable { modalRequester.requestTodoResponse(todo, responseState, currentTodo) },
                     )
                 }
             }

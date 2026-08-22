@@ -220,7 +220,12 @@ internal fun ConversationPanel(
                         onStatusChange = { conversationState.status = it },
                         onEditMessage = { conversationState.editingId = it },
                         sendContent = sendContent,
-                        onOpenTodoResponse = { todo, responseState -> modalRequester.requestTodoResponse(todo, responseState) },
+                        onOpenTodoResponse = { todo, responseState ->
+                            modalRequester.requestTodoResponse(todo, responseState) {
+                                todoState.todos.firstOrNull { current -> current.id == todo.id }
+                                    ?: todoState.deletedSnapshots[todo.id]
+                            }
+                        },
                         inlineComposer = {
                             ConversationInputCard(
                                 input = conversationState.input,

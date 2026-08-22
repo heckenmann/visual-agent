@@ -189,6 +189,7 @@ internal fun TodoPanel(
                 isNext = todo.id == nextTodoId,
                 isDragging = isDragging,
                 responseState = responseStates[todo.id] ?: remember(todo.id) { TodoResponseState() },
+                currentTodo = { todos.firstOrNull { current -> current.id == todo.id } },
                 todoPort = todoPort,
                 modalRequester = modalRequester,
                 refresh = refresh,
