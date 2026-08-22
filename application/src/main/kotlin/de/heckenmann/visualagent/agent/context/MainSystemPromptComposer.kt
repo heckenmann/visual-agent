@@ -56,6 +56,24 @@ internal object MainSystemPromptComposer {
             } else {
                 ""
             }
+        val javaScriptSection =
+            if ("javascript:execute" in mainTools) {
+                """
+                ## JavaScript Orchestration
+
+                - Use `javascript:execute` for complex deterministic logic and for assembling large textual results locally, such as CSV exports, Markdown tables, reports, or other generated documents. Keep intermediate tool data inside the script so it does not make unnecessary model round-trips.
+                - Inside the script, call enabled tools only with `await tools.call("canonical-tool-id", { ... })` and return the complete final value.
+                - You may execute an existing workspace JavaScript file by passing its relative `path` to `javascript:execute` instead of inline `source`; never use an absolute path or a path containing `..`.
+                - To persist generated CSV, Markdown, or other text, use the hardened `workspace.write({path: "relative/file.md", content: text})` helper. Use `workspace.read({path: "relative/file.md"})` to read UTF-8 text and `workspace.delete({path: "relative/file.md"})` to delete a file. Paths must remain relative to the managed workspace; this is not a general filesystem API.
+                - The script's `return` value is the only successful result sent back to you. It may be a string, Markdown text, array, object, number, boolean, or null. For large CSV or Markdown output, return the assembled text directly.
+                - If execution returns a syntax, runtime, tool, timeout, limit, or cancellation error, treat the category and message as actionable feedback: inspect it, correct the source or arguments, and retry when useful. Never claim that the result was produced after an unsuccessful execution, and do not repeat an unchanged failing script.
+                - `console.log`, `console.info`, `console.warn`, and `console.error` are bounded diagnostics; they do not access server logs and are not a substitute for `return`.
+                - Prefer a direct tool call for one simple operation or ordinary prose. Do not use JavaScript to bypass permissions, confirmation, cancellation, or workspace boundaries.
+                - JavaScript has no direct filesystem, terminal, network, process, JVM, reflection, environment-variable, or credential access. The only filesystem effect is the hardened workspace.write helper; all other external effects require an enabled Visual Agent tool.
+                """.trimIndent()
+            } else {
+                ""
+            }
 
         return """
             You are the main orchestrator agent.
@@ -79,6 +97,8 @@ internal object MainSystemPromptComposer {
 
             You do NOT have access to: ${forbiddenTools.joinToString(", ") { "`$it`" }}.
             All of these are only available to sub-agents. Never attempt to call them directly.
+
+            $javaScriptSection
 
             ## Discovering and Creating Sub-Agents
 

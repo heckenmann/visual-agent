@@ -43,6 +43,7 @@ class AgentToolConfigService(
             "workspace:file",
             "workspace:mime",
             "workspace:download",
+            "javascript:execute",
         ).let(::filterEnabledTools).map(::ToolId).toSet()
 
     /**
@@ -205,6 +206,7 @@ class AgentToolConfigService(
                         "workspace:mime",
                         "workspace:download",
                         "canvas",
+                        "javascript:execute",
                     ),
             ),
             SubAgentToolConfig(
@@ -232,6 +234,7 @@ class AgentToolConfigService(
                         "workspace:mime",
                         "workspace:download",
                         "canvas",
+                        "javascript:execute",
                     ),
                 maxTurns = 8,
             ),
@@ -257,6 +260,7 @@ class AgentToolConfigService(
                         "workspace:mime",
                         "workspace:download",
                         "canvas",
+                        "javascript:execute",
                     ),
             ),
         )
