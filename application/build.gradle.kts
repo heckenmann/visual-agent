@@ -1,5 +1,7 @@
 import org.gradle.api.tasks.testing.Test
+import org.springframework.boot.gradle.tasks.bundling.BootJar
 import java.nio.file.Files
+import java.util.jar.JarFile
 import kotlin.io.path.extension
 
 plugins {
@@ -201,6 +203,36 @@ tasks.jacocoTestCoverageVerification {
 
 springBoot {
     mainClass.set("de.heckenmann.visualagent.VisualAgentApplicationKt")
+}
+
+val verifyExecutableJar =
+    tasks.register("verifyExecutableJar") {
+        group = "verification"
+        description = "Verifies that the standalone application boot JAR has an executable Spring Boot manifest."
+        dependsOn(tasks.named("bootJar"))
+        doLast {
+            val executableJar =
+                tasks
+                    .named<BootJar>("bootJar")
+                    .get()
+                    .archiveFile
+                    .get()
+                    .asFile
+            check(executableJar.isFile) { "Executable application JAR was not created: $executableJar" }
+            JarFile(executableJar).use { archive ->
+                val attributes = archive.manifest.mainAttributes
+                check(attributes.getValue("Main-Class") == "org.springframework.boot.loader.launch.JarLauncher") {
+                    "Application boot JAR must use Spring Boot's JarLauncher as Main-Class"
+                }
+                check(attributes.getValue("Start-Class") == "de.heckenmann.visualagent.VisualAgentApplicationKt") {
+                    "Application boot JAR must declare the Kotlin application entry point as Start-Class"
+                }
+            }
+        }
+    }
+
+tasks.named("check") {
+    dependsOn(verifyExecutableJar)
 }
 
 tasks.register("runServer") {

@@ -43,3 +43,40 @@ jobs:
 
       - name: Run tests
         run: xvfb-run -a gradle ktlintCheck check test --build-cache --no-daemon --no-configuration-cache
+
+      - name: Verify executable JARs can launch
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          verify_launch() {
+            local jar_path="$1"
+            local log_path
+            local status=0
+            log_path="$(mktemp)"
+
+            timeout --kill-after=10s 25s xvfb-run -a java -jar "$jar_path" \
+              --spring.main.web-application-type=none >"$log_path" 2>&1 || status=$?
+
+            if ! grep -Eq "Started .+ in [0-9]+(\\.[0-9]+)? seconds" "$log_path"; then
+              cat "$log_path"
+              echo "JAR did not reach Spring Boot startup: $jar_path"
+              exit 1
+            fi
+
+            case "$status" in
+              0|124|137) ;;
+              *)
+                cat "$log_path"
+                echo "JAR exited before the launch check completed (status $status): $jar_path"
+                exit 1
+                ;;
+            esac
+          }
+
+          application_jar="$(find application/build/libs -maxdepth 1 -type f -name 'application-*.jar' ! -name '*-plain.jar' -print -quit)"
+          desktop_jar="$(find modules/desktop/build/libs -maxdepth 1 -type f -name 'desktop-*.jar' ! -name '*-plain.jar' -print -quit)"
+          test -n "$application_jar"
+          test -n "$desktop_jar"
+          verify_launch "$application_jar"
+          verify_launch "$desktop_jar"

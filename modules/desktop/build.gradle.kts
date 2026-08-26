@@ -1,4 +1,6 @@
 import org.gradle.api.publish.maven.MavenPublication
+import org.springframework.boot.gradle.tasks.bundling.BootJar
+import java.util.jar.JarFile
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
@@ -63,6 +65,36 @@ compose.desktop {
 
 springBoot {
     mainClass.set("de.heckenmann.visualagent.desktop.DesktopMain")
+}
+
+val verifyExecutableJar =
+    tasks.register("verifyExecutableJar") {
+        group = "verification"
+        description = "Verifies that the distributable desktop boot JAR has an executable manifest."
+        dependsOn(tasks.named("bootJar"))
+        doLast {
+            val executableJar =
+                tasks
+                    .named<BootJar>("bootJar")
+                    .get()
+                    .archiveFile
+                    .get()
+                    .asFile
+            check(executableJar.isFile) { "Executable desktop JAR was not created: $executableJar" }
+            JarFile(executableJar).use { archive ->
+                val attributes = archive.manifest.mainAttributes
+                check(attributes.getValue("Main-Class") == "org.springframework.boot.loader.launch.JarLauncher") {
+                    "Desktop boot JAR must use Spring Boot's JarLauncher as Main-Class"
+                }
+                check(attributes.getValue("Start-Class") == "de.heckenmann.visualagent.desktop.DesktopMain") {
+                    "Desktop boot JAR must declare DesktopMain as Start-Class"
+                }
+            }
+        }
+    }
+
+tasks.named("check") {
+    dependsOn(verifyExecutableJar)
 }
 
 publishing {
