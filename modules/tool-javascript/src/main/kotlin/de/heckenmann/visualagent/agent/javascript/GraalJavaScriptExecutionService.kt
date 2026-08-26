@@ -243,7 +243,19 @@ class GraalJavaScriptExecutionService(
         bridge: JavaScriptToolBridge? = null,
     ): JavaScriptExecutionException {
         if (error.isResourceExhausted) {
-            return JavaScriptExecutionException(JavaScriptErrorCategory.LIMIT_EXCEEDED, "JavaScript resource limit exceeded")
+            val category =
+                if (isCpuTimeLimit(error)) {
+                    JavaScriptErrorCategory.TIMEOUT
+                } else {
+                    JavaScriptErrorCategory.LIMIT_EXCEEDED
+                }
+            val message =
+                if (category == JavaScriptErrorCategory.TIMEOUT) {
+                    "JavaScript execution timed out"
+                } else {
+                    "JavaScript resource limit exceeded"
+                }
+            return JavaScriptExecutionException(category, message)
         }
         if (error.isHostException) {
             val host = runCatching { error.asHostException() }.getOrNull()
@@ -261,6 +273,11 @@ class GraalJavaScriptExecutionService(
             ?.take(MAX_ERROR_CHARACTERS)
             .orEmpty()
             .ifBlank { "JavaScript execution failed" }
+
+    private fun isCpuTimeLimit(error: PolyglotException): Boolean =
+        error.message
+            ?.contains("CPU time limit", ignoreCase = true)
+            ?: false
 
     private fun looksLikeJavaScriptError(message: String): Boolean =
         message.matches(Regex("(?i)^(error|typeerror|referenceerror|rangeerror|syntaxerror):.*"))
