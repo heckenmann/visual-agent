@@ -58,7 +58,7 @@ jobs:
             timeout --kill-after=10s 25s xvfb-run -a java -jar "$jar_path" \
               --spring.main.web-application-type=none >"$log_path" 2>&1 || status=$?
 
-            if ! grep -q "Started application" "$log_path"; then
+            if ! grep -Eq "Started .+ in [0-9]+(\\.[0-9]+)? seconds" "$log_path"; then
               cat "$log_path"
               echo "JAR did not reach Spring Boot startup: $jar_path"
               exit 1
