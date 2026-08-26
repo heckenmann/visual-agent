@@ -119,8 +119,13 @@ internal fun ConversationPanel(
         val content = rawContent.trim()
         if (content.isNotBlank()) {
             if (conversationState.sending) {
-                queue.enqueue(content, QueuedMessageSource.USER)
-                conversationState.status = "Queued (${queue.size})"
+                queueUserMessage(
+                    content = content,
+                    enqueue = { message -> queue.enqueue(message, QueuedMessageSource.USER) },
+                    queuedMessageCount = { queue.size },
+                    onInputChange = { conversationState.input = it },
+                    onStatusChange = { conversationState.status = it },
+                )
             } else {
                 scope.launch {
                     executeSend(

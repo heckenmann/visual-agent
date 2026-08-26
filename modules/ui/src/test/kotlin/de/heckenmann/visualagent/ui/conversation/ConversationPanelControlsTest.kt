@@ -130,4 +130,40 @@ class ConversationPanelControlsTest {
         composeTestRule.onNodeWithContentDescription("Clear conversation").performClick()
         assertTrue(clearClicked)
     }
+
+    @Test
+    fun `queueing a message clears the input after the queue accepts it`() {
+        var input = "Follow up"
+        var status = ""
+        val queue = MessageQueue()
+
+        queueUserMessage(
+            content = input,
+            enqueue = { message -> queue.enqueue(message, QueuedMessageSource.USER) },
+            queuedMessageCount = { queue.size },
+            onInputChange = { input = it },
+            onStatusChange = { status = it },
+        )
+
+        assertEquals("", input)
+        assertEquals("Follow up", queue.peek()?.content)
+        assertEquals("Queued (1)", status)
+    }
+
+    @Test
+    fun `queueing failure keeps the input for retry`() {
+        var input = "Follow up"
+        var status = ""
+
+        queueUserMessage(
+            content = input,
+            enqueue = { error("Queue unavailable") },
+            queuedMessageCount = { 0 },
+            onInputChange = { input = it },
+            onStatusChange = { status = it },
+        )
+
+        assertEquals("Follow up", input)
+        assertTrue(status.startsWith("Could not queue message:"))
+    }
 }

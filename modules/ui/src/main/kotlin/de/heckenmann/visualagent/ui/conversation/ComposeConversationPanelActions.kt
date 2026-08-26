@@ -76,6 +76,27 @@ internal fun handleClearConversation(
     )
 }
 
+/**
+ * Queues a user message and clears the composer only after the queue accepted it.
+ *
+ * Keeping the composer content on failure lets the user retry without retyping the message.
+ */
+internal fun queueUserMessage(
+    content: String,
+    enqueue: (String) -> Unit,
+    queuedMessageCount: () -> Int,
+    onInputChange: (String) -> Unit,
+    onStatusChange: (String) -> Unit,
+) {
+    runCatching { enqueue(content) }
+        .onSuccess {
+            onInputChange("")
+            onStatusChange("Queued (${queuedMessageCount()})")
+        }.onFailure {
+            onStatusChange("Could not queue message: ${it.toUiErrorMessage()}")
+        }
+}
+
 @Composable
 internal fun ConversationEditModal(
     editingId: String?,

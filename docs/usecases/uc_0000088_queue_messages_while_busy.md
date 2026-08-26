@@ -16,7 +16,7 @@ Desktop user.
 ## Main Flow
 
 1. The user types a message and presses Enter or clicks Send while the main agent is busy.
-2. The message is enqueued in an in-memory queue instead of being dropped.
+2. The message is enqueued in an in-memory queue instead of being dropped. Once accepted, the input field is cleared immediately.
 3. A queue strip appears above the text input field showing queued messages.
 4. When the main agent becomes idle and no tool calls are in flight, the queue is flushed automatically.
 5. Each queued message is sent as a separate request (one-by-one mode) or combined into one request (all-at-once mode).
@@ -41,6 +41,7 @@ Messages are never lost when the main agent is busy. The user can prioritize mes
 ## Acceptance Criteria
 
 - Messages sent while `sending == true` are enqueued, not dropped.
+- A successfully queued user message clears the input field; a queueing failure retains its text for retry.
 - The queue strip is visible when the queue is non-empty.
 - The queue strip shows source icon, truncated content, and a "Send now" button per message.
 - Clicking "Send now" cancels the current request and sends the selected message.
