@@ -40,3 +40,9 @@ Run from the repository root:
 ./gradlew :application:test
 ./gradlew :application:runServer
 ```
+
+The `:application:bootJar` task produces the executable standalone-server artifact. Its manifest
+contains Spring Boot's `JarLauncher` and `VisualAgentApplicationKt` as the start class, so it can
+be started with `java -jar application/build/libs/application-<version>.jar`. The regular
+`application-<version>-plain.jar` is an internal library artifact used by the desktop composition
+and is not intended to be launched directly.

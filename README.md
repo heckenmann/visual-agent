@@ -11,7 +11,9 @@ Visual Agent is a Kotlin desktop application. Its goal is to provide the model w
 
 ## Download and Run
 
-Each successful build on `master` publishes an executable JAR to GitHub Packages. You need a GitHub personal access token with `read:packages` scope to download it.
+Each successful build on `master` publishes an executable, platform-specific desktop JAR to GitHub Packages. You need a GitHub personal access token with `read:packages` scope to download it.
+
+The published desktop JAR is produced by `:desktop:bootJar` and is the artifact intended for `java -jar`. The `application` module also produces an executable standalone-server JAR for server-only deployments. Files ending in `-plain.jar` are internal library artifacts and are not launchable applications.
 
 1. Download the latest package that matches your operating system from the [GitHub Packages registry](https://github.com/heckenmann/visual-agent/packages):
 
