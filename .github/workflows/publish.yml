@@ -124,6 +124,11 @@ jobs:
         run: ./gradlew --no-daemon :desktop:bootJar
         shell: bash
 
+      - name: Verify macOS Netty DNS resolver
+        if: matrix.platform == 'macos-x64' || matrix.platform == 'macos-arm64'
+        shell: bash
+        run: ./gradlew --no-daemon :desktop:verifyMacOsNativeDnsResolver
+
       - name: Publish to GitHub Packages
         run: ./gradlew --no-daemon :desktop:publish
         shell: bash

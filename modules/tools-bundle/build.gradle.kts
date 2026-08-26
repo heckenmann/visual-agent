@@ -13,3 +13,9 @@ dependencies {
     api(project(":tool-standard"))
     api(project(":tool-javascript"))
 }
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(24))
+    }
+}

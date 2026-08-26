@@ -42,6 +42,7 @@ spring-boot-starter-data-jpa = { module = "org.springframework.boot:spring-boot-
 spring-boot-starter-flyway = { module = "org.springframework.boot:spring-boot-starter-flyway" }
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
 spring-context = { module = "org.springframework:spring-context" }
+netty-resolver-dns-native-macos = { module = "io.netty:netty-resolver-dns-native-macos" }
 spring-ai-bom = { module = "org.springframework.ai:spring-ai-bom", version.ref = "spring-ai" }
 spring-ai-model = { module = "org.springframework.ai:spring-ai-model" }
 spring-ai-ollama = { module = "org.springframework.ai:spring-ai-starter-model-ollama" }

@@ -29,6 +29,17 @@ version =
     libs.versions.visual.agent
         .get()
 
+val macOsDnsResolverClassifier =
+    if (System.getProperty("os.name").equals("Mac OS X", ignoreCase = true)) {
+        when (System.getProperty("os.arch").lowercase()) {
+            "aarch64", "arm64" -> "osx-aarch_64"
+            "amd64", "x86_64" -> "osx-x86_64"
+            else -> error("Unsupported macOS architecture for Netty DNS resolver: ${System.getProperty("os.arch")}")
+        }
+    } else {
+        null
+    }
+
 repositories {
     google()
     mavenCentral()
@@ -45,11 +56,39 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.spring.boot.starter)
     implementation(platform(libs.spring.boot.bom))
+    macOsDnsResolverClassifier?.let { classifier ->
+        runtimeOnly(
+            variantOf(libs.netty.resolver.dns.native.macos) {
+                classifier(classifier)
+            },
+        )
+    }
     implementation(libs.tika.core)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.compose.ui.test.junit4.desktop)
     testImplementation(libs.mockk)
     testImplementation(project(":application"))
+}
+
+if (macOsDnsResolverClassifier != null) {
+    dependencies {
+        components {
+            listOf(
+                "io.projectreactor.netty:reactor-netty-core",
+                "io.projectreactor.netty:reactor-netty-http",
+            ).forEach { reactorNettyModule ->
+                withModule(reactorNettyModule) {
+                    allVariants {
+                        withDependencies {
+                            removeIf { dependency ->
+                                dependency.group == "io.netty" && dependency.name == "netty-resolver-dns-native-macos"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 compose.desktop {
@@ -93,8 +132,45 @@ val verifyExecutableJar =
         }
     }
 
+val verifyMacOsNativeDnsResolver =
+    tasks.register("verifyMacOsNativeDnsResolver") {
+        group = "verification"
+        description = "Verifies that the desktop boot JAR contains the matching macOS Netty DNS resolver."
+        dependsOn(tasks.named("bootJar"))
+        onlyIf { macOsDnsResolverClassifier != null }
+        doLast {
+            val executableJar =
+                tasks
+                    .named<BootJar>("bootJar")
+                    .get()
+                    .archiveFile
+                    .get()
+                    .asFile
+            val expectedResolver = "netty-resolver-dns-native-macos-"
+            val expectedClassifier = "-$macOsDnsResolverClassifier.jar"
+            val unexpectedClassifier =
+                if (macOsDnsResolverClassifier == "osx-aarch_64") "-osx-x86_64.jar" else "-osx-aarch_64.jar"
+            JarFile(executableJar).use { archive ->
+                val resolverLibraries =
+                    archive
+                        .entries()
+                        .asSequence()
+                        .map { entry -> entry.name }
+                        .filter { entry -> entry.startsWith("BOOT-INF/lib/$expectedResolver") }
+                        .toList()
+                check(resolverLibraries.any { entry -> entry.endsWith(expectedClassifier) }) {
+                    "Desktop boot JAR must contain the Netty macOS DNS resolver for $macOsDnsResolverClassifier"
+                }
+                check(resolverLibraries.none { entry -> entry.endsWith(unexpectedClassifier) }) {
+                    "Desktop boot JAR must not contain the Netty macOS DNS resolver for the other architecture"
+                }
+            }
+        }
+    }
+
 tasks.named("check") {
     dependsOn(verifyExecutableJar)
+    dependsOn(verifyMacOsNativeDnsResolver)
 }
 
 publishing {
