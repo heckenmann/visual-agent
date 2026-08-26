@@ -1,5 +1,4 @@
 import org.gradle.api.publish.maven.MavenPublication
-import org.gradle.api.tasks.bundling.Jar
 import org.springframework.boot.gradle.tasks.bundling.BootJar
 import java.util.jar.JarFile
 
@@ -66,12 +65,6 @@ compose.desktop {
 
 springBoot {
     mainClass.set("de.heckenmann.visualagent.desktop.DesktopMain")
-}
-
-// The Spring Boot JAR is the only distributable desktop artifact. The regular JAR is
-// an unlaunchable implementation artifact and would otherwise confuse users.
-tasks.named<Jar>("jar") {
-    enabled = false
 }
 
 val verifyExecutableJar =
