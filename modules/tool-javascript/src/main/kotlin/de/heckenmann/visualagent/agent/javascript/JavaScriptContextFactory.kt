@@ -82,7 +82,10 @@ internal class JavaScriptContextFactory {
     }
 
     private companion object {
-        const val MAX_STATEMENTS = 10_000_000L
+        // CPU time is the request-scoped execution bound. Keep the mandatory
+        // statement limit effectively unbounded so faster GraalJS releases do
+        // not turn normal timeout failures into premature statement-limit errors.
+        const val MAX_STATEMENTS = Long.MAX_VALUE
         const val MAX_STACK_FRAMES = 128
         const val MAX_AST_DEPTH = 128
     }
