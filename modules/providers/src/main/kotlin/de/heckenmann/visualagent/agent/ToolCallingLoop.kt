@@ -10,10 +10,10 @@ import org.springframework.ai.chat.metadata.ChatGenerationMetadata
 import org.springframework.ai.chat.model.ChatModel
 import org.springframework.ai.chat.model.Generation
 import org.springframework.ai.chat.prompt.Prompt
+import org.springframework.ai.model.tool.ToolCallingChatOptions
 import org.springframework.ai.model.tool.ToolCallingManager
 import org.springframework.ai.model.tool.ToolExecutionResult
 import org.springframework.ai.tool.ToolCallback
-import org.springframework.ai.tool.resolution.StaticToolCallbackResolver
 import org.springframework.ai.chat.model.ChatResponse as SpringChatResponse
 
 /**
@@ -52,8 +52,9 @@ internal class ToolCallingLoop(
         if (toolCallbacks.isEmpty()) {
             return chatModel.call(initialPrompt).toVisualAgentResponse()
         }
-        val toolCallingManager = buildToolCallingManager(toolCallbacks)
-        var prompt = initialPrompt
+        val boundPrompt = bindToolCallbacks(initialPrompt, toolCallbacks)
+        val toolCallingManager = buildToolCallingManager()
+        var prompt = boundPrompt
         var lastResponse: SpringChatResponse? = null
 
         repeat(maxRounds) { round ->
@@ -112,10 +113,11 @@ internal class ToolCallingLoop(
                 }
                 return@flow
             }
-            val toolCallingManager = buildToolCallingManager(toolCallbacks)
+            val boundPrompt = bindToolCallbacks(initialPrompt, toolCallbacks)
+            val toolCallingManager = buildToolCallingManager()
             val springChunks = mutableListOf<SpringChatResponse>()
 
-            chatModel.stream(initialPrompt).asFlow().collect { springResponse ->
+            chatModel.stream(boundPrompt).asFlow().collect { springResponse ->
                 token?.throwIfCancelled()
                 springChunks += springResponse
                 emit(springResponse.toVisualAgentResponse())
@@ -126,14 +128,14 @@ internal class ToolCallingLoop(
                 return@flow
             }
 
-            val toolExecutionResult = toolCallingManager.executeToolCalls(initialPrompt, aggregated)
+            val toolExecutionResult = toolCallingManager.executeToolCalls(boundPrompt, aggregated)
             if (toolExecutionResult.returnDirect()) {
                 val direct = buildDirectResponse(aggregated, toolExecutionResult)
                 emit(direct)
                 return@flow
             }
 
-            var prompt = appendToolConversationHistory(initialPrompt, toolExecutionResult)
+            var prompt = appendToolConversationHistory(boundPrompt, toolExecutionResult)
             var lastFinalResponse: SpringChatResponse? = null
             repeat(maxRounds) { round ->
                 token?.throwIfCancelled()
@@ -159,11 +161,24 @@ internal class ToolCallingLoop(
             lastFinalResponse?.let { emit(it.toVisualAgentResponse()) }
         }
 
-    private fun buildToolCallingManager(toolCallbacks: List<ToolCallback>): ToolCallingManager =
+    private fun buildToolCallingManager(): ToolCallingManager =
         ToolCallingManager
             .builder()
-            .toolCallbackResolver(StaticToolCallbackResolver(toolCallbacks))
             .build()
+
+    private fun bindToolCallbacks(
+        prompt: Prompt,
+        toolCallbacks: List<ToolCallback>,
+    ): Prompt {
+        val options = prompt.options
+        val boundOptions =
+            if (options is ToolCallingChatOptions) {
+                options.mutate().toolCallbacks(toolCallbacks).build()
+            } else {
+                ToolCallingChatOptions.builder().toolCallbacks(toolCallbacks).build()
+            }
+        return Prompt(prompt.instructions, boundOptions)
+    }
 
     private fun appendToolConversationHistory(
         prompt: Prompt,

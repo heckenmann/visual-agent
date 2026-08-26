@@ -16,6 +16,7 @@ import org.springframework.ai.tool.ToolCallback
 import org.springframework.ai.tool.definition.ToolDefinition
 import org.springframework.ai.tool.metadata.ToolMetadata
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import org.springframework.ai.chat.model.ChatResponse as SpringChatResponse
 
@@ -77,6 +78,20 @@ class ToolCallingLoopTest {
 
         assertEquals("", response.message.content)
         assertEquals(3, tool.callCount)
+    }
+
+    @Test
+    fun `run rejects a tool that is not registered for the request`() {
+        val chatModel = mockk<ChatModel>()
+        val registeredTool = CountingTool()
+        val prompt = Prompt(listOf(UserMessage("call an unknown tool")))
+        every { chatModel.call(any<Prompt>()) } returns
+            springToolResponse("unit", toolName = "unknown_tool", arguments = "{}", callId = "call-1")
+
+        assertFailsWith<IllegalStateException> {
+            ToolCallingLoop().run(chatModel, prompt, null, listOf(registeredTool))
+        }
+        assertEquals(0, registeredTool.callCount)
     }
 
     @Test
