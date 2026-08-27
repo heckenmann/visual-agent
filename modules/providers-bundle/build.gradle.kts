@@ -13,3 +13,9 @@ dependencies {
     api(project(":provider-standard"))
     api(project(":provider-openai-codex"))
 }
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(24))
+    }
+}
