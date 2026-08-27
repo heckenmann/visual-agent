@@ -255,6 +255,31 @@ class MessageRowsTest {
     }
 
     @Test
+    fun `structured reasoning is rendered in the thinking row without markup`() {
+        composeTestRule.setContent {
+            MaterialTheme {
+                MessageRow(
+                    message = Message(role = "assistant", content = "answer", reasoning = "planning", id = "msg-reasoning"),
+                    isStreamingPlaceholder = false,
+                    isStreaming = false,
+                    canRetry = false,
+                    canEdit = false,
+                    canDelete = false,
+                    isDeleting = false,
+                    onCopied = {},
+                    onRetry = {},
+                    onEdit = {},
+                    onDelete = {},
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Thinking").assertExists()
+        composeTestRule.onNodeWithText("answer").assertExists()
+        composeTestRule.onNodeWithText("<think>planning</think>").assertDoesNotExist()
+    }
+
+    @Test
     fun `separate thinking blocks are separated by a blank line`() {
         val parsed = parseThinkingMarkup("<think>first</think>answer<think>second</think>")
 

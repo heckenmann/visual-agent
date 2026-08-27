@@ -1,11 +1,15 @@
 package de.heckenmann.visualagent.agent
+
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
+import de.heckenmann.visualagent.agent.provider.ProviderUserFacingError
+import de.heckenmann.visualagent.agent.provider.ProviderUserFacingException
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.todo.TodoEventBus
 import io.mockk.coEvery
 import io.mockk.mockk
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import java.time.Instant
@@ -175,6 +179,43 @@ class AgentManagerConversationOpsTest {
             val history = manager.getHistory()
             assertEquals("user", history.first().role)
             assertEquals("assistant", history.last().role)
+        }
+
+    @Test
+    fun `stream message persists a safe provider failure response`() =
+        runBlocking {
+            val db =
+                de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                    .create("jdbc:sqlite::memory:")
+            val provider = mockk<LLMProvider>(relaxed = true)
+            coEvery { provider.stream(any<ChatRequestContext>()) } returns
+                flow {
+                    throw ProviderUserFacingException(
+                        ProviderUserFacingError(
+                            "Provider executable unavailable",
+                            "The required provider executable is not installed.",
+                            false,
+                        ),
+                    )
+                }
+            val manager =
+                AgentManager(
+                    db,
+                    provider,
+                    AgentToolConfigService(db),
+                    ToolEventBus(),
+                    TodoEventBus(),
+                    AppConfigBean(db),
+                )
+
+            val result = manager.streamMessage("hi") { }
+
+            assertEquals(
+                "Provider executable unavailable\n\nThe required provider executable is not installed.",
+                result,
+            )
+            assertEquals(listOf("user", "assistant"), manager.getHistory().map(Message::role))
+            assertEquals(result, manager.getHistory().last().content)
         }
 
     @Test

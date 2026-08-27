@@ -11,6 +11,21 @@ data class ConversationMessage(
     val images: List<String>? = null,
     val id: String? = null,
     val createdAtEpochMillis: Long? = null,
+    val reasoning: String? = null,
+    val telemetry: ConversationResponseTelemetry? = null,
+)
+
+/** Safe per-response diagnostics displayed without parsing provider payloads in the UI. */
+data class ConversationResponseTelemetry(
+    val model: String,
+    val finishReason: String? = null,
+    val totalMillis: Long? = null,
+    val timeToFirstTokenMillis: Long? = null,
+    val promptEvaluationMillis: Long? = null,
+    val generationMillis: Long? = null,
+    val promptTokens: Int? = null,
+    val completionTokens: Int? = null,
+    val totalTokens: Int? = null,
 )
 
 /** Page of persisted conversation messages returned by the server. */

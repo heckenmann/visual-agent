@@ -140,9 +140,10 @@ internal fun ConversationMessageContent(
     isStreaming: Boolean,
 ) {
     val parsed = parseThinkingMarkup(message.content)
+    val thinking = listOfNotNull(message.reasoning, parsed.thinking.takeIf(String::isNotBlank)).joinToString("\n\n").trim()
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        if (parsed.thinking.isNotBlank()) {
-            ThinkingRow(content = parsed.thinking, isStreaming = isStreaming)
+        if (thinking.isNotBlank()) {
+            ThinkingRow(content = thinking, isStreaming = isStreaming)
         }
         if (isStreamingPlaceholder) {
             Text(
@@ -164,6 +165,7 @@ internal fun ConversationMessageContent(
             SelectionContainer { ComposeMarkdown(parsed.answer) }
         }
         ConversationImageAttachments(message.images.orEmpty())
+        ResponseTelemetryFooter(message.telemetry)
     }
 }
 

@@ -1,11 +1,32 @@
 package de.heckenmann.visualagent.error
 
+import de.heckenmann.visualagent.agent.provider.ProviderUserFacingError
+import de.heckenmann.visualagent.agent.provider.ProviderUserFacingException
 import org.junit.jupiter.api.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 
 class ErrorMessageMapperTest {
+    @Test
+    fun `provider supplied safe error is preserved`() {
+        val userError =
+            ErrorMessageMapper.map(
+                ProviderUserFacingException(
+                    ProviderUserFacingError(
+                        "Provider executable unavailable",
+                        "The required provider executable is not installed.",
+                        false,
+                    ),
+                ),
+            )
+
+        assertEquals(ErrorCategory.PROVIDER, userError.category)
+        assertEquals("Provider executable unavailable", userError.summary)
+        assertEquals("The required provider executable is not installed.", userError.detail)
+        assertFalse(userError.retryable)
+    }
+
     @Test
     fun `404 model not found is translated into actionable message`() {
         val error = IllegalStateException("HTTP 404 Not Found from POST http://localhost:11434/api/chat")

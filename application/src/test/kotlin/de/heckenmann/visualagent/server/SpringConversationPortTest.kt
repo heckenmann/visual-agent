@@ -2,8 +2,10 @@ package de.heckenmann.visualagent.server
 
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.Message
+import de.heckenmann.visualagent.agent.ProviderTurnResponse
 import de.heckenmann.visualagent.agent.clearTodos
 import de.heckenmann.visualagent.agent.conversation.ConversationHistoryPage
+import de.heckenmann.visualagent.agent.conversation.ResponseTelemetryMetadata
 import de.heckenmann.visualagent.agent.conversation.WelcomeResult
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.protocol.CancellationTokenImpl
@@ -42,6 +44,32 @@ class SpringConversationPortTest {
             assertEquals("assistant", page.messages.single().role)
             assertEquals("ready", page.messages.single().content)
             assertEquals("m1", page.messages.single().id)
+        }
+
+    @Test
+    fun `latest page exposes structured provider reasoning separately from content`() =
+        runTest {
+            every { manager.readLatestHistoryPage() } returns
+                ConversationHistoryPage(
+                    messages =
+                        listOf(
+                            Message(
+                                "assistant",
+                                "answer",
+                                metadata =
+                                    ResponseTelemetryMetadata.encode(
+                                        ProviderTurnResponse("model", "answer", reasoning = "planning"),
+                                    ),
+                            ),
+                        ),
+                    offset = 0,
+                    hasMore = false,
+                )
+
+            val page = port.latest()
+
+            assertEquals("answer", page.messages.single().content)
+            assertEquals("planning", page.messages.single().reasoning)
         }
 
     @Test

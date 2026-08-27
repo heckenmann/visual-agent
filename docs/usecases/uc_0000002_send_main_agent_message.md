@@ -24,7 +24,7 @@ Desktop user.
 6. The server adapter delegates the request to the agent manager.
 7. The agent manager builds a request context from recent history, todo state, active provider/model, enabled tools, and runtime metadata.
 8. The configured provider sends the request to the selected backend.
-9. The assistant response is rendered in the conversation.
+9. The assistant response is rendered in the conversation. If the provider cannot complete the request, a safe, actionable failure message is rendered instead.
 10. User and assistant messages are persisted.
 
 ## Result
@@ -50,4 +50,5 @@ The user receives a complete response and the conversation survives application 
 - Pressing Shift+Enter keeps editing and inserts a newline.
 - The main-agent request includes only request-scoped context.
 - Conversation turns are stored in SQLite.
+- Provider failures are persisted as an assistant message without exposing provider payloads or credentials.
 - The composer remains usable for multiline editing, cancellation, and keyboard submission in both input placement modes.

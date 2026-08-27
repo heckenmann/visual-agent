@@ -10,6 +10,17 @@ data class ProviderUserFacingError(
     val retryable: Boolean,
 )
 
+/**
+ * Provider failure whose safe user-facing description is already known at the provider boundary.
+ *
+ * @param userFacing Sanitized description suitable for conversation and UI display
+ * @param cause Optional underlying failure retained for diagnostics only
+ */
+class ProviderUserFacingException(
+    val userFacing: ProviderUserFacingError,
+    cause: Throwable? = null,
+) : RuntimeException(userFacing.summary, cause)
+
 /** Converts provider exceptions into concise, actionable messages safe for the UI. */
 object ProviderErrorMessages {
     /** Returns a user-facing string for the given provider error. */

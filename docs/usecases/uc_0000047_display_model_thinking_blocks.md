@@ -2,7 +2,7 @@
 
 ## Goal
 
-Extract model `<think>...</think>` blocks and show them separately when thinking display is enabled.
+Show provider-supplied structured reasoning and legacy model `<think>...</think>` blocks separately when thinking display is enabled.
 
 ## Primary Actor
 
@@ -11,12 +11,12 @@ Desktop user.
 ## Preconditions
 
 - Thinking display is enabled in application settings.
-- The model response contains one or more think blocks.
+- The model response contains structured reasoning or one or more legacy think blocks.
 
 ## Main Flow
 
-1. The model returns assistant text.
-2. The main window chat wiring extracts think blocks from the response.
+1. The model returns assistant text and may include structured reasoning.
+2. The main window chat wiring reads structured reasoning and extracts any legacy think blocks from the response.
 3. Extracted thinking events are added to the chat panel as collapsible rows.
 4. A collapsed row previews the latest non-empty thinking line.
 5. When expanded, the complete thinking content is rendered as Markdown.
@@ -43,5 +43,6 @@ The user can inspect model thinking output without polluting the final answer te
   their preview.
 - Expanded thinking content uses the same Markdown renderer as conversation
   answers.
+- Structured reasoning is rendered without adding `<think>` tags to the assistant text.
 - Final assistant text does not contain raw `<think>` tags.
 - Blank thinking blocks are ignored.

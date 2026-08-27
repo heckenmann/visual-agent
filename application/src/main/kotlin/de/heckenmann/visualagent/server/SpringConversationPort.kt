@@ -3,6 +3,7 @@ package de.heckenmann.visualagent.server
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.clearTodos
+import de.heckenmann.visualagent.agent.conversation.ResponseTelemetryMetadata
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.error.ErrorMessageMapper
 import de.heckenmann.visualagent.protocol.CancellationToken
@@ -13,6 +14,7 @@ import de.heckenmann.visualagent.protocol.ConversationInputPlacement
 import de.heckenmann.visualagent.protocol.ConversationMessage
 import de.heckenmann.visualagent.protocol.ConversationPort
 import de.heckenmann.visualagent.protocol.ConversationPreferences
+import de.heckenmann.visualagent.protocol.ConversationResponseTelemetry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -129,8 +131,9 @@ private fun de.heckenmann.visualagent.agent.conversation.ConversationHistoryPage
         hasMore,
     )
 
-private fun Message.toConversationMessage(mediaResolver: ConversationMediaResolver): ConversationMessage =
-    ConversationMessage(
+private fun Message.toConversationMessage(mediaResolver: ConversationMediaResolver): ConversationMessage {
+    val responseMetadata = ResponseTelemetryMetadata.decode(metadata)
+    return ConversationMessage(
         role = role,
         content = content,
         metadata = metadata,
@@ -140,7 +143,23 @@ private fun Message.toConversationMessage(mediaResolver: ConversationMediaResolv
                 .takeIf { it.isNotEmpty() },
         id = id,
         createdAtEpochMillis = createdAtEpochMillis,
+        reasoning = responseMetadata?.reasoning,
+        telemetry =
+            responseMetadata?.let { telemetry ->
+                ConversationResponseTelemetry(
+                    model = telemetry.model,
+                    finishReason = telemetry.finishReason?.name,
+                    totalMillis = telemetry.totalMillis,
+                    timeToFirstTokenMillis = telemetry.timeToFirstTokenMillis,
+                    promptEvaluationMillis = telemetry.promptEvaluationMillis,
+                    generationMillis = telemetry.generationMillis,
+                    promptTokens = telemetry.promptTokens,
+                    completionTokens = telemetry.completionTokens,
+                    totalTokens = telemetry.totalTokens,
+                )
+            },
     )
+}
 
 private fun metadataImageDataUrls(metadata: String?): List<String> {
     val element = metadata?.let { runCatching { Json.parseToJsonElement(it) }.getOrNull() } as? JsonObject ?: return emptyList()
