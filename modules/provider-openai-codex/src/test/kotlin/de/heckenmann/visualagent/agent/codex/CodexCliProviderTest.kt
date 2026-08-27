@@ -12,6 +12,7 @@ import org.springframework.ai.chat.model.ChatResponse
 import org.springframework.ai.chat.model.Generation
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 /** Verifies provider behavior that does not require a real Codex subscription. */
 class CodexCliProviderTest {
@@ -56,6 +57,7 @@ class CodexCliProviderTest {
 
         assertEquals("answer", message.content)
         assertEquals("planning", turn.reasoning)
+        assertTrue(turn.reasoningIsSummary)
         assertEquals(ProviderFinishReason.STOP, turn.finishReason)
         assertEquals("item-8", turn.metadata.responseId)
     }

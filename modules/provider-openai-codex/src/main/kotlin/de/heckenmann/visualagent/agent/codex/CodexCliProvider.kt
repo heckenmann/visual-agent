@@ -221,6 +221,7 @@ internal fun org.springframework.ai.chat.model.ChatResponse.toCodexProviderTurn(
         model = metadata.model.takeIf(String::isNotBlank) ?: fallbackModel,
         content = result?.output?.text.orEmpty(),
         reasoning = metadata.get<String>("codexReasoning"),
+        reasoningIsSummary = true,
         finishReason = rawFinishReason?.let { ProviderFinishReason.STOP },
         metadata =
             ProviderResponseMetadata(

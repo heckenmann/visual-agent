@@ -125,7 +125,7 @@ internal class ToolCallingLoop(
             chatModel.stream(boundPrompt).asFlow().collect { springResponse ->
                 token?.throwIfCancelled()
                 springChunks += springResponse
-                emit(springResponse.toVisualAgentResponse(sequence = springChunks.size))
+                emit(springResponse.toVisualAgentResponse(sequence = springChunks.lastIndex))
             }
 
             val aggregated = aggregateStreamingResponse(springChunks)
@@ -146,9 +146,10 @@ internal class ToolCallingLoop(
 
             var prompt = appendToolConversationHistory(boundPrompt, toolExecutionResult)
             var lastFinalResponse: SpringChatResponse? = null
-            repeat(maxRounds) { round ->
+            repeat(maxRounds) { followUpRoundIndex ->
+                val round = followUpRoundIndex + 1
                 token?.throwIfCancelled()
-                logger.debug { "Stream tool follow-up round ${round + 1}/$maxRounds" }
+                logger.debug { "Stream tool follow-up round $round/$maxRounds" }
                 val finalResponse = chatModel.call(prompt)
                 lastFinalResponse = finalResponse
 
@@ -171,7 +172,7 @@ internal class ToolCallingLoop(
             }
 
             logger.warn { "Stream tool calling loop reached max rounds ($maxRounds); emitting last response" }
-            lastFinalResponse?.let { emit(it.toVisualAgentResponse(round = maxRounds - 1)) }
+            lastFinalResponse?.let { emit(it.toVisualAgentResponse(round = maxRounds)) }
         }
 
     private fun buildToolCallingManager(): ToolCallingManager =

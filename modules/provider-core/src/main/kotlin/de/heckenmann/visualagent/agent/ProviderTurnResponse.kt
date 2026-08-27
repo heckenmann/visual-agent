@@ -13,6 +13,7 @@ import kotlinx.serialization.Serializable
  * @property model Provider-selected model identifier
  * @property content Assistant-visible content for this turn
  * @property reasoning Provider-supplied reasoning or reasoning summary
+ * @property reasoningIsSummary Whether [reasoning] is a provider-designated safe summary
  * @property toolCalls Structured tool calls requested in this turn
  * @property finishReason Typed terminal state reported by the provider
  * @property refusal Safe refusal or filtering summary when supplied
@@ -26,6 +27,7 @@ data class ProviderTurnResponse(
     val model: String,
     val content: String,
     val reasoning: String? = null,
+    val reasoningIsSummary: Boolean = false,
     val toolCalls: List<ProviderToolCall> = emptyList(),
     val finishReason: ProviderFinishReason? = null,
     val refusal: String? = null,

@@ -47,7 +47,7 @@ internal object ProviderTurnResponseMapper {
                             argumentsJson = call.arguments(),
                         )
                     },
-            finishReason = normalizeFinishReason(rawFinishReason, generationMetadata),
+            finishReason = normalizeFinishReason(rawFinishReason),
             refusal = refusalSummary(generationMetadata),
             usage =
                 ProviderTokenUsage(
@@ -78,7 +78,7 @@ internal object ProviderTurnResponseMapper {
             model = turn.model,
             message = Message(role = "assistant", content = turn.content),
             done = turn.finishReason != null,
-            totalDuration = turn.timing?.totalMillis,
+            totalDuration = turn.timing?.totalMillis?.times(NANOS_PER_MILLI),
             promptEvalCount = turn.usage?.promptTokens,
             evalCount = turn.usage?.completionTokens,
             providerTurn = turn,
@@ -103,7 +103,7 @@ internal object ProviderTurnResponseMapper {
             model = response.model(),
             content = response.message().content().orEmpty(),
             reasoning = response.message().thinking()?.takeIf { it.isNotBlank() },
-            finishReason = normalizeFinishReason(rawFinishReason, null),
+            finishReason = normalizeFinishReason(rawFinishReason),
             usage =
                 ProviderTokenUsage(
                     promptTokens = response.promptEvalCount(),
@@ -126,12 +126,9 @@ internal object ProviderTurnResponseMapper {
         )
     }
 
-    private fun normalizeFinishReason(
-        rawFinishReason: String?,
-        metadata: ChatGenerationMetadata?,
-    ): ProviderFinishReason? {
-        if (rawFinishReason == null && metadata == null) return null
-        return when (rawFinishReason?.lowercase()) {
+    private fun normalizeFinishReason(rawFinishReason: String?): ProviderFinishReason? {
+        if (rawFinishReason == null) return null
+        return when (rawFinishReason.lowercase()) {
             "stop", "completed", "complete" -> ProviderFinishReason.STOP
             "tool_calls", "tool_call", "function_call" -> ProviderFinishReason.TOOL_CALLS
             "length", "max_tokens", "max_output_tokens" -> ProviderFinishReason.LENGTH
@@ -139,7 +136,6 @@ internal object ProviderTurnResponseMapper {
             "content_filter", "content_filtered" -> ProviderFinishReason.CONTENT_FILTER
             "cancelled", "canceled" -> ProviderFinishReason.CANCELLED
             "error", "failed" -> ProviderFinishReason.ERROR
-            null -> ProviderFinishReason.UNKNOWN
             else -> ProviderFinishReason.UNKNOWN
         }
     }

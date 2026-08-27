@@ -8,6 +8,7 @@ import org.springframework.ai.chat.model.Generation
 import org.springframework.ai.ollama.api.OllamaApi
 import java.time.Instant
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import org.springframework.ai.chat.model.ChatResponse as SpringChatResponse
 
@@ -70,11 +71,27 @@ class ProviderTurnResponseMapperTest {
 
         assertEquals("answer", turn.content)
         assertEquals("brief reasoning", turn.reasoning)
+        assertFalse(turn.reasoningIsSummary)
         assertEquals(ProviderFinishReason.STOP, turn.finishReason)
         assertEquals(2_400L, turn.timing?.totalMillis)
         assertEquals(800L, turn.timing?.promptEvaluationMillis)
         assertEquals(1_600L, turn.timing?.generationMillis)
         assertEquals(17, turn.usage?.totalTokens)
         assertNull(ProviderTurnResponseMapper.toChatResponse(turn).message.metadata)
+        assertEquals(2_400_000_000L, ProviderTurnResponseMapper.toChatResponse(turn).totalDuration)
+    }
+
+    @Test
+    fun `keeps unfinished spring chunks nonterminal`() {
+        val response =
+            SpringChatResponse(
+                listOf(Generation(AssistantMessage("partial"), ChatGenerationMetadata.builder().build())),
+                ChatResponseMetadata.builder().model("model-a").build(),
+            )
+
+        val turn = ProviderTurnResponseMapper.fromSpring(response)
+
+        assertNull(turn.finishReason)
+        assertFalse(ProviderTurnResponseMapper.toChatResponse(turn).done)
     }
 }

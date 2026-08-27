@@ -6,6 +6,7 @@ import de.heckenmann.visualagent.agent.AgentStatus
 import de.heckenmann.visualagent.agent.CancellationToken
 import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.Message
+import de.heckenmann.visualagent.agent.ProviderTurnResponse
 import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.agent.text.ResponseRepetitionGuard
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
@@ -135,7 +136,7 @@ internal class AgentManagerConversationOps(
                 .randomUUID()
                 .toString()
         val collected = StringBuilder()
-        var terminalProviderTurn: de.heckenmann.visualagent.agent.ProviderTurnResponse? = null
+        var providerTurn: ProviderTurnResponse? = null
         var cancelled = false
         var providerFailure: Throwable? = null
         token?.throwIfCancelled()
@@ -145,7 +146,7 @@ internal class AgentManagerConversationOps(
                     .copy(cancellationToken = token)
             owner.llmProvider.stream(request).collect { chunk ->
                 token?.throwIfCancelled()
-                if (chunk.done) terminalProviderTurn = chunk.providerTurn
+                chunk.providerTurn?.let { providerTurn = ProviderTurnAccumulator.merge(providerTurn, it) }
                 val part = chunk.message.content
                 if (part.isNotBlank()) {
                     onChunk(appendStreamPart(collected, part))
@@ -173,18 +174,20 @@ internal class AgentManagerConversationOps(
             logger.warn { "Repetition guard detected runaway streaming output; retrying once" }
             assistantText = owner.responseCoordinator.retryAfterRepetition()
             presentationText = assistantText
+            providerTurn = null
         }
         assistantText = owner.responseCoordinator.normalizeAssistantContent(assistantText)
         if (assistantText == "(No text response. See tool results above.)") {
             val followup = owner.responseCoordinator.completeToolOnlyTurnWithFollowup(requestId)
             assistantText = followup?.let(owner.responseCoordinator::normalizeAssistantContent) ?: assistantText
             presentationText = followup?.let(owner.responseCoordinator::normalizeAssistantPresentationContent) ?: assistantText
+            if (followup != null) providerTurn = null
         }
         val assistantMessage =
             Message(
                 "assistant",
                 presentationText,
-                metadata = terminalProviderTurn?.let(ResponseTelemetryMetadata::encode),
+                metadata = providerTurn?.let { ResponseTelemetryMetadata.encode(it, owner.appConfig.thinkingEnabled) },
             )
         persist(assistantMessage)
         owner.finishedToolEventsByRequestId.remove(requestId)

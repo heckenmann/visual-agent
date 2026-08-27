@@ -14,12 +14,15 @@ import kotlinx.serialization.json.put
  *
  * Tool arguments, tool results, raw provider payloads, and credentials are
  * deliberately excluded from persisted conversation metadata. Provider
- * reasoning is retained only when it is presentation-safe and explicitly
- * supplied as a reasoning summary by the provider.
+ * reasoning is retained only when the caller explicitly permits it and the
+ * provider marks it as a presentation-safe summary.
  */
 internal object ResponseTelemetryMetadata {
     /** Encodes telemetry as conversation metadata. */
-    fun encode(turn: ProviderTurnResponse): String =
+    fun encode(
+        turn: ProviderTurnResponse,
+        includeReasoning: Boolean = false,
+    ): String =
         buildJsonObject {
             put(
                 RESPONSE_TELEMETRY_KEY,
@@ -27,7 +30,7 @@ internal object ResponseTelemetryMetadata {
                     Json.encodeToString(
                         PersistedResponseTelemetry(
                             model = turn.model,
-                            reasoning = turn.reasoning,
+                            reasoning = turn.reasoning.takeIf { includeReasoning && turn.reasoningIsSummary },
                             finishReason = turn.finishReason,
                             totalMillis = turn.timing?.totalMillis,
                             timeToFirstTokenMillis = turn.timing?.timeToFirstTokenMillis,

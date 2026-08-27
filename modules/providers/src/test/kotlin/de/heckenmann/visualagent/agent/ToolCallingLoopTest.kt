@@ -117,7 +117,13 @@ class ToolCallingLoopTest {
 
         assertEquals("done after two calls", response.message.content)
         assertEquals(2, tool.callCount)
-        assertEquals(listOf("call-1", "call-2"), correlation.rounds.single().map(ProviderToolCall::id))
+        assertEquals(
+            listOf("call-1", "call-2"),
+            correlation.rounds
+                .single()
+                .second
+                .map(ProviderToolCall::id),
+        )
     }
 
     @Test
@@ -125,6 +131,7 @@ class ToolCallingLoopTest {
         runTest {
             val chatModel = mockk<ChatModel>()
             val tool = CountingTool()
+            val correlation = CorrelatingCallbacks()
             val prompt = Prompt(listOf(UserMessage("stream and tool")))
             every { chatModel.stream(any<Prompt>()) } returns
                 reactor.core.publisher.Flux.just(
@@ -132,7 +139,7 @@ class ToolCallingLoopTest {
                 )
             every { chatModel.call(any<Prompt>()) } returns springResponse("unit", "final stream answer")
 
-            val chunks = ToolCallingLoop().runStream(chatModel, prompt, null, listOf(tool)).toList()
+            val chunks = ToolCallingLoop().runStream(chatModel, prompt, null, listOf(tool), correlation).toList()
 
             assertEquals(2, chunks.size)
             assertEquals("", chunks[0].message.content)
@@ -163,6 +170,7 @@ class ToolCallingLoopTest {
         runTest {
             val chatModel = mockk<ChatModel>()
             val tool = CountingTool()
+            val correlation = CorrelatingCallbacks()
             val prompt = Prompt(listOf(UserMessage("stream and chain tools")))
             every { chatModel.stream(any<Prompt>()) } returns
                 reactor.core.publisher.Flux.just(
@@ -174,12 +182,13 @@ class ToolCallingLoopTest {
                     springResponse("unit", "final after two tools"),
                 )
 
-            val chunks = ToolCallingLoop().runStream(chatModel, prompt, null, listOf(tool)).toList()
+            val chunks = ToolCallingLoop().runStream(chatModel, prompt, null, listOf(tool), correlation).toList()
 
             assertEquals(2, chunks.size)
             assertEquals("", chunks[0].message.content)
             assertEquals("final after two tools", chunks[1].message.content)
             assertEquals(2, tool.callCount)
+            assertEquals(listOf(0, 1), correlation.rounds.map { it.first })
         }
 
     private fun springResponse(
@@ -240,7 +249,7 @@ class ToolCallingLoopTest {
     }
 
     private class CorrelatingCallbacks : ProviderToolCallbacks {
-        val rounds = mutableListOf<List<ProviderToolCall>>()
+        val rounds = mutableListOf<Pair<Int, List<ProviderToolCall>>>()
 
         override fun functionCallbacks(
             enabledTools: Set<ToolId>,
@@ -251,7 +260,7 @@ class ToolCallingLoopTest {
             toolCalls: List<ProviderToolCall>,
             round: Int,
         ): AutoCloseable {
-            rounds += toolCalls
+            rounds += round to toolCalls
             return AutoCloseable {}
         }
     }

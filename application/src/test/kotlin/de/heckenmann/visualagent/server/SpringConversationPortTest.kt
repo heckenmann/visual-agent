@@ -58,7 +58,13 @@ class SpringConversationPortTest {
                                 "answer",
                                 metadata =
                                     ResponseTelemetryMetadata.encode(
-                                        ProviderTurnResponse("model", "answer", reasoning = "planning"),
+                                        ProviderTurnResponse(
+                                            model = "model",
+                                            content = "answer",
+                                            reasoning = "planning",
+                                            reasoningIsSummary = true,
+                                        ),
+                                        includeReasoning = true,
                                     ),
                             ),
                         ),
