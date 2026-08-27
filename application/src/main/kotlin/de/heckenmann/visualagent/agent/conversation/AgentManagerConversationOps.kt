@@ -6,10 +6,12 @@ import de.heckenmann.visualagent.agent.AgentStatus
 import de.heckenmann.visualagent.agent.CancellationToken
 import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.Message
+import de.heckenmann.visualagent.agent.ProviderTurnResponse
 import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.agent.text.ResponseRepetitionGuard
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolCallPhase
+import de.heckenmann.visualagent.error.ErrorMessageMapper
 import kotlinx.coroutines.flow.collect
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -107,7 +109,14 @@ internal class AgentManagerConversationOps(
                 .randomUUID()
                 .toString()
         token?.throwIfCancelled()
-        val assistantContent = owner.responseCoordinator.generateAssistantContentWithRepetitionGuard(requestId, token)
+        val assistantContent =
+            try {
+                owner.responseCoordinator.generateAssistantContentWithRepetitionGuard(requestId, token)
+            } catch (error: kotlinx.coroutines.CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                providerFailureMessage(error)
+            }
         token?.throwIfCancelled()
         val assistantMessage = Message(role = "assistant", content = assistantContent)
         persist(assistantMessage)
@@ -127,7 +136,9 @@ internal class AgentManagerConversationOps(
                 .randomUUID()
                 .toString()
         val collected = StringBuilder()
+        var providerTurn: ProviderTurnResponse? = null
         var cancelled = false
+        var providerFailure: Throwable? = null
         token?.throwIfCancelled()
         try {
             val request =
@@ -135,6 +146,7 @@ internal class AgentManagerConversationOps(
                     .copy(cancellationToken = token)
             owner.llmProvider.stream(request).collect { chunk ->
                 token?.throwIfCancelled()
+                chunk.providerTurn?.let { providerTurn = ProviderTurnAccumulator.merge(providerTurn, it) }
                 val part = chunk.message.content
                 if (part.isNotBlank()) {
                     onChunk(appendStreamPart(collected, part))
@@ -143,6 +155,14 @@ internal class AgentManagerConversationOps(
         } catch (_: kotlinx.coroutines.CancellationException) {
             cancelled = true
             logger.info { "Main agent request $requestId cancelled by user" }
+        } catch (error: Throwable) {
+            providerFailure = error
+        }
+        if (providerFailure != null) {
+            val failureMessage = providerFailureMessage(providerFailure)
+            persist(Message("assistant", failureMessage))
+            owner.finishedToolEventsByRequestId.remove(requestId)
+            return failureMessage
         }
         var assistantText = collected.toString().trim()
         var presentationText = owner.responseCoordinator.normalizeAssistantPresentationContent(assistantText)
@@ -154,14 +174,21 @@ internal class AgentManagerConversationOps(
             logger.warn { "Repetition guard detected runaway streaming output; retrying once" }
             assistantText = owner.responseCoordinator.retryAfterRepetition()
             presentationText = assistantText
+            providerTurn = null
         }
         assistantText = owner.responseCoordinator.normalizeAssistantContent(assistantText)
         if (assistantText == "(No text response. See tool results above.)") {
             val followup = owner.responseCoordinator.completeToolOnlyTurnWithFollowup(requestId)
             assistantText = followup?.let(owner.responseCoordinator::normalizeAssistantContent) ?: assistantText
             presentationText = followup?.let(owner.responseCoordinator::normalizeAssistantPresentationContent) ?: assistantText
+            if (followup != null) providerTurn = null
         }
-        val assistantMessage = Message("assistant", presentationText)
+        val assistantMessage =
+            Message(
+                "assistant",
+                presentationText,
+                metadata = providerTurn?.let { ResponseTelemetryMetadata.encode(it, owner.appConfig.thinkingEnabled) },
+            )
         persist(assistantMessage)
         owner.finishedToolEventsByRequestId.remove(requestId)
         return assistantText
@@ -179,6 +206,11 @@ internal class AgentManagerConversationOps(
     fun appendSystemMessage(content: String) {
         val message = Message(role = "system", content = content)
         persist(message)
+    }
+
+    private fun providerFailureMessage(error: Throwable): String {
+        val userError = ErrorMessageMapper.map(error)
+        return "${userError.summary}\n\n${userError.detail}"
     }
 
     fun recordToolCall(event: ToolCallEvent) = historyOps.recordToolCall(event)

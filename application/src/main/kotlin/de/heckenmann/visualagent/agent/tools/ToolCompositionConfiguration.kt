@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.agent.tools
 
 import de.heckenmann.visualagent.agent.AgentManager
+import de.heckenmann.visualagent.agent.ProviderToolCall
 import de.heckenmann.visualagent.agent.javascript.GraalJavaScriptExecutionService
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
 import de.heckenmann.visualagent.agent.tools.api.TodoToolPort
@@ -60,6 +61,8 @@ class ToolCompositionConfiguration {
 class SpringAiToolCallbacksAdapter(
     private val registry: ToolRegistry,
 ) : ProviderToolCallbacks {
+    private val callCorrelation = ThreadLocal<List<CorrelatedToolCall>?>()
+
     override fun functionCallbacks(
         enabledTools: Set<ProviderToolId>,
         context: Map<String, Any>,
@@ -76,13 +79,57 @@ class SpringAiToolCallbacksAdapter(
                         .inputSchema(tool.definition.inputSchema)
                         .build()
 
-                override fun call(functionInput: String): String = registry.execute(tool, functionInput, requestContext)
+                override fun call(functionInput: String): String =
+                    registry.execute(
+                        tool,
+                        functionInput,
+                        correlatedContext(tool.definition.name, functionInput, requestContext),
+                    )
 
                 override fun call(
                     functionInput: String,
                     toolContext: ToolContext?,
-                ): String = registry.execute(tool, functionInput, requestContext + (toolContext?.context ?: emptyMap()))
+                ): String =
+                    registry.execute(
+                        tool,
+                        functionInput,
+                        correlatedContext(tool.definition.name, functionInput, requestContext + (toolContext?.context ?: emptyMap())),
+                    )
             }
         }
     }
+
+    override fun bindToolCallRound(
+        toolCalls: List<ProviderToolCall>,
+        round: Int,
+    ): AutoCloseable {
+        check(callCorrelation.get() == null) { "Tool-call correlation scope is already active" }
+        callCorrelation.set(toolCalls.mapIndexed { sequence, call -> CorrelatedToolCall(call, round, sequence) })
+        return AutoCloseable { callCorrelation.remove() }
+    }
+
+    private fun correlatedContext(
+        functionName: String,
+        input: String,
+        context: Map<String, Any>,
+    ): Map<String, Any> {
+        val calls = callCorrelation.get() ?: return context
+        val index = calls.indexOfFirst { it.call.functionName == functionName && it.call.argumentsJson == input }
+        if (index < 0) return context
+        val correlated = calls[index]
+        callCorrelation.set(calls.toMutableList().also { it.removeAt(index) })
+        return context +
+            mapOf(
+                "providerToolCallId" to correlated.call.id,
+                "toolCallRound" to correlated.round,
+                "toolCallSequence" to correlated.sequence,
+            )
+    }
+
+    /** Provider call identity awaiting callback execution in one loop round. */
+    private data class CorrelatedToolCall(
+        val call: ProviderToolCall,
+        val round: Int,
+        val sequence: Int,
+    )
 }

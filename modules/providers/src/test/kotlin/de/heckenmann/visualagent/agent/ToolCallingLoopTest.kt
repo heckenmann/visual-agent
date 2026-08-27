@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent
 
+import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.toList
@@ -95,10 +96,42 @@ class ToolCallingLoopTest {
     }
 
     @Test
+    fun `run preserves distinct identities for repeated calls to the same tool`() {
+        val chatModel = mockk<ChatModel>()
+        val tool = CountingTool()
+        val correlation = CorrelatingCallbacks()
+        val prompt = Prompt(listOf(UserMessage("call the same tool twice")))
+        every { chatModel.call(any<Prompt>()) }
+            .returnsMany(
+                springToolResponse(
+                    "unit",
+                    toolName = "count_tool",
+                    arguments = "{}",
+                    callId = "call-1",
+                    additionalCalls = listOf(AssistantMessage.ToolCall("call-2", "function", "count_tool", "{}")),
+                ),
+                springResponse("unit", "done after two calls"),
+            )
+
+        val response = ToolCallingLoop().run(chatModel, prompt, null, listOf(tool), correlation)
+
+        assertEquals("done after two calls", response.message.content)
+        assertEquals(2, tool.callCount)
+        assertEquals(
+            listOf("call-1", "call-2"),
+            correlation.rounds
+                .single()
+                .second
+                .map(ProviderToolCall::id),
+        )
+    }
+
+    @Test
     fun `runStream emits final text after executing tool call from aggregated stream`() =
         runTest {
             val chatModel = mockk<ChatModel>()
             val tool = CountingTool()
+            val correlation = CorrelatingCallbacks()
             val prompt = Prompt(listOf(UserMessage("stream and tool")))
             every { chatModel.stream(any<Prompt>()) } returns
                 reactor.core.publisher.Flux.just(
@@ -106,7 +139,7 @@ class ToolCallingLoopTest {
                 )
             every { chatModel.call(any<Prompt>()) } returns springResponse("unit", "final stream answer")
 
-            val chunks = ToolCallingLoop().runStream(chatModel, prompt, null, listOf(tool)).toList()
+            val chunks = ToolCallingLoop().runStream(chatModel, prompt, null, listOf(tool), correlation).toList()
 
             assertEquals(2, chunks.size)
             assertEquals("", chunks[0].message.content)
@@ -137,6 +170,7 @@ class ToolCallingLoopTest {
         runTest {
             val chatModel = mockk<ChatModel>()
             val tool = CountingTool()
+            val correlation = CorrelatingCallbacks()
             val prompt = Prompt(listOf(UserMessage("stream and chain tools")))
             every { chatModel.stream(any<Prompt>()) } returns
                 reactor.core.publisher.Flux.just(
@@ -148,12 +182,13 @@ class ToolCallingLoopTest {
                     springResponse("unit", "final after two tools"),
                 )
 
-            val chunks = ToolCallingLoop().runStream(chatModel, prompt, null, listOf(tool)).toList()
+            val chunks = ToolCallingLoop().runStream(chatModel, prompt, null, listOf(tool), correlation).toList()
 
             assertEquals(2, chunks.size)
             assertEquals("", chunks[0].message.content)
             assertEquals("final after two tools", chunks[1].message.content)
             assertEquals(2, tool.callCount)
+            assertEquals(listOf(0, 1), correlation.rounds.map { it.first })
         }
 
     private fun springResponse(
@@ -169,13 +204,14 @@ class ToolCallingLoopTest {
         toolName: String,
         arguments: String,
         callId: String,
+        additionalCalls: List<AssistantMessage.ToolCall> = emptyList(),
     ): SpringChatResponse {
         val toolCall = AssistantMessage.ToolCall(callId, "function", toolName, arguments)
         val assistantMessage =
             AssistantMessage
                 .builder()
                 .content("")
-                .toolCalls(listOf(toolCall))
+                .toolCalls(listOf(toolCall) + additionalCalls)
                 .build()
         val generation = Generation(assistantMessage, ChatGenerationMetadata.builder().finishReason("tool_calls").build())
         return SpringChatResponse(listOf(generation), ChatResponseMetadata.builder().model(model).build())
@@ -210,5 +246,22 @@ class ToolCallingLoopTest {
         override fun getToolMetadata(): ToolMetadata = ToolMetadata.builder().returnDirect(true).build()
 
         override fun call(toolInput: String): String = "direct result"
+    }
+
+    private class CorrelatingCallbacks : ProviderToolCallbacks {
+        val rounds = mutableListOf<Pair<Int, List<ProviderToolCall>>>()
+
+        override fun functionCallbacks(
+            enabledTools: Set<ToolId>,
+            context: Map<String, Any>,
+        ): List<ToolCallback> = emptyList()
+
+        override fun bindToolCallRound(
+            toolCalls: List<ProviderToolCall>,
+            round: Int,
+        ): AutoCloseable {
+            rounds += round to toolCalls
+            return AutoCloseable {}
+        }
     }
 }

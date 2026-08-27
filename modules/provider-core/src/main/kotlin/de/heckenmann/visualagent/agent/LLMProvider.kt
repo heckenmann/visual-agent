@@ -331,6 +331,7 @@ data class ChatRequest(
  * @property totalDuration Total processing time in nanoseconds
  * @property promptEvalCount Number of tokens in the prompt
  * @property evalCount Number of tokens in the response
+ * @property providerTurn Structured final provider turn, when the adapter can supply it
  * @see docs/usecases/uc_0000002_send_main_agent_message.md
  * @see docs/usecases/uc_0000003_stream_main_agent_response.md
  */
@@ -342,4 +343,5 @@ data class ChatResponse(
     val totalDuration: Long? = null,
     val promptEvalCount: Int? = null,
     val evalCount: Int? = null,
+    val providerTurn: ProviderTurnResponse? = null,
 )

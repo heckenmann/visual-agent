@@ -6,6 +6,7 @@ import de.heckenmann.visualagent.agent.ChatResponse
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ModelDetails
+import de.heckenmann.visualagent.agent.ProviderTurnResponseMapper
 import de.heckenmann.visualagent.agent.ShowResponse
 import de.heckenmann.visualagent.agent.ToolCallingLoop
 import de.heckenmann.visualagent.agent.VisionSupport
@@ -62,6 +63,7 @@ class OpenAiClient(
                                 request.metadata + mapOf("model" to selectedModel, "provider" to "openai") +
                                     (request.cancellationToken?.let { mapOf("cancellationToken" to it) } ?: emptyMap()),
                             ),
+                            toolRegistry,
                         )
                 }
             if (responseResult.isFailure) throw buildDetailedProviderError(responseResult.exceptionOrNull())
@@ -92,21 +94,15 @@ class OpenAiClient(
                         .stream(prompt)
                         .asFlow()
                         .map { chunk ->
-                            ChatResponse(
-                                model = chunk.metadata.model.takeIf { it.isNotBlank() } ?: selectedModel,
-                                message =
-                                    Message(
-                                        role = "assistant",
-                                        content = chunk.result?.let { it.output.text.orEmpty() }.orEmpty(),
-                                    ),
-                                done = chunk.result?.metadata?.finishReason != null,
-                                promptEvalCount = chunk.metadata.usage.promptTokens,
-                                evalCount = chunk.metadata.usage.completionTokens,
-                            )
+                            ProviderTurnResponseMapper
+                                .fromSpring(chunk)
+                                .let { turn ->
+                                    if (turn.model.isBlank()) turn.copy(model = selectedModel) else turn
+                                }.let(ProviderTurnResponseMapper::toChatResponse)
                         }.collect { emit(it) }
                 } else {
                     ToolCallingLoop()
-                        .runStream(model, prompt, request.cancellationToken, toolCallbacks)
+                        .runStream(model, prompt, request.cancellationToken, toolCallbacks, toolRegistry)
                         .collect { emit(it) }
                 }
             } catch (error: Throwable) {
@@ -140,17 +136,7 @@ class OpenAiClient(
                             OpenAiChatOptions.builder().model(modelId).build(),
                         ),
                     )
-            ChatResponse(
-                model = response.metadata.model,
-                message =
-                    Message(
-                        role = "assistant",
-                        content = response.result?.let { it.output.text.orEmpty() }.orEmpty(),
-                    ),
-                done = true,
-                promptEvalCount = response.metadata.usage.promptTokens,
-                evalCount = response.metadata.usage.completionTokens,
-            )
+            ProviderTurnResponseMapper.toChatResponse(ProviderTurnResponseMapper.fromSpring(response))
         }
 
     override suspend fun embeddings(text: String): List<Double> = emptyList()

@@ -1,5 +1,7 @@
 package de.heckenmann.visualagent.error
 
+import de.heckenmann.visualagent.agent.provider.ProviderUserFacingException
+
 /**
  * Maps provider, workspace, canvas, tool, and persistence exceptions into concise, actionable
  * messages safe for the UI.
@@ -17,6 +19,13 @@ internal object ErrorMessageMapper {
     fun map(throwable: Throwable): UserFacingError =
         when (throwable) {
             is VisualAgentException -> mapVisualAgentException(throwable)
+            is ProviderUserFacingException ->
+                UserFacingError(
+                    category = ErrorCategory.PROVIDER,
+                    summary = throwable.userFacing.summary,
+                    detail = throwable.userFacing.detail,
+                    retryable = throwable.userFacing.retryable,
+                )
             else -> mapGenericThrowable(throwable)
         }
 

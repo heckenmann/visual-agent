@@ -120,7 +120,7 @@ class CodexAppServerChatModelTest {
         }
 
     @Test
-    fun `reasoning summaries are emitted as thinking markup`() =
+    fun `reasoning summaries are retained in structured response metadata`() =
         runBlocking {
             val directory = createTempDirectory("codex-app-server-reasoning-test-")
             val executable = fakeServer(directory, reasoningSummary = true)
@@ -130,7 +130,7 @@ class CodexAppServerChatModelTest {
                         .streamFlow(Prompt("hello"))
                         .toList()
 
-                assertTrue(responses.any { responseText(it) == "<think>planning</think>" })
+                assertTrue(responses.any { it.metadata.get<String>("codexReasoning") == "planning" })
             } finally {
                 deleteRecursively(directory)
             }

@@ -27,6 +27,10 @@ class AgentManagerToolHistoryPersistenceTest {
             ToolCallEvent(
                 toolId = "todos",
                 functionName = "todos",
+                providerToolCallId = "call-42",
+                requestId = "request-7",
+                round = 1,
+                sequence = 2,
                 phase = ToolCallPhase.FINISHED,
                 inputJson = """{"action":"list"}""",
                 context = mapOf("sessionId" to "main"),
@@ -45,6 +49,10 @@ class AgentManagerToolHistoryPersistenceTest {
         assertEquals("tool", last.role)
         assertTrue(last.content.startsWith("Tool todos"))
         assertTrue(last.metadata.orEmpty().contains("\"type\":\"tool_call\""))
+        assertTrue(last.metadata.orEmpty().contains("\"providerToolCallId\":\"call-42\""))
+        assertTrue(last.metadata.orEmpty().contains("\"requestId\":\"request-7\""))
+        assertTrue(last.metadata.orEmpty().contains("\"round\":1"))
+        assertTrue(last.metadata.orEmpty().contains("\"sequence\":2"))
         db.close()
     }
 

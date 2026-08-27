@@ -66,6 +66,7 @@ class OllamaClient(
                                     request.metadata + mapOf("model" to selectedModel) +
                                         (request.cancellationToken?.let { mapOf("cancellationToken" to it) } ?: emptyMap()),
                                 ),
+                                toolRegistry,
                             )
                     } else {
                         OllamaToollessChat.execute(
@@ -125,7 +126,7 @@ class OllamaClient(
                 } else {
                     val model = chatModelFor(request)
                     ToolCallingLoop()
-                        .runStream(model, prompt, request.cancellationToken, toolCallbacks)
+                        .runStream(model, prompt, request.cancellationToken, toolCallbacks, toolRegistry)
                         .collect { emit(it) }
                 }
             } catch (error: kotlinx.coroutines.CancellationException) {

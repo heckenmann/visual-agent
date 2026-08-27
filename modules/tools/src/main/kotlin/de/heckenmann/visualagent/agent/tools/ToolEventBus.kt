@@ -10,6 +10,10 @@ import java.util.concurrent.CopyOnWriteArrayList
  *
  * @property toolId Tool identifier such as `file:read`
  * @property functionName Provider-safe function callback name
+ * @property providerToolCallId Provider request-scoped call identity
+ * @property requestId Visual Agent request identity
+ * @property round Zero-based tool-loop round
+ * @property sequence Provider call position within its round
  * @property inputJson Sanitized JSON input passed by the model
  * @property context Request-scoped context attached to the tool callback
  * @property result Structured tool execution result
@@ -20,6 +24,10 @@ import java.util.concurrent.CopyOnWriteArrayList
 data class ToolCallEvent(
     val toolId: String,
     val functionName: String,
+    val providerToolCallId: String? = null,
+    val requestId: String? = null,
+    val round: Int? = null,
+    val sequence: Int? = null,
     val phase: ToolCallPhase = ToolCallPhase.FINISHED,
     val inputJson: String,
     val context: Map<String, Any>,
