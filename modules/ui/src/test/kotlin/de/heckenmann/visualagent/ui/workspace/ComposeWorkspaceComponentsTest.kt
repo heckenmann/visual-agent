@@ -2,16 +2,21 @@
 
 package de.heckenmann.visualagent.ui.workspace
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeRight
+import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -23,6 +28,7 @@ import de.heckenmann.visualagent.ui.settings.*
 import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
+import io.mockk.mockk
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -139,4 +145,53 @@ class ComposeWorkspaceComponentsTest {
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("animated workspace panel").assertDoesNotExist()
     }
+
+    @Test
+    fun `workspace panels animate to their reordered positions`() {
+        var windows by mutableStateOf(listOf(testWindow("first", "First"), testWindow("second", "Second")))
+        composeTestRule.mainClock.autoAdvance = false
+        composeTestRule.setContent {
+            MaterialTheme {
+                Box(
+                    modifier =
+                        androidx.compose.ui.Modifier
+                            .size(1_200.dp, 600.dp),
+                ) {
+                    ComposeSplitWorkspace(
+                        windows = windows,
+                        panelServices = mockk(relaxed = true),
+                        onToggleWindow = {},
+                        onReorderWindows = { windows = it },
+                        onResizeWindow = { _, _ -> },
+                        minPanelWidth = ComposeWorkspaceWindowBounds.MIN_WIDTH,
+                        viewport = ComposeWorkspaceViewport(1_200, 600),
+                    )
+                }
+            }
+        }
+        composeTestRule.mainClock.advanceTimeByFrame()
+        val initialLeft = composeTestRule.onNodeWithTag("workspace-panel-first").getUnclippedBoundsInRoot().left
+
+        windows = windows.reversed()
+        composeTestRule.mainClock.advanceTimeBy(110)
+        val halfwayLeft = composeTestRule.onNodeWithTag("workspace-panel-first").getUnclippedBoundsInRoot().left
+        composeTestRule.mainClock.advanceTimeBy(500)
+        val finalLeft = composeTestRule.onNodeWithTag("workspace-panel-first").getUnclippedBoundsInRoot().left
+
+        assertTrue(
+            "Expected panel to be between $initialLeft and $finalLeft halfway through reorder, but was $halfwayLeft",
+            halfwayLeft > initialLeft && halfwayLeft < finalLeft,
+        )
+    }
+
+    private fun testWindow(
+        id: String,
+        title: String,
+    ) = ComposeWorkspaceWindow(
+        id = id,
+        icon = id,
+        title = title,
+        subtitle = title,
+        bounds = ComposeWorkspaceWindowBounds(0, 0, 300, 200),
+    )
 }

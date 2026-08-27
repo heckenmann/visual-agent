@@ -18,7 +18,12 @@ import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -39,6 +44,7 @@ import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
 import sh.calvin.reorderable.ReorderableColumn
+import sh.calvin.reorderable.ReorderableItem
 
 /**
  * Left-hand rail that toggles panels, reorders them and adjusts their widths.
@@ -73,6 +79,17 @@ internal fun ComposeRail(
 ) {
     val railWidth = navigationRailWidth(windows, showPanelLabels)
     val animatedRailWidth by animateDpAsState(targetValue = railWidth, label = "navigation rail width")
+    var previousWindowIds by remember { mutableStateOf(windows.map(ComposeWorkspaceWindow::id)) }
+    var reorderOffsets by remember { mutableStateOf(emptyMap<String, Int>()) }
+    var settledWindowIds by remember { mutableStateOf<List<String>?>(null) }
+    LaunchedEffect(windows) {
+        val windowIds = windows.map(ComposeWorkspaceWindow::id)
+        reorderOffsets = railReorderOffsets(previousWindowIds, windowIds, settledWindowIds)
+        if (settledWindowIds == windowIds) {
+            settledWindowIds = null
+        }
+        previousWindowIds = windowIds
+    }
     Column(
         modifier =
             Modifier
@@ -86,34 +103,40 @@ internal fun ComposeRail(
             list = windows,
             onSettle = { fromIndex, toIndex ->
                 val reordered = windows.toMutableList().apply { add(toIndex, removeAt(fromIndex)) }
+                settledWindowIds = reordered.map(ComposeWorkspaceWindow::id)
                 onReorderWindows(reordered)
             },
             verticalArrangement = Arrangement.spacedBy(10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxWidth().animateContentSize(),
         ) { _, window, isDragging ->
-            DraggableRailButton(
-                window = window,
-                showLabel = showPanelLabels,
-                selected = window.visible,
-                isDragging = isDragging,
-                onToggle = { onToggleWindow(window.id) },
-                onWidthChange = { width -> onPanelWidthChanged(window.id, width) },
-                onRequestWidthDialog = {
-                    modalRequester.request(
-                        ComposeContentModal(
-                            title = "Width: ${window.title}",
-                            content = { dismiss ->
-                                PanelWidthSlider(
-                                    current = window.preferredWidth,
-                                    onWidthChange = { onPanelWidthChanged(window.id, it) },
-                                    onDismiss = dismiss,
-                                )
-                            },
-                        ),
+            key(window.id) {
+                ReorderableItem {
+                    DraggableRailButton(
+                        window = window,
+                        reorderOffsetPx = reorderOffsets[window.id] ?: 0,
+                        showLabel = showPanelLabels,
+                        selected = window.visible,
+                        isDragging = isDragging,
+                        onToggle = { onToggleWindow(window.id) },
+                        onWidthChange = { width -> onPanelWidthChanged(window.id, width) },
+                        onRequestWidthDialog = {
+                            modalRequester.request(
+                                ComposeContentModal(
+                                    title = "Width: ${window.title}",
+                                    content = { dismiss ->
+                                        PanelWidthSlider(
+                                            current = window.preferredWidth,
+                                            onWidthChange = { onPanelWidthChanged(window.id, it) },
+                                            onDismiss = dismiss,
+                                        )
+                                    },
+                                ),
+                            )
+                        },
                     )
-                },
-            )
+                }
+            }
         }
         Spacer(modifier = Modifier.weight(1f))
         HorizontalDividerLine()
@@ -138,6 +161,26 @@ internal fun ComposeRail(
             )
         }
     }
+}
+
+private const val RAIL_ITEM_STRIDE_PX = 46
+
+/**
+ * Calculates visual position offsets for an externally reordered rail list.
+ *
+ * A reordered list returned by [ReorderableColumn] has already been animated while the user was
+ * dragging it, so that specific state update must not start a second animation.
+ */
+internal fun railReorderOffsets(
+    previousWindowIds: List<String>,
+    windowIds: List<String>,
+    settledWindowIds: List<String>?,
+): Map<String, Int> {
+    if (settledWindowIds == windowIds) return emptyMap()
+    val previousIndexes = previousWindowIds.withIndex().associate { (index, id) -> id to index }
+    return windowIds
+        .mapIndexed { index, id -> id to ((previousIndexes[id] ?: index) - index) * RAIL_ITEM_STRIDE_PX }
+        .toMap()
 }
 
 @Composable
