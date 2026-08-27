@@ -40,7 +40,17 @@ class ToolRegistryTest {
         bus.addListener { events += it }
         val registry = ToolRegistry(listOf(FakeTool("context")), bus) { timeoutSeconds }
 
-        val result = registry.execute(registry.resolve(setOf(ToolId("context"))).single(), """{"x":1}""", emptyMap())
+        val result =
+            registry.execute(
+                registry.resolve(setOf(ToolId("context"))).single(),
+                """{"x":1}""",
+                mapOf(
+                    "providerToolCallId" to "call-9",
+                    "requestId" to "request-3",
+                    "toolCallRound" to 1,
+                    "toolCallSequence" to 2,
+                ),
+            )
         val json = Json.parseToJsonElement(result).jsonObject
 
         assertEquals("context", json["toolId"]!!.jsonPrimitive.content)
@@ -49,6 +59,10 @@ class ToolRegistryTest {
         assertEquals(ToolCallPhase.STARTED, events[0].phase)
         assertEquals(ToolCallPhase.FINISHED, events[1].phase)
         assertEquals("context", events[1].toolId)
+        assertEquals("call-9", events[1].providerToolCallId)
+        assertEquals("request-3", events[1].requestId)
+        assertEquals(1, events[1].round)
+        assertEquals(2, events[1].sequence)
         assertTrue(events[1].result.success)
     }
 

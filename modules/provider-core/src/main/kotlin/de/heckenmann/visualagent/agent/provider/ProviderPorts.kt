@@ -84,6 +84,23 @@ interface ProviderToolCallbacks {
         enabledTools: Set<ToolId>,
         context: Map<String, Any> = emptyMap(),
     ): List<ToolCallback>
+
+    /**
+     * Associates the tool callbacks for one model turn with the provider's
+     * request-scoped call identities.
+     *
+     * Implementations that do not own an execution event boundary may retain
+     * the default no-op scope. The scope is intentionally short-lived so
+     * provider call IDs cannot bleed into a subsequent model turn.
+     *
+     * @param toolCalls Ordered calls requested by the provider
+     * @param round Zero-based tool-loop round
+     * @return Handle clearing the correlation after execution
+     */
+    fun bindToolCallRound(
+        toolCalls: List<de.heckenmann.visualagent.agent.ProviderToolCall>,
+        round: Int,
+    ): AutoCloseable = AutoCloseable {}
 }
 
 /** Supplies the default filesystem location used by local provider processes. */

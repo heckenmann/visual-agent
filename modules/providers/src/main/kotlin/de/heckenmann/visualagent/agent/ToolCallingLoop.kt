@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent
 
+import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.reactive.asFlow
@@ -47,11 +48,10 @@ internal class ToolCallingLoop(
         initialPrompt: Prompt,
         token: CancellationToken?,
         toolCallbacks: List<ToolCallback>,
+        callCorrelation: ProviderToolCallbacks? = null,
     ): ChatResponse {
         token?.throwIfCancelled()
-        if (toolCallbacks.isEmpty()) {
-            return chatModel.call(initialPrompt).toVisualAgentResponse()
-        }
+        if (toolCallbacks.isEmpty()) return chatModel.call(initialPrompt).toVisualAgentResponse()
         val boundPrompt = bindToolCallbacks(initialPrompt, toolCallbacks)
         val toolCallingManager = buildToolCallingManager()
         var prompt = boundPrompt
@@ -64,10 +64,14 @@ internal class ToolCallingLoop(
             lastResponse = response
 
             if (!response.hasToolCalls()) {
-                return response.toVisualAgentResponse()
+                return response.toVisualAgentResponse(round = round)
             }
 
-            val toolExecutionResult = toolCallingManager.executeToolCalls(prompt, response)
+            val turn = ProviderTurnResponseMapper.fromSpring(response, round = round)
+            val toolExecutionResult =
+                (callCorrelation?.bindToolCallRound(turn.toolCalls, round) ?: AutoCloseable {}).use {
+                    toolCallingManager.executeToolCalls(prompt, response)
+                }
             if (toolExecutionResult.returnDirect()) {
                 return buildDirectResponse(response, toolExecutionResult)
             }
@@ -76,7 +80,7 @@ internal class ToolCallingLoop(
         }
 
         logger.warn { "Tool calling loop reached max rounds ($maxRounds); returning last response" }
-        return lastResponse?.toVisualAgentResponse()
+        return lastResponse?.toVisualAgentResponse(round = maxRounds - 1)
             ?: ChatResponse(
                 model = "",
                 message = Message(role = "assistant", content = ""),
@@ -103,6 +107,7 @@ internal class ToolCallingLoop(
         initialPrompt: Prompt,
         token: CancellationToken?,
         toolCallbacks: List<ToolCallback>,
+        callCorrelation: ProviderToolCallbacks? = null,
     ): Flow<ChatResponse> =
         flow {
             token?.throwIfCancelled()
@@ -120,7 +125,7 @@ internal class ToolCallingLoop(
             chatModel.stream(boundPrompt).asFlow().collect { springResponse ->
                 token?.throwIfCancelled()
                 springChunks += springResponse
-                emit(springResponse.toVisualAgentResponse())
+                emit(springResponse.toVisualAgentResponse(sequence = springChunks.size))
             }
 
             val aggregated = aggregateStreamingResponse(springChunks)
@@ -128,7 +133,11 @@ internal class ToolCallingLoop(
                 return@flow
             }
 
-            val toolExecutionResult = toolCallingManager.executeToolCalls(boundPrompt, aggregated)
+            val initialTurn = ProviderTurnResponseMapper.fromSpring(aggregated, round = 0)
+            val toolExecutionResult =
+                (callCorrelation?.bindToolCallRound(initialTurn.toolCalls, 0) ?: AutoCloseable {}).use {
+                    toolCallingManager.executeToolCalls(boundPrompt, aggregated)
+                }
             if (toolExecutionResult.returnDirect()) {
                 val direct = buildDirectResponse(aggregated, toolExecutionResult)
                 emit(direct)
@@ -144,11 +153,15 @@ internal class ToolCallingLoop(
                 lastFinalResponse = finalResponse
 
                 if (!finalResponse.hasToolCalls()) {
-                    emit(finalResponse.toVisualAgentResponse())
+                    emit(finalResponse.toVisualAgentResponse(round = round))
                     return@flow
                 }
 
-                val nextToolResult = toolCallingManager.executeToolCalls(prompt, finalResponse)
+                val turn = ProviderTurnResponseMapper.fromSpring(finalResponse, round = round)
+                val nextToolResult =
+                    (callCorrelation?.bindToolCallRound(turn.toolCalls, round) ?: AutoCloseable {}).use {
+                        toolCallingManager.executeToolCalls(prompt, finalResponse)
+                    }
                 if (nextToolResult.returnDirect()) {
                     val direct = buildDirectResponse(finalResponse, nextToolResult)
                     emit(direct)
@@ -158,7 +171,7 @@ internal class ToolCallingLoop(
             }
 
             logger.warn { "Stream tool calling loop reached max rounds ($maxRounds); emitting last response" }
-            lastFinalResponse?.let { emit(it.toVisualAgentResponse()) }
+            lastFinalResponse?.let { emit(it.toVisualAgentResponse(round = maxRounds - 1)) }
         }
 
     private fun buildToolCallingManager(): ToolCallingManager =
@@ -236,17 +249,17 @@ internal class ToolCallingLoop(
         return SpringChatResponse(listOf(generation))
     }
 
-    private fun SpringChatResponse.toVisualAgentResponse(): ChatResponse {
-        val generation = this.result
-        val content = generation?.let { it.output.text.orEmpty() }.orEmpty()
-        return ChatResponse(
-            model = this.metadata.model,
-            message = Message(role = "assistant", content = content),
-            done = generation?.metadata?.finishReason != null,
-            promptEvalCount = this.metadata.usage.promptTokens,
-            evalCount = this.metadata.usage.completionTokens,
+    private fun SpringChatResponse.toVisualAgentResponse(
+        round: Int? = null,
+        sequence: Int? = null,
+    ): ChatResponse =
+        ProviderTurnResponseMapper.toChatResponse(
+            ProviderTurnResponseMapper.fromSpring(
+                this,
+                round = round,
+                sequence = sequence,
+            ),
         )
-    }
 
     companion object {
         private const val DEFAULT_MAX_ROUNDS = 5

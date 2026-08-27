@@ -66,6 +66,10 @@ internal class AgentConversationHistoryOps(
                 put("type", "tool_call")
                 put("toolId", event.toolId)
                 put("functionName", event.functionName)
+                event.providerToolCallId?.let { put("providerToolCallId", it) }
+                event.requestId?.let { put("requestId", it) }
+                event.round?.let { put("round", it) }
+                event.sequence?.let { put("sequence", it) }
                 put("status", status)
                 put("durationMillis", event.durationMillis)
                 put("inputJson", event.inputJson)

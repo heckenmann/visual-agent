@@ -74,6 +74,10 @@ class ToolRegistry(
             ToolCallEvent(
                 toolId = definition.id.value,
                 functionName = definition.name,
+                providerToolCallId = effectiveContext["providerToolCallId"] as? String,
+                requestId = effectiveContext["requestId"] as? String,
+                round = effectiveContext["toolCallRound"] as? Int,
+                sequence = effectiveContext["toolCallSequence"] as? Int,
                 phase = ToolCallPhase.STARTED,
                 inputJson = functionInput,
                 context = effectiveContext,
@@ -102,6 +106,10 @@ class ToolRegistry(
                 ToolCallEvent(
                     toolId = definition.id.value,
                     functionName = definition.name,
+                    providerToolCallId = effectiveContext["providerToolCallId"] as? String,
+                    requestId = effectiveContext["requestId"] as? String,
+                    round = effectiveContext["toolCallRound"] as? Int,
+                    sequence = effectiveContext["toolCallSequence"] as? Int,
                     phase = ToolCallPhase.FINISHED,
                     inputJson = functionInput,
                     context = effectiveContext + mapOf("managedExecution" to true),
@@ -138,6 +146,10 @@ class ToolRegistry(
             ToolCallEvent(
                 toolId = definition.id.value,
                 functionName = definition.name,
+                providerToolCallId = effectiveContext["providerToolCallId"] as? String,
+                requestId = effectiveContext["requestId"] as? String,
+                round = effectiveContext["toolCallRound"] as? Int,
+                sequence = effectiveContext["toolCallSequence"] as? Int,
                 phase = ToolCallPhase.FINISHED,
                 inputJson = functionInput,
                 context = effectiveContext,
@@ -172,6 +184,10 @@ class ToolRegistry(
                 ToolCallEvent(
                     toolId = definition.id.value,
                     functionName = definition.name,
+                    providerToolCallId = effectiveContext["providerToolCallId"] as? String,
+                    requestId = effectiveContext["requestId"] as? String,
+                    round = effectiveContext["toolCallRound"] as? Int,
+                    sequence = effectiveContext["toolCallSequence"] as? Int,
                     phase = ToolCallPhase.FINISHED,
                     inputJson = functionInput,
                     context = effectiveContext + mapOf("async" to true),
