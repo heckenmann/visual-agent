@@ -53,7 +53,11 @@ internal object WorkspaceFilePaths {
     fun relativePath(
         path: Path,
         databasePath: String = "./data/visual-agent.db",
-    ): String = workspaceRoot(databasePath).relativize(path.toAbsolutePath().normalize()).toString()
+    ): String {
+        val root = workspaceRoot(databasePath).toRealPath()
+        val target = path.toRealPath()
+        return root.relativize(target).toString()
+    }
 
     /** Normalizes persisted workspace-relative paths to a platform-neutral form. */
     fun normalizeRelativePath(path: String): String = path.replace('\\', '/').trim().removePrefix("/")
