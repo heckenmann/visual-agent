@@ -20,6 +20,7 @@ import org.springframework.ai.chat.metadata.ChatGenerationMetadata
 import org.springframework.ai.chat.metadata.ChatResponseMetadata
 import org.springframework.ai.chat.model.ChatModel
 import org.springframework.ai.chat.model.Generation
+import org.springframework.ai.chat.model.ToolContext
 import org.springframework.ai.chat.prompt.Prompt
 import org.springframework.ai.tool.ToolCallback
 import reactor.core.publisher.Flux
@@ -55,16 +56,24 @@ internal class CodexAppServerChatModel(
         val content = StringBuilder()
         var last: SpringChatResponse? = null
         var lastItemId: String? = null
+        val reasoning = StringBuilder()
         stream.collect { response ->
-            response.result
-                ?.output
-                ?.text
-                ?.let(content::append)
+            response.metadata.get<String>(CODEX_REASONING)?.let(reasoning::append) ?: run {
+                response.result
+                    ?.output
+                    ?.text
+                    ?.let(content::append)
+            }
             response.metadata.get<String>(CODEX_ITEM_ID)?.let { lastItemId = it }
             last = response
         }
         val terminal = requireNotNull(last) { "Codex returned no response" }
-        return response(content.toString(), done = terminal.hasFinishReasons(setOf("stop")), itemId = lastItemId)
+        return response(
+            content.toString(),
+            done = terminal.hasFinishReasons(setOf("stop")),
+            itemId = lastItemId,
+            reasoning = reasoning.toString().takeIf(String::isNotBlank),
+        )
     }
 
     /** Streams native assistant deltas as Spring AI responses. */
@@ -97,12 +106,13 @@ internal class CodexAppServerChatModel(
                 var pendingDelta: String? = null
                 var pendingItemId: String? = null
                 var receivedMultipleDeltas = false
+                var toolCallSequence = 0
                 withTimeout(TURN_TIMEOUT_MILLIS) {
                     while (true) {
                         cancellationToken?.throwIfCancelled()
                         when (val event = transport.receive()) {
                             is CodexRpcMessage.Request ->
-                                handleServerRequest(transport, event)
+                                if (handleServerRequest(transport, event, toolCallSequence)) toolCallSequence++
                             is CodexRpcMessage.Notification ->
                                 when (event.method) {
                                     "item/agentMessage/delta" -> {
@@ -136,9 +146,10 @@ internal class CodexAppServerChatModel(
                                             if (summary.isNotEmpty()) {
                                                 emit(
                                                     response(
-                                                        "<think>$summary</think>",
+                                                        text = "",
                                                         done = false,
                                                         itemId = event.params["itemId"]?.jsonPrimitive?.contentOrNull,
+                                                        reasoning = summary,
                                                     ),
                                                 )
                                             }
@@ -203,19 +214,29 @@ internal class CodexAppServerChatModel(
     private suspend fun handleServerRequest(
         transport: CodexAppServerTransport,
         request: CodexRpcMessage.Request,
-    ) {
+        sequence: Int,
+    ): Boolean {
         if (request.method != "item/tool/call") {
             transport.respondError(request.id, -32601, "Unsupported Codex server request")
-            return
+            return false
         }
         val toolName = request.params["tool"]?.jsonPrimitive?.contentOrNull
         val callback = toolCallbacks.firstOrNull { it.toolDefinition.name() == toolName }
         if (callback == null) {
             transport.respondError(request.id, -32602, "Tool is not enabled for this request")
-            return
+            return false
         }
         val arguments = request.params["arguments"]?.toString() ?: "{}"
-        val result = withContext(Dispatchers.IO) { runCatching { callback.call(arguments) } }
+        val providerCallId = request.params["callId"]?.jsonPrimitive?.contentOrNull ?: request.id
+        val toolContext =
+            ToolContext(
+                mapOf(
+                    "providerToolCallId" to providerCallId,
+                    "toolCallRound" to 0,
+                    "toolCallSequence" to sequence,
+                ),
+            )
+        val result = withContext(Dispatchers.IO) { runCatching { callback.call(arguments, toolContext) } }
         val allowInlineImage = isWorkspaceImageRequest(toolName, arguments)
         val response =
             if (result.isFailure) {
@@ -231,6 +252,7 @@ internal class CodexAppServerChatModel(
                 )
             }
         transport.respond(request.id, response)
+        return true
     }
 
     private fun isWorkspaceImageRequest(
@@ -250,6 +272,7 @@ internal class CodexAppServerChatModel(
         text: String,
         done: Boolean,
         itemId: String? = null,
+        reasoning: String? = null,
     ): SpringChatResponse =
         SpringChatResponse(
             listOf(
@@ -261,12 +284,15 @@ internal class CodexAppServerChatModel(
             ChatResponseMetadata
                 .builder()
                 .model(model)
-                .apply { itemId?.let { keyValue("codexItemId", it) } }
-                .build(),
+                .apply {
+                    itemId?.let { keyValue(CODEX_ITEM_ID, it) }
+                    reasoning?.let { keyValue(CODEX_REASONING, it) }
+                }.build(),
         )
 
     private companion object {
         private const val CODEX_ITEM_ID = "codexItemId"
+        private const val CODEX_REASONING = "codexReasoning"
         private const val WORKSPACE_FILE_TOOL_NAME = "workspace_file"
         private const val WORKSPACE_IMAGE_ACTION = "imageBytes"
         private const val SIMULATED_CHUNK_DELAY_MS = 16L

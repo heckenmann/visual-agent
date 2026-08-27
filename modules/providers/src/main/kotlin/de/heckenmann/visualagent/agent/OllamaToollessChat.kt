@@ -49,17 +49,7 @@ internal object OllamaToollessChat {
                 options = prompt.options as OllamaChatOptions,
             )
         val response = ollamaApi.chat(chatRequest)
-        return ChatResponse(
-            model = response.model(),
-            message =
-                Message(
-                    role = "assistant",
-                    content = response.message().content().orEmpty(),
-                ),
-            done = response.done() == true,
-            promptEvalCount = response.promptEvalCount(),
-            evalCount = response.evalCount(),
-        )
+        return ProviderTurnResponseMapper.toChatResponse(ProviderTurnResponseMapper.fromOllama(response))
     }
 
     /**
@@ -87,20 +77,15 @@ internal object OllamaToollessChat {
                     stream = true,
                     options = prompt.options as OllamaChatOptions,
                 )
+            var sequence = 0
             ollamaApi.streamingChat(chatRequest).asFlow().collect { chunk: OllamaChatResponse ->
-                emit(
-                    ChatResponse(
-                        model = chunk.model().takeIf { !it.isNullOrBlank() } ?: selectedModel,
-                        message =
-                            Message(
-                                role = "assistant",
-                                content = chunk.message().content().orEmpty(),
-                            ),
-                        done = chunk.done() == true,
-                        promptEvalCount = chunk.promptEvalCount(),
-                        evalCount = chunk.evalCount(),
-                    ),
-                )
+                val turn =
+                    ProviderTurnResponseMapper
+                        .fromOllama(chunk, sequence = sequence++)
+                        .let { mapped ->
+                            if (mapped.model.isBlank()) mapped.copy(model = selectedModel) else mapped
+                        }
+                emit(ProviderTurnResponseMapper.toChatResponse(turn))
             }
         }
 

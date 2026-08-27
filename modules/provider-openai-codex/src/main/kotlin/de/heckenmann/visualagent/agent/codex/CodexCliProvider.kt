@@ -4,12 +4,17 @@ import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.ChatResponse
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ModelDetails
+import de.heckenmann.visualagent.agent.ProviderFinishReason
+import de.heckenmann.visualagent.agent.ProviderResponseMetadata
+import de.heckenmann.visualagent.agent.ProviderTurnResponse
 import de.heckenmann.visualagent.agent.ShowResponse
 import de.heckenmann.visualagent.agent.provider.ProfiledProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
+import de.heckenmann.visualagent.agent.provider.ProviderUserFacingError
+import de.heckenmann.visualagent.agent.provider.ProviderUserFacingException
 import de.heckenmann.visualagent.agent.provider.ProviderWorkingDirectory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -54,6 +59,7 @@ class CodexCliProvider internal constructor(
                 model = response.metadata.model.takeIf(String::isNotBlank) ?: model,
                 message = response.toCodexProviderMessage(),
                 done = true,
+                providerTurn = response.toCodexProviderTurn(model),
             )
         }
 
@@ -76,6 +82,7 @@ class CodexCliProvider internal constructor(
                         model = chunk.metadata.model.takeIf(String::isNotBlank) ?: model,
                         message = chunk.toCodexProviderMessage(),
                         done = chunk.hasFinishReasons(setOf("stop")),
+                        providerTurn = chunk.toCodexProviderTurn(model),
                     ),
                 )
             }
@@ -107,6 +114,7 @@ class CodexCliProvider internal constructor(
                 model = response.metadata.model.takeIf(String::isNotBlank) ?: model,
                 message = response.toCodexProviderMessage(),
                 done = true,
+                providerTurn = response.toCodexProviderTurn(model),
             )
         }
 
@@ -131,9 +139,20 @@ class CodexCliProvider internal constructor(
     private suspend fun resolveExecutable(profile: ProviderProfile): Path =
         when (val result = locator.locate(profile.options[OPTION_EXECUTABLE_PATH])) {
             is CodexCliLocation.Ready -> result.executable
-            CodexCliLocation.InvalidExplicitPath -> error("Configured Codex CLI path is invalid")
-            CodexCliLocation.Missing -> error("Codex CLI is not installed")
+            CodexCliLocation.InvalidExplicitPath ->
+                throw providerExecutableUnavailable("The configured provider executable path is invalid.")
+            CodexCliLocation.Missing ->
+                throw providerExecutableUnavailable("The required provider executable is not installed.")
         }
+
+    private fun providerExecutableUnavailable(reason: String): ProviderUserFacingException =
+        ProviderUserFacingException(
+            ProviderUserFacingError(
+                summary = "Provider executable unavailable",
+                detail = "$reason Install it or select another provider in Session settings.",
+                retryable = false,
+            ),
+        )
 
     private fun ChatRequestContext.toPrompt(): Prompt =
         Prompt(
@@ -192,5 +211,21 @@ internal fun org.springframework.ai.chat.model.ChatResponse.toCodexProviderMessa
         role = "assistant",
         content = result?.output?.text.orEmpty(),
         metadata = messageMetadata,
+    )
+}
+
+/** Maps allowlisted Codex app-server output to a provider-neutral model turn. */
+internal fun org.springframework.ai.chat.model.ChatResponse.toCodexProviderTurn(fallbackModel: String): ProviderTurnResponse {
+    val rawFinishReason = result?.metadata?.finishReason
+    return ProviderTurnResponse(
+        model = metadata.model.takeIf(String::isNotBlank) ?: fallbackModel,
+        content = result?.output?.text.orEmpty(),
+        reasoning = metadata.get<String>("codexReasoning"),
+        finishReason = rawFinishReason?.let { ProviderFinishReason.STOP },
+        metadata =
+            ProviderResponseMetadata(
+                responseId = metadata.get<String>("codexItemId"),
+                rawFinishReason = rawFinishReason,
+            ),
     )
 }
