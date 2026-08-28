@@ -2,7 +2,7 @@
 
 ## Goal
 
-Let the user update application-level settings such as provider defaults, runtime preferences, theme, and font size.
+Let the user update application-level settings such as provider defaults, runtime preferences, theme, font size, and UI scale.
 
 ## Primary Actor
 
@@ -41,4 +41,5 @@ User preferences survive restart and affect the application consistently.
 
 - Supported settings persist in SQLite.
 - Runtime numeric settings are constrained to supported ranges.
+- UI scale can be restored to automatic operating-system scaling.
 - Sensitive provider keys are not exposed in exports, logs, or model context.
