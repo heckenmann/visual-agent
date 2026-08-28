@@ -27,9 +27,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
+import org.slf4j.LoggerFactory
 import org.springframework.boot.WebApplicationType
 import org.springframework.boot.builder.SpringApplicationBuilder
 import org.springframework.context.ConfigurableApplicationContext
+
+private val logger = LoggerFactory.getLogger("de.heckenmann.visualagent.desktop.ComposeStartupHost")
 
 /** Starts Compose before the local Spring server and keeps the splash responsive during startup. */
 fun runVisualAgentComposeApplication() {
@@ -93,7 +96,8 @@ private fun ComposeStartupHost(exitApplication: () -> Unit) {
                 withContext(Dispatchers.IO + NonCancellable) { context?.close() }
             }
             throw cancelled
-        } catch (_: Exception) {
+        } catch (failure: Exception) {
+            logger.error("Could not start the desktop server", failure)
             withContext(Dispatchers.IO + NonCancellable) { context?.close() }
             startupStatus =
                 if (endpoint is DesktopServerEndpoint.RemoteTls) {
@@ -133,7 +137,8 @@ private fun ComposeStartupHost(exitApplication: () -> Unit) {
             startupStatus = StartupStatus.ready()
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
+        } catch (failure: Exception) {
+            logger.error("Could not connect the desktop client to its local server", failure)
             serverConnection = null
             springContext = null
             withContext(Dispatchers.IO + NonCancellable) {
