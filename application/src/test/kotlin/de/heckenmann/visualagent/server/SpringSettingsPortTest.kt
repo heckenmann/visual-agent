@@ -19,6 +19,7 @@ class SpringSettingsPortTest {
         config.llmProvider = "openai"
         config.openAiModel = "gpt-test"
         config.uiThemeMode = ThemeMode.DARK
+        config.uiScalePercent = 125
         config.queueFlushMode = "ALL"
         val catalog = mockk<ProviderCatalogService>()
         every { catalog.activeProviderId() } returns "openai"
@@ -29,6 +30,7 @@ class SpringSettingsPortTest {
         assertEquals("openai", snapshot.providerId)
         assertEquals("gpt-test", snapshot.modelId)
         assertEquals(ProtocolThemeMode.DARK, snapshot.uiThemeMode)
+        assertEquals(125, snapshot.uiScalePercent)
         assertEquals("ALL", snapshot.queueFlushMode)
     }
 
@@ -43,12 +45,14 @@ class SpringSettingsPortTest {
                 providerId = "openai",
                 modelId = "gpt-test",
                 uiThemeMode = ProtocolThemeMode.LIGHT,
+                uiScalePercent = 250,
                 queueFlushMode = "ALL",
             ),
         )
 
         verify { catalog.setActiveSelection("openai", "gpt-test") }
         assertEquals(ThemeMode.LIGHT, config.uiThemeMode)
+        assertEquals(200, config.uiScalePercent)
         assertEquals("ALL", config.queueFlushMode)
     }
 }
