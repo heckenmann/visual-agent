@@ -88,10 +88,12 @@ internal fun ReorderableListItemScope.DraggableRailButton(
     var horizontalOffset by remember { mutableFloatStateOf(0f) }
     val verticalOffset = remember { Animatable(0f) }
     LaunchedEffect(reorderOffsetPx) {
-        if (reorderOffsetPx != 0) {
-            verticalOffset.snapTo(reorderOffsetPx.toFloat())
-            verticalOffset.animateTo(0f, tween(RAIL_REORDER_ANIMATION_DURATION_MILLIS))
+        if (reorderOffsetPx == 0) {
+            verticalOffset.snapTo(0f)
+            return@LaunchedEffect
         }
+        verticalOffset.snapTo(reorderOffsetPx.toFloat())
+        verticalOffset.animateTo(0f, tween(RAIL_REORDER_ANIMATION_DURATION_MILLIS))
     }
     val backgroundColor = if (selected) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainer
     val borderColor = if (selected) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outline.copy(alpha = 0x2A / 255f)

@@ -45,6 +45,7 @@ import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
 import sh.calvin.reorderable.ReorderableColumn
 import sh.calvin.reorderable.ReorderableItem
+import kotlin.math.roundToInt
 
 /**
  * Left-hand rail that toggles panels, reorders them and adjusts their widths.
@@ -79,12 +80,13 @@ internal fun ComposeRail(
 ) {
     val railWidth = navigationRailWidth(windows, showPanelLabels)
     val animatedRailWidth by animateDpAsState(targetValue = railWidth, label = "navigation rail width")
+    val railItemStridePx = with(LocalDensity.current) { RAIL_ITEM_STRIDE.toPx().roundToInt() }
     var previousWindowIds by remember { mutableStateOf(windows.map(ComposeWorkspaceWindow::id)) }
     var reorderOffsets by remember { mutableStateOf(emptyMap<String, Int>()) }
     var settledWindowIds by remember { mutableStateOf<List<String>?>(null) }
-    LaunchedEffect(windows) {
+    LaunchedEffect(windows, railItemStridePx) {
         val windowIds = windows.map(ComposeWorkspaceWindow::id)
-        reorderOffsets = railReorderOffsets(previousWindowIds, windowIds, settledWindowIds)
+        reorderOffsets = railReorderOffsets(previousWindowIds, windowIds, settledWindowIds, railItemStridePx)
         if (settledWindowIds == windowIds) {
             settledWindowIds = null
         }
@@ -163,7 +165,7 @@ internal fun ComposeRail(
     }
 }
 
-private const val RAIL_ITEM_STRIDE_PX = 46
+private val RAIL_ITEM_STRIDE = 46.dp
 
 /**
  * Calculates visual position offsets for an externally reordered rail list.
@@ -175,11 +177,12 @@ internal fun railReorderOffsets(
     previousWindowIds: List<String>,
     windowIds: List<String>,
     settledWindowIds: List<String>?,
+    itemStridePx: Int,
 ): Map<String, Int> {
     if (settledWindowIds == windowIds) return emptyMap()
     val previousIndexes = previousWindowIds.withIndex().associate { (index, id) -> id to index }
     return windowIds
-        .mapIndexed { index, id -> id to ((previousIndexes[id] ?: index) - index) * RAIL_ITEM_STRIDE_PX }
+        .mapIndexed { index, id -> id to ((previousIndexes[id] ?: index) - index) * itemStridePx }
         .toMap()
 }
 

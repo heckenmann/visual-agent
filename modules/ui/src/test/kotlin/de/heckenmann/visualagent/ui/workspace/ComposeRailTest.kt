@@ -17,6 +17,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.up
+import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -159,8 +160,22 @@ class ComposeRailTest {
                 previousWindowIds = listOf("chat", "todos"),
                 windowIds = listOf("todos", "chat"),
                 settledWindowIds = listOf("todos", "chat"),
+                itemStridePx = 46,
             ),
             "A drag-and-drop reorder must not trigger an additional rail position animation after settling",
+        )
+    }
+
+    @Test
+    fun `rail reorder offsets use the display-density adjusted stride`() {
+        assertEquals(
+            mapOf("todos" to 92, "chat" to -92),
+            railReorderOffsets(
+                previousWindowIds = listOf("chat", "todos"),
+                windowIds = listOf("todos", "chat"),
+                settledWindowIds = null,
+                itemStridePx = 92,
+            ),
         )
     }
 
@@ -220,6 +235,34 @@ class ComposeRailTest {
             halfwayTop > initialTop && halfwayTop < finalTop,
             "Expected rail item to be between $initialTop and $finalTop halfway through reorder, but was $halfwayTop",
         )
+    }
+
+    @Test
+    fun `rail item returns to its settled position when an update interrupts reordering`() {
+        var windows by mutableStateOf(listOf(testWindow("chat", "Chat"), testWindow("todos", "Todos")))
+        composeTestRule.mainClock.autoAdvance = false
+        composeTestRule.setContent {
+            MaterialTheme {
+                ComposeRail(
+                    windows = windows,
+                    onToggleWindow = {},
+                    onReorderWindows = { windows = it },
+                    onPanelWidthChanged = { _, _ -> },
+                    onCloseApplication = {},
+                    modalRequester = ComposeModalRequester { },
+                )
+            }
+        }
+        composeTestRule.mainClock.advanceTimeByFrame()
+        val initialTop = composeTestRule.onNodeWithContentDescription("Toggle Chat").getUnclippedBoundsInRoot().top
+
+        windows = windows.reversed()
+        composeTestRule.mainClock.advanceTimeBy(80)
+        windows = windows.map { window -> if (window.id == "chat") window.copy(visible = false) else window }
+        composeTestRule.mainClock.advanceTimeBy(500)
+        val settledTop = composeTestRule.onNodeWithContentDescription("Toggle Chat").getUnclippedBoundsInRoot().top
+
+        assertEquals(initialTop + 46.dp, settledTop)
     }
 
     private fun testWindow(
