@@ -11,27 +11,13 @@ Visual Agent is a Kotlin desktop application. Its goal is to provide the model w
 
 ## Download and Run
 
-Each successful build on `master` publishes an executable, platform-specific desktop JAR to GitHub Packages. You need a GitHub personal access token with `read:packages` scope to download it.
+Download the matching native package from [GitHub Releases](https://github.com/heckenmann/visual-agent/releases). Each package contains the Visual Agent JAR, all runtime dependencies, and a platform-native launcher, so no Java installation is required.
 
-The published desktop JAR is produced by `:desktop:bootJar` and is the artifact intended for `java -jar`. The `application` module also produces an executable standalone-server JAR for server-only deployments. Files ending in `-plain.jar` are internal library artifacts and are not launchable applications.
+1. macOS: download the package for your processor (`macos-arm64` or `macos-x64`), open the `.dmg`, and move Visual Agent to Applications.
+2. Windows: run `visual-agent-windows.msi`.
+3. Linux: install `visual-agent-linux-deb.deb` on Debian/Ubuntu or `visual-agent-linux-rpm.rpm` on Fedora/openSUSE/RHEL.
 
-1. Download the latest package that matches your operating system from the [GitHub Packages registry](https://github.com/heckenmann/visual-agent/packages):
-
-   - Linux: `visual-agent-linux`
-   - macOS on Intel: `visual-agent-macos-x64`
-   - macOS on Apple Silicon: `visual-agent-macos-arm64`
-   - Windows: `visual-agent-windows`
-
-   Each package contains the native Compose runtime for its platform.
-2. Run it with Java 21 or later:
-
-   ```bash
-   java -jar visual-agent-<platform>-0.1.0-master-<version>.jar
-   ```
-
-   Visual Agent needs a desktop environment (it won't run headless).
-
-3. On first launch it creates a local SQLite database under `./data/` and opens the Compose UI.
+The native launcher supplies the Visual Agent name and icon to the operating system. On first launch it creates a local SQLite database under `./data/` and opens the Compose UI.
 
 ## Features
 
@@ -53,6 +39,8 @@ See [Setup Guide](docs/setup.md) for prerequisites, build/run commands, Ollama c
 ./gradlew build
 ./gradlew :desktop:run
 ```
+
+`./gradlew :desktop:run` builds and starts the same native application image used by the release packages. Use `./gradlew :desktop:runDistributable` explicitly when you want to run that image without the `run` alias.
 
 ## Gradle Modules
 
