@@ -41,5 +41,6 @@ User preferences survive restart and affect the application consistently.
 
 - Supported settings persist in SQLite.
 - Runtime numeric settings are constrained to supported ranges.
+- The session timeout setting supplies the default timeout for all model-callable tools.
 - UI scale can be restored to automatic operating-system scaling.
 - Sensitive provider keys are not exposed in exports, logs, or model context.

@@ -21,7 +21,7 @@ Allow an enabled agent to run a JavaScript program for deterministic multi-tool 
 1. The agent calls `javascript:execute` with inline `source` or a workspace-relative JavaScript `path`.
 2. The server creates a fresh GraalJS context with host access, IO, process, network, and polyglot access disabled. Script source length is not capped.
 3. The context receives only `tools.call(name, arguments)`, `tools.list()`, `tools.describe(name)`, the hardened `workspace.write/read/delete(...)` helpers, and bounded simulated `console` methods.
-4. Each `tools.call` verifies the request-scoped allowlist and invokes the existing `ToolRegistry` path. Nested activity keeps normal lifecycle events, cancellation, authorization, and timeout behavior.
+4. Each `tools.call` verifies the request-scoped allowlist and invokes the existing `ToolRegistry` path. Nested activity keeps normal lifecycle events, cancellation, authorization, and the outer call deadline.
 5. The script filters, aggregates, transforms, or combines results locally. For complex deterministic logic or large generated text (for example CSV exports and Markdown tables), it assembles the complete output before returning it. It can return a string, Markdown document, primitive, array, object, or null.
 6. Only the final `return` value becomes the model-visible tool result. Console diagnostics remain bounded execution metadata and never use the server's real stdout/stderr.
 7. If execution fails, the tool returns a compact category and message to the model. The model can correct the source or arguments and retry; an unchanged failing script must not be repeated.
@@ -29,7 +29,7 @@ Allow an enabled agent to run a JavaScript program for deterministic multi-tool 
 
 ## Tool Calls
 
-- `javascript:execute` with `{ "source": "...", "timeoutSeconds": 120 }` or `{ "path": "scripts/report.js" }`; `timeoutSeconds` is optional and uses the application default when omitted.
+- `javascript:execute` with `{ "source": "...", "timeoutSeconds": 120 }` or `{ "path": "scripts/report.js" }`; `timeoutSeconds` is optional, accepts 1 through 600 seconds, and uses the application default when omitted.
 - Script-internal `tools.call("<enabled canonical tool id>", { ... })` calls through the existing registry.
 - Script-internal `tools.list()` and `tools.describe(name)` for request-scoped discovery.
 - Script-internal `workspace.write({path: "relative/file.md", content: text})`, `workspace.read({path: "relative/file.md"})`, and `workspace.delete({path: "relative/file.md"})` for hardened UTF-8 workspace file access.
@@ -52,6 +52,7 @@ Execution exceptions are returned to the model as actionable tool errors (for ex
 - No JVM classes, reflection, host objects, filesystem, environment variables, process creation, native APIs, network, credentials, or unrestricted application services are exposed.
 - A script may call only tools enabled in the current request; `javascript:execute` cannot call itself recursively.
 - Parent cancellation cancels the guest context and in-flight bridge calls.
+- Nested calls inherit the outer deadline. Their `timeoutSeconds` argument can shorten the remaining budget but cannot extend it.
 - Workspace reads and writes count toward the request tool-call budget and are bounded per file and cumulatively for the execution. Reads are bounded before their UTF-8 content is copied into JavaScript. These data-transfer limits do not cap inline JavaScript source length.
 - The Oracle GraalVM isolate path applies hard isolate and retained guest-heap limits. Supported runtimes without the isolate image use Graal's constrained host-access policy plus the same bounded result traversal; no host filesystem or application classes are exposed.
 - Nested registry calls are always awaited; asynchronous scheduling is rejected so permits remain held until side effects finish.
