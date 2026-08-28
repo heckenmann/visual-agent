@@ -8,6 +8,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.util.concurrent.TimeUnit
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -140,7 +141,7 @@ class ToolRegistryTest {
             val result = registry.execute(registry.resolve(setOf(ToolId("context"))).single(), """{}""", emptyMap())
             val json = Json.parseToJsonElement(result).jsonObject
             assertFalse(json["success"]!!.jsonPrimitive.content.toBoolean())
-            assertTrue(json["error"]!!.jsonPrimitive.content.contains("timed out"))
+            assertTrue(json["error"]!!.jsonPrimitive.content.contains("TOOL_TIMEOUT"))
         } finally {
             timeoutSeconds = previousTimeout
         }
@@ -159,6 +160,29 @@ class ToolRegistryTest {
         } finally {
             timeoutSeconds = previousTimeout
         }
+    }
+
+    @Test
+    fun `tool call rejects invalid timeout override without clamping`() {
+        val registry = registry(FakeTool("context"))
+
+        val result = registry.execute(registry.resolve(setOf(ToolId("context"))).single(), """{"timeoutSeconds":601}""", emptyMap())
+        val json = Json.parseToJsonElement(result).jsonObject
+
+        assertFalse(json["success"]!!.jsonPrimitive.content.toBoolean())
+        assertContains(json["error"]!!.jsonPrimitive.content, "TOOL_ARGUMENTS")
+        assertContains(json["error"]!!.jsonPrimitive.content, "1 and 600")
+    }
+
+    @Test
+    fun `provider definitions centrally expose runtime parameters`() {
+        val registry = registry(FakeTool("context"))
+
+        val schema = Json.parseToJsonElement(registry.toolDefinitions().single().inputSchema).jsonObject
+        val properties = schema["properties"]!!.jsonObject
+
+        assertEquals("integer", properties["timeoutSeconds"]!!.jsonObject["type"]!!.jsonPrimitive.content)
+        assertEquals("boolean", properties["async"]!!.jsonObject["type"]!!.jsonPrimitive.content)
     }
 
     @Test
@@ -193,9 +217,13 @@ class ToolRegistryTest {
         val result = registry.execute(registry.resolve(setOf(ToolId("agent:start"))).single(), """{"async":true}""", emptyMap())
         val json = Json.parseToJsonElement(result).jsonObject
 
-        assertEquals("managed", json["content"]!!.jsonPrimitive.content)
+        assertTrue(json["content"]!!.jsonPrimitive.content.contains("scheduled async"))
+        val deadline = System.currentTimeMillis() + 3_000
+        while (System.currentTimeMillis() < deadline && events.count { it.phase == ToolCallPhase.FINISHED } == 0) {
+            TimeUnit.MILLISECONDS.sleep(25)
+        }
         assertEquals(2, events.size)
-        assertEquals(true, events.last().context["managedExecution"])
+        assertEquals(true, events.last().context["async"])
     }
 
     private fun registry(vararg tools: VisualAgentTool) = ToolRegistry(tools.toList(), ToolEventBus()) { timeoutSeconds }

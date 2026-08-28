@@ -54,7 +54,7 @@ class CodexCliProvider internal constructor(
                     callbacks(request, model),
                     request.workingDirectory(),
                     request.showReasoningSummary(),
-                ).complete(request.toPrompt(), request.cancellationToken)
+                ).complete(request.toPrompt(toolCallbacks.toolRuntimeGuidance()), request.cancellationToken)
             ChatResponse(
                 model = response.metadata.model.takeIf(String::isNotBlank) ?: model,
                 message = response.toCodexProviderMessage(),
@@ -76,7 +76,7 @@ class CodexCliProvider internal constructor(
                 callbacks(request, model),
                 request.workingDirectory(),
                 request.showReasoningSummary(),
-            ).streamFlow(request.toPrompt(), request.cancellationToken).collect { chunk ->
+            ).streamFlow(request.toPrompt(toolCallbacks.toolRuntimeGuidance()), request.cancellationToken).collect { chunk ->
                 emit(
                     ChatResponse(
                         model = chunk.metadata.model.takeIf(String::isNotBlank) ?: model,
@@ -154,9 +154,9 @@ class CodexCliProvider internal constructor(
             ),
         )
 
-    private fun ChatRequestContext.toPrompt(): Prompt =
+    private fun ChatRequestContext.toPrompt(toolRuntimeGuidance: String): Prompt =
         Prompt(
-            messages.map { message ->
+            (listOf(Message("system", "Tool timeout contract: $toolRuntimeGuidance")) + messages).map { message ->
                 when (message.role) {
                     "system" -> SystemMessage(message.content)
                     "assistant" -> AssistantMessage(message.content)

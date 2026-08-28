@@ -14,6 +14,7 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.io.path.absolute
 
 /** Shared JSON parser for tool input. */
@@ -59,6 +60,15 @@ private fun redactUriSecrets(value: String): String =
 /** Default permissive JSON schema used by tools without a richer schema. */
 public const val STRING_SCHEMA = """{"type":"object","additionalProperties":true}"""
 
+/** Minimum model-selectable duration for one tool call. */
+public const val MIN_TOOL_TIMEOUT_SECONDS = 1
+
+/** Maximum model-selectable duration for one tool call. */
+public const val MAX_TOOL_TIMEOUT_SECONDS = 600
+
+/** Default duration used outside the application composition boundary. */
+public const val DEFAULT_TOOL_TIMEOUT_SECONDS = 120
+
 internal class ToolInputException(
     message: String,
 ) : IllegalArgumentException(message)
@@ -92,6 +102,45 @@ public data class ToolExecutionOptions(
     val async: Boolean,
 )
 
+/** Request-scoped cancellation signal owned by the tool execution boundary. */
+public class ToolCancellationToken {
+    private val cancelled = AtomicBoolean(false)
+    private val listeners = mutableListOf<() -> Unit>()
+    private val lock = Any()
+
+    /** `true` once the tool execution boundary has been cancelled. */
+    public val isCancelled: Boolean
+        get() = cancelled.get()
+
+    /** Cancels this tool execution and invokes registered listeners once. */
+    public fun cancel() {
+        if (!cancelled.compareAndSet(false, true)) return
+        val callbacks = synchronized(lock) { listeners.toList().also { listeners.clear() } }
+        callbacks.forEach { callback -> runCatching(callback).onFailure { } }
+    }
+
+    /** Registers a listener that runs when this tool execution is cancelled. */
+    public fun onCancelled(listener: () -> Unit): AutoCloseable {
+        val invokeNow =
+            synchronized(lock) {
+                if (isCancelled) {
+                    true
+                } else {
+                    listeners += listener
+                    false
+                }
+            }
+        if (invokeNow) runCatching(listener).onFailure { }
+        return AutoCloseable { synchronized(lock) { listeners.remove(listener) } }
+    }
+}
+
+/** Adapts an outer request cancellation source to the tool execution boundary. */
+public fun interface ToolCancellationRegistrar {
+    /** Registers one callback to run when the outer request is cancelled. */
+    public fun register(listener: () -> Unit): AutoCloseable
+}
+
 /**
  * Parses standard tool runtime options from JSON input.
  *
@@ -107,9 +156,30 @@ public fun runtimeOptions(
     input: JsonObject,
     defaultTimeoutSeconds: Int,
 ): ToolExecutionOptions {
-    val timeout = (input.int("timeoutSeconds") ?: defaultTimeoutSeconds).coerceIn(1, 600)
+    val timeoutValue = input["timeoutSeconds"]
+    val timeout =
+        when {
+            timeoutValue == null -> defaultTimeoutSeconds
+            input.int("timeoutSeconds") == null ->
+                throw ToolInputException("The runtime field 'timeoutSeconds' must be an integer.")
+            else -> input.int("timeoutSeconds")!!
+        }
+    if (timeout !in MIN_TOOL_TIMEOUT_SECONDS..MAX_TOOL_TIMEOUT_SECONDS) {
+        throw ToolInputException(
+            "The runtime field 'timeoutSeconds' must be between $MIN_TOOL_TIMEOUT_SECONDS and $MAX_TOOL_TIMEOUT_SECONDS.",
+        )
+    }
     val async = input.boolean("async") ?: false
     return ToolExecutionOptions(timeoutSeconds = timeout, async = async)
+}
+
+/** Returns normalized tool-call guidance for a provider system message. */
+public fun toolTimeoutGuidance(defaultTimeoutSeconds: Int): String {
+    val default = defaultTimeoutSeconds.coerceIn(MIN_TOOL_TIMEOUT_SECONDS, MAX_TOOL_TIMEOUT_SECONDS)
+    return "Every tool call has a $default-second default timeout. " +
+        "You may set optional runtime field `timeoutSeconds` to an integer from " +
+        "$MIN_TOOL_TIMEOUT_SECONDS to $MAX_TOOL_TIMEOUT_SECONDS. " +
+        "If a call returns TOOL_TIMEOUT, inspect the result and retry with a larger timeoutSeconds value when useful."
 }
 
 /** Returns the normalized process workspace root. */

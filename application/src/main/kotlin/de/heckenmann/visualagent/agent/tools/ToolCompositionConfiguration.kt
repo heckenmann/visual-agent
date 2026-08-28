@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.agent.tools
 
 import de.heckenmann.visualagent.agent.AgentManager
+import de.heckenmann.visualagent.agent.CancellationToken
 import de.heckenmann.visualagent.agent.ProviderToolCall
 import de.heckenmann.visualagent.agent.javascript.GraalJavaScriptExecutionService
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
@@ -67,16 +68,19 @@ class SpringAiToolCallbacksAdapter(
         enabledTools: Set<ProviderToolId>,
         context: Map<String, Any>,
     ): List<ToolCallback> {
-        val requestContext = context + ("enabledTools" to enabledTools.map { it.value }.toSet())
+        val requestContext =
+            context +
+                ("enabledTools" to enabledTools.map { it.value }.toSet()) +
+                toolCancellationRegistrar(context)
         return registry.resolve(enabledTools.mapTo(mutableSetOf()) { ToolId(it.value) }).map { tool ->
             /** Provider callback delegating one resolved tool to the provider-neutral registry. */
             object : ToolCallback {
                 override fun getToolDefinition(): SpringToolDefinition =
                     SpringToolDefinition
                         .builder()
-                        .name(tool.definition.name)
-                        .description(tool.definition.description)
-                        .inputSchema(tool.definition.inputSchema)
+                        .name(registry.definition(tool).name)
+                        .description(registry.definition(tool).description)
+                        .inputSchema(registry.definition(tool).inputSchema)
                         .build()
 
                 override fun call(functionInput: String): String =
@@ -97,6 +101,13 @@ class SpringAiToolCallbacksAdapter(
                     )
             }
         }
+    }
+
+    override fun toolRuntimeGuidance(): String = registry.runtimeGuidance()
+
+    private fun toolCancellationRegistrar(context: Map<String, Any>): Map<String, Any> {
+        val parent = context["cancellationToken"] as? CancellationToken ?: return emptyMap()
+        return mapOf("toolCancellationRegistrar" to ToolCancellationRegistrar(parent::onCancelled))
     }
 
     override fun bindToolCallRound(

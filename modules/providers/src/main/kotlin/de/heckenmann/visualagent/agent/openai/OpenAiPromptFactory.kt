@@ -48,10 +48,14 @@ class OpenAiPromptFactory(
         request: ChatRequestContext,
         selectedModel: String,
     ): Prompt {
+        val toolContext =
+            request.metadata +
+                mapOf("model" to selectedModel, "provider" to "openai") +
+                (request.cancellationToken?.let { mapOf("cancellationToken" to it) } ?: emptyMap())
         val callbacks =
             toolRegistry.functionCallbacks(
                 enabledTools = request.enabledTools,
-                context = request.metadata + mapOf("model" to selectedModel, "provider" to "openai"),
+                context = toolContext,
             )
         val exactFunctionNames = callbacks.map { it.toolDefinition.name() }.distinct().sorted()
         val optionsBuilder =
@@ -59,7 +63,7 @@ class OpenAiPromptFactory(
                 .builder()
                 .model(selectedModel)
                 .toolCallbacks(callbacks)
-                .toolContext(request.metadata + mapOf("model" to selectedModel, "provider" to "openai"))
+                .toolContext(toolContext)
         request.parameters.temperature?.let(optionsBuilder::temperature)
         request.parameters.topP?.let(optionsBuilder::topP)
         request.parameters.maxTokens?.let(optionsBuilder::maxCompletionTokens)
@@ -82,8 +86,8 @@ class OpenAiPromptFactory(
                         Tool calling strict mode:
                         - You may only call tool functions with these exact names: ${exactFunctionNames.joinToString(", ")}.
                         - Do not invent variants, prefixes, or suffixes.
-                        - Every tool accepts optional runtime fields: `timeoutSeconds` (1..600) and `async` (true/false).
-                        - Use `timeoutSeconds` for long operations; use `async:true` when the tool can finish in background.
+                        - ${toolRegistry.toolRuntimeGuidance()}
+                        - Use `async:true` when a tool can finish in the background.
                         - If unsure about a tool name, do not call a tool; ask briefly or answer directly.
                         """.trimIndent(),
                 ),

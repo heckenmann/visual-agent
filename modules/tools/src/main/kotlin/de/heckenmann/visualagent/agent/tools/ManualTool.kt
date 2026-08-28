@@ -75,7 +75,7 @@ class ManualTool(
 
     private fun manualPages(): Map<String, String> =
         buildMap {
-            val toolDefinitions = allTools.map { it.definition }.sortedBy { it.name }
+            val toolDefinitions = allTools.map { it.definition.withRuntimeParameters() }.sortedBy { it.name }
             put(
                 "index",
                 """
