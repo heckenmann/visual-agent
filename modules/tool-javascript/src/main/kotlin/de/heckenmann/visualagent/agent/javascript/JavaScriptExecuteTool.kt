@@ -70,8 +70,10 @@ class JavaScriptExecuteTool(
                 }
                 ?: return failure("JavaScript source or path is required")
         val enabledTools = enabledToolIds(context)
-        val cancellationToken = context["cancellationToken"] as? CancellationToken ?: CancellationToken()
-        val cancellationRegistration =
+        val cancellationToken = CancellationToken()
+        val parentCancellationRegistration =
+            (context["cancellationToken"] as? CancellationToken)?.onCancelled(cancellationToken::cancel)
+        val toolCancellationRegistration =
             (context["toolCancellationToken"] as? ToolCancellationToken)?.onCancelled(cancellationToken::cancel)
         return try {
             val result =
@@ -90,7 +92,8 @@ class JavaScriptExecuteTool(
         } catch (_: Exception) {
             ToolResult(TOOL_ID, false, "", "INTERNAL: JavaScript execution failed")
         } finally {
-            cancellationRegistration?.close()
+            toolCancellationRegistration?.close()
+            parentCancellationRegistration?.close()
         }
     }
 

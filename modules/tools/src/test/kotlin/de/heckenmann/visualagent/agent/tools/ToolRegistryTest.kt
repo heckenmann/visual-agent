@@ -164,7 +164,10 @@ class ToolRegistryTest {
 
     @Test
     fun `tool call rejects invalid timeout override without clamping`() {
-        val registry = registry(FakeTool("context"))
+        val events = mutableListOf<ToolCallEvent>()
+        val bus = ToolEventBus()
+        bus.addListener { events += it }
+        val registry = ToolRegistry(listOf(FakeTool("context")), bus) { timeoutSeconds }
 
         val result = registry.execute(registry.resolve(setOf(ToolId("context"))).single(), """{"timeoutSeconds":601}""", emptyMap())
         val json = Json.parseToJsonElement(result).jsonObject
@@ -172,6 +175,8 @@ class ToolRegistryTest {
         assertFalse(json["success"]!!.jsonPrimitive.content.toBoolean())
         assertContains(json["error"]!!.jsonPrimitive.content, "TOOL_ARGUMENTS")
         assertContains(json["error"]!!.jsonPrimitive.content, "1 and 600")
+        assertEquals(listOf(ToolCallPhase.STARTED, ToolCallPhase.FINISHED), events.map(ToolCallEvent::phase))
+        assertFalse(events.last().result.success)
     }
 
     @Test

@@ -74,10 +74,15 @@ class ToolRegistry(
     ): String {
         val definition = tool.definition
         val inputObject = parseObject(functionInput)
+        val startedAt = Instant.now()
         val options =
             runCatching { runtimeOptions(inputObject, defaultTimeoutSeconds()) }
                 .getOrElse { error ->
-                    return Json.encodeToString(
+                    return completeImmediately(
+                        definition,
+                        functionInput,
+                        context + mapOf("toolTimeoutSeconds" to defaultTimeoutSeconds()),
+                        startedAt,
                         failure(
                             definition.id.value,
                             "TOOL_ARGUMENTS: ${error.message ?: "Invalid tool runtime arguments."}",
@@ -86,7 +91,13 @@ class ToolRegistry(
                 }
         val deadlineNanos = deadlineNanos(context, options.timeoutSeconds)
         if (remainingNanos(deadlineNanos) <= 0L) {
-            return Json.encodeToString(timeoutFailure(definition.id.value, 0L))
+            return completeImmediately(
+                definition,
+                functionInput,
+                context + mapOf("toolTimeoutSeconds" to options.timeoutSeconds),
+                startedAt,
+                timeoutFailure(definition.id.value, 0L),
+            )
         }
         val cancellationToken = ToolCancellationToken()
         val cancellationRegistration =
@@ -98,28 +109,14 @@ class ToolRegistry(
                     "toolDeadlineNanos" to deadlineNanos,
                     "toolCancellationToken" to cancellationToken,
                 )
-        val startedAt = Instant.now()
-        toolEventBus.publish(
-            ToolCallEvent(
-                toolId = definition.id.value,
-                functionName = definition.name,
-                providerToolCallId = effectiveContext["providerToolCallId"] as? String,
-                requestId = effectiveContext["requestId"] as? String,
-                round = effectiveContext["toolCallRound"] as? Int,
-                sequence = effectiveContext["toolCallSequence"] as? Int,
-                phase = ToolCallPhase.STARTED,
-                inputJson = functionInput,
-                context = effectiveContext,
-                result =
-                    ToolResult(
-                        toolId = definition.id.value,
-                        success = true,
-                        content = "",
-                    ),
-                startedAtUtc = startedAt,
-                finishedAtUtc = startedAt,
-                durationMillis = 0L,
-            ),
+        publishEvent(
+            definition,
+            ToolCallPhase.STARTED,
+            functionInput,
+            effectiveContext,
+            ToolResult(definition.id.value, true, ""),
+            startedAt,
+            startedAt,
         )
         if (options.async) {
             scheduleAsyncExecution(
@@ -146,26 +143,7 @@ class ToolRegistry(
                 cancellationRegistration?.close()
             }
         val finishedAt = Instant.now()
-        toolEventBus.publish(
-            ToolCallEvent(
-                toolId = definition.id.value,
-                functionName = definition.name,
-                providerToolCallId = effectiveContext["providerToolCallId"] as? String,
-                requestId = effectiveContext["requestId"] as? String,
-                round = effectiveContext["toolCallRound"] as? Int,
-                sequence = effectiveContext["toolCallSequence"] as? Int,
-                phase = ToolCallPhase.FINISHED,
-                inputJson = functionInput,
-                context = effectiveContext,
-                result = result,
-                startedAtUtc = startedAt,
-                finishedAtUtc = finishedAt,
-                durationMillis =
-                    java.time.Duration
-                        .between(startedAt, finishedAt)
-                        .toMillis(),
-            ),
-        )
+        publishEvent(definition, ToolCallPhase.FINISHED, functionInput, effectiveContext, result, startedAt, finishedAt)
         return Json.encodeToString(result)
     }
 
@@ -267,6 +245,65 @@ class ToolRegistry(
     }
 
     private fun remainingNanos(deadlineNanos: Long): Long = (deadlineNanos - System.nanoTime()).coerceAtLeast(0L)
+
+    private fun completeImmediately(
+        definition: ToolDefinition,
+        functionInput: String,
+        context: Map<String, Any>,
+        startedAt: Instant,
+        result: ToolResult,
+    ): String {
+        publishEvent(
+            definition,
+            ToolCallPhase.STARTED,
+            functionInput,
+            context,
+            ToolResult(definition.id.value, true, ""),
+            startedAt,
+            startedAt,
+        )
+        publishEvent(
+            definition,
+            ToolCallPhase.FINISHED,
+            functionInput,
+            context,
+            result,
+            startedAt,
+            Instant.now(),
+        )
+        return Json.encodeToString(result)
+    }
+
+    private fun publishEvent(
+        definition: ToolDefinition,
+        phase: ToolCallPhase,
+        functionInput: String,
+        context: Map<String, Any>,
+        result: ToolResult,
+        startedAt: Instant,
+        finishedAt: Instant,
+    ) {
+        toolEventBus.publish(
+            ToolCallEvent(
+                toolId = definition.id.value,
+                functionName = definition.name,
+                providerToolCallId = context["providerToolCallId"] as? String,
+                requestId = context["requestId"] as? String,
+                round = context["toolCallRound"] as? Int,
+                sequence = context["toolCallSequence"] as? Int,
+                phase = phase,
+                inputJson = functionInput,
+                context = context,
+                result = result,
+                startedAtUtc = startedAt,
+                finishedAtUtc = finishedAt,
+                durationMillis =
+                    java.time.Duration
+                        .between(startedAt, finishedAt)
+                        .toMillis(),
+            ),
+        )
+    }
 
     private fun timeoutFailure(
         toolId: String,
