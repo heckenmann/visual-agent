@@ -49,11 +49,15 @@ class OllamaPromptFactory(
         selectedModel: String,
     ): Prompt {
         val supportsTools = request.modelCapabilities.contains("tools")
+        val toolContext =
+            request.metadata +
+                mapOf("model" to selectedModel) +
+                (request.cancellationToken?.let { mapOf("cancellationToken" to it) } ?: emptyMap())
         val callbacks =
             if (supportsTools) {
                 toolRegistry.functionCallbacks(
                     enabledTools = request.enabledTools,
-                    context = request.metadata + mapOf("model" to selectedModel),
+                    context = toolContext,
                 )
             } else {
                 emptyList()
@@ -66,7 +70,7 @@ class OllamaPromptFactory(
         if (supportsTools && callbacks.isNotEmpty()) {
             optionsBuilder
                 .toolCallbacks(callbacks)
-                .toolContext(request.metadata + mapOf("model" to selectedModel))
+                .toolContext(toolContext)
         }
         request.parameters.temperature?.let(optionsBuilder::temperature)
         request.parameters.topP?.let(optionsBuilder::topP)
@@ -90,8 +94,8 @@ class OllamaPromptFactory(
                         Tool calling strict mode:
                         - You may only call tool functions with these exact names: ${exactFunctionNames.joinToString(", ")}.
                         - Do not invent variants, prefixes, or suffixes.
-                        - Every tool accepts optional runtime fields: `timeoutSeconds` (1..600) and `async` (true/false).
-                        - Use `timeoutSeconds` for long operations; use `async:true` when the tool can finish in background.
+                        - ${toolRegistry.toolRuntimeGuidance()}
+                        - Use `async:true` when a tool can finish in the background.
                         - If unsure about a tool name, do not call a tool; ask briefly or answer directly.
                         """.trimIndent(),
                 ),

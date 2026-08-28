@@ -165,6 +165,26 @@ class GraalJavaScriptExecutionServiceTest {
     }
 
     @Test
+    fun `JavaScript timeout does not cancel the parent request`() {
+        val tool = JavaScriptExecuteTool(service)
+        val parentCancellationToken = CancellationToken()
+        val modelRegistry = ToolRegistry(listOf(tool), ToolEventBus()) { 1 }
+        try {
+            val result =
+                modelRegistry.execute(
+                    tool,
+                    """{"source":"while (true) {}"}""",
+                    mapOf("cancellationToken" to parentCancellationToken),
+                )
+
+            assertTrue(result.contains("TOOL_TIMEOUT"))
+            assertFalse(parentCancellationToken.isCancelled)
+        } finally {
+            modelRegistry.close()
+        }
+    }
+
+    @Test
     fun `rejects disabled and recursive tools`() {
         assertFailsWith<JavaScriptExecutionException> {
             execute("await tools.call('test:echo', {});", enabled = emptySet())
@@ -265,6 +285,23 @@ class GraalJavaScriptExecutionServiceTest {
         }.also {
             assertEquals(JavaScriptErrorCategory.TOOL_ARGUMENTS, it.category)
             assertTrue(it.message.contains("must be awaited"))
+        }
+    }
+
+    @Test
+    fun `nested calls cannot extend the inherited tool deadline`() {
+        assertFailsWith<JavaScriptExecutionException> {
+            service.execute(
+                JavaScriptExecutionRequest(
+                    source = "await tools.call('test:slow', {timeoutSeconds: 600});",
+                    enabledTools = setOf("test:slow"),
+                    requestContext = mapOf("toolDeadlineNanos" to (System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(100))),
+                    limits = JavaScriptExecutionLimits(timeoutMillis = 30_000),
+                ),
+            )
+        }.also {
+            assertEquals(JavaScriptErrorCategory.TOOL_FAILURE, it.category)
+            assertTrue(it.message.isNotBlank())
         }
     }
 

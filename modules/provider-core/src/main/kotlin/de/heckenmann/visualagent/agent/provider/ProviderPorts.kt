@@ -73,6 +73,9 @@ interface ProviderPreferenceStore {
 
 /** Resolves application tools into provider-facing Spring AI callbacks. */
 interface ProviderToolCallbacks {
+    /** Returns the active runtime-parameter guidance for provider system instructions. */
+    fun toolRuntimeGuidance(): String = "Every tool accepts optional runtime field timeoutSeconds from 1 to 600 seconds."
+
     /**
      * Builds callbacks for the enabled application tool identifiers.
      *

@@ -16,9 +16,10 @@ Enabled sub-agent or main orchestration policy where allowed.
 ## Main Flow
 
 1. The model calls the terminal tool.
-2. The tool parses command input and optional timeout.
+2. The common tool registry validates the optional `timeoutSeconds` runtime field and creates the execution deadline.
 3. The command runs in the configured workspace context.
-4. Output, exit status, or timeout information is returned.
+4. A timeout or cancellation terminates the shell process and its descendants.
+5. Output, exit status, or a normalized timeout result is returned.
 
 ## Result
 
@@ -26,7 +27,7 @@ Agents can inspect or operate on the local workspace when explicitly permitted.
 
 ## Tool Calls
 
-- `terminal`: execute an allowed command with optional timeout handling.
+- `terminal`: execute an allowed command. The registry-owned `timeoutSeconds` field is optional and works identically for every tool.
 
 ## Code Entry Points
 
@@ -37,3 +38,4 @@ Agents can inspect or operate on the local workspace when explicitly permitted.
 
 - The command result is bounded and structured.
 - The tool is unavailable when disabled for the agent.
+- The terminal tool does not impose a separate default timeout or maximum.
