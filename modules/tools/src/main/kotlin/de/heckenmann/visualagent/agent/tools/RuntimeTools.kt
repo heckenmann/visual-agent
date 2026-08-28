@@ -21,8 +21,7 @@ class TerminalTool : VisualAgentTool {
             name = ToolId("terminal").toFunctionName(),
             description =
                 "Run a non-interactive shell command in the workspace directory. " +
-                    "Input: {\"command\":\"ls -la\",\"timeoutSeconds\":10}. " +
-                    "timeoutSeconds range: 1-30. Returns stdout + stderr combined. " +
+                    "Input: {\"command\":\"ls -la\"}. Returns stdout + stderr combined. " +
                     "Exit code is included in the result. Use for building, testing, git, and file operations.",
             inputSchema = STRING_SCHEMA,
         )
@@ -33,16 +32,21 @@ class TerminalTool : VisualAgentTool {
     ): ToolResult {
         val input = parseObject(inputJson)
         val command = input.requiredString("command")
-        val timeout = (input.int("timeoutSeconds") ?: 10).coerceIn(1, 30)
         val process =
             ProcessBuilder(shellCommand(command))
                 .directory(workspaceRoot().toFile())
                 .redirectErrorStream(true)
                 .start()
-        val finished = process.waitFor(timeout.toLong(), TimeUnit.SECONDS)
-        if (!finished) {
-            process.destroyForcibly()
-            return failure("terminal", "Command timed out after ${timeout}s")
+        val cancellationRegistration =
+            (context["toolCancellationToken"] as? ToolCancellationToken)?.onCancelled { destroyProcessTree(process) }
+        try {
+            process.waitFor()
+        } catch (_: InterruptedException) {
+            destroyProcessTree(process)
+            Thread.currentThread().interrupt()
+            return failure("terminal", "TOOL_CANCELLED: Command execution was cancelled.")
+        } finally {
+            cancellationRegistration?.close()
         }
         val output =
             process.inputStream
@@ -62,6 +66,11 @@ class TerminalTool : VisualAgentTool {
             listOf("zsh", "bash", "sh")
                 .firstOrNull(::isExecutableOnPath) ?: "sh"
         return listOf(shell, "-lc", command)
+    }
+
+    private fun destroyProcessTree(process: Process) {
+        process.toHandle().descendants().forEach { descendant -> descendant.destroyForcibly() }
+        process.destroyForcibly()
     }
 
     private fun isExecutableOnPath(command: String): Boolean {

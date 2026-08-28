@@ -166,7 +166,7 @@ internal class JavaScriptToolBridge(
                 registry
                     .resolve(setOf(ToolId(name)))
                     .singleOrNull()
-                    ?.definition
+                    ?.let(registry::definition)
                     ?.toJavaScriptDescription()
                     ?.let(::descriptionObject)
             },
@@ -181,7 +181,7 @@ internal class JavaScriptToolBridge(
                 .orEmpty()
         if (name !in enabledTools) throw failure(JavaScriptErrorCategory.TOOL_ACCESS, "Tool '$name' is not enabled")
         val definition =
-            registry.resolve(setOf(ToolId(name))).singleOrNull()?.definition
+            registry.resolve(setOf(ToolId(name))).singleOrNull()?.let(registry::definition)
                 ?: throw failure(JavaScriptErrorCategory.TOOL_ACCESS, "Tool '$name' is not registered")
         return descriptionObject(definition.toJavaScriptDescription())
     }

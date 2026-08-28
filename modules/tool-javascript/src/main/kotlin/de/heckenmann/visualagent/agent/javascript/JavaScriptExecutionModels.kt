@@ -1,11 +1,12 @@
 package de.heckenmann.visualagent.agent.javascript
 
 import de.heckenmann.visualagent.agent.CancellationToken
+import de.heckenmann.visualagent.agent.tools.DEFAULT_TOOL_TIMEOUT_SECONDS
 import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 
 /** Limits applied to one untrusted JavaScript execution. */
 data class JavaScriptExecutionLimits(
-    val timeoutMillis: Long = 15_000,
+    val timeoutMillis: Long = DEFAULT_TOOL_TIMEOUT_SECONDS * 1_000L,
     /** Maximum retained guest heap for one execution. */
     val maxGuestHeapBytes: Long = 512L * 1024L * 1024L,
     /** Hard isolate heap ceiling for one execution. */

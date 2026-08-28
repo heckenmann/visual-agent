@@ -1,6 +1,8 @@
 package de.heckenmann.visualagent.agent.javascript
 
 import de.heckenmann.visualagent.agent.CancellationToken
+import de.heckenmann.visualagent.agent.tools.DEFAULT_TOOL_TIMEOUT_SECONDS
+import de.heckenmann.visualagent.agent.tools.ToolCancellationToken
 import de.heckenmann.visualagent.agent.tools.VisualAgentTool
 import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 import de.heckenmann.visualagent.agent.tools.api.ToolId
@@ -19,8 +21,6 @@ import org.springframework.stereotype.Component
 class JavaScriptExecuteTool(
     private val executionService: GraalJavaScriptExecutionService,
 ) : VisualAgentTool {
-    override val managesExecution: Boolean = true
-
     override val definition =
         ToolDefinition(
             id = ToolId(TOOL_ID),
@@ -35,7 +35,7 @@ class JavaScriptExecuteTool(
                     "Markdown, or JSON value. " +
                     "Execution errors are returned so the source or arguments can be corrected.",
             inputSchema =
-                """{"type":"object","properties":{"source":{"type":"string","description":"Inline JavaScript source; return the final value"},"path":{"type":"string","description":"Workspace-relative JavaScript file to execute"},"timeoutSeconds":{"type":"integer","minimum":1,"maximum":600,"description":"Optional timeout override for this tool call; the application default applies when omitted"}},"anyOf":[{"required":["source"]},{"required":["path"]}],"additionalProperties":false}""",
+                """{"type":"object","properties":{"source":{"type":"string","description":"Inline JavaScript source; return the final value"},"path":{"type":"string","description":"Workspace-relative JavaScript file to execute"}},"anyOf":[{"required":["source"]},{"required":["path"]}],"additionalProperties":false}""",
         )
 
     override fun execute(
@@ -55,8 +55,7 @@ class JavaScriptExecuteTool(
         val timeoutSeconds =
             (context["toolTimeoutSeconds"] as? Number)
                 ?.toLong()
-                ?.coerceIn(1L, MAX_TIMEOUT_SECONDS)
-                ?: DEFAULT_TIMEOUT_SECONDS
+                ?: DEFAULT_TOOL_TIMEOUT_SECONDS.toLong()
         val limits = JavaScriptExecutionLimits(timeoutMillis = timeoutSeconds * MILLIS_PER_SECOND)
         val loadedSource =
             source
@@ -71,6 +70,9 @@ class JavaScriptExecuteTool(
                 }
                 ?: return failure("JavaScript source or path is required")
         val enabledTools = enabledToolIds(context)
+        val cancellationToken = context["cancellationToken"] as? CancellationToken ?: CancellationToken()
+        val cancellationRegistration =
+            (context["toolCancellationToken"] as? ToolCancellationToken)?.onCancelled(cancellationToken::cancel)
         return try {
             val result =
                 executionService.execute(
@@ -78,7 +80,7 @@ class JavaScriptExecuteTool(
                         source = loadedSource,
                         enabledTools = enabledTools,
                         requestContext = context,
-                        cancellationToken = context["cancellationToken"] as? CancellationToken,
+                        cancellationToken = cancellationToken,
                         limits = limits,
                     ),
                 )
@@ -87,6 +89,8 @@ class JavaScriptExecuteTool(
             ToolResult(TOOL_ID, false, "", "${error.category}: ${error.message}")
         } catch (_: Exception) {
             ToolResult(TOOL_ID, false, "", "INTERNAL: JavaScript execution failed")
+        } finally {
+            cancellationRegistration?.close()
         }
     }
 
@@ -118,8 +122,6 @@ class JavaScriptExecuteTool(
 
     private companion object {
         const val TOOL_ID = "javascript:execute"
-        const val DEFAULT_TIMEOUT_SECONDS = 15L
-        const val MAX_TIMEOUT_SECONDS = 600L
         const val MILLIS_PER_SECOND = 1_000L
     }
 }

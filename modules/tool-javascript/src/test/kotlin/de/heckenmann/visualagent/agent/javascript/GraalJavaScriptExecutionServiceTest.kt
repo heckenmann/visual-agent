@@ -269,6 +269,23 @@ class GraalJavaScriptExecutionServiceTest {
     }
 
     @Test
+    fun `nested calls cannot extend the inherited tool deadline`() {
+        assertFailsWith<JavaScriptExecutionException> {
+            service.execute(
+                JavaScriptExecutionRequest(
+                    source = "await tools.call('test:slow', {timeoutSeconds: 600});",
+                    enabledTools = setOf("test:slow"),
+                    requestContext = mapOf("toolDeadlineNanos" to (System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(100))),
+                    limits = JavaScriptExecutionLimits(timeoutMillis = 30_000),
+                ),
+            )
+        }.also {
+            assertEquals(JavaScriptErrorCategory.TOOL_FAILURE, it.category)
+            assertTrue(it.message.isNotBlank())
+        }
+    }
+
+    @Test
     fun `maps syntax runtime and resource-limit failures`() {
         assertFailsWith<JavaScriptExecutionException> {
             execute("return (")
