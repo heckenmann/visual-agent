@@ -21,6 +21,7 @@ class SpringSettingsPort(
         config.apply {
             uiThemeMode = settings.uiThemeMode.toApplication()
             fontSize = settings.fontSize
+            uiScalePercent = settings.uiScalePercent?.coerceIn(UI_SCALE_PERCENT_RANGE)
             showPanelLabels = settings.showPanelLabels
             contextLength = settings.contextLength
             streamingEnabled = settings.streamingEnabled
@@ -45,6 +46,7 @@ private fun AppConfigBean.toProtocol(providerCatalog: ProviderCatalogService): S
         modelId = providerCatalog.activeModelId(),
         uiThemeMode = uiThemeMode.toProtocol(),
         fontSize = fontSize,
+        uiScalePercent = uiScalePercent,
         showPanelLabels = showPanelLabels,
         contextLength = contextLength,
         streamingEnabled = streamingEnabled,
@@ -61,3 +63,5 @@ private fun AppConfigBean.toProtocol(providerCatalog: ProviderCatalogService): S
 private fun ApplicationThemeMode.toProtocol(): ThemeMode = ThemeMode.valueOf(name)
 
 private fun ThemeMode.toApplication(): ApplicationThemeMode = ApplicationThemeMode.valueOf(name)
+
+private val UI_SCALE_PERCENT_RANGE = 50..200

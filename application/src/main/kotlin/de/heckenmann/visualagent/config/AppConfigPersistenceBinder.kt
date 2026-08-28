@@ -32,6 +32,8 @@ class AppConfigPersistenceBinder(
         appConfigBean.uiThemeMode =
             preferenceStore.getPreference(AppConfigBean.KEY_UI_THEME_MODE)?.let(ThemeMode::fromString) ?: appConfigBean.uiThemeMode
         appConfigBean.fontSize = preferenceStore.getPreference(AppConfigBean.KEY_UI_FONT_SIZE)?.toIntOrNull() ?: appConfigBean.fontSize
+        appConfigBean.uiScalePercent =
+            preferenceStore.getPreference(AppConfigBean.KEY_UI_SCALE_PERCENT)?.toIntOrNull()?.takeIf { it in UI_SCALE_PERCENT_RANGE }
         appConfigBean.showPanelLabels =
             preferenceStore.getPreference(AppConfigBean.KEY_UI_SHOW_PANEL_LABELS)?.toBooleanStrictOrNull()
                 ?: appConfigBean.showPanelLabels
@@ -67,3 +69,5 @@ class AppConfigPersistenceBinder(
         appConfigBean.databasePath = databasePath
     }
 }
+
+private val UI_SCALE_PERCENT_RANGE = 50..200

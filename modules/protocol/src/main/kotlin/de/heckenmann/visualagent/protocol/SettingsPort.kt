@@ -24,6 +24,7 @@ data class SettingsSnapshot(
     val modelId: String = "",
     val uiThemeMode: ThemeMode = ThemeMode.SYSTEM,
     val fontSize: Int = 14,
+    val uiScalePercent: Int? = null,
     val showPanelLabels: Boolean = true,
     val contextLength: Int = 4096,
     val streamingEnabled: Boolean = true,

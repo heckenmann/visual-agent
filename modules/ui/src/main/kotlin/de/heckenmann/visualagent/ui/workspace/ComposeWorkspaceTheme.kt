@@ -6,9 +6,14 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import de.heckenmann.visualagent.protocol.ThemeMode
@@ -129,6 +134,30 @@ fun visualAgentTypography(fontSize: Int): Typography {
         labelMedium = defaults.labelMedium.scaled(scale),
         labelSmall = defaults.labelSmall.scaled(scale),
     )
+}
+
+/**
+ * Applies an optional user-selected UI scale on top of the current platform density.
+ *
+ * An absent value keeps Compose Desktop's automatic operating-system and monitor density.
+ * A manual value changes all Compose dimensions, including text, icons, spacing, and controls.
+ */
+@Composable
+fun ApplyVisualAgentUiScale(
+    scalePercent: Int?,
+    content: @Composable () -> Unit,
+) {
+    val platformDensity = LocalDensity.current
+    val scale = (scalePercent ?: 100).coerceIn(50, 200) / 100f
+    if (scale == 1f) {
+        content()
+        return
+    }
+    val scaledDensity =
+        remember(platformDensity.density, platformDensity.fontScale, scale) {
+            Density(platformDensity.density * scale, platformDensity.fontScale)
+        }
+    CompositionLocalProvider(LocalDensity provides scaledDensity, content = content)
 }
 
 private fun TextStyle.scaled(scale: Float): TextStyle = copy(fontSize = fontSize.scaled(scale))

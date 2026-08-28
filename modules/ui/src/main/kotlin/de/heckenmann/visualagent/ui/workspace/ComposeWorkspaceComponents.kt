@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
@@ -148,21 +149,18 @@ internal fun ComposeSplitWorkspace(
                                 items = windows,
                                 key = { it.id },
                             ) { window ->
-                                WorkspacePanelVisibility(
+                                SplitPanelItem(
+                                    state = reorderableState,
+                                    window = window,
                                     visible = window.visible,
-                                ) {
-                                    SplitPanelItem(
-                                        state = reorderableState,
-                                        window = window,
-                                        panelServices = panelServices,
-                                        width = widthsById[window.id] ?: window.preferredWidth.coerceAtLeast(minPanelWidth),
-                                        isLast = window.id == visibleWindows.lastOrNull()?.id,
-                                        onWidthChanged = { next -> resizeUpdatedState.value.invoke(window.id, next) },
-                                        onCloseWindow = { onToggleWindow(window.id) },
-                                        minPanelWidth = minPanelWidth,
-                                        rowHeight = panelHeight,
-                                    )
-                                }
+                                    panelServices = panelServices,
+                                    width = widthsById[window.id] ?: window.preferredWidth.coerceAtLeast(minPanelWidth),
+                                    isLast = window.id == visibleWindows.lastOrNull()?.id,
+                                    onWidthChanged = { next -> resizeUpdatedState.value.invoke(window.id, next) },
+                                    onCloseWindow = { onToggleWindow(window.id) },
+                                    minPanelWidth = minPanelWidth,
+                                    rowHeight = panelHeight,
+                                )
                             }
                         }
                     }
@@ -242,6 +240,7 @@ private fun EmptyWorkspace() {
 private fun LazyItemScope.SplitPanelItem(
     state: ReorderableLazyListState,
     window: ComposeWorkspaceWindow,
+    visible: Boolean,
     panelServices: ComposePanelServices,
     width: Int,
     isLast: Boolean,
@@ -266,30 +265,32 @@ private fun LazyItemScope.SplitPanelItem(
     ReorderableItem(
         state = state,
         key = window.id,
-        modifier = Modifier.height(animatedHeight + (2 * WORKSPACE_PANEL_GAP).dp),
+        modifier = Modifier.testTag("workspace-panel-${window.id}"),
     ) { isDragging ->
-        Row(
-            modifier =
-                Modifier
-                    .padding(vertical = WORKSPACE_PANEL_GAP.dp)
-                    .height(animatedHeight),
-        ) {
-            SplitPanelContent(
-                window = window,
-                panelServices = panelServices,
-                isDragging = isDragging,
-                width = animatedWidthPx,
-                onCloseWindow = onCloseWindow,
-                minPanelWidth = minPanelWidth,
-                modifier = Modifier.height(animatedHeight),
-            )
-            PanelResizer(
-                currentWidth = width,
-                onWidthChanged = onWidthChanged,
-                minPanelWidth = minPanelWidth,
-            )
-            if (!isLast) {
-                Spacer(modifier = Modifier.width(WORKSPACE_PANEL_GAP.dp))
+        WorkspacePanelVisibility(visible = visible) {
+            Row(
+                modifier =
+                    Modifier
+                        .padding(vertical = WORKSPACE_PANEL_GAP.dp)
+                        .height(animatedHeight),
+            ) {
+                SplitPanelContent(
+                    window = window,
+                    panelServices = panelServices,
+                    isDragging = isDragging,
+                    width = animatedWidthPx,
+                    onCloseWindow = onCloseWindow,
+                    minPanelWidth = minPanelWidth,
+                    modifier = Modifier.height(animatedHeight),
+                )
+                PanelResizer(
+                    currentWidth = width,
+                    onWidthChanged = onWidthChanged,
+                    minPanelWidth = minPanelWidth,
+                )
+                if (!isLast) {
+                    Spacer(modifier = Modifier.width(WORKSPACE_PANEL_GAP.dp))
+                }
             }
         }
     }
