@@ -36,6 +36,7 @@ class ToolSettingsPortAdapter(
             streamingEnabled = appConfig.streamingEnabled,
             thinkingEnabled = appConfig.thinkingEnabled,
             timeoutSeconds = appConfig.timeoutSeconds,
+            uiScalePercent = appConfig.uiScalePercent,
         )
     }
 
@@ -49,6 +50,9 @@ class ToolSettingsPortAdapter(
         update.openAiBaseUrl?.let { appConfig.openAiBaseUrl = it }
         update.streamingEnabled?.let { appConfig.streamingEnabled = it }
         update.thinkingEnabled?.let { appConfig.thinkingEnabled = it }
+        update.uiScalePercent?.let { percent ->
+            appConfig.uiScalePercent = percent.takeIf { it != 0 }?.coerceIn(50, 200)
+        }
         appConfig.save()
         return read()
     }

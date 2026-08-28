@@ -98,6 +98,14 @@ internal fun AppearanceSettingsSection(
             },
         )
         PanelDropdownField(
+            "UI scale",
+            snapshot.uiScalePercent?.let { "$it%" } ?: "Automatic",
+            uiScaleOptions(),
+            onSelected = { selected ->
+                onChange(snapshot.copy(uiScalePercent = selected.removeSuffix("%").toIntOrNull()))
+            },
+        )
+        PanelDropdownField(
             "Theme",
             snapshot.uiThemeMode.name,
             ThemeMode.entries.map { PanelSelectOption(it.name, it.name.lowercase().replaceFirstChar(Char::titlecase)) },
@@ -106,3 +114,9 @@ internal fun AppearanceSettingsSection(
         PanelCheckbox("Show panel labels", snapshot.showPanelLabels, onCheckedChange = { onChange(snapshot.copy(showPanelLabels = it)) })
     }
 }
+
+private fun uiScaleOptions(): List<PanelSelectOption> =
+    listOf(PanelSelectOption("Automatic", "Automatic")) +
+        listOf(75, 80, 90, 100, 110, 125, 150, 175, 200).map { percent ->
+            PanelSelectOption("$percent%", "$percent%")
+        }

@@ -102,6 +102,7 @@ private class LegacySettingsPort(
             config.streamingEnabled,
             config.thinkingEnabled,
             config.timeoutSeconds,
+            config.uiScalePercent,
         )
 
     override fun update(update: ToolSettingsUpdate): ToolSettings = read()

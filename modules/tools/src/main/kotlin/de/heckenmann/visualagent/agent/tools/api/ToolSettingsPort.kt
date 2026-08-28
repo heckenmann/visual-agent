@@ -19,6 +19,7 @@ data class ToolSettings(
     val streamingEnabled: Boolean,
     val thinkingEnabled: Boolean,
     val timeoutSeconds: Int,
+    val uiScalePercent: Int?,
 )
 
 /** Optional settings supplied by the UI tool. */
@@ -29,4 +30,5 @@ data class ToolSettingsUpdate(
     val openAiBaseUrl: String? = null,
     val streamingEnabled: Boolean? = null,
     val thinkingEnabled: Boolean? = null,
+    val uiScalePercent: Int? = null,
 )
