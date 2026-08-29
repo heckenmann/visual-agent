@@ -104,6 +104,7 @@ class ConversationMessageGroupRowTest {
         val messageBounds = composeTestRule.onNodeWithText("Short message").getUnclippedBoundsInRoot()
         val actionBounds = composeTestRule.onNodeWithContentDescription("Message actions").getUnclippedBoundsInRoot()
         assertTrue(actionBounds.top < messageBounds.bottom)
+        assertTrue(messageBounds.right <= actionBounds.left)
     }
 
     @Test

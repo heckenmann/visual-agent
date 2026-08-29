@@ -65,8 +65,6 @@ internal fun MessageRow(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    @Suppress("DEPRECATION")
-    val clipboard = LocalClipboardManager.current
     val isUser = message.role == "user"
     val accent = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
     val background =
@@ -94,15 +92,7 @@ internal fun MessageRow(
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
-                ActionIconButton(
-                    icon = Icons.Filled.ContentCopy,
-                    description = "Copy ${message.role} message",
-                    modifier = Modifier.size(24.dp).alpha(0.6f),
-                    onClick = {
-                        clipboard.setText(AnnotatedString(message.content))
-                        onCopied()
-                    },
-                )
+                ConversationCopyAction(message = message, onCopied = onCopied)
                 if (canEdit) {
                     ActionIconButton(
                         icon = Icons.Filled.Edit,
@@ -131,6 +121,26 @@ internal fun MessageRow(
             ConversationMessageContent(message, isStreamingPlaceholder, isStreaming)
         }
     }
+}
+
+/** Copies one conversation message without changing its timeline state. */
+@Composable
+internal fun ConversationCopyAction(
+    message: Message,
+    onCopied: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    @Suppress("DEPRECATION")
+    val clipboard = LocalClipboardManager.current
+    ActionIconButton(
+        icon = Icons.Filled.ContentCopy,
+        description = "Copy ${message.role} message",
+        modifier = modifier.size(24.dp).alpha(0.6f),
+        onClick = {
+            clipboard.setText(AnnotatedString(message.content))
+            onCopied()
+        },
+    )
 }
 
 @Composable

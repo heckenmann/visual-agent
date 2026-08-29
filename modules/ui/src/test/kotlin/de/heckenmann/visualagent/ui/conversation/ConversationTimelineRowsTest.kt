@@ -5,6 +5,7 @@ package de.heckenmann.visualagent.ui.conversation
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
@@ -76,5 +77,34 @@ class ConversationTimelineRowsTest {
         val metadata = parseSubAgentMetadata(null)
 
         assertFalse(shouldUseSubAgentSummary(metadata))
+    }
+
+    @Test
+    fun `persisted conversation messages retain their copy action`() {
+        composeTestRule.setContent {
+            MaterialTheme {
+                LazyColumn {
+                    ConversationTimeline(
+                        items =
+                            buildConversationTimeline(
+                                history = listOf(Message(role = "user", content = "Copy me", id = "message-1")),
+                                pendingUserMessage = null,
+                                streamingContent = "",
+                                showWaitingIndicator = false,
+                                showOlderHistoryLoading = false,
+                                includeInlineComposer = false,
+                            ),
+                        sending = false,
+                        deletingMessageIds = emptySet(),
+                        onDeleteMessage = {},
+                        onStatusChange = {},
+                        onEditMessage = {},
+                        sendContent = {},
+                    )
+                }
+            }
+        }
+
+        composeTestRule.onNodeWithContentDescription("Copy user message").assertExists()
     }
 }

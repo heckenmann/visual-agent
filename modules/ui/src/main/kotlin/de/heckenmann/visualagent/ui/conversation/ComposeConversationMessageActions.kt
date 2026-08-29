@@ -42,6 +42,7 @@ internal fun conversationMessageActionMenu(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onRetry: () -> Unit,
+    onCopied: () -> Unit,
     timestamp: Long? = null,
     showTimestamp: Boolean = false,
     modifier: Modifier = Modifier,
@@ -57,6 +58,7 @@ internal fun conversationMessageActionMenu(
                     modifier = Modifier.padding(end = 4.dp),
                 )
             }
+            ConversationCopyAction(message = message, onCopied = onCopied)
             ActionIconButton(
                 icon = Icons.Filled.MoreVert,
                 description = "Message actions",

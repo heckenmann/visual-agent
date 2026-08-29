@@ -121,6 +121,7 @@ internal fun ConversationMessageGroupRow(
 internal fun TransientConversationMessageGroupRow(
     message: Message,
     isStreaming: Boolean,
+    onCopied: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     PanelContentCard(modifier = modifier, backgroundColor = groupBackground(message.role)) {
@@ -130,12 +131,14 @@ internal fun TransientConversationMessageGroupRow(
             verticalAlignment = Alignment.Top,
         ) {
             ConversationAuthorColumn(message.role)
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Box(modifier = Modifier.weight(1f)) {
                 ConversationMessageContent(
                     message = message,
                     isStreamingPlaceholder = false,
                     isStreaming = isStreaming,
+                    modifier = Modifier.padding(end = 30.dp),
                 )
+                ConversationCopyAction(message = message, onCopied = onCopied, modifier = Modifier.align(Alignment.TopEnd))
             }
         }
     }
@@ -175,18 +178,20 @@ private fun ConversationMessageGroupContent(
 ) {
     val message = item.message
     var hovered by remember(message.id) { mutableStateOf(false) }
-    Box(
+    Row(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .onPointerEvent(PointerEventType.Enter) { hovered = true }
                 .onPointerEvent(PointerEventType.Exit) { hovered = false },
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.Top,
     ) {
         ConversationMessageContent(
             message = message,
             isStreamingPlaceholder = false,
             isStreaming = false,
-            modifier = Modifier.padding(end = 30.dp),
+            modifier = Modifier.weight(1f),
         )
         conversationMessageActionMenu(
             message = message,
@@ -196,9 +201,9 @@ private fun ConversationMessageGroupContent(
             onEdit = { onEditMessage(message.id) },
             onDelete = { message.id?.let(onDeleteMessage) },
             onRetry = onRetry,
+            onCopied = { onStatusChange("Copied ${message.role} message") },
             timestamp = message.createdAtEpochMillis,
             showTimestamp = hovered,
-            modifier = Modifier.align(Alignment.TopEnd),
         )
     }
 }
