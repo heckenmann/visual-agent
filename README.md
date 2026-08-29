@@ -11,12 +11,25 @@ Visual Agent is a Kotlin desktop application. Its goal is to provide the model w
 
 ## Download and Run
 
-Download the matching native package from [GitHub Releases](https://github.com/heckenmann/visual-agent/releases). Each package contains the Visual Agent JAR, all runtime dependencies, and a platform-native launcher, so no Java installation is required.
+Download the matching artifact from [GitHub Releases](https://github.com/heckenmann/visual-agent/releases). Native packages contain the Visual Agent JAR, all runtime dependencies, and a platform-native launcher, so no Java installation is required. The platform-specific JAR downloads require Java 24.
 
-1. macOS: download the package for your processor (`macos-arm64` or `macos-x64`), open the `.dmg`, and move Visual Agent to Applications.
-2. Windows x64: run `visual-agent-windows.msi`.
-3. Linux x86_64: install `visual-agent-linux-deb.deb` on Debian/Ubuntu or `visual-agent-linux-rpm.rpm` on Fedora/openSUSE/RHEL. Alternatively, make `visual-agent-linux-appimage.AppImage` executable and start it directly; it does not need to be installed.
-4. Java 24 option: download the JAR matching your platform (`visual-agent-linux-x64-jar.jar`, `visual-agent-macos-arm64-jar.jar`, `visual-agent-macos-x64-jar.jar`, or `visual-agent-windows-x64-jar.jar`) and run it with `java -jar`. It does not provide native operating-system integration.
+| Operating system | Architecture | Package | Download |
+| --- | --- | --- | --- |
+| macOS | Apple Silicon | DMG | [visual-agent-macos-arm64.dmg](https://github.com/heckenmann/visual-agent/releases/latest/download/visual-agent-macos-arm64.dmg) |
+| macOS | Apple Silicon | JAR (Java 24) | [visual-agent-macos-arm64-jar.jar](https://github.com/heckenmann/visual-agent/releases/latest/download/visual-agent-macos-arm64-jar.jar) |
+| macOS | Intel | DMG | [visual-agent-macos-x64.dmg](https://github.com/heckenmann/visual-agent/releases/latest/download/visual-agent-macos-x64.dmg) |
+| macOS | Intel | JAR (Java 24) | [visual-agent-macos-x64-jar.jar](https://github.com/heckenmann/visual-agent/releases/latest/download/visual-agent-macos-x64-jar.jar) |
+| Windows | x64 | MSI | [visual-agent-windows.msi](https://github.com/heckenmann/visual-agent/releases/latest/download/visual-agent-windows.msi) |
+| Windows | x64 | JAR (Java 24) | [visual-agent-windows-x64-jar.jar](https://github.com/heckenmann/visual-agent/releases/latest/download/visual-agent-windows-x64-jar.jar) |
+| Debian / Ubuntu Linux | x86_64 | DEB | [visual-agent-linux-deb.deb](https://github.com/heckenmann/visual-agent/releases/latest/download/visual-agent-linux-deb.deb) |
+| Fedora / openSUSE / RHEL Linux | x86_64 | RPM | [visual-agent-linux-rpm.rpm](https://github.com/heckenmann/visual-agent/releases/latest/download/visual-agent-linux-rpm.rpm) |
+| Linux | x86_64 | AppImage | [visual-agent-linux-appimage.AppImage](https://github.com/heckenmann/visual-agent/releases/latest/download/visual-agent-linux-appimage.AppImage) |
+| Linux | x86_64 | JAR (Java 24) | [visual-agent-linux-x64-jar.jar](https://github.com/heckenmann/visual-agent/releases/latest/download/visual-agent-linux-x64-jar.jar) |
+
+Open a macOS disk image and move Visual Agent to Applications. Run the Windows installer directly.
+Install Linux DEB/RPM files with the system package manager. Make the AppImage executable and start
+it directly; it does not need to be installed. Run a platform-matched JAR with `java -jar`; it does
+not provide native operating-system integration.
 
 The native launcher supplies the Visual Agent name and icon to the operating system. On first launch it creates a local SQLite database under `./data/` and opens the Compose UI.
 
