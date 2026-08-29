@@ -6,7 +6,6 @@ import de.heckenmann.visualagent.agent.CancellationToken
 import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ProviderTurnResponse
-import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.agent.text.ResponseRepetitionGuard
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolCallPhase
@@ -313,5 +312,4 @@ internal class AgentManagerConversationOps(
         return de.heckenmann.visualagent.agent.context.MainSystemPromptComposer
             .compose(todos, owner.pendingResumeMessage, owner.agentToolConfigService, owner.appConfig.userModelInstruction)
     }
-
 }
