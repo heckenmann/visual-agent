@@ -3,13 +3,23 @@
 package de.heckenmann.visualagent.ui.conversation
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -23,6 +33,7 @@ import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
 import org.junit.Rule
 import org.junit.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import de.heckenmann.visualagent.protocol.ConversationMessage as Message
 
@@ -105,6 +116,41 @@ class ConversationMessageGroupRowTest {
         val actionBounds = composeTestRule.onNodeWithContentDescription("Message actions").getUnclippedBoundsInRoot()
         assertTrue(actionBounds.top < messageBounds.bottom)
         assertTrue(messageBounds.right <= actionBounds.left)
+    }
+
+    @Test
+    fun `hover timestamp does not reduce message content width`() {
+        var showTimestamp by mutableStateOf(false)
+        val message = persisted("A message that must retain its available width", "user")
+
+        composeTestRule.setContent {
+            MaterialTheme {
+                Row(Modifier.width(320.dp)) {
+                    Text(
+                        text = message.message.content,
+                        modifier = Modifier.weight(1f).testTag("message content"),
+                    )
+                    conversationMessageActionMenu(
+                        message = message.message,
+                        canEdit = true,
+                        canDelete = true,
+                        canRetry = false,
+                        onEdit = {},
+                        onDelete = {},
+                        onRetry = {},
+                        onCopied = {},
+                        timestamp = 1_000L,
+                        showTimestamp = showTimestamp,
+                    )
+                }
+            }
+        }
+
+        val boundsBeforeHover = composeTestRule.onNodeWithTag("message content").getUnclippedBoundsInRoot()
+        composeTestRule.runOnIdle { showTimestamp = true }
+        val boundsDuringHover = composeTestRule.onNodeWithTag("message content").getUnclippedBoundsInRoot()
+
+        assertEquals(boundsBeforeHover.right - boundsBeforeHover.left, boundsDuringHover.right - boundsDuringHover.left)
     }
 
     @Test

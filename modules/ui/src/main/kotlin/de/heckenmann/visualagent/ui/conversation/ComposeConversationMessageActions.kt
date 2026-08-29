@@ -14,6 +14,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -23,7 +24,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import de.heckenmann.visualagent.ui.components.ActionIconButton
 import java.time.Instant
 import java.time.ZoneId
@@ -50,14 +55,6 @@ internal fun conversationMessageActionMenu(
     var expanded by remember(message.id) { mutableStateOf(false) }
     Box(modifier = modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            if (showTimestamp && timestamp != null) {
-                Text(
-                    text = formatConversationTimestamp(timestamp),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(end = 4.dp),
-                )
-            }
             ConversationCopyAction(message = message, onCopied = onCopied)
             ActionIconButton(
                 icon = Icons.Filled.MoreVert,
@@ -76,6 +73,33 @@ internal fun conversationMessageActionMenu(
                 onDelete = onDelete,
                 onRetry = onRetry,
                 dismiss = { expanded = false },
+            )
+        }
+        if (showTimestamp && timestamp != null) {
+            conversationTimestampPopup(timestamp)
+        }
+    }
+}
+
+/** Displays a timestamp outside the message layout without intercepting pointer input. */
+@Composable
+private fun conversationTimestampPopup(timestamp: Long) {
+    val verticalOffset = with(LocalDensity.current) { -32.dp.roundToPx() }
+    Popup(
+        alignment = Alignment.TopCenter,
+        offset = IntOffset(0, verticalOffset),
+        properties = PopupProperties(focusable = false),
+    ) {
+        Surface(
+            color = MaterialTheme.colorScheme.inverseSurface,
+            contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+            shape = MaterialTheme.shapes.extraSmall,
+            tonalElevation = 2.dp,
+        ) {
+            Text(
+                text = formatConversationTimestamp(timestamp),
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             )
         }
     }
