@@ -75,7 +75,11 @@ internal fun buildConversationTimeline(
         if (showWaitingIndicator) add(ConversationTimelineItem.Waiting)
         if (streamingContent.isNotEmpty()) add(ConversationTimelineItem.Streaming(streamingContent))
         if (pendingUserMessage != null) add(ConversationTimelineItem.PendingUser(pendingUserMessage))
-        val persisted = history.indices.reversed().map { index -> ConversationTimelineItem.Persisted(history[index], index) }
+        val uniqueHistory = history.distinctPersistedMessages()
+        val persisted =
+            uniqueHistory.indices.reversed().map { index ->
+                ConversationTimelineItem.Persisted(uniqueHistory[index], index)
+            }
         val cards =
             (todos.map { todo -> todo to false } + deletedTodoSnapshots.values.map { todo -> todo to true })
                 .distinctBy { (todo, _) -> todo.id }

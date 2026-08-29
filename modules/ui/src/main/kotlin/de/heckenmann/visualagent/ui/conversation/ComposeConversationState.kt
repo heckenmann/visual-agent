@@ -31,7 +31,7 @@ internal data class ConversationHistoryRequest(
 internal class ConversationUiState(
     initialHistory: List<Message>,
 ) {
-    var history: List<Message> by mutableStateOf(initialHistory.toList())
+    var history: List<Message> by mutableStateOf(initialHistory.distinctPersistedMessages())
         private set
     var input by mutableStateOf("")
     var status by mutableStateOf("Ready")
@@ -50,7 +50,7 @@ internal class ConversationUiState(
 
     fun replaceHistory(messages: List<Message>) {
         historyGeneration++
-        history = messages.toList()
+        history = messages.distinctPersistedMessages()
         isLoadingOlder = false
         hasMoreHistory = history.isNotEmpty()
         reachedOldestHistory = false
@@ -67,9 +67,10 @@ internal class ConversationUiState(
         page: ConversationHistoryPage,
     ): Boolean {
         if (request.generation != historyGeneration || request.offset != 0) return false
-        val latestIds = page.messages.mapNotNull(Message::id).toSet()
+        val latestMessages = page.messages.distinctPersistedMessages()
+        val latestIds = latestMessages.mapNotNull(Message::id).toSet()
         val retainedHistory = history.filter { it.id == null || it.id !in latestIds }
-        history = retainedHistory + page.messages
+        history = retainedHistory + latestMessages
         if (!reachedOldestHistory) {
             hasMoreHistory = page.hasMore
         }
@@ -88,7 +89,7 @@ internal class ConversationUiState(
     ): Int {
         if (request.generation != historyGeneration || request.offset != page.offset) return 0
         val existingIds = history.mapNotNull(Message::id).toSet()
-        val older = page.messages.filter { it.id == null || it.id !in existingIds }
+        val older = page.messages.distinctPersistedMessages().filter { it.id == null || it.id !in existingIds }
         if (older.isNotEmpty()) {
             history = older.toList() + history
         }
@@ -102,6 +103,13 @@ internal class ConversationUiState(
             isLoadingOlder = false
         }
     }
+}
+
+internal fun List<Message>.distinctPersistedMessages(): List<Message> {
+    val seenIds = mutableSetOf<String>()
+    return asReversed()
+        .filter { message -> message.id?.let(seenIds::add) ?: true }
+        .asReversed()
 }
 
 @Composable

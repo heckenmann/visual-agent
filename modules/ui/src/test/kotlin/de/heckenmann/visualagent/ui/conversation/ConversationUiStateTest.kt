@@ -91,6 +91,46 @@ class ConversationUiStateTest {
     }
 
     @Test
+    fun `history boundaries keep only the newest occurrence of a persisted message`() {
+        val state = ConversationUiState(listOf(message("duplicate", "stale"), message("duplicate", "initial")))
+
+        state.replaceHistory(listOf(message("duplicate", "old"), message("duplicate", "replacement")))
+        val request = state.beginLatestRequest()
+        state.applyLatest(
+            request,
+            ConversationHistoryPage(
+                listOf(message("duplicate", "page-old"), message("duplicate", "page-new")),
+                offset = 0,
+                hasMore = false,
+            ),
+        )
+
+        assertEquals(listOf("page-new"), state.history.map { it.content })
+    }
+
+    @Test
+    fun `timeline emits a unique key when history contains a repeated persisted id`() {
+        val items =
+            buildConversationTimeline(
+                history = listOf(message("duplicate", "stale"), message("duplicate", "newest")),
+                pendingUserMessage = null,
+                streamingContent = "",
+                showWaitingIndicator = false,
+                showOlderHistoryLoading = false,
+                includeInlineComposer = false,
+            )
+
+        assertEquals(listOf("message:duplicate"), items.map { it.stableKey })
+        val group = (items.single() as ConversationTimelineItem.PersistedGroup).group
+        assertEquals(
+            "newest",
+            group.messages
+                .single()
+                .message.content,
+        )
+    }
+
+    @Test
     fun `timeline keeps the newest message group before older history`() {
         val items =
             buildConversationTimeline(
@@ -111,5 +151,8 @@ class ConversationUiStateTest {
         assertEquals(items.size, items.map { it.stableKey }.distinct().size)
     }
 
-    private fun message(id: String): Message = Message("user", id, id = id)
+    private fun message(
+        id: String,
+        content: String = id,
+    ): Message = Message("user", content, id = id)
 }
