@@ -73,6 +73,31 @@ jobs:
             task: packageLinuxRpm
             extension: rpm
             install_rpm: true
+          - platform: linux-appimage
+            runner: ubuntu-latest
+            task: packageAppImage
+            extension: AppImage
+            install_rpm: false
+          - platform: linux-x64-jar
+            runner: ubuntu-latest
+            task: stageReleaseJar
+            extension: jar
+            install_rpm: false
+          - platform: macos-arm64-jar
+            runner: macos-latest
+            task: stageReleaseJar
+            extension: jar
+            install_rpm: false
+          - platform: macos-x64-jar
+            runner: macos-15-intel
+            task: stageReleaseJar
+            extension: jar
+            install_rpm: false
+          - platform: windows-x64-jar
+            runner: windows-latest
+            task: stageReleaseJar
+            extension: jar
+            install_rpm: false
           - platform: macos-arm64
             runner: macos-latest
             task: packageDmg
