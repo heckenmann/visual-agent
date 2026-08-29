@@ -134,11 +134,21 @@ compose.desktop {
     }
 }
 
+val linuxApplicationImage =
+    layout.buildDirectory.dir("compose/binaries/main/app/Visual Agent")
+val linuxJpackageResources =
+    layout.projectDirectory.dir("packaging/linux")
+val linuxPackageOutput =
+    layout.buildDirectory.dir("compose/binaries/main/packages")
+val developmentLinuxDesktopEntry =
+    layout.buildDirectory.file("compose/desktop-integration/visualagent-development.desktop")
+
 val runNativeApplication =
     tasks.register<Exec>("runNativeApplication") {
         group = "application"
         description = "Runs the current operating system's native Visual Agent application bundle."
         dependsOn("createDistributable")
+        workingDir(rootProject.projectDir)
         doFirst {
             val distributionDirectory =
                 layout.buildDirectory
@@ -161,6 +171,120 @@ val runNativeApplication =
             }
         }
     }
+
+val packageLinuxDeb =
+    tasks.register<Exec>("packageLinuxDeb") {
+        group = "distribution"
+        description = "Packages the native Visual Agent application image as a Linux DEB with desktop integration."
+        dependsOn("createDistributable")
+        inputs.dir(linuxJpackageResources)
+        outputs.dir(linuxPackageOutput)
+        onlyIf { System.getProperty("os.name", "").contains("linux", ignoreCase = true) }
+        doFirst {
+            commandLine(
+                File(System.getProperty("java.home"), "bin/jpackage"),
+                "--type",
+                "deb",
+                "--app-image",
+                linuxApplicationImage.get().asFile,
+                "--dest",
+                linuxPackageOutput.get().asFile,
+                "--resource-dir",
+                linuxJpackageResources.asFile,
+                "--linux-package-name",
+                "visual-agent",
+                "--linux-shortcut",
+            )
+        }
+    }
+
+val packageLinuxRpm =
+    tasks.register<Exec>("packageLinuxRpm") {
+        group = "distribution"
+        description = "Packages the native Visual Agent application image as a Linux RPM with desktop integration."
+        dependsOn("createDistributable")
+        inputs.dir(linuxJpackageResources)
+        outputs.dir(linuxPackageOutput)
+        onlyIf { System.getProperty("os.name", "").contains("linux", ignoreCase = true) }
+        doFirst {
+            commandLine(
+                File(System.getProperty("java.home"), "bin/jpackage"),
+                "--type",
+                "rpm",
+                "--app-image",
+                linuxApplicationImage.get().asFile,
+                "--dest",
+                linuxPackageOutput.get().asFile,
+                "--resource-dir",
+                linuxJpackageResources.asFile,
+                "--linux-package-name",
+                "visual-agent",
+                "--linux-shortcut",
+            )
+        }
+    }
+
+private fun quoteDesktopExecArgument(value: String): String =
+    "\"" +
+        value
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("`", "\\`")
+            .replace('$'.toString(), "\\" + '$') +
+        "\""
+
+val prepareDevelopmentLinuxDesktopEntry =
+    tasks.register("prepareDevelopmentLinuxDesktopEntry") {
+        group = "application"
+        description = "Prepares the temporary Linux desktop entry used while running Visual Agent from Gradle."
+        val template = linuxJpackageResources.file("de.heckenmann.VisualAgent.development.desktop.template")
+        inputs.file(template)
+        outputs.file(developmentLinuxDesktopEntry)
+        doLast {
+            val launcher =
+                linuxApplicationImage
+                    .get()
+                    .asFile
+                    .resolve("bin/Visual Agent")
+                    .absolutePath
+            val icon = project.file("../ui/src/main/resources/icons/visual-agent.png").absolutePath
+            val desktopEntry = developmentLinuxDesktopEntry.get().asFile
+            desktopEntry.parentFile.mkdirs()
+            desktopEntry.writeText(
+                template.asFile
+                    .readText()
+                    .replace("@EXECUTABLE@", quoteDesktopExecArgument(launcher))
+                    .replace("@ICON@", icon),
+            )
+        }
+    }
+
+val installDevelopmentLinuxDesktopEntry =
+    tasks.register<Exec>("installDevelopmentLinuxDesktopEntry") {
+        group = "application"
+        description = "Registers the temporary Visual Agent desktop entry so Linux taskbars can identify the native window."
+        dependsOn(prepareDevelopmentLinuxDesktopEntry)
+        inputs.file(developmentLinuxDesktopEntry)
+        outputs.upToDateWhen { false }
+        onlyIf { System.getProperty("os.name", "").contains("linux", ignoreCase = true) }
+        commandLine("xdg-desktop-menu", "install", "--mode", "user", developmentLinuxDesktopEntry.get().asFile)
+    }
+
+val uninstallDevelopmentLinuxDesktopEntry =
+    tasks.register<Exec>("uninstallDevelopmentLinuxDesktopEntry") {
+        group = "application"
+        description = "Removes the temporary Visual Agent desktop entry after a Gradle development run."
+        dependsOn(prepareDevelopmentLinuxDesktopEntry)
+        inputs.file(developmentLinuxDesktopEntry)
+        outputs.upToDateWhen { false }
+        onlyIf { System.getProperty("os.name", "").contains("linux", ignoreCase = true) }
+        commandLine("xdg-desktop-menu", "uninstall", "--mode", "user", developmentLinuxDesktopEntry.get().asFile.name)
+    }
+
+runNativeApplication.configure {
+    dependsOn(installDevelopmentLinuxDesktopEntry)
+    finalizedBy(uninstallDevelopmentLinuxDesktopEntry)
+}
 
 val verifyNativeDistributionIcons =
     tasks.register("verifyNativeDistributionIcons") {
@@ -207,6 +331,24 @@ val verifyNativeDistributionLauncher =
                     else -> distributionDirectory.resolve("$appName/bin/$appName")
                 }
             check(launcher.isFile && launcher.canExecute()) { "Native distribution launcher is missing or not executable: $launcher" }
+        }
+    }
+
+val verifyLinuxDesktopEntry =
+    tasks.register("verifyLinuxDesktopEntry") {
+        group = "verification"
+        description = "Verifies the Linux desktop launcher maps Visual Agent windows to their package entry."
+        val desktopEntry = linuxJpackageResources.file("Visual Agent.desktop")
+        inputs.file(desktopEntry)
+        doLast {
+            val entry = desktopEntry.asFile.readText()
+            check("Name=APPLICATION_NAME" in entry) { "Linux desktop entry must use jpackage's application name." }
+            check("Exec=APPLICATION_LAUNCHER" in entry) { "Linux desktop entry must use jpackage's native launcher." }
+            check("Icon=APPLICATION_ICON" in entry) { "Linux desktop entry must use jpackage's application icon." }
+            check("StartupNotify=true" in entry) { "Linux desktop entry must enable startup notification." }
+            check("StartupWMClass=de-heckenmann-visualagent-desktop-DesktopMain" in entry) {
+                "Linux desktop entry must match the X11 class created by DesktopMain."
+            }
         }
     }
 
@@ -281,6 +423,7 @@ tasks.named("check") {
     dependsOn(verifyMacOsNativeDnsResolver)
     dependsOn(verifyNativeDistributionIcons)
     dependsOn(verifyNativeDistributionLauncher)
+    dependsOn(verifyLinuxDesktopEntry)
 }
 
 publishing {

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Visual Agent (development)
+Comment=Visual Agent development launcher
+Exec=@EXECUTABLE@
+Icon=@ICON@
+Terminal=false
+Type=Application
+Categories=Utility;
+NoDisplay=true
+StartupNotify=true
+StartupWMClass=de-heckenmann-visualagent-desktop-DesktopMain

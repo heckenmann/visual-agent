@@ -44,7 +44,7 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
-          gradle_version="$(./gradlew --quiet printProjectVersion --no-daemon --no-configuration-cache)"
+          gradle_version="$(gradle --quiet printProjectVersion --no-daemon --no-configuration-cache)"
           expected_tag="v${gradle_version}"
           test "$RELEASE_TAG" = "$expected_tag" || {
             echo "Release tag must be $expected_tag, but was $RELEASE_TAG."
@@ -52,7 +52,7 @@ jobs:
           }
 
       - name: Run quality gates
-        run: xvfb-run -a ./gradlew ktlintCheck check test --no-daemon --no-configuration-cache
+        run: xvfb-run -a gradle ktlintCheck check test --no-daemon --no-configuration-cache
 
   package:
     name: Package ${{ matrix.platform }}
@@ -65,12 +65,12 @@ jobs:
         include:
           - platform: linux-deb
             runner: ubuntu-latest
-            task: packageDeb
+            task: packageLinuxDeb
             extension: deb
             install_rpm: false
           - platform: linux-rpm
             runner: ubuntu-latest
-            task: packageRpm
+            task: packageLinuxRpm
             extension: rpm
             install_rpm: true
           - platform: macos-arm64
@@ -110,7 +110,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install --yes rpm
 
       - name: Build native package
-        run: ./gradlew :desktop:${{ matrix.task }} --no-daemon --no-configuration-cache
+        run: gradle :desktop:${{ matrix.task }} --no-daemon --no-configuration-cache
         shell: bash
 
       - name: Stage release asset
@@ -145,6 +145,7 @@ jobs:
       - name: Create or update release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
