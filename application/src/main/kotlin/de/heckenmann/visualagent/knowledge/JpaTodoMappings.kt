@@ -5,7 +5,7 @@ import de.heckenmann.visualagent.todo.TodoStatus
 
 /** Maps the todo domain model to the active JPA entity. */
 internal fun Todo.toEntity(): TodoEntity =
-    TodoEntity(id, description, status.name, position, assignedAgentId, createdAt, updatedAt, completedAt, dueDate)
+    TodoEntity(id, description, status.name, position, assignedAgentId, createdAt, updatedAt, timelineSequence, completedAt, dueDate)
 
 /** Maps the active JPA entity to the todo domain model. */
 internal fun TodoEntity.toDomain(): Todo =
@@ -17,6 +17,7 @@ internal fun TodoEntity.toDomain(): Todo =
         assignedAgentId = assignedAgentId,
         createdAt = createdAt,
         updatedAt = updatedAt,
+        timelineSequence = timelineSequence,
         completedAt = completedAt,
         dueDate = dueDate,
     )

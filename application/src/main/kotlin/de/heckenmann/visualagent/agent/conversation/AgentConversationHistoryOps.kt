@@ -210,7 +210,6 @@ internal class AgentConversationHistoryOps(
     }
 
     internal fun persist(message: Message) {
-        val createdAt = Instant.now().toEpochMilli()
         val id =
             owner.conversationStore.saveConversationMessage(
                 AgentManager.MAIN_SESSION_ID,
@@ -218,7 +217,14 @@ internal class AgentConversationHistoryOps(
                 message.content,
                 message.metadata,
             )
-        owner.conversationHistory.add(message.copy(id = id, createdAtEpochMillis = createdAt))
+        val record = owner.conversationStore.getConversationMessage(id)
+        owner.conversationHistory.add(
+            message.copy(
+                id = id,
+                createdAtEpochMillis = record?.createdAt?.toEpochMilli() ?: Instant.now().toEpochMilli(),
+                timelineSequence = record?.timelineSequence,
+            ),
+        )
     }
 
     private fun toMessage(row: ConversationRecord): Message? =
@@ -231,6 +237,7 @@ internal class AgentConversationHistoryOps(
                     metadata = it.metadata?.ifBlank { null },
                     id = it.id,
                     createdAtEpochMillis = it.createdAt.toEpochMilli(),
+                    timelineSequence = it.timelineSequence,
                 )
             }
 }

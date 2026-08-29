@@ -40,7 +40,7 @@ internal interface PreferenceRepository : JpaRepository<PreferenceEntity, String
 internal interface ConversationRepository :
     JpaRepository<ConversationEntity, String>,
     ConversationRepositoryCustom {
-    fun findBySessionIdOrderByCreatedAtDescIdDesc(
+    fun findBySessionIdOrderByTimelineSequenceDescCreatedAtDescIdDesc(
         sessionId: String,
         pageable: Pageable,
     ): List<ConversationEntity>
@@ -86,7 +86,7 @@ internal class ConversationRepositoryCustomImpl(
                 """
                 SELECT message FROM ConversationEntity message
                 WHERE message.sessionId = :sessionId
-                ORDER BY message.createdAt DESC, message.id DESC
+                ORDER BY message.timelineSequence DESC, message.createdAt DESC, message.id DESC
                 """.trimIndent(),
                 ConversationEntity::class.java,
             ).setParameter("sessionId", sessionId)
@@ -118,7 +118,7 @@ internal class ConversationRepositoryCustomImpl(
                 SELECT message FROM ConversationEntity message
                 WHERE message.sessionId = :sessionId
                   AND lower(message.content) LIKE :query
-                ORDER BY message.createdAt DESC, message.id DESC
+                ORDER BY message.timelineSequence DESC, message.createdAt DESC, message.id DESC
                 """.trimIndent(),
                 ConversationEntity::class.java,
             ).setParameter("sessionId", sessionId)
@@ -133,7 +133,7 @@ internal class ConversationRepositoryCustomImpl(
             FROM conversation_history_fts fts
             JOIN conversation_history ch ON ch.id = fts.id
             WHERE fts.session_id = :sessionId AND fts.content MATCH :query
-            ORDER BY ch.created_at DESC, ch.id DESC
+            ORDER BY ch.timeline_sequence DESC, ch.created_at DESC, ch.id DESC
             """
     }
 }

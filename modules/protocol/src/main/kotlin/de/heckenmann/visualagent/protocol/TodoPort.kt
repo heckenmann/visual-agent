@@ -19,6 +19,7 @@ data class TodoItem(
     val assignedAgentId: String? = null,
     val createdAt: Instant? = null,
     val updatedAt: Instant? = null,
+    val timelineSequence: Long = 0,
     val completedAt: Instant? = null,
     val dueDate: Instant? = null,
 )

@@ -38,6 +38,7 @@ private fun Todo.toDeletedEntity(): DeletedTodoEntity =
         assignedAgentId = assignedAgentId,
         createdAt = createdAt,
         updatedAt = updatedAt,
+        timelineSequence = timelineSequence,
         completedAt = completedAt,
         dueDate = dueDate,
     )
@@ -51,6 +52,7 @@ private fun DeletedTodoEntity.toDomain(): Todo =
         assignedAgentId = assignedAgentId,
         createdAt = createdAt,
         updatedAt = updatedAt,
+        timelineSequence = timelineSequence,
         completedAt = completedAt,
         dueDate = dueDate,
     )

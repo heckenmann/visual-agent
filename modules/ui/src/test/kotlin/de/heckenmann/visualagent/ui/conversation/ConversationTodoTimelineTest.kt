@@ -43,6 +43,40 @@ class ConversationTodoTimelineTest {
     }
 
     @Test
+    fun `database timeline sequence orders a todo after its triggering user message`() {
+        val user =
+            ConversationMessage(
+                "user",
+                "Create a task",
+                id = "user",
+                createdAtEpochMillis = 2_000,
+                timelineSequence = 41,
+            )
+        val todo =
+            TodoItem(
+                "todo-3",
+                "Created from the request",
+                createdAt = Instant.ofEpochMilli(2_000),
+                updatedAt = Instant.ofEpochMilli(2_000),
+                timelineSequence = 42,
+            )
+
+        val items = buildConversationTimeline(listOf(user), null, "", false, false, false, todos = listOf(todo))
+
+        assertEquals(listOf("todo:todo-3", "message:user"), items.map { it.stableKey })
+    }
+
+    @Test
+    fun `legacy equal timestamps place todo activity on the newer side deterministically`() {
+        val user = ConversationMessage("user", "Create a task", id = "user", createdAtEpochMillis = 2_000)
+        val todo = TodoItem("todo-4", "Legacy task", createdAt = Instant.ofEpochMilli(2_000))
+
+        val items = buildConversationTimeline(listOf(user), null, "", false, false, false, todos = listOf(todo))
+
+        assertEquals(listOf("todo:todo-4", "message:user"), items.map { it.stableKey })
+    }
+
+    @Test
     fun `deleted todo keeps a stable unavailable card snapshot`() {
         val todo = TodoItem("todo-2", "Removed task", createdAt = Instant.ofEpochMilli(2_000))
         val items =

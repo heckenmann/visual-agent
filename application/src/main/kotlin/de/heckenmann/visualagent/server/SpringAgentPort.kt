@@ -138,6 +138,7 @@ private fun ApplicationMessage.toProtocol(): ConversationMessage =
         images = images,
         id = id,
         createdAtEpochMillis = createdAtEpochMillis,
+        timelineSequence = timelineSequence,
     )
 
 private fun SubAgentExecutionSnapshot.toProtocol(): AgentExecutionSnapshot =

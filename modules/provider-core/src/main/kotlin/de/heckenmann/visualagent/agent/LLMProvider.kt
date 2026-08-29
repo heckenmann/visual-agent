@@ -302,6 +302,8 @@ data class Message(
     val id: String? = null,
     @kotlinx.serialization.Transient
     val createdAtEpochMillis: Long? = null,
+    @kotlinx.serialization.Transient
+    val timelineSequence: Long? = null,
 )
 
 /**

@@ -143,6 +143,7 @@ private fun Message.toConversationMessage(mediaResolver: ConversationMediaResolv
                 .takeIf { it.isNotEmpty() },
         id = id,
         createdAtEpochMillis = createdAtEpochMillis,
+        timelineSequence = timelineSequence,
         reasoning = responseMetadata?.reasoning,
         telemetry =
             responseMetadata?.let { telemetry ->

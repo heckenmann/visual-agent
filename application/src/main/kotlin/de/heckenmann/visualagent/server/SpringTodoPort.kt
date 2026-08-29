@@ -101,6 +101,7 @@ private fun Todo.toTodoItem(): TodoItem =
         assignedAgentId = assignedAgentId,
         createdAt = createdAt,
         updatedAt = updatedAt,
+        timelineSequence = timelineSequence,
         completedAt = completedAt,
         dueDate = dueDate,
     )

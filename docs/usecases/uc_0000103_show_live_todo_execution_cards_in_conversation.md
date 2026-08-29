@@ -14,14 +14,14 @@ Keep the user aware of autonomous todo work by showing each todo as a compact ca
 
 1. A user action, todo tool call, or orchestration operation creates a todo through the canonical todo service.
 2. The server publishes the todo change through `TodoPort`; it does not append a synthetic user/system turn for the visual card.
-3. The Conversation panel inserts exactly one todo card ordered by the todo's latest activity timestamp (creation for a new todo).
+3. The Conversation panel inserts exactly one todo card using the persisted global activity sequence; this puts a todo created by a user request after that request even when both mutations share a millisecond timestamp.
 4. The card displays the description, status, and assigned agent when available.
 5. While the todo is `IN_PROGRESS`, an animated working indicator remains visible next to the current output.
 6. When execution starts, progress events update the same card with a bounded tail of the latest response lines.
 7. The Todo panel consumes the same response presentation behavior and can open the same full-response overlay.
 8. When execution completes, fails, is cancelled, or is paused, the card keeps the latest available response tail and updates its status.
 9. If the todo is deleted, the server atomically archives its snapshot before removing the active row; the conversation keeps a compact unavailable card based on that persisted snapshot.
-10. If an existing todo is genuinely updated, its activity timestamp changes and the same card moves down to the current position while retaining its stable id and history.
+10. If an existing todo is genuinely updated, its persisted activity sequence changes and the same card moves down to the current position while retaining its stable id and history.
 11. Reloading the conversation reconstructs cards from persisted todos and history at the same chronological positions.
 
 ## Alternative Flows
@@ -49,6 +49,7 @@ Keep the user aware of autonomous todo work by showing each todo as a compact ca
 
 - Todo cards are presentation-only timeline items and are excluded from model context.
 - A todo card keeps one stable id and moves to its latest activity position when it is genuinely updated.
+- Conversation messages and todo activity use one database-generated total order. Legacy rows without a sequence use timestamps and a documented deterministic fallback.
 - Existing todos are updated only when the objective and scope remain the same; a different objective gets a new todo so prior history remains meaningful.
 - One canonical execution stream is fanned out to Conversation, Todo, and the overlay.
 - Compact previews are bounded; the canonical full response is not truncated.

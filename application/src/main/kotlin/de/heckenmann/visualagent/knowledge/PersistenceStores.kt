@@ -16,6 +16,7 @@ data class ConversationRecord(
     val content: String,
     val metadata: String?,
     val createdAt: Instant,
+    val timelineSequence: Long = 0,
 ) {
     /** Returns a field value by its persistence-facing name. */
     operator fun get(key: String): Any? =
@@ -25,6 +26,7 @@ data class ConversationRecord(
             "content" -> content
             "metadata" -> metadata
             "createdAt" -> createdAt.toString()
+            "timelineSequence" -> timelineSequence
             else -> null
         }
 }
@@ -121,6 +123,9 @@ interface ConversationStore {
         content: String,
         metadata: String? = null,
     ): String
+
+    /** Returns one persisted message, including its durable timeline ordering key. */
+    fun getConversationMessage(id: String): ConversationRecord? = null
 
     /** Returns the latest messages for a session. */
     fun getConversationMessages(

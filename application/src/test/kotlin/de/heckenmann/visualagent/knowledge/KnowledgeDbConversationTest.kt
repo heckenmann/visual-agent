@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.knowledge
 
+import de.heckenmann.visualagent.todo.Todo
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -57,6 +58,41 @@ class KnowledgeDbConversationTest {
         val matches = db.searchConversationMessages(sessionId, "entry-8", limit = 5)
         assertEquals(1, matches.size)
         assertEquals("entry-8 keyword", matches[0]["content"])
+        db.close()
+    }
+
+    @Test
+    fun `conversation messages receive database timeline sequence values`() {
+        val tempDb = createTempDirectory("visual-agent-conversation-sequence-test").resolve("history.db").toString()
+        val db =
+            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                .create(tempDb)
+
+        db.saveConversationMessage("main", "user", "First")
+        db.saveConversationMessage("main", "assistant", "Second")
+
+        val messages = db.getConversationMessages("main")
+        assertTrue(messages[0].timelineSequence > 0)
+        assertTrue(messages[1].timelineSequence > messages[0].timelineSequence)
+        db.close()
+    }
+
+    @Test
+    fun `todo activity shares the conversation ordering sequence`() {
+        val tempDb = createTempDirectory("visual-agent-todo-sequence-test").resolve("history.db").toString()
+        val db =
+            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                .create(tempDb)
+
+        db.saveConversationMessage("main", "user", "Create a task")
+        val message = db.getConversationMessages("main").single()
+        val todo = Todo("todo", "Task")
+        db.todoStore.saveTodo(todo)
+
+        assertTrue(todo.timelineSequence > message.timelineSequence)
+        val firstActivity = todo.timelineSequence
+        db.todoStore.saveTodo(todo)
+        assertTrue(todo.timelineSequence > firstActivity)
         db.close()
     }
 }
