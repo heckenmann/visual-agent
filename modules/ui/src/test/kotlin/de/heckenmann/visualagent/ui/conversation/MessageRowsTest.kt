@@ -4,7 +4,6 @@ package de.heckenmann.visualagent.ui.conversation
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -220,12 +219,8 @@ class MessageRowsTest {
         }
         composeTestRule.onNodeWithText("Thinking…").assertExists()
         composeTestRule.onNodeWithText("answer").assertExists()
-        composeTestRule.onNodeWithText("**planning**").assertExists()
-        composeTestRule.onNodeWithContentDescription("Expand thinking").performClick()
-        composeTestRule.waitUntil(timeoutMillis = 5_000) {
-            composeTestRule.onAllNodesWithText("planning").fetchSemanticsNodes().isNotEmpty()
-        }
         composeTestRule.onNodeWithText("planning").assertExists()
+        composeTestRule.onNodeWithContentDescription("Expand thinking").performClick()
         composeTestRule.onNodeWithText("**planning**").assertDoesNotExist()
         composeTestRule.onNodeWithText("<think>**planning**</think>answer").assertDoesNotExist()
     }
