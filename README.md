@@ -11,27 +11,29 @@ Visual Agent is a Kotlin desktop application. Its goal is to provide the model w
 
 ## Download and Run
 
-Each successful build on `master` publishes an executable, platform-specific desktop JAR to GitHub Packages. You need a GitHub personal access token with `read:packages` scope to download it.
+Download the matching artifact from [GitHub Releases](https://github.com/heckenmann/visual-agent/releases). Native packages contain the Visual Agent JAR, all runtime dependencies, and a platform-native launcher, so no Java installation is required. The platform-specific JAR downloads require Java 24.
 
-The published desktop JAR is produced by `:desktop:bootJar` and is the artifact intended for `java -jar`. The `application` module also produces an executable standalone-server JAR for server-only deployments. Files ending in `-plain.jar` are internal library artifacts and are not launchable applications.
+| Operating system | Architecture | Package | Download |
+| --- | --- | --- | --- |
+| macOS | Apple Silicon | DMG | [visual-agent-macos-arm64.dmg](https://github.com/heckenmann/visual-agent/releases/latest/download/visual-agent-macos-arm64.dmg) |
+| macOS | Apple Silicon | JAR (Java 24) | [visual-agent-macos-arm64-jar.jar](https://github.com/heckenmann/visual-agent/releases/latest/download/visual-agent-macos-arm64-jar.jar) |
+| macOS | Intel | DMG | [visual-agent-macos-x64.dmg](https://github.com/heckenmann/visual-agent/releases/latest/download/visual-agent-macos-x64.dmg) |
+| macOS | Intel | JAR (Java 24) | [visual-agent-macos-x64-jar.jar](https://github.com/heckenmann/visual-agent/releases/latest/download/visual-agent-macos-x64-jar.jar) |
+| Windows | x64 | MSI | [visual-agent-windows.msi](https://github.com/heckenmann/visual-agent/releases/latest/download/visual-agent-windows.msi) |
+| Windows | x64 | JAR (Java 24) | [visual-agent-windows-x64-jar.jar](https://github.com/heckenmann/visual-agent/releases/latest/download/visual-agent-windows-x64-jar.jar) |
+| Debian / Ubuntu Linux | x86_64 | DEB | [visual-agent-linux-deb.deb](https://github.com/heckenmann/visual-agent/releases/latest/download/visual-agent-linux-deb.deb) |
+| Fedora / openSUSE / RHEL Linux | x86_64 | RPM | [visual-agent-linux-rpm.rpm](https://github.com/heckenmann/visual-agent/releases/latest/download/visual-agent-linux-rpm.rpm) |
+| Linux | x86_64 | AppImage | [visual-agent-linux-appimage.AppImage](https://github.com/heckenmann/visual-agent/releases/latest/download/visual-agent-linux-appimage.AppImage) |
+| Linux | x86_64 | JAR (Java 24) | [visual-agent-linux-x64-jar.jar](https://github.com/heckenmann/visual-agent/releases/latest/download/visual-agent-linux-x64-jar.jar) |
 
-1. Download the latest package that matches your operating system from the [GitHub Packages registry](https://github.com/heckenmann/visual-agent/packages):
+Open a macOS disk image and move Visual Agent to Applications. Run the Windows installer directly.
+Install Linux DEB/RPM files with the system package manager. Make the AppImage executable and start
+it directly; it does not need to be installed. Run a platform-matched JAR with `java -jar`; it does
+not provide native operating-system integration.
 
-   - Linux: `visual-agent-linux`
-   - macOS on Intel: `visual-agent-macos-x64`
-   - macOS on Apple Silicon: `visual-agent-macos-arm64`
-   - Windows: `visual-agent-windows`
+The native launcher supplies the Visual Agent name and icon to the operating system. On first launch it creates a local SQLite database under `./data/` and opens the Compose UI.
 
-   Each package contains the native Compose runtime for its platform.
-2. Run it with Java 21 or later:
-
-   ```bash
-   java -jar visual-agent-<platform>-0.1.0-master-<version>.jar
-   ```
-
-   Visual Agent needs a desktop environment (it won't run headless).
-
-3. On first launch it creates a local SQLite database under `./data/` and opens the Compose UI.
+Supported native release platforms are macOS (Apple Silicon and Intel), Windows x64, and Linux x86_64. The Linux AppImage is portable; the DEB and RPM packages integrate with the system package manager and application menu. A platform-matched executable JAR is additionally available for Java 24 environments.
 
 ## Features
 
@@ -53,6 +55,8 @@ See [Setup Guide](docs/setup.md) for prerequisites, build/run commands, Ollama c
 ./gradlew build
 ./gradlew :desktop:run
 ```
+
+`./gradlew :desktop:run` builds and starts the same native application image used by the release packages. Use `./gradlew :desktop:runDistributable` explicitly when you want to run that image without the `run` alias.
 
 ## Gradle Modules
 

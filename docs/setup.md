@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - Java 21+ (the project auto-resolves the JDK 24 toolchain locally; CI uses JDK 21 so the Foojay toolchain resolver can fetch 24).
-- The Gradle wrapper version is defined centrally in `gradle/wrapper/gradle-wrapper.properties`; the CI publish workflow reads that version when bootstrapping the wrapper on its runners.
+- The Gradle wrapper version is defined centrally in `gradle/wrapper/gradle-wrapper.properties`; the release workflow validates release tags against the project version.
 - Ollama running locally (`ollama serve`) or a reachable remote Ollama endpoint.
 - SQLite is embedded and managed automatically through Spring Data JPA + Flyway.
 
@@ -13,6 +13,47 @@
 ./gradlew build
 ./gradlew :desktop:run
 ```
+
+## Supported Operating Systems and Release Packages
+
+GitHub Releases provide native desktop packages. A Java installation is not required for any of
+them.
+
+| Operating system | Architecture | Release package | Installation |
+| --- | --- | --- | --- |
+| macOS | Apple Silicon, Intel | DMG | Open the disk image and move Visual Agent to Applications. |
+| Windows | x64 | MSI | Run the installer. |
+| Debian / Ubuntu Linux | x86_64 | DEB | Install with the system package manager. |
+| Fedora / openSUSE / RHEL Linux | x86_64 | RPM | Install with the system package manager. |
+| Linux distributions | x86_64 | AppImage | Make the file executable and start it directly; no installation is required. |
+
+Build the portable AppImage from source on Linux x86_64 with:
+
+```bash
+./gradlew :desktop:packageAppImage
+```
+
+The task downloads pinned, SHA-256-verified copies of the official `appimagetool` and AppImage
+Type 2 runtime into the Gradle build directory and writes the result to
+`modules/desktop/build/compose/binaries/main/packages/`. The release workflow publishes the same
+file as `visual-agent-linux-appimage.AppImage`.
+
+Build the executable JAR staged for a GitHub release with:
+
+```bash
+./gradlew :desktop:stageReleaseJar
+```
+
+The release workflow builds a JAR on every supported platform and publishes the matching asset
+alongside the native packages:
+
+- `visual-agent-linux-x64-jar.jar`
+- `visual-agent-macos-arm64-jar.jar`
+- `visual-agent-macos-x64-jar.jar`
+- `visual-agent-windows-x64-jar.jar`
+
+Each JAR requires Java 24 and must be used only on the platform for which it was built. It does
+not provide native launcher or package-manager integration.
 
 Run the Spring server without the Compose desktop host when a standalone server is
 required:

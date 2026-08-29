@@ -10,6 +10,14 @@ plugins {
 group = "de.heckenmann.visualagent"
 version = libs.versions.visual.agent.get()
 
+tasks.register("printProjectVersion") {
+    group = "help"
+    description = "Prints the Visual Agent version used by Gradle and release packages."
+    doLast {
+        println(project.version)
+    }
+}
+
 repositories {
     mavenCentral()
 }
