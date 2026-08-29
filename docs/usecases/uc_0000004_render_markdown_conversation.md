@@ -76,7 +76,7 @@ The model must use only image sources supplied by the user or returned by a tool
 - Empty table cells render gracefully without visible empty bordered boxes.
 - Standard Markdown image syntax renders inline after server-side validation; `client-file:` is the only client-local exception.
 - The original Markdown source remains the canonical persisted message content, including thinking markup.
-- Markdown formatting inside a thinking block is rendered when the block is expanded.
+- Markdown formatting inside a thinking block is rendered both in its collapsed latest-line preview and when the block is expanded.
 - Unsafe schemes, unregistered workspace paths, redirects, unsupported media, and oversized payloads are rejected without hiding the message.
 - Payload MIME is detected from the bytes with Apache Tika and must match the declared image type.
 - Images are requested only after a complete Markdown image node is available.
