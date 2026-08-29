@@ -1,4 +1,3 @@
-import org.gradle.api.publish.maven.MavenPublication
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.springframework.boot.gradle.tasks.bundling.BootJar
 import java.net.URI
@@ -11,7 +10,6 @@ plugins {
     alias(libs.plugins.compose)
     alias(libs.plugins.ktlint)
     alias(libs.plugins.spring.boot)
-    id("maven-publish")
     jacoco
 }
 
@@ -572,33 +570,6 @@ tasks.named("check") {
     dependsOn(verifyNativeDistributionIcons)
     dependsOn(verifyNativeDistributionLauncher)
     dependsOn(verifyLinuxDesktopEntry)
-}
-
-publishing {
-    publications {
-        create<MavenPublication>("masterJar") {
-            groupId = project.group.toString()
-            artifactId = "visual-agent-${System.getenv("VISUAL_AGENT_PLATFORM") ?: "local"}"
-            version =
-                if (project.version.toString().endsWith("SNAPSHOT")) {
-                    project.version.toString()
-                } else {
-                    val runNumber = System.getenv("GITHUB_RUN_NUMBER") ?: "0"
-                    "${project.version}-master-${System.getenv("GITHUB_SHA")?.take(8) ?: "local"}-$runNumber"
-                }
-            artifact(tasks.bootJar)
-        }
-    }
-    repositories {
-        maven {
-            name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/${System.getenv("GITHUB_REPOSITORY") ?: "heckenmann/visual-agent"}")
-            credentials {
-                username = System.getenv("GITHUB_ACTOR") ?: ""
-                password = System.getenv("GITHUB_TOKEN") ?: ""
-            }
-        }
-    }
 }
 
 kotlin {

@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - Java 21+ (the project auto-resolves the JDK 24 toolchain locally; CI uses JDK 21 so the Foojay toolchain resolver can fetch 24).
-- The Gradle wrapper version is defined centrally in `gradle/wrapper/gradle-wrapper.properties`; the CI publish workflow reads that version when bootstrapping the wrapper on its runners.
+- The Gradle wrapper version is defined centrally in `gradle/wrapper/gradle-wrapper.properties`; the release workflow validates release tags against the project version.
 - Ollama running locally (`ollama serve`) or a reachable remote Ollama endpoint.
 - SQLite is embedded and managed automatically through Spring Data JPA + Flyway.
 
