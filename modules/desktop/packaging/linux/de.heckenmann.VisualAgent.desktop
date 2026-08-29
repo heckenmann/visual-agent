@@ -1,0 +1,13 @@
+[Desktop Entry]
+Name=Visual Agent
+Comment=Visual workspace for AI agents
+Exec=Visual Agent
+Icon=de.heckenmann.VisualAgent
+Terminal=false
+Type=Application
+Categories=Utility;
+StartupNotify=true
+StartupWMClass=de-heckenmann-visualagent-desktop-DesktopMain
+X-AppImage-Name=Visual Agent
+X-AppImage-Version=APPLICATION_VERSION
+X-AppImage-Arch=x86_64

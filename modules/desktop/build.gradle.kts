@@ -1,6 +1,8 @@
 import org.gradle.api.publish.maven.MavenPublication
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.springframework.boot.gradle.tasks.bundling.BootJar
+import java.net.URI
+import java.security.MessageDigest
 import java.util.jar.JarFile
 
 plugins {
@@ -140,6 +142,22 @@ val linuxJpackageResources =
     layout.projectDirectory.dir("packaging/linux")
 val linuxPackageOutput =
     layout.buildDirectory.dir("compose/binaries/main/packages")
+val appImageDirectory =
+    layout.buildDirectory.dir("appimage/Visual Agent.AppDir")
+val appImageToolVersion = "1.9.1"
+val appImageTool =
+    layout.buildDirectory.file("appimage/tools/appimagetool-$appImageToolVersion-x86_64.AppImage")
+val appImageOutput =
+    linuxPackageOutput.map { output -> output.file("Visual-Agent-${project.version}-x86_64.AppImage") }
+val appImageToolDownloadUrl =
+    "https://github.com/AppImage/appimagetool/releases/download/$appImageToolVersion/appimagetool-x86_64.AppImage"
+val appImageToolSha256 = "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0"
+val appImageRuntimeVersion = "20251108"
+val appImageRuntime =
+    layout.buildDirectory.file("appimage/tools/runtime-$appImageRuntimeVersion-x86_64")
+val appImageRuntimeDownloadUrl =
+    "https://github.com/AppImage/type2-runtime/releases/download/$appImageRuntimeVersion/runtime-x86_64"
+val appImageRuntimeSha256 = "2fca8b443c92510f1483a883f60061ad09b46b978b2631c807cd873a47ec260d"
 val developmentLinuxDesktopEntry =
     layout.buildDirectory.file("compose/desktop-integration/visualagent-development.desktop")
 
@@ -223,6 +241,136 @@ val packageLinuxRpm =
             )
         }
     }
+
+val desktopBootJar = tasks.named<BootJar>("bootJar")
+
+val stageReleaseJar =
+    tasks.register<Copy>("stageReleaseJar") {
+        group = "distribution"
+        description = "Stages the executable Visual Agent JAR for a GitHub release."
+        dependsOn(desktopBootJar)
+        from(desktopBootJar.flatMap { bootJar -> bootJar.archiveFile })
+        into(linuxPackageOutput)
+        rename { "Visual-Agent-${project.version}.jar" }
+    }
+
+val downloadAppImageTool =
+    tasks.register("downloadAppImageTool") {
+        group = "distribution"
+        description = "Downloads the official appimagetool used to create the portable Linux package."
+        outputs.file(appImageTool)
+        onlyIf {
+            System.getProperty("os.name", "").contains("linux", ignoreCase = true) &&
+                System.getProperty("os.arch", "").equals("amd64", ignoreCase = true)
+        }
+        doLast {
+            val target = appImageTool.get().asFile
+            downloadVerifiedFile(appImageToolDownloadUrl, target, appImageToolSha256)
+            check(target.setExecutable(true)) { "Could not make appimagetool executable: $target" }
+        }
+    }
+
+val downloadAppImageRuntime =
+    tasks.register("downloadAppImageRuntime") {
+        group = "distribution"
+        description = "Downloads the verified AppImage Type 2 runtime embedded in the portable Linux package."
+        outputs.file(appImageRuntime)
+        onlyIf {
+            System.getProperty("os.name", "").contains("linux", ignoreCase = true) &&
+                System.getProperty("os.arch", "").equals("amd64", ignoreCase = true)
+        }
+        doLast {
+            downloadVerifiedFile(
+                appImageRuntimeDownloadUrl,
+                appImageRuntime.get().asFile,
+                appImageRuntimeSha256,
+            )
+        }
+    }
+
+val prepareAppImage =
+    tasks.register("prepareAppImage") {
+        group = "distribution"
+        description = "Prepares the portable Visual Agent AppDir from the native application image."
+        dependsOn("createDistributable")
+        val desktopEntry = linuxJpackageResources.file("de.heckenmann.VisualAgent.desktop")
+        val appRun = linuxJpackageResources.file("AppRun")
+        inputs.dir(linuxApplicationImage)
+        inputs.file(desktopEntry)
+        inputs.file(appRun)
+        inputs.file(project.file("../ui/src/main/resources/icons/visual-agent.png"))
+        outputs.dir(appImageDirectory)
+        onlyIf {
+            System.getProperty("os.name", "").contains("linux", ignoreCase = true) &&
+                System.getProperty("os.arch", "").equals("amd64", ignoreCase = true)
+        }
+        doLast {
+            val appDir = appImageDirectory.get().asFile
+            delete(appDir)
+            copy {
+                from(linuxApplicationImage)
+                into(appDir.resolve("usr/lib/visual-agent"))
+            }
+            copy {
+                from(desktopEntry)
+                into(appDir)
+                filter { line -> line.replace("APPLICATION_VERSION", project.version.toString()) }
+            }
+            copy {
+                from(appRun)
+                from(project.file("../ui/src/main/resources/icons/visual-agent.png"))
+                into(appDir)
+                rename("visual-agent.png", "de.heckenmann.VisualAgent.png")
+            }
+            val appRunTarget = appDir.resolve("AppRun")
+            check(appRunTarget.setExecutable(true)) { "Could not make AppRun executable: $appRunTarget" }
+        }
+    }
+
+val packageAppImage =
+    tasks.register<Exec>("packageAppImage") {
+        group = "distribution"
+        description = "Packages Visual Agent as a portable Linux AppImage."
+        dependsOn(downloadAppImageTool, downloadAppImageRuntime, prepareAppImage)
+        inputs.dir(appImageDirectory)
+        inputs.file(appImageTool)
+        inputs.file(appImageRuntime)
+        outputs.file(appImageOutput)
+        onlyIf {
+            System.getProperty("os.name", "").contains("linux", ignoreCase = true) &&
+                System.getProperty("os.arch", "").equals("amd64", ignoreCase = true)
+        }
+        environment("APPIMAGE_EXTRACT_AND_RUN", "1")
+        environment("ARCH", "x86_64")
+        doFirst {
+            commandLine(
+                appImageTool.get().asFile,
+                "--runtime-file",
+                appImageRuntime.get().asFile,
+                appImageDirectory.get().asFile,
+                appImageOutput.get().asFile,
+            )
+        }
+    }
+
+private fun downloadVerifiedFile(
+    url: String,
+    target: File,
+    expectedSha256: String,
+) {
+    target.parentFile.mkdirs()
+    URI(url).toURL().openStream().use { source ->
+        target.outputStream().use(source::copyTo)
+    }
+    val actualSha256 =
+        MessageDigest
+            .getInstance("SHA-256")
+            .digest(target.readBytes())
+            .joinToString(separator = "") { byte -> "%02x".format(byte.toInt() and 0xff) }
+    check(actualSha256 == expectedSha256) {
+        "Downloaded file checksum mismatch: expected $expectedSha256 but received $actualSha256."
+    }
+}
 
 private fun quoteDesktopExecArgument(value: String): String =
     "\"" +
