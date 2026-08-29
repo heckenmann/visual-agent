@@ -175,6 +175,15 @@ internal class JpaTodoStore(
     }
 
     @Transactional
+    override fun updateTodoPositions(todos: List<Todo>) {
+        if (todos.isEmpty()) return
+        val positionsById = todos.associate { it.id to it.position }
+        repository.findAllById(positionsById.keys).forEach { entity ->
+            positionsById[entity.id]?.let { position -> entity.position = position }
+        }
+    }
+
+    @Transactional
     override fun createTodoIfAbsent(todo: Todo): TodoCreation {
         val normalizedDescription = normalizeDescription(todo.description)
         val existing =

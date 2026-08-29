@@ -95,4 +95,33 @@ class KnowledgeDbConversationTest {
         assertTrue(todo.timelineSequence > firstActivity)
         db.close()
     }
+
+    @Test
+    fun `todo reordering preserves existing conversation timeline activity`() {
+        val tempDb =
+            createTempDirectory("visual-agent-todo-reorder-sequence-test")
+                .resolve("history.db")
+                .toString()
+        val db =
+            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                .create(tempDb)
+        val first = Todo("first", "First", position = 0)
+        val second = Todo("second", "Second", position = 1)
+
+        db.todoStore.saveTodo(first)
+        db.todoStore.saveTodo(second)
+        db.saveConversationMessage("main", "user", "Message after todo creation")
+        val sequencesBeforeReorder = db.todoStore.listTodos().associate { it.id to it.timelineSequence }
+        val followingMessage = db.getConversationMessages("main").single()
+
+        second.position = 0
+        first.position = 1
+        db.todoStore.updateTodoPositions(listOf(second, first))
+
+        val reordered = db.todoStore.listTodos()
+        assertEquals(listOf("second", "first"), reordered.map { it.id })
+        assertEquals(sequencesBeforeReorder, reordered.associate { it.id to it.timelineSequence })
+        assertTrue(reordered.all { it.timelineSequence < followingMessage.timelineSequence })
+        db.close()
+    }
 }

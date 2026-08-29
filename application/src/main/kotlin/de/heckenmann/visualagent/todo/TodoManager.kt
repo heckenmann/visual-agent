@@ -291,7 +291,7 @@ class TodoManager(
         val moved = ordered.removeAt(fromIndex)
         ordered.add(safeTarget, moved)
         renumberPositions(ordered)
-        ordered.forEach { todoStore.saveTodo(it) }
+        todoStore.updateTodoPositions(ordered)
         publishChange(TodoChange(TodoChangeType.REORDERED, todo = moved))
         return true
     }
@@ -306,7 +306,7 @@ class TodoManager(
         if (orderedIds.size != todos.size) return false
         val ordered = orderedIds.map { id -> todos.find { it.id == id } ?: return false }.toMutableList()
         renumberPositions(ordered)
-        ordered.forEach { todoStore.saveTodo(it) }
+        todoStore.updateTodoPositions(ordered)
         publishChange(TodoChange(TodoChangeType.REORDERED))
         return true
     }

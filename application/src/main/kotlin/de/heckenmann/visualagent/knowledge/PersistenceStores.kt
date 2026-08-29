@@ -183,6 +183,15 @@ interface TodoStore {
     /** Inserts or replaces a todo. */
     fun saveTodo(todo: Todo)
 
+    /**
+     * Persists list positions without recording new timeline activity.
+     *
+     * @param todos Todos whose positions changed through a user-initiated reorder
+     */
+    fun updateTodoPositions(todos: List<Todo>) {
+        todos.forEach(::saveTodo)
+    }
+
     /** Creates a todo only when no normalized description already exists. */
     fun createTodoIfAbsent(todo: Todo): TodoCreation
 
