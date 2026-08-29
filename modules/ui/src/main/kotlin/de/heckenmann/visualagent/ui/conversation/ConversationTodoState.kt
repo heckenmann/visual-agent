@@ -57,11 +57,16 @@ internal fun rememberConversationTodoState(
             todoPort.addListener { change ->
                 val removedSnapshot = change.todoId?.let { id -> state.todos.firstOrNull { todo -> todo.id == id } }
                 scope.launch {
-                    change.todo?.let { changedTodo ->
-                        state.todos = (state.todos.filterNot { it.id == changedTodo.id } + changedTodo).sortedBy { it.position }
-                    } ?: change.todoId?.let { removedId ->
-                        removedSnapshot?.let { state.deletedSnapshots = state.deletedSnapshots + (removedId to it) }
-                        state.todos = state.todos.filterNot { it.id == removedId }
+                    if (change.removed) {
+                        change.todoId?.let { removedId ->
+                            val archivedTodo = change.todo ?: removedSnapshot
+                            archivedTodo?.let { state.deletedSnapshots = state.deletedSnapshots + (removedId to it) }
+                            state.todos = state.todos.filterNot { it.id == removedId }
+                        }
+                    } else {
+                        change.todo?.let { changedTodo ->
+                            state.todos = (state.todos.filterNot { it.id == changedTodo.id } + changedTodo).sortedBy { it.position }
+                        }
                     }
                     if (!conversationState.sending) {
                         val history = withContext(Dispatchers.IO) { conversationPort.currentHistory() }

@@ -204,10 +204,11 @@ internal class JpaTodoStore(
     override fun deleteTodo(todoId: String) = repository.deleteById(todoId)
 
     @Transactional
-    override fun deleteTodoAndArchive(todo: Todo) {
+    override fun deleteTodoAndArchive(todo: Todo): Todo {
         todo.timelineSequence = timelineSequenceStore.next()
         deletedArchive.archive(todo)
         repository.deleteById(todo.id)
+        return todo
     }
 
     @Transactional(readOnly = true)

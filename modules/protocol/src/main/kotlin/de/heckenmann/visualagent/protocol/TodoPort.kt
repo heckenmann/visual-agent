@@ -34,6 +34,7 @@ data class AgentSummary(
 data class TodoChange(
     val todo: TodoItem? = null,
     val todoId: String? = null,
+    val removed: Boolean = false,
 )
 
 /** Incremental assistant output produced while a todo is processing. */

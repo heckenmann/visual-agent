@@ -3,8 +3,14 @@ package de.heckenmann.visualagent.ui.todo
 import java.text.BreakIterator
 import java.util.Locale
 
+/** Maximum number of latest response characters measured for a compact todo row. */
+internal const val TODO_STREAMING_LAYOUT_MAX_CHARACTERS = 8_192
+
 /** Converts streamed response output into the single visual line used by todo rows. */
-internal fun todoStreamingLine(response: String): String = response.replace(Regex("\\s+"), " ").trim()
+internal fun todoStreamingLine(response: String): String {
+    val tail = response.takeLast(TODO_STREAMING_LAYOUT_MAX_CHARACTERS)
+    return tail.replace(Regex("\\s+"), " ").trim()
+}
 
 /**
  * Returns the newest grapheme-safe suffix that fits within the supplied width.

@@ -19,7 +19,7 @@ enum class TodoChangeType {
  * Event payload sent to todo persistence and UI observers after a mutation.
  *
  * @property type Kind of mutation that occurred
- * @property todo Updated todo for add/update style events
+ * @property todo Updated or archived todo for add/update/remove style events
  * @property todoId Removed todo identifier for delete events
  */
 data class TodoChange(
@@ -319,9 +319,9 @@ class TodoManager(
      */
     fun remove(todoId: String): Boolean {
         val todo = todos.firstOrNull { it.id == todoId } ?: return false
-        todoStore.deleteTodoAndArchive(todo)
+        val archivedTodo = todoStore.deleteTodoAndArchive(todo)
         todos.removeIf { it.id == todoId }
-        publishChange(TodoChange(TodoChangeType.REMOVED, todoId = todoId))
+        publishChange(TodoChange(TodoChangeType.REMOVED, todo = archivedTodo, todoId = todoId))
         return true
     }
 

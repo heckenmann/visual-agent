@@ -202,7 +202,10 @@ interface TodoStore {
     fun deleteTodo(todoId: String)
 
     /** Archives a deleted todo snapshot and removes the active row atomically. */
-    fun deleteTodoAndArchive(todo: Todo) = deleteTodo(todo.id)
+    fun deleteTodoAndArchive(todo: Todo): Todo {
+        deleteTodo(todo.id)
+        return todo
+    }
 
     /** Returns deleted todo snapshots that may still be shown in conversation history. */
     fun listDeletedTodos(limit: Int = 100): List<Todo> = emptyList()
