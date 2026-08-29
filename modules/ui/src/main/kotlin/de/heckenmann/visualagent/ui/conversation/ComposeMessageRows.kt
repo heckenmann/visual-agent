@@ -135,6 +135,7 @@ internal fun ConversationCopyAction(
     ActionIconButton(
         icon = Icons.Filled.ContentCopy,
         description = "Copy ${message.role} message",
+        tooltipDescription = null,
         modifier = modifier.size(24.dp).alpha(0.6f),
         onClick = {
             clipboard.setText(AnnotatedString(message.content))
