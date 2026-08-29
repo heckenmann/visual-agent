@@ -14,10 +14,13 @@ Visual Agent is a Kotlin desktop application. Its goal is to provide the model w
 Download the matching native package from [GitHub Releases](https://github.com/heckenmann/visual-agent/releases). Each package contains the Visual Agent JAR, all runtime dependencies, and a platform-native launcher, so no Java installation is required.
 
 1. macOS: download the package for your processor (`macos-arm64` or `macos-x64`), open the `.dmg`, and move Visual Agent to Applications.
-2. Windows: run `visual-agent-windows.msi`.
-3. Linux: install `visual-agent-linux-deb.deb` on Debian/Ubuntu or `visual-agent-linux-rpm.rpm` on Fedora/openSUSE/RHEL.
+2. Windows x64: run `visual-agent-windows.msi`.
+3. Linux x86_64: install `visual-agent-linux-deb.deb` on Debian/Ubuntu or `visual-agent-linux-rpm.rpm` on Fedora/openSUSE/RHEL. Alternatively, make `visual-agent-linux-appimage.AppImage` executable and start it directly; it does not need to be installed.
+4. Java 24 option: download the JAR matching your platform (`visual-agent-linux-x64-jar.jar`, `visual-agent-macos-arm64-jar.jar`, `visual-agent-macos-x64-jar.jar`, or `visual-agent-windows-x64-jar.jar`) and run it with `java -jar`. It does not provide native operating-system integration.
 
 The native launcher supplies the Visual Agent name and icon to the operating system. On first launch it creates a local SQLite database under `./data/` and opens the Compose UI.
+
+Supported native release platforms are macOS (Apple Silicon and Intel), Windows x64, and Linux x86_64. The Linux AppImage is portable; the DEB and RPM packages integrate with the system package manager and application menu. A platform-matched executable JAR is additionally available for Java 24 environments.
 
 ## Features
 
