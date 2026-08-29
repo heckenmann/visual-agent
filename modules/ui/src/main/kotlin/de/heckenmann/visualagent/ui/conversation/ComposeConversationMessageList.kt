@@ -43,8 +43,8 @@ internal fun LazyListScope.ConversationTimeline(
         when (item) {
             ConversationTimelineItem.InlineComposer -> inlineComposer()
             ConversationTimelineItem.Waiting -> ConversationWaitingIndicator()
-            is ConversationTimelineItem.Streaming -> StreamingTimelineRow(item.content, onStatusChange)
-            is ConversationTimelineItem.PendingUser -> PendingTimelineRow(item.content, onStatusChange)
+            is ConversationTimelineItem.Streaming -> StreamingTimelineRow(item.content)
+            is ConversationTimelineItem.PendingUser -> PendingTimelineRow(item.content)
             is ConversationTimelineItem.TodoCard ->
                 ConversationTodoCard(
                     todo = item.todo,
@@ -127,27 +127,19 @@ internal fun LazyListScope.ConversationMessageList(
 }
 
 @Composable
-private fun StreamingTimelineRow(
-    content: String,
-    onStatusChange: (String) -> Unit,
-) {
+private fun StreamingTimelineRow(content: String) {
     TransientConversationMessageGroupRow(
         message = Message("assistant", content),
         isStreaming = true,
-        onCopied = { onStatusChange("Copied assistant message") },
         modifier = Modifier.padding(top = 2.dp),
     )
 }
 
 @Composable
-private fun PendingTimelineRow(
-    content: String,
-    onStatusChange: (String) -> Unit,
-) {
+private fun PendingTimelineRow(content: String) {
     TransientConversationMessageGroupRow(
         message = Message("user", content),
         isStreaming = false,
-        onCopied = { onStatusChange("Copied user message") },
         modifier = Modifier.padding(top = 10.dp),
     )
 }

@@ -68,12 +68,13 @@ internal fun ConversationScrollOnChangeEffect(
     pendingUserMessage: String? = null,
     streamingContent: String = "",
     isAtLatest: Boolean = listState.conversationPosition().isAtLatest,
+    onNewContentWhileBrowsing: () -> Unit = {},
 ) {
     var lastCount by remember { mutableStateOf(history.size) }
     var lastNewestMessage by remember { mutableStateOf(history.lastOrNull()) }
     var lastPendingUserMessage by remember { mutableStateOf(pendingUserMessage) }
     var lastStreamingContent by remember { mutableStateOf(streamingContent) }
-    LaunchedEffect(history.size, pendingUserMessage, streamingContent) {
+    LaunchedEffect(history.size, pendingUserMessage, streamingContent, isAtLatest) {
         val appendedLatestHistory =
             history.isNotEmpty() && history.size > lastCount && history.lastOrNull() != lastNewestMessage
         val displayedPendingMessage = pendingUserMessage != null && pendingUserMessage != lastPendingUserMessage
@@ -81,6 +82,8 @@ internal fun ConversationScrollOnChangeEffect(
         if (isAtLatest && (appendedLatestHistory || displayedPendingMessage || updatedStreamingContent)) {
             withFrameNanos { }
             listState.scrollToBottom()
+        } else if (!isAtLatest && (appendedLatestHistory || displayedPendingMessage || updatedStreamingContent)) {
+            onNewContentWhileBrowsing()
         }
         lastCount = history.size
         lastNewestMessage = history.lastOrNull()

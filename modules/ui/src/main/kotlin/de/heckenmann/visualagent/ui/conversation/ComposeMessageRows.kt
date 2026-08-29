@@ -138,10 +138,11 @@ internal fun ConversationMessageContent(
     message: Message,
     isStreamingPlaceholder: Boolean,
     isStreaming: Boolean,
+    modifier: Modifier = Modifier,
 ) {
     val parsed = parseThinkingMarkup(message.content)
     val thinking = listOfNotNull(message.reasoning, parsed.thinking.takeIf(String::isNotBlank)).joinToString("\n\n").trim()
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (thinking.isNotBlank()) {
             ThinkingRow(content = thinking, isStreaming = isStreaming)
         }

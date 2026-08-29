@@ -75,6 +75,7 @@ private suspend fun loadOlderConversationPage(
 @Composable
 internal fun ConversationScrollToLatestArea(
     isAtLatest: Boolean,
+    hasNewMessages: Boolean,
     state: ConversationUiState,
     gateway: ConversationHistoryGateway,
     listState: LazyListState,
@@ -98,6 +99,7 @@ internal fun ConversationScrollToLatestArea(
                         }
                     }
                 },
+                hasNewMessages = hasNewMessages,
                 modifier = Modifier.padding(end = 12.dp, bottom = 12.dp),
             )
         }

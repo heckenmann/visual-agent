@@ -160,7 +160,7 @@ See `README.md` for the full tree and the feature status table.
 - **Tool-name guard**: `OllamaPromptFactory` and `OpenAiPromptFactory` emit a system message listing the exact allowed function names for the request, so the model cannot invent variants.
 - **File LOC policy**: 300 effective LOC per `.kt` file, 3000 per package. `locAndPackageSizeCheck` blocks on violations; no grandfathering or exceptions are allowed. Split files before they exceed the limit.
 - **KDoc required**: every public declaration needs a `/** ... */` immediately above. `ktlintJavadocCheck` walks the file and reports missing KDoc.
-- **No unused private declarations**: `unusedCodeCheck` flags them; suppress with `@Suppress("unused")` if intentionally retained.
+- **No suppressions in production code**: `@Suppress` annotations are allowed only in test sources. Address warnings and static-analysis violations through code or API changes instead.
 - **kotlinx.serialization**: data classes passed through `Json.encodeToString` / `decodeFromString` must be annotated `@Serializable`. After `parseToJsonElement()`, navigate with `.jsonObject` / `.jsonArray` / `.jsonPrimitive` extensions.
 
 ## Model Context Payload

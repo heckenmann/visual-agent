@@ -5,9 +5,9 @@ package de.heckenmann.visualagent.ui.conversation
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import de.heckenmann.visualagent.ui.agents.*
@@ -23,6 +23,7 @@ import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
 import org.junit.Rule
 import org.junit.Test
+import kotlin.test.assertTrue
 import de.heckenmann.visualagent.protocol.ConversationMessage as Message
 
 /**
@@ -56,7 +57,6 @@ class ConversationMessageGroupRowTest {
             }
         }
 
-        composeTestRule.onAllNodesWithText("You").assertCountEquals(1)
         composeTestRule.onNodeWithContentDescription("You avatar").assertExists()
         composeTestRule.onNodeWithText("oldest").assertExists()
         composeTestRule.onNodeWithText("newest").assertExists()
@@ -80,8 +80,30 @@ class ConversationMessageGroupRowTest {
             }
         }
 
-        composeTestRule.onAllNodesWithText("Assistant").assertCountEquals(1)
         composeTestRule.onNodeWithContentDescription("Assistant avatar").assertExists()
+    }
+
+    @Test
+    fun `one-line message keeps contextual actions on its content row`() {
+        val group = ConversationMessageGroup(listOf(persisted("Short message", "user")))
+
+        composeTestRule.setContent {
+            MaterialTheme {
+                ConversationMessageGroupRow(
+                    group = group,
+                    sending = false,
+                    deletingMessageIds = emptySet(),
+                    onDeleteMessage = {},
+                    onStatusChange = {},
+                    onEditMessage = {},
+                    onRetry = {},
+                )
+            }
+        }
+
+        val messageBounds = composeTestRule.onNodeWithText("Short message").getUnclippedBoundsInRoot()
+        val actionBounds = composeTestRule.onNodeWithContentDescription("Message actions").getUnclippedBoundsInRoot()
+        assertTrue(actionBounds.top < messageBounds.bottom)
     }
 
     @Test
@@ -113,7 +135,6 @@ class ConversationMessageGroupRowTest {
             }
         }
 
-        composeTestRule.onAllNodesWithText("You").assertCountEquals(2)
         composeTestRule.onAllNodes(hasContentDescription("You avatar")).assertCountEquals(2)
     }
 

@@ -112,6 +112,18 @@ class ConversationPanelControlsTest {
     }
 
     @Test
+    fun `scroll control identifies unread messages while browsing`() {
+        composeTestRule.setContent {
+            MaterialTheme {
+                ScrollToBottomButton(onClick = {}, hasNewMessages = true)
+            }
+        }
+
+        composeTestRule.onNodeWithText("New messages").assertExists()
+        composeTestRule.onNodeWithContentDescription("Show new messages").assertExists()
+    }
+
+    @Test
     fun `clear button invokes callback`() {
         var clearClicked = false
         composeTestRule.setContent {

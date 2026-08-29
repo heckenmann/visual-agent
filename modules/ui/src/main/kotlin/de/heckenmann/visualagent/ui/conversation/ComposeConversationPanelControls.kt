@@ -14,9 +14,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -24,6 +26,8 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandCircleDown
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -40,6 +44,8 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.ConversationInputPlacement
 import de.heckenmann.visualagent.ui.agents.*
@@ -57,8 +63,20 @@ import de.heckenmann.visualagent.ui.workspace.*
 @Composable
 internal fun ScrollToBottomButton(
     onClick: () -> Unit,
+    hasNewMessages: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
+    if (hasNewMessages) {
+        FilledTonalButton(
+            onClick = onClick,
+            modifier = modifier.semantics { contentDescription = "Show new messages" },
+        ) {
+            Icon(Icons.Filled.ExpandCircleDown, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("New messages")
+        }
+        return
+    }
     ActionIconButton(
         icon = Icons.Filled.ExpandCircleDown,
         description = "Scroll to latest message",
