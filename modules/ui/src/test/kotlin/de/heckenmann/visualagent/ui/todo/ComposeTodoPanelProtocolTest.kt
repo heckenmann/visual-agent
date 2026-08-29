@@ -58,7 +58,7 @@ class ComposeTodoPanelProtocolTest {
     }
 
     @Test
-    fun `progress listener keeps the latest response available after completion`() {
+    fun `progress listener hides the streaming response after completion`() {
         var progressListener: ((TodoProgress) -> Unit)? = null
         var todoListener: ((TodoChange) -> Unit)? = null
         var currentTodo = TodoItem("todo", "Streaming task", TodoState.IN_PROGRESS)
@@ -84,7 +84,7 @@ class ComposeTodoPanelProtocolTest {
         currentTodo = currentTodo.copy(status = TodoState.COMPLETED)
         todoListener!!.invoke(TodoChange(todo = currentTodo))
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithText("New response").assertExists()
+        composeTestRule.onNodeWithText("New response").assertDoesNotExist()
         assertEquals(0, composeTestRule.onAllNodesWithContentDescription("Todo working").fetchSemanticsNodes().size)
     }
 

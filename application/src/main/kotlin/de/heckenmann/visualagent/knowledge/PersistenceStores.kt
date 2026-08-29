@@ -16,6 +16,7 @@ data class ConversationRecord(
     val content: String,
     val metadata: String?,
     val createdAt: Instant,
+    val timelineSequence: Long = 0,
 ) {
     /** Returns a field value by its persistence-facing name. */
     operator fun get(key: String): Any? =
@@ -25,6 +26,7 @@ data class ConversationRecord(
             "content" -> content
             "metadata" -> metadata
             "createdAt" -> createdAt.toString()
+            "timelineSequence" -> timelineSequence
             else -> null
         }
 }
@@ -122,6 +124,9 @@ interface ConversationStore {
         metadata: String? = null,
     ): String
 
+    /** Returns one persisted message, including its durable timeline ordering key. */
+    fun getConversationMessage(id: String): ConversationRecord? = null
+
     /** Returns the latest messages for a session. */
     fun getConversationMessages(
         sessionId: String,
@@ -178,6 +183,15 @@ interface TodoStore {
     /** Inserts or replaces a todo. */
     fun saveTodo(todo: Todo)
 
+    /**
+     * Persists list positions without recording new timeline activity.
+     *
+     * @param todos Todos whose positions changed through a user-initiated reorder
+     */
+    fun updateTodoPositions(todos: List<Todo>) {
+        todos.forEach(::saveTodo)
+    }
+
     /** Creates a todo only when no normalized description already exists. */
     fun createTodoIfAbsent(todo: Todo): TodoCreation
 
@@ -188,7 +202,10 @@ interface TodoStore {
     fun deleteTodo(todoId: String)
 
     /** Archives a deleted todo snapshot and removes the active row atomically. */
-    fun deleteTodoAndArchive(todo: Todo) = deleteTodo(todo.id)
+    fun deleteTodoAndArchive(todo: Todo): Todo {
+        deleteTodo(todo.id)
+        return todo
+    }
 
     /** Returns deleted todo snapshots that may still be shown in conversation history. */
     fun listDeletedTodos(limit: Int = 100): List<Todo> = emptyList()

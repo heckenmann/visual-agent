@@ -11,27 +11,26 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
@@ -72,7 +71,7 @@ internal fun groupConsecutiveConversationMessages(messages: List<ConversationTim
 
 private fun String.isConversationalRole(): Boolean = this == "user" || this == "assistant"
 
-private val ConversationAuthorColumnWidth = 64.dp
+private val ConversationAuthorColumnWidth = 48.dp
 
 @Composable
 internal fun ConversationMessageGroupRow(
@@ -95,11 +94,11 @@ internal fun ConversationMessageGroupRow(
         PanelContentCard(backgroundColor = groupBackground(group.role)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.Top,
             ) {
                 ConversationAuthorColumn(group.role)
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     visibleMessages.asReversed().forEach { item ->
                         key(item.stableKey) {
                             ConversationMessageGroupContent(
@@ -128,25 +127,18 @@ internal fun TransientConversationMessageGroupRow(
     PanelContentCard(modifier = modifier, backgroundColor = groupBackground(message.role)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.Top,
         ) {
             ConversationAuthorColumn(message.role)
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                ConversationMessageContent(message, isStreamingPlaceholder = false, isStreaming = isStreaming)
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End)) {
-                    @Suppress("DEPRECATION")
-                    val clipboard = LocalClipboardManager.current
-                    ActionIconButton(
-                        icon = Icons.Filled.ContentCopy,
-                        description = "Copy ${message.role} message",
-                        modifier = Modifier.size(24.dp).alpha(0.6f),
-                        onClick = {
-                            clipboard.setText(AnnotatedString(message.content))
-                            onCopied()
-                        },
-                    )
-                }
+            Box(modifier = Modifier.weight(1f)) {
+                ConversationMessageContent(
+                    message = message,
+                    isStreamingPlaceholder = false,
+                    isStreaming = isStreaming,
+                    modifier = Modifier.padding(end = 30.dp),
+                )
+                ConversationCopyAction(message = message, onCopied = onCopied, modifier = Modifier.align(Alignment.TopEnd))
             }
         }
     }
@@ -161,21 +153,21 @@ private fun ConversationAuthorColumn(role: String) {
     Column(
         modifier = Modifier.width(ConversationAuthorColumnWidth),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Box(modifier = Modifier.size(28.dp).background(accent, CircleShape), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.size(24.dp).background(accent, CircleShape), contentAlignment = Alignment.Center) {
             Icon(
                 imageVector = if (isUser) Icons.Filled.Person else Icons.Filled.SmartToy,
                 contentDescription = "$label avatar",
                 tint = onAccent,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(16.dp),
             )
         }
-        Text(label, style = MaterialTheme.typography.labelMedium, color = accent, fontWeight = FontWeight.SemiBold)
     }
 }
 
 @Composable
+@OptIn(ExperimentalComposeUiApi::class)
 private fun ConversationMessageGroupContent(
     item: ConversationTimelineItem.Persisted,
     sending: Boolean,
@@ -185,43 +177,34 @@ private fun ConversationMessageGroupContent(
     onRetry: () -> Unit,
 ) {
     val message = item.message
-    ConversationMessageContent(message, isStreamingPlaceholder = false, isStreaming = false)
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End)) {
-        @Suppress("DEPRECATION")
-        val clipboard = LocalClipboardManager.current
-        ActionIconButton(
-            icon = Icons.Filled.ContentCopy,
-            description = "Copy ${message.role} message",
-            modifier = Modifier.size(24.dp).alpha(0.6f),
-            onClick = {
-                clipboard.setText(AnnotatedString(message.content))
-                onStatusChange("Copied ${message.role} message")
-            },
+    var hovered by remember(message.id) { mutableStateOf(false) }
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .onPointerEvent(PointerEventType.Enter) { hovered = true }
+                .onPointerEvent(PointerEventType.Exit) { hovered = false },
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        ConversationMessageContent(
+            message = message,
+            isStreamingPlaceholder = false,
+            isStreaming = false,
+            modifier = Modifier.weight(1f),
         )
-        if (message.role == "user" && !sending) {
-            ActionIconButton(
-                icon = Icons.Filled.Edit,
-                description = "Edit user message",
-                modifier = Modifier.size(24.dp).alpha(0.6f),
-                onClick = { onEditMessage(message.id) },
-            )
-        }
-        message.id?.let { messageId ->
-            ActionIconButton(
-                icon = Icons.Filled.Delete,
-                description = "Delete ${message.role} message",
-                modifier = Modifier.size(24.dp).alpha(0.6f),
-                onClick = { onDeleteMessage(messageId) },
-            )
-        }
-        if (message.role == "assistant" && !sending) {
-            ActionIconButton(
-                icon = Icons.Filled.Refresh,
-                description = "Retry from previous user message",
-                modifier = Modifier.size(24.dp).alpha(0.6f),
-                onClick = onRetry,
-            )
-        }
+        conversationMessageActionMenu(
+            message = message,
+            canEdit = message.role == "user" && !sending,
+            canDelete = message.id != null,
+            canRetry = message.role == "assistant" && !sending,
+            onEdit = { onEditMessage(message.id) },
+            onDelete = { message.id?.let(onDeleteMessage) },
+            onRetry = onRetry,
+            onCopied = { onStatusChange("Copied ${message.role} message") },
+            timestamp = message.createdAtEpochMillis,
+            showTimestamp = hovered,
+        )
     }
 }
 

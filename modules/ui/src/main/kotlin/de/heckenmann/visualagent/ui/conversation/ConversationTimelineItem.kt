@@ -75,7 +75,11 @@ internal fun buildConversationTimeline(
         if (showWaitingIndicator) add(ConversationTimelineItem.Waiting)
         if (streamingContent.isNotEmpty()) add(ConversationTimelineItem.Streaming(streamingContent))
         if (pendingUserMessage != null) add(ConversationTimelineItem.PendingUser(pendingUserMessage))
-        val persisted = history.indices.reversed().map { index -> ConversationTimelineItem.Persisted(history[index], index) }
+        val uniqueHistory = history.distinctPersistedMessages()
+        val persisted =
+            uniqueHistory.indices.reversed().map { index ->
+                ConversationTimelineItem.Persisted(uniqueHistory[index], index)
+            }
         val cards =
             (todos.map { todo -> todo to false } + deletedTodoSnapshots.values.map { todo -> todo to true })
                 .distinctBy { (todo, _) -> todo.id }
@@ -86,21 +90,38 @@ internal fun buildConversationTimeline(
                         deleted = deleted,
                     )
                 }
+        val messageEntries: List<TimelineEntry<ConversationTimelineItem>> =
+            persisted.mapIndexed { index, item ->
+                TimelineEntry<ConversationTimelineItem>(
+                    sequence = item.message.timelineSequence ?: 0,
+                    timestamp = item.message.createdAtEpochMillis ?: Long.MIN_VALUE + (persisted.size - index),
+                    typeRank = 0,
+                    fallbackOrder = index,
+                    item = item,
+                )
+            }
+        val todoEntries: List<TimelineEntry<ConversationTimelineItem>> =
+            cards.mapIndexed { index, item ->
+                TimelineEntry<ConversationTimelineItem>(
+                    sequence = item.todo.timelineSequence,
+                    timestamp =
+                        item.todo.updatedAt?.toEpochMilli()
+                            ?: item.todo.createdAt?.toEpochMilli()
+                            ?: Long.MIN_VALUE / 2 + index,
+                    typeRank = 1,
+                    fallbackOrder = index,
+                    item = item,
+                )
+            }
+        val entries = messageEntries + todoEntries
         val merged =
-            (
-                persisted.mapIndexed { index, item ->
-                    TimelineEntry(item.message.createdAtEpochMillis ?: Long.MIN_VALUE + (persisted.size - index), item)
-                } +
-                    cards.mapIndexed { index, item ->
-                        TimelineEntry(
-                            item.todo.updatedAt?.toEpochMilli()
-                                ?: item.todo.createdAt?.toEpochMilli()
-                                ?: Long.MIN_VALUE / 2 + index,
-                            item,
-                        )
-                    }
-            ).sortedByDescending { it.timestamp }
-                .map { it.item }
+            entries
+                .sortedWith(
+                    compareByDescending<TimelineEntry<ConversationTimelineItem>> { it.sequence }
+                        .thenByDescending { it.timestamp }
+                        .thenByDescending { it.typeRank }
+                        .thenBy { it.fallbackOrder },
+                ).map { it.item }
         var messageRun = mutableListOf<ConversationTimelineItem.Persisted>()
 
         /** Flushes the current consecutive message run into grouped timeline items. */
@@ -132,6 +153,9 @@ internal fun buildConversationTimeline(
     }
 
 private data class TimelineEntry<T>(
+    val sequence: Long,
     val timestamp: Long,
+    val typeRank: Int,
+    val fallbackOrder: Int,
     val item: T,
 )

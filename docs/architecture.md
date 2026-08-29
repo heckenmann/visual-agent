@@ -306,6 +306,12 @@ must create or message a sub-agent, and that sub-agent can use the
 
 ## Current Constraints
 
+### Code Quality Constraints
+
+`@Suppress` annotations are permitted only in test sources. Production code must address the
+underlying warning or violation through an explicit implementation, API, or structural change;
+it must not silence it.
+
 The build includes automated `locAndPackageSizeCheck` during `check` and blocks files above the
 300 effective-LOC limit. `desktopApiUsageCheck` blocks any new `java.awt`/`javax.swing`/
 JavaFX/AWT image I/O source references. The single

@@ -93,7 +93,7 @@ internal fun ReorderableColumnScope.TodoRow(
                     )
                     TodoMetaLine(todo = todo, isNext = isNext, agentName = agentName)
                     TodoStreamingResponse(
-                        visible = todo.status == TodoState.IN_PROGRESS || responseState.text.isNotBlank(),
+                        visible = todo.status == TodoState.IN_PROGRESS,
                         working = todo.status == TodoState.IN_PROGRESS,
                         responseState = responseState,
                         modalRequester = modalRequester,

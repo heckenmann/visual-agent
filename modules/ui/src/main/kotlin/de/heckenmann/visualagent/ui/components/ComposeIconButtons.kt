@@ -72,6 +72,7 @@ internal fun ActionTooltip(
  * @param modifier Compose modifier
  * @param enabled Whether the button accepts input
  * @param selected Whether the button shows the active/mode-selected highlight
+ * @param tooltipDescription Optional visual tooltip; the accessibility description is always retained
  * @param iconSize Icon size
  * @param onLongClick Optional long-click handler
  */
@@ -83,12 +84,13 @@ internal fun ActionIconButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     selected: Boolean = false,
+    tooltipDescription: String? = description,
     iconSize: Dp = 17.dp,
     onLongClick: (() -> Unit)? = null,
 ) {
     val backgroundColor = if (selected) MaterialTheme.colorScheme.tertiaryContainer else Color.Transparent
     val iconTint = if (selected) MaterialTheme.colorScheme.tertiary else LocalContentColor.current
-    ActionTooltip(description = description) {
+    val actionButton: @Composable () -> Unit = {
         Box(
             modifier =
                 modifier
@@ -110,5 +112,10 @@ internal fun ActionIconButton(
                 tint = if (enabled) iconTint else LocalContentColor.current,
             )
         }
+    }
+    if (tooltipDescription == null) {
+        actionButton()
+    } else {
+        ActionTooltip(description = tooltipDescription) { actionButton() }
     }
 }

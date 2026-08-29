@@ -22,7 +22,7 @@ Desktop user.
    - The content of the last assistant message grows during streaming.
 3. The conversation timeline detects new content and asks the scroll coordinator to follow the latest item after layout.
 4. While the user is following the newest message, each visible assistant update and structural viewport-size change keeps the newest content visible.
-5. If the user browses older history, viewport changes preserve that position instead of forcing the list back to the newest message.
+5. If the user browses older history, viewport changes preserve that position instead of forcing the list back to the newest message. New content raises a compact **New messages** control instead.
 6. User input invalidates pending programmatic navigation immediately, but enters history-browsing mode only after it actually moves the list.
 7. Follow mode is restored only after Compose publishes an actual return to index 0 with zero offset.
 8. A fixed composer reserves space below the timeline and does not change list padding or schedule delayed resize navigation.
@@ -54,6 +54,7 @@ The conversation panel follows the latest message automatically without overridi
 - When the last message content changes during streaming the list scrolls to the bottom.
 - When the structural timeline viewport changes height while the list is at the newest end, the newest message remains visible.
 - When the user is browsing older history, composer and panel size changes preserve the browsed position.
+- While browsing older history, new messages and streaming updates do not move the viewport; the **New messages** control navigates explicitly to the latest content.
 - The fixed composer reserves layout space instead of overlaying the timeline or feeding its measured height back into list padding.
 - No fixed delay or retry loop is used for viewport resize navigation.
 - Pointer input that consumes no scroll distance must not leave the coordinator in history-browsing mode.

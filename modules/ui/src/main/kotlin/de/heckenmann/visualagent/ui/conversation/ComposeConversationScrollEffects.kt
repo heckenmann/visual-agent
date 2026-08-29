@@ -68,22 +68,26 @@ internal fun ConversationScrollOnChangeEffect(
     pendingUserMessage: String? = null,
     streamingContent: String = "",
     isAtLatest: Boolean = listState.conversationPosition().isAtLatest,
+    onNewContentWhileBrowsing: () -> Unit = {},
 ) {
     var lastCount by remember { mutableStateOf(history.size) }
     var lastNewestMessage by remember { mutableStateOf(history.lastOrNull()) }
     var lastPendingUserMessage by remember { mutableStateOf(pendingUserMessage) }
     var lastStreamingContent by remember { mutableStateOf(streamingContent) }
-    LaunchedEffect(history.size, pendingUserMessage, streamingContent) {
+    val newestMessage = history.lastOrNull()
+    LaunchedEffect(history.size, newestMessage?.id, newestMessage?.timelineSequence, pendingUserMessage, streamingContent, isAtLatest) {
         val appendedLatestHistory =
-            history.isNotEmpty() && history.size > lastCount && history.lastOrNull() != lastNewestMessage
+            history.isNotEmpty() && newestMessage != lastNewestMessage
         val displayedPendingMessage = pendingUserMessage != null && pendingUserMessage != lastPendingUserMessage
         val updatedStreamingContent = streamingContent.isNotEmpty() && streamingContent != lastStreamingContent
         if (isAtLatest && (appendedLatestHistory || displayedPendingMessage || updatedStreamingContent)) {
             withFrameNanos { }
             listState.scrollToBottom()
+        } else if (!isAtLatest && (appendedLatestHistory || displayedPendingMessage || updatedStreamingContent)) {
+            onNewContentWhileBrowsing()
         }
         lastCount = history.size
-        lastNewestMessage = history.lastOrNull()
+        lastNewestMessage = newestMessage
         lastPendingUserMessage = pendingUserMessage
         lastStreamingContent = streamingContent
     }

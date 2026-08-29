@@ -2,12 +2,10 @@ package de.heckenmann.visualagent.agent.conversation
 
 import de.heckenmann.visualagent.agent.AgentJobResult
 import de.heckenmann.visualagent.agent.AgentManager
-import de.heckenmann.visualagent.agent.AgentStatus
 import de.heckenmann.visualagent.agent.CancellationToken
 import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ProviderTurnResponse
-import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.agent.text.ResponseRepetitionGuard
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolCallPhase
@@ -28,7 +26,6 @@ internal class AgentManagerConversationOps(
     private val historyOps = AgentConversationHistoryOps(owner, ::buildMainRequest)
 
     internal fun persist(message: Message): Message {
-        val createdAt = Instant.now().toEpochMilli()
         val id =
             owner.conversationStore.saveConversationMessage(
                 AgentManager.MAIN_SESSION_ID,
@@ -36,7 +33,13 @@ internal class AgentManagerConversationOps(
                 message.content,
                 message.metadata,
             )
-        val persisted = message.copy(id = id, createdAtEpochMillis = createdAt)
+        val record = owner.conversationStore.getConversationMessage(id)
+        val persisted =
+            message.copy(
+                id = id,
+                createdAtEpochMillis = record?.createdAt?.toEpochMilli() ?: Instant.now().toEpochMilli(),
+                timelineSequence = record?.timelineSequence,
+            )
         owner.conversationHistory.add(persisted)
         return persisted
     }
@@ -56,7 +59,7 @@ internal class AgentManagerConversationOps(
         content: String,
     ): AgentJobResult {
         val agent = owner.subAgentOpsProvider.getSubAgent(agentId) ?: throw IllegalArgumentException("Agent not found: $agentId")
-        return executeAgentJob(agent, content)
+        return owner.executeSubAgentJob(agent, content)
     }
 
     suspend fun startAgentJob(
@@ -66,7 +69,7 @@ internal class AgentManagerConversationOps(
         content: String,
     ): AgentJobResult {
         val agent = owner.createAgent(name, role, templateName)
-        return executeAgentJob(agent, content)
+        return owner.executeSubAgentJob(agent, content)
     }
 
     fun notifyMainAgentOfJobCompletion(
@@ -308,39 +311,5 @@ internal class AgentManagerConversationOps(
         val todos = owner.todoStore.listTodos()
         return de.heckenmann.visualagent.agent.context.MainSystemPromptComposer
             .compose(todos, owner.pendingResumeMessage, owner.agentToolConfigService, owner.appConfig.userModelInstruction)
-    }
-
-    private suspend fun executeAgentJob(
-        agent: SubAgent,
-        content: String,
-    ): AgentJobResult {
-        owner.activeJobsByAgentId.compute(agent.id) { _, count -> (count ?: 0) + 1 }
-        agent.status = AgentStatus.BUSY
-        agent.currentTask = content
-        agent.currentTodoId = null
-        owner.saveSubAgent(agent)
-        owner.agentStatusCallbackAdapter.notify(agent.id, "STATUS:${agent.status.name}")
-        return try {
-            val response =
-                agent.chat(
-                    messages = listOf(Message("user", content)),
-                    provider = owner.llmProvider,
-                    enabledTools = owner.agentToolConfigService.toolsFor(agent),
-                )
-            AgentJobResult(agent.id, agent.name, response.message.content)
-        } finally {
-            val remainingJobs =
-                owner.activeJobsByAgentId.compute(agent.id) { _, count ->
-                    val remaining = (count ?: 1) - 1
-                    remaining.takeIf { it > 0 }
-                } ?: 0
-            agent.status = if (remainingJobs > 0) AgentStatus.BUSY else AgentStatus.IDLE
-            if (remainingJobs == 0) {
-                agent.currentTask = null
-            }
-            agent.currentTodoId = null
-            owner.saveSubAgent(agent)
-            owner.agentStatusCallbackAdapter.notify(agent.id, "STATUS:${agent.status.name}")
-        }
     }
 }

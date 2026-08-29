@@ -3,6 +3,7 @@ package de.heckenmann.visualagent
 import org.junit.jupiter.api.Test
 import org.springframework.boot.WebApplicationType
 import org.springframework.boot.builder.SpringApplicationBuilder
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class ApplicationStartupTest {
@@ -17,6 +18,7 @@ class ApplicationStartupTest {
                 ).run()
         try {
             assertTrue(context.isActive)
+            assertEquals("off", context.environment.getProperty("spring.main.banner-mode"))
         } finally {
             context.close()
         }

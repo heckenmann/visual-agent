@@ -25,8 +25,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.ui.modal.ComposeModalRequester
 
-private const val TODO_RESPONSE_WINDOW_CHARS = 180
-
 /**
  * Shows the latest response text while a todo is being processed.
  *
@@ -59,7 +57,11 @@ internal fun TodoStreamingResponse(
                     .padding(horizontal = 8.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 if (working) TodoWorkingIndicator()
                 if (responseState.text.isBlank()) {
                     Text(
@@ -81,15 +83,3 @@ internal fun TodoStreamingResponse(
         }
     }
 }
-
-/**
- * Keeps only the newest response characters for the fixed-width streaming window.
- *
- * @param response Complete response text received so far
- * @param maxChars Maximum number of visible characters
- * @return Newest response suffix
- */
-internal fun todoResponseWindow(
-    response: String,
-    maxChars: Int = TODO_RESPONSE_WINDOW_CHARS,
-): String = response.takeLast(maxChars.coerceAtLeast(1))

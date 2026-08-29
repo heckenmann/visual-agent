@@ -89,6 +89,8 @@ class TestPersistence internal constructor(
         metadata: String?,
     ): String = conversationStore.saveConversationMessage(sessionId, role, content, metadata)
 
+    override fun getConversationMessage(id: String) = conversationStore.getConversationMessage(id)
+
     override fun getConversationMessages(
         sessionId: String,
         limit: Int,

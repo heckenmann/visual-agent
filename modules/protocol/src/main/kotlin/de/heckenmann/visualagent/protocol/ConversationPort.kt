@@ -11,6 +11,7 @@ data class ConversationMessage(
     val images: List<String>? = null,
     val id: String? = null,
     val createdAtEpochMillis: Long? = null,
+    val timelineSequence: Long? = null,
     val reasoning: String? = null,
     val telemetry: ConversationResponseTelemetry? = null,
 )

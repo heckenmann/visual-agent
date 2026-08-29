@@ -19,7 +19,7 @@ Desktop user.
 
 ## Main Flow
 
-1. The user scrolls up to read older messages, which makes the scroll-to-bottom button appear.
+1. The user scrolls up to read older messages, which makes the scroll-to-bottom button appear. When newer content arrives while browsing, the control is labelled **New messages**.
 2. While the user is reading, a background process persists one or more new messages to the database.
 3. The immutable conversation UI snapshot does not yet contain those new messages.
 4. The user clicks the scroll-to-bottom button.

@@ -75,7 +75,13 @@ class SpringTodoPort(
 
     override fun addListener(listener: (TodoChange) -> Unit): AutoCloseable =
         todoEventBus.addListener { change ->
-            listener(TodoChange(todo = change.todo?.toTodoItem(), todoId = change.todoId))
+            listener(
+                TodoChange(
+                    todo = change.todo?.toTodoItem(),
+                    todoId = change.todoId,
+                    removed = change.type == de.heckenmann.visualagent.todo.TodoChangeType.REMOVED,
+                ),
+            )
         }
 
     override fun addProgressListener(listener: (TodoProgress) -> Unit): AutoCloseable =
@@ -101,6 +107,7 @@ private fun Todo.toTodoItem(): TodoItem =
         assignedAgentId = assignedAgentId,
         createdAt = createdAt,
         updatedAt = updatedAt,
+        timelineSequence = timelineSequence,
         completedAt = completedAt,
         dueDate = dueDate,
     )

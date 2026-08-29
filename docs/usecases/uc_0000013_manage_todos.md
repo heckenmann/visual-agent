@@ -54,6 +54,9 @@ Todos stay synchronized between UI, database, and agent context.
 - The panel provides start-all and stop-all controls for unfinished todos.
 - Each todo row provides start and stop controls with status-appropriate enablement.
 - An in-progress todo row expands with an animated one-line LLM response preview. Supported streaming models move newer text in from the right and older text out to the left; providers without streaming support use the complete-response fallback.
+- The animated working indicator is vertically centered with the one-line streaming response.
+- The streaming response preview is visible only while the todo is `IN_PROGRESS` and disappears when execution reaches a terminal status.
+- The one-line preview measures the available text width, keeps the newest response suffix visible at the right edge, and recalculates that suffix when the user resizes the Todo panel.
 - Start and stop actions never change or restart todos that are already `COMPLETED`.
 - Todos can be reordered by dragging the row drag handle.
 - The first pending todo is visually highlighted as the next task.

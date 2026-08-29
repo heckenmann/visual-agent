@@ -65,8 +65,6 @@ internal fun MessageRow(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    @Suppress("DEPRECATION")
-    val clipboard = LocalClipboardManager.current
     val isUser = message.role == "user"
     val accent = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
     val background =
@@ -94,15 +92,7 @@ internal fun MessageRow(
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
-                ActionIconButton(
-                    icon = Icons.Filled.ContentCopy,
-                    description = "Copy ${message.role} message",
-                    modifier = Modifier.size(24.dp).alpha(0.6f),
-                    onClick = {
-                        clipboard.setText(AnnotatedString(message.content))
-                        onCopied()
-                    },
-                )
+                ConversationCopyAction(message = message, onCopied = onCopied)
                 if (canEdit) {
                     ActionIconButton(
                         icon = Icons.Filled.Edit,
@@ -133,15 +123,37 @@ internal fun MessageRow(
     }
 }
 
+/** Copies one conversation message without changing its timeline state. */
+@Composable
+internal fun ConversationCopyAction(
+    message: Message,
+    onCopied: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    @Suppress("DEPRECATION")
+    val clipboard = LocalClipboardManager.current
+    ActionIconButton(
+        icon = Icons.Filled.ContentCopy,
+        description = "Copy ${message.role} message",
+        tooltipDescription = null,
+        modifier = modifier.size(24.dp).alpha(0.6f),
+        onClick = {
+            clipboard.setText(AnnotatedString(message.content))
+            onCopied()
+        },
+    )
+}
+
 @Composable
 internal fun ConversationMessageContent(
     message: Message,
     isStreamingPlaceholder: Boolean,
     isStreaming: Boolean,
+    modifier: Modifier = Modifier,
 ) {
     val parsed = parseThinkingMarkup(message.content)
     val thinking = listOfNotNull(message.reasoning, parsed.thinking.takeIf(String::isNotBlank)).joinToString("\n\n").trim()
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (thinking.isNotBlank()) {
             ThinkingRow(content = thinking, isStreaming = isStreaming)
         }

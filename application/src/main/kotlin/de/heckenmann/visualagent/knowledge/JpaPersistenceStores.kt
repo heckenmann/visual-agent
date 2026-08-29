@@ -1,9 +1,7 @@
 package de.heckenmann.visualagent.knowledge
 
-import de.heckenmann.visualagent.agent.config.SubAgentToolConfig
 import de.heckenmann.visualagent.todo.Todo
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.springframework.data.domain.PageRequest
@@ -77,6 +75,7 @@ internal class JpaPreferenceStore(
 @Service
 internal class JpaConversationStore(
     private val repository: ConversationRepository,
+    private val timelineSequenceStore: ConversationTimelineSequenceStore,
 ) : ConversationStore {
     @Transactional
     override fun saveConversationMessage(
@@ -94,10 +93,14 @@ internal class JpaConversationStore(
                 content = content,
                 metadata = metadata,
                 createdAt = Instant.now(),
+                timelineSequence = timelineSequenceStore.next(),
             ),
         )
         return id
     }
+
+    @Transactional(readOnly = true)
+    override fun getConversationMessage(id: String): ConversationRecord? = repository.findByIdOrNull(id)?.toRecord()
 
     @Transactional(readOnly = true)
     override fun getConversationMessages(
@@ -105,7 +108,7 @@ internal class JpaConversationStore(
         limit: Int,
     ): List<ConversationRecord> =
         repository
-            .findBySessionIdOrderByCreatedAtDescIdDesc(sessionId, PageRequest.of(0, limit.coerceAtLeast(1)))
+            .findBySessionIdOrderByTimelineSequenceDescCreatedAtDescIdDesc(sessionId, PageRequest.of(0, limit.coerceAtLeast(1)))
             .asReversed()
             .map(ConversationEntity::toRecord)
 
@@ -163,10 +166,21 @@ internal class JpaConversationStore(
 internal class JpaTodoStore(
     private val repository: TodoRepository,
     private val deletedArchive: DeletedTodoArchive,
+    private val timelineSequenceStore: ConversationTimelineSequenceStore,
 ) : TodoStore {
     @Transactional
     override fun saveTodo(todo: Todo) {
+        todo.timelineSequence = timelineSequenceStore.next()
         repository.save(todo.toEntity())
+    }
+
+    @Transactional
+    override fun updateTodoPositions(todos: List<Todo>) {
+        if (todos.isEmpty()) return
+        val positionsById = todos.associate { it.id to it.position }
+        repository.findAllById(positionsById.keys).forEach { entity ->
+            positionsById[entity.id]?.let { position -> entity.position = position }
+        }
     }
 
     @Transactional
@@ -178,6 +192,7 @@ internal class JpaTodoStore(
                     normalizedDescription
             }
         if (existing != null) return TodoCreation(existing.toDomain(), created = false)
+        todo.timelineSequence = timelineSequenceStore.next()
         repository.save(todo.toEntity())
         return TodoCreation(todo, created = true)
     }
@@ -189,9 +204,11 @@ internal class JpaTodoStore(
     override fun deleteTodo(todoId: String) = repository.deleteById(todoId)
 
     @Transactional
-    override fun deleteTodoAndArchive(todo: Todo) {
+    override fun deleteTodoAndArchive(todo: Todo): Todo {
+        todo.timelineSequence = timelineSequenceStore.next()
         deletedArchive.archive(todo)
         repository.deleteById(todo.id)
+        return todo
     }
 
     @Transactional(readOnly = true)
@@ -250,35 +267,6 @@ internal class JpaSubAgentStore(
     }
 }
 
-@Service
-internal class JpaSubAgentConfigStore(
-    private val repository: SubAgentConfigRepository,
-) : SubAgentConfigStore {
-    @Transactional
-    override fun saveSubAgentConfig(config: SubAgentToolConfig) {
-        val createdAt = repository.findById(config.id).orElse(null)?.createdAt ?: Instant.now()
-        repository.save(
-            SubAgentConfigEntity(
-                id = config.id,
-                name = config.name,
-                description = config.description,
-                model = config.model,
-                systemPrompt = config.systemPrompt,
-                tools = Json.encodeToString(config.tools),
-                maxTurns = config.maxTurns,
-                enabled = config.enabled,
-                createdAt = createdAt,
-            ),
-        )
-    }
-
-    @Transactional(readOnly = true)
-    override fun getSubAgentConfig(id: String): SubAgentToolConfig? = repository.findById(id).orElse(null)?.toDomain()
-
-    @Transactional(readOnly = true)
-    override fun listSubAgentConfigs(): List<SubAgentToolConfig> = repository.findAllByOrderByIdAsc().map(SubAgentConfigEntity::toDomain)
-}
-
 @Serializable
 private data class StructuredKnowledge(
     val subject: String,
@@ -295,7 +283,7 @@ private fun MemoryEntity.toDomain(): Memory =
         embedding = embedding,
     )
 
-private fun ConversationEntity.toRecord(): ConversationRecord = ConversationRecord(id, role, content, metadata, createdAt)
+private fun ConversationEntity.toRecord(): ConversationRecord = ConversationRecord(id, role, content, metadata, createdAt, timelineSequence)
 
 private fun PersistedSubAgent.toEntity(originalCreatedAt: Instant): SubAgentEntity =
     SubAgentEntity(
@@ -312,18 +300,6 @@ private fun PersistedSubAgent.toEntity(originalCreatedAt: Instant): SubAgentEnti
 
 private fun SubAgentEntity.toRecord(): PersistedSubAgent =
     PersistedSubAgent(id, name, role, status, currentTask, parentAgentId, config, createdAt, updatedAt)
-
-private fun SubAgentConfigEntity.toDomain(): SubAgentToolConfig =
-    SubAgentToolConfig(
-        id = id,
-        name = name,
-        description = description,
-        model = model,
-        systemPrompt = systemPrompt,
-        tools = runCatching { Json.decodeFromString<List<String>>(tools) }.getOrElse { emptyList() },
-        maxTurns = maxTurns,
-        enabled = enabled,
-    )
 
 private fun isSafeFtsQuery(query: String): Boolean =
     query.isNotBlank() &&

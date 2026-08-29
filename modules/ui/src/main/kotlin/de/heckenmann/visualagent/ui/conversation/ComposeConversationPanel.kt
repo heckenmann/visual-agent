@@ -77,6 +77,7 @@ internal fun ConversationPanel(
     onScrollStateObserved?.invoke(conversationState, listState)
     RegisterPanelScrollbar(rememberScrollbarAdapter(listState))
     var activeToken by remember { mutableStateOf<CancellationToken?>(null) }
+    var hasNewMessages by remember { mutableStateOf(false) }
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
     val preferences = remember(conversationPort) { conversationPort.preferences() }
     var inputPlacement by remember { mutableStateOf(preferences.inputPlacement) }
@@ -167,7 +168,11 @@ internal fun ConversationPanel(
         conversationState.pendingUserMessage,
         streamingContent,
         isAtLatest,
+        onNewContentWhileBrowsing = { hasNewMessages = true },
     )
+    LaunchedEffect(isAtLatest) {
+        if (isAtLatest) hasNewMessages = false
+    }
     val hasConversationContent =
         conversationState.history.isNotEmpty() ||
             todoState.todos.isNotEmpty() ||
@@ -265,6 +270,7 @@ internal fun ConversationPanel(
                 )
                 ConversationScrollToLatestArea(
                     isAtLatest = isAtLatest,
+                    hasNewMessages = hasNewMessages,
                     state = conversationState,
                     gateway = conversationGateway,
                     listState = listState,

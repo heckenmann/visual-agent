@@ -31,13 +31,21 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.TodoItem
@@ -112,15 +120,34 @@ internal fun TodoResponseSingleLine(
     modifier: Modifier = Modifier,
 ) {
     if (responseState.text.isBlank()) return
-    Text(
-        text = todoResponseWindow(responseState.text),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1,
-        softWrap = false,
-        overflow = TextOverflow.Clip,
-        modifier = modifier.fillMaxWidth(),
-    )
+    val line = todoStreamingLine(responseState.text)
+    val textStyle = MaterialTheme.typography.bodySmall
+    val textMeasurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val layoutDirection = LocalLayoutDirection.current
+    var availableWidthPx by remember { mutableIntStateOf(0) }
+    val displayedText =
+        remember(line, availableWidthPx, textStyle, density.density, density.fontScale, layoutDirection) {
+            fittedTextSuffix(line, availableWidthPx) { candidate ->
+                textMeasurer.measure(AnnotatedString(candidate), style = textStyle).size.width
+            }
+        }
+    Box(
+        modifier = modifier.onSizeChanged { availableWidthPx = it.width },
+        contentAlignment = Alignment.CenterEnd,
+    ) {
+        if (availableWidthPx > 0 && displayedText.isNotBlank()) {
+            Text(
+                text = displayedText,
+                style = textStyle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.End,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Clip,
+            )
+        }
+    }
 }
 
 /** Renders a compact animated indicator while a todo is actively executing. */

@@ -88,6 +88,7 @@ class ConversationScrollToLatestInteractionTest {
                     ConversationLatestPositionEffect(listState, coordinator)
                     ConversationScrollToLatestArea(
                         isAtLatest = isAtLatest,
+                        hasNewMessages = false,
                         state = state,
                         gateway = gateway,
                         listState = listState,

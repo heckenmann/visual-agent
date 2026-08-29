@@ -3,6 +3,8 @@ package de.heckenmann.visualagent.knowledge
 import jakarta.persistence.Column
 import jakarta.persistence.Convert
 import jakarta.persistence.Entity
+import jakarta.persistence.GeneratedValue
+import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.Lob
 import jakarta.persistence.Table
@@ -72,6 +74,17 @@ internal class ConversationEntity(
     @Convert(converter = InstantStringConverter::class)
     @Column(name = "created_at", columnDefinition = "TIMESTAMP")
     var createdAt: Instant = Instant.EPOCH,
+    @Column(name = "timeline_sequence", nullable = false)
+    var timelineSequence: Long = 0,
+)
+
+/** Allocates globally ordered activity identifiers within the SQLite database. */
+@Entity
+@Table(name = "conversation_timeline_sequence")
+internal class ConversationTimelineSequenceEntity(
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    var value: Long = 0,
 )
 
 @Entity
@@ -117,6 +130,8 @@ internal class TodoEntity(
     @Convert(converter = InstantStringConverter::class)
     @Column(name = "updated_at", columnDefinition = "TIMESTAMP")
     var updatedAt: Instant = Instant.EPOCH,
+    @Column(name = "timeline_sequence", nullable = false)
+    var timelineSequence: Long = 0,
     @Convert(converter = InstantStringConverter::class)
     @Column(name = "completed_at", columnDefinition = "TIMESTAMP")
     var completedAt: Instant? = null,
@@ -142,6 +157,8 @@ internal class DeletedTodoEntity(
     @Convert(converter = InstantStringConverter::class)
     @Column(name = "updated_at", columnDefinition = "TIMESTAMP")
     var updatedAt: Instant = Instant.EPOCH,
+    @Column(name = "timeline_sequence", nullable = false)
+    var timelineSequence: Long = 0,
     @Convert(converter = InstantStringConverter::class)
     @Column(name = "completed_at", columnDefinition = "TIMESTAMP")
     var completedAt: Instant? = null,

@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -293,5 +294,18 @@ class ConversationPanelRowsTest {
 
         composeTestRule.onNodeWithText("latest").assertExists()
         composeTestRule.onNodeWithText("first").assertDoesNotExist()
+        val titleBounds = composeTestRule.onNodeWithText("Thinking…").getUnclippedBoundsInRoot()
+        val previewBounds = composeTestRule.onNodeWithText("latest").getUnclippedBoundsInRoot()
+        assertTrue(previewBounds.top < titleBounds.bottom && titleBounds.top < previewBounds.bottom)
+    }
+
+    @Test
+    fun `collapsed thinking preview renders its latest line as markdown`() {
+        mount {
+            ThinkingRow(content = "first\n**latest**", isStreaming = false)
+        }
+
+        composeTestRule.onNodeWithText("latest").assertExists()
+        composeTestRule.onNodeWithText("**latest**").assertDoesNotExist()
     }
 }
