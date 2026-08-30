@@ -193,7 +193,7 @@ class OllamaClient(
 
     override suspend fun getModels(): List<String> = ops.getModels()
 
-    internal suspend fun getModels(profile: ProviderProfile): List<String> = ops.getModels(profile)
+    override suspend fun getModels(profile: ProviderProfile): List<String> = ops.getModels(profile)
 
     internal suspend fun getModelDetails(
         profile: ProviderProfile,

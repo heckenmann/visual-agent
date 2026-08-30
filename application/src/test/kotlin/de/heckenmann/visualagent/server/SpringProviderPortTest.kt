@@ -7,6 +7,7 @@ import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.protocol.ModelStatus
 import de.heckenmann.visualagent.protocol.ProviderAdapter
+import de.heckenmann.visualagent.protocol.ProviderProfile
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -121,6 +122,32 @@ class SpringProviderPortTest {
             coVerify { provider.getModels("ollama") }
             coVerify { provider.getModelDetails("ollama", "llama3") }
             verify { catalog.updateDiscoveredModels("ollama", listOf("llama3")) }
+        }
+
+    @Test
+    fun `staged model discovery does not update the catalog`() =
+        runTest {
+            val staged =
+                ProviderProfile(
+                    id = "staged",
+                    name = "Staged OpenAI",
+                    adapter = ProviderAdapter.OPENAI_COMPATIBLE,
+                    baseUrl = "https://staged.example.test",
+                    apiKey = "not-persisted",
+                )
+            coEvery { provider.getModels(any<ApplicationProviderProfile>()) } returns listOf("gpt-staged")
+
+            assertEquals("gpt-staged", port.discoverModels(staged).single().id)
+
+            coVerify {
+                provider.getModels(
+                    match<ApplicationProviderProfile> {
+                        it.id == "staged" && it.baseUrl == "https://staged.example.test" && it.apiKey == "not-persisted"
+                    },
+                )
+            }
+            verify(exactly = 0) { catalog.updateDiscoveredModels(any(), any()) }
+            verify(exactly = 0) { catalog.updateDiscoveredModelConfigs(any(), any()) }
         }
 
     @Test

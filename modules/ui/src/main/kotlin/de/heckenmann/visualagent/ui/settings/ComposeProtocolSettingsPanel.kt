@@ -58,17 +58,23 @@ internal fun settingsPanel(
         }
     }
 
-    /** Applies the complete local draft only after the user explicitly chooses Save. */
+    /** Applies only staged appearance fields while preserving newer settings from the server. */
     fun saveDraft() {
         if (!loaded || saving || !hasUnsavedChanges) return
         saving = true
         scope.launch {
-            runCatching { withContext(Dispatchers.IO) { settingsPort.save(draft) } }
-                .onSuccess {
-                    persisted = draft
-                    status = "Saved settings"
-                    onSettingsChanged()
-                }.onFailure { error -> status = error.toUiErrorMessage() }
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val merged = settingsPort.snapshot().withAppearanceFrom(draft)
+                    settingsPort.save(merged)
+                    merged
+                }
+            }.onSuccess { saved ->
+                persisted = saved
+                draft = saved
+                status = "Saved settings"
+                onSettingsChanged()
+            }.onFailure { error -> status = error.toUiErrorMessage() }
             saving = false
         }
     }
@@ -113,3 +119,12 @@ internal fun settingsPanel(
         }
     }
 }
+
+/** Replaces only persisted appearance values with those staged in the appearance settings panel. */
+internal fun SettingsSnapshot.withAppearanceFrom(appearance: SettingsSnapshot): SettingsSnapshot =
+    copy(
+        uiThemeMode = appearance.uiThemeMode,
+        fontSize = appearance.fontSize,
+        uiScalePercent = appearance.uiScalePercent,
+        showPanelLabels = appearance.showPanelLabels,
+    )

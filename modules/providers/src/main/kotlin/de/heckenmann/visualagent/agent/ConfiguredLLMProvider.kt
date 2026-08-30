@@ -6,6 +6,7 @@ import de.heckenmann.visualagent.agent.provider.ProfiledProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderEnvironmentCredentials
+import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import kotlinx.coroutines.flow.Flow
 import org.springframework.context.annotation.Primary
@@ -75,24 +76,20 @@ class ConfiguredLLMProvider(
 
     override suspend fun getModels(providerId: String): List<String> {
         val profile = providerCatalog.getProvider(providerId) ?: error("Provider not found: $providerId")
+        val discovered = discoverModelConfigs(profile)
         if (profile.adapter == ProviderAdapter.CODEX_CLI) {
-            val models = adapterFor(profile.adapter).loadModels(profile)
-            providerCatalog.updateDiscoveredModelConfigs(providerId, models)
-            return providerCatalog.selectableModels(providerId).map { it.id }
+            providerCatalog.updateDiscoveredModelConfigs(providerId, discovered)
+        } else {
+            providerCatalog.updateDiscoveredModels(providerId, discovered.map { it.id })
         }
-        val discovered =
-            when (profile.adapter) {
-                ProviderAdapter.OLLAMA -> ollamaClient.getModels(profile)
-                ProviderAdapter.OPENAI_COMPATIBLE -> openAiClient.getModels(profile)
-                ProviderAdapter.CODEX_CLI -> error("Profiled provider models are handled above")
-            }
-        providerCatalog.updateDiscoveredModels(providerId, discovered)
         if (profile.adapter == ProviderAdapter.OLLAMA) {
             val capabilities = fetchCapabilities(profile)
             providerCatalog.updateModelCapabilities(providerId, capabilities)
         }
         return providerCatalog.selectableModels(providerId).map { it.id }
     }
+
+    override suspend fun getModels(profile: ProviderProfile): List<String> = discoverModelConfigs(profile).map { it.id }
 
     override suspend fun getModelDetails(modelName: String): ShowResponse = getModelDetails(providerCatalog.activeProviderId(), modelName)
 
@@ -107,6 +104,14 @@ class ConfiguredLLMProvider(
             ProviderAdapter.CODEX_CLI -> adapterFor(profile.adapter).getModelDetails(profile, modelName)
         }
     }
+
+    private suspend fun discoverModelConfigs(profile: ProviderProfile): List<ProviderModelConfig> =
+        when (profile.adapter) {
+            ProviderAdapter.OLLAMA -> ollamaClient.getModels(profile).map(::ProviderModelConfig)
+            ProviderAdapter.OPENAI_COMPATIBLE ->
+                openAiClient.getModels(profile).map(::ProviderModelConfig)
+            ProviderAdapter.CODEX_CLI -> adapterFor(profile.adapter).loadModels(profile)
+        }
 
     private fun activeProviderSelection(): Pair<LLMProvider, String> {
         val providerId = providerCatalog.activeProviderId()

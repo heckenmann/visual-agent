@@ -15,6 +15,7 @@ import io.mockk.mockk
 import io.mockk.verify
 import org.junit.Rule
 import org.junit.Test
+import kotlin.test.assertEquals
 
 /** Verifies that UI settings are staged locally and can be reset from persisted state. */
 class ComposeProtocolSettingsPanelTest {
@@ -65,6 +66,18 @@ class ComposeProtocolSettingsPanelTest {
 
         composeTestRule.onNodeWithText("Reset changes").assertIsNotEnabled()
         verify(exactly = 0) { settings.save(any()) }
+    }
+
+    @Test
+    fun `appearance merge preserves newer conversation settings`() {
+        val current = SettingsSnapshot(fontSize = 14, contextLength = 20, timeoutSeconds = 120)
+        val appearanceDraft = SettingsSnapshot(fontSize = 18, contextLength = 5, timeoutSeconds = 30)
+
+        val merged = current.withAppearanceFrom(appearanceDraft)
+
+        assertEquals(18, merged.fontSize)
+        assertEquals(20, merged.contextLength)
+        assertEquals(120, merged.timeoutSeconds)
     }
 
     private fun settingsPort(snapshot: SettingsSnapshot): SettingsPort =

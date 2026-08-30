@@ -119,7 +119,7 @@ internal fun providerSettingsOverlay(
         if (refreshing || saving) return
         refreshing = true
         scope.launch {
-            runCatching { withContext(Dispatchers.IO) { providerPort.refreshModels(provider.id) } }
+            runCatching { withContext(Dispatchers.IO) { providerPort.discoverModels(provider) } }
                 .onSuccess { discovered ->
                     draft = draft.withModels(provider.id, discovered)
                     status = "Loaded ${discovered.size} selectable models"
@@ -258,22 +258,21 @@ private fun providerSettingsDraft(
         conversationSettings = settings,
     )
 
-private fun ProviderSettingsDraft.upsert(profile: ProviderProfile): ProviderSettingsDraft =
-    copy(providers = providers.filterNot { it.id == profile.id } + profile)
+/** Replaces one staged profile and retains a valid enabled provider/model selection. */
+internal fun ProviderSettingsDraft.upsert(profile: ProviderProfile): ProviderSettingsDraft =
+    copy(providers = providers.filterNot { it.id == profile.id } + profile).normalizeSelection()
 
-private fun ProviderSettingsDraft.remove(providerId: String): ProviderSettingsDraft {
-    val remaining = providers.filterNot { it.id == providerId }
+private fun ProviderSettingsDraft.remove(providerId: String): ProviderSettingsDraft =
+    copy(providers = providers.filterNot { it.id == providerId }).normalizeSelection()
+
+/** Keeps the draft selection aligned with an enabled provider and one of its selectable models. */
+internal fun ProviderSettingsDraft.normalizeSelection(): ProviderSettingsDraft {
     val nextProvider =
-        this.providerId.takeIf { id -> remaining.any { it.id == id && it.enabled } }
-            ?: remaining.firstOrNull(ProviderProfile::enabled)?.id.orEmpty()
-    val nextModel =
-        remaining
-            .firstOrNull { it.id == nextProvider }
-            ?.selectableModels()
-            ?.firstOrNull()
-            ?.id
-            .orEmpty()
-    return copy(providers = remaining, providerId = nextProvider, modelId = nextModel)
+        providerId.takeIf { id -> providers.any { it.id == id && it.enabled } }
+            ?: providers.firstOrNull(ProviderProfile::enabled)?.id.orEmpty()
+    val selectableModels = providers.firstOrNull { it.id == nextProvider }?.selectableModels().orEmpty()
+    val nextModel = modelId.takeIf { id -> selectableModels.any { it.id == id } } ?: selectableModels.firstOrNull()?.id.orEmpty()
+    return copy(providerId = nextProvider, modelId = nextModel)
 }
 
 private fun ProviderSettingsDraft.withModels(
