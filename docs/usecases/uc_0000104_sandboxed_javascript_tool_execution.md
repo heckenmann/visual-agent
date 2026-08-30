@@ -2,7 +2,7 @@
 
 ## Goal
 
-Allow an enabled agent to run a JavaScript program for deterministic multi-tool orchestration and local data processing without exposing host capabilities or sending intermediate results through another model turn.
+Allow an enabled agent to run a JavaScript program for deterministic multi-tool orchestration, bulk processing of many elements, and local data processing without exposing host capabilities or sending intermediate results through another model turn.
 
 ## Actors
 

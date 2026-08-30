@@ -166,7 +166,8 @@ data class SubAgent(
                         )
                         if (enabledTools.any { it.value == "javascript:execute" }) {
                             append(
-                                " Use javascript:execute for complex deterministic multi-tool filtering, aggregation, " +
+                                " Use javascript:execute for complex deterministic logic, bulk processing of many elements " +
+                                    "(mapping, filtering, transforming, deduplicating, sorting, or aggregating records), " +
                                     "or large CSV/Markdown assembly; call only enabled tools through " +
                                     "await tools.call(name, arguments), use workspace.write({path, content}) " +
                                     "for generated text that must be persisted, workspace.read({path}) to read " +
