@@ -98,7 +98,9 @@ internal fun ConversationPanel(
         buildConversationTimeline(
             history = conversationState.history,
             pendingUserMessage = conversationState.pendingUserMessage,
+            pendingUserEntryId = conversationState.pendingUserEntryId,
             streamingContent = streamingContent,
+            streamingEntryId = conversationState.streamingEntryId,
             showWaitingIndicator = showWaitingIndicator,
             showOlderHistoryLoading =
                 shouldShowOlderHistoryLoadingIndicator(
@@ -140,6 +142,9 @@ internal fun ConversationPanel(
                         onHistoryChange = conversationState::replaceHistory,
                         onActiveTokenChange = { activeToken = it },
                         onPendingUserMessageChange = { conversationState.pendingUserMessage = it },
+                        onPendingUserEntryIdChange = { conversationState.pendingUserEntryId = it },
+                        onStreamingEntryIdChange = { conversationState.streamingEntryId = it },
+                        onStreamCompletion = conversationState::completeStream,
                         streamingFlow = conversationState.streaming,
                     )
                 }

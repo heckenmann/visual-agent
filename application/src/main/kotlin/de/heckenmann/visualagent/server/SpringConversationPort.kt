@@ -15,6 +15,7 @@ import de.heckenmann.visualagent.protocol.ConversationMessage
 import de.heckenmann.visualagent.protocol.ConversationPort
 import de.heckenmann.visualagent.protocol.ConversationPreferences
 import de.heckenmann.visualagent.protocol.ConversationResponseTelemetry
+import de.heckenmann.visualagent.protocol.ConversationStreamRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -39,7 +40,7 @@ class SpringConversationPort(
         withContext(Dispatchers.IO) { protocolBoundary { agentManager.readOlderHistoryPage(offset).toConversationPage(mediaResolver) } }
 
     override suspend fun stream(
-        content: String,
+        request: ConversationStreamRequest,
         token: CancellationToken,
         onChunk: (String) -> Unit,
     ) {
@@ -47,7 +48,7 @@ class SpringConversationPort(
             protocolBoundary {
                 val applicationToken = ApplicationCancellationToken()
                 token.onCancelled(applicationToken::cancel)
-                agentManager.streamMessage(content, applicationToken, onChunk)
+                agentManager.streamMessage(request.content, applicationToken, onChunk, request.userEntryId, request.assistantEntryId)
             }
         }
     }

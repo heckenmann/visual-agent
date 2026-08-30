@@ -37,8 +37,8 @@ class ConversationTodoTimelineTest {
                 todos = listOf(todo.copy(status = TodoState.COMPLETED, updatedAt = Instant.ofEpochMilli(4_000))),
             )
 
-        assertEquals(listOf("message:new", "todo:todo-1", "message:old"), pending.map { it.stableKey })
-        assertEquals(listOf("todo:todo-1", "message:new", "message:old"), completed.map { it.stableKey })
+        assertEquals(listOf("new", "todo:todo-1", "old"), pending.map { it.stableKey })
+        assertEquals(listOf("todo:todo-1", "new", "old"), completed.map { it.stableKey })
         assertTrue(completed.any { it is ConversationTimelineItem.TodoCard && it.todo.status == TodoState.COMPLETED })
     }
 
@@ -63,7 +63,7 @@ class ConversationTodoTimelineTest {
 
         val items = buildConversationTimeline(listOf(user), null, "", false, false, false, todos = listOf(todo))
 
-        assertEquals(listOf("todo:todo-3", "message:user"), items.map { it.stableKey })
+        assertEquals(listOf("todo:todo-3", "user"), items.map { it.stableKey })
     }
 
     @Test
@@ -73,7 +73,7 @@ class ConversationTodoTimelineTest {
 
         val items = buildConversationTimeline(listOf(user), null, "", false, false, false, todos = listOf(todo))
 
-        assertEquals(listOf("todo:todo-4", "message:user"), items.map { it.stableKey })
+        assertEquals(listOf("todo:todo-4", "user"), items.map { it.stableKey })
     }
 
     @Test

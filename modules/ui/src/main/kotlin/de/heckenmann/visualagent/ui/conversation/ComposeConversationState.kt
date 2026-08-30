@@ -39,6 +39,8 @@ internal class ConversationUiState(
     var editingId: String? by mutableStateOf(null)
     var deletingMessageIds: Set<String> by mutableStateOf(emptySet())
     var pendingUserMessage: String? by mutableStateOf(null)
+    var pendingUserEntryId: String? by mutableStateOf(null)
+    var streamingEntryId: String? by mutableStateOf(null)
     var isLoadingOlder by mutableStateOf(false)
         private set
     var hasMoreHistory by mutableStateOf(true)
@@ -51,6 +53,19 @@ internal class ConversationUiState(
     fun replaceHistory(messages: List<Message>) {
         historyGeneration++
         history = messages.distinctPersistedMessages()
+        isLoadingOlder = false
+        hasMoreHistory = history.isNotEmpty()
+        reachedOldestHistory = false
+    }
+
+    /** Atomically replaces transient entries with their persisted counterparts after one stream completes. */
+    fun completeStream(messages: List<Message>) {
+        historyGeneration++
+        history = messages.distinctPersistedMessages()
+        pendingUserMessage = null
+        pendingUserEntryId = null
+        streamingEntryId = null
+        streaming.value = ""
         isLoadingOlder = false
         hasMoreHistory = history.isNotEmpty()
         reachedOldestHistory = false

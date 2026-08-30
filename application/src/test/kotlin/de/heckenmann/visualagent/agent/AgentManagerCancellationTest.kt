@@ -43,7 +43,7 @@ class AgentManagerCancellationTest {
             val token = CancellationToken()
             val streamJob =
                 launch {
-                    manager.streamMessage("hello", token) { }
+                    manager.streamMessage("hello", token, {}, "user-id", "assistant-id")
                 }
             try {
                 streamEntered.await()

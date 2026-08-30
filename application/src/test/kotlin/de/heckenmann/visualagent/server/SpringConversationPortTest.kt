@@ -134,7 +134,7 @@ class SpringConversationPortTest {
     @Test
     fun `stream cancellation is bridged to application token`() =
         runTest {
-            coEvery { manager.streamMessage(any(), any(), any()) } coAnswers {
+            coEvery { manager.streamMessage(any(), any(), any(), any(), any()) } coAnswers {
                 thirdArg<(String) -> Unit>().invoke("delta")
                 "delta"
             }
@@ -145,7 +145,7 @@ class SpringConversationPortTest {
             token.cancel()
 
             assertEquals(listOf("delta"), chunks)
-            coVerify(exactly = 1) { manager.streamMessage("hello", any(), any()) }
+            coVerify(exactly = 1) { manager.streamMessage("hello", any(), any(), any(), any()) }
         }
 
     @Test

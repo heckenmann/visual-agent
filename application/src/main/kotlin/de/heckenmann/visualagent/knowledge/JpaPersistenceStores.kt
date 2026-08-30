@@ -77,14 +77,22 @@ internal class JpaConversationStore(
     private val repository: ConversationRepository,
     private val timelineSequenceStore: ConversationTimelineSequenceStore,
 ) : ConversationStore {
-    @Transactional
     override fun saveConversationMessage(
         sessionId: String,
         role: String,
         content: String,
         metadata: String?,
+    ): String = saveConversationMessage(UUID.randomUUID().toString(), sessionId, role, content, metadata)
+
+    @Transactional
+    override fun saveConversationMessage(
+        id: String,
+        sessionId: String,
+        role: String,
+        content: String,
+        metadata: String?,
     ): String {
-        val id = UUID.randomUUID().toString()
+        require(repository.findByIdOrNull(id) == null) { "Conversation message $id already exists" }
         repository.save(
             ConversationEntity(
                 id = id,

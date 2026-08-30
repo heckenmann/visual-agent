@@ -43,8 +43,19 @@ internal fun LazyListScope.ConversationTimeline(
         when (item) {
             ConversationTimelineItem.InlineComposer -> inlineComposer()
             ConversationTimelineItem.Waiting -> ConversationWaitingIndicator()
-            is ConversationTimelineItem.Streaming -> StreamingTimelineRow(item.content, onStatusChange)
-            is ConversationTimelineItem.PendingUser -> PendingTimelineRow(item.content, onStatusChange)
+            is ConversationTimelineItem.Streaming -> StreamingTimelineRow(item, onStatusChange)
+            is ConversationTimelineItem.PendingUser -> PendingTimelineRow(item, onStatusChange)
+            is ConversationTimelineItem.MessageEntry ->
+                ConversationMessageTimelineRow(
+                    item = item,
+                    olderItems = items.drop(index + 1),
+                    sending = sending,
+                    deletingMessageIds = deletingMessageIds,
+                    onDeleteMessage = onDeleteMessage,
+                    onStatusChange = onStatusChange,
+                    onEditMessage = onEditMessage,
+                    sendContent = sendContent,
+                )
             is ConversationTimelineItem.TodoCard ->
                 ConversationTodoCard(
                     todo = item.todo,
@@ -83,6 +94,34 @@ internal fun LazyListScope.ConversationTimeline(
                 )
         }
     }
+}
+
+@Composable
+private fun ConversationMessageTimelineRow(
+    item: ConversationTimelineItem.MessageEntry,
+    olderItems: List<ConversationTimelineItem>,
+    sending: Boolean,
+    deletingMessageIds: Set<String>,
+    onDeleteMessage: (String) -> Unit,
+    onStatusChange: (String) -> Unit,
+    onEditMessage: (String?) -> Unit,
+    sendContent: (String) -> Unit,
+) {
+    val persisted = ConversationTimelineItem.Persisted(item.message, item.chronologicalIndex)
+    ConversationMessageGroupRow(
+        group = ConversationMessageGroup(listOf(persisted)),
+        sending = sending || item.isStreaming,
+        deletingMessageIds = deletingMessageIds,
+        onDeleteMessage = onDeleteMessage,
+        onStatusChange = onStatusChange,
+        onEditMessage = onEditMessage,
+        onRetry = {
+            val previous = olderItems.persistedMessages().firstOrNull { it.message.role == "user" }
+            if (previous == null) onStatusChange("No previous user message to retry") else sendContent(previous.message.content)
+        },
+        isStreaming = item.isStreaming,
+        modifier = Modifier.padding(top = if (item.message.role == "assistant" && item.isStreaming) 2.dp else 10.dp),
+    )
 }
 
 /** Renders conversation history messages in a [LazyListScope]. */
@@ -128,11 +167,11 @@ internal fun LazyListScope.ConversationMessageList(
 
 @Composable
 private fun StreamingTimelineRow(
-    content: String,
+    item: ConversationTimelineItem.Streaming,
     onStatusChange: (String) -> Unit,
 ) {
     TransientConversationMessageGroupRow(
-        message = Message("assistant", content),
+        message = Message("assistant", item.content, id = item.id),
         isStreaming = true,
         onCopied = { onStatusChange("Copied assistant message") },
         modifier = Modifier.padding(top = 2.dp),
@@ -141,11 +180,11 @@ private fun StreamingTimelineRow(
 
 @Composable
 private fun PendingTimelineRow(
-    content: String,
+    item: ConversationTimelineItem.PendingUser,
     onStatusChange: (String) -> Unit,
 ) {
     TransientConversationMessageGroupRow(
-        message = Message("user", content),
+        message = Message("user", item.content, id = item.id),
         isStreaming = false,
         onCopied = { onStatusChange("Copied user message") },
         modifier = Modifier.padding(top = 10.dp),
@@ -239,7 +278,13 @@ private fun PersistedTimelineGroup(
 }
 
 private fun List<ConversationTimelineItem>.persistedMessages(): List<ConversationTimelineItem.Persisted> =
-    filterIsInstance<ConversationTimelineItem.PersistedGroup>().flatMap { it.group.messages }
+    flatMap { item ->
+        when (item) {
+            is ConversationTimelineItem.PersistedGroup -> item.group.messages
+            is ConversationTimelineItem.MessageEntry -> listOf(ConversationTimelineItem.Persisted(item.message, item.chronologicalIndex))
+            else -> emptyList()
+        }
+    }
 
 /** Renders the conversation waiting indicator from the canonical in-flight state. */
 @Composable

@@ -172,7 +172,7 @@ class AgentManagerConversationOpsTest {
             val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
             val chunks = mutableListOf<String>()
 
-            val result = manager.streamMessage("hi") { chunks += it }
+            val result = manager.streamMessage("hi", onChunk = { chunks += it }, userEntryId = "user-id", assistantEntryId = "assistant-id")
 
             assertEquals("Hello world", result)
             assertEquals(listOf("Hello", " world"), chunks)
@@ -208,7 +208,7 @@ class AgentManagerConversationOpsTest {
                     AppConfigBean(db),
                 )
 
-            val result = manager.streamMessage("hi") { }
+            val result = manager.streamMessage("hi", onChunk = {}, userEntryId = "user-id", assistantEntryId = "assistant-id")
 
             assertEquals(
                 "Provider executable unavailable\n\nThe required provider executable is not installed.",
@@ -233,7 +233,7 @@ class AgentManagerConversationOpsTest {
             val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
             val chunks = mutableListOf<String>()
 
-            val result = manager.streamMessage("hi") { chunks += it }
+            val result = manager.streamMessage("hi", onChunk = { chunks += it }, userEntryId = "user-id", assistantEntryId = "assistant-id")
 
             assertEquals("First.Second.", result)
             assertEquals(listOf("First.", "Second."), chunks)
@@ -254,7 +254,10 @@ class AgentManagerConversationOpsTest {
                 )
             val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
-            assertEquals("answer", manager.streamMessage("hi") { })
+            assertEquals(
+                "answer",
+                manager.streamMessage("hi", onChunk = {}, userEntryId = "user-id", assistantEntryId = "assistant-id"),
+            )
             assertEquals(
                 "<think>first</think><think>second</think>answer",
                 manager.getHistory().last().content,

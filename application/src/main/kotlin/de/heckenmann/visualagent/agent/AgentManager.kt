@@ -299,14 +299,14 @@ class AgentManager
             token: CancellationToken? = null,
         ): String = conversationOps.sendMessage(content, token)
 
-        /**
-         * Sends a user message to the main agent and streams the response via [onChunk].
-         */
+        /** Streams a user message while preserving caller-provided conversation entry identities. */
         suspend fun streamMessage(
             content: String,
             token: CancellationToken? = null,
             onChunk: (String) -> Unit,
-        ): String = conversationOps.streamMessage(content, token, onChunk)
+            userEntryId: String,
+            assistantEntryId: String,
+        ): String = conversationOps.streamMessage(content, token, onChunk, userEntryId, assistantEntryId)
 
         /**
          * Cancels a sub-agent job by job ID. Returns true if the job was found and cancelled.

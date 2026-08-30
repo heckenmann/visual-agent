@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -80,6 +79,7 @@ internal fun ConversationMessageGroupRow(
     onStatusChange: (String) -> Unit,
     onEditMessage: (String?) -> Unit,
     onRetry: () -> Unit,
+    isStreaming: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     AnimatedVisibility(
@@ -116,6 +116,7 @@ internal fun ConversationMessageGroupRow(
                                     onStatusChange = onStatusChange,
                                     onEditMessage = onEditMessage,
                                     onRetry = onRetry,
+                                    isStreaming = isStreaming,
                                 )
                             }
                         }
@@ -133,31 +134,17 @@ internal fun TransientConversationMessageGroupRow(
     onCopied: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    AnimatedVisibility(
-        visibleState = rememberConversationMessageVisibility(isVisible = true),
-        enter = conversationMessageEnterTransition(),
-        exit = conversationMessageDeleteTransition(),
+    ConversationMessageGroupRow(
+        group = ConversationMessageGroup(listOf(ConversationTimelineItem.Persisted(message, 0))),
+        sending = true,
+        deletingMessageIds = emptySet(),
+        onDeleteMessage = {},
+        onStatusChange = { onCopied() },
+        onEditMessage = {},
+        onRetry = {},
+        isStreaming = isStreaming,
         modifier = modifier,
-    ) {
-        PanelContentCard(backgroundColor = groupBackground(message.role)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.Top,
-            ) {
-                ConversationAuthorColumn(message.role)
-                Box(modifier = Modifier.weight(1f)) {
-                    ConversationMessageContent(
-                        message = message,
-                        isStreamingPlaceholder = false,
-                        isStreaming = isStreaming,
-                        modifier = Modifier.padding(end = 30.dp),
-                    )
-                    ConversationCopyAction(message = message, onCopied = onCopied, modifier = Modifier.align(Alignment.TopEnd))
-                }
-            }
-        }
-    }
+    )
 }
 
 @Composable
@@ -191,6 +178,7 @@ private fun ConversationMessageGroupContent(
     onStatusChange: (String) -> Unit,
     onEditMessage: (String?) -> Unit,
     onRetry: () -> Unit,
+    isStreaming: Boolean,
 ) {
     val message = item.message
     var hovered by remember(message.id) { mutableStateOf(false) }
@@ -206,21 +194,23 @@ private fun ConversationMessageGroupContent(
         ConversationMessageContent(
             message = message,
             isStreamingPlaceholder = false,
-            isStreaming = false,
+            isStreaming = isStreaming,
             modifier = Modifier.weight(1f),
         )
-        conversationMessageActionMenu(
-            message = message,
-            canEdit = message.role == "user" && !sending,
-            canDelete = message.id != null,
-            canRetry = message.role == "assistant" && !sending,
-            onEdit = { onEditMessage(message.id) },
-            onDelete = { message.id?.let(onDeleteMessage) },
-            onRetry = onRetry,
-            onCopied = { onStatusChange("Copied ${message.role} message") },
-            timestamp = message.createdAtEpochMillis,
-            showTimestamp = hovered,
-        )
+        if (!isStreaming) {
+            conversationMessageActionMenu(
+                message = message,
+                canEdit = message.role == "user" && !sending,
+                canDelete = message.id != null,
+                canRetry = message.role == "assistant" && !sending,
+                onEdit = { onEditMessage(message.id) },
+                onDelete = { message.id?.let(onDeleteMessage) },
+                onRetry = onRetry,
+                onCopied = { onStatusChange("Copied ${message.role} message") },
+                timestamp = message.createdAtEpochMillis,
+                showTimestamp = hovered,
+            )
+        }
     }
 }
 

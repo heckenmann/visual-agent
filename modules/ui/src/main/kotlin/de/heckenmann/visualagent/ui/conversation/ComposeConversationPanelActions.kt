@@ -7,6 +7,7 @@ import androidx.compose.runtime.LaunchedEffect
 import de.heckenmann.visualagent.protocol.CancellationToken
 import de.heckenmann.visualagent.protocol.CancellationTokenImpl
 import de.heckenmann.visualagent.protocol.ConversationPort
+import de.heckenmann.visualagent.protocol.ConversationStreamRequest
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -164,12 +165,25 @@ internal suspend fun executeSend(
     onHistoryChange: (List<Message>) -> Unit,
     onActiveTokenChange: (CancellationToken?) -> Unit,
     onPendingUserMessageChange: (String?) -> Unit,
+    onPendingUserEntryIdChange: (String?) -> Unit = {},
+    onStreamingEntryIdChange: (String?) -> Unit = {},
+    onStreamCompletion: ((List<Message>) -> Unit)? = null,
     streamingFlow: MutableStateFlow<String>,
 ) {
     onInputChange("")
     onSendingChange(true)
     onStatusChange("Streaming...")
+    val userEntryId =
+        java.util.UUID
+            .randomUUID()
+            .toString()
+    val assistantEntryId =
+        java.util.UUID
+            .randomUUID()
+            .toString()
     onPendingUserMessageChange(content)
+    onPendingUserEntryIdChange(userEntryId)
+    onStreamingEntryIdChange(assistantEntryId)
     streamingFlow.value = ""
     val streamRequestId =
         java.util.UUID
@@ -181,20 +195,25 @@ internal suspend fun executeSend(
     val streamedContent = StringBuilder()
     val result =
         runCatching {
-            messageGateway.stream(content, token) { chunk ->
+            messageGateway.stream(ConversationStreamRequest(userEntryId, assistantEntryId, content), token) { chunk ->
                 streamedContent.append(chunk)
                 streamingFlow.value = streamedContent.toString()
             }
         }
-    streamingFlow.value = ""
-    onPendingUserMessageChange(null)
-    onHistoryChange(messageGateway.currentHistory())
+    val completedHistory = messageGateway.currentHistory()
+    if (onStreamCompletion != null) {
+        onStreamCompletion(completedHistory)
+    } else {
+        streamingFlow.value = ""
+        onStreamingEntryIdChange(null)
+        onPendingUserMessageChange(null)
+        onPendingUserEntryIdChange(null)
+        onHistoryChange(completedHistory)
+    }
     result
         .onSuccess {
-            onHistoryChange(messageGateway.currentHistory())
             onStatusChange("Ready")
         }.onFailure {
-            onHistoryChange(messageGateway.currentHistory())
             onStatusChange(it.toUiErrorMessage())
         }.also {
             inFlight.markStreamEnd(streamRequestId)

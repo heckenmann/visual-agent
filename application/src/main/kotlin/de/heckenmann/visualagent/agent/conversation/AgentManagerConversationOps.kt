@@ -26,8 +26,13 @@ internal class AgentManagerConversationOps(
     private val historyOps = AgentConversationHistoryOps(owner, ::buildMainRequest)
 
     internal fun persist(message: Message): Message {
+        val messageId =
+            message.id ?: java.util.UUID
+                .randomUUID()
+                .toString()
         val id =
             owner.conversationStore.saveConversationMessage(
+                messageId,
                 AgentManager.MAIN_SESSION_ID,
                 message.role,
                 message.content,
@@ -131,13 +136,12 @@ internal class AgentManagerConversationOps(
         content: String,
         token: CancellationToken? = null,
         onChunk: (String) -> Unit,
+        userEntryId: String,
+        assistantEntryId: String,
     ): String {
-        val userMessage = Message("user", content)
+        val userMessage = Message("user", content, id = userEntryId)
         persist(userMessage)
-        val requestId =
-            java.util.UUID
-                .randomUUID()
-                .toString()
+        val requestId = assistantEntryId
         val collected = StringBuilder()
         var providerTurn: ProviderTurnResponse? = null
         var cancelled = false
@@ -163,7 +167,7 @@ internal class AgentManagerConversationOps(
         }
         if (providerFailure != null) {
             val failureMessage = providerFailureMessage(providerFailure)
-            persist(Message("assistant", failureMessage))
+            persist(Message("assistant", failureMessage, id = assistantEntryId))
             owner.finishedToolEventsByRequestId.remove(requestId)
             return failureMessage
         }
@@ -191,6 +195,7 @@ internal class AgentManagerConversationOps(
                 "assistant",
                 presentationText,
                 metadata = providerTurn?.let { ResponseTelemetryMetadata.encode(it, true) },
+                id = assistantEntryId,
             )
         persist(assistantMessage)
         owner.finishedToolEventsByRequestId.remove(requestId)

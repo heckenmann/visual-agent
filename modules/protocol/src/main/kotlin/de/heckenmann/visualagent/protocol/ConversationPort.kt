@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.protocol
 
+import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -35,6 +36,28 @@ data class ConversationHistoryPage(
     val offset: Int,
     val hasMore: Boolean,
 )
+
+/** Identifies the user and assistant entries of one streamed conversation turn. */
+data class ConversationStreamRequest(
+    val userEntryId: String,
+    val assistantEntryId: String,
+    val content: String,
+) {
+    init {
+        require(content.isNotBlank()) { "Conversation content must not be blank" }
+        require(userEntryId != assistantEntryId) { "Conversation entry IDs must differ" }
+        requireCanonicalUuid(userEntryId)
+        requireCanonicalUuid(assistantEntryId)
+    }
+}
+
+private fun requireCanonicalUuid(value: String) {
+    val isCanonical =
+        runCatching {
+            UUID.fromString(value).toString() == value
+        }.getOrDefault(false)
+    require(isCanonical) { "Conversation entry ID must be a canonical UUID" }
+}
 
 /** Cancellation handle that is safe to expose to a presentation client. */
 interface CancellationToken {
@@ -82,10 +105,17 @@ interface ConversationPort {
 
     /** Streams one assistant response and invokes [onChunk] for each text delta. */
     suspend fun stream(
-        content: String,
+        request: ConversationStreamRequest,
         token: CancellationToken,
         onChunk: (String) -> Unit,
     )
+
+    /** Streams one assistant response with freshly allocated entry identities for legacy callers. */
+    suspend fun stream(
+        content: String,
+        token: CancellationToken,
+        onChunk: (String) -> Unit,
+    ) = stream(ConversationStreamRequest(UUID.randomUUID().toString(), UUID.randomUUID().toString(), content), token, onChunk)
 
     /** Resolves one Markdown image source through the server-owned media boundary. */
     suspend fun resolveImage(source: String): ConversationImageResolution

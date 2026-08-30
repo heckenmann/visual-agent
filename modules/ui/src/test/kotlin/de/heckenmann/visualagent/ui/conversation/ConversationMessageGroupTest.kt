@@ -58,7 +58,7 @@ class ConversationMessageGroupTest {
                 listOf(persisted("newest", "user"), persisted("oldest", "user")),
             ).single()
 
-        assertEquals("message:newest", group.stableKey)
+        assertEquals("newest", group.stableKey)
     }
 
     private fun persisted(

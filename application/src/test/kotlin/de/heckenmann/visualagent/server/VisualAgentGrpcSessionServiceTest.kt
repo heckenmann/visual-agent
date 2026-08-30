@@ -164,7 +164,7 @@ class VisualAgentGrpcSessionServiceTest {
             val releaseFirst = CompletableDeferred<Unit>()
             val secondCompleted = CompletableDeferred<Unit>()
             val conversationPort = mockk<ConversationPort>(relaxed = true)
-            coEvery { conversationPort.stream(any(), any(), any()) } coAnswers {
+            coEvery { conversationPort.stream(any<String>(), any(), any()) } coAnswers {
                 when (firstArg<String>()) {
                     "first" -> {
                         firstStarted.complete(Unit)
