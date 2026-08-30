@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import de.heckenmann.visualagent.protocol.SettingsSnapshot
@@ -14,7 +15,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /** Verifies selection of manual and automatic UI scaling in the appearance settings section. */
-class ComposeRuntimeSettingsSectionTest {
+class ComposeAppearanceSettingsSectionTest {
     @get:Rule
     val composeTestRule = createComposeRule()
 
@@ -35,5 +36,18 @@ class ComposeRuntimeSettingsSectionTest {
         composeTestRule.onNodeWithText("125%").performClick()
         composeTestRule.onNodeWithText("Automatic").performClick()
         assertNull(settings.uiScalePercent)
+    }
+
+    @Test
+    fun `appearance settings explain every editable setting`() {
+        composeTestRule.setContent {
+            MaterialTheme {
+                AppearanceSettingsSection(snapshot = SettingsSnapshot(), onChange = {})
+            }
+        }
+
+        listOf("Font size", "UI scale", "Theme", "Show panel labels").forEach { label ->
+            composeTestRule.onNodeWithContentDescription("$label information").assertExists()
+        }
     }
 }

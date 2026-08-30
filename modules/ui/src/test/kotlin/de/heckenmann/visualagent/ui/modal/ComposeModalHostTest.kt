@@ -4,10 +4,12 @@ package de.heckenmann.visualagent.ui.modal
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performKeyInput
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -133,6 +135,41 @@ class ComposeModalHostTest {
     }
 
     @Test
+    fun `settings modal renders reusable panel settings content`() {
+        var dismissed = false
+        composeTestRule.setContent {
+            MaterialTheme {
+                ComposeModalHost(
+                    modal = ComposeSettingsModal(title = "Panel settings") { Text("Settings body") },
+                    onDismiss = { dismissed = true },
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Panel settings").assertExists()
+        composeTestRule.onNodeWithText("Settings body").assertExists()
+        composeTestRule.onNodeWithContentDescription("Close Panel settings").performClick()
+        assertTrue(dismissed)
+    }
+
+    @Test
+    fun `escape dismisses settings modal without invoking its content action`() {
+        var dismissed = false
+        composeTestRule.setContent {
+            MaterialTheme {
+                ComposeModalHost(
+                    modal = ComposeSettingsModal(title = "Panel settings") { Text("Settings body") },
+                    onDismiss = { dismissed = true },
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Settings body").performKeyInput { keyDown(Key.Escape) }
+
+        assertTrue(dismissed)
+    }
+
+    @Test
     fun `requestInfo extension function invokes requester`() {
         var requested: ComposeModal? = null
         val requester = ComposeModalRequester { requested = it }
@@ -155,5 +192,15 @@ class ComposeModalHostTest {
             ),
         )
         assertTrue(requested is ComposeConfirmationModal)
+    }
+
+    @Test
+    fun `requestSettings extension function invokes requester`() {
+        var requested: ComposeModal? = null
+        val requester = ComposeModalRequester { requested = it }
+
+        requester.requestSettings(ComposeSettingsModal(title = "Panel settings") {})
+
+        assertTrue(requested is ComposeSettingsModal)
     }
 }

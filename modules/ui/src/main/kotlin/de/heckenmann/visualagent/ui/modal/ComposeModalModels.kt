@@ -50,6 +50,18 @@ data class ComposeContentModal(
 ) : ComposeModal
 
 /**
+ * Describes a reusable global settings modal for one workspace panel.
+ *
+ * The modal host owns its scrim, focus boundary, and dismissal behavior. Panel implementations
+ * provide only their draft-based settings content, which keeps all panel settings overlays
+ * consistent.
+ */
+data class ComposeSettingsModal(
+    val title: String,
+    val content: @Composable () -> Unit,
+) : ComposeModal
+
+/**
  * Describes an error modal that presents a structured [UserFacingError] with optional recovery
  * actions.
  *
@@ -94,6 +106,9 @@ fun ComposeModalRequester.requestConfirmation(modal: ComposeConfirmationModal) =
  * @param modal Information modal to render
  */
 fun ComposeModalRequester.requestInfo(modal: ComposeInfoModal) = request(modal)
+
+/** Opens a global settings modal owned by the shared modal host. */
+fun ComposeModalRequester.requestSettings(modal: ComposeSettingsModal) = request(modal)
 
 /**
  * Shows an error modal and prevents interacting with workspace windows until it is dismissed.

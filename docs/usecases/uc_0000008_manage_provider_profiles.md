@@ -17,10 +17,11 @@ Desktop user.
 
 1. The user opens the same provider-connection dialog for creating or editing a profile. The dialog uses mode-specific titles and primary actions while keeping the connection fields and validation consistent.
 2. The profile editor generates an opaque stable provider ID for new profiles and stores it without exposing it as a user-editable setting. The user manages the display name, adapter type, endpoint, API key, enabled state, and provider options independently from main-agent model selection.
-3. The panel validates required fields and persists the profile through the catalog.
-4. The catalog permits multiple profiles using the same adapter, so separate endpoints and credentials can be configured independently.
-5. If the active profile is disabled or deleted, the catalog selects another enabled profile; it never leaves the session without an enabled provider.
-6. Model resolution uses provider, model, agent, and variant settings in deterministic order.
+3. The panel validates required fields and stages the profile in the global provider settings overlay.
+4. The user explicitly saves the overlay to persist the complete catalog and active model selection together, or resets it to reload the persisted catalog.
+5. The catalog permits multiple profiles using the same adapter, so separate endpoints and credentials can be configured independently.
+6. If the active profile is disabled or deleted, the catalog selects another enabled profile; it never leaves the session without an enabled provider.
+7. Model resolution uses provider, model, agent, and variant settings in deterministic order.
 
 ## Result
 
@@ -34,13 +35,14 @@ Different agents and sessions can use different providers and model parameters.
 
 - `de.heckenmann.visualagent.agent.provider.ProviderProfile`
 - `de.heckenmann.visualagent.agent.provider.ProviderCatalogService`
-- `de.heckenmann.visualagent.ui.settings.SettingsPanel`
+- `de.heckenmann.visualagent.ui.settings.providerSettingsOverlay`
 - `de.heckenmann.visualagent.ui.settings.ComposeProtocolSettingsSupport`
 - `de.heckenmann.visualagent.ui.components.ActionIconButton`
 
 ## Acceptance Criteria
 
 - Profiles survive restart.
+- Profile edits do not affect the active provider until the global overlay is explicitly saved.
 - New profiles receive a generated stable provider ID; existing profile IDs never change during editing.
 - Name and Base URL are required unless the selected adapter owns a fixed endpoint.
 - Deleting the active provider selects another enabled provider.

@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DividerDefaults
@@ -63,6 +64,19 @@ internal fun ReorderableCollectionItemScope.SplitPanelContent(
     modifier: Modifier,
 ) {
     val primary = window.id == "chat"
+    val onOpenSettings =
+        if (window.id == "chat") {
+            {
+                openConversationProviderSettings(
+                    modalRequester = panelServices.modalRequester,
+                    settingsPort = panelServices.settings,
+                    providerPort = panelServices.providers,
+                    onSettingsChanged = panelServices.onSettingsChanged,
+                )
+            }
+        } else {
+            null
+        }
     val shape = RoundedCornerShape(8.dp)
     val borderColor =
         if (isDragging) {
@@ -108,6 +122,7 @@ internal fun ReorderableCollectionItemScope.SplitPanelContent(
             SplitPanelHeader(
                 window = window,
                 primary = primary,
+                onOpenSettings = onOpenSettings,
                 onClose = onCloseWindow,
             )
             HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
@@ -130,6 +145,7 @@ internal fun ReorderableCollectionItemScope.SplitPanelContent(
 private fun ReorderableCollectionItemScope.SplitPanelHeader(
     window: ComposeWorkspaceWindow,
     primary: Boolean,
+    onOpenSettings: (() -> Unit)?,
     onClose: () -> Unit,
 ) {
     Row(
@@ -185,6 +201,15 @@ private fun ReorderableCollectionItemScope.SplitPanelHeader(
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+            )
+        }
+        onOpenSettings?.let { openSettings ->
+            ActionIconButton(
+                icon = Icons.Filled.Settings,
+                description = "Configure providers and models",
+                onClick = openSettings,
+                modifier = Modifier.size(if (primary) 28.dp else 26.dp),
+                iconSize = if (primary) 18.dp else 16.dp,
             )
         }
         ActionIconButton(
