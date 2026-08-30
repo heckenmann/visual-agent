@@ -44,7 +44,7 @@ class AgentManagerStructuredResponseTest {
                             ),
                     ),
                 )
-            val config = AppConfigBean(db).also { it.thinkingEnabled = true }
+            val config = AppConfigBean(db)
             val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), config)
 
             manager.streamMessage("hi") { }

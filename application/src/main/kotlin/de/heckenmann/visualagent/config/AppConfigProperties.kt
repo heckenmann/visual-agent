@@ -26,9 +26,6 @@ internal object AppConfigProperties {
             setProperty(AppConfig.KEY_BROWSER_DEFAULT, config.browserDefault)
             setProperty(AppConfig.KEY_SESSION_FAVORITE_MODELS, config.favoriteModels)
             setProperty(AppConfig.KEY_SESSION_CONTEXT_LENGTH, config.contextLength.toString())
-            setProperty(AppConfig.KEY_SESSION_STREAMING, config.streamingEnabled.toString())
-            setProperty(AppConfig.KEY_SESSION_THINKING, config.thinkingEnabled.toString())
-            setProperty(AppConfig.KEY_SESSION_AUTO_COMPACTION, config.autoCompactionEnabled.toString())
             setProperty(AppConfig.KEY_SESSION_LOAD_LIMIT, config.loadLimit.toString())
             setProperty(AppConfig.KEY_SESSION_MAX_PARALLEL_SUB_AGENTS, config.maxParallelSubAgents.toString())
             setProperty(AppConfig.KEY_SESSION_TIMEOUT_SECONDS, config.timeoutSeconds.toString())
@@ -63,10 +60,6 @@ internal object AppConfigProperties {
             )
         config.browserDefault = properties.string(AppConfig.KEY_BROWSER_DEFAULT, config.browserDefault)
         config.contextLength = properties.int(AppConfig.KEY_SESSION_CONTEXT_LENGTH, config.contextLength, 1024..32768)
-        config.streamingEnabled = properties.boolean(AppConfig.KEY_SESSION_STREAMING, config.streamingEnabled)
-        config.thinkingEnabled = properties.boolean(AppConfig.KEY_SESSION_THINKING, config.thinkingEnabled)
-        config.autoCompactionEnabled =
-            properties.boolean(AppConfig.KEY_SESSION_AUTO_COMPACTION, config.autoCompactionEnabled)
         config.loadLimit = properties.int(AppConfig.KEY_SESSION_LOAD_LIMIT, config.loadLimit, 1..1000)
         config.maxParallelSubAgents =
             properties.int(AppConfig.KEY_SESSION_MAX_PARALLEL_SUB_AGENTS, config.maxParallelSubAgents, 1..20)

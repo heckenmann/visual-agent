@@ -99,8 +99,6 @@ private class LegacySettingsPort(
             providerCatalog.activeModelId(),
             config.openAiBaseUrl,
             config.openAiApiKey.isNotBlank(),
-            config.streamingEnabled,
-            config.thinkingEnabled,
             config.timeoutSeconds,
             config.uiScalePercent,
         )

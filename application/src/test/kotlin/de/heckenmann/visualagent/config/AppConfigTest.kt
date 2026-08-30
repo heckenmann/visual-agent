@@ -53,8 +53,6 @@ class AppConfigTest {
             config.openAiBaseUrl = "https://openai-compatible.example"
             config.openAiModel = "gpt-test"
             config.contextLength = 8192
-            config.streamingEnabled = false
-            config.autoCompactionEnabled = false
             config.userModelInstruction = "Always respond in German."
             config.save()
 
@@ -71,8 +69,6 @@ class AppConfigTest {
             assertEquals("https://openai-compatible.example", db.getPreference("openai.base.url"))
             assertEquals("gpt-test", db.getPreference("openai.model"))
             assertEquals("8192", db.getPreference("session.context.length"))
-            assertEquals("false", db.getPreference("session.streaming.enabled"))
-            assertEquals("false", db.getPreference("session.auto.compaction.enabled"))
             assertEquals("Always respond in German.", db.getPreference("session.user.model.instruction"))
             assertNull(db.getPreference("database.path"))
             assertEquals(propertiesBefore, propertiesFile.readText())
@@ -206,9 +202,6 @@ class AppConfigTest {
         val conversationInputPlacement: ConversationInputPlacement,
         val browserDefault: String,
         val contextLength: Int,
-        val streamingEnabled: Boolean,
-        val thinkingEnabled: Boolean,
-        val autoCompactionEnabled: Boolean,
         val loadLimit: Int,
         val maxParallelSubAgents: Int,
         val timeoutSeconds: Int,
@@ -230,9 +223,6 @@ class AppConfigTest {
             conversationInputPlacement = config.conversationInputPlacement,
             browserDefault = config.browserDefault,
             contextLength = config.contextLength,
-            streamingEnabled = config.streamingEnabled,
-            thinkingEnabled = config.thinkingEnabled,
-            autoCompactionEnabled = config.autoCompactionEnabled,
             loadLimit = config.loadLimit,
             maxParallelSubAgents = config.maxParallelSubAgents,
             timeoutSeconds = config.timeoutSeconds,
@@ -256,9 +246,6 @@ class AppConfigTest {
         config.conversationInputPlacement = snapshot.conversationInputPlacement
         config.browserDefault = snapshot.browserDefault
         config.contextLength = snapshot.contextLength
-        config.streamingEnabled = snapshot.streamingEnabled
-        config.thinkingEnabled = snapshot.thinkingEnabled
-        config.autoCompactionEnabled = snapshot.autoCompactionEnabled
         config.loadLimit = snapshot.loadLimit
         config.maxParallelSubAgents = snapshot.maxParallelSubAgents
         config.timeoutSeconds = snapshot.timeoutSeconds

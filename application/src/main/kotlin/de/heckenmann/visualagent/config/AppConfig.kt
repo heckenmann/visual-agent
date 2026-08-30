@@ -39,9 +39,6 @@ class AppConfig private constructor() {
     var conversationInputPlacement: ConversationInputPlacement = ConversationInputPlacement.CONVERSATION_MESSAGE
     var browserDefault: String = "firefox"
     var contextLength: Int = 4096
-    var streamingEnabled: Boolean = true
-    var thinkingEnabled: Boolean = false
-    var autoCompactionEnabled: Boolean = true
     var loadLimit: Int = 50
     var maxParallelSubAgents: Int = 4
     var timeoutSeconds: Int = 120
@@ -73,9 +70,6 @@ class AppConfig private constructor() {
         internal const val KEY_UI_CONVERSATION_INPUT_PLACEMENT = "ui.conversation.input.placement"
         internal const val KEY_BROWSER_DEFAULT = "browser.default"
         internal const val KEY_SESSION_CONTEXT_LENGTH = "session.context.length"
-        internal const val KEY_SESSION_STREAMING = "session.streaming.enabled"
-        internal const val KEY_SESSION_THINKING = "session.thinking.enabled"
-        internal const val KEY_SESSION_AUTO_COMPACTION = "session.auto.compaction.enabled"
         internal const val KEY_SESSION_LOAD_LIMIT = "session.load.limit"
         internal const val KEY_SESSION_MAX_PARALLEL_SUB_AGENTS = "session.max.parallel.sub.agents"
         internal const val KEY_SESSION_TIMEOUT_SECONDS = "session.timeout.seconds"
@@ -221,9 +215,6 @@ class AppConfig private constructor() {
                 KEY_UI_CONVERSATION_INPUT_PLACEMENT to conversationInputPlacement.name,
                 KEY_BROWSER_DEFAULT to browserDefault,
                 KEY_SESSION_CONTEXT_LENGTH to contextLength.toString(),
-                KEY_SESSION_STREAMING to streamingEnabled.toString(),
-                KEY_SESSION_THINKING to thinkingEnabled.toString(),
-                KEY_SESSION_AUTO_COMPACTION to autoCompactionEnabled.toString(),
                 KEY_SESSION_LOAD_LIMIT to loadLimit.toString(),
                 KEY_SESSION_MAX_PARALLEL_SUB_AGENTS to maxParallelSubAgents.toString(),
                 KEY_SESSION_TIMEOUT_SECONDS to timeoutSeconds.toString(),
@@ -249,9 +240,6 @@ class AppConfig private constructor() {
             db.setPreference(KEY_UI_CONVERSATION_INPUT_PLACEMENT, conversationInputPlacement.name)
             db.setPreference(KEY_BROWSER_DEFAULT, browserDefault)
             db.setPreference(KEY_SESSION_CONTEXT_LENGTH, contextLength.toString())
-            db.setPreference(KEY_SESSION_STREAMING, streamingEnabled.toString())
-            db.setPreference(KEY_SESSION_THINKING, thinkingEnabled.toString())
-            db.setPreference(KEY_SESSION_AUTO_COMPACTION, autoCompactionEnabled.toString())
             db.setPreference(KEY_SESSION_LOAD_LIMIT, loadLimit.toString())
             db.setPreference(KEY_SESSION_MAX_PARALLEL_SUB_AGENTS, maxParallelSubAgents.toString())
             db.setPreference(KEY_SESSION_TIMEOUT_SECONDS, timeoutSeconds.toString())
@@ -291,9 +279,6 @@ class AppConfig private constructor() {
                     ?: conversationInputPlacement
             browserDefault = db.getPreference(KEY_BROWSER_DEFAULT) ?: browserDefault
             contextLength = db.getPreference(KEY_SESSION_CONTEXT_LENGTH)?.toIntOrNull() ?: contextLength
-            streamingEnabled = db.getPreference(KEY_SESSION_STREAMING)?.toBooleanStrictOrNull() ?: streamingEnabled
-            thinkingEnabled = db.getPreference(KEY_SESSION_THINKING)?.toBooleanStrictOrNull() ?: thinkingEnabled
-            autoCompactionEnabled = db.getPreference(KEY_SESSION_AUTO_COMPACTION)?.toBooleanStrictOrNull() ?: autoCompactionEnabled
             loadLimit = db.getPreference(KEY_SESSION_LOAD_LIMIT)?.toIntOrNull() ?: loadLimit
             maxParallelSubAgents = db.getPreference(KEY_SESSION_MAX_PARALLEL_SUB_AGENTS)?.toIntOrNull() ?: maxParallelSubAgents
             timeoutSeconds = db.getPreference(KEY_SESSION_TIMEOUT_SECONDS)?.toIntOrNull() ?: timeoutSeconds

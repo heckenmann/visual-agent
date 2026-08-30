@@ -2,7 +2,7 @@
 
 ## Goal
 
-Show provider-supplied structured reasoning and legacy model `<think>...</think>` blocks separately when thinking display is enabled.
+Show provider-supplied structured reasoning and legacy model `<think>...</think>` blocks separately.
 
 ## Primary Actor
 
@@ -10,7 +10,6 @@ Desktop user.
 
 ## Preconditions
 
-- Thinking display is enabled in application settings.
 - The model response contains structured reasoning or one or more legacy think blocks.
 
 ## Main Flow
@@ -34,11 +33,10 @@ The user can inspect model thinking output without polluting the final answer te
 
 - `de.heckenmann.visualagent.ui.application.VisualAgentComposeApp`
 - `de.heckenmann.visualagent.ui.conversation.ThinkingRow`
-- `de.heckenmann.visualagent.protocol.SettingsSnapshot.thinkingEnabled`
 
 ## Acceptance Criteria
 
-- Thinking blocks are shown only when enabled.
+- Thinking blocks are shown whenever the provider supplies them.
 - Thinking rows are collapsed by default and show the latest non-empty line as
   their Markdown-rendered one-line preview.
 - Expanded thinking content uses the same Markdown renderer as conversation

@@ -44,13 +44,6 @@ class AppConfigPersistenceBinder(
         appConfigBean.browserDefault = preferenceStore.getPreference(AppConfigBean.KEY_BROWSER_DEFAULT) ?: appConfigBean.browserDefault
         appConfigBean.contextLength =
             preferenceStore.getPreference(AppConfigBean.KEY_SESSION_CONTEXT_LENGTH)?.toIntOrNull() ?: appConfigBean.contextLength
-        appConfigBean.streamingEnabled =
-            preferenceStore.getPreference(AppConfigBean.KEY_SESSION_STREAMING)?.toBooleanStrictOrNull() ?: appConfigBean.streamingEnabled
-        appConfigBean.thinkingEnabled =
-            preferenceStore.getPreference(AppConfigBean.KEY_SESSION_THINKING)?.toBooleanStrictOrNull() ?: appConfigBean.thinkingEnabled
-        appConfigBean.autoCompactionEnabled =
-            preferenceStore.getPreference(AppConfigBean.KEY_SESSION_AUTO_COMPACTION)?.toBooleanStrictOrNull()
-                ?: appConfigBean.autoCompactionEnabled
         appConfigBean.loadLimit =
             preferenceStore.getPreference(AppConfigBean.KEY_SESSION_LOAD_LIMIT)?.toIntOrNull() ?: appConfigBean.loadLimit
         appConfigBean.maxParallelSubAgents =

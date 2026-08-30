@@ -19,7 +19,7 @@ Show compact, safe model-response timing and token information below a completed
 ## Security and Privacy
 
 - Raw provider payloads, tool arguments, tool results, credentials, and native reasoning are not persisted in telemetry metadata.
-- A provider-designated reasoning summary is persisted only while the user has enabled Reasoning in runtime settings.
+- A provider-designated reasoning summary is persisted when supplied, using the same allowlist as other presentation telemetry.
 - Provider telemetry is not sent back to a model as conversation context.
 
 ## Tool Calls

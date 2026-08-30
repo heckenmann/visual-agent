@@ -18,7 +18,7 @@ class SettingsTool(
             description =
                 "Read or update Visual Agent UI settings. Actions: get, set. " +
                     "Input: {\"action\":\"get|set\",\"fontSize\":14,\"uiScalePercent\":125,\"provider\":\"ollama\"," +
-                    "\"model\":\"llama3\",\"streamingEnabled\":true,\"thinkingEnabled\":false}. " +
+                    "\"model\":\"llama3\"}. " +
                     "Font size range: 10-24. API keys are reported as configured/not configured only.",
             inputSchema = STRING_SCHEMA,
         )
@@ -36,8 +36,6 @@ class SettingsTool(
                         provider = input.string("provider"),
                         model = input.string("model"),
                         openAiBaseUrl = input.string("openAiBaseUrl"),
-                        streamingEnabled = input.boolean("streamingEnabled"),
-                        thinkingEnabled = input.boolean("thinkingEnabled"),
                         uiScalePercent =
                             input.int("uiScalePercent")?.let { percent ->
                                 percent.takeIf { it == 0 } ?: percent.coerceIn(50, 200)
@@ -58,8 +56,6 @@ class SettingsTool(
               Model: ${current.model}
               OpenAI Base URL: ${current.openAiBaseUrl}
               OpenAI API key configured: ${current.openAiApiKeyConfigured}
-              Streaming: ${current.streamingEnabled}
-              Thinking: ${current.thinkingEnabled}
               UI scale: ${current.uiScalePercent?.let { "$it%" } ?: "Automatic"}
             Font size range: 10-24. UI scale range: 50-200; use 0 for automatic scaling.
             """.trimIndent(),

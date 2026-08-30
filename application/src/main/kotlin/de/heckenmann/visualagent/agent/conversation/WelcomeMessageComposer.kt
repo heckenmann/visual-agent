@@ -66,7 +66,7 @@ class WelcomeMessageComposer(
                     mapOf(
                         "sessionId" to AgentManager.MAIN_SESSION_ID,
                         "agent" to "main",
-                        "thinkingEnabled" to appConfig.thinkingEnabled,
+                        "thinkingEnabled" to true,
                     ),
             )
         val generated =
