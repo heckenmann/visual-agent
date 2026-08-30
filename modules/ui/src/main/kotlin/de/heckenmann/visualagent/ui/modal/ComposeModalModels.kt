@@ -46,6 +46,7 @@ data class ComposeInfoModal(
  */
 data class ComposeContentModal(
     val title: String,
+    val onDismiss: () -> Unit = {},
     val content: @Composable (dismiss: () -> Unit) -> Unit,
 ) : ComposeModal
 

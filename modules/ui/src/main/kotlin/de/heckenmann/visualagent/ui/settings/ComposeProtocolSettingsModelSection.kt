@@ -2,13 +2,18 @@ package de.heckenmann.visualagent.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.ProviderModel
-import de.heckenmann.visualagent.ui.components.ActionIconButton
 import de.heckenmann.visualagent.ui.components.PanelCheckbox
 import de.heckenmann.visualagent.ui.components.PanelDropdownField
 import de.heckenmann.visualagent.ui.components.PanelInfoBox
@@ -36,12 +41,14 @@ internal fun modelSettingsContent(
         information = "Selects the model used for future main-agent requests through the selected provider.",
     )
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-        ActionIconButton(
-            icon = Icons.Filled.Refresh,
-            description = "Refresh models",
+        OutlinedButton(
             enabled = !loadingModels,
             onClick = onRefreshModels,
-        )
+        ) {
+            Icon(Icons.Filled.Refresh, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text("Refresh models")
+        }
         PanelCheckbox(
             label = "Favorite",
             checked = modelId in favoriteModels,

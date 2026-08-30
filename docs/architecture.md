@@ -258,9 +258,15 @@ expose an interactive `System.console()` even when its output is attached to a t
   `WORKSPACE_PANEL_GAP = 16`.
 - `Cmd/Ctrl+1..6` focuses panels; `Cmd/Ctrl+K` opens the internal
   command palette; `Esc` closes the palette.
-- Workspace toolbar action groups use icon-only buttons with descriptive
-  tooltips and accessibility descriptions. Settings authentication flows keep
-  labeled controls where their text communicates the authentication action.
+- Buttons should include an icon that directly represents their action. A button
+  without an icon is an explicit exception, limited to cases where a standard,
+  unambiguous text label communicates the action more clearly (for example,
+  modal confirmation and cancellation). Icon-only workspace actions must also
+  provide descriptive tooltips and accessibility descriptions.
+- Repeated semantic actions use shared Compose components. In particular,
+  save actions use the theme-provided green checkmark button and reset actions
+  use the theme-provided yellow close button; individual panels must not
+  redefine their colors, icons, or spacing.
 - Internal modals (`ComposeModalHost` with `ComposeConfirmationModal`,
   `ComposeInfoModal`, `ComposeContentModal`) replace native dialogs
   for destructive confirmations.

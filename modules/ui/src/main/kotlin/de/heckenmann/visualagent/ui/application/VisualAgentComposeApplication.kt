@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -150,105 +151,107 @@ fun VisualAgentComposeApp(
             colorScheme = if (darkTheme) visualAgentDarkColorScheme() else visualAgentLightColorScheme(),
             typography = visualAgentTypography(settings.fontSize),
         ) {
-            Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    Row(
-                        modifier =
-                            Modifier
-                                .fillMaxSize()
-                                .focusRequester(workspaceFocusRequester)
-                                .onPreviewKeyEvent { event ->
-                                    when {
-                                        event.isCommandPaletteShortcut() -> {
-                                            commandPaletteVisible = true
-                                            true
-                                        }
-                                        event.workspaceShortcutDigit() != null -> {
-                                            panelIdForShortcutDigit(event.workspaceShortcutDigit()!!)?.let(toggleWindow)
-                                            true
-                                        }
-                                        else -> false
-                                    }
-                                }.focusable(),
-                    ) {
-                        ComposeRail(
-                            windows = windows,
-                            onToggleWindow = toggleWindow,
-                            onReorderWindows = reorderWindows,
-                            onPanelWidthChanged = resizeWindow,
-                            showPanelLabels = settings.showPanelLabels,
-                            onTogglePanelLabels = {
-                                if (settingsLoaded) {
-                                    val next = settings.copy(showPanelLabels = !settings.showPanelLabels)
-                                    settings = next
-                                    composeScope.launch {
-                                        withContext(Dispatchers.IO) { deps.applicationPort.settings.save(next) }
-                                    }
-                                }
-                            },
-                            onCloseApplication = onCloseApplication,
-                            modalRequester = panelServices.modalRequester,
-                        )
-                        BoxWithConstraints(
+            CompositionLocalProvider(LocalSemanticActionColors provides semanticActionColors(darkTheme)) {
+                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        Row(
                             modifier =
                                 Modifier
                                     .fillMaxSize()
-                                    .padding(14.dp),
-                        ) {
-                            val viewport =
-                                ComposeWorkspaceViewport(
-                                    width = maxWidth.value.roundToInt(),
-                                    height = maxHeight.value.roundToInt(),
-                                )
-                            val minPanelWidth = ComposeWorkspaceWindowBounds.MIN_WIDTH
-                            val workspaceStates = windows.mapIndexed { index, window -> window.toLayoutWindowState(index) }
-                            deps.applicationPort.layout.bind(
-                                stage = LayoutSize(width = viewport.width.toDouble(), height = viewport.height.toDouble()),
-                                desktop = LayoutSize(width = viewport.width.toDouble(), height = viewport.height.toDouble()),
-                                windows = workspaceStates,
-                            )
-                            LaunchedEffect(workspaceStates) {
-                                deps.applicationPort.layout.applyWindowStates(workspaceStates, notifyListeners = false)
-                            }
-                            val activeProvider =
-                                remember(settingsRevision) {
-                                    panelServices.providers.getProvider(panelServices.providers.activeProviderId())
-                                }
-                            Column(modifier = Modifier.fillMaxSize()) {
-                                ComposeWorkspaceHeader(
-                                    providerName = activeProvider?.id ?: panelServices.providers.activeProviderId(),
-                                    modelName = panelServices.providers.activeModelId(),
-                                    beanDefinitionCount = deps.beanDefinitionCount,
-                                    inFlight = inFlight.state.value,
-                                    onStopAll = {
-                                        composeScope.launch {
-                                            deps.applicationPort.cancelActiveWork()
+                                    .focusRequester(workspaceFocusRequester)
+                                    .onPreviewKeyEvent { event ->
+                                        when {
+                                            event.isCommandPaletteShortcut() -> {
+                                                commandPaletteVisible = true
+                                                true
+                                            }
+                                            event.workspaceShortcutDigit() != null -> {
+                                                panelIdForShortcutDigit(event.workspaceShortcutDigit()!!)?.let(toggleWindow)
+                                                true
+                                            }
+                                            else -> false
                                         }
-                                    },
+                                    }.focusable(),
+                        ) {
+                            ComposeRail(
+                                windows = windows,
+                                onToggleWindow = toggleWindow,
+                                onReorderWindows = reorderWindows,
+                                onPanelWidthChanged = resizeWindow,
+                                showPanelLabels = settings.showPanelLabels,
+                                onTogglePanelLabels = {
+                                    if (settingsLoaded) {
+                                        val next = settings.copy(showPanelLabels = !settings.showPanelLabels)
+                                        settings = next
+                                        composeScope.launch {
+                                            withContext(Dispatchers.IO) { deps.applicationPort.settings.save(next) }
+                                        }
+                                    }
+                                },
+                                onCloseApplication = onCloseApplication,
+                                modalRequester = panelServices.modalRequester,
+                            )
+                            BoxWithConstraints(
+                                modifier =
+                                    Modifier
+                                        .fillMaxSize()
+                                        .padding(14.dp),
+                            ) {
+                                val viewport =
+                                    ComposeWorkspaceViewport(
+                                        width = maxWidth.value.roundToInt(),
+                                        height = maxHeight.value.roundToInt(),
+                                    )
+                                val minPanelWidth = ComposeWorkspaceWindowBounds.MIN_WIDTH
+                                val workspaceStates = windows.mapIndexed { index, window -> window.toLayoutWindowState(index) }
+                                deps.applicationPort.layout.bind(
+                                    stage = LayoutSize(width = viewport.width.toDouble(), height = viewport.height.toDouble()),
+                                    desktop = LayoutSize(width = viewport.width.toDouble(), height = viewport.height.toDouble()),
+                                    windows = workspaceStates,
                                 )
-                                ComposeSplitWorkspace(
-                                    windows = windows,
-                                    panelServices = panelServices,
-                                    onToggleWindow = toggleWindow,
-                                    onReorderWindows = reorderWindows,
-                                    onResizeWindow = resizeWindow,
-                                    minPanelWidth = minPanelWidth,
-                                    viewport = viewport,
-                                    modifier =
-                                        Modifier
-                                            .weight(1f)
-                                            .fillMaxWidth()
-                                            .padding(top = 12.dp),
-                                )
+                                LaunchedEffect(workspaceStates) {
+                                    deps.applicationPort.layout.applyWindowStates(workspaceStates, notifyListeners = false)
+                                }
+                                val activeProvider =
+                                    remember(settingsRevision) {
+                                        panelServices.providers.getProvider(panelServices.providers.activeProviderId())
+                                    }
+                                Column(modifier = Modifier.fillMaxSize()) {
+                                    ComposeWorkspaceHeader(
+                                        providerName = activeProvider?.id ?: panelServices.providers.activeProviderId(),
+                                        modelName = panelServices.providers.activeModelId(),
+                                        beanDefinitionCount = deps.beanDefinitionCount,
+                                        inFlight = inFlight.state.value,
+                                        onStopAll = {
+                                            composeScope.launch {
+                                                deps.applicationPort.cancelActiveWork()
+                                            }
+                                        },
+                                    )
+                                    ComposeSplitWorkspace(
+                                        windows = windows,
+                                        panelServices = panelServices,
+                                        onToggleWindow = toggleWindow,
+                                        onReorderWindows = reorderWindows,
+                                        onResizeWindow = resizeWindow,
+                                        minPanelWidth = minPanelWidth,
+                                        viewport = viewport,
+                                        modifier =
+                                            Modifier
+                                                .weight(1f)
+                                                .fillMaxWidth()
+                                                .padding(top = 12.dp),
+                                    )
+                                }
                             }
                         }
+                        composeModalHost(modal = modal, onDismiss = { modal = null })
+                        ComposeCommandPaletteHost(
+                            visible = commandPaletteVisible,
+                            commands = commands,
+                            onDismiss = { commandPaletteVisible = false },
+                        )
                     }
-                    ComposeModalHost(modal = modal, onDismiss = { modal = null })
-                    ComposeCommandPaletteHost(
-                        visible = commandPaletteVisible,
-                        commands = commands,
-                        onDismiss = { commandPaletteVisible = false },
-                    )
                 }
             }
         }

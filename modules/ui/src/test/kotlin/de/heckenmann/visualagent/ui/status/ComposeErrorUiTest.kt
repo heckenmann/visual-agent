@@ -4,7 +4,6 @@ package de.heckenmann.visualagent.ui.status
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import de.heckenmann.visualagent.protocol.ProtocolErrorCategory
@@ -42,7 +41,7 @@ class ComposeErrorUiTest {
             )
         composeTestRule.setContent {
             MaterialTheme {
-                ComposeModalHost(
+                composeModalHost(
                     modal =
                         ComposeErrorModal(
                             userError = userError,
@@ -69,7 +68,7 @@ class ComposeErrorUiTest {
         var retried = false
         composeTestRule.setContent {
             MaterialTheme {
-                ComposeModalHost(
+                composeModalHost(
                     modal =
                         ComposeErrorModal(
                             userError = userError,
@@ -81,7 +80,7 @@ class ComposeErrorUiTest {
             }
         }
 
-        composeTestRule.onNodeWithContentDescription("Retry").performClick()
+        composeTestRule.onNodeWithText("Retry").performClick()
 
         assertTrue(retried)
     }
@@ -98,7 +97,7 @@ class ComposeErrorUiTest {
         var copied = false
         composeTestRule.setContent {
             MaterialTheme {
-                ComposeModalHost(
+                composeModalHost(
                     modal =
                         ComposeErrorModal(
                             userError = userError,
@@ -110,7 +109,7 @@ class ComposeErrorUiTest {
             }
         }
 
-        composeTestRule.onNodeWithContentDescription("Copy error details").performClick()
+        composeTestRule.onNodeWithText("Copy details").performClick()
 
         assertTrue(copied)
     }

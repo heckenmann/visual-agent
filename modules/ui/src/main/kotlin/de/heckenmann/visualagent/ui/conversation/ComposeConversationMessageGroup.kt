@@ -3,8 +3,6 @@
 package de.heckenmann.visualagent.ui.conversation
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -84,11 +82,13 @@ internal fun ConversationMessageGroupRow(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val visibleMessages = group.messages.filterNot { it.message.id in deletingMessageIds }
     AnimatedVisibility(
-        visible = visibleMessages.isNotEmpty(),
-        enter = EnterTransition.None,
-        exit = ExitTransition.None,
+        visibleState =
+            rememberConversationMessageVisibility(
+                isVisible = group.messages.any { it.message.id !in deletingMessageIds },
+            ),
+        enter = conversationMessageEnterTransition(),
+        exit = conversationMessageDeleteTransition(),
         modifier = modifier.fillMaxWidth(),
     ) {
         PanelContentCard(backgroundColor = groupBackground(group.role)) {
@@ -99,16 +99,25 @@ internal fun ConversationMessageGroupRow(
             ) {
                 ConversationAuthorColumn(group.role)
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    visibleMessages.asReversed().forEach { item ->
+                    group.messages.asReversed().forEach { item ->
                         key(item.stableKey) {
-                            ConversationMessageGroupContent(
-                                item = item,
-                                sending = sending,
-                                onDeleteMessage = onDeleteMessage,
-                                onStatusChange = onStatusChange,
-                                onEditMessage = onEditMessage,
-                                onRetry = onRetry,
-                            )
+                            AnimatedVisibility(
+                                visibleState =
+                                    rememberConversationMessageVisibility(
+                                        isVisible = item.message.id !in deletingMessageIds,
+                                    ),
+                                enter = conversationMessageEnterTransition(),
+                                exit = conversationMessageDeleteTransition(),
+                            ) {
+                                ConversationMessageGroupContent(
+                                    item = item,
+                                    sending = sending,
+                                    onDeleteMessage = onDeleteMessage,
+                                    onStatusChange = onStatusChange,
+                                    onEditMessage = onEditMessage,
+                                    onRetry = onRetry,
+                                )
+                            }
                         }
                     }
                 }
@@ -124,21 +133,28 @@ internal fun TransientConversationMessageGroupRow(
     onCopied: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    PanelContentCard(modifier = modifier, backgroundColor = groupBackground(message.role)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-            ConversationAuthorColumn(message.role)
-            Box(modifier = Modifier.weight(1f)) {
-                ConversationMessageContent(
-                    message = message,
-                    isStreamingPlaceholder = false,
-                    isStreaming = isStreaming,
-                    modifier = Modifier.padding(end = 30.dp),
-                )
-                ConversationCopyAction(message = message, onCopied = onCopied, modifier = Modifier.align(Alignment.TopEnd))
+    AnimatedVisibility(
+        visibleState = rememberConversationMessageVisibility(isVisible = true),
+        enter = conversationMessageEnterTransition(),
+        exit = conversationMessageDeleteTransition(),
+        modifier = modifier,
+    ) {
+        PanelContentCard(backgroundColor = groupBackground(message.role)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                ConversationAuthorColumn(message.role)
+                Box(modifier = Modifier.weight(1f)) {
+                    ConversationMessageContent(
+                        message = message,
+                        isStreamingPlaceholder = false,
+                        isStreaming = isStreaming,
+                        modifier = Modifier.padding(end = 30.dp),
+                    )
+                    ConversationCopyAction(message = message, onCopied = onCopied, modifier = Modifier.align(Alignment.TopEnd))
+                }
             }
         }
     }

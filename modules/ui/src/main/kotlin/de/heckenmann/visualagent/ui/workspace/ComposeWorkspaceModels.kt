@@ -208,7 +208,7 @@ const val WORKSPACE_PANEL_GAP: Int = 16
 /**
  * Width of the draggable resizer handle rendered on the right edge of each panel.
  *
- * This value must stay in sync with the visual width used by [PanelResizer] so that
+ * This value must stay in sync with the visual width used by [panelResizer] so that
  * scroll and layout math match the rendered content.
  */
 const val WORKSPACE_PANEL_RESIZER_WIDTH: Int = 12

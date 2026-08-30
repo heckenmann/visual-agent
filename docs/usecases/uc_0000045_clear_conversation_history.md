@@ -33,7 +33,7 @@ The main conversation and its todos are reset without requiring an application r
 ## Code Entry Points
 
 - `de.heckenmann.visualagent.ui.conversation.ConversationPanel`
-- `de.heckenmann.visualagent.ui.modal.ComposeModalHost`
+- `de.heckenmann.visualagent.ui.modal.composeModalHost`
 - `de.heckenmann.visualagent.agent.AgentManager.cancelAllRunningActions`
 - `de.heckenmann.visualagent.agent.AgentManager.cancelAllActiveTodos`
 - `de.heckenmann.visualagent.agent.AgentManager.clearTodos`

@@ -20,7 +20,7 @@ Desktop user.
 3. The Compose shell lays out visible panels in the user-defined order, each panel using its own stored preferred width.
 4. All visible panels are placed side by side in the user-defined order, each using its own stored preferred width.
 5. The user drags a panel by its header to reorder the row.
-6. The user drags the resizer on the right edge of any panel, including the rightmost one, to change the panel's width; all panels to the right shift right, and the row becomes scrollable if needed. The resizer shows a visible three-bar grip.
+6. The user drags the resizer on the right edge of any panel, including the rightmost one, to change the panel's width; its edge follows the pointer directly during the drag, then the final width is committed once. All panels to the right shift right, and the row becomes scrollable if needed. The resizer shows a visible three-bar grip.
 7. The user long-presses or right-clicks a rail button and chooses "Set width…" to adjust a panel's preferred width with a slider.
 8. The user drags any rail button vertically to reorder panels; the dragged button shows a smooth preview, the other buttons animate out of the way, and the workspace row animates to the same order on release.
 9. The user drags any workspace panel header horizontally to reorder the row; the rail buttons animate to the same order on release.
@@ -62,7 +62,7 @@ The user can keep multiple panels visible and ordered for the current task witho
 - Dragging a rail button vertically reorders the user-defined panel order with an animated preview and settle.
 - Reordering from either location updates the other view with an animated transition.
 - Opening and hiding panels uses a smooth horizontal expand/collapse and fade transition.
-- Resizing a panel interpolates its rendered width to the persisted preferred width.
+- During an active resizer drag, the panel follows the pointer directly without an interpolation delay or persisted intermediate widths; external and rail-driven width changes may animate to their persisted preferred width.
 - Panel widths are attached to the panel identity, not to its position; reordering does not change panel widths.
 - Dragging a resizer on any panel's right edge, including the rightmost panel, changes only that panel's width and shifts all panels to the right instead of shrinking a neighbour; the resizer shows a visible three-bar grip.
 - Panel width changes can be made through a slider reachable from the rail button context menu.
@@ -71,5 +71,5 @@ The user can keep multiple panels visible and ordered for the current task witho
 - Large panel contents remain scrollable without expensive desktop chrome effects being recalculated.
 - Scrollable panel bodies register their adapters with the shared workspace-panel scrollbar host instead of rendering separate scrollbars.
 - The canvas panel does not receive a generic vertical scrollbar.
-- Panel cards remain visually separable through spacing, borders, and header contrast; the vertical spacing to the workspace edges matches the horizontal gap between adjacent panels.
+- Panel cards remain visually separable through spacing, borders, and header contrast; top, bottom, and left workspace-edge spacing use the shared panel-gap token, while the gap between adjacent panels remains unchanged.
 - The `workspace:layout` tool exposes and accepts order, visibility, and preferred width.

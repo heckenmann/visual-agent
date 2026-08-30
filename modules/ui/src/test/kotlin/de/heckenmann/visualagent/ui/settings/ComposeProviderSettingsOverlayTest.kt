@@ -63,6 +63,9 @@ class ComposeProviderSettingsOverlayTest {
         listOf("Provider", "Model", "Favorite").forEach { label ->
             composeTestRule.onNodeWithContentDescription("$label information").assertExists()
         }
+        listOf("Add provider", "Edit provider", "Remove provider", "Refresh models").forEach { label ->
+            composeTestRule.onNodeWithText(label).assertExists()
+        }
         verify(exactly = 0) { settings.save(any(), any()) }
     }
 }

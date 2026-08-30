@@ -293,6 +293,7 @@ internal fun ConversationPanel(
                 editingId = conversationState.editingId,
                 history = conversationState.history,
                 conversationPort = conversationPort,
+                modalRequester = modalRequester,
                 onDismiss = { conversationState.editingId = null },
                 onHistoryRefresh = { conversationState.replaceHistory(conversationPort.currentHistory()) },
             )

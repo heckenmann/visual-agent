@@ -3,15 +3,12 @@
 package de.heckenmann.visualagent.ui.files
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material3.MaterialTheme
@@ -143,24 +140,25 @@ private fun RenameFileDialog(
     onRename: (String) -> Unit,
 ) {
     var name by remember(currentName) { mutableStateOf(currentName) }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedTextField(
-            value = name,
-            onValueChange = { name = it },
-            label = { Text("File name") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End), modifier = Modifier.fillMaxWidth()) {
-            ActionIconButton(icon = Icons.Filled.Close, description = "Cancel rename", onClick = onCancel)
-            ActionIconButton(
-                icon = Icons.Filled.Done,
-                description = "Rename workspace file",
+    modalDialogLayout(
+        body = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("File name") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        footer = {
+            modalSecondaryButton(label = "Cancel", onClick = onCancel)
+            modalPrimaryButton(
+                label = "Rename",
                 enabled = name.isNotBlank(),
                 onClick = { onRename(name.trim()) },
             )
-        }
-    }
+        },
+    )
 }
 
 private fun WorkspaceFile.toClipboardMetadata(): String =

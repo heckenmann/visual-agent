@@ -3,13 +3,16 @@ package de.heckenmann.visualagent.ui.settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,7 +22,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.SettingsSnapshot
-import de.heckenmann.visualagent.ui.components.ActionIconButton
 import de.heckenmann.visualagent.ui.components.ActionTooltip
 import de.heckenmann.visualagent.ui.components.PanelDropdownField
 import de.heckenmann.visualagent.ui.components.PanelSection
@@ -109,21 +111,23 @@ private fun conversationNumberSetting(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ActionIconButton(
-                    icon = Icons.Filled.Remove,
-                    description = "Decrease $label",
-                    tooltipDescription = "Decrease $label by one",
+                OutlinedButton(
                     enabled = value > range.first,
                     onClick = { onChange(value - 1) },
-                )
+                ) {
+                    Icon(Icons.Filled.Remove, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Decrease")
+                }
                 Text(value.toString(), modifier = Modifier.semantics { contentDescription = label })
-                ActionIconButton(
-                    icon = Icons.Filled.Add,
-                    description = "Increase $label",
-                    tooltipDescription = "Increase $label by one",
+                OutlinedButton(
                     enabled = value < range.last,
                     onClick = { onChange(value + 1) },
-                )
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Increase")
+                }
             }
         } else {
             OutlinedTextField(

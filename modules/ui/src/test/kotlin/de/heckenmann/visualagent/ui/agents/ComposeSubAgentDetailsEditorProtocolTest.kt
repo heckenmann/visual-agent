@@ -2,7 +2,6 @@ package de.heckenmann.visualagent.ui.agents
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import de.heckenmann.visualagent.protocol.Agent
 import de.heckenmann.visualagent.protocol.AgentConfig
@@ -47,6 +46,6 @@ class ComposeSubAgentDetailsEditorProtocolTest {
         composeTestRule.onNodeWithText("Timeout").assertExists()
         composeTestRule.onNodeWithText("terminal").assertExists()
         composeTestRule.onNodeWithText("files").assertExists()
-        composeTestRule.onNodeWithContentDescription("Save sub-agent details").assertExists()
+        composeTestRule.onNodeWithText("Save changes").assertExists()
     }
 }

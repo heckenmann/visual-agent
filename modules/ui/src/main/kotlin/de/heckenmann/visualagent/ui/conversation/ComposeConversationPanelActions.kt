@@ -3,6 +3,7 @@
 package de.heckenmann.visualagent.ui.conversation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import de.heckenmann.visualagent.protocol.CancellationToken
 import de.heckenmann.visualagent.protocol.CancellationTokenImpl
 import de.heckenmann.visualagent.protocol.ConversationPort
@@ -113,25 +114,34 @@ internal fun ConversationEditModal(
     editingId: String?,
     history: List<Message>,
     conversationPort: ConversationPort,
+    modalRequester: ComposeModalRequester,
     onDismiss: () -> Unit,
     onHistoryRefresh: suspend () -> Unit,
 ) {
     if (editingId == null) return
     val message = history.find { it.id == editingId } ?: return
     val scope = androidx.compose.runtime.rememberCoroutineScope()
-    EditMessageModal(
-        content = message.content,
-        onDismiss = onDismiss,
-        onSave = { newContent ->
-            editingId.let { id ->
-                scope.launch {
-                    withContext(Dispatchers.IO) { conversationPort.updateMessage(id, newContent) }
-                    onHistoryRefresh()
-                }
-            }
-            onDismiss()
-        },
-    )
+    LaunchedEffect(editingId) {
+        modalRequester.request(
+            ComposeContentModal(
+                title = "Edit message",
+                content = { dismiss ->
+                    EditMessageForm(
+                        content = message.content,
+                        onDismiss = dismiss,
+                        onSave = { newContent ->
+                            scope.launch {
+                                withContext(Dispatchers.IO) { conversationPort.updateMessage(editingId, newContent) }
+                                onHistoryRefresh()
+                                dismiss()
+                            }
+                        },
+                    )
+                },
+                onDismiss = onDismiss,
+            ),
+        )
+    }
 }
 
 /**
