@@ -16,8 +16,6 @@ data class ToolSettings(
     val model: String,
     val openAiBaseUrl: String,
     val openAiApiKeyConfigured: Boolean,
-    val streamingEnabled: Boolean,
-    val thinkingEnabled: Boolean,
     val timeoutSeconds: Int,
     val uiScalePercent: Int?,
 )
@@ -28,7 +26,5 @@ data class ToolSettingsUpdate(
     val provider: String? = null,
     val model: String? = null,
     val openAiBaseUrl: String? = null,
-    val streamingEnabled: Boolean? = null,
-    val thinkingEnabled: Boolean? = null,
     val uiScalePercent: Int? = null,
 )

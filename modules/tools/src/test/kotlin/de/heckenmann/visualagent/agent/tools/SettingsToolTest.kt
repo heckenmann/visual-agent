@@ -44,8 +44,6 @@ class SettingsToolTest {
                 model = "test-model",
                 openAiBaseUrl = "https://api.openai.com",
                 openAiApiKeyConfigured = false,
-                streamingEnabled = true,
-                thinkingEnabled = false,
                 timeoutSeconds = 120,
                 uiScalePercent = null,
             )

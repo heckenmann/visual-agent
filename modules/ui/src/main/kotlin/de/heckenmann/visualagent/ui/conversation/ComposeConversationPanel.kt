@@ -194,10 +194,8 @@ internal fun ConversationPanel(
         onPendingUserMessageChange = { conversationState.pendingUserMessage = it },
         streamingFlow = conversationState.streaming,
     )
-    val onInputPlacementChange: (ConversationInputPlacement) -> Unit = { placement ->
-        inputPlacement = placement
-        scope.launch { persistConversationInputPlacement(conversationPort, placement) }
-    }
+    val onInputPlacementChange =
+        conversationInputPlacementChange(scope, conversationPort) { placement -> inputPlacement = placement }
     CompositionLocalProvider(
         LocalConversationPort provides conversationPort,
         LocalClientImagePort provides clientImagePort,

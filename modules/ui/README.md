@@ -19,6 +19,12 @@ and the splash lifecycle belong to `:desktop`.
 :application -> :protocol
 ```
 
+## Scope
+
+The module owns Compose panels, reusable controls, themes, presentation-only state, and UI tests.
+It never performs persistence, provider or network calls, workspace filesystem access, or direct
+tool execution; those operations travel through protocol ports.
+
 ## Commands
 
 Run from the repository root:

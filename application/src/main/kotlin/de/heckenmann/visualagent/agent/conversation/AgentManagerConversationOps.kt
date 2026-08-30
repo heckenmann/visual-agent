@@ -190,7 +190,7 @@ internal class AgentManagerConversationOps(
             Message(
                 "assistant",
                 presentationText,
-                metadata = providerTurn?.let { ResponseTelemetryMetadata.encode(it, owner.appConfig.thinkingEnabled) },
+                metadata = providerTurn?.let { ResponseTelemetryMetadata.encode(it, true) },
             )
         persist(assistantMessage)
         owner.finishedToolEventsByRequestId.remove(requestId)
@@ -277,7 +277,7 @@ internal class AgentManagerConversationOps(
             mutableMapOf<String, Any>(
                 "sessionId" to AgentManager.MAIN_SESSION_ID,
                 "agent" to "main",
-                "thinkingEnabled" to owner.appConfig.thinkingEnabled,
+                "thinkingEnabled" to true,
             ).apply {
                 if (!requestId.isNullOrBlank()) put("requestId", requestId)
             }

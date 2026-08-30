@@ -58,13 +58,9 @@ internal fun WindowBody(
                 todoPort = panelServices.todos,
             )
         "settings" ->
-            SettingsPanel(
+            settingsPanel(
                 settingsPort = panelServices.settings,
-                providerPort = panelServices.providers,
-                modalRequester = panelServices.modalRequester,
                 onSettingsChanged = panelServices.onSettingsChanged,
-                inFlight = panelServices.inFlight,
-                activityPort = panelServices.activity,
             )
         "canvas" ->
             CanvasPanel(

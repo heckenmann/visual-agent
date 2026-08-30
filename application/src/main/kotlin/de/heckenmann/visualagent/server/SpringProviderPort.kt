@@ -58,6 +58,12 @@ class SpringProviderPort(
             selectableModels(providerId)
         }
 
+    override suspend fun discoverModels(profile: ProviderProfile): List<ProviderModel> =
+        protocolBoundary {
+            val discovered = llmProvider.getModels(profile.toApplication())
+            profile.withDiscoveredModels(discovered).selectableModels()
+        }
+
     override suspend fun modelDetails(
         providerId: String,
         modelId: String,
@@ -95,6 +101,22 @@ private fun ProviderProfile.toApplication(): ApplicationProviderProfile =
         modelWhitelist = modelWhitelist,
         modelBlacklist = modelBlacklist,
     )
+
+private fun ProviderProfile.withDiscoveredModels(modelIds: List<String>): ProviderProfile =
+    copy(
+        models =
+            modelIds.distinct().map { modelId ->
+                models.firstOrNull { it.id == modelId } ?: ProviderModel(id = modelId)
+            },
+    )
+
+private fun ProviderProfile.selectableModels(): List<ProviderModel> =
+    models.filter { model ->
+        model.id !in modelBlacklist &&
+            (modelWhitelist.isEmpty() || model.id in modelWhitelist) &&
+            model.status != ModelStatus.DEPRECATED &&
+            model.status != ModelStatus.DISABLED
+    }
 
 private fun ApplicationProviderAdapter.toProtocol(): ProviderAdapter =
     when (this) {

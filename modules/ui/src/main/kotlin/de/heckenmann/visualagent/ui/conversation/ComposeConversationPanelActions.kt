@@ -35,6 +35,17 @@ internal suspend fun persistConversationInputPlacement(
     }
 }
 
+/** Returns a non-blocking callback that updates and persists the composer placement. */
+internal fun conversationInputPlacementChange(
+    scope: CoroutineScope,
+    conversationPort: ConversationPort,
+    onPlacementChanged: (de.heckenmann.visualagent.protocol.ConversationInputPlacement) -> Unit,
+): (de.heckenmann.visualagent.protocol.ConversationInputPlacement) -> Unit =
+    { placement ->
+        onPlacementChanged(placement)
+        scope.launch { persistConversationInputPlacement(conversationPort, placement) }
+    }
+
 /**
  * Extracted conversation panel actions to keep [ConversationPanel] under the 300-LOC limit.
  */

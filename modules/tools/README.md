@@ -14,3 +14,18 @@ Current contracts live under `de.heckenmann.visualagent.agent.tools.api`:
 - tool-owned ports for application services
 
 `ToolDefinition` remains the runtime source of model-facing descriptions and input schemas. `@AgentTool` only controls Spring discovery.
+
+## Responsibilities
+
+- Registers tools and adapts them to provider-facing callbacks.
+- Publishes tool execution events and provides JSON schemas and result contracts.
+- Contains standard agent, todo, workspace, canvas, terminal, and support tools.
+
+## Commands
+
+Run from the repository root:
+
+```bash
+./gradlew :tool-standard:build
+./gradlew :tool-standard:test
+```

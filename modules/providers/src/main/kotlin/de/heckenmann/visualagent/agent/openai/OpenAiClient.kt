@@ -165,7 +165,7 @@ class OpenAiClient(
             }
         }
 
-    internal suspend fun getModels(profile: ProviderProfile): List<String> =
+    override suspend fun getModels(profile: ProviderProfile): List<String> =
         withContext(Dispatchers.IO) {
             requireUsableApiKey(profile.baseUrl, ProviderEnvironmentCredentials.openAiApiKey(profile))
             OpenAiModelCatalog { openAiClient(profile) }.load(modelsUri(profile))

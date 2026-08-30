@@ -30,4 +30,35 @@ class ComposeProtocolSettingsSupportTest {
         assertEquals("gpt", state.modelId)
         assertEquals(listOf("gpt"), state.models.map(ProviderModel::id))
     }
+
+    @Test
+    fun `disabling the selected provider selects an enabled fallback`() {
+        val draft =
+            ProviderSettingsDraft(
+                providers =
+                    listOf(
+                        ProviderProfile(
+                            "active",
+                            "Active",
+                            ProviderAdapter.OLLAMA,
+                            "",
+                            models = listOf(ProviderModel("old")),
+                        ),
+                        ProviderProfile(
+                            "fallback",
+                            "Fallback",
+                            ProviderAdapter.OPENAI_COMPATIBLE,
+                            "",
+                            models = listOf(ProviderModel("new")),
+                        ),
+                    ),
+                providerId = "active",
+                modelId = "old",
+            )
+
+        val normalized = draft.upsert(draft.providers.first().copy(enabled = false))
+
+        assertEquals("fallback", normalized.providerId)
+        assertEquals("new", normalized.modelId)
+    }
 }

@@ -33,8 +33,6 @@ class ToolSettingsPortAdapter(
             model = providerCatalog.activeModelId(),
             openAiBaseUrl = appConfig.openAiBaseUrl,
             openAiApiKeyConfigured = appConfig.openAiApiKey.isNotBlank(),
-            streamingEnabled = appConfig.streamingEnabled,
-            thinkingEnabled = appConfig.thinkingEnabled,
             timeoutSeconds = appConfig.timeoutSeconds,
             uiScalePercent = appConfig.uiScalePercent,
         )
@@ -48,8 +46,6 @@ class ToolSettingsPortAdapter(
             if (provider != null) providerCatalog.saveProvider(provider.copy(defaultModel = model))
         }
         update.openAiBaseUrl?.let { appConfig.openAiBaseUrl = it }
-        update.streamingEnabled?.let { appConfig.streamingEnabled = it }
-        update.thinkingEnabled?.let { appConfig.thinkingEnabled = it }
         update.uiScalePercent?.let { percent ->
             appConfig.uiScalePercent = percent.takeIf { it != 0 }?.coerceIn(50, 200)
         }

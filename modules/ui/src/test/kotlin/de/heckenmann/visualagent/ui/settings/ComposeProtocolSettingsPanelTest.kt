@@ -1,142 +1,89 @@
 package de.heckenmann.visualagent.ui.settings
 
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
-import de.heckenmann.visualagent.protocol.ActivityPort
-import de.heckenmann.visualagent.protocol.ModelDetails
-import de.heckenmann.visualagent.protocol.ProviderAdapter
-import de.heckenmann.visualagent.protocol.ProviderModel
-import de.heckenmann.visualagent.protocol.ProviderPort
-import de.heckenmann.visualagent.protocol.ProviderProfile
 import de.heckenmann.visualagent.protocol.SettingsPort
 import de.heckenmann.visualagent.protocol.SettingsSnapshot
-import de.heckenmann.visualagent.ui.modal.ComposeModalRequester
-import de.heckenmann.visualagent.ui.status.InFlightStateHolder
+import de.heckenmann.visualagent.ui.components.settingsDraftActionRow
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import org.junit.Rule
 import org.junit.Test
-import kotlin.test.assertTrue
+import kotlin.test.assertEquals
 
-/** Verifies provider and runtime settings through transport-neutral ports. */
+/** Verifies that UI settings are staged locally and can be reset from persisted state. */
 class ComposeProtocolSettingsPanelTest {
     @get:Rule
     val composeTestRule = createComposeRule()
 
     @Test
-    fun `panel renders provider and execution settings`() {
-        var detailsLoaded = false
-        val settings = mockk<SettingsPort>(relaxed = true)
-        every { settings.snapshot() } returns SettingsSnapshot()
-        coEvery { settings.snapshotAsync() } returns SettingsSnapshot()
-        every { settings.addChangeListener(any()) } returns AutoCloseable { }
-        val providers = mockk<ProviderPort>(relaxed = true)
-        every { providers.listProviders() } returns listOf(ProviderProfile("ollama", "Ollama", ProviderAdapter.OLLAMA, ""))
-        every { providers.enabledProviders() } returns listOf(ProviderProfile("ollama", "Ollama", ProviderAdapter.OLLAMA, ""))
-        every { providers.activeProviderId() } returns "ollama"
-        every { providers.activeModelId() } returns "llama"
-        every { providers.selectableModels("ollama") } returns listOf(ProviderModel("llama", "Llama"))
-        coEvery { providers.modelDetails("ollama", "llama") } answers {
-            detailsLoaded = true
-            ModelDetails("llama", "today")
-        }
-        every { providers.addChangeListener(any()) } returns AutoCloseable { }
+    fun `panel renders only UI settings and disabled draft actions`() {
+        val settings = settingsPort(SettingsSnapshot())
 
-        composeTestRule.setContent {
-            MaterialTheme {
-                SettingsPanel(
-                    settings,
-                    providers,
-                    ComposeModalRequester { },
-                    {},
-                    InFlightStateHolder(),
-                    mockk<ActivityPort>(relaxed = true),
-                )
-            }
-        }
+        composeTestRule.setContent { MaterialTheme { settingsPanel(settings, {}) } }
 
-        composeTestRule.onNodeWithText("Provider connections").assertExists()
-        composeTestRule.onNodeWithText("Execution").assertExists()
         composeTestRule.onNodeWithText("Appearance").assertExists()
-        composeTestRule.onNodeWithText("Context length").assertExists()
-        composeTestRule.onNodeWithContentDescription("Save provider and model").assertExists()
-        composeTestRule.onNodeWithContentDescription("Save settings").assertExists().assertIsEnabled()
-        composeTestRule.onNodeWithContentDescription("Refresh models").assertExists()
-        composeTestRule.onNodeWithContentDescription("Refresh model details").assertDoesNotExist()
-        composeTestRule.waitUntil(5_000) { detailsLoaded }
+        composeTestRule.onNodeWithText("Conversation").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Save changes").assertIsNotEnabled()
+        composeTestRule.onNodeWithText("Reset changes").assertIsNotEnabled()
+        composeTestRule.onNodeWithText("Settings loaded").assertExists()
+        composeTestRule.onNodeWithText("Provider connection").assertDoesNotExist()
     }
 
     @Test
-    fun `save action persists the current settings snapshot`() {
-        var settingsSaved = false
-        var selectionSaved = false
-        val settings = mockk<SettingsPort>(relaxed = true)
-        every { settings.snapshot() } returns SettingsSnapshot()
-        coEvery { settings.snapshotAsync() } returns SettingsSnapshot()
-        every { settings.addChangeListener(any()) } returns AutoCloseable { }
-        every { settings.save(any()) } answers { settingsSaved = true }
-        val providers = mockk<ProviderPort>(relaxed = true)
-        every { providers.listProviders() } returns listOf(ProviderProfile("ollama", "Ollama", ProviderAdapter.OLLAMA, ""))
-        every { providers.enabledProviders() } returns listOf(ProviderProfile("ollama", "Ollama", ProviderAdapter.OLLAMA, ""))
-        every { providers.activeProviderId() } returns "ollama"
-        every { providers.activeModelId() } returns "llama"
-        every { providers.selectableModels(any()) } returns listOf(ProviderModel("llama", "Llama"))
-        every { providers.addChangeListener(any()) } returns AutoCloseable { }
-        every { providers.setActiveSelection(any(), any()) } answers { selectionSaved = true }
+    fun `settings draft actions expose a clear secondary reset and primary save`() {
+        var resetCount = 0
+        var saveCount = 0
 
         composeTestRule.setContent {
             MaterialTheme {
-                SettingsPanel(
-                    settings,
-                    providers,
-                    ComposeModalRequester { },
-                    {},
-                    InFlightStateHolder(),
-                    mockk<ActivityPort>(relaxed = true),
+                settingsDraftActionRow(
+                    hasUnsavedChanges = true,
+                    saving = false,
+                    onReset = { resetCount += 1 },
+                    onSave = { saveCount += 1 },
                 )
             }
         }
 
-        composeTestRule
-            .onNodeWithContentDescription(
-                "Save settings",
-            ).performScrollTo()
-            .assert(hasClickAction())
-            .assertIsEnabled()
-            .performClick()
-        composeTestRule.waitUntil(5_000) { settingsSaved && selectionSaved }
-        assertTrue(settingsSaved)
-        assertTrue(selectionSaved)
+        composeTestRule.onNodeWithText("Reset changes").assertIsEnabled().performClick()
+        composeTestRule.onNodeWithText("Save changes").assertIsEnabled().performClick()
+        kotlin.test.assertEquals(1, resetCount)
+        kotlin.test.assertEquals(1, saveCount)
     }
 
     @Test
-    fun `settings save is disabled when provider has no selectable model`() {
-        val settings = mockk<SettingsPort>(relaxed = true)
-        every { settings.snapshot() } returns SettingsSnapshot(modelId = "")
-        coEvery { settings.snapshotAsync() } returns SettingsSnapshot(modelId = "")
-        every { settings.addChangeListener(any()) } returns AutoCloseable { }
-        val providers = mockk<ProviderPort>(relaxed = true)
-        every { providers.listProviders() } returns listOf(ProviderProfile("ollama", "Ollama", ProviderAdapter.OLLAMA, ""))
-        every { providers.activeProviderId() } returns "ollama"
-        every { providers.activeModelId() } returns ""
-        every { providers.selectableModels("ollama") } returns emptyList()
-        every { providers.addChangeListener(any()) } returns AutoCloseable { }
+    fun `reset reloads persisted settings without saving the local draft`() {
+        val settings = settingsPort(SettingsSnapshot(fontSize = 16))
 
-        composeTestRule.setContent {
-            MaterialTheme {
-                SettingsPanel(settings, providers, ComposeModalRequester { }, {}, InFlightStateHolder(), mockk(relaxed = true))
-            }
-        }
+        composeTestRule.setContent { MaterialTheme { settingsPanel(settings, {}) } }
 
-        composeTestRule.onNodeWithContentDescription("Save settings").assertIsNotEnabled()
+        composeTestRule.onNodeWithText("Reset changes").assertIsNotEnabled()
+        verify(exactly = 0) { settings.save(any()) }
     }
+
+    @Test
+    fun `appearance merge preserves newer conversation settings`() {
+        val current = SettingsSnapshot(fontSize = 14, contextLength = 20, timeoutSeconds = 120)
+        val appearanceDraft = SettingsSnapshot(fontSize = 18, contextLength = 5, timeoutSeconds = 30)
+
+        val merged = current.withAppearanceFrom(appearanceDraft)
+
+        assertEquals(18, merged.fontSize)
+        assertEquals(20, merged.contextLength)
+        assertEquals(120, merged.timeoutSeconds)
+    }
+
+    private fun settingsPort(snapshot: SettingsSnapshot): SettingsPort =
+        mockk<SettingsPort>(relaxed = true).also { port ->
+            every { port.snapshot() } returns snapshot
+            coEvery { port.snapshotAsync() } returns snapshot
+            every { port.addChangeListener(any()) } returns AutoCloseable { }
+        }
 }

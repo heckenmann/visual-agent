@@ -27,6 +27,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.ProviderAdapter
+import de.heckenmann.visualagent.protocol.ProviderModel
 import de.heckenmann.visualagent.protocol.ProviderProfile
 import de.heckenmann.visualagent.ui.components.ActionIconButton
 import de.heckenmann.visualagent.ui.components.PanelCheckbox
@@ -185,19 +186,28 @@ private fun ProviderProfileFormState.validationError(): String? =
     }
 
 private fun ProviderProfileFormState.toProviderProfile(existing: ProviderProfile?): ProviderProfile =
-    ProviderProfile(
-        id = existing?.id ?: id.trim(),
-        name = name.trim(),
-        adapter = adapter,
-        baseUrl = baseUrl.trim(),
-        apiKey = apiKey.trim(),
-        enabled = enabled,
-        defaultModel = defaultModel.trim(),
-        options = optionsText.toSettingsMap(),
-        models = existing?.models.orEmpty(),
-        modelWhitelist = existing?.modelWhitelist.orEmpty(),
-        modelBlacklist = existing?.modelBlacklist.orEmpty(),
-    )
+    defaultModel.trim().let { selectedDefault ->
+        val existingModels = existing?.models.orEmpty()
+        val models =
+            if (selectedDefault.isNotBlank() && existingModels.none { it.id == selectedDefault }) {
+                existingModels + ProviderModel(selectedDefault)
+            } else {
+                existingModels
+            }
+        ProviderProfile(
+            id = existing?.id ?: id.trim(),
+            name = name.trim(),
+            adapter = adapter,
+            baseUrl = baseUrl.trim(),
+            apiKey = apiKey.trim(),
+            enabled = enabled,
+            defaultModel = selectedDefault,
+            options = optionsText.toSettingsMap(),
+            models = models,
+            modelWhitelist = existing?.modelWhitelist.orEmpty(),
+            modelBlacklist = existing?.modelBlacklist.orEmpty(),
+        )
+    }
 
 internal fun Map<String, String>.toSettingsMapText(): String =
     entries.sortedBy { it.key }.joinToString("\n") { (key, value) -> "$key=$value" }

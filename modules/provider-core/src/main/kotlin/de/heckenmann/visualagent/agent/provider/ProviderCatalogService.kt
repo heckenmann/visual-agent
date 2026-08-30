@@ -77,6 +77,36 @@ class ProviderCatalogService(
     }
 
     /**
+     * Replaces the complete provider catalog and active selection from one staged settings edit.
+     *
+     * The validation happens before writing the catalog so an invalid profile, disabled provider,
+     * or unavailable model cannot leave the persisted configuration partially updated.
+     *
+     * @param configuration Complete catalog and active main-agent selection to persist
+     */
+    fun replaceConfiguration(configuration: ProviderConfiguration) {
+        val providers = configuration.providers.map { profile -> profile.withSelectableCodexDefault() }
+        require(providers.map(ProviderProfile::id).all { it.isNotBlank() }) { "Provider identifiers must not be blank" }
+        require(providers.map(ProviderProfile::id).distinct().size == providers.size) { "Provider identifiers must be unique" }
+        require(providers.any(ProviderProfile::enabled)) { "At least one provider profile must remain enabled" }
+        val selectedProvider =
+            providers.firstOrNull { it.id == configuration.providerId && it.enabled }
+                ?: error("Provider is missing or disabled: ${configuration.providerId}")
+        require(configuration.modelId.isNotBlank()) { "Model is required" }
+        require(selectedProvider.selectableModels().any { it.id == configuration.modelId }) {
+            "Model is missing, disabled, or filtered: ${configuration.providerId}/${configuration.modelId}"
+        }
+        save(
+            CatalogState(
+                activeProviderId = configuration.providerId,
+                activeModelId = configuration.modelId,
+                providers = providers,
+            ),
+        )
+        appConfig.llmProvider = configuration.providerId
+    }
+
+    /**
      * Deletes a provider profile when at least one other enabled profile remains.
      *
      * @return `true` when the profile was removed
@@ -160,11 +190,7 @@ class ProviderCatalogService(
      */
     fun selectableModels(providerId: String): List<ProviderModelConfig> {
         val profile = getProvider(providerId) ?: return emptyList()
-        return profile.models.filter { model ->
-            model.status !in setOf(ModelStatus.DEPRECATED, ModelStatus.DISABLED) &&
-                model.id !in profile.modelBlacklist &&
-                (profile.modelWhitelist.isEmpty() || model.id in profile.modelWhitelist)
-        }
+        return profile.selectableModels()
     }
 
     /**
@@ -363,6 +389,13 @@ class ProviderCatalogService(
             copy(models = models + ProviderModelConfig(defaultModel, capabilities = setOf("vision")))
         } else {
             this
+        }
+
+    private fun ProviderProfile.selectableModels(): List<ProviderModelConfig> =
+        models.filter { model ->
+            model.status !in setOf(ModelStatus.DEPRECATED, ModelStatus.DISABLED) &&
+                model.id !in modelBlacklist &&
+                (modelWhitelist.isEmpty() || model.id in modelWhitelist)
         }
 
     private fun load(): CatalogState =

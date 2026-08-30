@@ -77,6 +77,17 @@ data class ProviderProfile(
 )
 
 /**
+ * Complete provider catalog state staged by the settings UI.
+ *
+ * Persisting this value replaces the catalog and the main-agent selection together.
+ */
+data class ProviderConfiguration(
+    val providers: List<ProviderProfile>,
+    val providerId: String,
+    val modelId: String,
+)
+
+/**
  * Fully resolved provider, model, and merged request options.
  *
  * @property provider Selected provider profile

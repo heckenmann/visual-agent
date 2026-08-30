@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import de.heckenmann.visualagent.protocol.ProviderAdapter
+import de.heckenmann.visualagent.protocol.ProviderModel
 import de.heckenmann.visualagent.protocol.ProviderProfile
 import org.junit.Rule
 import org.junit.Test
@@ -30,6 +31,7 @@ class ComposeProviderProfileEditorTest {
                 baseUrl = "http://localhost:11434",
                 apiKey = "secret",
                 defaultModel = "llama3",
+                models = listOf(ProviderModel("llama3")),
                 options = mapOf("keep_alive" to "5m"),
             )
         var saved: ProviderProfile? = null

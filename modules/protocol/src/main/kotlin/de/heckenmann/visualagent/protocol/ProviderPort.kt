@@ -38,6 +38,9 @@ interface ProviderPort {
     /** Discovers models and updates the provider catalog. */
     suspend fun refreshModels(providerId: String): List<ProviderModel>
 
+    /** Discovers models with a staged provider profile without persisting the result. */
+    suspend fun discoverModels(profile: ProviderProfile): List<ProviderModel>
+
     /** Loads details for one provider model. */
     suspend fun modelDetails(
         providerId: String,

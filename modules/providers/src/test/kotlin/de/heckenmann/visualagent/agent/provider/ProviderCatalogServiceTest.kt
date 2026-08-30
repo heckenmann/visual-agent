@@ -47,6 +47,26 @@ class ProviderCatalogServiceTest {
     }
 
     @Test
+    fun `staged configuration replaces catalog and active selection together`() {
+        val catalog = ProviderCatalogService(MapPreferenceStore())
+        val profile =
+            ProviderProfile(
+                id = "staged",
+                name = "Staged provider",
+                adapter = ProviderAdapter.OPENAI_COMPATIBLE,
+                baseUrl = "https://example.test",
+                defaultModel = "model-a",
+                models = listOf(ProviderModelConfig("model-a")),
+            )
+
+        catalog.replaceConfiguration(ProviderConfiguration(listOf(profile), "staged", "model-a"))
+
+        assertEquals("staged", catalog.activeProviderId())
+        assertEquals("model-a", catalog.activeModelId())
+        assertEquals(listOf("staged"), catalog.listProviders().map { it.id })
+    }
+
+    @Test
     fun `model filters exclude disabled deprecated and blacklisted models`() {
         val catalog = ProviderCatalogService(MapPreferenceStore())
         catalog.saveProvider(

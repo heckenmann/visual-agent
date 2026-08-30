@@ -145,6 +145,15 @@ interface LLMProvider {
     suspend fun getModels(providerId: String): List<String> = getModels()
 
     /**
+     * Discovers model names using a caller-supplied provider profile without changing persisted configuration.
+     *
+     * @param profile Provider connection, credentials, and adapter settings used for discovery
+     * @return Discovered model names
+     * @see docs/usecases/uc_0000009_discover_available_models.md
+     */
+    suspend fun getModels(profile: ProviderProfile): List<String> = getModels()
+
+    /**
      * Get detailed information about a specific model.
      *
      * @param modelName Name of the model to get details for
