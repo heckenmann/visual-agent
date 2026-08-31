@@ -52,5 +52,7 @@ Long conversations can be reviewed incrementally without loading all history on 
 - A loading indicator is shown while older messages are being fetched.
 - When no older messages remain, no further automatic loads are triggered.
 - Already visible messages are not duplicated.
+- Loaded historical rows preserve their persisted identities and do not play a
+  new-message enter animation.
 - Startup history remains bounded.
 - History paging is deterministic.
