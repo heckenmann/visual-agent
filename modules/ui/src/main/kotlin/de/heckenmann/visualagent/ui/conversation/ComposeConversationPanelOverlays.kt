@@ -4,6 +4,7 @@ package de.heckenmann.visualagent.ui.conversation
 
 import androidx.compose.runtime.Composable
 import de.heckenmann.visualagent.protocol.CancellationToken
+import de.heckenmann.visualagent.protocol.ConversationPort
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -68,5 +69,22 @@ internal fun ConversationPanelQueueStrip(
                     QueueFlushMode.ONE_BY_ONE
                 }
         },
+    )
+}
+
+/** Hosts the edit modal while keeping the conversation panel focused on its main layout. */
+@Composable
+internal fun ConversationEditMessageOverlay(
+    state: ConversationUiState,
+    conversationPort: ConversationPort,
+    modalRequester: de.heckenmann.visualagent.ui.modal.ComposeModalRequester,
+) {
+    ConversationEditModal(
+        editingId = state.editingId,
+        history = state.history,
+        conversationPort = conversationPort,
+        modalRequester = modalRequester,
+        onDismiss = { state.editingId = null },
+        onHistoryRefresh = { state.replaceHistory(conversationPort.currentHistory()) },
     )
 }

@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -38,6 +39,8 @@ internal fun LazyListScope.ConversationTimeline(
     sendContent: (String) -> Unit,
     inlineComposer: @Composable () -> Unit = {},
     onOpenTodoResponse: (TodoItem, de.heckenmann.visualagent.ui.todo.TodoResponseState) -> Unit = { _, _ -> },
+    shouldAnimateEntry: (String?) -> Boolean = { false },
+    onMessageEntryRendered: (String?) -> Unit = {},
 ) {
     itemsIndexed(items, key = { _, item -> item.stableKey }) { index, item ->
         when (item) {
@@ -55,6 +58,8 @@ internal fun LazyListScope.ConversationTimeline(
                     onStatusChange = onStatusChange,
                     onEditMessage = onEditMessage,
                     sendContent = sendContent,
+                    animateEntry = shouldAnimateEntry(item.message.id),
+                    onMessageEntryRendered = onMessageEntryRendered,
                 )
             is ConversationTimelineItem.TodoCard ->
                 ConversationTodoCard(
@@ -106,7 +111,12 @@ private fun ConversationMessageTimelineRow(
     onStatusChange: (String) -> Unit,
     onEditMessage: (String?) -> Unit,
     sendContent: (String) -> Unit,
+    animateEntry: Boolean,
+    onMessageEntryRendered: (String?) -> Unit,
 ) {
+    LaunchedEffect(item.message.id) {
+        onMessageEntryRendered(item.message.id)
+    }
     val persisted = ConversationTimelineItem.Persisted(item.message, item.chronologicalIndex)
     ConversationMessageGroupRow(
         group = ConversationMessageGroup(listOf(persisted)),
@@ -120,6 +130,7 @@ private fun ConversationMessageTimelineRow(
             if (previous == null) onStatusChange("No previous user message to retry") else sendContent(previous.message.content)
         },
         isStreaming = item.isStreaming,
+        animateEntry = animateEntry,
         modifier = Modifier.padding(top = if (item.message.role == "assistant" && item.isStreaming) 2.dp else 10.dp),
     )
 }

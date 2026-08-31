@@ -80,12 +80,14 @@ internal fun ConversationMessageGroupRow(
     onEditMessage: (String?) -> Unit,
     onRetry: () -> Unit,
     isStreaming: Boolean = false,
+    animateEntry: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     AnimatedVisibility(
         visibleState =
             rememberConversationMessageVisibility(
                 isVisible = group.messages.any { it.message.id !in deletingMessageIds },
+                animateInitial = animateEntry,
             ),
         enter = conversationMessageEnterTransition(),
         exit = conversationMessageDeleteTransition(),
@@ -105,6 +107,7 @@ internal fun ConversationMessageGroupRow(
                                 visibleState =
                                     rememberConversationMessageVisibility(
                                         isVisible = item.message.id !in deletingMessageIds,
+                                        animateInitial = animateEntry,
                                     ),
                                 enter = conversationMessageEnterTransition(),
                                 exit = conversationMessageDeleteTransition(),

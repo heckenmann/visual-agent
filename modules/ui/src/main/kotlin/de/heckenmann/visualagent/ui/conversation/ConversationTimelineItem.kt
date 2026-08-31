@@ -85,13 +85,14 @@ internal fun buildConversationTimeline(
     buildList {
         if (includeInlineComposer) add(ConversationTimelineItem.InlineComposer)
         if (showWaitingIndicator) add(ConversationTimelineItem.Waiting)
-        if (streamingContent.isNotEmpty() && streamingEntryId != null) {
+        val uniqueHistory = history.distinctPersistedMessages()
+        val persistedIds = uniqueHistory.mapNotNull { message -> message.id }.toSet()
+        if (streamingContent.isNotEmpty() && streamingEntryId != null && streamingEntryId !in persistedIds) {
             add(ConversationTimelineItem.MessageEntry(Message("assistant", streamingContent, id = streamingEntryId), -2, true))
         }
-        if (pendingUserMessage != null && pendingUserEntryId != null) {
+        if (pendingUserMessage != null && pendingUserEntryId != null && pendingUserEntryId !in persistedIds) {
             add(ConversationTimelineItem.MessageEntry(Message("user", pendingUserMessage, id = pendingUserEntryId), -1))
         }
-        val uniqueHistory = history.distinctPersistedMessages()
         val persisted =
             uniqueHistory.indices.reversed().map { index ->
                 ConversationTimelineItem.Persisted(uniqueHistory[index], index)

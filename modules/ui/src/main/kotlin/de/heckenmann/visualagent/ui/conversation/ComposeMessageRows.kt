@@ -255,8 +255,12 @@ internal const val DELETE_ANIMATION_DURATION_MS = 220
 
 /** Keeps a row's first appearance animated while preserving its deletion transition. */
 @Composable
-internal fun rememberConversationMessageVisibility(isVisible: Boolean): MutableTransitionState<Boolean> =
-    remember { MutableTransitionState(false) }.also { visibility -> visibility.targetState = isVisible }
+internal fun rememberConversationMessageVisibility(
+    isVisible: Boolean,
+    animateInitial: Boolean = true,
+): MutableTransitionState<Boolean> =
+    remember { MutableTransitionState(if (animateInitial) false else isVisible) }
+        .also { visibility -> visibility.targetState = isVisible }
 
 /** Animates a newly added conversation row upward from below its final position. */
 internal fun conversationMessageEnterTransition() =

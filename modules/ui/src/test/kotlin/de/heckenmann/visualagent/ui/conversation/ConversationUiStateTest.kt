@@ -164,6 +164,38 @@ class ConversationUiStateTest {
     }
 
     @Test
+    fun `history refresh never duplicates an active streaming entry`() {
+        val id = "assistant-id"
+        val items =
+            buildConversationTimeline(
+                history = listOf(Message("assistant", "Persisted answer", id = id)),
+                pendingUserMessage = null,
+                streamingContent = "Partial answer",
+                streamingEntryId = id,
+                showWaitingIndicator = false,
+                showOlderHistoryLoading = false,
+                includeInlineComposer = false,
+            )
+
+        assertEquals(listOf(id), items.map { it.stableKey })
+        assertFalse((items.single() as ConversationTimelineItem.MessageEntry).isStreaming)
+    }
+
+    @Test
+    fun `loaded history remains known while newly rendered entries animate once`() {
+        val state = ConversationUiState(listOf(message("persisted")))
+
+        assertFalse(state.shouldAnimateEntry("persisted"))
+        assertTrue(state.shouldAnimateEntry("new-entry"))
+        state.markEntryKnown("new-entry")
+
+        assertFalse(state.shouldAnimateEntry("new-entry"))
+        val request = state.beginOlderRequest()
+        state.applyOlder(request!!, ConversationHistoryPage(listOf(message("older")), request.offset, hasMore = false))
+        assertFalse(state.shouldAnimateEntry("older"))
+    }
+
+    @Test
     fun `stream completion replaces transient entries with one persisted identity`() {
         val state = ConversationUiState(emptyList())
         state.pendingUserMessage = "Request"

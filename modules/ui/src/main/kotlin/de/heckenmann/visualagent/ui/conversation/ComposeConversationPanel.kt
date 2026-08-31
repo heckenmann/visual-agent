@@ -159,7 +159,7 @@ internal fun ConversationPanel(
             activeToken = { activeToken },
             onSendingChange = { conversationState.sending = it },
             onStatusChange = { conversationState.status = it },
-            onHistoryRefresh = { conversationState.replaceHistory(conversationPort.currentHistory()) },
+            onHistoryRefresh = { conversationState.resetHistory(conversationPort.currentHistory()) },
             onTodosCleared = todoState::clear,
         )
     }
@@ -225,10 +225,10 @@ internal fun ConversationPanel(
                             conversationState.deletingMessageIds += id
                             scope.launch {
                                 delay(DELETE_ANIMATION_DURATION_MS.toLong())
-                                conversationPort.deleteMessage(id)
+                                val deleted = conversationPort.deleteMessage(id)
                                 conversationState.replaceHistory(conversationPort.currentHistory())
                                 conversationState.deletingMessageIds -= id
-                                conversationState.status = "Message deleted"
+                                conversationState.status = if (deleted) "Message deleted" else "Message could not be deleted"
                             }
                         },
                         onStatusChange = { conversationState.status = it },
@@ -240,6 +240,8 @@ internal fun ConversationPanel(
                                     ?: todoState.deletedSnapshots[todo.id]
                             }
                         },
+                        shouldAnimateEntry = conversationState::shouldAnimateEntry,
+                        onMessageEntryRendered = conversationState::markEntryKnown,
                         inlineComposer = {
                             ConversationInputCard(
                                 input = conversationState.input,
@@ -294,14 +296,7 @@ internal fun ConversationPanel(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
                 )
             }
-            ConversationEditModal(
-                editingId = conversationState.editingId,
-                history = conversationState.history,
-                conversationPort = conversationPort,
-                modalRequester = modalRequester,
-                onDismiss = { conversationState.editingId = null },
-                onHistoryRefresh = { conversationState.replaceHistory(conversationPort.currentHistory()) },
-            )
+            ConversationEditMessageOverlay(conversationState, conversationPort, modalRequester)
         }
     }
 }

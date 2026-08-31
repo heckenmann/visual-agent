@@ -49,10 +49,12 @@ internal class ConversationUiState(
 
     private var historyGeneration = 0L
     private var reachedOldestHistory = false
+    private var knownEntryIds by mutableStateOf(initialHistory.mapNotNull(Message::id).toSet())
 
     fun replaceHistory(messages: List<Message>) {
         historyGeneration++
         history = messages.distinctPersistedMessages()
+        markEntriesKnown(history)
         isLoadingOlder = false
         hasMoreHistory = history.isNotEmpty()
         reachedOldestHistory = false
@@ -62,6 +64,7 @@ internal class ConversationUiState(
     fun completeStream(messages: List<Message>) {
         historyGeneration++
         history = messages.distinctPersistedMessages()
+        markEntriesKnown(history)
         pendingUserMessage = null
         pendingUserEntryId = null
         streamingEntryId = null
@@ -86,6 +89,7 @@ internal class ConversationUiState(
         val latestIds = latestMessages.mapNotNull(Message::id).toSet()
         val retainedHistory = history.filter { it.id == null || it.id !in latestIds }
         history = retainedHistory + latestMessages
+        markEntriesKnown(latestMessages)
         if (!reachedOldestHistory) {
             hasMoreHistory = page.hasMore
         }
@@ -107,6 +111,7 @@ internal class ConversationUiState(
         val older = page.messages.distinctPersistedMessages().filter { it.id == null || it.id !in existingIds }
         if (older.isNotEmpty()) {
             history = older.toList() + history
+            markEntriesKnown(older)
         }
         hasMoreHistory = page.hasMore && older.isNotEmpty()
         reachedOldestHistory = !hasMoreHistory
@@ -117,6 +122,28 @@ internal class ConversationUiState(
         if (request.generation == historyGeneration) {
             isLoadingOlder = false
         }
+    }
+
+    /** Clears transient state and treats the replacement history as already known after a full reset. */
+    fun resetHistory(messages: List<Message>) {
+        knownEntryIds = emptySet()
+        replaceHistory(messages)
+        pendingUserMessage = null
+        pendingUserEntryId = null
+        streamingEntryId = null
+        streaming.value = ""
+    }
+
+    /** Returns whether this entry should play the new-message animation on first composition. */
+    fun shouldAnimateEntry(id: String?): Boolean = id != null && id !in knownEntryIds
+
+    /** Marks a rendered entry as known without changing its stable identity. */
+    fun markEntryKnown(id: String?) {
+        if (id != null && id !in knownEntryIds) knownEntryIds += id
+    }
+
+    private fun markEntriesKnown(messages: List<Message>) {
+        knownEntryIds += messages.mapNotNull(Message::id)
     }
 }
 
