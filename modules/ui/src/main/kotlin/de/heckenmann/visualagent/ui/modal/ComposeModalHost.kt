@@ -182,7 +182,7 @@ internal fun modalDialogLayout(
 ) {
     val scrollState = rememberScrollState()
     Column {
-        Box(modifier = Modifier.fillMaxWidth().heightIn(max = LocalModalBodyMaxHeight.current)) {
+        Box(modifier = Modifier.fillMaxWidth().weight(1f, fill = false)) {
             Column(
                 modifier =
                     Modifier
@@ -260,7 +260,14 @@ private fun errorModalContent(
         },
         footer = {
             modal.onCopyDetails?.let { onCopy ->
-                modalSecondaryButton(label = "Copy details", icon = Icons.Filled.ContentCopy, onClick = onCopy)
+                modalSecondaryButton(
+                    label = "Copy details",
+                    icon = Icons.Filled.ContentCopy,
+                    onClick = {
+                        onCopy()
+                        onDismiss()
+                    },
+                )
             }
             if (modal.userError.retryable && modal.onRetry != null) {
                 modalPrimaryButton(

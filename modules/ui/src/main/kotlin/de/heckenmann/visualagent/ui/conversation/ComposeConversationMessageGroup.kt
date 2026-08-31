@@ -204,7 +204,7 @@ private fun ConversationMessageGroupContent(
             conversationMessageActionMenu(
                 message = message,
                 canEdit = message.role == "user" && !sending,
-                canDelete = message.id != null,
+                canDelete = message.id != null && !sending,
                 canRetry = message.role == "assistant" && !sending,
                 onEdit = { onEditMessage(message.id) },
                 onDelete = { message.id?.let(onDeleteMessage) },

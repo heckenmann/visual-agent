@@ -259,6 +259,32 @@ class ComposeModalHostTest {
     }
 
     @Test
+    fun `overflowing modal keeps footer action within modal bounds`() {
+        val longMessage = List(100) { "A detailed line of modal content." }.joinToString("\n")
+        composeTestRule.setContent {
+            MaterialTheme {
+                Box(modifier = Modifier.size(800.dp, 400.dp)) {
+                    composeModalHost(
+                        modal =
+                            ComposeConfirmationModal(
+                                title = "Confirm",
+                                message = longMessage,
+                                confirmDescription = "Confirm action",
+                                onConfirm = {},
+                            ),
+                        onDismiss = {},
+                    )
+                }
+            }
+        }
+
+        val modalBounds = composeTestRule.onNodeWithTag("Internal modal").getUnclippedBoundsInRoot()
+        val footerBounds = composeTestRule.onNodeWithText("Confirm action").getUnclippedBoundsInRoot()
+
+        assertTrue(footerBounds.bottom <= modalBounds.bottom)
+    }
+
+    @Test
     fun `requestInfo extension function invokes requester`() {
         var requested: ComposeModal? = null
         val requester = ComposeModalRequester { requested = it }

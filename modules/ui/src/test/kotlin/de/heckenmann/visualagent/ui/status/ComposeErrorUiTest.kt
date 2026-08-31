@@ -95,6 +95,7 @@ class ComposeErrorUiTest {
                 retryable = false,
             )
         var copied = false
+        var dismissed = false
         composeTestRule.setContent {
             MaterialTheme {
                 composeModalHost(
@@ -104,7 +105,7 @@ class ComposeErrorUiTest {
                             onDismiss = {},
                             onCopyDetails = { copied = true },
                         ),
-                    onDismiss = {},
+                    onDismiss = { dismissed = true },
                 )
             }
         }
@@ -112,6 +113,7 @@ class ComposeErrorUiTest {
         composeTestRule.onNodeWithText("Copy details").performClick()
 
         assertTrue(copied)
+        assertTrue(dismissed)
     }
 
     @Test
