@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent.tools
 
+import de.heckenmann.visualagent.agent.tools.canvas.CanvasTool
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -10,7 +11,7 @@ import kotlin.test.assertTrue
 class CanvasToolTest {
     @Test
     fun `get returns current canvas snapshot`() {
-        val tool = CanvasTool(FakeCanvasOperations(), FakeConversationStore())
+        val tool = CanvasTool(CanvasToolPortAdapter(FakeCanvasOperations(), FakeConversationStore()))
 
         val result = tool.execute("""{"action":"get"}""")
         val content = Json.parseToJsonElement(result.content).jsonObject
@@ -22,7 +23,7 @@ class CanvasToolTest {
     @Test
     fun `draw actions delegate to canvas operations`() {
         val canvas = FakeCanvasOperations()
-        val tool = CanvasTool(canvas, FakeConversationStore())
+        val tool = CanvasTool(CanvasToolPortAdapter(canvas, FakeConversationStore()))
 
         tool.execute("""{"action":"drawText","text":"Hello","x":1,"y":2}""")
         tool.execute("""{"action":"drawLine","x1":1,"y1":2,"x2":3,"y2":4}""")
@@ -38,7 +39,7 @@ class CanvasToolTest {
     @Test
     fun `drawStroke action delegates to canvas operations`() {
         val canvas = FakeCanvasOperations()
-        val tool = CanvasTool(canvas, FakeConversationStore())
+        val tool = CanvasTool(CanvasToolPortAdapter(canvas, FakeConversationStore()))
 
         val result =
             tool.execute(
@@ -56,7 +57,7 @@ class CanvasToolTest {
 
     @Test
     fun `drawStroke rejects fewer than two points`() {
-        val tool = CanvasTool(FakeCanvasOperations(), FakeConversationStore())
+        val tool = CanvasTool(CanvasToolPortAdapter(FakeCanvasOperations(), FakeConversationStore()))
 
         val result = tool.execute("""{"action":"drawStroke","points":[{"x":0,"y":0}]}""")
 
@@ -67,7 +68,7 @@ class CanvasToolTest {
     @Test
     fun `selection mutation actions delegate to canvas operations`() {
         val canvas = FakeCanvasOperations()
-        val tool = CanvasTool(canvas, FakeConversationStore())
+        val tool = CanvasTool(CanvasToolPortAdapter(canvas, FakeConversationStore()))
 
         tool.execute("""{"action":"drawRect","x":10,"y":20,"width":100,"height":50}""")
         val selected = tool.execute("""{"action":"selectAt","x":15,"y":25}""")
@@ -86,7 +87,7 @@ class CanvasToolTest {
     @Test
     fun `select with index still works and select with indices supports multi-selection`() {
         val canvas = FakeCanvasOperations()
-        val tool = CanvasTool(canvas, FakeConversationStore())
+        val tool = CanvasTool(CanvasToolPortAdapter(canvas, FakeConversationStore()))
 
         tool.execute("""{"action":"select","index":2}""")
         tool.execute("""{"action":"select","indices":[1,3,5]}""")
@@ -97,7 +98,7 @@ class CanvasToolTest {
     @Test
     fun `save and open document actions delegate to canvas operations`() {
         val canvas = FakeCanvasOperations()
-        val tool = CanvasTool(canvas, FakeConversationStore())
+        val tool = CanvasTool(CanvasToolPortAdapter(canvas, FakeConversationStore()))
 
         val saved = tool.execute("""{"action":"saveDocument","name":"diagram"}""")
         val opened = tool.execute("""{"action":"openDocument","id":"canvas-1"}""")
@@ -111,7 +112,7 @@ class CanvasToolTest {
     @Test
     fun `clear and unsupported actions return deterministic results`() {
         val canvas = FakeCanvasOperations()
-        val tool = CanvasTool(canvas, FakeConversationStore())
+        val tool = CanvasTool(CanvasToolPortAdapter(canvas, FakeConversationStore()))
 
         tool.execute("""{"action":"drawText","text":"Hello","x":1,"y":2}""")
         val clear = tool.execute("""{"action":"clear"}""")

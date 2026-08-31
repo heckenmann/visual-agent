@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent.tools
 
+import de.heckenmann.visualagent.agent.tools.canvas.CanvasTool
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -8,7 +9,7 @@ import kotlin.test.assertTrue
 class CanvasToolValidationAndCaptureTest {
     @Test
     fun `missing required fields return a tool failure`() {
-        val tool = CanvasTool(FakeCanvasOperations(), FakeConversationStore())
+        val tool = CanvasTool(CanvasToolPortAdapter(FakeCanvasOperations(), FakeConversationStore()))
 
         val result = tool.execute("""{"action":"drawText","x":1,"y":2}""")
 
@@ -19,7 +20,7 @@ class CanvasToolValidationAndCaptureTest {
 
     @Test
     fun `insert image rejects paths outside workspace`() {
-        val tool = CanvasTool(FakeCanvasOperations(), FakeConversationStore())
+        val tool = CanvasTool(CanvasToolPortAdapter(FakeCanvasOperations(), FakeConversationStore()))
 
         val result = tool.execute("""{"action":"insertImage","path":"../outside.png"}""")
 
@@ -31,7 +32,7 @@ class CanvasToolValidationAndCaptureTest {
     fun `capture image persists immutable history image and returns compact result`() {
         val canvas = FakeCanvasOperations()
         val store = FakeConversationStore()
-        val tool = CanvasTool(canvas, store)
+        val tool = CanvasTool(CanvasToolPortAdapter(canvas, store))
 
         assertTrue(tool.definition.description.contains("conversation image attachment"))
 
@@ -52,7 +53,7 @@ class CanvasToolValidationAndCaptureTest {
 
     @Test
     fun `capture image reports unsupported formats as tool failure`() {
-        val tool = CanvasTool(FakeCanvasOperations(), FakeConversationStore())
+        val tool = CanvasTool(CanvasToolPortAdapter(FakeCanvasOperations(), FakeConversationStore()))
 
         val result = tool.execute("""{"action":"captureImage","format":"jpg"}""")
 

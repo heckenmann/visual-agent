@@ -190,9 +190,7 @@ class AgentManager
          */
         fun getTodosFromDb(): List<Todo> = lifecycleOps.getTodosFromDb()
 
-        /**
-         * Returns a summary of todos (counts by status) from the database.
-         */
+        /** Returns a summary of todos (counts by status) from the database. */
         fun getTodoSummaryFromDb(): TodoSummary = lifecycleOps.getTodoSummaryFromDb()
 
         /**

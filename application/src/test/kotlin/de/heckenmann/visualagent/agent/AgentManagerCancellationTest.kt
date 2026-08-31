@@ -43,7 +43,13 @@ class AgentManagerCancellationTest {
             val token = CancellationToken()
             val streamJob =
                 launch {
-                    manager.streamMessage("hello", token, {}, "user-id", "assistant-id")
+                    manager.streamMessage(
+                        "hello",
+                        token,
+                        {},
+                        "11111111-1111-4111-8111-111111111111",
+                        "22222222-2222-4222-8222-222222222222",
+                    )
                 }
             try {
                 streamEntered.await()
@@ -51,8 +57,9 @@ class AgentManagerCancellationTest {
                 assertTrue(token.isCancelled)
                 cancelled.complete(Unit)
                 streamJob.join()
-                val lastMessage = manager.getHistory().lastOrNull()
-                assertTrue(lastMessage?.role == "assistant" || lastMessage?.role == "user")
+                val lastMessage = manager.getHistory().last()
+                assertTrue(lastMessage.role == "assistant" || lastMessage.role == "user")
+                assertEquals("22222222-2222-4222-8222-222222222222", lastMessage.id)
             } finally {
                 streamJob.cancel()
                 streamJob.join()

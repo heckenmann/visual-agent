@@ -10,6 +10,7 @@ import de.heckenmann.visualagent.agent.text.ResponseRepetitionGuard
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.error.ErrorMessageMapper
+import de.heckenmann.visualagent.protocol.ConversationStreamRequest
 import kotlinx.coroutines.flow.collect
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -45,7 +46,12 @@ internal class AgentManagerConversationOps(
                 createdAtEpochMillis = record?.createdAt?.toEpochMilli() ?: Instant.now().toEpochMilli(),
                 timelineSequence = record?.timelineSequence,
             )
-        owner.conversationHistory.add(persisted)
+        val existingIndex = owner.conversationHistory.indexOfFirst { it.id == id }
+        if (existingIndex >= 0) {
+            owner.conversationHistory[existingIndex] = persisted
+        } else {
+            owner.conversationHistory.add(persisted)
+        }
         return persisted
     }
 
@@ -139,6 +145,11 @@ internal class AgentManagerConversationOps(
         userEntryId: String,
         assistantEntryId: String,
     ): String {
+        ConversationStreamRequest(userEntryId, assistantEntryId, content)
+        owner.conversationStore.getConversationMessage(assistantEntryId)?.let { existing ->
+            onChunk(existing.content)
+            return existing.content
+        }
         val userMessage = Message("user", content, id = userEntryId)
         persist(userMessage)
         val requestId = assistantEntryId

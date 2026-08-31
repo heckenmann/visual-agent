@@ -83,11 +83,29 @@ class TestPersistence internal constructor(
     }
 
     override fun saveConversationMessage(
+        id: String,
         sessionId: String,
         role: String,
         content: String,
         metadata: String?,
-    ): String = conversationStore.saveConversationMessage(sessionId, role, content, metadata)
+    ): String = conversationStore.saveConversationMessage(id, sessionId, role, content, metadata)
+
+    /** Persists a test conversation message with a generated identifier. */
+    fun saveConversationMessage(
+        sessionId: String,
+        role: String,
+        content: String,
+        metadata: String? = null,
+    ): String =
+        conversationStore.saveConversationMessage(
+            java.util.UUID
+                .randomUUID()
+                .toString(),
+            sessionId,
+            role,
+            content,
+            metadata,
+        )
 
     override fun getConversationMessage(id: String) = conversationStore.getConversationMessage(id)
 

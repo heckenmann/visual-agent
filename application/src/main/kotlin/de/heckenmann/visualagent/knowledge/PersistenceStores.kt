@@ -123,14 +123,6 @@ interface ConversationStore {
         role: String,
         content: String,
         metadata: String? = null,
-    ): String = saveConversationMessage(sessionId, role, content, metadata)
-
-    /** Persists one conversation message and returns its identifier. */
-    fun saveConversationMessage(
-        sessionId: String,
-        role: String,
-        content: String,
-        metadata: String? = null,
     ): String
 
     /** Returns one persisted message, including its durable timeline ordering key. */
