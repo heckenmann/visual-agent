@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 @de.heckenmann.visualagent.testsupport.DatabaseTest
 class AgentManagerStreamingConversationTest {
@@ -56,6 +57,27 @@ class AgentManagerStreamingConversationTest {
 
             assertEquals(listOf("Answer"), retryChunks)
             assertEquals(listOf(USER_ID, ASSISTANT_ID), manager.getHistory().mapNotNull(Message::id))
+            coVerify(exactly = 1) { provider.stream(any<ChatRequestContext>()) }
+        }
+
+    @Test
+    fun `transport retry rejects an assistant identity linked to another user entry`() =
+        runBlocking {
+            val db = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+            val provider = mockk<LLMProvider>(relaxed = true)
+            coEvery { provider.stream(any<ChatRequestContext>()) } returns
+                flowOf(ChatResponse(model = "test", message = Message("assistant", "Answer"), done = true))
+            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
+
+            manager.streamMessage("Request", onChunk = {}, userEntryId = USER_ID, assistantEntryId = ASSISTANT_ID)
+
+            assertFailsWith<IllegalArgumentException> {
+                manager.streamMessage("Request", onChunk = {}, userEntryId = SECOND_USER_ID, assistantEntryId = ASSISTANT_ID)
+            }
+            assertFailsWith<IllegalArgumentException> {
+                manager.streamMessage("Request", onChunk = {}, userEntryId = SECOND_USER_ID, assistantEntryId = USER_ID)
+            }
+
             coVerify(exactly = 1) { provider.stream(any<ChatRequestContext>()) }
         }
 
@@ -128,5 +150,6 @@ class AgentManagerStreamingConversationTest {
     private companion object {
         const val USER_ID = "11111111-1111-4111-8111-111111111111"
         const val ASSISTANT_ID = "22222222-2222-4222-8222-222222222222"
+        const val SECOND_USER_ID = "33333333-3333-4333-8333-333333333333"
     }
 }

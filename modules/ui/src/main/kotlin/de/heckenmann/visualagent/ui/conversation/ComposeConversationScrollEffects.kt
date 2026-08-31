@@ -139,9 +139,11 @@ internal fun ConversationQueueFlushEffect(
     onInputChange: (String) -> Unit,
     onSendingChange: (Boolean) -> Unit,
     onStatusChange: (String) -> Unit,
-    onHistoryChange: (List<Message>) -> Unit,
     onActiveTokenChange: (de.heckenmann.visualagent.protocol.CancellationToken?) -> Unit,
     onPendingUserMessageChange: (String?) -> Unit,
+    onPendingUserEntryIdChange: (String?) -> Unit,
+    onStreamingEntryIdChange: (String?) -> Unit,
+    onStreamCompletion: (List<de.heckenmann.visualagent.protocol.ConversationMessage>) -> Unit,
     streamingFlow: MutableStateFlow<String>,
 ) {
     val scope = rememberCoroutineScope()
@@ -162,9 +164,11 @@ internal fun ConversationQueueFlushEffect(
                                     onInputChange = onInputChange,
                                     onSendingChange = onSendingChange,
                                     onStatusChange = onStatusChange,
-                                    onHistoryChange = onHistoryChange,
                                     onActiveTokenChange = onActiveTokenChange,
                                     onPendingUserMessageChange = onPendingUserMessageChange,
+                                    onPendingUserEntryIdChange = onPendingUserEntryIdChange,
+                                    onStreamingEntryIdChange = onStreamingEntryIdChange,
+                                    onStreamCompletion = onStreamCompletion,
                                     streamingFlow = streamingFlow,
                                 )
                             }
@@ -180,9 +184,11 @@ internal fun ConversationQueueFlushEffect(
                                 onInputChange = onInputChange,
                                 onSendingChange = onSendingChange,
                                 onStatusChange = onStatusChange,
-                                onHistoryChange = onHistoryChange,
                                 onActiveTokenChange = onActiveTokenChange,
                                 onPendingUserMessageChange = onPendingUserMessageChange,
+                                onPendingUserEntryIdChange = onPendingUserEntryIdChange,
+                                onStreamingEntryIdChange = onStreamingEntryIdChange,
+                                onStreamCompletion = onStreamCompletion,
                                 streamingFlow = streamingFlow,
                             )
                         }

@@ -147,10 +147,20 @@ internal class AgentManagerConversationOps(
     ): String {
         ConversationStreamRequest(userEntryId, assistantEntryId, content)
         owner.conversationStore.getConversationMessage(assistantEntryId)?.let { existing ->
+            require(existing.role == "assistant") { "Conversation retry assistant entry must have role assistant" }
+            val userEntry =
+                requireNotNull(owner.conversationStore.getConversationMessage(userEntryId)) {
+                    "Conversation retry user entry does not exist"
+                }
+            require(userEntry.role == "user") { "Conversation retry user entry must have role user" }
+            require(userEntry.content == content) { "Conversation retry user content does not match" }
+            require(userEntry.metadata == conversationTurnMetadata(assistantEntryId)) {
+                "Conversation retry entries do not belong to the same turn"
+            }
             onChunk(existing.content)
             return existing.content
         }
-        val userMessage = Message("user", content, id = userEntryId)
+        val userMessage = Message("user", content, metadata = conversationTurnMetadata(assistantEntryId), id = userEntryId)
         persist(userMessage)
         val requestId = assistantEntryId
         val collected = StringBuilder()
@@ -214,6 +224,12 @@ internal class AgentManagerConversationOps(
     }
 
     fun clearHistory() = historyOps.clearHistory()
+
+    private fun conversationTurnMetadata(assistantEntryId: String): String =
+        buildJsonObject {
+            put("type", "conversation_turn")
+            put("assistantEntryId", assistantEntryId)
+        }.toString()
 
     suspend fun addWelcomeMessageAfterReset(): WelcomeResult =
         owner.welcomeMessageComposer.compose(

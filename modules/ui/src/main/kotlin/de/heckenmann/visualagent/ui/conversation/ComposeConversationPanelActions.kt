@@ -151,8 +151,8 @@ internal fun ConversationEditModal(
  * Streaming runs on [Dispatchers.IO] so the UI thread is never blocked. The streaming
  * content is pushed to a [MutableStateFlow] (thread-safe, non-blocking via [tryEmit]).
  * Compose collects it via [collectAsState] on the Main dispatcher, fully decoupled from
- * the streaming coroutine. [onHistoryChange] is only refreshed from DB after streaming
- * completes, so the LazyColumn is not rebuilt on every token.
+ * the streaming coroutine. [onStreamCompletion] applies the persisted history only after
+ * streaming completes, so the LazyColumn is not rebuilt on every token.
  */
 internal suspend fun executeSend(
     content: String,
@@ -162,12 +162,11 @@ internal suspend fun executeSend(
     onInputChange: (String) -> Unit,
     onSendingChange: (Boolean) -> Unit,
     onStatusChange: (String) -> Unit,
-    onHistoryChange: (List<Message>) -> Unit,
     onActiveTokenChange: (CancellationToken?) -> Unit,
     onPendingUserMessageChange: (String?) -> Unit,
-    onPendingUserEntryIdChange: (String?) -> Unit = {},
-    onStreamingEntryIdChange: (String?) -> Unit = {},
-    onStreamCompletion: ((List<Message>) -> Unit)? = null,
+    onPendingUserEntryIdChange: (String?) -> Unit,
+    onStreamingEntryIdChange: (String?) -> Unit,
+    onStreamCompletion: (List<Message>) -> Unit,
     streamingFlow: MutableStateFlow<String>,
 ) {
     onInputChange("")
@@ -201,15 +200,7 @@ internal suspend fun executeSend(
             }
         }
     val completedHistory = messageGateway.currentHistory()
-    if (onStreamCompletion != null) {
-        onStreamCompletion(completedHistory)
-    } else {
-        streamingFlow.value = ""
-        onStreamingEntryIdChange(null)
-        onPendingUserMessageChange(null)
-        onPendingUserEntryIdChange(null)
-        onHistoryChange(completedHistory)
-    }
+    onStreamCompletion(completedHistory)
     result
         .onSuccess {
             onStatusChange("Ready")

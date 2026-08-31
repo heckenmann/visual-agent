@@ -33,9 +33,11 @@ internal fun ConversationPanelQueueStrip(
     onInputChange: (String) -> Unit,
     onSendingChange: (Boolean) -> Unit,
     onStatusChange: (String) -> Unit,
-    onHistoryChange: (List<de.heckenmann.visualagent.protocol.ConversationMessage>) -> Unit,
     onActiveTokenChange: (CancellationToken?) -> Unit,
     onPendingUserMessageChange: (String?) -> Unit,
+    onPendingUserEntryIdChange: (String?) -> Unit,
+    onStreamingEntryIdChange: (String?) -> Unit,
+    onStreamCompletion: (List<de.heckenmann.visualagent.protocol.ConversationMessage>) -> Unit,
     streamingFlow: MutableStateFlow<String>,
 ) {
     MessageQueueStrip(
@@ -53,9 +55,11 @@ internal fun ConversationPanelQueueStrip(
                     onInputChange = onInputChange,
                     onSendingChange = onSendingChange,
                     onStatusChange = onStatusChange,
-                    onHistoryChange = onHistoryChange,
                     onActiveTokenChange = onActiveTokenChange,
                     onPendingUserMessageChange = onPendingUserMessageChange,
+                    onPendingUserEntryIdChange = onPendingUserEntryIdChange,
+                    onStreamingEntryIdChange = onStreamingEntryIdChange,
+                    onStreamCompletion = onStreamCompletion,
                     streamingFlow = streamingFlow,
                 )
             }
