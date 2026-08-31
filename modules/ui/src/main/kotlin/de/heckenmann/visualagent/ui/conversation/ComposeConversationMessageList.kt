@@ -46,8 +46,8 @@ internal fun LazyListScope.ConversationTimeline(
         when (item) {
             ConversationTimelineItem.InlineComposer -> inlineComposer()
             ConversationTimelineItem.Waiting -> ConversationWaitingIndicator()
-            is ConversationTimelineItem.Streaming -> StreamingTimelineRow(item, onStatusChange)
-            is ConversationTimelineItem.PendingUser -> PendingTimelineRow(item, onStatusChange)
+            is ConversationTimelineItem.Streaming -> streamingTimelineRow(item, onStatusChange)
+            is ConversationTimelineItem.PendingUser -> pendingTimelineRow(item, onStatusChange)
             is ConversationTimelineItem.MessageEntry ->
                 ConversationMessageTimelineRow(
                     item = item,
@@ -152,6 +152,8 @@ internal fun LazyListScope.ConversationMessageList(
     deletedTodoSnapshots: Map<String, TodoItem> = emptyMap(),
     todoResponses: Map<String, de.heckenmann.visualagent.ui.todo.TodoResponseState> = emptyMap(),
     onOpenTodoResponse: (TodoItem, de.heckenmann.visualagent.ui.todo.TodoResponseState) -> Unit = { _, _ -> },
+    pendingUserEntryId: String? = null,
+    streamingEntryId: String? = null,
 ) {
     ConversationTimeline(
         items =
@@ -165,6 +167,8 @@ internal fun LazyListScope.ConversationMessageList(
                 todos = todos,
                 deletedTodoSnapshots = deletedTodoSnapshots,
                 todoResponses = todoResponses,
+                pendingUserEntryId = pendingUserEntryId,
+                streamingEntryId = streamingEntryId,
             ),
         sending = sending,
         deletingMessageIds = deletingMessageIds,
@@ -173,32 +177,6 @@ internal fun LazyListScope.ConversationMessageList(
         onEditMessage = onEditMessage,
         sendContent = sendContent,
         onOpenTodoResponse = onOpenTodoResponse,
-    )
-}
-
-@Composable
-private fun StreamingTimelineRow(
-    item: ConversationTimelineItem.Streaming,
-    onStatusChange: (String) -> Unit,
-) {
-    TransientConversationMessageGroupRow(
-        message = Message("assistant", item.content, id = item.id),
-        isStreaming = true,
-        onCopied = { onStatusChange("Copied assistant message") },
-        modifier = Modifier.padding(top = 2.dp),
-    )
-}
-
-@Composable
-private fun PendingTimelineRow(
-    item: ConversationTimelineItem.PendingUser,
-    onStatusChange: (String) -> Unit,
-) {
-    TransientConversationMessageGroupRow(
-        message = Message("user", item.content, id = item.id),
-        isStreaming = false,
-        onCopied = { onStatusChange("Copied user message") },
-        modifier = Modifier.padding(top = 10.dp),
     )
 }
 
