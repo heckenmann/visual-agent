@@ -54,7 +54,7 @@ class VisualAgentGrpcSessionServiceTest {
 
         assertEquals(1, observer.values.size)
         assertEquals(
-            "v1",
+            ProtocolVersion.CURRENT,
             observer.values
                 .single()
                 .helloAck
