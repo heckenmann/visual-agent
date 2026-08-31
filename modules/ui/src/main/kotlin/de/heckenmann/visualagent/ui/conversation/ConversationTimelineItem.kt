@@ -19,21 +19,31 @@ internal sealed interface ConversationTimelineItem {
 
     data class Streaming(
         val content: String,
+        val id: String,
     ) : ConversationTimelineItem {
-        override val stableKey = "streaming-assistant"
+        override val stableKey = id
     }
 
     data class PendingUser(
         val content: String,
+        val id: String,
     ) : ConversationTimelineItem {
-        override val stableKey = "pending-user"
+        override val stableKey = id
+    }
+
+    data class MessageEntry(
+        val message: Message,
+        val chronologicalIndex: Int,
+        val isStreaming: Boolean = false,
+    ) : ConversationTimelineItem {
+        override val stableKey = message.id ?: "temporary-message-$chronologicalIndex"
     }
 
     data class Persisted(
         val message: Message,
         val chronologicalIndex: Int,
     ) : ConversationTimelineItem {
-        override val stableKey = message.id?.let { "message:$it" } ?: "temporary-message-$chronologicalIndex"
+        override val stableKey = message.id ?: "temporary-message-$chronologicalIndex"
     }
 
     data class PersistedGroup(
@@ -69,13 +79,20 @@ internal fun buildConversationTimeline(
     todos: List<TodoItem> = emptyList(),
     deletedTodoSnapshots: Map<String, TodoItem> = emptyMap(),
     todoResponses: Map<String, TodoResponseState> = emptyMap(),
+    streamingEntryId: String? = null,
+    pendingUserEntryId: String? = null,
 ): List<ConversationTimelineItem> =
     buildList {
         if (includeInlineComposer) add(ConversationTimelineItem.InlineComposer)
         if (showWaitingIndicator) add(ConversationTimelineItem.Waiting)
-        if (streamingContent.isNotEmpty()) add(ConversationTimelineItem.Streaming(streamingContent))
-        if (pendingUserMessage != null) add(ConversationTimelineItem.PendingUser(pendingUserMessage))
         val uniqueHistory = history.distinctPersistedMessages()
+        val persistedIds = uniqueHistory.mapNotNull { message -> message.id }.toSet()
+        if (streamingContent.isNotEmpty() && streamingEntryId != null && streamingEntryId !in persistedIds) {
+            add(ConversationTimelineItem.MessageEntry(Message("assistant", streamingContent, id = streamingEntryId), -2, true))
+        }
+        if (pendingUserMessage != null && pendingUserEntryId != null && pendingUserEntryId !in persistedIds) {
+            add(ConversationTimelineItem.MessageEntry(Message("user", pendingUserMessage, id = pendingUserEntryId), -1))
+        }
         val persisted =
             uniqueHistory.indices.reversed().map { index ->
                 ConversationTimelineItem.Persisted(uniqueHistory[index], index)
@@ -127,7 +144,13 @@ internal fun buildConversationTimeline(
         /** Flushes the current consecutive message run into grouped timeline items. */
         fun flushMessageRun() {
             if (messageRun.isNotEmpty()) {
-                groupConsecutiveConversationMessages(messageRun).forEach { group -> add(ConversationTimelineItem.PersistedGroup(group)) }
+                messageRun.forEach { item ->
+                    if (item.message.role == "user" || item.message.role == "assistant") {
+                        add(ConversationTimelineItem.MessageEntry(item.message, item.chronologicalIndex))
+                    } else {
+                        add(item)
+                    }
+                }
                 messageRun = mutableListOf()
             }
         }

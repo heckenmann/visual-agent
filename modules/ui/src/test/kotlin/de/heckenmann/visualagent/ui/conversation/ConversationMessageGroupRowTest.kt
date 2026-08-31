@@ -19,6 +19,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
@@ -116,6 +117,29 @@ class ConversationMessageGroupRowTest {
         val actionBounds = composeTestRule.onNodeWithContentDescription("Message actions").getUnclippedBoundsInRoot()
         assertTrue(actionBounds.top < messageBounds.bottom)
         assertTrue(messageBounds.right <= actionBounds.left)
+    }
+
+    @Test
+    fun `active turn prevents persisted messages from being deleted`() {
+        val group = ConversationMessageGroup(listOf(persisted("Cannot delete while sending", "user")))
+
+        composeTestRule.setContent {
+            MaterialTheme {
+                ConversationMessageGroupRow(
+                    group = group,
+                    sending = true,
+                    deletingMessageIds = emptySet(),
+                    onDeleteMessage = {},
+                    onStatusChange = {},
+                    onEditMessage = {},
+                    onRetry = {},
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithContentDescription("Message actions").performClick()
+
+        composeTestRule.onNodeWithText("Delete").assertDoesNotExist()
     }
 
     @Test

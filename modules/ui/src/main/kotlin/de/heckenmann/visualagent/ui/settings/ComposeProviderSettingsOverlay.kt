@@ -3,15 +3,21 @@ package de.heckenmann.visualagent.ui.settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -28,7 +34,6 @@ import de.heckenmann.visualagent.protocol.ProviderPort
 import de.heckenmann.visualagent.protocol.ProviderProfile
 import de.heckenmann.visualagent.protocol.SettingsPort
 import de.heckenmann.visualagent.protocol.SettingsSnapshot
-import de.heckenmann.visualagent.ui.components.ActionIconButton
 import de.heckenmann.visualagent.ui.components.PanelDropdownField
 import de.heckenmann.visualagent.ui.components.PanelInfoBox
 import de.heckenmann.visualagent.ui.components.PanelScrollbarHost
@@ -181,16 +186,20 @@ internal fun providerSettingsOverlay(
                                 "It also changes the available model catalog.",
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        ActionIconButton(Icons.Filled.Add, "Add provider", onClick = { creatingProfile = true })
-                        ActionIconButton(
-                            Icons.Filled.Edit,
-                            "Edit provider",
+                        Button(onClick = { creatingProfile = true }) {
+                            Icon(Icons.Filled.Add, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Add provider")
+                        }
+                        OutlinedButton(
                             enabled = selectedProvider != null,
                             onClick = { editingProfile = selectedProvider },
-                        )
-                        ActionIconButton(
-                            Icons.Filled.Delete,
-                            "Remove staged provider",
+                        ) {
+                            Icon(Icons.Filled.Edit, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Edit provider")
+                        }
+                        OutlinedButton(
                             enabled = draft.providers.size > 1 && selectedProvider != null,
                             onClick = {
                                 selectedProvider?.let { profile ->
@@ -198,7 +207,11 @@ internal fun providerSettingsOverlay(
                                     status = "Staged removal of ${profile.name}"
                                 }
                             },
-                        )
+                        ) {
+                            Icon(Icons.Filled.Delete, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Remove provider")
+                        }
                     }
                     PanelInfoBox("Provider and credential changes remain local until you save this dialog.")
                     androidx.compose.material3.HorizontalDivider()

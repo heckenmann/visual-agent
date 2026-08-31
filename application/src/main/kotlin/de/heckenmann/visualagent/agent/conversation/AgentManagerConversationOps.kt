@@ -10,6 +10,7 @@ import de.heckenmann.visualagent.agent.text.ResponseRepetitionGuard
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.error.ErrorMessageMapper
+import de.heckenmann.visualagent.protocol.ConversationStreamRequest
 import kotlinx.coroutines.flow.collect
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -26,8 +27,13 @@ internal class AgentManagerConversationOps(
     private val historyOps = AgentConversationHistoryOps(owner, ::buildMainRequest)
 
     internal fun persist(message: Message): Message {
+        val messageId =
+            message.id ?: java.util.UUID
+                .randomUUID()
+                .toString()
         val id =
             owner.conversationStore.saveConversationMessage(
+                messageId,
                 AgentManager.MAIN_SESSION_ID,
                 message.role,
                 message.content,
@@ -40,7 +46,12 @@ internal class AgentManagerConversationOps(
                 createdAtEpochMillis = record?.createdAt?.toEpochMilli() ?: Instant.now().toEpochMilli(),
                 timelineSequence = record?.timelineSequence,
             )
-        owner.conversationHistory.add(persisted)
+        val existingIndex = owner.conversationHistory.indexOfFirst { it.id == id }
+        if (existingIndex >= 0) {
+            owner.conversationHistory[existingIndex] = persisted
+        } else {
+            owner.conversationHistory.add(persisted)
+        }
         return persisted
     }
 
@@ -131,13 +142,27 @@ internal class AgentManagerConversationOps(
         content: String,
         token: CancellationToken? = null,
         onChunk: (String) -> Unit,
+        userEntryId: String,
+        assistantEntryId: String,
     ): String {
-        val userMessage = Message("user", content)
+        ConversationStreamRequest(userEntryId, assistantEntryId, content)
+        owner.conversationStore.getConversationMessage(assistantEntryId)?.let { existing ->
+            require(existing.role == "assistant") { "Conversation retry assistant entry must have role assistant" }
+            val userEntry =
+                requireNotNull(owner.conversationStore.getConversationMessage(userEntryId)) {
+                    "Conversation retry user entry does not exist"
+                }
+            require(userEntry.role == "user") { "Conversation retry user entry must have role user" }
+            require(userEntry.content == content) { "Conversation retry user content does not match" }
+            require(userEntry.metadata == conversationTurnMetadata(assistantEntryId)) {
+                "Conversation retry entries do not belong to the same turn"
+            }
+            onChunk(existing.content)
+            return existing.content
+        }
+        val userMessage = Message("user", content, metadata = conversationTurnMetadata(assistantEntryId), id = userEntryId)
         persist(userMessage)
-        val requestId =
-            java.util.UUID
-                .randomUUID()
-                .toString()
+        val requestId = assistantEntryId
         val collected = StringBuilder()
         var providerTurn: ProviderTurnResponse? = null
         var cancelled = false
@@ -163,7 +188,7 @@ internal class AgentManagerConversationOps(
         }
         if (providerFailure != null) {
             val failureMessage = providerFailureMessage(providerFailure)
-            persist(Message("assistant", failureMessage))
+            persist(Message("assistant", failureMessage, id = assistantEntryId))
             owner.finishedToolEventsByRequestId.remove(requestId)
             return failureMessage
         }
@@ -191,6 +216,7 @@ internal class AgentManagerConversationOps(
                 "assistant",
                 presentationText,
                 metadata = providerTurn?.let { ResponseTelemetryMetadata.encode(it, true) },
+                id = assistantEntryId,
             )
         persist(assistantMessage)
         owner.finishedToolEventsByRequestId.remove(requestId)
@@ -198,6 +224,12 @@ internal class AgentManagerConversationOps(
     }
 
     fun clearHistory() = historyOps.clearHistory()
+
+    private fun conversationTurnMetadata(assistantEntryId: String): String =
+        buildJsonObject {
+            put("type", "conversation_turn")
+            put("assistantEntryId", assistantEntryId)
+        }.toString()
 
     suspend fun addWelcomeMessageAfterReset(): WelcomeResult =
         owner.welcomeMessageComposer.compose(

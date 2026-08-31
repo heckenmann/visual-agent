@@ -20,7 +20,8 @@ Desktop user.
 3. If confirmed, the UI cancels the active main-agent request and all running sub-agent jobs.
 4. The agent manager deletes every todo and then deletes main-session history from memory and persistence.
 5. A post-reset welcome message is generated and persisted.
-6. The chat panel renders the new welcome message.
+6. The chat panel clears transient entries and known-row animation state, then
+   renders the new welcome message as the fresh post-reset history.
 
 ## Result
 
@@ -33,7 +34,7 @@ The main conversation and its todos are reset without requiring an application r
 ## Code Entry Points
 
 - `de.heckenmann.visualagent.ui.conversation.ConversationPanel`
-- `de.heckenmann.visualagent.ui.modal.ComposeModalHost`
+- `de.heckenmann.visualagent.ui.modal.composeModalHost`
 - `de.heckenmann.visualagent.agent.AgentManager.cancelAllRunningActions`
 - `de.heckenmann.visualagent.agent.AgentManager.cancelAllActiveTodos`
 - `de.heckenmann.visualagent.agent.AgentManager.clearTodos`

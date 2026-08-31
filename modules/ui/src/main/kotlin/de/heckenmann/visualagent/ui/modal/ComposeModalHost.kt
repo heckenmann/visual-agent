@@ -1,36 +1,50 @@
-@file:Suppress("ktlint:standard:no-wildcard-imports", "FunctionName")
-
 package de.heckenmann.visualagent.ui.modal
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -41,23 +55,19 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.ProtocolErrorCategory
-import de.heckenmann.visualagent.ui.agents.*
-import de.heckenmann.visualagent.ui.application.*
-import de.heckenmann.visualagent.ui.canvas.*
-import de.heckenmann.visualagent.ui.components.*
-import de.heckenmann.visualagent.ui.conversation.*
-import de.heckenmann.visualagent.ui.files.*
-import de.heckenmann.visualagent.ui.modal.*
-import de.heckenmann.visualagent.ui.settings.*
-import de.heckenmann.visualagent.ui.status.*
-import de.heckenmann.visualagent.ui.todo.*
-import de.heckenmann.visualagent.ui.workspace.*
+
+private val ModalShape = RoundedCornerShape(22.dp)
+private val LocalModalBodyMaxHeight = compositionLocalOf { 600.dp }
+private const val MODAL_TRANSITION_DURATION_MILLIS = 180
 
 /**
- * Modal host that renders confirmation, content, and info dialogs.
+ * Modal host that renders all internal dialog variants in one consistent frame.
  *
  * Use cases: UC-0000071.
  *
@@ -65,43 +75,56 @@ import de.heckenmann.visualagent.ui.workspace.*
  * @param onDismiss Callback invoked when the modal is dismissed
  */
 @Composable
-internal fun ComposeModalHost(
+internal fun composeModalHost(
     modal: ComposeModal?,
     onDismiss: () -> Unit,
 ) {
-    if (modal == null) return
-    val scheme = MaterialTheme.colorScheme
+    var lastModal by remember { mutableStateOf<ComposeModal?>(null) }
+    SideEffect {
+        if (modal != null) lastModal = modal
+    }
+    val displayedModal = modal ?: lastModal ?: return
+    val visibility = remember { MutableTransitionState(false) }
+    visibility.targetState = modal != null
+    val dismiss = {
+        if (displayedModal is ComposeContentModal) displayedModal.onDismiss()
+        onDismiss()
+    }
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(modal) {
-        focusRequester.requestFocus()
+        if (modal != null) focusRequester.requestFocus()
     }
-    Box(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .background(scheme.scrim.copy(alpha = 0xCC / 255f))
-                .onPreviewKeyEvent { event ->
-                    if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
-                        onDismiss()
-                        true
-                    } else {
-                        false
-                    }
-                }.focusRequester(focusRequester)
-                .focusable(),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (modal is ComposeSettingsModal) {
-            SettingsModalContent(modal = modal, onDismiss = onDismiss)
-        } else {
-            Box(modifier = Modifier.padding(24.dp)) {
-                ModalCard {
-                    when (modal) {
-                        is ComposeConfirmationModal -> ConfirmationModalContent(modal = modal, onDismiss = onDismiss)
-                        is ComposeContentModal -> ContentModalContent(modal = modal, onDismiss = onDismiss)
-                        is ComposeInfoModal -> InfoModalContent(modal = modal, onDismiss = onDismiss)
-                        is ComposeSettingsModal -> error("Settings modal is rendered outside the standard card")
-                        is ComposeErrorModal -> ErrorModalContent(modal = modal, onDismiss = onDismiss)
+    if (visibility.currentState || visibility.targetState) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0xCC / 255f))
+                    .onPreviewKeyEvent { event ->
+                        if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
+                            dismiss()
+                            true
+                        } else {
+                            false
+                        }
+                    }.focusRequester(focusRequester)
+                    .focusable(),
+            contentAlignment = Alignment.Center,
+        ) {
+            AnimatedVisibility(
+                visibleState = visibility,
+                enter = slideInVertically(animationSpec = tween(MODAL_TRANSITION_DURATION_MILLIS)) { it / 8 },
+                exit = scaleOut(animationSpec = tween(MODAL_TRANSITION_DURATION_MILLIS), targetScale = 0.96f),
+            ) {
+                Box(modifier = Modifier.padding(24.dp)) {
+                    modalFrame(title = displayedModal.title(), onDismiss = dismiss) {
+                        when (displayedModal) {
+                            is ComposeConfirmationModal -> confirmationModalContent(modal = displayedModal, onDismiss = dismiss)
+                            is ComposeContentModal -> displayedModal.content(dismiss)
+                            is ComposeInfoModal -> infoModalContent(modal = displayedModal, onDismiss = dismiss)
+                            is ComposeSettingsModal -> Box(modifier = Modifier.padding(22.dp)) { displayedModal.content() }
+                            is ComposeErrorModal -> errorModalContent(modal = displayedModal, onDismiss = dismiss)
+                        }
                     }
                 }
             }
@@ -110,185 +133,182 @@ internal fun ComposeModalHost(
 }
 
 @Composable
-private fun ModalCard(content: @Composable () -> Unit) {
-    Card(
-        modifier =
-            Modifier
-                .widthIn(min = 320.dp, max = 560.dp)
-                .border(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0x66 / 255f), RoundedCornerShape(22.dp)),
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-        elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
-    ) {
-        Column(
-            modifier = Modifier.padding(22.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+private fun modalFrame(
+    title: String,
+    onDismiss: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    BoxWithConstraints {
+        val maximumHeight = maxHeight * 0.8f
+        Card(
+            modifier =
+                Modifier
+                    .heightIn(max = maximumHeight)
+                    .widthIn(min = 420.dp, max = 760.dp)
+                    .testTag("Internal modal")
+                    .border(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0x66 / 255f), ModalShape),
+            shape = ModalShape,
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+            elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
         ) {
-            content()
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(start = 22.dp, top = 14.dp, end = 12.dp, bottom = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    modalTitle(title)
+                    modalSecondaryButton(label = "Close", onClick = onDismiss)
+                }
+                HorizontalDivider()
+                CompositionLocalProvider(LocalModalBodyMaxHeight provides (maximumHeight - 64.dp)) {
+                    content()
+                }
+            }
         }
     }
 }
 
+/**
+ * Provides the standard scrollable body and persistent, right-aligned action footer for custom dialogs.
+ *
+ * Dialog content is responsible only for its fields and state, while this layout keeps action placement
+ * and overflow behavior consistent across the application.
+ */
 @Composable
-private fun ConfirmationModalContent(
+internal fun modalDialogLayout(
+    body: @Composable ColumnScope.() -> Unit,
+    footer: @Composable RowScope.() -> Unit,
+) {
+    val scrollState = rememberScrollState()
+    Column {
+        Box(modifier = Modifier.fillMaxWidth().weight(1f, fill = false)) {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = LocalModalBodyMaxHeight.current)
+                        .verticalScroll(scrollState)
+                        .padding(start = 22.dp, top = 22.dp, end = 36.dp, bottom = 22.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                content = body,
+            )
+            if (scrollState.maxValue > 0) {
+                VerticalScrollbar(
+                    adapter = rememberScrollbarAdapter(scrollState),
+                    modifier = Modifier.align(Alignment.CenterEnd).semantics { contentDescription = "Modal scrollbar" },
+                )
+            }
+        }
+        HorizontalDivider()
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
+            verticalAlignment = Alignment.CenterVertically,
+            content = footer,
+        )
+    }
+}
+
+@Composable
+private fun confirmationModalContent(
     modal: ComposeConfirmationModal,
     onDismiss: () -> Unit,
 ) {
-    ModalTitle(modal.title)
-    Text(text = modal.message, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium)
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End), modifier = Modifier.fillMaxWidth()) {
-        ActionIconButton(
-            icon = Icons.Filled.Close,
-            description = modal.dismissDescription,
-            onClick = onDismiss,
-        )
-        ActionIconButton(
-            icon = Icons.Filled.Check,
-            description = modal.confirmDescription,
-            onClick = {
-                modal.onConfirm()
-                onDismiss()
-            },
-        )
-    }
+    modalDialogLayout(
+        body = { Text(text = modal.message, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium) },
+        footer = {
+            modalSecondaryButton(label = modal.dismissDescription, onClick = onDismiss)
+            modalPrimaryButton(
+                label = modal.confirmDescription,
+                onClick = {
+                    modal.onConfirm()
+                    onDismiss()
+                },
+            )
+        },
+    )
 }
 
 @Composable
-private fun InfoModalContent(
+private fun infoModalContent(
     modal: ComposeInfoModal,
     onDismiss: () -> Unit,
 ) {
-    ModalTitle(modal.title)
-    Text(
-        text = modal.message,
-        color = MaterialTheme.colorScheme.onSurface,
-        style = MaterialTheme.typography.bodyMedium,
-        modifier = Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState()),
+    modalDialogLayout(
+        body = { Text(text = modal.message, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium) },
+        footer = { modalPrimaryButton(label = modal.dismissDescription, icon = Icons.Filled.Close, onClick = onDismiss) },
     )
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End), modifier = Modifier.fillMaxWidth()) {
-        ActionIconButton(
-            icon = Icons.Filled.Close,
-            description = modal.dismissDescription,
-            onClick = onDismiss,
-        )
-    }
 }
 
 @Composable
-private fun ContentModalContent(
-    modal: ComposeContentModal,
-    onDismiss: () -> Unit,
-) {
-    ModalTitle(modal.title)
-    modal.content(onDismiss)
-}
-
-@Composable
-private fun SettingsModalContent(
-    modal: ComposeSettingsModal,
-    onDismiss: () -> Unit,
-) {
-    Card(
-        modifier =
-            Modifier
-                .fillMaxHeight(0.8f)
-                .widthIn(min = 420.dp, max = 760.dp)
-                .border(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0x66 / 255f), RoundedCornerShape(22.dp)),
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-        elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(start = 22.dp, top = 14.dp, end = 12.dp, bottom = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                ModalTitle(modal.title)
-                ActionIconButton(
-                    icon = Icons.Filled.Close,
-                    description = "Close ${modal.title}",
-                    onClick = onDismiss,
-                )
-            }
-            androidx.compose.material3.HorizontalDivider()
-            Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(22.dp)) {
-                modal.content()
-            }
-        }
-    }
-}
-
-@Composable
-private fun ErrorModalContent(
+private fun errorModalContent(
     modal: ComposeErrorModal,
     onDismiss: () -> Unit,
 ) {
     val color = errorColorForCategory(modal.userError.category)
-    ModalTitle(modal.userError.summary, color)
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        androidx.compose.material3.Icon(
-            imageVector = Icons.Filled.ErrorOutline,
-            contentDescription = null,
-            tint = color,
-        )
-        Text(
-            text = modal.userError.detail,
-            color = MaterialTheme.colorScheme.onSurface,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
-        )
-    }
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End), modifier = Modifier.fillMaxWidth()) {
-        modal.onCopyDetails?.let { onCopy ->
-            ActionIconButton(
-                icon = Icons.Filled.ContentCopy,
-                description = "Copy error details",
-                onClick = {
-                    onCopy()
-                    onDismiss()
-                },
-            )
-        }
-        if (modal.userError.retryable && modal.onRetry != null) {
-            ActionIconButton(
-                icon = Icons.Filled.Refresh,
-                description = "Retry",
-                onClick = {
-                    modal.onRetry()
-                    onDismiss()
-                },
-            )
-        }
-        ActionIconButton(
-            icon = Icons.Filled.Close,
-            description = modal.dismissDescription,
-            onClick = onDismiss,
-        )
-    }
+    modalDialogLayout(
+        body = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Icon(imageVector = Icons.Filled.ErrorOutline, contentDescription = null, tint = color)
+                Text(
+                    text = modal.userError.detail,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        },
+        footer = {
+            modal.onCopyDetails?.let { onCopy ->
+                modalSecondaryButton(
+                    label = "Copy details",
+                    icon = Icons.Filled.ContentCopy,
+                    onClick = {
+                        onCopy()
+                        onDismiss()
+                    },
+                )
+            }
+            if (modal.userError.retryable && modal.onRetry != null) {
+                modalPrimaryButton(
+                    label = "Retry",
+                    icon = Icons.Filled.Refresh,
+                    onClick = {
+                        modal.onRetry()
+                        onDismiss()
+                    },
+                )
+            }
+            modalPrimaryButton(label = modal.dismissDescription, icon = Icons.Filled.Close, onClick = onDismiss)
+        },
+    )
 }
+
+private fun ComposeModal.title(): String =
+    when (this) {
+        is ComposeConfirmationModal -> title
+        is ComposeContentModal -> title
+        is ComposeInfoModal -> title
+        is ComposeSettingsModal -> title
+        is ComposeErrorModal -> userError.summary
+    }
 
 @Composable
 private fun errorColorForCategory(category: ProtocolErrorCategory): Color {
     val scheme = MaterialTheme.colorScheme
     return when (category) {
-        ProtocolErrorCategory.PROVIDER -> scheme.tertiary
-        ProtocolErrorCategory.WORKSPACE -> scheme.tertiary
+        ProtocolErrorCategory.PROVIDER, ProtocolErrorCategory.WORKSPACE -> scheme.tertiary
         ProtocolErrorCategory.CANVAS -> scheme.primary
         ProtocolErrorCategory.TOOL -> scheme.secondary
-        ProtocolErrorCategory.PERSISTENCE -> scheme.error
-        ProtocolErrorCategory.UNKNOWN -> scheme.error
+        ProtocolErrorCategory.PERSISTENCE, ProtocolErrorCategory.UNKNOWN -> scheme.error
     }
 }
 
 @Composable
-private fun ModalTitle(
-    title: String,
-    color: Color = MaterialTheme.colorScheme.onSurface,
-) {
+private fun modalTitle(title: String) {
     Text(
         text = title,
-        color = color,
+        color = MaterialTheme.colorScheme.onSurface,
         style = MaterialTheme.typography.titleLarge,
         fontWeight = FontWeight.SemiBold,
     )

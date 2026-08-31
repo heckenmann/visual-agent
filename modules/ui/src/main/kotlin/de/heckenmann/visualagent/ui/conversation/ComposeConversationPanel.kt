@@ -98,7 +98,9 @@ internal fun ConversationPanel(
         buildConversationTimeline(
             history = conversationState.history,
             pendingUserMessage = conversationState.pendingUserMessage,
+            pendingUserEntryId = conversationState.pendingUserEntryId,
             streamingContent = streamingContent,
+            streamingEntryId = conversationState.streamingEntryId,
             showWaitingIndicator = showWaitingIndicator,
             showOlderHistoryLoading =
                 shouldShowOlderHistoryLoadingIndicator(
@@ -137,9 +139,11 @@ internal fun ConversationPanel(
                         onInputChange = { conversationState.input = it },
                         onSendingChange = { conversationState.sending = it },
                         onStatusChange = { conversationState.status = it },
-                        onHistoryChange = conversationState::replaceHistory,
                         onActiveTokenChange = { activeToken = it },
                         onPendingUserMessageChange = { conversationState.pendingUserMessage = it },
+                        onPendingUserEntryIdChange = { conversationState.pendingUserEntryId = it },
+                        onStreamingEntryIdChange = { conversationState.streamingEntryId = it },
+                        onStreamCompletion = conversationState::completeStream,
                         streamingFlow = conversationState.streaming,
                     )
                 }
@@ -154,7 +158,7 @@ internal fun ConversationPanel(
             activeToken = { activeToken },
             onSendingChange = { conversationState.sending = it },
             onStatusChange = { conversationState.status = it },
-            onHistoryRefresh = { conversationState.replaceHistory(conversationPort.currentHistory()) },
+            onHistoryRefresh = { conversationState.resetHistory(conversationPort.currentHistory()) },
             onTodosCleared = todoState::clear,
         )
     }
@@ -189,9 +193,11 @@ internal fun ConversationPanel(
         onInputChange = { conversationState.input = it },
         onSendingChange = { conversationState.sending = it },
         onStatusChange = { conversationState.status = it },
-        onHistoryChange = conversationState::replaceHistory,
         onActiveTokenChange = { activeToken = it },
         onPendingUserMessageChange = { conversationState.pendingUserMessage = it },
+        onPendingUserEntryIdChange = { conversationState.pendingUserEntryId = it },
+        onStreamingEntryIdChange = { conversationState.streamingEntryId = it },
+        onStreamCompletion = conversationState::completeStream,
         streamingFlow = conversationState.streaming,
     )
     val onInputPlacementChange =
@@ -220,10 +226,10 @@ internal fun ConversationPanel(
                             conversationState.deletingMessageIds += id
                             scope.launch {
                                 delay(DELETE_ANIMATION_DURATION_MS.toLong())
-                                conversationPort.deleteMessage(id)
+                                val deleted = conversationPort.deleteMessage(id)
                                 conversationState.replaceHistory(conversationPort.currentHistory())
                                 conversationState.deletingMessageIds -= id
-                                conversationState.status = "Message deleted"
+                                conversationState.status = if (deleted) "Message deleted" else "Message could not be deleted"
                             }
                         },
                         onStatusChange = { conversationState.status = it },
@@ -235,6 +241,8 @@ internal fun ConversationPanel(
                                     ?: todoState.deletedSnapshots[todo.id]
                             }
                         },
+                        shouldAnimateEntry = conversationState::shouldAnimateEntry,
+                        onMessageEntryRendered = conversationState::markEntryKnown,
                         inlineComposer = {
                             ConversationInputCard(
                                 input = conversationState.input,
@@ -252,19 +260,21 @@ internal fun ConversationPanel(
                     )
                 }
                 ConversationPanelQueueStrip(
-                    queue,
-                    scope,
-                    inFlight,
-                    conversationGateway,
-                    inputFocusRequester,
-                    { activeToken },
-                    { conversationState.input = it },
-                    { conversationState.sending = it },
-                    { conversationState.status = it },
-                    conversationState::replaceHistory,
-                    { activeToken = it },
-                    { conversationState.pendingUserMessage = it },
-                    conversationState.streaming,
+                    queue = queue,
+                    scope = scope,
+                    inFlight = inFlight,
+                    messageGateway = conversationGateway,
+                    inputFocusRequester = inputFocusRequester,
+                    activeToken = { activeToken },
+                    onInputChange = { conversationState.input = it },
+                    onSendingChange = { conversationState.sending = it },
+                    onStatusChange = { conversationState.status = it },
+                    onActiveTokenChange = { activeToken = it },
+                    onPendingUserMessageChange = { conversationState.pendingUserMessage = it },
+                    onPendingUserEntryIdChange = { conversationState.pendingUserEntryId = it },
+                    onStreamingEntryIdChange = { conversationState.streamingEntryId = it },
+                    onStreamCompletion = conversationState::completeStream,
+                    streamingFlow = conversationState.streaming,
                 )
                 ConversationScrollToLatestArea(
                     isAtLatest = isAtLatest,
@@ -289,13 +299,7 @@ internal fun ConversationPanel(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
                 )
             }
-            ConversationEditModal(
-                editingId = conversationState.editingId,
-                history = conversationState.history,
-                conversationPort = conversationPort,
-                onDismiss = { conversationState.editingId = null },
-                onHistoryRefresh = { conversationState.replaceHistory(conversationPort.currentHistory()) },
-            )
+            ConversationEditMessageOverlay(conversationState, conversationPort, modalRequester)
         }
     }
 }

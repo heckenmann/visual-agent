@@ -1,16 +1,12 @@
 package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
-import de.heckenmann.visualagent.agent.provider.ProviderUserFacingError
-import de.heckenmann.visualagent.agent.provider.ProviderUserFacingException
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.todo.TodoEventBus
 import io.mockk.coEvery
 import io.mockk.mockk
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import java.time.Instant
 import kotlin.test.Test
@@ -156,114 +152,6 @@ class AgentManagerConversationOpsTest {
         assertEquals("system", manager.getHistory().single().role)
         assertEquals("You are helpful.", manager.getHistory().single().content)
     }
-
-    @Test
-    fun `stream message emits chunks and persists assistant response`() =
-        runBlocking {
-            val db =
-                de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                    .create("jdbc:sqlite::memory:")
-            val provider = mockk<LLMProvider>(relaxed = true)
-            coEvery { provider.stream(any<ChatRequestContext>()) } returns
-                flowOf(
-                    ChatResponse(model = "test", message = Message("assistant", "Hello"), done = false),
-                    ChatResponse(model = "test", message = Message("assistant", " world"), done = true),
-                )
-            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
-            val chunks = mutableListOf<String>()
-
-            val result = manager.streamMessage("hi") { chunks += it }
-
-            assertEquals("Hello world", result)
-            assertEquals(listOf("Hello", " world"), chunks)
-            val history = manager.getHistory()
-            assertEquals("user", history.first().role)
-            assertEquals("assistant", history.last().role)
-        }
-
-    @Test
-    fun `stream message persists a safe provider failure response`() =
-        runBlocking {
-            val db =
-                de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                    .create("jdbc:sqlite::memory:")
-            val provider = mockk<LLMProvider>(relaxed = true)
-            coEvery { provider.stream(any<ChatRequestContext>()) } returns
-                flow {
-                    throw ProviderUserFacingException(
-                        ProviderUserFacingError(
-                            "Provider executable unavailable",
-                            "The required provider executable is not installed.",
-                            false,
-                        ),
-                    )
-                }
-            val manager =
-                AgentManager(
-                    db,
-                    provider,
-                    AgentToolConfigService(db),
-                    ToolEventBus(),
-                    TodoEventBus(),
-                    AppConfigBean(db),
-                )
-
-            val result = manager.streamMessage("hi") { }
-
-            assertEquals(
-                "Provider executable unavailable\n\nThe required provider executable is not installed.",
-                result,
-            )
-            assertEquals(listOf("user", "assistant"), manager.getHistory().map(Message::role))
-            assertEquals(result, manager.getHistory().last().content)
-        }
-
-    @Test
-    fun `stream message preserves adjacent sentence chunks`() =
-        runBlocking {
-            val db =
-                de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                    .create("jdbc:sqlite::memory:")
-            val provider = mockk<LLMProvider>(relaxed = true)
-            coEvery { provider.stream(any<ChatRequestContext>()) } returns
-                flowOf(
-                    ChatResponse(model = "test", message = Message("assistant", "First."), done = false),
-                    ChatResponse(model = "test", message = Message("assistant", "Second."), done = true),
-                )
-            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
-            val chunks = mutableListOf<String>()
-
-            val result = manager.streamMessage("hi") { chunks += it }
-
-            assertEquals("First.Second.", result)
-            assertEquals(listOf("First.", "Second."), chunks)
-            assertEquals("First.Second.", manager.getHistory().last().content)
-        }
-
-    @Test
-    fun `stream message persists thinking markup but removes it from provider history`() =
-        runBlocking {
-            val db =
-                de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                    .create("jdbc:sqlite::memory:")
-            val provider = mockk<LLMProvider>(relaxed = true)
-            coEvery { provider.stream(any<ChatRequestContext>()) } returns
-                flowOf(
-                    ChatResponse(model = "test", message = Message("assistant", "<think>first</think>"), done = false),
-                    ChatResponse(model = "test", message = Message("assistant", "<think>second</think>answer"), done = true),
-                )
-            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
-
-            assertEquals("answer", manager.streamMessage("hi") { })
-            assertEquals(
-                "<think>first</think><think>second</think>answer",
-                manager.getHistory().last().content,
-            )
-            val providerHistory =
-                manager.conversationOps
-                    .buildMainRequest(manager.conversationOps.loadRecentHistoryFromDb())
-            assertEquals("answer", providerHistory.messages.last().content)
-        }
 
     @Test
     fun `start agent job creates agent and executes task`() =

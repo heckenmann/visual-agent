@@ -226,7 +226,7 @@ class MessageRowsTest {
     }
 
     @Test
-    fun `persisted thinking markup remains visible after streaming completes`() {
+    fun `successful completion hides persisted thinking markup`() {
         composeTestRule.setContent {
             MaterialTheme {
                 MessageRow(
@@ -245,12 +245,12 @@ class MessageRowsTest {
             }
         }
 
-        composeTestRule.onNodeWithText("Thinking").assertExists()
+        composeTestRule.onNodeWithText("Thinking").assertDoesNotExist()
         composeTestRule.onNodeWithText("answer").assertExists()
     }
 
     @Test
-    fun `structured reasoning is rendered in the thinking row without markup`() {
+    fun `failed request does not render persisted structured reasoning`() {
         composeTestRule.setContent {
             MaterialTheme {
                 MessageRow(
@@ -269,9 +269,33 @@ class MessageRowsTest {
             }
         }
 
-        composeTestRule.onNodeWithText("Thinking").assertExists()
+        composeTestRule.onNodeWithText("Thinking").assertDoesNotExist()
         composeTestRule.onNodeWithText("answer").assertExists()
         composeTestRule.onNodeWithText("<think>planning</think>").assertDoesNotExist()
+    }
+
+    @Test
+    fun `cancelled request does not render persisted thinking markup`() {
+        composeTestRule.setContent {
+            MaterialTheme {
+                MessageRow(
+                    message = Message(role = "assistant", content = "<think>cancelled work</think>answer", id = "msg-cancelled"),
+                    isStreamingPlaceholder = false,
+                    isStreaming = false,
+                    canRetry = false,
+                    canEdit = false,
+                    canDelete = false,
+                    isDeleting = false,
+                    onCopied = {},
+                    onRetry = {},
+                    onEdit = {},
+                    onDelete = {},
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Thinking").assertDoesNotExist()
+        composeTestRule.onNodeWithText("answer").assertExists()
     }
 
     @Test
@@ -280,23 +304,5 @@ class MessageRowsTest {
 
         assertEquals("first\n\nsecond", parsed.thinking)
         assertEquals("answer", parsed.answer)
-    }
-
-    @Test
-    fun `renders a validated canvas image attachment`() {
-        val canvasImage =
-            "data:image/png;base64," +
-                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
-
-        composeTestRule.setContent {
-            MaterialTheme {
-                ConversationImageAttachments(listOf(canvasImage))
-            }
-        }
-
-        composeTestRule.waitForIdle()
-        Thread.sleep(100)
-        composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithContentDescription("Embedded image 1").assertExists()
     }
 }

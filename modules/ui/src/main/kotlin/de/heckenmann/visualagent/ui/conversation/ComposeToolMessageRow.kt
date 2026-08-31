@@ -3,8 +3,6 @@
 package de.heckenmann.visualagent.ui.conversation
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -80,9 +78,9 @@ internal fun ToolMessageRow(
             MaterialTheme.colorScheme.onSurfaceVariant
         }
     AnimatedVisibility(
-        visible = !isDeleting,
-        enter = EnterTransition.None,
-        exit = ExitTransition.None,
+        visibleState = rememberConversationMessageVisibility(isVisible = !isDeleting),
+        enter = conversationMessageEnterTransition(),
+        exit = conversationMessageDeleteTransition(),
         modifier = modifier.fillMaxWidth(),
     ) {
         Column(

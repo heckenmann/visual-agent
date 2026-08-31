@@ -16,14 +16,14 @@ Desktop user.
 
 1. The model returns assistant text and may include structured reasoning.
 2. The main window chat wiring reads structured reasoning and extracts any legacy think blocks from the response.
-3. Extracted thinking events are added to the chat panel as collapsible rows.
+3. Extracted thinking events are added to the chat panel as collapsible rows only while the corresponding response is active.
 4. A collapsed row previews the latest non-empty thinking line beside its `Thinking` label with the same Markdown renderer, constrained to one visible line.
 5. When expanded, the complete thinking content is rendered as Markdown.
 6. The visible assistant answer is stripped of the raw think tags.
 
 ## Result
 
-The user can inspect model thinking output without polluting the final answer text.
+The user can inspect model thinking output while a response is active without polluting the final answer text or completed conversation history.
 
 ## Tool Calls
 
@@ -36,7 +36,7 @@ The user can inspect model thinking output without polluting the final answer te
 
 ## Acceptance Criteria
 
-- Thinking blocks are shown whenever the provider supplies them.
+- Thinking blocks are shown only while the corresponding response is active, then removed on success, cancellation, or failure.
 - Thinking rows are collapsed by default and show the latest non-empty line as
   their Markdown-rendered one-line preview.
 - Expanded thinking content uses the same Markdown renderer as conversation

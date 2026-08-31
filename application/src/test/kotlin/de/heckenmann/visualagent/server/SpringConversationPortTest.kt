@@ -12,6 +12,7 @@ import de.heckenmann.visualagent.protocol.CancellationTokenImpl
 import de.heckenmann.visualagent.protocol.ConversationImageResolution
 import de.heckenmann.visualagent.protocol.ConversationInputPlacement
 import de.heckenmann.visualagent.protocol.ConversationPreferences
+import de.heckenmann.visualagent.protocol.ConversationStreamRequest
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -134,18 +135,23 @@ class SpringConversationPortTest {
     @Test
     fun `stream cancellation is bridged to application token`() =
         runTest {
-            coEvery { manager.streamMessage(any(), any(), any()) } coAnswers {
+            coEvery { manager.streamMessage(any(), any(), any(), any(), any()) } coAnswers {
                 thirdArg<(String) -> Unit>().invoke("delta")
                 "delta"
             }
             val token = CancellationTokenImpl()
             val chunks = mutableListOf<String>()
+            val userEntryId = "11111111-1111-4111-8111-111111111111"
+            val assistantEntryId = "22222222-2222-4222-8222-222222222222"
+            every { manager.getHistory() } returns listOf(Message("assistant", "delta", id = assistantEntryId))
 
-            port.stream("hello", token) { chunks += it }
+            val result =
+                port.stream(ConversationStreamRequest(userEntryId, assistantEntryId, "hello"), token) { chunks += it }
             token.cancel()
 
             assertEquals(listOf("delta"), chunks)
-            coVerify(exactly = 1) { manager.streamMessage("hello", any(), any()) }
+            assertEquals(assistantEntryId, result.assistantMessage.id)
+            coVerify(exactly = 1) { manager.streamMessage("hello", any(), any(), any(), any()) }
         }
 
     @Test

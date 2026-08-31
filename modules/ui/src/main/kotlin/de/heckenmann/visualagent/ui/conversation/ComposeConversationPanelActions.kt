@@ -3,9 +3,11 @@
 package de.heckenmann.visualagent.ui.conversation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import de.heckenmann.visualagent.protocol.CancellationToken
 import de.heckenmann.visualagent.protocol.CancellationTokenImpl
 import de.heckenmann.visualagent.protocol.ConversationPort
+import de.heckenmann.visualagent.protocol.ConversationStreamRequest
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -113,25 +115,34 @@ internal fun ConversationEditModal(
     editingId: String?,
     history: List<Message>,
     conversationPort: ConversationPort,
+    modalRequester: ComposeModalRequester,
     onDismiss: () -> Unit,
     onHistoryRefresh: suspend () -> Unit,
 ) {
     if (editingId == null) return
     val message = history.find { it.id == editingId } ?: return
     val scope = androidx.compose.runtime.rememberCoroutineScope()
-    EditMessageModal(
-        content = message.content,
-        onDismiss = onDismiss,
-        onSave = { newContent ->
-            editingId.let { id ->
-                scope.launch {
-                    withContext(Dispatchers.IO) { conversationPort.updateMessage(id, newContent) }
-                    onHistoryRefresh()
-                }
-            }
-            onDismiss()
-        },
-    )
+    LaunchedEffect(editingId) {
+        modalRequester.request(
+            ComposeContentModal(
+                title = "Edit message",
+                content = { dismiss ->
+                    EditMessageForm(
+                        content = message.content,
+                        onDismiss = dismiss,
+                        onSave = { newContent ->
+                            scope.launch {
+                                withContext(Dispatchers.IO) { conversationPort.updateMessage(editingId, newContent) }
+                                onHistoryRefresh()
+                                dismiss()
+                            }
+                        },
+                    )
+                },
+                onDismiss = onDismiss,
+            ),
+        )
+    }
 }
 
 /**
@@ -140,8 +151,8 @@ internal fun ConversationEditModal(
  * Streaming runs on [Dispatchers.IO] so the UI thread is never blocked. The streaming
  * content is pushed to a [MutableStateFlow] (thread-safe, non-blocking via [tryEmit]).
  * Compose collects it via [collectAsState] on the Main dispatcher, fully decoupled from
- * the streaming coroutine. [onHistoryChange] is only refreshed from DB after streaming
- * completes, so the LazyColumn is not rebuilt on every token.
+ * the streaming coroutine. [onStreamCompletion] applies the persisted history only after
+ * streaming completes, so the LazyColumn is not rebuilt on every token.
  */
 internal suspend fun executeSend(
     content: String,
@@ -151,15 +162,27 @@ internal suspend fun executeSend(
     onInputChange: (String) -> Unit,
     onSendingChange: (Boolean) -> Unit,
     onStatusChange: (String) -> Unit,
-    onHistoryChange: (List<Message>) -> Unit,
     onActiveTokenChange: (CancellationToken?) -> Unit,
     onPendingUserMessageChange: (String?) -> Unit,
+    onPendingUserEntryIdChange: (String?) -> Unit,
+    onStreamingEntryIdChange: (String?) -> Unit,
+    onStreamCompletion: (List<Message>) -> Unit,
     streamingFlow: MutableStateFlow<String>,
 ) {
     onInputChange("")
     onSendingChange(true)
     onStatusChange("Streaming...")
+    val userEntryId =
+        java.util.UUID
+            .randomUUID()
+            .toString()
+    val assistantEntryId =
+        java.util.UUID
+            .randomUUID()
+            .toString()
     onPendingUserMessageChange(content)
+    onPendingUserEntryIdChange(userEntryId)
+    onStreamingEntryIdChange(assistantEntryId)
     streamingFlow.value = ""
     val streamRequestId =
         java.util.UUID
@@ -171,20 +194,17 @@ internal suspend fun executeSend(
     val streamedContent = StringBuilder()
     val result =
         runCatching {
-            messageGateway.stream(content, token) { chunk ->
+            messageGateway.stream(ConversationStreamRequest(userEntryId, assistantEntryId, content), token) { chunk ->
                 streamedContent.append(chunk)
                 streamingFlow.value = streamedContent.toString()
             }
         }
-    streamingFlow.value = ""
-    onPendingUserMessageChange(null)
-    onHistoryChange(messageGateway.currentHistory())
+    val completedHistory = messageGateway.currentHistory()
+    onStreamCompletion(completedHistory)
     result
         .onSuccess {
-            onHistoryChange(messageGateway.currentHistory())
             onStatusChange("Ready")
         }.onFailure {
-            onHistoryChange(messageGateway.currentHistory())
             onStatusChange(it.toUiErrorMessage())
         }.also {
             inFlight.markStreamEnd(streamRequestId)

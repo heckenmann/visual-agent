@@ -4,10 +4,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import de.heckenmann.visualagent.protocol.ProviderAdapter
 import de.heckenmann.visualagent.protocol.ProviderModel
 import de.heckenmann.visualagent.protocol.ProviderProfile
@@ -45,7 +43,7 @@ class ComposeProviderProfileEditorTest {
         composeTestRule.onNodeWithText("Base URL").assertExists()
         composeTestRule.onNodeWithText("API key").assertExists()
         composeTestRule.onNodeWithText("Provider options (key=value per line)").assertExists()
-        composeTestRule.onNodeWithContentDescription("Save provider changes").performScrollTo().performClick()
+        composeTestRule.onNodeWithText("Save changes").performClick()
 
         assertEquals(profile, saved)
     }

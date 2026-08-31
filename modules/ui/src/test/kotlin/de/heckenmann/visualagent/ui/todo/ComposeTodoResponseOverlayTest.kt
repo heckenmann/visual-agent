@@ -5,6 +5,8 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import de.heckenmann.visualagent.protocol.TodoItem
+import de.heckenmann.visualagent.ui.modal.ComposeContentModal
+import de.heckenmann.visualagent.ui.modal.composeModalHost
 import org.junit.Rule
 import org.junit.Test
 import kotlin.test.assertTrue
@@ -29,7 +31,7 @@ class ComposeTodoResponseOverlayTest {
             }
         }
 
-        composeTestRule.onNodeWithContentDescription("Close todo response").performClick()
+        composeTestRule.onNodeWithContentDescription("Close").performClick()
 
         assertTrue(dismissed)
     }
@@ -37,17 +39,25 @@ class ComposeTodoResponseOverlayTest {
     @Test
     fun `response overlay exposes a vertical scrollbar`() {
         val responseState = TodoResponseState()
-        responseState.apply("execution", "agent", (1..80).joinToString("\n"), completed = true)
+        responseState.apply("execution", "agent", (1..500).joinToString("\n"), completed = true)
         composeTestRule.setContent {
             MaterialTheme {
-                TodoResponseOverlay(
-                    todo = TodoItem(id = "todo", description = "Task"),
-                    responseState = responseState,
+                composeModalHost(
+                    modal =
+                        ComposeContentModal(title = "Todo response") {
+                            TodoResponseOverlay(
+                                todo = TodoItem(id = "todo", description = "Task"),
+                                responseState = responseState,
+                                onDismiss = {},
+                            )
+                        },
                     onDismiss = {},
                 )
             }
         }
 
-        composeTestRule.onNodeWithContentDescription("Todo response scrollbar").assertExists()
+        composeTestRule.mainClock.advanceTimeBy(200)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithContentDescription("Modal scrollbar").assertExists()
     }
 }

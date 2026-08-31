@@ -18,7 +18,8 @@ Desktop user.
 1. The user hovers or focuses a user message row.
 2. The row exposes an icon-only edit action.
 3. The user clicks the edit icon.
-4. A modal opens with the current message content in an editable text field.
+4. A modal opens with the current message content in an editable text field. Its title bar remains
+   visible while the form body scrolls and its actions stay in the fixed footer.
 5. The user changes the content and saves.
 6. The message content is updated in the conversation history and persisted.
 7. The modal closes and the conversation panel reflects the updated text.

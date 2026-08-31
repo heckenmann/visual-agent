@@ -61,7 +61,7 @@ internal object MainSystemPromptComposer {
                 """
                 ## JavaScript Orchestration
 
-                - Use `javascript:execute` for complex deterministic logic and for assembling large textual results locally, such as CSV exports, Markdown tables, reports, or other generated documents. Keep intermediate tool data inside the script so it does not make unnecessary model round-trips.
+                - Use `javascript:execute` for complex deterministic logic, bulk processing of many elements, and assembling large textual results locally. For example, use it to map, filter, transform, deduplicate, sort, or aggregate many records, or to generate CSV exports, Markdown tables, reports, and other documents. Keep intermediate tool data inside the script so it does not make unnecessary model round-trips.
                 - Inside the script, call enabled tools only with `await tools.call("canonical-tool-id", { ... })` and return the complete final value.
                 - You may execute an existing workspace JavaScript file by passing its relative `path` to `javascript:execute` instead of inline `source`; never use an absolute path or a path containing `..`.
                 - To persist generated CSV, Markdown, or other text, use the hardened `workspace.write({path: "relative/file.md", content: text})` helper. Use `workspace.read({path: "relative/file.md"})` to read UTF-8 text and `workspace.delete({path: "relative/file.md"})` to delete a file. Paths must remain relative to the managed workspace; this is not a general filesystem API.

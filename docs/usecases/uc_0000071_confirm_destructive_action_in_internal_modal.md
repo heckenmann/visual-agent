@@ -18,9 +18,10 @@ Desktop user.
 1. The user activates a destructive action such as clearing conversation history, deleting a todo, deleting a sub-agent, deleting a workspace file, clearing the canvas, or deleting the selected canvas figure from the toolbar.
 2. The application shows an internal modal above all workspace panels.
 3. The dimmed workspace remains visible but cannot be interacted with until the modal is resolved.
-4. The user confirms or cancels through icon-only modal actions with tooltips.
-5. On confirmation, the original action runs and the modal closes.
-6. On cancellation, no destructive change is applied and the modal closes.
+4. The dialog slides upward into view.
+5. The user confirms or cancels through clearly labelled standard buttons.
+6. On confirmation, the original action runs and the dialog scales down out of view.
+7. On cancellation, no destructive change is applied and the dialog scales down out of view.
 
 ## Result
 
@@ -32,10 +33,11 @@ Destructive UI actions are deliberate and stay inside the Visual Agent workspace
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.modal.ComposeModalHost`
+- `de.heckenmann.visualagent.ui.modal.composeModalHost`
 - `de.heckenmann.visualagent.ui.modal.ComposeConfirmationModal`
 - `de.heckenmann.visualagent.ui.modal.ComposeModalRequester`
-- `de.heckenmann.visualagent.ui.components.ActionIconButton`
+- `de.heckenmann.visualagent.ui.modal.modalPrimaryButton`
+- `de.heckenmann.visualagent.ui.modal.modalSecondaryButton`
 - `de.heckenmann.visualagent.ui.application.VisualAgentComposeApp`
 
 ## Acceptance Criteria
@@ -43,5 +45,10 @@ Destructive UI actions are deliberate and stay inside the Visual Agent workspace
 - Confirmation UI is rendered inside the main Compose window, not as a native dialog.
 - The modal is visually above all workspace panels.
 - Workspace interaction is blocked while the modal is visible.
-- Confirm and cancel actions are icon-only and expose tooltips.
+- Confirm and cancel actions use visible, descriptive text labels.
 - Cancelling a destructive action does not mutate persisted state.
+- Every internal modal uses the common title bar, independently scrollable body, and fixed,
+  right-aligned action footer so that actions remain available for long content.
+- A modal grows with its content until it reaches 80% of the window height; additional content
+  scrolls without moving its footer actions.
+- All dialog variants use the same upward entry and scale-down exit transition.

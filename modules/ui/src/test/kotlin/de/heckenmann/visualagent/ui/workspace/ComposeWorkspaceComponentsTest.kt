@@ -9,6 +9,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -29,6 +30,7 @@ import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
 import io.mockk.mockk
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -104,18 +106,24 @@ class ComposeWorkspaceComponentsTest {
     @Test
     fun `panel resizer reports a new width when dragged right`() {
         var resizedWidth = 0
+        var committedWidths = 0
+        val previewWidths = mutableListOf<Int>()
         composeTestRule.setContent {
             MaterialTheme {
-                PanelResizer(
+                panelResizer(
                     currentWidth = 300,
-                    onWidthChanged = { resizedWidth = it },
+                    onPreviewWidthChanged = previewWidths::add,
+                    onWidthCommitted = {
+                        resizedWidth = it
+                        committedWidths++
+                    },
+                    onCancelled = {},
                     minPanelWidth = 200,
                 )
             }
         }
 
         composeTestRule.waitForIdle()
-        // Drag far enough to cross the resizer threshold (10 px) at least once.
         composeTestRule
             .onNodeWithContentDescription("Resize panel")
             .performTouchInput {
@@ -127,6 +135,59 @@ class ComposeWorkspaceComponentsTest {
         composeTestRule.waitForIdle()
 
         assertTrue("Expected resized width > 300 but was $resizedWidth", resizedWidth > 300)
+        assertTrue("Expected live preview widths", previewWidths.any { it > 300 })
+        assertEquals("Expected one final width commit", 1, committedWidths)
+    }
+
+    @Test
+    fun `workspace starts the first visible panel at the shared edge gap`() {
+        composeTestRule.setContent {
+            MaterialTheme {
+                Box(
+                    modifier = Modifier.size(1_200.dp, 600.dp),
+                ) {
+                    ComposeSplitWorkspace(
+                        windows = listOf(testWindow("first", "First")),
+                        panelServices = mockk(relaxed = true),
+                        onToggleWindow = {},
+                        onReorderWindows = {},
+                        onResizeWindow = { _, _ -> },
+                        minPanelWidth = ComposeWorkspaceWindowBounds.MIN_WIDTH,
+                        viewport = ComposeWorkspaceViewport(1_200, 600),
+                    )
+                }
+            }
+        }
+
+        val panelBounds =
+            composeTestRule
+                .onNodeWithTag("workspace-panel-content-first")
+                .getUnclippedBoundsInRoot()
+
+        assertEquals(WORKSPACE_PANEL_GAP.dp, panelBounds.left)
+    }
+
+    @Test
+    fun `workspace preserves the shared edge gap when earlier panels are hidden`() {
+        composeTestRule.setContent {
+            MaterialTheme {
+                Box(modifier = Modifier.size(1_200.dp, 600.dp)) {
+                    ComposeSplitWorkspace(
+                        windows = listOf(testWindow("hidden", "Hidden").copy(visible = false), testWindow("visible", "Visible")),
+                        panelServices = mockk(relaxed = true),
+                        onToggleWindow = {},
+                        onReorderWindows = {},
+                        onResizeWindow = { _, _ -> },
+                        minPanelWidth = ComposeWorkspaceWindowBounds.MIN_WIDTH,
+                        viewport = ComposeWorkspaceViewport(1_200, 600),
+                    )
+                }
+            }
+        }
+
+        val panelBounds = composeTestRule.onNodeWithTag("workspace-panel-content-visible").getUnclippedBoundsInRoot()
+
+        assertEquals(WORKSPACE_PANEL_GAP.dp, panelBounds.left)
     }
 
     @Test

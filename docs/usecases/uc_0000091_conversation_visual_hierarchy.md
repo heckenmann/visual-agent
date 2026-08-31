@@ -22,8 +22,11 @@ collapsed by default.
 ## Main Flow
 
 1. The user sends a message to the main agent.
-2. The assistant answer appears as a primary row: borderless background tint,
-   avatar icon, role label "Assistant", and Markdown content.
+2. New conversation rows slide upward into place. Every dynamic row keeps one
+   opaque identity from its pending or streaming state through persistence, so
+   completing an answer updates the existing row without flicker or a second
+   enter animation. The assistant answer appears as a primary row: borderless
+   background tint, avatar icon, role label "Assistant", and Markdown content.
 3. A tool call fires during the turn. The tool appears as a compact tertiary
    chip showing the tool id and duration, collapsed by default.
 4. The user expands the tool chip to inspect input, result, and error blocks.
@@ -73,5 +76,8 @@ collapsed by default.
   hide their content by default.
 - Thinking rows are collapsed by default and use `bodySmall` /
   `onSurfaceVariant`.
+- New rows slide upward into the conversation; streaming updates and their
+  persisted completion retain the same row identity without a second enter
+  animation or visible replacement.
 - All conversation-row colors come from `MaterialTheme.colorScheme` tokens; no
   hardcoded colors or alpha magic numbers are used.

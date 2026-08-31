@@ -7,9 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -82,33 +79,30 @@ internal fun PanelWidthSlider(
     onDismiss: () -> Unit,
 ) {
     var sliderValue by remember(current) { mutableFloatStateOf(current.toFloat()) }
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(
-            text = "${sliderValue.toInt()} px",
-            color = MaterialTheme.colorScheme.onSurface,
-            style = MaterialTheme.typography.bodyLarge,
-        )
-        Slider(
-            value = sliderValue,
-            onValueChange = { sliderValue = it },
-            onValueChangeFinished = { onWidthChange(sliderValue.toInt().coerceIn(MIN_PANEL_WIDTH, MAX_PANEL_WIDTH)) },
-            valueRange = MIN_PANEL_WIDTH.toFloat()..MAX_PANEL_WIDTH.toFloat(),
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End), modifier = Modifier.fillMaxWidth()) {
-            ActionIconButton(
-                icon = Icons.Filled.Close,
-                description = "Cancel",
-                onClick = onDismiss,
+    modalDialogLayout(
+        body = {
+            Text(
+                text = "${sliderValue.toInt()} px",
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.bodyLarge,
             )
-            ActionIconButton(
-                icon = Icons.Filled.CheckCircle,
-                description = "Apply width",
+            Slider(
+                value = sliderValue,
+                onValueChange = { sliderValue = it },
+                onValueChangeFinished = { onWidthChange(sliderValue.toInt().coerceIn(MIN_PANEL_WIDTH, MAX_PANEL_WIDTH)) },
+                valueRange = MIN_PANEL_WIDTH.toFloat()..MAX_PANEL_WIDTH.toFloat(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        footer = {
+            modalSecondaryButton(label = "Cancel", onClick = onDismiss)
+            modalPrimaryButton(
+                label = "Apply width",
                 onClick = {
                     onWidthChange(sliderValue.toInt().coerceIn(MIN_PANEL_WIDTH, MAX_PANEL_WIDTH))
                     onDismiss()
                 },
             )
-        }
-    }
+        },
+    )
 }

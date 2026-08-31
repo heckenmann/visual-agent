@@ -116,8 +116,9 @@ interface PreferenceStore : ProviderPreferenceStore {
 
 /** Stores, pages, searches, and deletes conversation messages. Use cases: UC-0000005, UC-0000032, UC-0000041. */
 interface ConversationStore {
-    /** Persists one conversation message and returns its identifier. */
+    /** Persists one conversation message using the caller-provided immutable identifier. */
     fun saveConversationMessage(
+        id: String,
         sessionId: String,
         role: String,
         content: String,

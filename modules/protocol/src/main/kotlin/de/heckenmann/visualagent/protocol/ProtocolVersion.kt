@@ -3,7 +3,7 @@ package de.heckenmann.visualagent.protocol
 /** Version negotiated by desktop clients and Visual Agent servers. */
 object ProtocolVersion {
     /** Current wire contract version. */
-    const val CURRENT = "v1"
+    const val CURRENT = "v2"
 }
 
 /** Stable operation error categories exposed by the transport boundary. */

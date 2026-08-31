@@ -3,8 +3,12 @@
 package de.heckenmann.visualagent.ui.conversation
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,10 +20,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.MaterialTheme
@@ -74,9 +76,9 @@ internal fun MessageRow(
             MaterialTheme.colorScheme.surfaceContainerLow
         }
     AnimatedVisibility(
-        visible = !isDeleting,
-        enter = EnterTransition.None,
-        exit = ExitTransition.None,
+        visibleState = rememberConversationMessageVisibility(isVisible = !isDeleting),
+        enter = conversationMessageEnterTransition(),
+        exit = conversationMessageDeleteTransition(),
         modifier = modifier.fillMaxWidth(),
     ) {
         Column(
@@ -152,7 +154,12 @@ internal fun ConversationMessageContent(
     modifier: Modifier = Modifier,
 ) {
     val parsed = parseThinkingMarkup(message.content)
-    val thinking = listOfNotNull(message.reasoning, parsed.thinking.takeIf(String::isNotBlank)).joinToString("\n\n").trim()
+    val thinking =
+        if (isStreaming) {
+            listOfNotNull(message.reasoning, parsed.thinking.takeIf(String::isNotBlank)).joinToString("\n\n").trim()
+        } else {
+            ""
+        }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (thinking.isNotBlank()) {
             ThinkingRow(content = thinking, isStreaming = isStreaming)
@@ -216,14 +223,14 @@ internal fun SystemMessageRow(
 }
 
 @Composable
-internal fun EditMessageModal(
+internal fun EditMessageForm(
     content: String,
     onDismiss: () -> Unit,
     onSave: (String) -> Unit,
 ) {
     var edited by remember { mutableStateOf(content) }
-    ComposeContentModal(title = "Edit message") { dismiss ->
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(16.dp)) {
+    modalDialogLayout(
+        body = {
             OutlinedTextField(
                 value = edited,
                 onValueChange = { edited = it },
@@ -231,17 +238,36 @@ internal fun EditMessageModal(
                 minLines = 3,
                 modifier = Modifier.fillMaxWidth(),
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End), modifier = Modifier.fillMaxWidth()) {
-                ActionIconButton(icon = Icons.Filled.Close, description = "Cancel edit", onClick = dismiss)
-                ActionIconButton(
-                    icon = Icons.Filled.Done,
-                    description = "Save message",
-                    enabled = edited.isNotBlank(),
-                    onClick = { onSave(edited) },
-                )
-            }
-        }
-    }
+        },
+        footer = {
+            modalSecondaryButton(label = "Cancel", onClick = onDismiss)
+            modalSaveButton(
+                label = "Save message",
+                enabled = edited.isNotBlank(),
+                onClick = { onSave(edited) },
+            )
+        },
+    )
 }
 
+internal const val MESSAGE_TRANSITION_DURATION_MS = 180
 internal const val DELETE_ANIMATION_DURATION_MS = 220
+
+/** Keeps a row's first appearance animated while preserving its deletion transition. */
+@Composable
+internal fun rememberConversationMessageVisibility(
+    isVisible: Boolean,
+    animateInitial: Boolean = true,
+): MutableTransitionState<Boolean> =
+    remember { MutableTransitionState(if (animateInitial) false else isVisible) }
+        .also { visibility -> visibility.targetState = isVisible }
+
+/** Animates a newly added conversation row upward from below its final position. */
+internal fun conversationMessageEnterTransition() =
+    fadeIn(animationSpec = tween(MESSAGE_TRANSITION_DURATION_MS)) +
+        slideInVertically(animationSpec = tween(MESSAGE_TRANSITION_DURATION_MS)) { height -> height / 2 }
+
+/** Fades a deleted conversation row before its height collapses. */
+internal fun conversationMessageDeleteTransition() =
+    fadeOut(animationSpec = tween(DELETE_ANIMATION_DURATION_MS)) +
+        shrinkVertically(animationSpec = tween(DELETE_ANIMATION_DURATION_MS))

@@ -120,14 +120,8 @@ class ConversationUiStateTest {
                 includeInlineComposer = false,
             )
 
-        assertEquals(listOf("message:duplicate"), items.map { it.stableKey })
-        val group = (items.single() as ConversationTimelineItem.PersistedGroup).group
-        assertEquals(
-            "newest",
-            group.messages
-                .single()
-                .message.content,
-        )
+        assertEquals(listOf("duplicate"), items.map { it.stableKey })
+        assertEquals("newest", (items.single() as ConversationTimelineItem.MessageEntry).message.content)
     }
 
     @Test
@@ -137,6 +131,8 @@ class ConversationUiStateTest {
                 history = listOf(message("oldest"), message("newest")),
                 pendingUserMessage = "pending",
                 streamingContent = "streaming",
+                pendingUserEntryId = "pending-id",
+                streamingEntryId = "streaming-id",
                 showWaitingIndicator = true,
                 showOlderHistoryLoading = true,
                 includeInlineComposer = true,
@@ -144,11 +140,93 @@ class ConversationUiStateTest {
 
         assertIs<ConversationTimelineItem.InlineComposer>(items[0])
         assertIs<ConversationTimelineItem.Waiting>(items[1])
-        assertIs<ConversationTimelineItem.Streaming>(items[2])
-        assertIs<ConversationTimelineItem.PendingUser>(items[3])
-        assertEquals("message:newest", items[4].stableKey)
-        assertIs<ConversationTimelineItem.OlderHistoryLoading>(items[5])
+        assertIs<ConversationTimelineItem.MessageEntry>(items[2])
+        assertIs<ConversationTimelineItem.MessageEntry>(items[3])
+        assertEquals("newest", items[4].stableKey)
+        assertEquals("oldest", items[5].stableKey)
+        assertIs<ConversationTimelineItem.OlderHistoryLoading>(items[6])
         assertEquals(items.size, items.map { it.stableKey }.distinct().size)
+    }
+
+    @Test
+    fun `streaming and persisted answer retain one timeline identity and type`() {
+        val id = "assistant-id"
+        val streaming =
+            buildConversationTimeline(emptyList(), null, "partial", false, false, false, streamingEntryId = id).single()
+        val persisted =
+            buildConversationTimeline(listOf(Message("assistant", "complete", id = id)), null, "", false, false, false).single()
+
+        assertIs<ConversationTimelineItem.MessageEntry>(streaming)
+        assertIs<ConversationTimelineItem.MessageEntry>(persisted)
+        assertEquals(streaming.stableKey, persisted.stableKey)
+        assertTrue(streaming.isStreaming)
+        assertFalse(persisted.isStreaming)
+    }
+
+    @Test
+    fun `history refresh never duplicates an active streaming entry`() {
+        val id = "assistant-id"
+        val items =
+            buildConversationTimeline(
+                history = listOf(Message("assistant", "Persisted answer", id = id)),
+                pendingUserMessage = null,
+                streamingContent = "Partial answer",
+                streamingEntryId = id,
+                showWaitingIndicator = false,
+                showOlderHistoryLoading = false,
+                includeInlineComposer = false,
+            )
+
+        assertEquals(listOf(id), items.map { it.stableKey })
+        assertFalse((items.single() as ConversationTimelineItem.MessageEntry).isStreaming)
+    }
+
+    @Test
+    fun `loaded history remains known while newly rendered entries animate once`() {
+        val state = ConversationUiState(listOf(message("persisted")))
+
+        assertFalse(state.shouldAnimateEntry("persisted"))
+        assertTrue(state.shouldAnimateEntry("new-entry"))
+        state.markEntryKnown("new-entry")
+
+        assertFalse(state.shouldAnimateEntry("new-entry"))
+        val request = state.beginOlderRequest()
+        state.applyOlder(request!!, ConversationHistoryPage(listOf(message("older")), request.offset, hasMore = false))
+        assertFalse(state.shouldAnimateEntry("older"))
+    }
+
+    @Test
+    fun `stream completion replaces transient entries with one persisted identity`() {
+        val state = ConversationUiState(emptyList())
+        state.pendingUserMessage = "Request"
+        state.pendingUserEntryId = "user-id"
+        state.streamingEntryId = "assistant-id"
+        state.streaming.value = "Partial answer"
+
+        state.completeStream(
+            listOf(
+                Message("user", "Request", id = "user-id"),
+                Message("assistant", "Complete answer", id = "assistant-id"),
+            ),
+        )
+
+        val entries =
+            buildConversationTimeline(
+                history = state.history,
+                pendingUserMessage = state.pendingUserMessage,
+                streamingContent = state.streaming.value,
+                showWaitingIndicator = false,
+                showOlderHistoryLoading = false,
+                includeInlineComposer = false,
+                pendingUserEntryId = state.pendingUserEntryId,
+                streamingEntryId = state.streamingEntryId,
+            ).filterIsInstance<ConversationTimelineItem.MessageEntry>()
+
+        assertEquals(listOf("assistant-id", "user-id"), entries.map { it.stableKey })
+        assertTrue(entries.none { it.isStreaming })
+        assertEquals(null, state.pendingUserMessage)
+        assertEquals(null, state.pendingUserEntryId)
+        assertEquals(null, state.streamingEntryId)
     }
 
     private fun message(

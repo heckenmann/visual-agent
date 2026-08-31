@@ -16,7 +16,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Edit
@@ -255,39 +254,40 @@ internal fun TodoEditor(
     val agentOptions =
         listOf(PanelSelectOption(UNASSIGNED_AGENT_ID, "Unassigned")) +
             agents.map { PanelSelectOption(it.id, it.name) }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedTextField(
-            value = description,
-            onValueChange = { description = it },
-            label = { Text("Description") },
-            minLines = 2,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        PanelDropdownField(
-            label = "Status",
-            selectedValue = status.name,
-            options = TodoState.entries.map { PanelSelectOption(it.name, it.name.labelizeEnumName()) },
-            onSelected = { status = TodoState.valueOf(it) },
-        )
-        PanelDropdownField(
-            label = "Assigned agent",
-            selectedValue = assignedAgentId,
-            options = agentOptions,
-            onSelected = { assignedAgentId = it },
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End), modifier = Modifier.fillMaxWidth()) {
-            ActionIconButton(icon = Icons.Filled.Close, description = "Cancel edit", onClick = onCancel)
-            ActionIconButton(
-                icon = Icons.Filled.Done,
-                description = "Save todo",
+    modalDialogLayout(
+        body = {
+            OutlinedTextField(
+                value = description,
+                onValueChange = { description = it },
+                label = { Text("Description") },
+                minLines = 2,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            PanelDropdownField(
+                label = "Status",
+                selectedValue = status.name,
+                options = TodoState.entries.map { PanelSelectOption(it.name, it.name.labelizeEnumName()) },
+                onSelected = { status = TodoState.valueOf(it) },
+            )
+            PanelDropdownField(
+                label = "Assigned agent",
+                selectedValue = assignedAgentId,
+                options = agentOptions,
+                onSelected = { assignedAgentId = it },
+            )
+        },
+        footer = {
+            modalSecondaryButton(label = "Cancel", onClick = onCancel)
+            modalSaveButton(
+                label = "Save todo",
                 enabled = description.isNotBlank(),
                 onClick = {
                     val selectedAgent = assignedAgentId.takeIf { it != UNASSIGNED_AGENT_ID }
                     onSave(description.trim(), status, selectedAgent)
                 },
             )
-        }
-    }
+        },
+    )
 }
 
 internal const val UNASSIGNED_AGENT_ID = "__unassigned__"

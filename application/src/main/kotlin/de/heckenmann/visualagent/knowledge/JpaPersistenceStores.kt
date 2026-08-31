@@ -79,12 +79,23 @@ internal class JpaConversationStore(
 ) : ConversationStore {
     @Transactional
     override fun saveConversationMessage(
+        id: String,
         sessionId: String,
         role: String,
         content: String,
         metadata: String?,
     ): String {
-        val id = UUID.randomUUID().toString()
+        require(UUID.fromString(id).toString() == id) { "Conversation message ID must be a canonical UUID" }
+        val existing = repository.findByIdOrNull(id)
+        if (existing != null) {
+            require(
+                existing.sessionId == sessionId &&
+                    existing.role == role &&
+                    existing.content == content &&
+                    existing.metadata == metadata,
+            ) { "Conversation message $id conflicts with an existing entry" }
+            return existing.id
+        }
         repository.save(
             ConversationEntity(
                 id = id,

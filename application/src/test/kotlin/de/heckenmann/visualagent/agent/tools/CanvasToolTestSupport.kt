@@ -195,6 +195,7 @@ internal class FakeConversationStore : ConversationStore {
     val saved = mutableListOf<SavedMessage>()
 
     override fun saveConversationMessage(
+        id: String,
         sessionId: String,
         role: String,
         content: String,

@@ -4,10 +4,29 @@ import de.heckenmann.visualagent.todo.Todo
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 @de.heckenmann.visualagent.testsupport.DatabaseTest
 class KnowledgeDbConversationTest {
+    @Test
+    fun `caller supplied message identity is insert only and idempotent`() {
+        val tempDb = createTempDirectory("visual-agent-conversation-id-test").resolve("history.db").toString()
+        val db =
+            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                .create(tempDb)
+        val id = "11111111-1111-4111-8111-111111111111"
+
+        assertEquals(id, db.conversationStore.saveConversationMessage(id, "main", "user", "Hello"))
+        val sequence = db.conversationStore.getConversationMessage(id)!!.timelineSequence
+        assertEquals(id, db.conversationStore.saveConversationMessage(id, "main", "user", "Hello"))
+        assertEquals(sequence, db.conversationStore.getConversationMessage(id)!!.timelineSequence)
+        assertFailsWith<IllegalArgumentException> {
+            db.conversationStore.saveConversationMessage(id, "main", "assistant", "Changed")
+        }
+        db.close()
+    }
+
     @Test
     fun `save load and delete conversation messages`() {
         val tempDb = createTempDirectory("visual-agent-conversation-db-test").resolve("history.db").toString()

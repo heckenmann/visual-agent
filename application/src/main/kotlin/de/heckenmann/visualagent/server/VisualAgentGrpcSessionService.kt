@@ -2,6 +2,7 @@ package de.heckenmann.visualagent.server
 
 import de.heckenmann.visualagent.protocol.CancellationTokenImpl
 import de.heckenmann.visualagent.protocol.ConversationPort
+import de.heckenmann.visualagent.protocol.ConversationStreamRequest
 import de.heckenmann.visualagent.protocol.ProtocolVersion
 import de.heckenmann.visualagent.protocol.v1.CancelRequest
 import de.heckenmann.visualagent.protocol.v1.ChatCompleted
@@ -51,7 +52,7 @@ class VisualAgentGrpcSessionService(
             sessionId = frame.sessionId.ifBlank { sessionId }
             when (frame.payloadCase) {
                 ClientFrame.PayloadCase.HELLO -> hello(frame.hello.protocolVersion)
-                ClientFrame.PayloadCase.CHAT_REQUEST -> chat(frame.requestId, frame.chatRequest.content)
+                ClientFrame.PayloadCase.CHAT_REQUEST -> chat(frame.requestId, frame.chatRequest.content, frame.chatRequest.userEntryId)
                 ClientFrame.PayloadCase.CANCEL_REQUEST -> cancel(frame.requestId, frame.cancelRequest)
                 ClientFrame.PayloadCase.SNAPSHOT_ACK, ClientFrame.PayloadCase.PAYLOAD_NOT_SET -> Unit
             }
@@ -88,6 +89,7 @@ class VisualAgentGrpcSessionService(
         private fun chat(
             requestId: String,
             content: String,
+            userEntryId: String,
         ) {
             if (!helloReceived) {
                 error("SESSION_NOT_READY", "The session must complete the handshake first", retryable = false)
@@ -97,12 +99,23 @@ class VisualAgentGrpcSessionService(
                 error("OPERATION_FAILED", "Chat content must not be blank", retryable = false)
                 return
             }
+            val request =
+                runCatching { ConversationStreamRequest(userEntryId, requestId, content) }
+                    .getOrElse { error ->
+                        error(
+                            "INVALID_ARGUMENT",
+                            error.message ?: "Invalid conversation entry identity",
+                            retryable = false,
+                            requestId = requestId,
+                        )
+                        return
+                    }
             cancelActiveRequest()
             val state = RequestState(requestId = requestId, token = CancellationTokenImpl())
             val job =
                 scope.launch(start = CoroutineStart.LAZY) {
                     try {
-                        conversationPort.stream(content, state.token) { chunk -> sendDelta(state.requestId, chunk) }
+                        conversationPort.stream(request, state.token) { chunk -> sendDelta(state.requestId, chunk) }
                         send(
                             ServerFrame
                                 .newBuilder()

@@ -110,6 +110,9 @@ class CanvasToolPortAdapter(
                 put("immutable", true)
             }.toString()
         return conversations.saveConversationMessage(
+            java.util.UUID
+                .randomUUID()
+                .toString(),
             sessionId,
             "assistant",
             "Canvas snapshot (${image.format.uppercase()})",

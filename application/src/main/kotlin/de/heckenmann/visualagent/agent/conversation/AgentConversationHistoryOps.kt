@@ -210,21 +210,31 @@ internal class AgentConversationHistoryOps(
     }
 
     internal fun persist(message: Message) {
+        val messageId =
+            message.id ?: java.util.UUID
+                .randomUUID()
+                .toString()
         val id =
             owner.conversationStore.saveConversationMessage(
+                messageId,
                 AgentManager.MAIN_SESSION_ID,
                 message.role,
                 message.content,
                 message.metadata,
             )
         val record = owner.conversationStore.getConversationMessage(id)
-        owner.conversationHistory.add(
+        val persisted =
             message.copy(
                 id = id,
                 createdAtEpochMillis = record?.createdAt?.toEpochMilli() ?: Instant.now().toEpochMilli(),
                 timelineSequence = record?.timelineSequence,
-            ),
-        )
+            )
+        val existingIndex = owner.conversationHistory.indexOfFirst { it.id == id }
+        if (existingIndex >= 0) {
+            owner.conversationHistory[existingIndex] = persisted
+        } else {
+            owner.conversationHistory.add(persisted)
+        }
     }
 
     private fun toMessage(row: ConversationRecord): Message? =

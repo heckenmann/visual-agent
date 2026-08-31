@@ -16,7 +16,9 @@ Desktop user.
 ## Main Flow
 
 1. User, assistant, tool-call and sub-agent entries are recorded.
-2. Records are stored in the database.
+2. Records are stored in the database with caller-provided opaque UUID primary
+   keys. A repeated write with identical data is idempotent; a conflicting
+   reuse of an ID is rejected without overwriting the original record.
 3. On startup, recent conversation records are loaded.
 4. The chat panel renders the restored messages, including tool and sub-agent rows.
 5. The chat panel scrolls to the most recent message so the user sees the current end of the conversation.
@@ -41,3 +43,5 @@ The conversation state is durable across application restarts.
 - Restarting the application restores recent history.
 - History search and paging use database-backed records.
 - Tool-call history entries remain distinguishable from normal text messages.
+- Restored rows retain their persisted UUIDs and do not play the new-message
+  animation merely because history was loaded again.

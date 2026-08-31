@@ -9,6 +9,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
@@ -42,6 +43,35 @@ fun visualAgentLightColorScheme(): ColorScheme = lightColorScheme()
  * Uses the baseline Material3 dark color scheme without custom colors.
  */
 fun visualAgentDarkColorScheme(): ColorScheme = darkColorScheme()
+
+/** Theme-provided colors for semantic save and reset actions. */
+internal data class SemanticActionColors(
+    val saveContainer: Color,
+    val onSaveContainer: Color,
+    val resetContainer: Color,
+    val onResetContainer: Color,
+)
+
+/** Supplies the semantic action colors selected by the active application theme. */
+internal val LocalSemanticActionColors = staticCompositionLocalOf { semanticActionColors(darkTheme = false) }
+
+/** Returns semantic save and reset colors for the selected application theme. */
+internal fun semanticActionColors(darkTheme: Boolean): SemanticActionColors =
+    if (darkTheme) {
+        SemanticActionColors(
+            saveContainer = Color(0xFF69B96E),
+            onSaveContainer = Color(0xFF06210A),
+            resetContainer = Color(0xFFFFB74D),
+            onResetContainer = Color(0xFF2A1600),
+        )
+    } else {
+        SemanticActionColors(
+            saveContainer = Color(0xFF2E7D32),
+            onSaveContainer = Color.White,
+            resetContainer = Color(0xFFB26A00),
+            onResetContainer = Color.White,
+        )
+    }
 
 /**
  * Resolves the effective dark-mode flag for the current platform.

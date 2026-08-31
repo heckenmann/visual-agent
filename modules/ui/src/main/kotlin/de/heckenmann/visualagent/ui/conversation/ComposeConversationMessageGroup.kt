@@ -3,15 +3,12 @@
 package de.heckenmann.visualagent.ui.conversation
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -82,13 +79,18 @@ internal fun ConversationMessageGroupRow(
     onStatusChange: (String) -> Unit,
     onEditMessage: (String?) -> Unit,
     onRetry: () -> Unit,
+    isStreaming: Boolean = false,
+    animateEntry: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    val visibleMessages = group.messages.filterNot { it.message.id in deletingMessageIds }
     AnimatedVisibility(
-        visible = visibleMessages.isNotEmpty(),
-        enter = EnterTransition.None,
-        exit = ExitTransition.None,
+        visibleState =
+            rememberConversationMessageVisibility(
+                isVisible = group.messages.any { it.message.id !in deletingMessageIds },
+                animateInitial = animateEntry,
+            ),
+        enter = conversationMessageEnterTransition(),
+        exit = conversationMessageDeleteTransition(),
         modifier = modifier.fillMaxWidth(),
     ) {
         PanelContentCard(backgroundColor = groupBackground(group.role)) {
@@ -99,16 +101,27 @@ internal fun ConversationMessageGroupRow(
             ) {
                 ConversationAuthorColumn(group.role)
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    visibleMessages.asReversed().forEach { item ->
+                    group.messages.asReversed().forEach { item ->
                         key(item.stableKey) {
-                            ConversationMessageGroupContent(
-                                item = item,
-                                sending = sending,
-                                onDeleteMessage = onDeleteMessage,
-                                onStatusChange = onStatusChange,
-                                onEditMessage = onEditMessage,
-                                onRetry = onRetry,
-                            )
+                            AnimatedVisibility(
+                                visibleState =
+                                    rememberConversationMessageVisibility(
+                                        isVisible = item.message.id !in deletingMessageIds,
+                                        animateInitial = animateEntry,
+                                    ),
+                                enter = conversationMessageEnterTransition(),
+                                exit = conversationMessageDeleteTransition(),
+                            ) {
+                                ConversationMessageGroupContent(
+                                    item = item,
+                                    sending = sending,
+                                    onDeleteMessage = onDeleteMessage,
+                                    onStatusChange = onStatusChange,
+                                    onEditMessage = onEditMessage,
+                                    onRetry = onRetry,
+                                    isStreaming = isStreaming,
+                                )
+                            }
                         }
                     }
                 }
@@ -124,24 +137,17 @@ internal fun TransientConversationMessageGroupRow(
     onCopied: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    PanelContentCard(modifier = modifier, backgroundColor = groupBackground(message.role)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-            ConversationAuthorColumn(message.role)
-            Box(modifier = Modifier.weight(1f)) {
-                ConversationMessageContent(
-                    message = message,
-                    isStreamingPlaceholder = false,
-                    isStreaming = isStreaming,
-                    modifier = Modifier.padding(end = 30.dp),
-                )
-                ConversationCopyAction(message = message, onCopied = onCopied, modifier = Modifier.align(Alignment.TopEnd))
-            }
-        }
-    }
+    ConversationMessageGroupRow(
+        group = ConversationMessageGroup(listOf(ConversationTimelineItem.Persisted(message, 0))),
+        sending = true,
+        deletingMessageIds = emptySet(),
+        onDeleteMessage = {},
+        onStatusChange = { onCopied() },
+        onEditMessage = {},
+        onRetry = {},
+        isStreaming = isStreaming,
+        modifier = modifier,
+    )
 }
 
 @Composable
@@ -175,6 +181,7 @@ private fun ConversationMessageGroupContent(
     onStatusChange: (String) -> Unit,
     onEditMessage: (String?) -> Unit,
     onRetry: () -> Unit,
+    isStreaming: Boolean,
 ) {
     val message = item.message
     var hovered by remember(message.id) { mutableStateOf(false) }
@@ -190,21 +197,23 @@ private fun ConversationMessageGroupContent(
         ConversationMessageContent(
             message = message,
             isStreamingPlaceholder = false,
-            isStreaming = false,
+            isStreaming = isStreaming,
             modifier = Modifier.weight(1f),
         )
-        conversationMessageActionMenu(
-            message = message,
-            canEdit = message.role == "user" && !sending,
-            canDelete = message.id != null,
-            canRetry = message.role == "assistant" && !sending,
-            onEdit = { onEditMessage(message.id) },
-            onDelete = { message.id?.let(onDeleteMessage) },
-            onRetry = onRetry,
-            onCopied = { onStatusChange("Copied ${message.role} message") },
-            timestamp = message.createdAtEpochMillis,
-            showTimestamp = hovered,
-        )
+        if (!isStreaming) {
+            conversationMessageActionMenu(
+                message = message,
+                canEdit = message.role == "user" && !sending,
+                canDelete = message.id != null && !sending,
+                canRetry = message.role == "assistant" && !sending,
+                onEdit = { onEditMessage(message.id) },
+                onDelete = { message.id?.let(onDeleteMessage) },
+                onRetry = onRetry,
+                onCopied = { onStatusChange("Copied ${message.role} message") },
+                timestamp = message.createdAtEpochMillis,
+                showTimestamp = hovered,
+            )
+        }
     }
 }
 

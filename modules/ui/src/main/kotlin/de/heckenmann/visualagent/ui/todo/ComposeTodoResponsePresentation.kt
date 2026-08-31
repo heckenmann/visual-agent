@@ -9,24 +9,13 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Stable
@@ -49,11 +38,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.TodoItem
-import de.heckenmann.visualagent.ui.components.ActionIconButton
 import de.heckenmann.visualagent.ui.components.ComposeMarkdown
 import de.heckenmann.visualagent.ui.components.labelizeEnumName
 import de.heckenmann.visualagent.ui.modal.ComposeContentModal
 import de.heckenmann.visualagent.ui.modal.ComposeModalRequester
+import de.heckenmann.visualagent.ui.modal.modalDialogLayout
+import de.heckenmann.visualagent.ui.modal.modalPrimaryButton
 
 /** Maximum number of response lines rendered in a compact todo card. */
 internal const val TODO_RESPONSE_PREVIEW_MAX_LINES = 4
@@ -188,37 +178,22 @@ internal fun TodoResponseOverlay(
     responseState: TodoResponseState,
     onDismiss: () -> Unit,
 ) {
-    val responseScrollState = rememberScrollState()
-    Column(
-        modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 560.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text(todo.description, style = MaterialTheme.typography.titleMedium)
-        Text(
-            text = "${todo.status.name.labelizeEnumName()}${responseState.agentId?.let { " · $it" } ?: ""}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
-            SelectionContainer {
-                Column(
-                    modifier = Modifier.fillMaxSize().verticalScroll(responseScrollState).padding(end = 14.dp),
-                ) {
-                    ComposeMarkdown(responseState.text.ifBlank { "No response output yet." })
-                }
-            }
-            VerticalScrollbar(
-                adapter = rememberScrollbarAdapter(responseScrollState),
-                modifier =
-                    Modifier
-                        .align(Alignment.CenterEnd)
-                        .semantics { contentDescription = "Todo response scrollbar" },
+    modalDialogLayout(
+        body = {
+            Text(todo.description, style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "${todo.status.name.labelizeEnumName()}${responseState.agentId?.let { " · $it" } ?: ""}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            ActionIconButton(icon = Icons.Filled.Close, description = "Close todo response", onClick = onDismiss)
-        }
-    }
+            SelectionContainer {
+                ComposeMarkdown(responseState.text.ifBlank { "No response output yet." })
+            }
+        },
+        footer = {
+            modalPrimaryButton(label = "Close", onClick = onDismiss)
+        },
+    )
 }
 
 /** Opens the shared full-response overlay for a todo from any presentation surface. */

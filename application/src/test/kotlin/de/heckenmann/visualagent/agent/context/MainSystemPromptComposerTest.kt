@@ -39,6 +39,8 @@ class MainSystemPromptComposerTest {
         val prompt = MainSystemPromptComposer.compose(emptyTodos, null, toolConfigService)
 
         assertTrue("complex deterministic logic" in prompt)
+        assertTrue("bulk processing of many elements" in prompt)
+        assertTrue("deduplicate" in prompt)
         assertTrue("CSV exports" in prompt)
         assertTrue("Markdown tables" in prompt)
         assertTrue("actionable feedback" in prompt)

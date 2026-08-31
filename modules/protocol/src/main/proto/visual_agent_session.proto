@@ -49,6 +49,7 @@ message HelloAck {
 
 message ChatRequest {
   string content = 1;
+  string user_entry_id = 2;
 }
 
 message ChatDelta {

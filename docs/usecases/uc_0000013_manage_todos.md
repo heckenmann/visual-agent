@@ -41,7 +41,7 @@ Todos stay synchronized between UI, database, and agent context.
 
 - `de.heckenmann.visualagent.todo.TodoManager`
 - `de.heckenmann.visualagent.ui.todo.TodoPanel`
-- `de.heckenmann.visualagent.ui.modal.ComposeModalHost`
+- `de.heckenmann.visualagent.ui.modal.composeModalHost`
 - `de.heckenmann.visualagent.agent.tools.TodosTool`
 - `de.heckenmann.visualagent.knowledge.TodoStore`
 

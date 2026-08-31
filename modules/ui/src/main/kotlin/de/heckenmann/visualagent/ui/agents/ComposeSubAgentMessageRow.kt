@@ -83,9 +83,9 @@ internal fun SubAgentMessageRow(
             MaterialTheme.colorScheme.error
         }
     AnimatedVisibility(
-        visible = !isDeleting,
-        enter = fadeIn(),
-        exit = fadeOut(animationSpec = tween(DELETE_ANIMATION_DURATION_MS)),
+        visibleState = rememberConversationMessageVisibility(isVisible = !isDeleting),
+        enter = conversationMessageEnterTransition(),
+        exit = conversationMessageDeleteTransition(),
         modifier = modifier.fillMaxWidth().animateContentSize(),
     ) {
         Row(

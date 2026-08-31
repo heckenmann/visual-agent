@@ -47,7 +47,12 @@ class AgentManagerStructuredResponseTest {
             val config = AppConfigBean(db)
             val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), config)
 
-            manager.streamMessage("hi") { }
+            manager.streamMessage(
+                "hi",
+                onChunk = {},
+                userEntryId = "11111111-1111-4111-8111-111111111111",
+                assistantEntryId = "22222222-2222-4222-8222-222222222222",
+            )
 
             val telemetry = ResponseTelemetryMetadata.decode(manager.getHistory().last().metadata)
             assertEquals("plan complete", telemetry?.reasoning)
@@ -86,7 +91,15 @@ class AgentManagerStructuredResponseTest {
                 ChatResponse(model = "test", message = Message("assistant", "replacement"), done = true)
             val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
-            assertEquals("replacement", manager.streamMessage("hi") { })
+            assertEquals(
+                "replacement",
+                manager.streamMessage(
+                    "hi",
+                    onChunk = {},
+                    userEntryId = "11111111-1111-4111-8111-111111111111",
+                    assistantEntryId = "22222222-2222-4222-8222-222222222222",
+                ),
+            )
             assertNull(ResponseTelemetryMetadata.decode(manager.getHistory().last().metadata))
         }
 }

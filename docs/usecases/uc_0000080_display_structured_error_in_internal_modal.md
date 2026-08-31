@@ -35,7 +35,7 @@ The user sees a concise, actionable explanation of what went wrong instead of a 
 ## Code Entry Points
 
 - `de.heckenmann.visualagent.ui.modal.ComposeErrorModal`
-- `de.heckenmann.visualagent.ui.modal.ComposeModalHost`
+- `de.heckenmann.visualagent.ui.modal.composeModalHost`
 - `de.heckenmann.visualagent.ui.modal.ComposeModalRequester.requestError`
 - `de.heckenmann.visualagent.error.ErrorMessageMapper`
 

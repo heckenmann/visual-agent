@@ -6,11 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -113,171 +108,168 @@ internal fun SubAgentDetailsEditor(
             optionsText.toOptionsMapOrNull() != null
     val canSave = name.isNotBlank() && role.isNotBlank() && numericFieldsAreValid
 
-    Column(
-        modifier =
-            Modifier
-                .heightIn(max = 560.dp)
-                .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Name") },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-            )
-            PanelDropdownField(
-                label = "Template",
-                selectedValue = templateName.ifBlank { KEEP_AGENT_CONFIG },
-                options =
-                    listOf(PanelSelectOption(KEEP_AGENT_CONFIG, "Keep current")) +
-                        AgentConfig.templates.keys
-                            .sorted()
-                            .map { PanelSelectOption(it, it.labelizeEnumName()) },
-                onSelected = { selected -> templateName = selected.takeUnless { it == KEEP_AGENT_CONFIG }.orEmpty() },
-                modifier = Modifier.weight(1f),
-            )
-        }
-        OutlinedTextField(
-            value = role,
-            onValueChange = { role = it },
-            label = { Text("Role") },
-            minLines = 2,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            PanelDropdownField(
-                label = "Provider",
-                selectedValue = provider.ifBlank { INHERIT_SELECTION },
-                options = providerOptions,
-                onSelected = { selected ->
-                    provider = selected.takeUnless { it == INHERIT_SELECTION }.orEmpty()
-                    model = ""
-                },
-                modifier = Modifier.weight(1f),
-            )
-            PanelDropdownField(
-                label = "Model",
-                selectedValue = model.ifBlank { INHERIT_SELECTION },
-                options = modelOptions,
-                onSelected = { selected -> model = selected.takeUnless { it == INHERIT_SELECTION }.orEmpty() },
-                modifier = Modifier.weight(1f),
-            )
-        }
-        OutlinedTextField(
-            value = variant,
-            onValueChange = { variant = it },
-            label = { Text("Variant") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = temperature,
-                onValueChange = { temperature = it },
-                label = { Text("Temperature") },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-            )
-            OutlinedTextField(
-                value = topP,
-                onValueChange = { topP = it },
-                label = { Text("Top P") },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-            )
-            NumericPanelField(
-                value = maxTokens,
-                onValueChange = { maxTokens = it },
-                label = "Max tokens",
-                modifier = Modifier.weight(1f),
-            )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            NumericPanelField(
-                value = timeout,
-                onValueChange = { timeout = it },
-                label = "Timeout",
-                modifier = Modifier.weight(1f),
-            )
-            NumericPanelField(
-                value = maxRetries,
-                onValueChange = { maxRetries = it },
-                label = "Retries",
-                modifier = Modifier.weight(1f),
-            )
-            NumericPanelField(
-                value = memoryLimitMb,
-                onValueChange = { memoryLimitMb = it },
-                label = "Memory MB",
-                modifier = Modifier.weight(1f),
-            )
-        }
-        OutlinedTextField(
-            value = optionsText,
-            onValueChange = { optionsText = it },
-            label = { Text("Options key=value") },
-            minLines = 2,
-            maxLines = 4,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        if (!numericFieldsAreValid) {
-            Text(
-                "Check numeric values and options format.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.secondary,
-            )
-        }
-        Text("Tools", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-        toolDefinitions.forEach { definition ->
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Checkbox(
-                    checked = definition.id in selectedTools,
-                    onCheckedChange = { checked ->
-                        selectedTools =
-                            if (checked) {
-                                selectedTools + definition.id
-                            } else {
-                                selectedTools - definition.id
-                            }
-                    },
+    modalDialogLayout(
+        body = {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
                 )
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(definition.id, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        definition.description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
+                PanelDropdownField(
+                    label = "Template",
+                    selectedValue = templateName.ifBlank { KEEP_AGENT_CONFIG },
+                    options =
+                        listOf(PanelSelectOption(KEEP_AGENT_CONFIG, "Keep current")) +
+                            AgentConfig.templates.keys
+                                .sorted()
+                                .map { PanelSelectOption(it, it.labelizeEnumName()) },
+                    onSelected = { selected -> templateName = selected.takeUnless { it == KEEP_AGENT_CONFIG }.orEmpty() },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            OutlinedTextField(
+                value = role,
+                onValueChange = { role = it },
+                label = { Text("Role") },
+                minLines = 2,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                PanelDropdownField(
+                    label = "Provider",
+                    selectedValue = provider.ifBlank { INHERIT_SELECTION },
+                    options = providerOptions,
+                    onSelected = { selected ->
+                        provider = selected.takeUnless { it == INHERIT_SELECTION }.orEmpty()
+                        model = ""
+                    },
+                    modifier = Modifier.weight(1f),
+                )
+                PanelDropdownField(
+                    label = "Model",
+                    selectedValue = model.ifBlank { INHERIT_SELECTION },
+                    options = modelOptions,
+                    onSelected = { selected -> model = selected.takeUnless { it == INHERIT_SELECTION }.orEmpty() },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            OutlinedTextField(
+                value = variant,
+                onValueChange = { variant = it },
+                label = { Text("Variant") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = temperature,
+                    onValueChange = { temperature = it },
+                    label = { Text("Temperature") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedTextField(
+                    value = topP,
+                    onValueChange = { topP = it },
+                    label = { Text("Top P") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+                NumericPanelField(
+                    value = maxTokens,
+                    onValueChange = { maxTokens = it },
+                    label = "Max tokens",
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                NumericPanelField(
+                    value = timeout,
+                    onValueChange = { timeout = it },
+                    label = "Timeout",
+                    modifier = Modifier.weight(1f),
+                )
+                NumericPanelField(
+                    value = maxRetries,
+                    onValueChange = { maxRetries = it },
+                    label = "Retries",
+                    modifier = Modifier.weight(1f),
+                )
+                NumericPanelField(
+                    value = memoryLimitMb,
+                    onValueChange = { memoryLimitMb = it },
+                    label = "Memory MB",
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            OutlinedTextField(
+                value = optionsText,
+                onValueChange = { optionsText = it },
+                label = { Text("Options key=value") },
+                minLines = 2,
+                maxLines = 4,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (!numericFieldsAreValid) {
+                Text(
+                    "Check numeric values and options format.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+            }
+            Text("Tools", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            toolDefinitions.forEach { definition ->
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Checkbox(
+                        checked = definition.id in selectedTools,
+                        onCheckedChange = { checked ->
+                            selectedTools =
+                                if (checked) {
+                                    selectedTools + definition.id
+                                } else {
+                                    selectedTools - definition.id
+                                }
+                        },
                     )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(definition.id, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            definition.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
-        }
-        ActionIconButton(
-            icon = Icons.Filled.Save,
-            description = "Save sub-agent details",
-            enabled = canSave,
-            onClick = {
-                val baseConfig = templateName.takeIf(String::isNotBlank)?.let(AgentConfig::fromTemplate) ?: agent.config
-                val config =
-                    baseConfig.copy(
-                        timeout = timeout.toInt(),
-                        maxRetries = maxRetries.toInt(),
-                        memoryLimitMb = memoryLimitMb.toLong(),
-                        provider = provider.trim().takeIf(String::isNotEmpty),
-                        model = model.trim().takeIf(String::isNotEmpty),
-                        variant = variant.trim().takeIf(String::isNotEmpty),
-                        temperature = temperature.trim().takeIf(String::isNotEmpty)?.toDouble(),
-                        topP = topP.trim().takeIf(String::isNotEmpty)?.toDouble(),
-                        maxTokens = maxTokens.trim().takeIf(String::isNotEmpty)?.toInt(),
-                        options = optionsText.toOptionsMapOrNull().orEmpty(),
-                        tools = selectedTools.sorted(),
-                    )
-                agentPort.update(agent.id, name.trim(), role.trim(), config)?.let(onSaved)
-            },
-        )
-    }
+        },
+        footer = {
+            modalSaveButton(
+                label = "Save changes",
+                enabled = canSave,
+                onClick = {
+                    val baseConfig = templateName.takeIf(String::isNotBlank)?.let(AgentConfig::fromTemplate) ?: agent.config
+                    val config =
+                        baseConfig.copy(
+                            timeout = timeout.toInt(),
+                            maxRetries = maxRetries.toInt(),
+                            memoryLimitMb = memoryLimitMb.toLong(),
+                            provider = provider.trim().takeIf(String::isNotEmpty),
+                            model = model.trim().takeIf(String::isNotEmpty),
+                            variant = variant.trim().takeIf(String::isNotEmpty),
+                            temperature = temperature.trim().takeIf(String::isNotEmpty)?.toDouble(),
+                            topP = topP.trim().takeIf(String::isNotEmpty)?.toDouble(),
+                            maxTokens = maxTokens.trim().takeIf(String::isNotEmpty)?.toInt(),
+                            options = optionsText.toOptionsMapOrNull().orEmpty(),
+                            tools = selectedTools.sorted(),
+                        )
+                    agentPort.update(agent.id, name.trim(), role.trim(), config)?.let(onSaved)
+                },
+            )
+        },
+    )
 }

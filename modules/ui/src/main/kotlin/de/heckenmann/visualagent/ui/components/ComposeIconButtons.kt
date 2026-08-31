@@ -24,6 +24,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -97,7 +99,10 @@ internal fun ActionIconButton(
                     .defaultMinSize(minWidth = 32.dp, minHeight = 32.dp)
                     .background(backgroundColor, RoundedCornerShape(6.dp))
                     .alpha(if (enabled) 1f else 0.38f)
-                    .combinedClickable(
+                    .pointerHoverIcon(
+                        if (enabled) PointerIcon.Hand else PointerIcon.Default,
+                        overrideDescendants = true,
+                    ).combinedClickable(
                         enabled = enabled,
                         role = Role.Button,
                         onClick = onClick,

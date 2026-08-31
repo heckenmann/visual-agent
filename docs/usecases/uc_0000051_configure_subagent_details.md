@@ -33,7 +33,7 @@ Each sub-agent can use an appropriate role and model configuration.
 
 - `de.heckenmann.visualagent.ui.application.SubAgentsPanel`
 - `de.heckenmann.visualagent.ui.modal.ComposeContentModal`
-- `de.heckenmann.visualagent.ui.modal.ComposeModalHost`
+- `de.heckenmann.visualagent.ui.modal.composeModalHost`
 - `de.heckenmann.visualagent.ui.components.ActionIconButton`
 - `de.heckenmann.visualagent.agent.AgentManager.updateAgent`
 - `de.heckenmann.visualagent.agent.AgentConfig`
