@@ -3,6 +3,7 @@ package de.heckenmann.visualagent.desktop
 import de.heckenmann.visualagent.protocol.ProtocolVersion
 import de.heckenmann.visualagent.protocol.v1.ClientFrame
 import io.grpc.stub.StreamObserver
+import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -33,6 +34,10 @@ class DesktopServerSessionTest {
         assertEquals(2, observer.values.size)
         assertEquals(requestId, observer.values[0].requestId)
         assertEquals(requestId, observer.values[1].requestId)
+        assertEquals("hello", observer.values[0].chatRequest.content)
+        assertTrue(UUID.fromString(requestId).toString() == requestId)
+        assertTrue(UUID.fromString(observer.values[0].chatRequest.userEntryId).toString() == observer.values[0].chatRequest.userEntryId)
+        assertTrue(requestId != observer.values[0].chatRequest.userEntryId)
         assertEquals("Cancelled by desktop", observer.values[1].cancelRequest.reason)
     }
 

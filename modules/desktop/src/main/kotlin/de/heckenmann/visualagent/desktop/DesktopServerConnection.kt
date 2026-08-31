@@ -87,6 +87,7 @@ class DesktopServerSession internal constructor(
     fun sendChat(content: String): String {
         require(content.isNotBlank()) { "Chat content must not be blank" }
         val requestId = UUID.randomUUID().toString()
+        val userEntryId = UUID.randomUUID().toString()
         requestObserver.onNext(
             ClientFrame
                 .newBuilder()
@@ -97,6 +98,7 @@ class DesktopServerSession internal constructor(
                     de.heckenmann.visualagent.protocol.v1.ChatRequest
                         .newBuilder()
                         .setContent(content)
+                        .setUserEntryId(userEntryId)
                         .build(),
                 ).build(),
         )

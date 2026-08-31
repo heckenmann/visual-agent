@@ -3,6 +3,7 @@ package de.heckenmann.visualagent.protocol
 import de.heckenmann.visualagent.protocol.CancellationTokenImpl
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -31,5 +32,19 @@ class ConversationPortTest {
         token.onCancelled { notified = true }
 
         assertTrue(notified)
+    }
+
+    @Test
+    fun `stream request rejects invalid identities before it can cross a boundary`() {
+        assertFailsWith<IllegalArgumentException> {
+            ConversationStreamRequest("not-a-uuid", "22222222-2222-4222-8222-222222222222", "Hello")
+        }
+        assertFailsWith<IllegalArgumentException> {
+            ConversationStreamRequest(
+                "11111111-1111-4111-8111-111111111111",
+                "11111111-1111-4111-8111-111111111111",
+                "Hello",
+            )
+        }
     }
 }

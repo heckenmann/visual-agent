@@ -16,6 +16,7 @@ import de.heckenmann.visualagent.protocol.ConversationPort
 import de.heckenmann.visualagent.protocol.ConversationPreferences
 import de.heckenmann.visualagent.protocol.ConversationResponseTelemetry
 import de.heckenmann.visualagent.protocol.ConversationStreamRequest
+import de.heckenmann.visualagent.protocol.ConversationStreamResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -43,15 +44,20 @@ class SpringConversationPort(
         request: ConversationStreamRequest,
         token: CancellationToken,
         onChunk: (String) -> Unit,
-    ) {
+    ): ConversationStreamResult =
         withContext(Dispatchers.IO) {
             protocolBoundary {
                 val applicationToken = ApplicationCancellationToken()
                 token.onCancelled(applicationToken::cancel)
                 agentManager.streamMessage(request.content, applicationToken, onChunk, request.userEntryId, request.assistantEntryId)
+                val message =
+                    agentManager
+                        .getHistory()
+                        .lastOrNull { it.id == request.assistantEntryId }
+                        ?: error("Conversation stream completed without its assistant entry")
+                ConversationStreamResult(message.toConversationMessage(mediaResolver))
             }
         }
-    }
 
     override suspend fun resolveImage(source: String): ConversationImageResolution =
         withContext(Dispatchers.IO) { mediaResolver.resolve(source) }

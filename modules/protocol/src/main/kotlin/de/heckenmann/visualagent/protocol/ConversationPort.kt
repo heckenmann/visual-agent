@@ -108,14 +108,7 @@ interface ConversationPort {
         request: ConversationStreamRequest,
         token: CancellationToken,
         onChunk: (String) -> Unit,
-    )
-
-    /** Streams one assistant response with freshly allocated entry identities for legacy callers. */
-    suspend fun stream(
-        content: String,
-        token: CancellationToken,
-        onChunk: (String) -> Unit,
-    ) = stream(ConversationStreamRequest(UUID.randomUUID().toString(), UUID.randomUUID().toString(), content), token, onChunk)
+    ): ConversationStreamResult
 
     /** Resolves one Markdown image source through the server-owned media boundary. */
     suspend fun resolveImage(source: String): ConversationImageResolution
@@ -144,6 +137,11 @@ interface ConversationPort {
     /** Persists presentation preferences needed by the conversation panel. */
     fun updatePreferences(preferences: ConversationPreferences)
 }
+
+/** Completed result of a streamed conversation turn. */
+data class ConversationStreamResult(
+    val assistantMessage: ConversationMessage,
+)
 
 /** Result of clearing a conversation and composing its new welcome message. */
 data class ConversationClearResult(
