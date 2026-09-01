@@ -1,4 +1,5 @@
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+import org.gradle.api.tasks.SourceSetContainer
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.springframework.boot.gradle.tasks.bundling.BootJar
 import java.net.URI
@@ -254,9 +255,15 @@ val desktopRuntimeClasspath =
             }
         }.files
 
+val desktopMainOutput =
+    extensions
+        .getByType<SourceSetContainer>()
+        .getByName("main")
+        .output
+
 val desktopBootJar =
     tasks.named<BootJar>("bootJar") {
-        setClasspath(desktopRuntimeClasspath)
+        setClasspath(files(desktopMainOutput, desktopRuntimeClasspath))
     }
 
 val stageReleaseJar =
@@ -540,6 +547,9 @@ val verifyExecutableJar =
                 }
                 check(attributes.getValue("Start-Class") == "de.heckenmann.visualagent.desktop.DesktopMain") {
                     "Desktop boot JAR must declare DesktopMain as Start-Class"
+                }
+                check(archive.getJarEntry("BOOT-INF/classes/de/heckenmann/visualagent/desktop/DesktopMain.class") != null) {
+                    "Desktop boot JAR must contain its configured start class"
                 }
             }
         }
