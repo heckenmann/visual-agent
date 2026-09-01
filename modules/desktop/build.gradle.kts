@@ -1,3 +1,5 @@
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+import org.gradle.api.tasks.SourceSetContainer
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.springframework.boot.gradle.tasks.bundling.BootJar
 import java.net.URI
@@ -56,7 +58,6 @@ dependencies {
     implementation(project(":application"))
     implementation(libs.grpc.inprocess)
     implementation(libs.grpc.netty.shaded)
-    implementation(compose.desktop.currentOs)
     implementation(libs.compose.material3)
     implementation(libs.spring.boot.starter)
     implementation(platform(libs.spring.boot.bom))
@@ -240,7 +241,30 @@ val packageLinuxRpm =
         }
     }
 
-val desktopBootJar = tasks.named<BootJar>("bootJar")
+// Compose 1.12 publishes metadata-only compatibility bridges under the legacy
+// org.jetbrains.compose.runtime coordinates alongside AndroidX implementation
+// JARs with identical file names. Spring Boot packages dependencies by file
+// name, so retain the implementation artifacts and omit only the bridges.
+val desktopRuntimeClasspath =
+    configurations.runtimeClasspath
+        .get()
+        .incoming
+        .artifactView {
+            componentFilter { component ->
+                component !is ModuleComponentIdentifier || component.group != "org.jetbrains.compose.runtime"
+            }
+        }.files
+
+val desktopMainOutput =
+    extensions
+        .getByType<SourceSetContainer>()
+        .getByName("main")
+        .output
+
+val desktopBootJar =
+    tasks.named<BootJar>("bootJar") {
+        setClasspath(files(desktopMainOutput, desktopRuntimeClasspath))
+    }
 
 val stageReleaseJar =
     tasks.register<Copy>("stageReleaseJar") {
@@ -523,6 +547,9 @@ val verifyExecutableJar =
                 }
                 check(attributes.getValue("Start-Class") == "de.heckenmann.visualagent.desktop.DesktopMain") {
                     "Desktop boot JAR must declare DesktopMain as Start-Class"
+                }
+                check(archive.getJarEntry("BOOT-INF/classes/de/heckenmann/visualagent/desktop/DesktopMain.class") != null) {
+                    "Desktop boot JAR must contain its configured start class"
                 }
             }
         }

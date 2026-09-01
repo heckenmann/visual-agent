@@ -49,7 +49,14 @@ internal class ConversationUiState(
 
     private var historyGeneration = 0L
     private var reachedOldestHistory = false
-    private var knownEntryIds by mutableStateOf(initialHistory.mapNotNull(Message::id).toSet())
+
+    /**
+     * Tracks entries that have already been composed once.
+     *
+     * This is deliberately not Compose state: marking a row as known happens from its first
+     * composition and must not trigger a second composition while its enter transition starts.
+     */
+    private val knownEntryIds = initialHistory.mapNotNull(Message::id).toMutableSet()
 
     fun replaceHistory(messages: List<Message>) {
         historyGeneration++
@@ -64,7 +71,6 @@ internal class ConversationUiState(
     fun completeStream(messages: List<Message>) {
         historyGeneration++
         history = messages.distinctPersistedMessages()
-        markEntriesKnown(history)
         pendingUserMessage = null
         pendingUserEntryId = null
         streamingEntryId = null
@@ -89,7 +95,6 @@ internal class ConversationUiState(
         val latestIds = latestMessages.mapNotNull(Message::id).toSet()
         val retainedHistory = history.filter { it.id == null || it.id !in latestIds }
         history = retainedHistory + latestMessages
-        markEntriesKnown(latestMessages)
         if (!reachedOldestHistory) {
             hasMoreHistory = page.hasMore
         }
@@ -126,7 +131,7 @@ internal class ConversationUiState(
 
     /** Clears transient state and treats the replacement history as already known after a full reset. */
     fun resetHistory(messages: List<Message>) {
-        knownEntryIds = emptySet()
+        knownEntryIds.clear()
         replaceHistory(messages)
         pendingUserMessage = null
         pendingUserEntryId = null
@@ -139,7 +144,7 @@ internal class ConversationUiState(
 
     /** Marks a rendered entry as known without changing its stable identity. */
     fun markEntryKnown(id: String?) {
-        if (id != null && id !in knownEntryIds) knownEntryIds += id
+        if (id != null) knownEntryIds += id
     }
 
     private fun markEntriesKnown(messages: List<Message>) {

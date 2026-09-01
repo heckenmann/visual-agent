@@ -196,6 +196,40 @@ class ConversationUiStateTest {
     }
 
     @Test
+    fun `latest history entries remain eligible for their first enter animation`() {
+        val state = ConversationUiState(listOf(message("persisted")))
+        val request = state.beginLatestRequest()
+
+        state.applyLatest(request, ConversationHistoryPage(listOf(message("new")), offset = 0, hasMore = false))
+
+        assertTrue(state.shouldAnimateEntry("new"))
+        state.markEntryKnown("new")
+        assertFalse(state.shouldAnimateEntry("new"))
+    }
+
+    @Test
+    fun `unrendered completed stream remains eligible for one enter animation`() {
+        val state = ConversationUiState(emptyList())
+
+        state.completeStream(listOf(message("user"), Message("assistant", "Response", id = "assistant")))
+
+        assertTrue(state.shouldAnimateEntry("user"))
+        assertTrue(state.shouldAnimateEntry("assistant"))
+    }
+
+    @Test
+    fun `completed stream does not reanimate an entry already rendered while streaming`() {
+        val state = ConversationUiState(emptyList())
+        state.markEntryKnown("user")
+        state.markEntryKnown("assistant")
+
+        state.completeStream(listOf(message("user"), Message("assistant", "Response", id = "assistant")))
+
+        assertFalse(state.shouldAnimateEntry("user"))
+        assertFalse(state.shouldAnimateEntry("assistant"))
+    }
+
+    @Test
     fun `stream completion replaces transient entries with one persisted identity`() {
         val state = ConversationUiState(emptyList())
         state.pendingUserMessage = "Request"
