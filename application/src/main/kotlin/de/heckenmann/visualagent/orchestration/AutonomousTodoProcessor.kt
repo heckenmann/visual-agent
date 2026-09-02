@@ -172,10 +172,9 @@ internal suspend fun processTodoWithLLM(
             } catch (error: Exception) {
                 attempt++
                 val backoff = 500L * attempt
+                val userError = ErrorMessageMapper.map(error)
                 logger.warn(error) { "Autonomous todo $todoId failed on attempt $attempt for agent ${agent.id}" }
-                delay(backoff)
                 if (attempt >= maxRetries) {
-                    val userError = ErrorMessageMapper.map(error)
                     todoManager.cancelTodo(todoId)
                     persistSubAgentMessage(
                         agent = agent,
@@ -190,6 +189,18 @@ internal suspend fun processTodoWithLLM(
                     )
                     return
                 }
+                persistSubAgentMessage(
+                    agent = agent,
+                    content =
+                        "Agent ${agent.name} (${agent.id}) failed attempt $attempt for todo $todoId. " +
+                            "Retrying after ${backoff}ms: ${userError.summary}: ${userError.detail}",
+                    success = false,
+                    persistMessage = { conversationOps.persist(it) },
+                    attempt = attempt,
+                    executionId = executionId,
+                    todoId = todoId,
+                )
+                delay(backoff)
             }
         }
     } catch (_: kotlinx.coroutines.CancellationException) {

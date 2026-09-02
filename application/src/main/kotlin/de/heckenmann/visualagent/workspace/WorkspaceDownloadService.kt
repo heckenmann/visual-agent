@@ -58,18 +58,24 @@ class WorkspaceDownloadService(
             require(size > 0) { "Downloaded file is empty" }
             control.awaitReady()
             val detectedMimeType = detectMimeType(temp)
+            control.awaitReady()
             job.sizeBytes = size
             job.mimeType = detectedMimeType
-            job.sha256 = WorkspaceFilePaths.sha256(temp)
+            val sha256 = WorkspaceFilePaths.sha256(temp)
+            job.sha256 = sha256
+            control.awaitReady()
             job.validationResult = "validated"
             val destination = publish(temp, target)
-            if (control.isCancelled()) {
-                destination.deleteIfExists()
-                throw WorkspaceDownloadCancelledException()
-            }
             val registered =
                 runCatching {
-                    workspaceFiles.registerDownloadedFile(destination, destination.name, detectedMimeType)
+                    control.awaitReady()
+                    workspaceFiles.registerDownloadedFile(
+                        destination,
+                        destination.name,
+                        detectedMimeType,
+                        size,
+                        sha256,
+                    )
                 }.getOrElse { error ->
                     job.validationResult = "rejected"
                     destination.deleteIfExists()

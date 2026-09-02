@@ -233,6 +233,25 @@ class AutonomousCoordinatorTest {
         }
 
     @Test
+    fun `transient worker failure is persisted before the retry succeeds`() =
+        runBlocking {
+            val fixture = buildFixture(failingWorkerAttempts = 1)
+            fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
+            val todo = fixture.todoManager.add("Retry after transient failure", "agent-1")
+
+            try {
+                fixture.coordinator.startAutonomousProcessing(seed = false)
+                delay(2_000)
+
+                assertEquals(TodoStatus.COMPLETED, fixture.todoManager.getById(todo.id)?.status)
+                assertTrue(fixture.messages.any { it.content.contains("failed attempt 1") })
+                assertTrue(fixture.messages.any { it.content.contains("completed todo ${todo.id}") })
+            } finally {
+                fixture.cancel()
+            }
+        }
+
+    @Test
     fun `sub-agent restarts when todo description is edited while running`() =
         runBlocking {
             val fixture = buildFixture(chatDelayMs = 1000)
