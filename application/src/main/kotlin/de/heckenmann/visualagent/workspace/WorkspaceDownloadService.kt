@@ -58,17 +58,35 @@ class WorkspaceDownloadService(
             require(size > 0) { "Downloaded file is empty" }
             control.awaitReady()
             val detectedMimeType = detectMimeType(temp)
+            control.awaitReady()
+            job.sizeBytes = size
+            job.mimeType = detectedMimeType
+            val sha256 = WorkspaceFilePaths.sha256(temp)
+            job.sha256 = sha256
+            control.awaitReady()
+            job.validationResult = "validated"
             val destination = publish(temp, target)
-            if (control.isCancelled()) {
-                destination.deleteIfExists()
-                throw WorkspaceDownloadCancelledException()
-            }
-            return runCatching {
-                workspaceFiles.registerDownloadedFile(destination, destination.name, detectedMimeType)
-            }.getOrElse { error ->
-                destination.deleteIfExists()
-                throw error
-            }.also { publishStatus(job, DownloadActivityStatus.COMPLETED) }
+            val registered =
+                runCatching {
+                    control.awaitReady()
+                    workspaceFiles.registerDownloadedFile(
+                        destination,
+                        destination.name,
+                        detectedMimeType,
+                        size,
+                        sha256,
+                    )
+                }.getOrElse { error ->
+                    job.validationResult = "rejected"
+                    destination.deleteIfExists()
+                    throw error
+                }
+            job.mimeType = registered.mimeType
+            job.sizeBytes = registered.sizeBytes
+            job.sha256 = registered.sha256
+            job.validationResult = "accepted"
+            publishStatus(job, DownloadActivityStatus.COMPLETED)
+            return registered
         } catch (error: WorkspaceFileException) {
             if (!control.isCancelled()) publishStatus(job, DownloadActivityStatus.FAILED, error.message)
             throw error
@@ -178,6 +196,10 @@ class WorkspaceDownloadService(
                 downloadedBytes = job.control.downloadedBytes,
                 totalBytes = job.control.totalBytes,
                 detail = detail,
+                mimeType = job.mimeType,
+                sizeBytes = job.sizeBytes,
+                sha256 = job.sha256,
+                validationResult = job.validationResult,
             ),
         )
     }

@@ -4,6 +4,7 @@ import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.AgentStatus
 import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.protocol.TodoState
+import de.heckenmann.visualagent.protocol.TodoUpdate
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoChange
 import de.heckenmann.visualagent.todo.TodoChangeType
@@ -11,6 +12,7 @@ import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoManager
 import de.heckenmann.visualagent.todo.TodoProgressUpdate
 import de.heckenmann.visualagent.todo.TodoStatus
+import de.heckenmann.visualagent.todo.TodoUpdateCommand
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -40,18 +42,32 @@ class SpringTodoPortTest {
     fun `mutations delegate through the todo manager`() {
         every { manager.todoManager } returns todoManager
         every { todoManager.update("todo-1", "Updated") } returns true
+        every { todoManager.update(any<TodoUpdateCommand>()) } returns true
         every { todoManager.updateStatus("todo-1", TodoStatus.IN_PROGRESS) } returns true
         every { todoManager.updateAssignedAgent("todo-1", "agent-1") } returns true
         every { todoManager.reorder(listOf("todo-1")) } returns true
         every { todoManager.remove("todo-1") } returns true
 
         assertTrue(port.updateDescription("todo-1", "Updated"))
+        assertTrue(port.update(TodoUpdate("todo-1", "Updated", TodoState.IN_PROGRESS, "agent-1")))
         assertTrue(port.updateStatus("todo-1", TodoState.IN_PROGRESS))
         assertTrue(port.updateAssignedAgent("todo-1", "agent-1"))
         assertTrue(port.reorder(listOf("todo-1")))
         assertTrue(port.remove("todo-1"))
 
         verify { todoManager.update("todo-1", "Updated") }
+        verify {
+            todoManager.update(
+                TodoUpdateCommand(
+                    id = "todo-1",
+                    description = "Updated",
+                    assignment =
+                        de.heckenmann.visualagent.todo.TodoAssignmentChange
+                            .Set("agent-1"),
+                    status = TodoStatus.IN_PROGRESS,
+                ),
+            )
+        }
         verify { todoManager.updateStatus("todo-1", TodoStatus.IN_PROGRESS) }
         verify { todoManager.updateAssignedAgent("todo-1", "agent-1") }
         verify { todoManager.reorder(listOf("todo-1")) }

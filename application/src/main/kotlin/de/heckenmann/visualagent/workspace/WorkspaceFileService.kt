@@ -61,7 +61,7 @@ class WorkspaceFileService(
         directory.createDirectories()
         require(directory.toRealPath().startsWith(workspaceRoot().toRealPath())) { "Workspace directory escapes the workspace" }
         return WorkspaceFilePaths.relativePath(directory, databasePath).also {
-            recordActivity("Workspace folder created: $it.")
+            recordActivity("Workspace folder created: $it.", it, "create-directory")
         }
     }
 
@@ -94,7 +94,9 @@ class WorkspaceFileService(
         val importsDir = workspaceRoot().resolve("imports").also { it.createDirectories() }
         val destination = WorkspaceFilePaths.uniqueDestination(importsDir, source.name)
         Files.copy(source.toPath(), destination)
-        return recordManagedFile(destination, source.name).also { recordActivity("Workspace file imported: ${it.relativePath}.") }
+        return recordManagedFile(destination, source.name).also {
+            recordActivity("Workspace file imported: ${it.relativePath}.", it.relativePath, "import", it.mimeType, it.sizeBytes)
+        }
     }
 
     /**
@@ -121,7 +123,9 @@ class WorkspaceFileService(
         val directory = resolveWorkspaceDirectory(directoryName)
         val destination = WorkspaceFilePaths.uniqueDestination(directory, originalName)
         destination.writeBytes(bytes)
-        return recordManagedFile(destination, originalName).also { recordActivity("Workspace file imported: ${it.relativePath}.") }
+        return recordManagedFile(destination, originalName).also {
+            recordActivity("Workspace file imported: ${it.relativePath}.", it.relativePath, "import", it.mimeType, it.sizeBytes)
+        }
     }
 
     /**
@@ -147,7 +151,7 @@ class WorkspaceFileService(
         val destination = WorkspaceFilePaths.uniqueDestination(directory, requestedName)
         destination.writeBytes(bytes)
         return recordManagedFile(destination, requestedName, mimeType).also {
-            recordActivity("Workspace file created: ${it.relativePath}.")
+            recordActivity("Workspace file created: ${it.relativePath}.", it.relativePath, "create", it.mimeType, it.sizeBytes)
         }
     }
 
@@ -155,6 +159,8 @@ class WorkspaceFileService(
         destination: Path,
         originalName: String,
         mimeType: String? = null,
+        sizeBytes: Long? = null,
+        sha256: String? = null,
     ): WorkspaceFileRecord {
         val now = Instant.now()
         val relativePath = WorkspaceFilePaths.relativePath(destination, databasePath)
@@ -165,8 +171,8 @@ class WorkspaceFileService(
                 relativePath = relativePath,
                 originalName = WorkspaceFilePaths.safeFileName(originalName),
                 mimeType = mimeType ?: mimeDetector.detect(destination),
-                sizeBytes = destination.fileSize(),
-                sha256 = WorkspaceFilePaths.sha256(destination),
+                sizeBytes = sizeBytes ?: destination.fileSize(),
+                sha256 = sha256 ?: WorkspaceFilePaths.sha256(destination),
                 extractedText = null,
                 importedAt = existing?.importedAt ?: now,
                 updatedAt = now,
@@ -229,7 +235,7 @@ class WorkspaceFileService(
                 if (store.deleteWorkspaceFile(it.id)) removed++
             }
         return WorkspaceSyncResult(added = added, updated = updated, removed = removed, total = listFiles().size).also {
-            recordActivity("Workspace files synchronized: added=$added updated=$updated removed=$removed.")
+            recordActivity("Workspace files synchronized: added=$added updated=$updated removed=$removed.", operation = "sync")
         }
     }
 
@@ -269,7 +275,7 @@ class WorkspaceFileService(
             path.deleteIfExists()
         }
         return store.deleteWorkspaceFile(id).also { deleted ->
-            if (deleted) recordActivity("Workspace file deleted: ${record.relativePath}.")
+            if (deleted) recordActivity("Workspace file deleted: ${record.relativePath}.", record.relativePath, "delete")
         }
     }
 
@@ -290,6 +296,8 @@ class WorkspaceFileService(
             recordActivity(
                 "Workspace directory deleted: ${result.relativePath} " +
                     "(recursive=${result.recursive}, files=${result.deletedFiles}).",
+                result.relativePath,
+                "delete-directory",
             )
         }
 
@@ -326,7 +334,15 @@ class WorkspaceFileService(
                 updatedAt = Instant.now(),
             )
         store.saveWorkspaceFile(updated)
-        return updated.also { recordActivity("Workspace file renamed: ${current.relativePath} to ${it.relativePath}.") }
+        return updated.also {
+            recordActivity(
+                "Workspace file renamed: ${current.relativePath} to ${it.relativePath}.",
+                it.relativePath,
+                "rename",
+                it.mimeType,
+                it.sizeBytes,
+            )
+        }
     }
 
     /**
@@ -358,12 +374,7 @@ class WorkspaceFileService(
     fun renderPdfPage(
         record: WorkspaceFileRecord,
         page: Int,
-    ): WorkspaceFileRecord =
-        contentOperations.renderPdfPage(
-            requireFile(record.id, null),
-            page,
-            ::createManagedFile,
-        )
+    ): WorkspaceFileRecord = contentOperations.renderPdfPage(requireFile(record.id, null), page, ::createManagedFile)
 
     /**
      * Reads image dimensions and metadata.
@@ -383,13 +394,13 @@ class WorkspaceFileService(
      */
     fun resolveManagedPath(relativePath: String): Path = WorkspaceFilePaths.resolveManagedPath(relativePath, databasePath)
 
-    private fun recordActivity(message: String) {
-        activityEvents?.publish(WorkspaceFileActivity(message))
+    private fun recordActivity(
+        message: String,
+        relativePath: String? = null,
+        operation: String? = null,
+        mimeType: String? = null,
+        sizeBytes: Long? = null,
+    ) {
+        activityEvents?.publish(WorkspaceFileActivity(message, relativePath, operation, mimeType = mimeType, sizeBytes = sizeBytes))
     }
-}
-
-internal fun String.snippet(index: Int): String {
-    val start = (index - 80).coerceAtLeast(0)
-    val end = (index + 160).coerceAtMost(length)
-    return substring(start, end).replace(Regex("\\s+"), " ").trim()
 }

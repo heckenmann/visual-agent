@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.agent.tools
 
 import de.heckenmann.visualagent.agent.tools.api.TodoToolPort
+import de.heckenmann.visualagent.agent.tools.api.TodoUpdateRequest
 import de.heckenmann.visualagent.agent.tools.api.ToolTodo
 import de.heckenmann.visualagent.agent.tools.api.ToolTodoCreation
 import kotlin.test.Test
@@ -37,12 +38,7 @@ private class FakeTodoPort : TodoToolPort {
         assignedAgentId: String,
     ): ToolTodoCreation = ToolTodoCreation(list().single(), created = true)
 
-    override fun update(
-        id: String,
-        description: String?,
-        assignedAgentId: String?,
-        status: String?,
-    ) = Unit
+    override fun update(request: TodoUpdateRequest): Boolean = true
 
     override fun setStatus(
         id: String,

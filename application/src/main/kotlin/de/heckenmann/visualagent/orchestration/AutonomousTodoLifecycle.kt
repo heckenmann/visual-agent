@@ -27,14 +27,21 @@ internal fun persistSubAgentMessage(
     content: String,
     success: Boolean,
     persistMessage: (Message) -> Unit,
+    attempt: Int? = null,
+    executionId: String? = null,
+    todoId: String? = null,
 ) {
     val metadata =
         buildJsonObject {
             put("type", "sub_agent")
+            put("eventType", "todo_attempt")
             put("agentId", agent.id)
             put("agentName", agent.name)
-            put("todoId", agent.currentTodoId ?: "")
+            put("todoId", todoId ?: agent.currentTodoId ?: "")
             put("success", success)
+            put("status", if (success) "success" else "failure")
+            attempt?.let { put("attempt", it) }
+            executionId?.let { put("executionId", it) }
         }.toString()
     persistMessage(
         Message(

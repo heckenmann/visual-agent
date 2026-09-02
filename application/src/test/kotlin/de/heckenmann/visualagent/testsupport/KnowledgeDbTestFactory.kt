@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.testsupport
 
 import de.heckenmann.visualagent.agent.AgentManager
+import de.heckenmann.visualagent.agent.ConversationContextPolicy
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.config.SubAgentToolConfig
@@ -89,6 +90,15 @@ class TestPersistence internal constructor(
         content: String,
         metadata: String?,
     ): String = conversationStore.saveConversationMessage(id, sessionId, role, content, metadata)
+
+    override fun saveConversationMessage(
+        id: String,
+        sessionId: String,
+        role: String,
+        content: String,
+        metadata: String?,
+        contextPolicy: ConversationContextPolicy,
+    ): String = conversationStore.saveConversationMessage(id, sessionId, role, content, metadata, contextPolicy)
 
     /** Persists a test conversation message with a generated identifier. */
     fun saveConversationMessage(

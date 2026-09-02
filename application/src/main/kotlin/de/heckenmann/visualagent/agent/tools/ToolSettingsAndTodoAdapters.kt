@@ -6,7 +6,9 @@ import de.heckenmann.visualagent.agent.startAllTodos
 import de.heckenmann.visualagent.agent.startTodo
 import de.heckenmann.visualagent.agent.stopAllTodos
 import de.heckenmann.visualagent.agent.stopTodo
+import de.heckenmann.visualagent.agent.tools.api.TodoAssignmentMode
 import de.heckenmann.visualagent.agent.tools.api.TodoToolPort
+import de.heckenmann.visualagent.agent.tools.api.TodoUpdateRequest
 import de.heckenmann.visualagent.agent.tools.api.ToolSettings
 import de.heckenmann.visualagent.agent.tools.api.ToolSettingsPort
 import de.heckenmann.visualagent.agent.tools.api.ToolSettingsUpdate
@@ -15,8 +17,10 @@ import de.heckenmann.visualagent.agent.tools.api.ToolTodoCreation
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.knowledge.MemoryStore
 import de.heckenmann.visualagent.knowledge.TodoStore
+import de.heckenmann.visualagent.todo.TodoAssignmentChange
 import de.heckenmann.visualagent.todo.TodoManager
 import de.heckenmann.visualagent.todo.TodoStatus
+import de.heckenmann.visualagent.todo.TodoUpdateCommand
 import org.springframework.stereotype.Component
 
 /** Application adapter for safe settings consumed by tools. */
@@ -92,17 +96,22 @@ class TodoToolPortAdapter(
             )
         }
 
-    override fun update(
-        id: String,
-        description: String?,
-        assignedAgentId: String?,
-        status: String?,
-    ) {
-        description?.let { todoManager.update(id, it) }
-        assignedAgentId?.let { todoManager.updateAssignedAgent(id, it) }
-        status?.let { value ->
-            runCatching { TodoStatus.valueOf(value) }.getOrNull()?.let { todoManager.updateStatus(id, it) }
-        }
+    override fun update(request: TodoUpdateRequest): Boolean {
+        val assignment =
+            when (request.assignmentMode) {
+                TodoAssignmentMode.UNCHANGED -> TodoAssignmentChange.Unchanged
+                TodoAssignmentMode.CLEAR -> TodoAssignmentChange.Clear
+                TodoAssignmentMode.SET -> TodoAssignmentChange.Set(request.assignedAgentId ?: return false)
+            }
+        val status = request.status?.let { runCatching { TodoStatus.valueOf(it) }.getOrNull() ?: return false }
+        return todoManager.update(
+            TodoUpdateCommand(
+                id = request.id,
+                description = request.description,
+                assignment = assignment,
+                status = status,
+            ),
+        )
     }
 
     override fun setStatus(

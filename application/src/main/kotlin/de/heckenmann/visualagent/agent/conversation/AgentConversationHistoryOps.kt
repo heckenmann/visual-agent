@@ -1,7 +1,9 @@
 package de.heckenmann.visualagent.agent.conversation
 
 import de.heckenmann.visualagent.agent.AgentManager
+import de.heckenmann.visualagent.agent.AgentManagerConstants
 import de.heckenmann.visualagent.agent.ChatRequestContext
+import de.heckenmann.visualagent.agent.ConversationContextPolicy
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.provider.ProviderErrorMessages
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
@@ -20,7 +22,7 @@ internal class AgentConversationHistoryOps(
 ) {
     fun clearHistory() {
         owner.conversationHistory.clear()
-        owner.conversationStore.deleteConversationMessages(AgentManager.MAIN_SESSION_ID)
+        owner.conversationStore.deleteConversationMessages(AgentManagerConstants.MAIN_SESSION_ID)
         owner.loadedHistoryCount = 0
     }
 
@@ -76,13 +78,20 @@ internal class AgentConversationHistoryOps(
                 put("resultContent", event.result.content)
                 put("resultError", event.result.error ?: "")
             }.toString()
-        persist(Message(role = "tool", content = compactText, metadata = metadata))
+        persist(
+            Message(
+                role = "tool",
+                content = compactText,
+                metadata = metadata,
+                contextPolicy = ConversationContextPolicy.SUMMARY_SOURCE,
+            ),
+        )
     }
 
     fun loadOlderHistory(pageSize: Int): List<Message> {
         val rows =
             owner.conversationStore.getConversationMessagesPage(
-                sessionId = AgentManager.MAIN_SESSION_ID,
+                sessionId = AgentManagerConstants.MAIN_SESSION_ID,
                 limit = pageSize.coerceAtLeast(1),
                 offset = owner.loadedHistoryCount,
             )
@@ -105,7 +114,7 @@ internal class AgentConversationHistoryOps(
         val limit = pageSize.coerceAtLeast(1)
         val messages =
             owner.conversationStore
-                .getConversationMessagesPage(AgentManager.MAIN_SESSION_ID, limit, offset.coerceAtLeast(0))
+                .getConversationMessagesPage(AgentManagerConstants.MAIN_SESSION_ID, limit, offset.coerceAtLeast(0))
                 .mapNotNull(::toMessage)
         return ConversationHistoryPage(messages, offset.coerceAtLeast(0), messages.size == limit)
     }
@@ -114,7 +123,7 @@ internal class AgentConversationHistoryOps(
         val pageSize = limit.coerceAtLeast(1)
         val messages =
             owner.conversationStore
-                .getConversationMessages(AgentManager.MAIN_SESSION_ID, pageSize)
+                .getConversationMessages(AgentManagerConstants.MAIN_SESSION_ID, pageSize)
                 .mapNotNull(::toMessage)
         return ConversationHistoryPage(messages, 0, messages.size == pageSize)
     }
@@ -128,7 +137,7 @@ internal class AgentConversationHistoryOps(
     fun loadLatestHistory(limit: Int): List<Message> {
         val rows =
             owner.conversationStore.getConversationMessages(
-                sessionId = AgentManager.MAIN_SESSION_ID,
+                sessionId = AgentManagerConstants.MAIN_SESSION_ID,
                 limit = limit.coerceAtLeast(1),
             )
         val dbMessages = rows.mapNotNull(::toMessage)
@@ -153,7 +162,7 @@ internal class AgentConversationHistoryOps(
         owner.loadedHistoryCount = 0
         val rows =
             owner.conversationStore.getConversationMessages(
-                sessionId = AgentManager.MAIN_SESSION_ID,
+                sessionId = AgentManagerConstants.MAIN_SESSION_ID,
                 limit = limit.coerceAtLeast(1),
             )
         val messages = rows.mapNotNull(::toMessage)
@@ -164,12 +173,21 @@ internal class AgentConversationHistoryOps(
 
     fun loadRecentHistoryFromDb(limit: Int): List<Message> =
         owner.conversationStore
-            .getConversationMessages(AgentManager.MAIN_SESSION_ID, limit)
+            .getConversationMessages(AgentManagerConstants.MAIN_SESSION_ID, limit)
+            .mapNotNull(::toMessage)
+
+    /** Loads the bounded context projection used for main-agent provider requests. */
+    fun loadMainAgentContextFromDb(
+        userTurnLimit: Int = 10,
+        recordLimit: Int = 512,
+    ): List<Message> =
+        owner.conversationStore
+            .getConversationMessagesForContext(AgentManagerConstants.MAIN_SESSION_ID, userTurnLimit, recordLimit)
             .mapNotNull(::toMessage)
 
     fun loadConversationFromDb() {
         owner.conversationHistory.clear()
-        owner.conversationHistory.addAll(loadRecentHistoryFromDb(AgentManager.INITIAL_HISTORY_LOAD_LIMIT))
+        owner.conversationHistory.addAll(loadRecentHistoryFromDb(AgentManagerConstants.INITIAL_HISTORY_LOAD_LIMIT))
         owner.loadedHistoryCount = owner.conversationHistory.size
         owner.pendingResumeMessage =
             owner.conversationHistory
@@ -192,13 +210,17 @@ internal class AgentConversationHistoryOps(
                 return@launch
             }
             runCatching {
-                val instruction =
+                val request = buildMainRequest(loadMainAgentContextFromDb(), null)
+                val messages = request.messages.toMutableList()
+                val systemContextIndex = messages.indexOfFirst { it.role == "system" }
+                messages.add(
+                    if (systemContextIndex >= 0) systemContextIndex + 1 else 0,
                     Message(
                         "system",
                         "The previous request was interrupted by an app shutdown or failure. Continue the unfinished work from the last user request now.",
-                    )
-                val history = listOf(instruction) + loadRecentHistoryFromDb(AgentManager.INITIAL_HISTORY_LOAD_LIMIT)
-                val response = owner.llmProvider.chat(buildMainRequest(history, null))
+                    ),
+                )
+                val response = owner.llmProvider.chat(request.copy(messages = messages))
                 persist(Message("assistant", owner.responseCoordinator.normalizeAssistantPresentationContent(response.message.content)))
                 owner.pendingResumeMessage = null
             }.onFailure { error ->
@@ -217,10 +239,11 @@ internal class AgentConversationHistoryOps(
         val id =
             owner.conversationStore.saveConversationMessage(
                 messageId,
-                AgentManager.MAIN_SESSION_ID,
+                AgentManagerConstants.MAIN_SESSION_ID,
                 message.role,
                 message.content,
                 message.metadata,
+                message.contextPolicy ?: ConversationContextPolicy.forRole(message.role),
             )
         val record = owner.conversationStore.getConversationMessage(id)
         val persisted =
@@ -228,6 +251,7 @@ internal class AgentConversationHistoryOps(
                 id = id,
                 createdAtEpochMillis = record?.createdAt?.toEpochMilli() ?: Instant.now().toEpochMilli(),
                 timelineSequence = record?.timelineSequence,
+                contextPolicy = record?.contextPolicy ?: message.contextPolicy ?: ConversationContextPolicy.forRole(message.role),
             )
         val existingIndex = owner.conversationHistory.indexOfFirst { it.id == id }
         if (existingIndex >= 0) {
@@ -248,6 +272,7 @@ internal class AgentConversationHistoryOps(
                     id = it.id,
                     createdAtEpochMillis = it.createdAt.toEpochMilli(),
                     timelineSequence = it.timelineSequence,
+                    contextPolicy = it.contextPolicy,
                 )
             }
 }

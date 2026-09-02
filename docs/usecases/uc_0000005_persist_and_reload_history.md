@@ -24,6 +24,12 @@ Desktop user.
 5. The chat panel scrolls to the most recent message so the user sees the current end of the conversation.
 6. Older history can be paged or searched when needed.
 
+The persisted timeline is also the source for main-agent context assembly. The
+server selects the latest user-turn boundary, excludes records marked
+`AUDIT_ONLY`, and summarizes execution events before sending them to a
+provider. This projection does not change what the user can inspect in the
+conversation or history tools.
+
 ## Result
 
 The conversation state is durable across application restarts.

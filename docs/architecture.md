@@ -65,14 +65,41 @@ The UI receives only protocol ports; it never receives Spring beans.
      authoritative todo counters, current todo list, active provider and
      model, execution policy);
    - optional `userModelInstruction` system message from `AppConfig`;
-   - recent persisted history (max 20 messages; older rows are reachable
-     via the `history` tool);
+   - a bounded context projection assembled from the latest persisted user turns;
+     routine audit events are classified and compacted, while the complete history
+     remains available through the `history` tool;
    - tool-name guard system message from the active provider's prompt
      factory;
    - `enabledTools = agentToolConfigService.mainAgentTools()`;
    - metadata: `sessionId=main`, `agent=main`, optional `requestId`.
 6. The active provider maps context to its Spring AI prompt and model
    options and dispatches to the underlying `ChatModel`.
+
+### Context and mutation boundaries
+
+The conversation database is both the complete user-visible audit timeline and the
+source for provider context, but those concerns are deliberately separated. Each
+record has a `context_policy`: `DIALOGUE` records preserve user requests and visible
+assistant outcomes, `SUMMARY_SOURCE` records contribute compact execution summaries,
+and `AUDIT_ONLY` records remain visible to the UI without being copied to the model.
+`MainAgentContextAssembler` selects the latest user-turn boundary, deduplicates todo,
+tool, sub-agent, and workspace events, and applies a token budget while never evicting
+the current user request. It is used for normal requests, streaming, retries, resume,
+and autonomous terminal reviews.
+
+Todo edits use one combined command for description, assignment, and status. The
+manager persists the candidate once and emits one change event only after the store
+operation succeeds; no-op updates allocate no new activity sequence. The event
+contains the previous status, so terminal review is triggered only for a genuine
+non-terminal to `COMPLETED` or `CANCELLED` transition. Position-only reorders do not
+create activity entries. Retry attempts are separate structured conversation records
+and never replace the todo's stable objective description.
+
+Workspace and download lifecycle messages are retained for audit and presentation.
+Starts, pauses, resumes, cancellations, and progress are `AUDIT_ONLY`; successful
+completions and failures are `SUMMARY_SOURCE` records with a normalized path and
+available MIME, size, checksum, and validation metadata. These passive notifications never trigger the main
+agent by themselves; the next user turn consumes their coalesced summary.
 
 `ProviderCatalogService` is the authoritative source for dynamic provider
 profiles and model metadata. It persists a versioned JSON catalog in

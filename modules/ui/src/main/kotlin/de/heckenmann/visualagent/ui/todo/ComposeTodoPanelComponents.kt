@@ -112,9 +112,14 @@ internal fun ReorderableColumnScope.TodoRow(
                                         agents = todoPort.agents(),
                                         onCancel = dismiss,
                                         onSave = { updatedDescription, updatedStatus, updatedAgentId ->
-                                            todoPort.updateDescription(todo.id, updatedDescription)
-                                            todoPort.updateStatus(todo.id, updatedStatus)
-                                            todoPort.updateAssignedAgent(todo.id, updatedAgentId)
+                                            todoPort.update(
+                                                de.heckenmann.visualagent.protocol.TodoUpdate(
+                                                    todoId = todo.id,
+                                                    description = updatedDescription,
+                                                    status = updatedStatus,
+                                                    assignedAgentId = updatedAgentId,
+                                                ),
+                                            )
                                             refresh()
                                             dismiss()
                                         },

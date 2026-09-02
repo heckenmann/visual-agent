@@ -126,6 +126,27 @@ class TodosToolTest {
     }
 
     @Test
+    fun `update distinguishes omitted assignment from an explicit clear`() {
+        val tempDb =
+            createTempDirectory("visual-agent-todos-tool-assignment")
+                .resolve("todos-tool.db")
+                .toString()
+        val db = KnowledgeDbTestFactory.create(tempDb)
+        try {
+            val tool = createTool(db)
+            val added = tool.execute(json("action" to "add", "description" to "Assigned task", "assignedAgentId" to "agent-1"))
+            val id = added.content.removePrefix("Added todo ")
+
+            val cleared = tool.execute("""{"action":"update","id":"$id","assignedAgentId":null}""")
+
+            assertTrue(cleared.success)
+            assertEquals(null, db.listTodos().single().assignedAgentId)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
     fun `add requires assignedAgentId referencing an existing agent`() {
         val tempDb =
             createTempDirectory("visual-agent-todos-tool-add-validation")

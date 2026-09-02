@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentHashMap
  * dependency between [AgentManager] and the coordinators.
  *
  * [AgentManager] wires the lambdas via [setBuildMainRequest], [setBuildMainSystemContextPrompt],
- * [setLoadRecentHistoryFromDb], and [setPersistMessage] during its `init` block.
+ * [setLoadRecentHistoryFromDb], [setLoadMainAgentContextFromDb], and [setPersistMessage] during its `init` block.
  */
 class ConversationOpsProvider(
     private val toolEventBus: ToolEventBus,
@@ -20,6 +20,7 @@ class ConversationOpsProvider(
     private var buildMainRequest: ((List<Message>, String?, CancellationToken?) -> ChatRequestContext)? = null
     private var buildMainSystemContextPrompt: (() -> String)? = null
     private var loadRecentHistoryFromDb: ((Int) -> List<Message>)? = null
+    private var loadMainAgentContextFromDb: ((Int, Int) -> List<Message>)? = null
     private var persistMessage: ((Message) -> Message)? = null
 
     /**
@@ -41,6 +42,11 @@ class ConversationOpsProvider(
      */
     fun setLoadRecentHistoryFromDb(fn: (Int) -> List<Message>) {
         loadRecentHistoryFromDb = fn
+    }
+
+    /** Sets the lambda for loading the bounded context projection for the main agent. */
+    fun setLoadMainAgentContextFromDb(fn: (Int, Int) -> List<Message>) {
+        loadMainAgentContextFromDb = fn
     }
 
     /**
@@ -71,6 +77,15 @@ class ConversationOpsProvider(
      */
     fun loadRecentHistoryFromDb(limit: Int = 20): List<Message> =
         checkNotNull(loadRecentHistoryFromDb) { "loadRecentHistoryFromDb not wired; ensure AgentManager.init completed" }(limit)
+
+    /** Loads the bounded, provider-facing context projection for the main agent. */
+    fun loadMainAgentContextFromDb(
+        userTurnLimit: Int = 10,
+        recordLimit: Int = 512,
+    ): List<Message> =
+        checkNotNull(loadMainAgentContextFromDb) {
+            "loadMainAgentContextFromDb not wired; ensure AgentManager.init completed"
+        }(userTurnLimit, recordLimit)
 
     /**
      * Persists a message to the database and returns the saved message.

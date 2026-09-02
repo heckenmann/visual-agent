@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.knowledge
 
+import de.heckenmann.visualagent.agent.ConversationContextPolicy
 import de.heckenmann.visualagent.agent.config.SubAgentToolConfig
 import de.heckenmann.visualagent.agent.provider.ProviderPreferenceStore
 import de.heckenmann.visualagent.todo.Todo
@@ -17,6 +18,7 @@ data class ConversationRecord(
     val metadata: String?,
     val createdAt: Instant,
     val timelineSequence: Long = 0,
+    val contextPolicy: ConversationContextPolicy = ConversationContextPolicy.SUMMARY_SOURCE,
 ) {
     /** Returns a field value by its persistence-facing name. */
     operator fun get(key: String): Any? =
@@ -27,6 +29,7 @@ data class ConversationRecord(
             "metadata" -> metadata
             "createdAt" -> createdAt.toString()
             "timelineSequence" -> timelineSequence
+            "contextPolicy" -> contextPolicy.name
             else -> null
         }
 }
@@ -124,6 +127,32 @@ interface ConversationStore {
         content: String,
         metadata: String? = null,
     ): String
+
+    /** Persists one message with an explicit model-context policy. */
+    fun saveConversationMessage(
+        id: String,
+        sessionId: String,
+        role: String,
+        content: String,
+        metadata: String? = null,
+        contextPolicy: ConversationContextPolicy,
+    ): String = saveConversationMessage(id, sessionId, role, content, metadata)
+
+    /** Returns messages eligible for a bounded main-agent context projection. */
+    fun getConversationMessagesForContext(
+        sessionId: String,
+        userTurnLimit: Int,
+        recordLimit: Int,
+    ): List<ConversationRecord> =
+        getConversationMessages(sessionId, recordLimit.coerceAtLeast(1))
+            .let { rows ->
+                val users = rows.filter { it.role == "user" }
+                val boundary = users.takeLast(userTurnLimit.coerceAtLeast(1)).firstOrNull()?.timelineSequence
+                rows.filter { row ->
+                    (boundary == null || row.timelineSequence >= boundary) &&
+                        row.contextPolicy != ConversationContextPolicy.AUDIT_ONLY
+                }
+            }
 
     /** Returns one persisted message, including its durable timeline ordering key. */
     fun getConversationMessage(id: String): ConversationRecord? = null

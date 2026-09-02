@@ -1,6 +1,8 @@
 package de.heckenmann.visualagent.knowledge
 
+import de.heckenmann.visualagent.agent.ConversationContextPolicy
 import de.heckenmann.visualagent.todo.Todo
+import java.sql.DriverManager
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -93,6 +95,115 @@ class KnowledgeDbConversationTest {
         val messages = db.getConversationMessages("main")
         assertTrue(messages[0].timelineSequence > 0)
         assertTrue(messages[1].timelineSequence > messages[0].timelineSequence)
+        db.close()
+    }
+
+    @Test
+    fun `main context query keeps recent turns and excludes audit-only records`() {
+        val tempDb = createTempDirectory("visual-agent-conversation-context-test").resolve("history.db").toString()
+        val db =
+            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                .create(tempDb)
+        val ids = (1..4).map { "11111111-1111-4111-8111-11111111111$it" }
+
+        db.conversationStore.saveConversationMessage(ids[0], "main", "user", "Old request", null, ConversationContextPolicy.DIALOGUE)
+        db.conversationStore.saveConversationMessage(ids[1], "main", "assistant", "Old answer", null, ConversationContextPolicy.DIALOGUE)
+        db.conversationStore.saveConversationMessage(ids[2], "main", "system", "Internal trace", null, ConversationContextPolicy.AUDIT_ONLY)
+        db.conversationStore.saveConversationMessage(ids[3], "main", "user", "Current request", null, ConversationContextPolicy.DIALOGUE)
+
+        val context = db.conversationStore.getConversationMessagesForContext("main", userTurnLimit = 1, recordLimit = 20)
+
+        assertEquals(listOf("Current request"), context.filter { it.role == "user" }.map { it.content })
+        assertTrue(context.none { it.content == "Internal trace" })
+        db.close()
+    }
+
+    @Test
+    fun `main context query retains the current dialogue when execution events exceed the record budget`() {
+        val tempDb = createTempDirectory("visual-agent-conversation-context-budget-test").resolve("history.db").toString()
+        val db =
+            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                .create(tempDb)
+        val userId = "22222222-2222-4222-8222-222222222222"
+        db.conversationStore.saveConversationMessage(
+            userId,
+            "main",
+            "user",
+            "Current request",
+            null,
+            ConversationContextPolicy.DIALOGUE,
+        )
+        repeat(25) { index ->
+            db.conversationStore.saveConversationMessage(
+                java
+                    .util.UUID
+                    .randomUUID()
+                    .toString(),
+                "main",
+                "system",
+                "Execution event $index",
+                """{"type":"tool_call","toolId":"tool-$index"}""",
+                ConversationContextPolicy.SUMMARY_SOURCE,
+            )
+        }
+
+        val context = db.conversationStore.getConversationMessagesForContext("main", userTurnLimit = 1, recordLimit = 5)
+
+        assertTrue(context.any { it.id == userId })
+        assertTrue(context.any { it.content == "Execution event 24" })
+        db.close()
+    }
+
+    @Test
+    fun `main context query includes summary events that immediately precede the selected user turn`() {
+        val tempDb = createTempDirectory("visual-agent-conversation-prelude-test").resolve("history.db").toString()
+        val db =
+            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                .create(tempDb)
+        db.conversationStore.saveConversationMessage(
+            "33333333-3333-4333-8333-333333333333",
+            "main",
+            "system",
+            "Workspace file imported: input.csv.",
+            """{"type":"workspace_file","workspacePath":"imports/input.csv","operation":"import"}""",
+            ConversationContextPolicy.SUMMARY_SOURCE,
+        )
+        db.conversationStore.saveConversationMessage(
+            "44444444-4444-4444-8444-444444444444",
+            "main",
+            "user",
+            "Analyze the imported file",
+            null,
+            ConversationContextPolicy.DIALOGUE,
+        )
+
+        val context = db.conversationStore.getConversationMessagesForContext("main", userTurnLimit = 1, recordLimit = 20)
+
+        assertTrue(context.any { it.content == "Workspace file imported: input.csv." })
+        assertTrue(context.any { it.content == "Analyze the imported file" })
+        db.close()
+    }
+
+    @Test
+    fun `main context query remains bounded when legacy timeline values are zero`() {
+        val tempDb = createTempDirectory("visual-agent-conversation-legacy-sequence-test").resolve("history.db").toString()
+        val db =
+            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                .create(tempDb)
+        repeat(12) { index ->
+            db.saveConversationMessage("main", "user", "Request $index")
+            db.saveConversationMessage("main", "assistant", "Answer $index")
+        }
+        DriverManager.getConnection("jdbc:sqlite:$tempDb").use { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeUpdate("UPDATE conversation_history SET timeline_sequence = 0")
+            }
+        }
+
+        val context = db.conversationStore.getConversationMessagesForContext("main", userTurnLimit = 1, recordLimit = 20)
+
+        assertEquals(listOf("Request 11"), context.filter { it.role == "user" }.map { it.content })
+        assertEquals(listOf("Answer 11"), context.filter { it.role == "assistant" }.map { it.content })
         db.close()
     }
 

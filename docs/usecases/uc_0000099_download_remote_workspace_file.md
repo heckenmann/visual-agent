@@ -28,8 +28,11 @@ user can pause, resume, or cancel it; cancellation removes the temporary workspa
 file and no managed record is created.
 
 Each lifecycle transition is also persisted as a system notification in the
-conversation. A completed download notification tells the main agent that the
-managed file is available for subsequent tool calls.
+conversation. Start, pause, resume, cancellation, and progress notifications are
+audit-only; completion and failure records include structured path, byte, MIME,
+SHA-256, validation, and status metadata where available. A completed download
+notification tells the main agent that the managed file is available for subsequent
+tool calls on the next user turn.
 
 ## Alternate Flows
 
@@ -60,6 +63,8 @@ The downloaded file is available to existing workspace tools without exposing an
 - Active transfers expose progress and pause/resume/cancel controls to the file browser.
 - Start, pause, resume, cancel, failure, and completion transitions appear as conversation notifications.
 - Completion notifications are included in the main-agent conversation context.
+- Repeated lifecycle notifications are coalesced before entering provider context;
+  actionable failures remain available.
 - The default destination is `workspace/downloads`.
 - Path traversal, symlink escapes, credentials, private targets, and partial files are prevented.
 - Downloads are not rejected because of their size; available disk space remains the practical limit.

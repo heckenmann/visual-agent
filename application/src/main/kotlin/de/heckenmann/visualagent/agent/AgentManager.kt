@@ -88,18 +88,11 @@ class AgentManager
             providerCatalog,
         )
 
-        companion object {
-            internal const val MAIN_SESSION_ID = "main"
-            internal const val INITIAL_HISTORY_LOAD_LIMIT = 20
-            internal const val HISTORY_PAGE_SIZE = 20
-        }
-
         internal lateinit var autonomousCoordinator: AutonomousCoordinator
         internal lateinit var responseCoordinator: AgentResponseCoordinator
         internal var todoManager: TodoManager = TodoManager(todoStore, todoEventBus)
         internal val welcomeMessageComposer = WelcomeMessageComposer(llmProvider, appConfig, providerCatalog)
-        internal val subAgentJobScheduler =
-            SubAgentJobScheduler(scope, parallelismProvider, subAgentExecutionControl)
+        internal val subAgentJobScheduler = SubAgentJobScheduler(scope, parallelismProvider, subAgentExecutionControl)
         internal val conversationOpsProvider = ConversationOpsProvider(toolEventBus)
         internal val subAgentOpsProvider = SubAgentOpsProvider()
         internal val subAgents: Map<String, SubAgent> get() = subAgentOpsProvider.allSubAgents
@@ -122,6 +115,7 @@ class AgentManager
             conversationOpsProvider.setBuildMainRequest(conversationOps::buildMainRequest)
             conversationOpsProvider.setBuildMainSystemContextPrompt(conversationOps::buildMainSystemContextPrompt)
             conversationOpsProvider.setLoadRecentHistoryFromDb(conversationOps::loadRecentHistoryFromDb)
+            conversationOpsProvider.setLoadMainAgentContextFromDb(conversationOps::loadMainAgentContextFromDb)
             conversationOpsProvider.setPersistMessage(conversationOps::persist)
             subAgentOpsProvider.setSaveSubAgent(lifecycleOps::saveAgentToDb)
             subAgentOpsProvider.setCreateAgent { name, role, templateName -> lifecycleOps.createAgent(name, role, templateName) }
@@ -156,6 +150,7 @@ class AgentManager
                 if (lifecycle.closing) return@addListener
                 val todo = change.todo ?: return@addListener
                 if (change.type != TodoChangeType.UPDATED) return@addListener
+                if (change.previousStatus == null || change.previousStatus == todo.status) return@addListener
                 when (todo.status) {
                     TodoStatus.COMPLETED, TodoStatus.CANCELLED -> todoTrigger.trigger(todo)
                     else -> Unit
@@ -331,9 +326,7 @@ class AgentManager
         /**
          * Clears the in-memory conversation history.
          */
-        fun clearHistory() {
-            conversationOps.clearHistory()
-        }
+        fun clearHistory() = conversationOps.clearHistory()
 
         /**
          * Adds a welcome message to the conversation after a history reset.
@@ -349,16 +342,18 @@ class AgentManager
         /**
          * Appends a system message to the conversation history.
          */
-        fun appendSystemMessage(content: String) {
-            conversationOps.appendSystemMessage(content)
+        fun appendSystemMessage(
+            content: String,
+            metadata: String? = null,
+            contextPolicy: ConversationContextPolicy = ConversationContextPolicy.SUMMARY_SOURCE,
+        ) {
+            conversationOps.persist(Message(role = "system", content = content, metadata = metadata, contextPolicy = contextPolicy))
         }
 
         /**
          * Records a tool call event in the conversation history.
          */
-        fun recordToolCall(event: ToolCallEvent) {
-            conversationOps.recordToolCall(event)
-        }
+        fun recordToolCall(event: ToolCallEvent) = conversationOps.recordToolCall(event)
 
         /**
          * Deletes a message from the conversation history by its ID.
@@ -376,16 +371,18 @@ class AgentManager
         /**
          * Loads older conversation history from the database, paginated by [pageSize].
          */
-        fun loadOlderHistory(pageSize: Int = HISTORY_PAGE_SIZE): List<Message> = conversationOps.loadOlderHistory(pageSize)
+        fun loadOlderHistory(pageSize: Int = AgentManagerConstants.HISTORY_PAGE_SIZE): List<Message> =
+            conversationOps.loadOlderHistory(pageSize)
 
         /** Returns an immutable older page without changing the active in-memory history. */
         fun readOlderHistoryPage(
             offset: Int,
-            pageSize: Int = HISTORY_PAGE_SIZE,
+            pageSize: Int = AgentManagerConstants.HISTORY_PAGE_SIZE,
         ): ConversationHistoryPage = conversationOps.readOlderHistoryPage(offset, pageSize)
 
         /** Returns an immutable latest page without changing the active in-memory history. */
-        fun readLatestHistoryPage(limit: Int = HISTORY_PAGE_SIZE): ConversationHistoryPage = conversationOps.readLatestHistoryPage(limit)
+        fun readLatestHistoryPage(limit: Int = AgentManagerConstants.HISTORY_PAGE_SIZE): ConversationHistoryPage =
+            conversationOps.readLatestHistoryPage(limit)
 
         /**
          * Loads the latest messages from the database and appends any that are
@@ -393,7 +390,8 @@ class AgentManager
          *
          * @return the updated history list (newest messages appended).
          */
-        fun loadLatestHistory(limit: Int = HISTORY_PAGE_SIZE): List<Message> = conversationOps.loadLatestHistory(limit)
+        fun loadLatestHistory(limit: Int = AgentManagerConstants.HISTORY_PAGE_SIZE): List<Message> =
+            conversationOps.loadLatestHistory(limit)
 
         /**
          * Clears the in-memory conversation history and reloads the latest page
@@ -403,7 +401,8 @@ class AgentManager
          *
          * @return the reloaded history list.
          */
-        fun refreshHistoryToLatest(limit: Int = HISTORY_PAGE_SIZE): List<Message> = conversationOps.refreshHistoryToLatest(limit)
+        fun refreshHistoryToLatest(limit: Int = AgentManagerConstants.HISTORY_PAGE_SIZE): List<Message> =
+            conversationOps.refreshHistoryToLatest(limit)
 
         /**
          * Returns all sub-agents from the database (bypasses the in-memory cache).

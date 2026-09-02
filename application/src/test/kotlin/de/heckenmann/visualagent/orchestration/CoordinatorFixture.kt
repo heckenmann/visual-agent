@@ -26,6 +26,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.flowOf
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Test fixture for [AutonomousCoordinator] tests.
@@ -64,11 +65,13 @@ internal fun buildFixture(
     chatDelayMs: Int = 0,
     responseContent: String = "APPROVED\nLooks good.",
     reviewContent: String = "APPROVED",
+    failingWorkerAttempts: Int = 0,
 ): CoordinatorFixture {
     val todoStore = FakeTodoStore()
     val todoEventBus = TodoEventBus()
     val todoManager = TodoManager(todoStore, todoEventBus)
     val provider = mockk<LLMProvider>()
+    val workerAttempts = AtomicInteger()
     val memoryStore =
         object : MemoryStore {
             override fun saveMemory(
@@ -111,6 +114,9 @@ internal fun buildFixture(
     coEvery { provider.stream(any<ChatRequestContext>()) } coAnswers {
         val ctx = it.invocation.args[0] as ChatRequestContext
         val isReview = ctx.metadata["sessionId"] == "review"
+        if (!isReview && workerAttempts.incrementAndGet() <= failingWorkerAttempts) {
+            throw IllegalStateException("transient worker failure")
+        }
         if (chatDelayMs > 0 && !isReview) {
             val start = System.currentTimeMillis()
             while (System.currentTimeMillis() - start < chatDelayMs) {

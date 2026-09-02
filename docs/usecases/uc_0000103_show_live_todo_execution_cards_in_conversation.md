@@ -48,6 +48,8 @@ Keep the user aware of autonomous todo work by showing each todo as a compact ca
 ## Invariants
 
 - Todo cards are presentation-only timeline items and are excluded from model context.
+- The complete card and audit timeline remains visible in the UI while the main agent
+  receives only the bounded, deduplicated context projection.
 - A todo card keeps one stable id and moves to its latest activity position when it is genuinely updated.
 - Conversation messages and todo activity use one database-generated total order. Legacy rows without a sequence use timestamps and a documented deterministic fallback.
 - Existing todos are updated only when the objective and scope remain the same; a different objective gets a new todo so prior history remains meaningful.

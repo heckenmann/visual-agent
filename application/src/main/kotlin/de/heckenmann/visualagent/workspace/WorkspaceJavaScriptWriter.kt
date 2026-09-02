@@ -53,7 +53,15 @@ class WorkspaceJavaScriptWriter(
             StandardCharsets.UTF_8,
         )
         val record = workspaceFiles.recordManagedFile(destination, destination.fileName.toString())
-        activityEvents.publish(WorkspaceFileActivity("Workspace file written by JavaScript: ${record.relativePath}."))
+        activityEvents.publish(
+            WorkspaceFileActivity(
+                "Workspace file written by JavaScript: ${record.relativePath}.",
+                record.relativePath,
+                "write",
+                mimeType = record.mimeType,
+                sizeBytes = record.sizeBytes,
+            ),
+        )
         return JavaScriptWorkspaceWriteResult(record.relativePath, record.sizeBytes, record.mimeType)
     }
 
@@ -86,7 +94,7 @@ class WorkspaceJavaScriptWriter(
                 path.deleteIfExists()
             }
         if (record == null && deleted) {
-            activityEvents.publish(WorkspaceFileActivity("Workspace file deleted by JavaScript: $normalized."))
+            activityEvents.publish(WorkspaceFileActivity("Workspace file deleted by JavaScript: $normalized.", normalized, "delete"))
         }
         return JavaScriptWorkspaceDeleteResult(normalized, deleted)
     }

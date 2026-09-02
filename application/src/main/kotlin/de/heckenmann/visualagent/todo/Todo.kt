@@ -38,3 +38,25 @@ data class Todo(
     var completedAt: Instant? = null,
     val dueDate: Instant? = null,
 )
+
+/** Assignment mutation requested together with a todo update. */
+internal sealed interface TodoAssignmentChange {
+    /** Keep the current assignment unchanged. */
+    data object Unchanged : TodoAssignmentChange
+
+    /** Remove the current assignment. */
+    data object Clear : TodoAssignmentChange
+
+    /** Assign the todo to the supplied agent. */
+    data class Set(
+        val agentId: String,
+    ) : TodoAssignmentChange
+}
+
+/** Complete todo mutation applied and persisted as one database operation. */
+internal data class TodoUpdateCommand(
+    val id: String,
+    val description: String? = null,
+    val assignment: TodoAssignmentChange = TodoAssignmentChange.Unchanged,
+    val status: TodoStatus? = null,
+)

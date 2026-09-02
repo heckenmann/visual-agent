@@ -65,6 +65,11 @@ class WorkspaceDownloadServiceTest {
             listOf(DownloadActivityStatus.STARTED, DownloadActivityStatus.COMPLETED),
             events.map { it.status },
         )
+        val completed = events.last()
+        assertEquals("application/octet-stream", completed.mimeType)
+        assertEquals(3L, completed.sizeBytes)
+        assertEquals("accepted", completed.validationResult)
+        assertTrue(completed.sha256.orEmpty().isNotBlank())
     }
 
     @Test

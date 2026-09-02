@@ -26,7 +26,10 @@ Desktop user.
 9. For delete actions, the UI shows an internal confirmation modal before removing the managed file.
 10. The file service deletes the physical file when it still exists and always removes its metadata, including stale metadata for an already-missing file.
 11. The panel refreshes its view.
-12. Completed workspace mutations are added as passive system messages in the conversation; they do not start the main agent.
+12. Workspace mutations are added as passive system messages in the conversation; they
+    do not start the main agent. Lifecycle noise is retained for audit but classified
+    as `AUDIT_ONLY`; compact completions and failures can contribute to the next
+    provider context.
 
 ## Result
 
@@ -57,3 +60,5 @@ Workspace files can be managed without leaving the application.
 - Active downloads show progress controls in their containing folder; opening is unavailable until completion.
 - Pausing preserves the partial transfer, resuming continues it, and cancellation removes partial workspace data.
 - File mutations are visible in the conversation and become model context only with the next user message.
+- Context summaries coalesce repeated operations by normalized path and retain
+  actionable failures without copying progress text verbatim.

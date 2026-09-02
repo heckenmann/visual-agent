@@ -21,7 +21,9 @@ Main orchestration agent.
    - If the todo already has a valid `assignedAgentId`, that agent is used.
    - If the todo has no assignment, the coordinator auto-assigns the first idle sub-agent.
 4. Sub-agent execution updates status and produces results.
-5. Start, completion, and cancellation messages are persisted to the conversation.
+5. Start, completion, cancellation, and retry-attempt messages are persisted to the
+   conversation with structured metadata. Retry instructions do not replace the
+   original todo objective.
 
 ## Result
 
@@ -46,3 +48,5 @@ Todo work is delegated while keeping the main agent as an orchestration layer th
 - New todos with an explicit `assignedAgentId` must reference an existing sub-agent; invalid references are rejected.
 - The autonomous coordinator selects the first pending todo ordered by `position`.
 - Sub-agent results are surfaced through persisted conversation messages.
+- Assignment and status changes made together are persisted as one transaction and
+  one consolidated event.

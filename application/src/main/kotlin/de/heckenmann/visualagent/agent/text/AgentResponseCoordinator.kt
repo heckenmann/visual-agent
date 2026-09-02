@@ -1,7 +1,6 @@
 package de.heckenmann.visualagent.agent.text
 
 import de.heckenmann.visualagent.agent.CancellationToken
-import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.ConversationOpsProvider
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
@@ -14,7 +13,6 @@ class AgentResponseCoordinator
         private val llmProvider: LLMProvider,
         private val conversationOps: ConversationOpsProvider,
     ) {
-        private val mainSessionId = "main"
         private val repetitionGuardRetryLimit = 1
 
         /**
@@ -79,7 +77,7 @@ class AgentResponseCoordinator
             token?.throwIfCancelled()
             var raw =
                 llmProvider
-                    .chat(conversationOps.buildMainRequest(conversationOps.loadRecentHistoryFromDb(), requestId, token))
+                    .chat(conversationOps.buildMainRequest(conversationOps.loadMainAgentContextFromDb(), requestId, token))
                     .message
                     .content
                     .trim()
@@ -118,24 +116,24 @@ class AgentResponseCoordinator
                     val payload = event.result.content.ifBlank { event.result.error.orEmpty() }
                     "- ${event.toolId} [$status]: $payload"
                 }
-            val followup =
-                ChatRequestContext(
-                    messages =
-                        buildList {
-                            add(Message("system", conversationOps.buildMainSystemContextPrompt()))
-                            add(
-                                Message(
-                                    "system",
-                                    "Generate the final user-facing answer from the tool results below. Be concrete and do not ask for more context.",
-                                ),
-                            )
-                            addAll(conversationOps.loadRecentHistoryFromDb())
-                            add(Message("assistant", "Tool results:\n$summary"))
-                        },
-                    enabledTools = emptySet(),
-                    metadata = mapOf("sessionId" to mainSessionId, "agent" to "main", "requestId" to "$requestId:finalize"),
-                    cancellationToken = token,
+            val base =
+                conversationOps.buildMainRequest(
+                    conversationOps.loadMainAgentContextFromDb(),
+                    "$requestId:finalize",
+                    token,
                 )
+            val followupMessages = base.messages.toMutableList()
+            val systemContextIndex = followupMessages.indexOfFirst { it.role == "system" }
+            val instructionIndex = if (systemContextIndex >= 0) systemContextIndex + 1 else 0
+            followupMessages.add(
+                instructionIndex,
+                Message(
+                    "system",
+                    "Generate the final user-facing answer from the tool results below. Be concrete and do not ask for more context.",
+                ),
+            )
+            followupMessages += Message("assistant", "Tool results:\n$summary")
+            val followup = base.copy(messages = followupMessages, enabledTools = emptySet(), cancellationToken = token)
             token?.throwIfCancelled()
             return llmProvider
                 .chat(followup)
@@ -161,7 +159,7 @@ class AgentResponseCoordinator
             var retryRaw = ""
             repeat(repetitionGuardRetryLimit) {
                 token?.throwIfCancelled()
-                val base = conversationOps.buildMainRequest(conversationOps.loadRecentHistoryFromDb(), null, token)
+                val base = conversationOps.buildMainRequest(conversationOps.loadMainAgentContextFromDb(), null, token)
                 val retryInstruction =
                     Message(
                         role = "system",

@@ -20,13 +20,8 @@ interface TodoToolPort {
         assignedAgentId: String,
     ): ToolTodoCreation
 
-    /** Updates supplied todo fields. */
-    fun update(
-        id: String,
-        description: String?,
-        assignedAgentId: String?,
-        status: String?,
-    )
+    /** Applies supplied todo fields as one mutation. */
+    fun update(request: TodoUpdateRequest): Boolean
 
     /** Applies a todo status transition. */
     fun setStatus(
@@ -72,4 +67,20 @@ data class ToolTodo(
 data class ToolTodoCreation(
     val todo: ToolTodo,
     val created: Boolean,
+)
+
+/** Controls whether an update keeps, clears, or sets an assignment. */
+enum class TodoAssignmentMode {
+    UNCHANGED,
+    CLEAR,
+    SET,
+}
+
+/** Transport-neutral todo update request with explicit assignment semantics. */
+data class TodoUpdateRequest(
+    val id: String,
+    val description: String? = null,
+    val assignmentMode: TodoAssignmentMode = TodoAssignmentMode.UNCHANGED,
+    val assignedAgentId: String? = null,
+    val status: String? = null,
 )
