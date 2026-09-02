@@ -159,4 +159,54 @@ class MainAgentContextAssemblerTest {
         assertFalse(content.contains("Request 0"))
         assertTrue(content.contains("older conversation turn(s) omitted"))
     }
+
+    @Test
+    fun `does not retain stale turns after a newer turn exceeds the budget`() {
+        val history =
+            listOf(
+                Message("user", "Old request"),
+                Message("assistant", "Old answer"),
+                Message("user", "Oversized request " + "x".repeat(8_000)),
+                Message("assistant", "Oversized answer " + "y".repeat(8_000)),
+                Message("user", "Current request"),
+                Message("assistant", "Current answer"),
+            )
+
+        val content = assembler.assemble(history, "System", 1_800).joinToString("\n") { it.content }
+
+        assertTrue(content.contains("Current request"))
+        assertFalse(content.contains("Old request"))
+    }
+
+    @Test
+    fun `keeps the latest event for a deduplicated identity within the summary limit`() {
+        val history =
+            buildList {
+                add(Message("user", "Process the workspace"))
+                repeat(25) { index ->
+                    add(
+                        Message(
+                            "system",
+                            "Initial event $index",
+                            metadata = """{"type":"workspace_file","workspacePath":"batch/$index.txt","operation":"write"}""",
+                            contextPolicy = ConversationContextPolicy.SUMMARY_SOURCE,
+                        ),
+                    )
+                }
+                add(
+                    Message(
+                        "system",
+                        "Final event 0",
+                        metadata = """{"type":"workspace_file","workspacePath":"batch/0.txt","operation":"write","status":"completed"}""",
+                        contextPolicy = ConversationContextPolicy.SUMMARY_SOURCE,
+                    ),
+                )
+                add(Message("assistant", "Finished"))
+            }
+
+        val summary = assembler.assemble(history, "System", 4_096).first { it.content.startsWith("Execution summary:") }
+
+        assertTrue(summary.content.contains("Final event 0"))
+        assertFalse(summary.content.contains("Initial event 0"))
+    }
 }

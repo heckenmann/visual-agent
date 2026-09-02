@@ -139,55 +139,77 @@ internal class ConversationRepositoryCustomImpl(
     ): List<ConversationEntity> {
         val turnLimit = userTurnLimit.coerceAtLeast(1)
         val maxRecords = recordLimit.coerceAtLeast(1)
-        val boundary =
-            entityManager
-                .createNativeQuery(
-                    """
-                    SELECT MIN(timeline_sequence)
-                    FROM (
-                        SELECT timeline_sequence
-                        FROM conversation_history
-                        WHERE session_id = :sessionId AND role = 'user'
-                        ORDER BY timeline_sequence DESC
-                        LIMIT :turnLimit
-                    )
-                    """.trimIndent(),
-                ).setParameter("sessionId", sessionId)
-                .setParameter("turnLimit", turnLimit)
-                .singleResult
-                ?.let { (it as? Number)?.toLong() }
-                ?: return emptyList()
         val dialogue =
             entityManager
                 .createNativeQuery(
                     """
+                    WITH boundary AS (
+                        SELECT timeline_sequence, created_at, id
+                        FROM conversation_history
+                        WHERE session_id = :sessionId AND role = 'user'
+                        ORDER BY timeline_sequence DESC, created_at DESC, id DESC
+                        LIMIT 1 OFFSET :boundaryOffset
+                    )
                     SELECT *
                     FROM conversation_history
                     WHERE session_id = :sessionId
-                      AND timeline_sequence >= :boundary
                       AND context_policy = 'DIALOGUE'
+                      AND EXISTS (SELECT 1 FROM boundary)
+                      AND (
+                          timeline_sequence > (SELECT timeline_sequence FROM boundary)
+                          OR (
+                              timeline_sequence = (SELECT timeline_sequence FROM boundary)
+                              AND (
+                                  created_at > (SELECT created_at FROM boundary)
+                                  OR (
+                                      created_at = (SELECT created_at FROM boundary)
+                                      AND id >= (SELECT id FROM boundary)
+                                  )
+                              )
+                          )
+                      )
                     ORDER BY timeline_sequence ASC, created_at ASC, id ASC
                     """.trimIndent(),
                     ConversationEntity::class.java,
                 ).setParameter("sessionId", sessionId)
-                .setParameter("boundary", boundary)
+                .setParameter("boundaryOffset", turnLimit - 1)
                 .resultList
                 .filterIsInstance<ConversationEntity>()
         val summaries =
             entityManager
                 .createNativeQuery(
                     """
+                    WITH previous_user AS (
+                        SELECT timeline_sequence, created_at, id
+                        FROM conversation_history
+                        WHERE session_id = :sessionId AND role = 'user'
+                        ORDER BY timeline_sequence DESC, created_at DESC, id DESC
+                        LIMIT 1 OFFSET :turnLimit
+                    )
                     SELECT *
                     FROM conversation_history
                     WHERE session_id = :sessionId
-                      AND timeline_sequence >= :boundary
                       AND context_policy = 'SUMMARY_SOURCE'
+                      AND (
+                          NOT EXISTS (SELECT 1 FROM previous_user)
+                          OR timeline_sequence > (SELECT timeline_sequence FROM previous_user)
+                          OR (
+                              timeline_sequence = (SELECT timeline_sequence FROM previous_user)
+                              AND (
+                                  created_at > (SELECT created_at FROM previous_user)
+                                  OR (
+                                      created_at = (SELECT created_at FROM previous_user)
+                                      AND id > (SELECT id FROM previous_user)
+                                  )
+                              )
+                          )
+                      )
                     ORDER BY timeline_sequence DESC, created_at DESC, id DESC
                     LIMIT :recordLimit
                     """.trimIndent(),
                     ConversationEntity::class.java,
                 ).setParameter("sessionId", sessionId)
-                .setParameter("boundary", boundary)
+                .setParameter("turnLimit", turnLimit)
                 .setParameter("recordLimit", maxRecords)
                 .resultList
                 .filterIsInstance<ConversationEntity>()

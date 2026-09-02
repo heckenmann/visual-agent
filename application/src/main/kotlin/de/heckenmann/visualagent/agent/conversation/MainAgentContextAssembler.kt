@@ -109,6 +109,7 @@ internal class MainAgentContextAssembler(
                 val key = "$type:$keySuffix"
                 val status = statusValue.takeIf(String::isNotBlank)?.let { " [$it]" }.orEmpty()
                 val text = "$type$status: ${message.content.replace(Regex("\\s+"), " ").trim().take(MAX_SUMMARY_CHARS)}"
+                deduplicated.remove(key)
                 deduplicated[key] = text
             }
         val values = deduplicated.values.toList()
@@ -144,7 +145,7 @@ internal class MainAgentContextAssembler(
     ): List<List<Message>> {
         val retained = ArrayDeque<List<Message>>()
         var used = 0
-        turns.asReversed().forEachIndexed { index, turn ->
+        for ((index, turn) in turns.asReversed().withIndex()) {
             val candidate =
                 if (index == 0) {
                     fitLatestTurn(turn, budget)
@@ -152,10 +153,9 @@ internal class MainAgentContextAssembler(
                     turn
                 }
             val estimate = estimateTurn(candidate)
-            if (retained.isEmpty() || used + estimate <= budget) {
-                retained.addFirst(candidate)
-                used += estimate
-            }
+            if (retained.isNotEmpty() && used + estimate > budget) break
+            retained.addFirst(candidate)
+            used += estimate
         }
         return retained.toList()
     }

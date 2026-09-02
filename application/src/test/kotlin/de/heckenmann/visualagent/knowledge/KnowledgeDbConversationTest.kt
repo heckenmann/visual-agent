@@ -2,6 +2,7 @@ package de.heckenmann.visualagent.knowledge
 
 import de.heckenmann.visualagent.agent.ConversationContextPolicy
 import de.heckenmann.visualagent.todo.Todo
+import java.sql.DriverManager
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -150,6 +151,59 @@ class KnowledgeDbConversationTest {
 
         assertTrue(context.any { it.id == userId })
         assertTrue(context.any { it.content == "Execution event 24" })
+        db.close()
+    }
+
+    @Test
+    fun `main context query includes summary events that immediately precede the selected user turn`() {
+        val tempDb = createTempDirectory("visual-agent-conversation-prelude-test").resolve("history.db").toString()
+        val db =
+            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                .create(tempDb)
+        db.conversationStore.saveConversationMessage(
+            "33333333-3333-4333-8333-333333333333",
+            "main",
+            "system",
+            "Workspace file imported: input.csv.",
+            """{"type":"workspace_file","workspacePath":"imports/input.csv","operation":"import"}""",
+            ConversationContextPolicy.SUMMARY_SOURCE,
+        )
+        db.conversationStore.saveConversationMessage(
+            "44444444-4444-4444-8444-444444444444",
+            "main",
+            "user",
+            "Analyze the imported file",
+            null,
+            ConversationContextPolicy.DIALOGUE,
+        )
+
+        val context = db.conversationStore.getConversationMessagesForContext("main", userTurnLimit = 1, recordLimit = 20)
+
+        assertTrue(context.any { it.content == "Workspace file imported: input.csv." })
+        assertTrue(context.any { it.content == "Analyze the imported file" })
+        db.close()
+    }
+
+    @Test
+    fun `main context query remains bounded when legacy timeline values are zero`() {
+        val tempDb = createTempDirectory("visual-agent-conversation-legacy-sequence-test").resolve("history.db").toString()
+        val db =
+            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                .create(tempDb)
+        repeat(12) { index ->
+            db.saveConversationMessage("main", "user", "Request $index")
+            db.saveConversationMessage("main", "assistant", "Answer $index")
+        }
+        DriverManager.getConnection("jdbc:sqlite:$tempDb").use { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeUpdate("UPDATE conversation_history SET timeline_sequence = 0")
+            }
+        }
+
+        val context = db.conversationStore.getConversationMessagesForContext("main", userTurnLimit = 1, recordLimit = 20)
+
+        assertEquals(listOf("Request 11"), context.filter { it.role == "user" }.map { it.content })
+        assertEquals(listOf("Answer 11"), context.filter { it.role == "assistant" }.map { it.content })
         db.close()
     }
 
