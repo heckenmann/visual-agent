@@ -30,6 +30,7 @@ class AgentResponseCoordinatorTest {
             }
             setBuildMainSystemContextPrompt { "system context" }
             setLoadRecentHistoryFromDb { listOf(Message("user", "question")) }
+            setLoadMainAgentContextFromDb { _, _ -> listOf(Message("user", "question")) }
         }
     private val coordinator =
         AgentResponseCoordinator(
@@ -74,7 +75,9 @@ class AgentResponseCoordinatorTest {
 
             assertEquals("Final answer from tool output", result)
             assertFalse(events.containsKey("request-1"))
-            assertTrue(requests.single().metadata["requestId"] == "request-1")
+            assertEquals(2, requests.size)
+            assertEquals("request-1", requests.first().metadata["requestId"])
+            assertEquals("request-1:finalize", requests.last().metadata["requestId"])
         }
 
     @Test

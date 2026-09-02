@@ -2,8 +2,10 @@ package de.heckenmann.visualagent.agent.conversation
 
 import de.heckenmann.visualagent.agent.AgentJobResult
 import de.heckenmann.visualagent.agent.AgentManager
+import de.heckenmann.visualagent.agent.AgentManagerConstants
 import de.heckenmann.visualagent.agent.CancellationToken
 import de.heckenmann.visualagent.agent.ChatRequestContext
+import de.heckenmann.visualagent.agent.ConversationContextPolicy
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ProviderTurnResponse
 import de.heckenmann.visualagent.agent.text.ResponseRepetitionGuard
@@ -24,6 +26,7 @@ internal class AgentManagerConversationOps(
     private val owner: AgentManager,
 ) {
     private val logger = KotlinLogging.logger {}
+    private val contextOps = AgentManagerContextOps(owner)
     private val historyOps = AgentConversationHistoryOps(owner, ::buildMainRequest)
 
     internal fun persist(message: Message): Message {
@@ -34,10 +37,11 @@ internal class AgentManagerConversationOps(
         val id =
             owner.conversationStore.saveConversationMessage(
                 messageId,
-                AgentManager.MAIN_SESSION_ID,
+                AgentManagerConstants.MAIN_SESSION_ID,
                 message.role,
                 message.content,
                 message.metadata,
+                message.contextPolicy ?: ConversationContextPolicy.forRole(message.role),
             )
         val record = owner.conversationStore.getConversationMessage(id)
         val persisted =
@@ -45,6 +49,7 @@ internal class AgentManagerConversationOps(
                 id = id,
                 createdAtEpochMillis = record?.createdAt?.toEpochMilli() ?: Instant.now().toEpochMilli(),
                 timelineSequence = record?.timelineSequence,
+                contextPolicy = record?.contextPolicy ?: message.contextPolicy ?: ConversationContextPolicy.forRole(message.role),
             )
         val existingIndex = owner.conversationHistory.indexOfFirst { it.id == id }
         if (existingIndex >= 0) {
@@ -170,7 +175,7 @@ internal class AgentManagerConversationOps(
         token?.throwIfCancelled()
         try {
             val request =
-                buildMainRequest(loadRecentHistoryFromDb(), requestId)
+                buildMainRequest(loadMainAgentContextFromDb(), requestId)
                     .copy(cancellationToken = token)
             owner.llmProvider.stream(request).collect { chunk ->
                 token?.throwIfCancelled()
@@ -257,7 +262,7 @@ internal class AgentManagerConversationOps(
         newContent: String,
     ) = historyOps.updateMessageContentById(id, newContent)
 
-    fun loadOlderHistory(pageSize: Int = AgentManager.HISTORY_PAGE_SIZE): List<Message> = historyOps.loadOlderHistory(pageSize)
+    fun loadOlderHistory(pageSize: Int = AgentManagerConstants.HISTORY_PAGE_SIZE): List<Message> = historyOps.loadOlderHistory(pageSize)
 
     fun readOlderHistoryPage(
         offset: Int,
@@ -266,7 +271,7 @@ internal class AgentManagerConversationOps(
 
     fun readLatestHistoryPage(limit: Int): ConversationHistoryPage = historyOps.readLatestHistoryPage(limit)
 
-    fun loadLatestHistory(limit: Int = AgentManager.HISTORY_PAGE_SIZE): List<Message> = historyOps.loadLatestHistory(limit)
+    fun loadLatestHistory(limit: Int = AgentManagerConstants.HISTORY_PAGE_SIZE): List<Message> = historyOps.loadLatestHistory(limit)
 
     /**
      * Clears the in-memory conversation history and reloads the latest page from
@@ -276,10 +281,17 @@ internal class AgentManagerConversationOps(
      *
      * @return the reloaded history list.
      */
-    fun refreshHistoryToLatest(limit: Int = AgentManager.HISTORY_PAGE_SIZE): List<Message> = historyOps.refreshHistoryToLatest(limit)
+    fun refreshHistoryToLatest(limit: Int = AgentManagerConstants.HISTORY_PAGE_SIZE): List<Message> =
+        historyOps.refreshHistoryToLatest(limit)
 
-    fun loadRecentHistoryFromDb(limit: Int = AgentManager.INITIAL_HISTORY_LOAD_LIMIT): List<Message> =
+    fun loadRecentHistoryFromDb(limit: Int = AgentManagerConstants.INITIAL_HISTORY_LOAD_LIMIT): List<Message> =
         historyOps.loadRecentHistoryFromDb(limit)
+
+    /** Loads the database-backed, bounded source records for main-agent context assembly. */
+    fun loadMainAgentContextFromDb(
+        userTurnLimit: Int = AgentManagerConstants.MAIN_CONTEXT_USER_TURN_LIMIT,
+        recordLimit: Int = AgentManagerConstants.MAIN_CONTEXT_RECORD_LIMIT,
+    ): List<Message> = historyOps.loadMainAgentContextFromDb(userTurnLimit, recordLimit)
 
     fun loadConversationFromDb() = historyOps.loadConversationFromDb()
 
@@ -300,48 +312,7 @@ internal class AgentManagerConversationOps(
         history: List<Message>,
         requestId: String? = null,
         token: CancellationToken? = null,
-    ): ChatRequestContext {
-        val contextPrompt = buildMainSystemContextPrompt()
-        val preparedMessages = mutableListOf<Message>()
-        preparedMessages += Message("system", contextPrompt)
-        preparedMessages += history.map(::normalizeHistoryRoleForProvider)
-        val metadata =
-            mutableMapOf<String, Any>(
-                "sessionId" to AgentManager.MAIN_SESSION_ID,
-                "agent" to "main",
-                "thinkingEnabled" to true,
-            ).apply {
-                if (!requestId.isNullOrBlank()) put("requestId", requestId)
-            }
-        return ChatRequestContext(
-            messages = preparedMessages,
-            enabledTools = owner.agentToolConfigService.mainAgentTools(),
-            metadata = metadata,
-            cancellationToken = token,
-        )
-    }
+    ): ChatRequestContext = contextOps.buildMainRequest(history, requestId, token)
 
-    /**
-     * Map UI-only roles to provider-safe roles.
-     *
-     * `tool` records are converted to `assistant` so the model sees the
-     * result summary, and `sub_agent` notifications become `system`
-     * messages.
-     *
-     * @param message History message with any supported role
-     * @return Message with a role the configured LLM provider accepts
-     */
-    private fun normalizeHistoryRoleForProvider(message: Message): Message =
-        when (message.role) {
-            "tool" -> message.copy(role = "assistant")
-            "sub_agent" -> message.copy(role = "system")
-            "assistant" -> message.copy(content = owner.responseCoordinator.removeThinkingMarkup(message.content).trim())
-            else -> message
-        }
-
-    fun buildMainSystemContextPrompt(): String {
-        val todos = owner.todoStore.listTodos()
-        return de.heckenmann.visualagent.agent.context.MainSystemPromptComposer
-            .compose(todos, owner.pendingResumeMessage, owner.agentToolConfigService, owner.appConfig.userModelInstruction)
-    }
+    fun buildMainSystemContextPrompt(): String = contextOps.buildMainSystemContextPrompt()
 }

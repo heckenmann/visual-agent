@@ -1,6 +1,6 @@
 package de.heckenmann.visualagent.agent.conversation
 
-import de.heckenmann.visualagent.agent.AgentManager
+import de.heckenmann.visualagent.agent.AgentManagerConstants
 import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
@@ -64,7 +64,7 @@ class WelcomeMessageComposer(
                 enabledTools = emptySet(),
                 metadata =
                     mapOf(
-                        "sessionId" to AgentManager.MAIN_SESSION_ID,
+                        "sessionId" to AgentManagerConstants.MAIN_SESSION_ID,
                         "agent" to "main",
                         "thinkingEnabled" to true,
                     ),

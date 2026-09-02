@@ -13,6 +13,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import mu.KotlinLogging
 import de.heckenmann.visualagent.agent.tools.api.ToolResult as ToolsToolResult
 
@@ -61,6 +63,13 @@ internal class AgentTodoTrigger(
                 Message(
                     role = "system",
                     content = "The todo \"${todo.description}\" (id=${todo.id}) $action",
+                    metadata =
+                        buildJsonObject {
+                            put("type", "todo_review")
+                            put("eventType", "todo_terminal_transition")
+                            put("todoId", todo.id)
+                            put("status", todo.status.name)
+                        }.toString(),
                 ),
             )
             val requestId = "todo-trigger-${todo.id}"
@@ -78,7 +87,7 @@ internal class AgentTodoTrigger(
                     durationMillis = 0L,
                 ),
             )
-            val history = conversationOps.loadRecentHistoryFromDb()
+            val history = conversationOps.loadMainAgentContextFromDb()
             val request =
                 conversationOps.buildMainRequest(
                     appendTodoChangeReviewInput(history, todo),

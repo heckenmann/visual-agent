@@ -191,8 +191,19 @@ internal class AgentManagerLifecycleOps(
         return false
     }
 
-    fun persistTodoChangeMessage(content: String) {
-        owner.conversationOps.persist(Message(role = "system", content = content))
+    fun persistTodoChangeMessage(
+        content: String,
+        metadata: String? = null,
+        contextPolicy: ConversationContextPolicy = ConversationContextPolicy.SUMMARY_SOURCE,
+    ) {
+        owner.conversationOps.persist(
+            Message(
+                role = "system",
+                content = content,
+                metadata = metadata,
+                contextPolicy = contextPolicy,
+            ),
+        )
     }
 
     fun getSubAgentsFromDb(): List<SubAgent> = listSubAgentsFromDb()
@@ -211,15 +222,25 @@ internal class AgentManagerLifecycleOps(
             de.heckenmann.visualagent.todo.TodoChangeType.UPDATED,
             -> {
                 val todo = change.todo ?: return
-                persistTodoChangeMessage(formatTodoChangeMessage(change.type, todo))
+                persistTodoChangeMessage(
+                    formatTodoChangeMessage(change.type, todo),
+                    todoChangeMetadata(change.type, todo),
+                )
             }
             de.heckenmann.visualagent.todo.TodoChangeType.REMOVED -> {
                 val todoId = change.todoId ?: return
-                persistTodoChangeMessage("Removed todo $todoId")
+                persistTodoChangeMessage(
+                    "Removed todo $todoId",
+                    Json.encodeToString(mapOf("type" to "todo", "todoId" to todoId, "status" to "removed")),
+                )
             }
             de.heckenmann.visualagent.todo.TodoChangeType.REORDERED -> {
                 val moved = change.todo?.let { " (${it.description.take(60)}, id=${it.id})" } ?: ""
-                persistTodoChangeMessage("Reordered todo list$moved")
+                persistTodoChangeMessage(
+                    "Reordered todo list$moved",
+                    change.todo?.let { todoChangeMetadata(change.type, it) },
+                    ConversationContextPolicy.AUDIT_ONLY,
+                )
             }
             de.heckenmann.visualagent.todo.TodoChangeType.CLEARED -> {
                 persistTodoChangeMessage("Cleared all todos")
@@ -240,4 +261,17 @@ internal class AgentManagerLifecycleOps(
         val assigned = todo.assignedAgentId?.let { " assigned to $it" }.orEmpty()
         return "$base ${todo.id} (${todo.description.take(80)})$assigned [${todo.status}]"
     }
+
+    private fun todoChangeMetadata(
+        type: TodoChangeType,
+        todo: Todo,
+    ): String =
+        Json.encodeToString(
+            mapOf(
+                "type" to "todo",
+                "todoId" to todo.id,
+                "status" to todo.status.name,
+                "change" to type.name,
+            ),
+        )
 }

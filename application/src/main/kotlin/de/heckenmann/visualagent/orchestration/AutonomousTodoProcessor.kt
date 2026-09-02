@@ -133,6 +133,9 @@ internal suspend fun processTodoWithLLM(
                                 "Use `todos` with `get-result` to read the full stored result.",
                         success = true,
                         persistMessage = { conversationOps.persist(it) },
+                        attempt = attempt + 1,
+                        executionId = executionId,
+                        todoId = todoId,
                     )
                     todoManager.completeTodo(todoId)
                     return
@@ -142,12 +145,26 @@ internal suspend fun processTodoWithLLM(
                     todoManager.cancelTodo(todoId)
                     persistSubAgentMessage(
                         agent = agent,
-                        content = "Agent ${agent.name} (${agent.id}) stopped todo $todoId. Main review rejected final result",
+                        content =
+                            "Agent ${agent.name} (${agent.id}) stopped todo $todoId. " +
+                                "Main review rejected attempt $attempt after the final retry.",
                         success = false,
                         persistMessage = { conversationOps.persist(it) },
+                        attempt = attempt,
+                        executionId = executionId,
+                        todoId = todoId,
                     )
                     return
                 }
+                persistSubAgentMessage(
+                    agent = agent,
+                    content = "Main review rejected attempt $attempt for todo $todoId; retrying with the same objective.",
+                    success = false,
+                    persistMessage = { conversationOps.persist(it) },
+                    attempt = attempt,
+                    executionId = executionId,
+                    todoId = todoId,
+                )
                 subAgentOps.notifyAgent(agent.id, "Main review requested retry for todo: $todoId")
             } catch (_: kotlinx.coroutines.CancellationException) {
                 cancelledByChange = true
@@ -167,6 +184,9 @@ internal suspend fun processTodoWithLLM(
                                 "Failed: ${userError.summary}: ${userError.detail}",
                         success = false,
                         persistMessage = { conversationOps.persist(it) },
+                        attempt = attempt,
+                        executionId = executionId,
+                        todoId = todoId,
                     )
                     return
                 }
@@ -182,6 +202,9 @@ internal suspend fun processTodoWithLLM(
             content = "Agent ${agent.name} (${agent.id}) stopped todo $todoId. Crashed unexpectedly",
             success = false,
             persistMessage = { conversationOps.persist(it) },
+            attempt = attempt,
+            executionId = executionId,
+            todoId = todoId,
         )
     } finally {
         todoEventBus.publishProgress(
