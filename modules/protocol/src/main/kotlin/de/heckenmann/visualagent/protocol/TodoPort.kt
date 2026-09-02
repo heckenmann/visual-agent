@@ -53,6 +53,14 @@ data class TodoResponseSnapshot(
     val agentId: String? = null,
 )
 
+/** Combined todo edit submitted as one atomic mutation. */
+data class TodoUpdate(
+    val todoId: String,
+    val description: String,
+    val status: TodoState,
+    val assignedAgentId: String?,
+)
+
 /** Transport-neutral todo operations used by the todo panel. */
 interface TodoPort {
     /** Reads the current persisted todo list. */
@@ -75,6 +83,9 @@ interface TodoPort {
         todoId: String,
         description: String,
     ): Boolean
+
+    /** Applies description, status, and assignment in one atomic mutation. */
+    fun update(update: TodoUpdate): Boolean
 
     /** Updates a todo lifecycle state. */
     fun updateStatus(

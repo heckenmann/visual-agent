@@ -1,7 +1,9 @@
 
 package de.heckenmann.visualagent.agent.tools
 
+import de.heckenmann.visualagent.agent.tools.api.TodoAssignmentMode
 import de.heckenmann.visualagent.agent.tools.api.TodoToolPort
+import de.heckenmann.visualagent.agent.tools.api.TodoUpdateRequest
 import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
@@ -139,15 +141,32 @@ class TodosTool(
     private fun updateTodo(input: JsonObject): ToolResult {
         val id = input.requiredString("id")
         val todo = todos.list().firstOrNull { it.id == id } ?: return failure("todos", "Todo not found")
-        val newAssignedAgentId = input.string("assignedAgentId")
+        val hasAssignment = input.containsKey("assignedAgentId")
+        val newAssignedAgentId = input.string("assignedAgentId")?.takeIf(String::isNotBlank)
         if (newAssignedAgentId != null && !agentExists(newAssignedAgentId)) {
             return failure(
                 "todos",
                 "assignedAgentId must reference an existing sub-agent",
             )
         }
-        todos.update(id, input.string("description"), newAssignedAgentId, input.string("status")?.uppercase())
-        return success("todos", "Updated todo $id")
+        val updated =
+            todos.update(
+                TodoUpdateRequest(
+                    id = id,
+                    description = input.string("description"),
+                    assignmentMode =
+                        if (!hasAssignment) {
+                            TodoAssignmentMode.UNCHANGED
+                        } else if (newAssignedAgentId == null) {
+                            TodoAssignmentMode.CLEAR
+                        } else {
+                            TodoAssignmentMode.SET
+                        },
+                    assignedAgentId = newAssignedAgentId,
+                    status = input.string("status")?.uppercase(),
+                ),
+            )
+        return if (updated) success("todos", "Updated todo $id") else failure("todos", "Todo update failed")
     }
 
     private fun updateStatus(

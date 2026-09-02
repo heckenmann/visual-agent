@@ -26,6 +26,7 @@ data class TodoChange(
     val type: TodoChangeType,
     val todo: Todo? = null,
     val todoId: String? = null,
+    val previousStatus: TodoStatus? = null,
 )
 
 /**
@@ -167,13 +168,32 @@ class TodoManager(
     fun update(
         todoId: String,
         description: String,
-    ): Boolean {
-        val todo = getById(todoId) ?: return false
-        if (todo.description == description) return true
-        todo.description = description
-        touch(todo)
-        todoStore.saveTodo(todo)
-        publishChange(TodoChange(TodoChangeType.UPDATED, todo = todo))
+    ): Boolean = update(TodoUpdateCommand(id = todoId, description = description))
+
+    /** Applies all supplied fields and persists one atomic todo mutation. */
+    internal fun update(command: TodoUpdateCommand): Boolean {
+        if (command.description?.isBlank() == true) return false
+        if (command.assignment is TodoAssignmentChange.Set && command.assignment.agentId.isBlank()) return false
+        val original = getById(command.id) ?: return false
+        val candidate = original.copy()
+        command.description?.let { candidate.description = it }
+        when (val assignment = command.assignment) {
+            TodoAssignmentChange.Unchanged -> Unit
+            TodoAssignmentChange.Clear -> candidate.assignedAgentId = null
+            is TodoAssignmentChange.Set -> candidate.assignedAgentId = assignment.agentId
+        }
+        command.status?.let { status ->
+            if (candidate.status != status) {
+                candidate.status = status
+                candidate.completedAt = if (status == TodoStatus.COMPLETED) java.time.Instant.now() else null
+            }
+        }
+        if (candidate == original) return true
+        val previousStatus = original.status
+        touch(candidate)
+        todoStore.saveTodo(candidate)
+        copyMutableFields(candidate, original)
+        publishChange(TodoChange(TodoChangeType.UPDATED, todo = original, previousStatus = previousStatus))
         return true
     }
 
@@ -187,16 +207,7 @@ class TodoManager(
     fun updateStatus(
         todoId: String,
         status: TodoStatus,
-    ): Boolean {
-        val todo = getById(todoId) ?: return false
-        if (todo.status == status) return true
-        todo.status = status
-        todo.completedAt = if (status == TodoStatus.COMPLETED) java.time.Instant.now() else null
-        touch(todo)
-        todoStore.saveTodo(todo)
-        publishChange(TodoChange(TodoChangeType.UPDATED, todo = todo))
-        return true
-    }
+    ): Boolean = update(TodoUpdateCommand(id = todoId, status = status))
 
     /**
      * Updates only the assigned agent identifier and publishes an update event.
@@ -208,15 +219,13 @@ class TodoManager(
     fun updateAssignedAgent(
         todoId: String,
         agentId: String?,
-    ): Boolean {
-        val todo = getById(todoId) ?: return false
-        if (todo.assignedAgentId == agentId) return true
-        todo.assignedAgentId = agentId
-        touch(todo)
-        todoStore.saveTodo(todo)
-        publishChange(TodoChange(TodoChangeType.UPDATED, todo = todo))
-        return true
-    }
+    ): Boolean =
+        update(
+            TodoUpdateCommand(
+                id = todoId,
+                assignment = agentId?.let(TodoAssignmentChange::Set) ?: TodoAssignmentChange.Clear,
+            ),
+        )
 
     /**
      * Assigns a pending todo to an agent and moves it to in-progress.
@@ -231,12 +240,13 @@ class TodoManager(
     ): Boolean {
         val todo = getById(todoId) ?: return false
         if (todo.status != TodoStatus.PENDING) return false
-        todo.assignedAgentId = agentId
-        todo.status = TodoStatus.IN_PROGRESS
-        touch(todo)
-        todoStore.saveTodo(todo)
-        publishChange(TodoChange(TodoChangeType.UPDATED, todo = todo))
-        return true
+        return update(
+            TodoUpdateCommand(
+                id = todoId,
+                assignment = TodoAssignmentChange.Set(agentId),
+                status = TodoStatus.IN_PROGRESS,
+            ),
+        )
     }
 
     /**
@@ -248,12 +258,7 @@ class TodoManager(
     fun completeTodo(todoId: String): Boolean {
         val todo = getById(todoId) ?: return false
         if (todo.status != TodoStatus.IN_PROGRESS) return false
-        todo.status = TodoStatus.COMPLETED
-        todo.completedAt = java.time.Instant.now()
-        touch(todo)
-        todoStore.saveTodo(todo)
-        publishChange(TodoChange(TodoChangeType.UPDATED, todo = todo))
-        return true
+        return update(TodoUpdateCommand(id = todoId, status = TodoStatus.COMPLETED))
     }
 
     /**
@@ -265,11 +270,7 @@ class TodoManager(
     fun cancelTodo(todoId: String): Boolean {
         val todo = getById(todoId) ?: return false
         if (todo.status == TodoStatus.COMPLETED || todo.status == TodoStatus.CANCELLED) return false
-        todo.status = TodoStatus.CANCELLED
-        touch(todo)
-        todoStore.saveTodo(todo)
-        publishChange(TodoChange(TodoChangeType.UPDATED, todo = todo))
-        return true
+        return update(TodoUpdateCommand(id = todoId, status = TodoStatus.CANCELLED))
     }
 
     /**
@@ -374,6 +375,19 @@ class TodoManager(
     /** Marks a todo mutation for activity-based conversation ordering. */
     private fun touch(todo: Todo) {
         todo.updatedAt = java.time.Instant.now()
+    }
+
+    private fun copyMutableFields(
+        source: Todo,
+        target: Todo,
+    ) {
+        target.description = source.description
+        target.status = source.status
+        target.position = source.position
+        target.assignedAgentId = source.assignedAgentId
+        target.updatedAt = source.updatedAt
+        target.timelineSequence = source.timelineSequence
+        target.completedAt = source.completedAt
     }
 }
 

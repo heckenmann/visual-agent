@@ -292,58 +292,46 @@ class TodoManagerTest {
     }
 
     @Test
-    fun `full lifecycle - add, assign, complete`() {
-        val todo = manager.add("Full lifecycle task")
-        assertEquals(TodoStatus.PENDING, todo.status)
-
-        manager.assignToAgent(todo.id, "agent-1")
-        assertEquals(TodoStatus.IN_PROGRESS, todo.status)
-        assertEquals("agent-1", todo.assignedAgentId)
-
-        manager.completeTodo(todo.id)
-        assertEquals(TodoStatus.COMPLETED, todo.status)
-        assertNotNull(todo.completedAt)
-    }
-}
-
-private class InMemoryTodoStore : TodoStore {
-    private val todos = mutableListOf<Todo>()
-
-    override fun saveTodo(todo: Todo) {
-        todos.removeIf { it.id == todo.id }
-        todos.add(todo)
-    }
-
-    override fun createTodoIfAbsent(todo: Todo): de.heckenmann.visualagent.knowledge.TodoCreation {
-        val normalized =
-            todo.description
-                .trim()
-                .replace(Regex("\\s+"), " ")
-                .lowercase()
-        val existing =
-            todos.firstOrNull {
-                it.description
-                    .trim()
-                    .replace(Regex("\\s+"), " ")
-                    .lowercase() == normalized
+    fun `combined mutation is persisted once and reports the status transition`() {
+        val saves = mutableListOf<Todo>()
+        val store =
+            object : TodoStore by InMemoryTodoStore() {
+                override fun saveTodo(todo: Todo) {
+                    saves += todo.copy()
+                }
             }
-        return if (existing == null) {
-            saveTodo(todo)
-            de.heckenmann.visualagent.knowledge
-                .TodoCreation(todo, created = true)
-        } else {
-            de.heckenmann.visualagent.knowledge
-                .TodoCreation(existing, created = false)
-        }
+        val eventBus = TodoEventBus()
+        val testManager = TodoManager(store, eventBus)
+        val changes = mutableListOf<TodoChange>()
+        testManager.addListener(changes::add)
+        val todo = testManager.add("Original")
+        saves.clear()
+
+        assertTrue(
+            testManager.update(
+                TodoUpdateCommand(
+                    id = todo.id,
+                    description = "Updated",
+                    assignment = TodoAssignmentChange.Set("agent-1"),
+                    status = TodoStatus.IN_PROGRESS,
+                ),
+            ),
+        )
+
+        assertEquals(1, saves.size)
+        assertEquals("Updated", saves.single().description)
+        assertEquals("agent-1", saves.single().assignedAgentId)
+        assertEquals(TodoStatus.IN_PROGRESS, saves.single().status)
+        assertEquals(TodoStatus.PENDING, changes.last().previousStatus)
     }
 
-    override fun listTodos(): List<Todo> = todos.toList()
-
-    override fun deleteTodo(todoId: String) {
-        todos.removeIf { it.id == todoId }
-    }
-
-    override fun clearTodos() {
-        todos.clear()
+    @Test
+    fun `repeating a status is a no-op and does not publish a transition`() {
+        val changes = mutableListOf<TodoChange>()
+        val testManager = TodoManager(InMemoryTodoStore(), TodoEventBus())
+        testManager.addListener(changes::add)
+        val todo = testManager.add("Stable status")
+        assertTrue(testManager.updateStatus(todo.id, TodoStatus.PENDING))
+        assertEquals(1, changes.size)
     }
 }

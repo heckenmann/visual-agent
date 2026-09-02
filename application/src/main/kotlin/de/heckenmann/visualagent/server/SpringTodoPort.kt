@@ -13,6 +13,7 @@ import de.heckenmann.visualagent.protocol.TodoPort
 import de.heckenmann.visualagent.protocol.TodoProgress
 import de.heckenmann.visualagent.protocol.TodoResponseSnapshot
 import de.heckenmann.visualagent.protocol.TodoState
+import de.heckenmann.visualagent.protocol.TodoUpdate
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoStatus
@@ -46,6 +47,18 @@ class SpringTodoPort(
         todoId: String,
         description: String,
     ): Boolean = agentManager.todoManager.update(todoId, description)
+
+    override fun update(update: TodoUpdate): Boolean =
+        agentManager.todoManager.update(
+            de.heckenmann.visualagent.todo.TodoUpdateCommand(
+                id = update.todoId,
+                description = update.description,
+                assignment =
+                    update.assignedAgentId?.let(de.heckenmann.visualagent.todo.TodoAssignmentChange::Set)
+                        ?: de.heckenmann.visualagent.todo.TodoAssignmentChange.Clear,
+                status = update.status.toTodoStatus(),
+            ),
+        )
 
     override fun updateStatus(
         todoId: String,
