@@ -1,6 +1,8 @@
 package de.heckenmann.visualagent.workspace
 
 import de.heckenmann.visualagent.agent.AgentManager
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.springframework.beans.factory.DisposableBean
 import org.springframework.stereotype.Component
 
@@ -17,6 +19,19 @@ class WorkspaceFileActivityNotificationService(
     }
 
     private fun appendToConversation(activity: WorkspaceFileActivity) {
-        agentManager.appendSystemMessage(activity.message)
+        agentManager.appendSystemMessage(
+            content = activity.message,
+            metadata =
+                buildJsonObject {
+                    put("type", "workspace_file")
+                    put("eventType", "workspace_file_${activity.operation ?: "mutation"}")
+                    activity.relativePath?.let { put("workspacePath", it) }
+                    activity.operation?.let { put("operation", it) }
+                    put("status", if (activity.success) "success" else "failure")
+                    activity.mimeType?.let { put("mimeType", it) }
+                    activity.sizeBytes?.let { put("sizeBytes", it) }
+                }.toString(),
+            contextPolicy = activity.contextPolicy,
+        )
     }
 }

@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.workspace
 
 import de.heckenmann.visualagent.agent.AgentManager
+import de.heckenmann.visualagent.agent.ConversationContextPolicy
 import io.mockk.mockk
 import io.mockk.verify
 import kotlin.test.Test
@@ -15,7 +16,13 @@ class WorkspaceFileActivityNotificationServiceTest {
 
         eventBus.publish(WorkspaceFileActivity("Workspace folder created: projects/demo."))
 
-        verify(exactly = 1) { agentManager.appendSystemMessage("Workspace folder created: projects/demo.") }
+        verify(exactly = 1) {
+            agentManager.appendSystemMessage(
+                "Workspace folder created: projects/demo.",
+                any(),
+                ConversationContextPolicy.SUMMARY_SOURCE,
+            )
+        }
         notifications.destroy()
     }
 }

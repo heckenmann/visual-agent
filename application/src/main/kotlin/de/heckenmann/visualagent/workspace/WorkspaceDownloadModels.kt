@@ -13,6 +13,10 @@ internal data class WorkspaceDownloadJob(
     val relativePath: String,
     val control: WorkspaceDownloadControl,
     @Volatile var paused: Boolean = false,
+    @Volatile var mimeType: String? = null,
+    @Volatile var sizeBytes: Long? = null,
+    @Volatile var sha256: String? = null,
+    @Volatile var validationResult: String? = null,
 )
 
 /** Content-derived MIME metadata for one managed workspace file. */

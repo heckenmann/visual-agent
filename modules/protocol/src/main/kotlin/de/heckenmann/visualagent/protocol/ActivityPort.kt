@@ -46,6 +46,10 @@ data class DownloadActivity(
     val downloadedBytes: Long,
     val totalBytes: Long? = null,
     val detail: String? = null,
+    val mimeType: String? = null,
+    val sizeBytes: Long? = null,
+    val sha256: String? = null,
+    val validationResult: String? = null,
 )
 
 /** Lifecycle statuses reported for a workspace download. */
