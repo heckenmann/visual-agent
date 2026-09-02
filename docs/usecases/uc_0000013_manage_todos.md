@@ -21,9 +21,11 @@ Desktop user.
 4. The user drags a todo by its drag handle to reorder the list. The first pending todo is the next one to process.
 5. The user starts all unfinished todos or stops all pending and in-progress todos with the panel actions.
 6. The user starts or stops an individual todo from its row. Starting a cancelled todo resets it to `PENDING`; stopping a todo changes it to `CANCELLED` and cancels its worker cooperatively.
-7. The user changes status from the edit dialog to update description and status together.
+7. The user changes status, assignment, and description from the edit dialog. The
+   complete edit is submitted as one atomic todo mutation.
 8. For delete actions, the UI shows an internal confirmation modal before removing the todo.
-9. The todo manager records the change.
+9. The todo manager validates and records the change once; a no-op does not write or
+   allocate a new activity sequence.
 10. The todo store persists the authoritative state ordered by `position`.
 11. Agent prompts and tools read current todo summaries from persistence.
 12. When an autonomous todo reaches `COMPLETED` or `CANCELLED`, the main agent receives a request-local user instruction to review the persisted status notification.
@@ -59,6 +61,9 @@ Todos stay synchronized between UI, database, and agent context.
 - The one-line preview measures the available text width, keeps the newest response suffix visible at the right edge, and recalculates that suffix when the user resizes the Todo panel.
 - Start and stop actions never change or restart todos that are already `COMPLETED`.
 - Todos can be reordered by dragging the row drag handle.
+- A combined edit emits one persisted state transition and one todo change event.
+- Terminal review is triggered only after a real non-terminal to terminal transition;
+  later metadata edits do not retrigger it.
 - The first pending todo is visually highlighted as the next task.
 - Status is edited in the todo editor through a bounded dropdown choice, not free text.
 - The `todos` tool supports a `reorder` action to change which task is next.

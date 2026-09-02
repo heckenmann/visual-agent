@@ -24,7 +24,7 @@ Desktop user.
    the user entry and the assistant entry, then sends both through the
    protocol-owned conversation port.
 6. The server adapter delegates the request to the agent manager.
-7. The agent manager builds a request context from recent history, todo state, active provider/model, enabled tools, and runtime metadata.
+7. The agent manager loads the complete audit history from SQLite, then builds a bounded request context from the latest user turns. Dialogue is retained verbatim; todo, tool, workspace and sub-agent activity is reduced to deterministic execution summaries, while audit-only records remain available to the history UI but are excluded from the provider context.
 8. The configured provider sends the request to the selected backend.
 9. The assistant response is rendered in the conversation. If the provider cannot complete the request, a safe, actionable failure message is rendered instead.
 10. User and assistant messages are persisted.
@@ -51,6 +51,8 @@ The user receives a complete response and the conversation survives application 
 - Pressing Enter in the conversation input sends the current message.
 - Pressing Shift+Enter keeps editing and inserts a newline.
 - The main-agent request includes only request-scoped context.
+- The main-agent request is bounded by the configured context length and reserves capacity for the response and tool calls.
+- Audit-only records are never sent to the provider, while relevant execution failures remain visible in the compact summary.
 - Conversation turns are stored in SQLite with their caller-provided opaque
   UUIDs; IDs never encode a role or message type.
 - Provider failures are persisted as an assistant message without exposing provider payloads or credentials.
