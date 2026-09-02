@@ -313,6 +313,7 @@ data class Message(
     val createdAtEpochMillis: Long? = null,
     @kotlinx.serialization.Transient
     val timelineSequence: Long? = null,
+    val contextPolicy: ConversationContextPolicy? = null,
 )
 
 /**

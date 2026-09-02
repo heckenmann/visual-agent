@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.knowledge
 
+import de.heckenmann.visualagent.agent.ConversationContextPolicy
 import jakarta.persistence.Column
 import jakarta.persistence.Convert
 import jakarta.persistence.Entity
@@ -76,6 +77,8 @@ internal class ConversationEntity(
     var createdAt: Instant = Instant.EPOCH,
     @Column(name = "timeline_sequence", nullable = false)
     var timelineSequence: Long = 0,
+    @Column(name = "context_policy", nullable = false)
+    var contextPolicy: String = ConversationContextPolicy.SUMMARY_SOURCE.name,
 )
 
 /** Allocates globally ordered activity identifiers within the SQLite database. */

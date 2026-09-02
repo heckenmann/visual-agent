@@ -70,6 +70,12 @@ internal interface ConversationRepositoryCustom {
         query: String,
         limit: Int,
     ): List<ConversationEntity>
+
+    fun findForMainContext(
+        sessionId: String,
+        userTurnLimit: Int,
+        recordLimit: Int,
+    ): List<ConversationEntity>
 }
 
 @Repository
@@ -125,6 +131,70 @@ internal class ConversationRepositoryCustomImpl(
             .setParameter("query", "%${query.lowercase()}%")
             .setMaxResults(limit)
             .resultList
+
+    override fun findForMainContext(
+        sessionId: String,
+        userTurnLimit: Int,
+        recordLimit: Int,
+    ): List<ConversationEntity> {
+        val turnLimit = userTurnLimit.coerceAtLeast(1)
+        val maxRecords = recordLimit.coerceAtLeast(1)
+        val boundary =
+            entityManager
+                .createNativeQuery(
+                    """
+                    SELECT MIN(timeline_sequence)
+                    FROM (
+                        SELECT timeline_sequence
+                        FROM conversation_history
+                        WHERE session_id = :sessionId AND role = 'user'
+                        ORDER BY timeline_sequence DESC
+                        LIMIT :turnLimit
+                    )
+                    """.trimIndent(),
+                ).setParameter("sessionId", sessionId)
+                .setParameter("turnLimit", turnLimit)
+                .singleResult
+                ?.let { (it as? Number)?.toLong() }
+                ?: return emptyList()
+        val dialogue =
+            entityManager
+                .createNativeQuery(
+                    """
+                    SELECT *
+                    FROM conversation_history
+                    WHERE session_id = :sessionId
+                      AND timeline_sequence >= :boundary
+                      AND context_policy = 'DIALOGUE'
+                    ORDER BY timeline_sequence ASC, created_at ASC, id ASC
+                    """.trimIndent(),
+                    ConversationEntity::class.java,
+                ).setParameter("sessionId", sessionId)
+                .setParameter("boundary", boundary)
+                .resultList
+                .filterIsInstance<ConversationEntity>()
+        val summaries =
+            entityManager
+                .createNativeQuery(
+                    """
+                    SELECT *
+                    FROM conversation_history
+                    WHERE session_id = :sessionId
+                      AND timeline_sequence >= :boundary
+                      AND context_policy = 'SUMMARY_SOURCE'
+                    ORDER BY timeline_sequence DESC, created_at DESC, id DESC
+                    LIMIT :recordLimit
+                    """.trimIndent(),
+                    ConversationEntity::class.java,
+                ).setParameter("sessionId", sessionId)
+                .setParameter("boundary", boundary)
+                .setParameter("recordLimit", maxRecords)
+                .resultList
+                .filterIsInstance<ConversationEntity>()
+        return (dialogue + summaries)
+            .distinctBy(ConversationEntity::id)
+            .sortedWith(compareBy<ConversationEntity> { it.timelineSequence }.thenBy { it.createdAt }.thenBy { it.id })
+    }
 
     private companion object {
         private const val FTS_QUERY =
