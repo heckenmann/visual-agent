@@ -2,7 +2,7 @@
 
 ## Goal
 
-Keep assigned todo work pending while all sub-agent slots are occupied, then process it when a later autonomous polling pass finds capacity.
+Keep assigned todo work pending while all sub-agent slots are occupied, then process it when an event signals newly available capacity.
 
 ## Primary Actor
 
@@ -17,7 +17,7 @@ Autonomous coordinator.
 
 1. The autonomous coordinator identifies assigned pending work.
 2. If every slot is occupied, the coordinator leaves the todo `PENDING` and returns.
-3. A later polling pass selects the pending todo when capacity becomes available.
+3. Slot release, resume, or a parallelism increase signals the coordinator, which immediately selects pending work.
 4. The selected sub-agent processes the todo.
 5. Completion updates the persisted todo, conversation history, and UI state.
 
@@ -39,5 +39,5 @@ Assigned work remains pending until a worker is available, without exposing dire
 ## Acceptance Criteria
 
 - Assigned work remains `PENDING` when all workers are busy.
-- A later autonomous polling pass retries pending assigned work when capacity is available.
+- A capacity-change signal retries pending assigned work without normal-path polling.
 - Completed work updates persisted todo and conversation state.
