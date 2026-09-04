@@ -8,11 +8,14 @@ import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.protocol.LifecyclePort
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoStatus
+import de.heckenmann.visualagent.todo.TodoTerminalReason
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import mu.KotlinLogging
@@ -32,6 +35,7 @@ internal class AgentTodoTrigger(
     private val lifecycle: LifecyclePort,
 ) {
     private val logger = KotlinLogging.logger {}
+    private val terminalReviewMutex = Mutex()
 
     /**
      * Triggers the main agent to process a todo change notification.
@@ -39,96 +43,102 @@ internal class AgentTodoTrigger(
      * On LLM failure, a system message is persisted instead and the error is logged.
      * A synthetic [ToolCallEvent] is always published so the UI refreshes.
      */
-    fun trigger(todo: Todo) {
+    fun trigger(
+        todo: Todo,
+        terminalReason: TodoTerminalReason,
+    ) {
         if (lifecycle.closing) return
         scope.launch {
-            if (lifecycle.closing) return@launch
-            currentCoroutineContext().ensureActive()
-            val action =
-                when (todo.status) {
-                    TodoStatus.COMPLETED ->
-                        "was just completed by the sub-agent. " +
-                            "Review the result. If the task was done correctly, inform the user. " +
-                            "Do NOT create, update, restart, or reassign this terminal todo during this " +
-                            "automatic review. If the result is incomplete or incorrect, report that to the " +
-                            "user and wait for an explicit retry request."
-                    TodoStatus.CANCELLED ->
-                        "was cancelled. Inform the user. " +
-                            "Do NOT create, update, restart, or reassign this terminal todo during this " +
-                            "automatic review. A retry requires an explicit user request."
-                    else -> return@launch
-                }
-            if (lifecycle.closing) return@launch
-            conversationOps.persist(
-                Message(
-                    role = "system",
-                    content = "The todo \"${todo.description}\" (id=${todo.id}) $action",
-                    metadata =
-                        buildJsonObject {
-                            put("type", "todo_review")
-                            put("eventType", "todo_terminal_transition")
-                            put("todoId", todo.id)
-                            put("status", todo.status.name)
-                        }.toString(),
-                ),
-            )
-            val requestId = "todo-trigger-${todo.id}"
-            val activityRequestId = "$requestId:activity"
-            toolEventBus.publish(
-                ToolCallEvent(
-                    toolId = "todos",
-                    functionName = "todos",
-                    phase = ToolCallPhase.STARTED,
-                    inputJson = "{}",
-                    context = mapOf("trigger" to "todoChange", "requestId" to activityRequestId),
-                    result = ToolsToolResult(toolId = "todos", success = true, content = ""),
-                    startedAtUtc = java.time.Instant.now(),
-                    finishedAtUtc = java.time.Instant.now(),
-                    durationMillis = 0L,
-                ),
-            )
-            val history = conversationOps.loadMainAgentContextFromDb()
-            val request =
-                conversationOps.buildMainRequest(
-                    appendTodoChangeReviewInput(history, todo),
-                    requestId,
-                )
-            try {
+            terminalReviewMutex.withLock {
+                if (lifecycle.closing) return@withLock
                 currentCoroutineContext().ensureActive()
-                val response = llmProvider.chat(request)
-                val content = responseCoordinator.normalizeAssistantPresentationContent(response.message.content)
-                if (lifecycle.closing) return@launch
-                conversationOps.persist(Message(role = "assistant", content = content))
-            } catch (cancelled: CancellationException) {
-                // Cancellation is expected while the application is shutting down. Do not
-                // log it as a failed trigger or attempt a database write after cancellation.
-                return@launch
-            } catch (error: Throwable) {
-                if (lifecycle.closing) return@launch
-                logger.warn(error) { "triggerMainAgentOnTodoChange failed" }
+                val action =
+                    when (todo.status) {
+                        TodoStatus.COMPLETED ->
+                            "was just completed by the sub-agent. " +
+                                "Review the result. If the task was done correctly, inform the user. " +
+                                "Do NOT create, update, restart, or reassign this terminal todo during this " +
+                                "automatic review. If the result is incomplete or incorrect, report that to the " +
+                                "user and wait for an explicit retry request."
+                        TodoStatus.CANCELLED ->
+                            "stopped with outcome ${terminalReason.name}. Inform the user accurately. " +
+                                "Do NOT create, update, restart, or reassign this terminal todo during this " +
+                                "automatic review. A retry requires an explicit user request."
+                        else -> return@withLock
+                    }
+                if (lifecycle.closing) return@withLock
                 conversationOps.persist(
                     Message(
                         role = "system",
-                        content =
-                            "The main agent could not be triggered to review a todo change: " +
-                                "${error.message ?: error::class.simpleName ?: "unknown error"}.",
+                        content = "The todo \"${todo.description}\" (id=${todo.id}) $action",
+                        metadata =
+                            buildJsonObject {
+                                put("type", "todo_review")
+                                put("eventType", "todo_terminal_transition")
+                                put("todoId", todo.id)
+                                put("status", todo.status.name)
+                                put("terminalReason", terminalReason.name)
+                            }.toString(),
+                    ),
+                )
+                val requestId = "todo-trigger-${todo.id}"
+                val activityRequestId = "$requestId:activity"
+                toolEventBus.publish(
+                    ToolCallEvent(
+                        toolId = "todos",
+                        functionName = "todos",
+                        phase = ToolCallPhase.STARTED,
+                        inputJson = "{}",
+                        context = mapOf("trigger" to "todoChange", "requestId" to activityRequestId),
+                        result = ToolsToolResult(toolId = "todos", success = true, content = ""),
+                        startedAtUtc = java.time.Instant.now(),
+                        finishedAtUtc = java.time.Instant.now(),
+                        durationMillis = 0L,
+                    ),
+                )
+                val history = conversationOps.loadMainAgentContextFromDb()
+                val request =
+                    conversationOps.buildMainRequest(
+                        appendTodoChangeReviewInput(history, todo),
+                        requestId,
+                    )
+                try {
+                    currentCoroutineContext().ensureActive()
+                    val response = llmProvider.chat(request)
+                    val content = responseCoordinator.normalizeAssistantPresentationContent(response.message.content)
+                    if (lifecycle.closing) return@withLock
+                    conversationOps.persist(Message(role = "assistant", content = content))
+                } catch (cancelled: CancellationException) {
+                    // Cancellation is expected while the application is shutting down. Do not
+                    // log it as a failed trigger or attempt a database write after cancellation.
+                    return@withLock
+                } catch (error: Throwable) {
+                    if (lifecycle.closing) return@withLock
+                    logger.warn(error) { "triggerMainAgentOnTodoChange failed" }
+                    conversationOps.persist(
+                        Message(
+                            role = "system",
+                            content =
+                                "The main agent could not be triggered to review a todo change: " +
+                                    "${error.message ?: error::class.simpleName ?: "unknown error"}.",
+                        ),
+                    )
+                }
+                if (lifecycle.closing) return@withLock
+                toolEventBus.publish(
+                    ToolCallEvent(
+                        toolId = "todos",
+                        functionName = "todos",
+                        phase = ToolCallPhase.FINISHED,
+                        inputJson = "{}",
+                        context = mapOf("trigger" to "todoChange", "requestId" to activityRequestId),
+                        result = ToolsToolResult(toolId = "todos", success = true, content = ""),
+                        startedAtUtc = java.time.Instant.now(),
+                        finishedAtUtc = java.time.Instant.now(),
+                        durationMillis = 0L,
                     ),
                 )
             }
-            if (lifecycle.closing) return@launch
-            toolEventBus.publish(
-                ToolCallEvent(
-                    toolId = "todos",
-                    functionName = "todos",
-                    phase = ToolCallPhase.FINISHED,
-                    inputJson = "{}",
-                    context = mapOf("trigger" to "todoChange", "requestId" to activityRequestId),
-                    result = ToolsToolResult(toolId = "todos", success = true, content = ""),
-                    startedAtUtc = java.time.Instant.now(),
-                    finishedAtUtc = java.time.Instant.now(),
-                    durationMillis = 0L,
-                ),
-            )
         }
     }
 }

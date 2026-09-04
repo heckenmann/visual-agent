@@ -4,7 +4,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.ArrayDeque
 import java.util.UUID
@@ -13,8 +12,8 @@ import java.util.concurrent.ConcurrentHashMap
 /**
  * Schedules sub-agent jobs against the user-configured parallelism limit.
  *
- * Waiting jobs are admitted in FIFO order. The limit is read repeatedly so queued jobs
- * can start after the user raises the configured capacity.
+ * Waiting jobs are admitted in FIFO order and dispatched when work, capacity, or execution
+ * gates change.
  *
  * @property scope Coroutine scope used for queued background jobs
  * @property parallelismProvider Current maximum number of concurrently running sub-agent jobs
@@ -30,12 +29,8 @@ class SubAgentJobScheduler(
     private val jobsById = ConcurrentHashMap<String, Job>()
 
     init {
-        scope.launch {
-            while (true) {
-                dispatchWaitingJobs()
-                delay(DISPATCH_INTERVAL_MILLIS)
-            }
-        }
+        executionControl?.addListener { dispatchWaitingJobs() }
+        parallelismProvider.addChangeListener { dispatchWaitingJobs() }
     }
 
     /**
@@ -186,10 +181,6 @@ class SubAgentJobScheduler(
         val permit: CompletableDeferred<Unit>,
         var dispatched: Boolean = false,
     )
-
-    private companion object {
-        const val DISPATCH_INTERVAL_MILLIS = 100L
-    }
 }
 
 /**

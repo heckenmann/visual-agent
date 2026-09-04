@@ -10,6 +10,7 @@ import de.heckenmann.visualagent.todo.TodoChangeType
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoManager
 import de.heckenmann.visualagent.todo.TodoStatus
+import de.heckenmann.visualagent.todo.TodoTerminalReason
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -118,7 +119,7 @@ internal fun handleTodoChangeAfterCancellation(
     val change = pendingTodoChanges.remove(todoId)
     when {
         currentTodo == null || currentTodo.status == TodoStatus.CANCELLED || currentTodo.assignedAgentId != agent.id -> {
-            todoManager.cancelTodo(todoId)
+            todoManager.cancelTodo(todoId, TodoTerminalReason.REASSIGNED)
             val metadata =
                 buildJsonObject {
                     put("type", "sub_agent")
@@ -154,7 +155,7 @@ internal fun handleTodoChangeAfterCancellation(
     }
 }
 
-private fun setAgentIdle(
+internal fun setAgentIdle(
     agent: SubAgent,
     saveAgentToDb: (SubAgent) -> Unit,
     notifyAgent: (String, String) -> Unit,

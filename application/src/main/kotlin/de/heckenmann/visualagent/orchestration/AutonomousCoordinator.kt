@@ -13,26 +13,24 @@ import de.heckenmann.visualagent.agent.SubAgentOpsProvider
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.knowledge.MemoryStore
 import de.heckenmann.visualagent.knowledge.TodoStore
-import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoChange
-import de.heckenmann.visualagent.todo.TodoChangeType
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoManager
 import de.heckenmann.visualagent.todo.TodoStatus
+import de.heckenmann.visualagent.todo.TodoTerminalReason
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import mu.KotlinLogging
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Coordinates autonomous todo decomposition and worker execution through a continuous
- * auto-pickup loop.
+ * Coordinates autonomous todo decomposition and worker execution through conflated
+ * event-driven pickup.
  *
  * Use cases: UC-0000014, UC-0000053, UC-0000054, UC-0000055, UC-0000057.
  */
@@ -57,11 +55,15 @@ class AutonomousCoordinator
         private val pendingTodoChanges = ConcurrentHashMap<String, TodoChange>()
         private val activeCancellationTokens = ConcurrentHashMap<String, CancellationToken>()
         private val activeTodoJobs = ConcurrentHashMap<String, Job>()
+        private val activeDecompositionJobs = ConcurrentHashMap<String, Job>()
         private val agentBusySince = ConcurrentHashMap<String, Long>()
-        private val individualTodoRequests = ConcurrentHashMap.newKeySet<String>()
-        private val pickupMutex = Mutex()
-        private var loopJob: kotlinx.coroutines.Job? = null
-        private var loopStarted = false
+        private val decomposingTodoIds = ConcurrentHashMap.newKeySet<String>()
+        private val decompositionAttemptedTodoIds = ConcurrentHashMap.newKeySet<String>()
+        private val decompositionActive = AtomicBoolean(false)
+        private val requestedTodoIds = ConcurrentLinkedQueue<String>()
+        private val requestedTodoIdSet = ConcurrentHashMap.newKeySet<String>()
+        private val workSignal = AutonomousWorkSignal()
+        private val autonomousProcessingEnabled = AtomicBoolean(false)
         private val taskPlanner =
             AutonomousTaskPlanner(
                 todoManager = todoManager,
@@ -73,23 +75,28 @@ class AutonomousCoordinator
 
         init {
             logger.info { "AutonomousCoordinator initialized" }
+            scope.launch(Dispatchers.IO) {
+                while (true) {
+                    workSignal.await()
+                    drainWork()
+                }
+            }
             todoEventBus.addListener { change ->
                 change.todo?.id?.let { pendingTodoChanges[it] = change }
                 change.todoId?.let { pendingTodoChanges[it] = change }
                 val todo = change.todo
+                todo?.let {
+                    if (it.status != TodoStatus.PENDING || change.previousStatus != TodoStatus.PENDING) {
+                        decompositionAttemptedTodoIds.remove(it.id)
+                    }
+                }
                 if (todo?.status == TodoStatus.PENDING) {
                     activeCancellationTokens[todo.id]?.cancel()
                 }
-                val todoBecamePending =
-                    todo?.status == TodoStatus.PENDING &&
-                        (
-                            change.type == TodoChangeType.ADDED ||
-                                change.type == TodoChangeType.UPDATED
-                        )
-                if (todoBecamePending && todo.id !in individualTodoRequests && loopStarted && loopJob?.isActive != true) {
-                    startAutonomousProcessing(seed = false)
-                }
+                if (autonomousProcessingEnabled.get() || requestedTodoIds.isNotEmpty()) workSignal.signal()
             }
+            executionControl?.addListener { workSignal.signal() }
+            parallelismProvider.addChangeListener { workSignal.signal() }
         }
 
         /**
@@ -100,29 +107,18 @@ class AutonomousCoordinator
             UxSeedTasks.all().filterNot { it in existingDescriptions }.forEach { desc -> todoManager.add(desc) }
         }
 
+        /** Requests a pickup pass after worker availability or configuration changes. */
+        fun signalWork() {
+            workSignal.signal()
+        }
+
         /**
-         * Starts the autonomous todo-processing loop. Optionally seeds UX todos first.
-         * The loop picks pending todos, assigns them to sub-agents, and processes them until
-         * no work remains.
+         * Enables event-driven autonomous todo processing. Optionally seeds UX todos first.
          */
         fun startAutonomousProcessing(seed: Boolean = true) {
-            loopStarted = true
-            if (loopJob?.isActive == true) return
+            autonomousProcessingEnabled.set(true)
             if (seed) seedUxTodos()
-            loopJob =
-                scope.launch {
-                    while (true) {
-                        if (executionControl?.isExecutionAllowed() != false) {
-                            taskPlanner.expandComplexTodoIfNeeded(todoStore.listTodos())
-                        }
-                        pickAndProcessOneTodo()
-                        val pending = todoStore.listTodos().filter { it.status == TodoStatus.PENDING }
-                        val inProgress = todoStore.listTodos().any { it.status == TodoStatus.IN_PROGRESS }
-                        val anyAgentBusy = subAgents.values.any { it.status == AgentStatus.BUSY }
-                        if (pending.isEmpty() && !inProgress && !anyAgentBusy) break
-                        delay(LOOP_DELAY_MILLIS)
-                    }
-                }
+            workSignal.signal()
         }
 
         /**
@@ -135,7 +131,7 @@ class AutonomousCoordinator
         }
 
         /**
-         * Queues one todo for autonomous execution and restarts the loop if needed.
+         * Queues one todo for autonomous execution without enabling unrelated pending work.
          * Cancelled todos are reset to pending; completed todos are not restarted.
          *
          * @param todoId Identifier of the todo to start
@@ -144,24 +140,13 @@ class AutonomousCoordinator
         fun startTodo(todoId: String): Boolean {
             val todo = todoStore.listTodos().firstOrNull { it.id == todoId } ?: return false
             if (todo.status == TodoStatus.COMPLETED || todo.status == TodoStatus.IN_PROGRESS) return false
-            if (loopJob?.isActive == true || !individualTodoRequests.add(todoId)) return false
+            if (!requestedTodoIdSet.add(todoId)) return false
             try {
                 if (todo.status == TodoStatus.CANCELLED) todoManager.updateStatus(todoId, TodoStatus.PENDING)
-                scope.launch {
-                    try {
-                        while (isActive) {
-                            val current = todoStore.listTodos().firstOrNull { it.id == todoId } ?: return@launch
-                            if (current.status != TodoStatus.PENDING) return@launch
-                            pickAndProcessOneTodo(requestedTodoId = todoId)
-                            if (todoStore.listTodos().firstOrNull { it.id == todoId }?.status == TodoStatus.IN_PROGRESS) return@launch
-                            delay(LOOP_DELAY_MILLIS)
-                        }
-                    } finally {
-                        individualTodoRequests.remove(todoId)
-                    }
-                }
+                requestedTodoIds.add(todoId)
+                workSignal.signal()
             } catch (error: Exception) {
-                individualTodoRequests.remove(todoId)
+                requestedTodoIdSet.remove(todoId)
                 throw error
             }
             return true
@@ -192,6 +177,7 @@ class AutonomousCoordinator
             if (todo.status == TodoStatus.COMPLETED || todo.status == TodoStatus.CANCELLED) return false
             activeCancellationTokens[todoId]?.cancel()
             activeTodoJobs[todoId]?.cancel()
+            activeDecompositionJobs[todoId]?.cancel()
             return todoManager.cancelTodo(todoId)
         }
 
@@ -205,6 +191,7 @@ class AutonomousCoordinator
             stoppableTodos.forEach { todo ->
                 activeCancellationTokens[todo.id]?.cancel()
                 activeTodoJobs[todo.id]?.cancel()
+                activeDecompositionJobs[todo.id]?.cancel()
                 todoManager.cancelTodo(todo.id)
             }
             return stoppableTodos.size
@@ -218,40 +205,51 @@ class AutonomousCoordinator
             val todoId = agent.currentTodoId ?: return
             val todo = todoStore.listTodos().firstOrNull { it.id == todoId } ?: return
             if (todo.status != TodoStatus.IN_PROGRESS) return
-            todoManager.cancelTodo(todoId)
             persistSubAgentMessage(
                 agent = agent,
                 content = "Cancelled todo $todoId for deleted agent $agentId.",
                 success = false,
                 persistMessage = { conversationOps.persist(it) },
             )
+            todoManager.cancelTodo(todoId, TodoTerminalReason.AGENT_REMOVED)
         }
 
-        private suspend fun pickAndProcessOneTodo(requestedTodoId: String? = null) {
-            pickupMutex.withLock {
-                if (executionControl?.isGloballyPaused() == true) return
-                val busyCount =
-                    subAgents.values.count {
-                        it.status == AgentStatus.BUSY && executionControl?.isExecutionAllowed(it.id) != false
+        private suspend fun drainWork() {
+            if (executionControl?.isGloballyPaused() == true) return
+            scheduleComplexTodoDecomposition()
+            while (true) {
+                val requestedTodoId = requestedTodoIds.peek()
+                if (requestedTodoId != null) {
+                    val claimed = claimAndProcessOneTodo(requestedTodoId)
+                    val current = todoStore.listTodos().firstOrNull { it.id == requestedTodoId }
+                    if (claimed || current?.status != TodoStatus.PENDING) {
+                        requestedTodoIds.poll()
+                        requestedTodoIdSet.remove(requestedTodoId)
+                        continue
                     }
-                val parallelLimit = parallelismProvider.get().coerceAtLeast(1)
-                if (busyCount >= parallelLimit) return
-
-                val todo = findNextAssignableTodo(requestedTodoId) ?: return
-                val agent = subAgents[todo.assignedAgentId] ?: return
-                if (executionControl?.isAgentPaused(agent.id) == true) return
-                if (agent.status == AgentStatus.BUSY) {
-                    if (recoverStuckAgentIfNeeded(agent)) todoManager.updateStatus(todo.id, TodoStatus.PENDING)
                     return
                 }
-                if (agent.status != AgentStatus.IDLE) return
+                if (!autonomousProcessingEnabled.get() || !claimAndProcessOneTodo()) return
+            }
+        }
 
+        private fun claimAndProcessOneTodo(requestedTodoId: String? = null): Boolean {
+            if (executionControl?.isGloballyPaused() == true) return false
+            val busyCount =
+                subAgents.values.count {
+                    it.status == AgentStatus.BUSY && executionControl?.isExecutionAllowed(it.id) != false
+                }
+            if (busyCount >= parallelismProvider.get().coerceAtLeast(1)) return false
+
+            val candidate = findNextAssignableTodo(requestedTodoId) ?: return false
+            val agent = candidate.agent
+            val todo = todoManager.claimPendingTodo(candidate.todo.id, agent.id) ?: return false
+            try {
                 agent.status = AgentStatus.BUSY
                 agent.currentTodoId = todo.id
                 agent.currentTask = todo.description
                 agentBusySince[agent.id] = System.currentTimeMillis()
                 subAgentOps.saveSubAgent(agent)
-                todoManager.updateStatus(todo.id, TodoStatus.IN_PROGRESS)
                 conversationOps.persist(
                     Message(
                         role = "system",
@@ -294,6 +292,15 @@ class AutonomousCoordinator
                     releaseUnstartedTodo(agent, todo.id)
                 }
                 processingJob.start()
+                return true
+            } catch (error: Throwable) {
+                agentBusySince.remove(agent.id)
+                agent.status = AgentStatus.IDLE
+                agent.currentTodoId = null
+                agent.currentTask = null
+                subAgentOps.saveSubAgent(agent)
+                todoManager.updateStatus(todo.id, TodoStatus.PENDING)
+                throw error
             }
         }
 
@@ -301,54 +308,60 @@ class AutonomousCoordinator
             agent: SubAgent,
             todoId: String,
         ) {
-            if (agent.currentTodoId != todoId) return
-            agentBusySince.remove(agent.id)
-            agent.status = AgentStatus.IDLE
-            agent.currentTask = null
-            agent.currentTodoId = null
-            subAgentOps.saveSubAgent(agent)
-            subAgentOps.notifyAgent(agent.id, "STATUS:${agent.status.name}")
-        }
-
-        private fun recoverStuckAgentIfNeeded(agent: SubAgent): Boolean {
-            if (executionControl?.isAgentPaused(agent.id) == true || executionControl?.isGloballyPaused() == true) {
-                return false
+            if (agent.currentTodoId == todoId) {
+                agentBusySince.remove(agent.id)
+                agent.status = AgentStatus.IDLE
+                agent.currentTask = null
+                agent.currentTodoId = null
+                subAgentOps.saveSubAgent(agent)
+                subAgentOps.notifyAgent(agent.id, "STATUS:${agent.status.name}")
             }
-            val busySince = agentBusySince[agent.id] ?: return false
-            val timeoutMs = agent.config.timeout.coerceAtLeast(1) * 1000L
-            if (System.currentTimeMillis() - busySince < timeoutMs) return false
-            val todoId = agent.currentTodoId ?: return false
-            activeCancellationTokens[todoId]?.cancel()
-            agentBusySince.remove(agent.id)
-            agent.status = AgentStatus.IDLE
-            agent.currentTask = null
-            agent.currentTodoId = null
-            subAgentOps.saveSubAgent(agent)
-            todoManager.cancelTodo(todoId)
-            conversationOps.persist(
-                Message(
-                    role = "sub_agent",
-                    content =
-                        "Agent ${agent.name} (${agent.id}) stopped todo $todoId " +
-                            "because it exceeded the configured timeout of ${agent.config.timeout}s.",
-                ),
-            )
-            subAgentOps.notifyAgent(agent.id, "STATUS:${agent.status.name}")
-            return true
+            workSignal.signal()
         }
 
-        private fun findNextAssignableTodo(requestedTodoId: String? = null): Todo? =
+        private fun scheduleComplexTodoDecomposition() {
+            if (!autonomousProcessingEnabled.get() || executionControl?.isExecutionAllowed() == false) return
+            if (!decompositionActive.compareAndSet(false, true)) return
+            val todo =
+                todoStore
+                    .listTodos()
+                    .firstOrNull {
+                        it.status == TodoStatus.PENDING &&
+                            it.id !in decompositionAttemptedTodoIds &&
+                            taskPlanner.isComplex(it.description)
+                    }
+            if (todo == null) {
+                decompositionActive.set(false)
+                return
+            }
+            decomposingTodoIds += todo.id
+            decompositionAttemptedTodoIds += todo.id
+            val job =
+                scope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
+                    try {
+                        taskPlanner.expandComplexTodo(todo)
+                    } catch (error: Throwable) {
+                        if (error !is kotlinx.coroutines.CancellationException) {
+                            logger.warn(error) { "Could not decompose todo ${todo.id}; leaving it available for execution" }
+                        }
+                    } finally {
+                        activeDecompositionJobs.remove(todo.id)
+                        decomposingTodoIds.remove(todo.id)
+                        decompositionActive.set(false)
+                        workSignal.signal()
+                    }
+                }
+            activeDecompositionJobs[todo.id] = job
+            job.start()
+        }
+
+        private fun findNextAssignableTodo(requestedTodoId: String? = null): TodoExecutionCandidate? =
             findNextAssignableTodo(
-                todoStore.listTodos(),
+                todoStore.listTodos().filterNot { it.id in decomposingTodoIds },
                 subAgents,
-                todoManager,
                 requestedTodoId = requestedTodoId,
                 isAgentEligible = { agentId ->
                     executionControl?.isExecutionAllowed(agentId) ?: true
                 },
             )
-
-        private companion object {
-            const val LOOP_DELAY_MILLIS = 1500L
-        }
     }

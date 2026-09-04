@@ -152,7 +152,11 @@ class AgentManager
                 if (change.type != TodoChangeType.UPDATED) return@addListener
                 if (change.previousStatus == null || change.previousStatus == todo.status) return@addListener
                 when (todo.status) {
-                    TodoStatus.COMPLETED, TodoStatus.CANCELLED -> todoTrigger.trigger(todo)
+                    TodoStatus.COMPLETED, TodoStatus.CANCELLED ->
+                        todoTrigger.trigger(
+                            todo,
+                            change.terminalReason ?: de.heckenmann.visualagent.todo.TodoTerminalReason.USER_CANCELLED,
+                        )
                     else -> Unit
                 }
             }
@@ -195,7 +199,10 @@ class AgentManager
             name: String,
             role: String,
             templateName: String = "researcher",
-        ): SubAgent = lifecycleOps.createAgent(name, role, templateName)
+        ): SubAgent =
+            lifecycleOps.createAgent(name, role, templateName).also {
+                autonomousCoordinator.signalWork()
+            }
 
         /**
          * Updates an existing sub-agent's name, role, or config. Returns true if the agent was found and updated.
@@ -205,7 +212,10 @@ class AgentManager
             name: String? = null,
             role: String? = null,
             config: AgentConfig? = null,
-        ): Boolean = lifecycleOps.updateAgent(id, name, role, config)
+        ): Boolean =
+            lifecycleOps.updateAgent(id, name, role, config).also { updated ->
+                if (updated) autonomousCoordinator.signalWork()
+            }
 
         /**
          * Deletes a sub-agent by ID. Returns true if the agent was found and deleted.

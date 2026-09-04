@@ -214,6 +214,16 @@ interface TodoStore {
     fun saveTodo(todo: Todo)
 
     /**
+     * Atomically assigns and claims a pending todo for execution.
+     *
+     * @return The claimed todo, or `null` when it is no longer pending
+     */
+    fun claimPendingTodo(
+        todoId: String,
+        agentId: String,
+    ): Todo?
+
+    /**
      * Persists list positions without recording new timeline activity.
      *
      * @param todos Todos whose positions changed through a user-initiated reorder

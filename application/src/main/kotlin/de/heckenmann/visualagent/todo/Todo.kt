@@ -12,6 +12,17 @@ enum class TodoStatus {
     CANCELLED,
 }
 
+/** Explains why a todo reached a terminal state. */
+enum class TodoTerminalReason {
+    COMPLETED,
+    USER_CANCELLED,
+    REVIEW_REJECTED,
+    RETRIES_EXHAUSTED,
+    EXECUTION_FAILED,
+    AGENT_REMOVED,
+    REASSIGNED,
+}
+
 /**
  * Work item that can be tracked by the user and assigned to sub-agents.
  *

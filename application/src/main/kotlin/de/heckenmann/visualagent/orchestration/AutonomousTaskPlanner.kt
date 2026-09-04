@@ -22,6 +22,11 @@ internal class AutonomousTaskPlanner(
 ) {
     suspend fun expandComplexTodoIfNeeded(todos: List<Todo>): Boolean {
         val candidate = todos.firstOrNull { it.status == TodoStatus.PENDING && isComplex(it.description) } ?: return false
+        return expandComplexTodo(candidate)
+    }
+
+    suspend fun expandComplexTodo(candidate: Todo): Boolean {
+        if (candidate.status != TodoStatus.PENDING || !isComplex(candidate.description)) return false
         val analyst = ensureAnalysisAgent()
         val prompt = OrchestrationConstants.decompositionPrompt(candidate.description)
         val response = analyst.chat(prompt, llmProvider, agentToolConfigService.toolsFor(analyst)).message.content

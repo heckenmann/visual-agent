@@ -27,6 +27,7 @@ data class TodoChange(
     val todo: Todo? = null,
     val todoId: String? = null,
     val previousStatus: TodoStatus? = null,
+    val terminalReason: TodoTerminalReason? = null,
 )
 
 /**
@@ -43,7 +44,6 @@ class TodoManager(
     /**
      * Test-only constructor that creates a manager without persistence.
      */
-    @Suppress("unused")
     internal constructor() : this(NoOpTodoStore(), TodoEventBus())
 
     private val todos = mutableListOf<Todo>()
@@ -171,7 +171,10 @@ class TodoManager(
     ): Boolean = update(TodoUpdateCommand(id = todoId, description = description))
 
     /** Applies all supplied fields and persists one atomic todo mutation. */
-    internal fun update(command: TodoUpdateCommand): Boolean {
+    internal fun update(
+        command: TodoUpdateCommand,
+        terminalReason: TodoTerminalReason? = null,
+    ): Boolean {
         if (command.description?.isBlank() == true) return false
         if (command.assignment is TodoAssignmentChange.Set && command.assignment.agentId.isBlank()) return false
         val original = getById(command.id) ?: return false
@@ -190,10 +193,23 @@ class TodoManager(
         }
         if (candidate == original) return true
         val previousStatus = original.status
+        val effectiveTerminalReason =
+            terminalReason ?: when (candidate.status) {
+                TodoStatus.COMPLETED -> TodoTerminalReason.COMPLETED
+                TodoStatus.CANCELLED -> TodoTerminalReason.USER_CANCELLED
+                else -> null
+            }
         touch(candidate)
         todoStore.saveTodo(candidate)
         copyMutableFields(candidate, original)
-        publishChange(TodoChange(TodoChangeType.UPDATED, todo = original, previousStatus = previousStatus))
+        publishChange(
+            TodoChange(
+                TodoChangeType.UPDATED,
+                todo = original,
+                previousStatus = previousStatus,
+                terminalReason = effectiveTerminalReason,
+            ),
+        )
         return true
     }
 
@@ -250,6 +266,22 @@ class TodoManager(
     }
 
     /**
+     * Atomically assigns a pending todo and marks it as in progress.
+     *
+     * @return The claimed todo, or `null` when another mutation won the claim race
+     */
+    internal fun claimPendingTodo(
+        todoId: String,
+        agentId: String,
+    ): Todo? {
+        val original = getById(todoId) ?: return null
+        val claimed = todoStore.claimPendingTodo(todoId, agentId) ?: return null
+        copyMutableFields(claimed, original)
+        publishChange(TodoChange(TodoChangeType.UPDATED, todo = original, previousStatus = TodoStatus.PENDING))
+        return original
+    }
+
+    /**
      * Completes an in-progress todo and records the completion timestamp.
      *
      * @param todoId Identifier of the in-progress todo
@@ -258,7 +290,7 @@ class TodoManager(
     fun completeTodo(todoId: String): Boolean {
         val todo = getById(todoId) ?: return false
         if (todo.status != TodoStatus.IN_PROGRESS) return false
-        return update(TodoUpdateCommand(id = todoId, status = TodoStatus.COMPLETED))
+        return update(TodoUpdateCommand(id = todoId, status = TodoStatus.COMPLETED), TodoTerminalReason.COMPLETED)
     }
 
     /**
@@ -267,10 +299,13 @@ class TodoManager(
      * @param todoId Identifier of the todo to cancel
      * @return true if the todo existed and was not already terminal
      */
-    fun cancelTodo(todoId: String): Boolean {
+    fun cancelTodo(
+        todoId: String,
+        reason: TodoTerminalReason = TodoTerminalReason.USER_CANCELLED,
+    ): Boolean {
         val todo = getById(todoId) ?: return false
         if (todo.status == TodoStatus.COMPLETED || todo.status == TodoStatus.CANCELLED) return false
-        return update(TodoUpdateCommand(id = todoId, status = TodoStatus.CANCELLED))
+        return update(TodoUpdateCommand(id = todoId, status = TodoStatus.CANCELLED), reason)
     }
 
     /**
@@ -394,6 +429,11 @@ class TodoManager(
 /** In-memory no-op store used by the test-only [TodoManager] constructor. */
 internal class NoOpTodoStore : TodoStore {
     override fun saveTodo(todo: Todo) {}
+
+    override fun claimPendingTodo(
+        todoId: String,
+        agentId: String,
+    ): Todo? = null
 
     override fun createTodoIfAbsent(todo: Todo): de.heckenmann.visualagent.knowledge.TodoCreation =
         de.heckenmann.visualagent.knowledge

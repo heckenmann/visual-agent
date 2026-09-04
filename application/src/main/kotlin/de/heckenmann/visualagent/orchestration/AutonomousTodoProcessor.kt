@@ -1,6 +1,5 @@
 package de.heckenmann.visualagent.orchestration
 
-import de.heckenmann.visualagent.agent.AgentStatus
 import de.heckenmann.visualagent.agent.CancellationToken
 import de.heckenmann.visualagent.agent.ConversationOpsProvider
 import de.heckenmann.visualagent.agent.LLMProvider
@@ -16,6 +15,7 @@ import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoManager
 import de.heckenmann.visualagent.todo.TodoProgressUpdate
 import de.heckenmann.visualagent.todo.TodoStatus
+import de.heckenmann.visualagent.todo.TodoTerminalReason
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -65,7 +65,6 @@ internal suspend fun processTodoWithLLM(
         token.throwIfCancelled()
         if (todoManager.getById(todoId)?.status != TodoStatus.IN_PROGRESS) return
         executionControl?.awaitExecutionAllowed(agent.id)
-        delay(300)
         while (attempt < maxRetries) {
             try {
                 executionId =
@@ -138,11 +137,11 @@ internal suspend fun processTodoWithLLM(
                         todoId = todoId,
                     )
                     todoManager.completeTodo(todoId)
+                    setAgentIdle(agent, subAgentOps::saveSubAgent, subAgentOps::notifyAgent)
                     return
                 }
                 attempt++
                 if (attempt >= maxRetries) {
-                    todoManager.cancelTodo(todoId)
                     persistSubAgentMessage(
                         agent = agent,
                         content =
@@ -154,6 +153,8 @@ internal suspend fun processTodoWithLLM(
                         executionId = executionId,
                         todoId = todoId,
                     )
+                    todoManager.cancelTodo(todoId, TodoTerminalReason.REVIEW_REJECTED)
+                    setAgentIdle(agent, subAgentOps::saveSubAgent, subAgentOps::notifyAgent)
                     return
                 }
                 persistSubAgentMessage(
@@ -175,7 +176,6 @@ internal suspend fun processTodoWithLLM(
                 val userError = ErrorMessageMapper.map(error)
                 logger.warn(error) { "Autonomous todo $todoId failed on attempt $attempt for agent ${agent.id}" }
                 if (attempt >= maxRetries) {
-                    todoManager.cancelTodo(todoId)
                     persistSubAgentMessage(
                         agent = agent,
                         content =
@@ -187,6 +187,8 @@ internal suspend fun processTodoWithLLM(
                         executionId = executionId,
                         todoId = todoId,
                     )
+                    todoManager.cancelTodo(todoId, TodoTerminalReason.RETRIES_EXHAUSTED)
+                    setAgentIdle(agent, subAgentOps::saveSubAgent, subAgentOps::notifyAgent)
                     return
                 }
                 persistSubAgentMessage(
@@ -207,7 +209,6 @@ internal suspend fun processTodoWithLLM(
         cancelledByChange = true
     } catch (error: Exception) {
         logger.error(error) { "Autonomous job for todo $todoId crashed unexpectedly" }
-        todoManager.cancelTodo(todoId)
         persistSubAgentMessage(
             agent = agent,
             content = "Agent ${agent.name} (${agent.id}) stopped todo $todoId. Crashed unexpectedly",
@@ -217,6 +218,8 @@ internal suspend fun processTodoWithLLM(
             executionId = executionId,
             todoId = todoId,
         )
+        todoManager.cancelTodo(todoId, TodoTerminalReason.EXECUTION_FAILED)
+        setAgentIdle(agent, subAgentOps::saveSubAgent, subAgentOps::notifyAgent)
     } finally {
         todoEventBus.publishProgress(
             TodoProgressUpdate(
@@ -264,11 +267,7 @@ internal suspend fun processTodoWithLLM(
                 },
             )
         } else if (scope.isActive) {
-            agent.status = AgentStatus.IDLE
-            agent.currentTask = null
-            agent.currentTodoId = null
-            subAgentOps.saveSubAgent(agent)
-            subAgentOps.notifyAgent(agent.id, "STATUS:${agent.status.name}")
+            setAgentIdle(agent, subAgentOps::saveSubAgent, subAgentOps::notifyAgent)
         }
     }
 }
