@@ -238,6 +238,25 @@ internal interface WorkspaceFileRepository : JpaRepository<WorkspaceFileEntity, 
 
 internal interface TodoRepository : JpaRepository<TodoEntity, String> {
     fun findAllByOrderByPositionAscIdAsc(): List<TodoEntity>
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+        """
+        UPDATE TodoEntity todo
+        SET todo.status = 'IN_PROGRESS',
+            todo.assignedAgentId = :agentId,
+            todo.updatedAt = :updatedAt,
+            todo.timelineSequence = :timelineSequence
+        WHERE todo.id = :todoId
+          AND todo.status = 'PENDING'
+        """,
+    )
+    fun claimPendingTodo(
+        @Param("todoId") todoId: String,
+        @Param("agentId") agentId: String,
+        @Param("updatedAt") updatedAt: Instant,
+        @Param("timelineSequence") timelineSequence: Long,
+    ): Int
 }
 
 internal interface DeletedTodoRepository : JpaRepository<DeletedTodoEntity, String> {

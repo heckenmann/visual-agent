@@ -18,10 +18,8 @@ import de.heckenmann.visualagent.orchestration.AutonomousCoordinator
 import de.heckenmann.visualagent.protocol.LifecyclePort
 import de.heckenmann.visualagent.protocol.LifecycleState
 import de.heckenmann.visualagent.todo.Todo
-import de.heckenmann.visualagent.todo.TodoChangeType
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoManager
-import de.heckenmann.visualagent.todo.TodoStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -146,16 +144,7 @@ class AgentManager
                     toolEventBus = toolEventBus,
                     lifecycle = lifecycle,
                 )
-            todoEventBus.addListener { change ->
-                if (lifecycle.closing) return@addListener
-                val todo = change.todo ?: return@addListener
-                if (change.type != TodoChangeType.UPDATED) return@addListener
-                if (change.previousStatus == null || change.previousStatus == todo.status) return@addListener
-                when (todo.status) {
-                    TodoStatus.COMPLETED, TodoStatus.CANCELLED -> todoTrigger.trigger(todo)
-                    else -> Unit
-                }
-            }
+            registerTodoTerminalReviewListener()
             toolEventListenerHandle = conversationOpsProvider.registerToolEventListener()
             conversationOps.loadConversationFromDb()
             conversationOps.resumeInterruptedConversationIfNeeded()
@@ -195,7 +184,10 @@ class AgentManager
             name: String,
             role: String,
             templateName: String = "researcher",
-        ): SubAgent = lifecycleOps.createAgent(name, role, templateName)
+        ): SubAgent =
+            lifecycleOps.createAgent(name, role, templateName).also {
+                autonomousCoordinator.signalWork()
+            }
 
         /**
          * Updates an existing sub-agent's name, role, or config. Returns true if the agent was found and updated.
@@ -205,7 +197,10 @@ class AgentManager
             name: String? = null,
             role: String? = null,
             config: AgentConfig? = null,
-        ): Boolean = lifecycleOps.updateAgent(id, name, role, config)
+        ): Boolean =
+            lifecycleOps.updateAgent(id, name, role, config).also { updated ->
+                if (updated) autonomousCoordinator.signalWork()
+            }
 
         /**
          * Deletes a sub-agent by ID. Returns true if the agent was found and deleted.

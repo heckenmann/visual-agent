@@ -17,7 +17,7 @@ Main orchestration agent.
 
 1. The main agent inspects todo state and available sub-agents via `agent:list`.
 2. It creates a new todo, either with an explicit `assignedAgentId` or without an assignment.
-3. The autonomous coordinator detects the pending todo and starts it when an idle agent is available and parallelism allows.
+3. The committed pending todo emits a conflated work signal. The autonomous coordinator immediately claims it when an idle agent is available and parallelism allows.
    - If the todo already has a valid `assignedAgentId`, that agent is used.
    - If the todo has no assignment, the coordinator auto-assigns the first idle sub-agent.
 4. Sub-agent execution updates status and produces results.
@@ -46,7 +46,7 @@ Todo work is delegated while keeping the main agent as an orchestration layer th
 
 - New todos may omit `assignedAgentId`; they are auto-assigned to an idle sub-agent by the coordinator.
 - New todos with an explicit `assignedAgentId` must reference an existing sub-agent; invalid references are rejected.
-- The autonomous coordinator selects the first pending todo ordered by `position`.
+- The autonomous coordinator selects pending todos ordered by `position` and claims them conditionally in the database.
 - Sub-agent results are surfaced through persisted conversation messages.
 - Assignment and status changes made together are persisted as one transaction and
   one consolidated event.

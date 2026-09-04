@@ -75,6 +75,29 @@ class AutonomousCoordinatorTodoExecutionTest {
         }
 
     @Test
+    fun `blocked requested todo does not prevent another requested todo from starting`() =
+        runBlocking {
+            val fixture = buildFixture(chatDelayMs = 5000)
+            fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
+            fixture.putSubAgent(SubAgent(id = "agent-2", name = "Tester", role = "Testing", status = AgentStatus.IDLE))
+            val blocked = fixture.todoManager.add("Blocked task", "agent-1")
+            val runnable = fixture.todoManager.add("Runnable task", "agent-2")
+            fixture.executionControl.pauseAgent("agent-1")
+
+            try {
+                assertTrue(fixture.coordinator.startTodo(blocked.id))
+                assertTrue(fixture.coordinator.startTodo(runnable.id))
+
+                withTimeout(50) {
+                    while (fixture.todoManager.getById(runnable.id)?.status != TodoStatus.IN_PROGRESS) delay(10)
+                }
+                assertEquals(TodoStatus.PENDING, fixture.todoManager.getById(blocked.id)?.status)
+            } finally {
+                fixture.cancel()
+            }
+        }
+
+    @Test
     fun `concurrent starts atomically claim one todo per idle agent`() =
         runBlocking {
             val fixture = buildFixture(chatDelayMs = 5000)
@@ -121,6 +144,28 @@ class AutonomousCoordinatorTodoExecutionTest {
 
                 assertEquals(TodoStatus.PENDING, fixture.todoManager.getById(todo.id)?.status)
                 assertFalse(fixture.subAgents.values.any { it.name.contains("analyst", ignoreCase = true) })
+            } finally {
+                fixture.cancel()
+            }
+        }
+
+    @Test
+    fun `complex todo with empty decomposition falls back to direct execution`() =
+        runBlocking {
+            val fixture = buildFixture(responseContent = "")
+            val todo =
+                fixture.todoManager.add(
+                    "Analyze and integrate a multi-service architecture pipeline, then plan migration, tests, and documentation",
+                )
+
+            try {
+                fixture.coordinator.startAutonomousProcessing(seed = false)
+
+                withTimeout(2_000) {
+                    while (fixture.todoManager.getById(todo.id)?.status != TodoStatus.COMPLETED) delay(10)
+                }
+                assertEquals(1, fixture.todoManager.getAll().size)
+                assertTrue(fixture.messages.any { it.content.contains("Started todo ${todo.id}") })
             } finally {
                 fixture.cancel()
             }

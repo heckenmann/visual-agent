@@ -84,6 +84,22 @@ internal class JpaTodoStore(
     }
 
     @Transactional
+    override fun claimPendingTodo(
+        todoId: String,
+        agentId: String,
+    ): Todo? {
+        val updated =
+            repository.claimPendingTodo(
+                todoId = todoId,
+                agentId = agentId,
+                updatedAt = Instant.now(),
+                timelineSequence = timelineSequenceStore.next(),
+            )
+        if (updated != 1) return null
+        return repository.findById(todoId).orElseThrow().toDomain()
+    }
+
+    @Transactional
     override fun updateTodoPositions(todos: List<Todo>) {
         if (todos.isEmpty()) return
         val positionsById = todos.associate { it.id to it.position }

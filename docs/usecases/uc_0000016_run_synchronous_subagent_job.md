@@ -16,8 +16,8 @@ Autonomous coordinator.
 ## Main Flow
 
 1. The autonomous coordinator identifies an assigned pending todo.
-2. If every sub-agent slot is occupied, the todo remains `PENDING` for a later polling pass.
-3. When a polling pass finds capacity, it selects the todo and starts the sub-agent job.
+2. If every sub-agent slot is occupied, the todo remains `PENDING` until a slot-release signal arrives.
+3. The coordinator immediately re-evaluates pending work after the signal and starts the eligible job.
 4. Active job counters are updated while the job runs.
 5. The result is persisted and the todo status is updated.
 6. The conversation history and UI reflect the completed work.
@@ -40,6 +40,6 @@ Assigned work is completed without exceeding configured concurrency and its resu
 ## Acceptance Criteria
 
 - Assigned todos remain `PENDING` instead of failing when the concurrency limit is reached.
-- A later autonomous polling pass starts pending assigned work when capacity is available.
+- A worker completion, resume, or parallelism increase immediately re-evaluates pending assigned work.
 - Active job counts are incremented and decremented reliably.
 - Completed work updates persisted todo and conversation state.

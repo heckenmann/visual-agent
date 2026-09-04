@@ -19,4 +19,10 @@ open class ParallelismProvider(
      * Returns the current parallelism limit.
      */
     open fun get(): Int = appConfig.maxParallelSubAgents.coerceAtLeast(1)
+
+    /** Registers a listener that is notified when the configured limit changes. */
+    open fun addChangeListener(listener: () -> Unit): AutoCloseable =
+        appConfig.addChangeListener { change ->
+            if (change.key == AppConfigBean.KEY_SESSION_MAX_PARALLEL_SUB_AGENTS) listener()
+        }
 }

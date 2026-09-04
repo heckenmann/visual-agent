@@ -66,6 +66,7 @@ internal fun buildFixture(
     responseContent: String = "APPROVED\nLooks good.",
     reviewContent: String = "APPROVED",
     failingWorkerAttempts: Int = 0,
+    onWorkerStreamStarted: (() -> Unit)? = null,
 ): CoordinatorFixture {
     val todoStore = FakeTodoStore()
     val todoEventBus = TodoEventBus()
@@ -117,6 +118,7 @@ internal fun buildFixture(
         if (!isReview && workerAttempts.incrementAndGet() <= failingWorkerAttempts) {
             throw IllegalStateException("transient worker failure")
         }
+        if (!isReview) onWorkerStreamStarted?.invoke()
         if (chatDelayMs > 0 && !isReview) {
             val start = System.currentTimeMillis()
             while (System.currentTimeMillis() - start < chatDelayMs) {
@@ -207,6 +209,17 @@ internal class FakeTodoStore : TodoStore {
     override fun saveTodo(todo: Todo) {
         todos.removeIf { it.id == todo.id }
         todos.add(todo)
+    }
+
+    override fun claimPendingTodo(
+        todoId: String,
+        agentId: String,
+    ): Todo? {
+        val todo = todos.firstOrNull { it.id == todoId && it.status == de.heckenmann.visualagent.todo.TodoStatus.PENDING } ?: return null
+        todo.assignedAgentId = agentId
+        todo.status = de.heckenmann.visualagent.todo.TodoStatus.IN_PROGRESS
+        todo.updatedAt = java.time.Instant.now()
+        return todo.copy()
     }
 
     override fun createTodoIfAbsent(todo: Todo): de.heckenmann.visualagent.knowledge.TodoCreation {
