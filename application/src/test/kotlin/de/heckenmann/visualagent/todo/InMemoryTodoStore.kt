@@ -12,6 +12,17 @@ internal class InMemoryTodoStore : TodoStore {
         todos.add(todo)
     }
 
+    override fun claimPendingTodo(
+        todoId: String,
+        agentId: String,
+    ): Todo? {
+        val todo = todos.firstOrNull { it.id == todoId && it.status == TodoStatus.PENDING } ?: return null
+        todo.assignedAgentId = agentId
+        todo.status = TodoStatus.IN_PROGRESS
+        todo.updatedAt = java.time.Instant.now()
+        return todo.copy()
+    }
+
     override fun createTodoIfAbsent(todo: Todo): TodoCreation {
         val normalized =
             todo.description

@@ -22,6 +22,11 @@ class TodoManagerTest {
                     saved += todo
                 }
 
+                override fun claimPendingTodo(
+                    todoId: String,
+                    agentId: String,
+                ): Todo? = null
+
                 override fun createTodoIfAbsent(todo: Todo): de.heckenmann.visualagent.knowledge.TodoCreation {
                     val existing = saved.firstOrNull { it.description.equals(todo.description, ignoreCase = true) }
                     return if (existing == null) {

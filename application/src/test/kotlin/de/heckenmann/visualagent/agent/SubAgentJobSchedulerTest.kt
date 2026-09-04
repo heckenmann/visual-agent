@@ -6,9 +6,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
-import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -50,12 +50,12 @@ class SubAgentJobSchedulerTest {
                     }
                 }
 
-            delay(150)
-            assertFalse(secondStarted.isCompleted)
+            assertFalse(withTimeoutOrNull(50) { secondStarted.await() } != null)
             assertEquals(SubAgentJobQueueSnapshot(active = 1, queued = 1), scheduler.snapshot())
 
             releaseFirst.complete(Unit)
             assertEquals("first", first.await())
+            withTimeout(50) { secondStarted.await() }
             assertEquals("second", second.await())
         }
 
@@ -83,8 +83,7 @@ class SubAgentJobSchedulerTest {
                 )
 
             assertTrue(jobId.isNotBlank())
-            delay(150)
-            assertFalse(completion.isCompleted)
+            assertFalse(withTimeoutOrNull(50) { completion.await() } != null)
             assertEquals(1, scheduler.snapshot().queued)
 
             releaseFirst.complete(Unit)
@@ -111,12 +110,12 @@ class SubAgentJobSchedulerTest {
                     }
                 }
 
-            delay(150)
-            assertFalse(started.isCompleted)
+            assertFalse(withTimeoutOrNull(50) { started.await() } != null)
             assertEquals(SubAgentJobQueueSnapshot(active = 0, queued = 1), scheduler.snapshot())
-            job.cancelAndJoin()
-            assertEquals(SubAgentJobQueueSnapshot(active = 0, queued = 0), scheduler.snapshot())
             control.resumeAll()
+            withTimeout(50) { started.await() }
+            job.join()
+            assertEquals(SubAgentJobQueueSnapshot(active = 0, queued = 0), scheduler.snapshot())
             scope.coroutineContext[Job]?.cancel()
         }
 

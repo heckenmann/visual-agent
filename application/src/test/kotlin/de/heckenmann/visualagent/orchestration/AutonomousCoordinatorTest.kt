@@ -3,14 +3,82 @@ package de.heckenmann.visualagent.orchestration
 import de.heckenmann.visualagent.agent.AgentStatus
 import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.todo.TodoStatus
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class AutonomousCoordinatorTest {
+    @Test
+    fun `worker begins without an artificial post-claim delay`() =
+        runBlocking {
+            val workerStreamStarted = CompletableDeferred<Unit>()
+            val fixture = buildFixture(onWorkerStreamStarted = { workerStreamStarted.complete(Unit) })
+            fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
+            val todo = fixture.todoManager.add("Implement feature", "agent-1")
+
+            try {
+                assertTrue(fixture.coordinator.startTodo(todo.id))
+
+                withTimeout(50) { workerStreamStarted.await() }
+            } finally {
+                fixture.cancel()
+            }
+        }
+
+    @Test
+    fun `complex decomposition does not delay a simple todo pickup`() =
+        runBlocking {
+            val simpleWorkerStarted = CompletableDeferred<Unit>()
+            val fixture =
+                buildFixture(
+                    chatDelayMs = 5_000,
+                    onWorkerStreamStarted = { simpleWorkerStarted.complete(Unit) },
+                )
+            fixture.putSubAgent(
+                SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE),
+            )
+            fixture.todoManager.add(
+                "Analyze and integrate a multi-service architecture pipeline, then plan migration, tests, and documentation",
+            )
+            fixture.todoManager.add("Write the release notes", "agent-1")
+
+            try {
+                fixture.coordinator.startAutonomousProcessing(seed = false)
+
+                withTimeout(50) { simpleWorkerStarted.await() }
+            } finally {
+                fixture.cancel()
+            }
+        }
+
+    @Test
+    fun `pending todo wakes an already waiting coordinator without polling`() =
+        runBlocking {
+            val fixture = buildFixture(chatDelayMs = 5_000)
+            fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
+            val claimed = CompletableDeferred<Unit>()
+            val registration =
+                fixture.todoManager.addListener { change ->
+                    if (change.todo?.status == TodoStatus.IN_PROGRESS) claimed.complete(Unit)
+                }
+
+            try {
+                fixture.coordinator.startAutonomousProcessing(seed = false)
+                fixture.todoManager.add("Implement feature", "agent-1")
+
+                withTimeout(500) { claimed.await() }
+                assertEquals(AgentStatus.BUSY, fixture.subAgents["agent-1"]?.status)
+            } finally {
+                registration.close()
+                fixture.cancel()
+            }
+        }
+
     @Test
     fun `auto pickup assigns pending todo to idle agent and schedules work`(): Unit =
         runBlocking {

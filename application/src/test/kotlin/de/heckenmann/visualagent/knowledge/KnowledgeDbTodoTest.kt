@@ -2,6 +2,11 @@ package de.heckenmann.visualagent.knowledge
 
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoStatus
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import java.sql.DriverManager
 import java.time.Instant
@@ -68,6 +73,36 @@ class KnowledgeDbTodoTest {
         assertTrue(db.listTodos().isEmpty())
         db.close()
     }
+
+    @Test
+    fun `concurrent sqlite claims change a pending todo exactly once`() =
+        runBlocking {
+            val tempDb =
+                createTempDirectory("visual-agent-db-todo-claim-test")
+                    .resolve("todos.db")
+                    .toString()
+            val db =
+                de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                    .create(tempDb)
+            db.saveTodo(Todo(id = "todo-claim", description = "Claim me", status = TodoStatus.PENDING))
+
+            val start = CompletableDeferred<Unit>()
+            val claims =
+                listOf("agent-1", "agent-2")
+                    .map { agentId ->
+                        async(Dispatchers.Default) {
+                            start.await()
+                            db.claimPendingTodo("todo-claim", agentId)
+                        }
+                    }.also { start.complete(Unit) }
+                    .awaitAll()
+            val claimed = claims.single { it != null }
+
+            assertEquals(TodoStatus.IN_PROGRESS, claimed?.status)
+            assertEquals(1, claims.count { it != null })
+            assertEquals(claimed?.assignedAgentId, db.listTodos().single().assignedAgentId)
+            db.close()
+        }
 
     @Test
     fun `deleted todo snapshot survives active row removal`() {

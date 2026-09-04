@@ -6,6 +6,7 @@ import de.heckenmann.visualagent.knowledge.PersistenceStores
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoStatus
+import de.heckenmann.visualagent.todo.TodoTerminalReason
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
@@ -110,7 +111,7 @@ class AgentManagerTodoTest {
         }
 
     @Test
-    fun `autonomous pickup picks first idle agent and topmost pending todo by position`(): Unit =
+    fun `autonomous pickup admits the topmost todo before later work`(): Unit =
         runBlocking {
             useManager { manager ->
                 manager.todoManager.add("Later task", "1")
@@ -120,8 +121,9 @@ class AgentManagerTodoTest {
                 manager.startAutonomousProcessing(seed = false)
                 delay(1200)
 
-                val busyAgent = manager.getSubAgents().first { it.status == AgentStatus.BUSY }
-                assertEquals(top.id, busyAgent.currentTodoId)
+                val topAgent = manager.getSubAgent("2")
+                assertEquals(AgentStatus.BUSY, topAgent?.status)
+                assertEquals(top.id, topAgent?.currentTodoId)
             }
         }
 
@@ -250,7 +252,7 @@ class AgentManagerTodoTest {
         }
 
     @Test
-    fun `cancelled todo review request ends with an explicit user instruction`(): Unit =
+    fun `failed todo review request includes its terminal outcome`(): Unit =
         runBlocking {
             val (manager, provider, _) = createManagerWithInstantResponse()
             val request = CompletableDeferred<ChatRequestContext>()
@@ -260,7 +262,7 @@ class AgentManagerTodoTest {
             }
             val todo = manager.todoManager.add("Cancelled review", "1")
 
-            manager.todoManager.updateStatus(todo.id, TodoStatus.CANCELLED)
+            manager.todoManager.cancelTodo(todo.id, TodoTerminalReason.EXECUTION_FAILED)
 
             val cancelledRequest = withTimeout(2_000) { request.await() }
             val cancelledMessages = cancelledRequest.messages
@@ -274,6 +276,38 @@ class AgentManagerTodoTest {
                     "and carry out its instructions. Do not substitute another todo.",
                 cancelledMessage.content,
             )
+            assertTrue(
+                cancelledMessages.any { it.content.contains("EXECUTION_FAILED") },
+                "Expected the main-agent review to receive the failed terminal outcome.",
+            )
+            manager.destroy()
+        }
+
+    @Test
+    fun `terminal todo changes each create one main-agent review notification`() =
+        runBlocking {
+            val (manager, _, _) = createManagerWithInstantResponse()
+            val first = manager.todoManager.add("First terminal todo", "1")
+            val second = manager.todoManager.add("Second terminal todo", "2")
+
+            manager.todoManager.updateStatus(first.id, TodoStatus.COMPLETED)
+            manager.todoManager.cancelTodo(second.id, TodoTerminalReason.EXECUTION_FAILED)
+
+            withTimeout(2_000) {
+                while (
+                    manager
+                        .getHistory()
+                        .count { it.metadata?.contains("todo_terminal_transition") == true } < 2
+                ) {
+                    delay(10)
+                }
+            }
+            val terminalReviews =
+                manager
+                    .getHistory()
+                    .filter { it.metadata?.contains("todo_terminal_transition") == true }
+            assertTrue(terminalReviews.any { it.metadata?.contains(first.id) == true })
+            assertTrue(terminalReviews.any { it.metadata?.contains(second.id) == true })
             manager.destroy()
         }
 
