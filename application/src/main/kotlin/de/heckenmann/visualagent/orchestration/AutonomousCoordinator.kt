@@ -13,6 +13,7 @@ import de.heckenmann.visualagent.agent.SubAgentOpsProvider
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.knowledge.MemoryStore
 import de.heckenmann.visualagent.knowledge.TodoStore
+import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoChange
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoManager
@@ -332,8 +333,7 @@ class AutonomousCoordinator
                 todoStore
                     .listTodos()
                     .filterNot {
-                        decompositionScheduler.isDecomposing(it.id) ||
-                            (requestedTodoId == null && taskPlanner.isComplex(it.description))
+                        decompositionScheduler.isDecomposing(it.id) || shouldDecomposeBeforeExecution(it, requestedTodoId)
                     },
                 subAgents,
                 requestedTodoId = requestedTodoId,
@@ -341,4 +341,12 @@ class AutonomousCoordinator
                     executionControl?.isExecutionAllowed(agentId) ?: true
                 },
             )
+
+        private fun shouldDecomposeBeforeExecution(
+            todo: Todo,
+            requestedTodoId: String?,
+        ): Boolean =
+            requestedTodoId == null &&
+                taskPlanner.isComplex(todo.description) &&
+                !decompositionScheduler.hasAttemptedDecomposition(todo.id)
     }

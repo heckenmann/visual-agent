@@ -37,6 +37,9 @@ internal class AutonomousTodoDecompositionScheduler(
 
     fun isDecomposing(todoId: String): Boolean = todoId in decomposingTodoIds
 
+    /** Returns whether a todo has already had a decomposition attempt in this process. */
+    fun hasAttemptedDecomposition(todoId: String): Boolean = todoId in attemptedTodoIds
+
     fun cancel(todoId: String) {
         activeJobs[todoId]?.cancel()
     }

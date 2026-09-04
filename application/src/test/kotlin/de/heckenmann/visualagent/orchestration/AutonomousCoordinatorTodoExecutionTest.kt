@@ -150,6 +150,28 @@ class AutonomousCoordinatorTodoExecutionTest {
         }
 
     @Test
+    fun `complex todo with empty decomposition falls back to direct execution`() =
+        runBlocking {
+            val fixture = buildFixture(responseContent = "")
+            val todo =
+                fixture.todoManager.add(
+                    "Analyze and integrate a multi-service architecture pipeline, then plan migration, tests, and documentation",
+                )
+
+            try {
+                fixture.coordinator.startAutonomousProcessing(seed = false)
+
+                withTimeout(2_000) {
+                    while (fixture.todoManager.getById(todo.id)?.status != TodoStatus.COMPLETED) delay(10)
+                }
+                assertEquals(1, fixture.todoManager.getAll().size)
+                assertTrue(fixture.messages.any { it.content.contains("Started todo ${todo.id}") })
+            } finally {
+                fixture.cancel()
+            }
+        }
+
+    @Test
     fun `paused worker does not hold the scheduler slot at the next execution boundary`() =
         runBlocking {
             val fixture = buildFixture(parallelism = 1, chatDelayMs = 5000)
