@@ -25,9 +25,11 @@ internal class AutonomousTaskPlanner(
         return expandComplexTodo(candidate)
     }
 
-    suspend fun expandComplexTodo(candidate: Todo): Boolean {
+    suspend fun expandComplexTodo(
+        candidate: Todo,
+        analyst: SubAgent = ensureAnalysisAgent(),
+    ): Boolean {
         if (candidate.status != TodoStatus.PENDING || !isComplex(candidate.description)) return false
-        val analyst = ensureAnalysisAgent()
         val prompt = OrchestrationConstants.decompositionPrompt(candidate.description)
         val response = analyst.chat(prompt, llmProvider, agentToolConfigService.toolsFor(analyst)).message.content
         val subtasks =
@@ -84,6 +86,9 @@ internal class AutonomousTaskPlanner(
         val lower = description.lowercase()
         return OrchestrationConstants.COMPLEXITY_HINTS.any(lower::contains)
     }
+
+    /** Returns the dedicated analyst, creating it when the system has none yet. */
+    internal fun analysisAgent(): SubAgent = ensureAnalysisAgent()
 
     private fun ensureAnalysisAgent(): SubAgent =
         subAgents.values.firstOrNull { it.name.contains("analyst", true) || it.role.contains("analysis", true) }

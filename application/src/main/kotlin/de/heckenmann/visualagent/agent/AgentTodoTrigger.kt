@@ -48,12 +48,13 @@ internal class AgentTodoTrigger(
         terminalReason: TodoTerminalReason,
     ) {
         if (lifecycle.closing) return
+        val terminalTodo = todo.copy()
         scope.launch {
             terminalReviewMutex.withLock {
                 if (lifecycle.closing) return@withLock
                 currentCoroutineContext().ensureActive()
                 val action =
-                    when (todo.status) {
+                    when (terminalTodo.status) {
                         TodoStatus.COMPLETED ->
                             "was just completed by the sub-agent. " +
                                 "Review the result. If the task was done correctly, inform the user. " +
@@ -70,18 +71,18 @@ internal class AgentTodoTrigger(
                 conversationOps.persist(
                     Message(
                         role = "system",
-                        content = "The todo \"${todo.description}\" (id=${todo.id}) $action",
+                        content = "The todo \"${terminalTodo.description}\" (id=${terminalTodo.id}) $action",
                         metadata =
                             buildJsonObject {
                                 put("type", "todo_review")
                                 put("eventType", "todo_terminal_transition")
-                                put("todoId", todo.id)
-                                put("status", todo.status.name)
+                                put("todoId", terminalTodo.id)
+                                put("status", terminalTodo.status.name)
                                 put("terminalReason", terminalReason.name)
                             }.toString(),
                     ),
                 )
-                val requestId = "todo-trigger-${todo.id}"
+                val requestId = "todo-trigger-${terminalTodo.id}"
                 val activityRequestId = "$requestId:activity"
                 toolEventBus.publish(
                     ToolCallEvent(
@@ -99,7 +100,7 @@ internal class AgentTodoTrigger(
                 val history = conversationOps.loadMainAgentContextFromDb()
                 val request =
                     conversationOps.buildMainRequest(
-                        appendTodoChangeReviewInput(history, todo),
+                        appendTodoChangeReviewInput(history, terminalTodo),
                         requestId,
                     )
                 try {

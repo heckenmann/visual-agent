@@ -137,7 +137,6 @@ internal suspend fun processTodoWithLLM(
                         todoId = todoId,
                     )
                     todoManager.completeTodo(todoId)
-                    setAgentIdle(agent, subAgentOps::saveSubAgent, subAgentOps::notifyAgent)
                     return
                 }
                 attempt++
@@ -154,7 +153,6 @@ internal suspend fun processTodoWithLLM(
                         todoId = todoId,
                     )
                     todoManager.cancelTodo(todoId, TodoTerminalReason.REVIEW_REJECTED)
-                    setAgentIdle(agent, subAgentOps::saveSubAgent, subAgentOps::notifyAgent)
                     return
                 }
                 persistSubAgentMessage(
@@ -188,7 +186,6 @@ internal suspend fun processTodoWithLLM(
                         todoId = todoId,
                     )
                     todoManager.cancelTodo(todoId, TodoTerminalReason.RETRIES_EXHAUSTED)
-                    setAgentIdle(agent, subAgentOps::saveSubAgent, subAgentOps::notifyAgent)
                     return
                 }
                 persistSubAgentMessage(
@@ -219,7 +216,6 @@ internal suspend fun processTodoWithLLM(
             todoId = todoId,
         )
         todoManager.cancelTodo(todoId, TodoTerminalReason.EXECUTION_FAILED)
-        setAgentIdle(agent, subAgentOps::saveSubAgent, subAgentOps::notifyAgent)
     } finally {
         todoEventBus.publishProgress(
             TodoProgressUpdate(

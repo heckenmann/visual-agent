@@ -55,11 +55,7 @@ class AutonomousCoordinator
         private val pendingTodoChanges = ConcurrentHashMap<String, TodoChange>()
         private val activeCancellationTokens = ConcurrentHashMap<String, CancellationToken>()
         private val activeTodoJobs = ConcurrentHashMap<String, Job>()
-        private val activeDecompositionJobs = ConcurrentHashMap<String, Job>()
         private val agentBusySince = ConcurrentHashMap<String, Long>()
-        private val decomposingTodoIds = ConcurrentHashMap.newKeySet<String>()
-        private val decompositionAttemptedTodoIds = ConcurrentHashMap.newKeySet<String>()
-        private val decompositionActive = AtomicBoolean(false)
         private val requestedTodoIds = ConcurrentLinkedQueue<String>()
         private val requestedTodoIdSet = ConcurrentHashMap.newKeySet<String>()
         private val workSignal = AutonomousWorkSignal()
@@ -72,24 +68,37 @@ class AutonomousCoordinator
                 agentToolConfigService = agentToolConfigService,
                 createAgent = { name, role, templateName -> subAgentOps.createAgent(name, role, templateName) },
             )
+        private val decompositionScheduler =
+            AutonomousTodoDecompositionScheduler(
+                scope = scope,
+                todoStore = todoStore,
+                taskPlanner = taskPlanner,
+                jobScheduler = jobScheduler,
+                subAgentOps = subAgentOps,
+                executionControl = executionControl,
+                signalWork = workSignal::signal,
+            )
 
         init {
             logger.info { "AutonomousCoordinator initialized" }
             scope.launch(Dispatchers.IO) {
                 while (true) {
                     workSignal.await()
-                    drainWork()
+                    try {
+                        drainWork()
+                    } catch (error: Throwable) {
+                        if (error !is kotlinx.coroutines.CancellationException) {
+                            logger.warn(error) { "Autonomous work pickup failed; waiting for the next signal" }
+                        }
+                        if (error is kotlinx.coroutines.CancellationException) throw error
+                    }
                 }
             }
             todoEventBus.addListener { change ->
                 change.todo?.id?.let { pendingTodoChanges[it] = change }
                 change.todoId?.let { pendingTodoChanges[it] = change }
                 val todo = change.todo
-                todo?.let {
-                    if (it.status != TodoStatus.PENDING || change.previousStatus != TodoStatus.PENDING) {
-                        decompositionAttemptedTodoIds.remove(it.id)
-                    }
-                }
+                decompositionScheduler.onTodoChanged(change)
                 if (todo?.status == TodoStatus.PENDING) {
                     activeCancellationTokens[todo.id]?.cancel()
                 }
@@ -177,7 +186,7 @@ class AutonomousCoordinator
             if (todo.status == TodoStatus.COMPLETED || todo.status == TodoStatus.CANCELLED) return false
             activeCancellationTokens[todoId]?.cancel()
             activeTodoJobs[todoId]?.cancel()
-            activeDecompositionJobs[todoId]?.cancel()
+            decompositionScheduler.cancel(todoId)
             return todoManager.cancelTodo(todoId)
         }
 
@@ -191,7 +200,7 @@ class AutonomousCoordinator
             stoppableTodos.forEach { todo ->
                 activeCancellationTokens[todo.id]?.cancel()
                 activeTodoJobs[todo.id]?.cancel()
-                activeDecompositionJobs[todo.id]?.cancel()
+                decompositionScheduler.cancel(todo.id)
                 todoManager.cancelTodo(todo.id)
             }
             return stoppableTodos.size
@@ -216,20 +225,19 @@ class AutonomousCoordinator
 
         private suspend fun drainWork() {
             if (executionControl?.isGloballyPaused() == true) return
-            scheduleComplexTodoDecomposition()
-            while (true) {
-                val requestedTodoId = requestedTodoIds.peek()
-                if (requestedTodoId != null) {
-                    val claimed = claimAndProcessOneTodo(requestedTodoId)
-                    val current = todoStore.listTodos().firstOrNull { it.id == requestedTodoId }
-                    if (claimed || current?.status != TodoStatus.PENDING) {
-                        requestedTodoIds.poll()
-                        requestedTodoIdSet.remove(requestedTodoId)
-                        continue
-                    }
-                    return
+            requestedTodoIds.toList().forEach { requestedTodoId ->
+                val claimed = claimAndProcessOneTodo(requestedTodoId)
+                val current = todoStore.listTodos().firstOrNull { it.id == requestedTodoId }
+                if (claimed || current?.status != TodoStatus.PENDING) {
+                    requestedTodoIds.remove(requestedTodoId)
+                    requestedTodoIdSet.remove(requestedTodoId)
                 }
-                if (!autonomousProcessingEnabled.get() || !claimAndProcessOneTodo()) return
+            }
+            if (autonomousProcessingEnabled.get()) {
+                while (claimAndProcessOneTodo()) {
+                    // Continue claiming while capacity is available.
+                }
+                decompositionScheduler.scheduleIfNeeded(autonomousProcessingEnabled.get())
             }
         }
 
@@ -319,45 +327,14 @@ class AutonomousCoordinator
             workSignal.signal()
         }
 
-        private fun scheduleComplexTodoDecomposition() {
-            if (!autonomousProcessingEnabled.get() || executionControl?.isExecutionAllowed() == false) return
-            if (!decompositionActive.compareAndSet(false, true)) return
-            val todo =
-                todoStore
-                    .listTodos()
-                    .firstOrNull {
-                        it.status == TodoStatus.PENDING &&
-                            it.id !in decompositionAttemptedTodoIds &&
-                            taskPlanner.isComplex(it.description)
-                    }
-            if (todo == null) {
-                decompositionActive.set(false)
-                return
-            }
-            decomposingTodoIds += todo.id
-            decompositionAttemptedTodoIds += todo.id
-            val job =
-                scope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
-                    try {
-                        taskPlanner.expandComplexTodo(todo)
-                    } catch (error: Throwable) {
-                        if (error !is kotlinx.coroutines.CancellationException) {
-                            logger.warn(error) { "Could not decompose todo ${todo.id}; leaving it available for execution" }
-                        }
-                    } finally {
-                        activeDecompositionJobs.remove(todo.id)
-                        decomposingTodoIds.remove(todo.id)
-                        decompositionActive.set(false)
-                        workSignal.signal()
-                    }
-                }
-            activeDecompositionJobs[todo.id] = job
-            job.start()
-        }
-
         private fun findNextAssignableTodo(requestedTodoId: String? = null): TodoExecutionCandidate? =
             findNextAssignableTodo(
-                todoStore.listTodos().filterNot { it.id in decomposingTodoIds },
+                todoStore
+                    .listTodos()
+                    .filterNot {
+                        decompositionScheduler.isDecomposing(it.id) ||
+                            (requestedTodoId == null && taskPlanner.isComplex(it.description))
+                    },
                 subAgents,
                 requestedTodoId = requestedTodoId,
                 isAgentEligible = { agentId ->

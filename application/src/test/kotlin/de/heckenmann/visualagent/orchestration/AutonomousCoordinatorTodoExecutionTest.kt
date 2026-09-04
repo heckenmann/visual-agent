@@ -75,6 +75,29 @@ class AutonomousCoordinatorTodoExecutionTest {
         }
 
     @Test
+    fun `blocked requested todo does not prevent another requested todo from starting`() =
+        runBlocking {
+            val fixture = buildFixture(chatDelayMs = 5000)
+            fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
+            fixture.putSubAgent(SubAgent(id = "agent-2", name = "Tester", role = "Testing", status = AgentStatus.IDLE))
+            val blocked = fixture.todoManager.add("Blocked task", "agent-1")
+            val runnable = fixture.todoManager.add("Runnable task", "agent-2")
+            fixture.executionControl.pauseAgent("agent-1")
+
+            try {
+                assertTrue(fixture.coordinator.startTodo(blocked.id))
+                assertTrue(fixture.coordinator.startTodo(runnable.id))
+
+                withTimeout(50) {
+                    while (fixture.todoManager.getById(runnable.id)?.status != TodoStatus.IN_PROGRESS) delay(10)
+                }
+                assertEquals(TodoStatus.PENDING, fixture.todoManager.getById(blocked.id)?.status)
+            } finally {
+                fixture.cancel()
+            }
+        }
+
+    @Test
     fun `concurrent starts atomically claim one todo per idle agent`() =
         runBlocking {
             val fixture = buildFixture(chatDelayMs = 5000)

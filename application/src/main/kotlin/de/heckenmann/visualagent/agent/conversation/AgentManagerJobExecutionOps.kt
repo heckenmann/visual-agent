@@ -36,5 +36,6 @@ internal suspend fun AgentManager.executeSubAgentJob(
         agent.currentTodoId = null
         saveSubAgent(agent)
         agentStatusCallbackAdapter.notify(agent.id, "STATUS:${agent.status.name}")
+        if (remainingJobs == 0) autonomousCoordinator.signalWork()
     }
 }

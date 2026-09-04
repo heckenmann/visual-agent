@@ -18,10 +18,8 @@ import de.heckenmann.visualagent.orchestration.AutonomousCoordinator
 import de.heckenmann.visualagent.protocol.LifecyclePort
 import de.heckenmann.visualagent.protocol.LifecycleState
 import de.heckenmann.visualagent.todo.Todo
-import de.heckenmann.visualagent.todo.TodoChangeType
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoManager
-import de.heckenmann.visualagent.todo.TodoStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -146,20 +144,7 @@ class AgentManager
                     toolEventBus = toolEventBus,
                     lifecycle = lifecycle,
                 )
-            todoEventBus.addListener { change ->
-                if (lifecycle.closing) return@addListener
-                val todo = change.todo ?: return@addListener
-                if (change.type != TodoChangeType.UPDATED) return@addListener
-                if (change.previousStatus == null || change.previousStatus == todo.status) return@addListener
-                when (todo.status) {
-                    TodoStatus.COMPLETED, TodoStatus.CANCELLED ->
-                        todoTrigger.trigger(
-                            todo,
-                            change.terminalReason ?: de.heckenmann.visualagent.todo.TodoTerminalReason.USER_CANCELLED,
-                        )
-                    else -> Unit
-                }
-            }
+            registerTodoTerminalReviewListener()
             toolEventListenerHandle = conversationOpsProvider.registerToolEventListener()
             conversationOps.loadConversationFromDb()
             conversationOps.resumeInterruptedConversationIfNeeded()
