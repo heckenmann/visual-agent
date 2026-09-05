@@ -1,8 +1,10 @@
 package de.heckenmann.visualagent.ui.application
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
 import de.heckenmann.visualagent.protocol.ActivityPort
 import de.heckenmann.visualagent.protocol.AgentPort
 import de.heckenmann.visualagent.protocol.ApplicationPort
@@ -56,6 +58,10 @@ class VisualAgentComposeAppProtocolTest {
         assertTrue(composeTestRule.onAllNodesWithText("Subagents").fetchSemanticsNodes().isNotEmpty())
         assertTrue(composeTestRule.onAllNodesWithText("Settings").fetchSemanticsNodes().isNotEmpty())
         assertTrue(composeTestRule.onAllNodesWithText("Canvas").fetchSemanticsNodes().isNotEmpty())
+        val shellBounds = composeTestRule.onNodeWithTag("workspace-shell").getUnclippedBoundsInRoot()
+        val contentBounds = composeTestRule.onNodeWithTag("workspace-content-slot").getUnclippedBoundsInRoot()
+        assertTrue(contentBounds.left > shellBounds.left)
+        assertEquals(shellBounds.right, contentBounds.right)
     }
 
     private fun protocolPort(): ApplicationPort {

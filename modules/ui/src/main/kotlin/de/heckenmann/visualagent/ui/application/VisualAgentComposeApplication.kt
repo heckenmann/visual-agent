@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -26,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.LayoutSize
 import de.heckenmann.visualagent.protocol.LayoutWindowState
@@ -154,94 +156,104 @@ fun VisualAgentComposeApp(
             CompositionLocalProvider(LocalSemanticActionColors provides semanticActionColors(darkTheme)) {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     Box(modifier = Modifier.fillMaxSize()) {
-                        Row(
-                            modifier =
-                                Modifier
-                                    .fillMaxSize()
-                                    .focusRequester(workspaceFocusRequester)
-                                    .onPreviewKeyEvent { event ->
-                                        when {
-                                            event.isCommandPaletteShortcut() -> {
-                                                commandPaletteVisible = true
-                                                true
-                                            }
-                                            event.workspaceShortcutDigit() != null -> {
-                                                panelIdForShortcutDigit(event.workspaceShortcutDigit()!!)?.let(toggleWindow)
-                                                true
-                                            }
-                                            else -> false
-                                        }
-                                    }.focusable(),
-                        ) {
-                            ComposeRail(
-                                windows = windows,
-                                onToggleWindow = toggleWindow,
-                                onReorderWindows = reorderWindows,
-                                onPanelWidthChanged = resizeWindow,
-                                showPanelLabels = settings.showPanelLabels,
-                                onTogglePanelLabels = {
-                                    if (settingsLoaded) {
-                                        val next = settings.copy(showPanelLabels = !settings.showPanelLabels)
-                                        settings = next
-                                        composeScope.launch {
-                                            withContext(Dispatchers.IO) { deps.applicationPort.settings.save(next) }
-                                        }
-                                    }
-                                },
-                                onCloseApplication = onCloseApplication,
-                                modalRequester = panelServices.modalRequester,
-                            )
-                            BoxWithConstraints(
+                        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                            val stage =
+                                LayoutSize(
+                                    width = maxWidth.value.toDouble(),
+                                    height = maxHeight.value.toDouble(),
+                                )
+                            Row(
                                 modifier =
                                     Modifier
                                         .fillMaxSize()
-                                        .padding(14.dp),
-                            ) {
-                                val viewport =
-                                    ComposeWorkspaceViewport(
-                                        width = maxWidth.value.roundToInt(),
-                                        height = maxHeight.value.roundToInt(),
-                                    )
-                                val minPanelWidth = ComposeWorkspaceWindowBounds.MIN_WIDTH
-                                val workspaceStates = windows.mapIndexed { index, window -> window.toLayoutWindowState(index) }
-                                deps.applicationPort.layout.bind(
-                                    stage = LayoutSize(width = viewport.width.toDouble(), height = viewport.height.toDouble()),
-                                    desktop = LayoutSize(width = viewport.width.toDouble(), height = viewport.height.toDouble()),
-                                    windows = workspaceStates,
-                                )
-                                LaunchedEffect(workspaceStates) {
-                                    deps.applicationPort.layout.applyWindowStates(workspaceStates, notifyListeners = false)
-                                }
-                                val activeProvider =
-                                    remember(settingsRevision) {
-                                        panelServices.providers.getProvider(panelServices.providers.activeProviderId())
-                                    }
-                                Column(modifier = Modifier.fillMaxSize()) {
-                                    ComposeWorkspaceHeader(
-                                        providerName = activeProvider?.id ?: panelServices.providers.activeProviderId(),
-                                        modelName = panelServices.providers.activeModelId(),
-                                        beanDefinitionCount = deps.beanDefinitionCount,
-                                        inFlight = inFlight.state.value,
-                                        onStopAll = {
-                                            composeScope.launch {
-                                                deps.applicationPort.cancelActiveWork()
+                                        .testTag("workspace-shell")
+                                        .focusRequester(workspaceFocusRequester)
+                                        .onPreviewKeyEvent { event ->
+                                            when {
+                                                event.isCommandPaletteShortcut() -> {
+                                                    commandPaletteVisible = true
+                                                    true
+                                                }
+                                                event.workspaceShortcutDigit() != null -> {
+                                                    panelIdForShortcutDigit(event.workspaceShortcutDigit()!!)?.let(toggleWindow)
+                                                    true
+                                                }
+                                                else -> false
                                             }
-                                        },
+                                        }.focusable(),
+                            ) {
+                                ComposeRail(
+                                    windows = windows,
+                                    onToggleWindow = toggleWindow,
+                                    onReorderWindows = reorderWindows,
+                                    onPanelWidthChanged = resizeWindow,
+                                    showPanelLabels = settings.showPanelLabels,
+                                    onTogglePanelLabels = {
+                                        if (settingsLoaded) {
+                                            val next = settings.copy(showPanelLabels = !settings.showPanelLabels)
+                                            settings = next
+                                            composeScope.launch {
+                                                withContext(Dispatchers.IO) { deps.applicationPort.settings.save(next) }
+                                            }
+                                        }
+                                    },
+                                    onCloseApplication = onCloseApplication,
+                                    modalRequester = panelServices.modalRequester,
+                                )
+                                BoxWithConstraints(
+                                    modifier =
+                                        Modifier
+                                            .weight(1f)
+                                            .fillMaxHeight()
+                                            .testTag("workspace-content-slot")
+                                            .padding(14.dp),
+                                ) {
+                                    val viewport =
+                                        ComposeWorkspaceViewport(
+                                            width = maxWidth.value.roundToInt(),
+                                            height = maxHeight.value.roundToInt(),
+                                        )
+                                    val minPanelWidth = ComposeWorkspaceWindowBounds.MIN_WIDTH
+                                    val workspaceStates = windows.mapIndexed { index, window -> window.toLayoutWindowState(index) }
+                                    deps.applicationPort.layout.bind(
+                                        stage = stage,
+                                        desktop = LayoutSize(width = viewport.width.toDouble(), height = viewport.height.toDouble()),
+                                        windows = workspaceStates,
                                     )
-                                    ComposeSplitWorkspace(
-                                        windows = windows,
-                                        panelServices = panelServices,
-                                        onToggleWindow = toggleWindow,
-                                        onReorderWindows = reorderWindows,
-                                        onResizeWindow = resizeWindow,
-                                        minPanelWidth = minPanelWidth,
-                                        viewport = viewport,
-                                        modifier =
-                                            Modifier
-                                                .weight(1f)
-                                                .fillMaxWidth()
-                                                .padding(top = 12.dp),
-                                    )
+                                    LaunchedEffect(workspaceStates) {
+                                        deps.applicationPort.layout.applyWindowStates(workspaceStates, notifyListeners = false)
+                                    }
+                                    val activeProvider =
+                                        remember(settingsRevision) {
+                                            panelServices.providers.getProvider(panelServices.providers.activeProviderId())
+                                        }
+                                    Column(modifier = Modifier.fillMaxSize()) {
+                                        ComposeWorkspaceHeader(
+                                            providerName = activeProvider?.id ?: panelServices.providers.activeProviderId(),
+                                            modelName = panelServices.providers.activeModelId(),
+                                            beanDefinitionCount = deps.beanDefinitionCount,
+                                            inFlight = inFlight.state.value,
+                                            onStopAll = {
+                                                composeScope.launch {
+                                                    deps.applicationPort.cancelActiveWork()
+                                                }
+                                            },
+                                        )
+                                        ComposeSplitWorkspace(
+                                            windows = windows,
+                                            panelServices = panelServices,
+                                            onToggleWindow = toggleWindow,
+                                            onReorderWindows = reorderWindows,
+                                            onResizeWindow = resizeWindow,
+                                            minPanelWidth = minPanelWidth,
+                                            viewport = viewport,
+                                            modifier =
+                                                Modifier
+                                                    .weight(1f)
+                                                    .fillMaxWidth()
+                                                    .padding(top = 12.dp),
+                                        )
+                                    }
                                 }
                             }
                         }
