@@ -103,9 +103,9 @@ internal fun ComposeSplitWorkspace(
             },
         )
     Box(modifier = modifier.fillMaxSize()) {
-        WorkspaceBackdrop()
+        workspaceBackdrop()
         if (windows.isEmpty()) {
-            EmptyWorkspace()
+            emptyWorkspace()
         } else {
             val persistedWidths = rowPanelWidths(visibleWindows)
             val widthsById =
@@ -126,12 +126,18 @@ internal fun ComposeSplitWorkspace(
                 withFrameNanos { }
                 val layoutInfo = horizontalScrollState.layoutInfo
                 val activeItem = layoutInfo.visibleItemsInfo.firstOrNull { it.key == activePanelId }
-                val overflow =
+                val trailingGap = if (activePanelId == visibleWindows.lastOrNull()?.id) 0 else WORKSPACE_PANEL_GAP
+                val resizerEdge =
                     activeItem?.let { item ->
-                        (item.offset + item.size - layoutInfo.viewportEndOffset).coerceAtLeast(0)
-                    } ?: 0
-                if (overflow > 0) {
-                    horizontalScrollState.scrollBy(overflow.toFloat())
+                        item.offset + item.size - trailingGap
+                    }
+                val scrollRight =
+                    resizerEdge?.let { (it - layoutInfo.viewportEndOffset).coerceAtLeast(0) } ?: 0
+                val scrollLeft =
+                    resizerEdge?.let { (layoutInfo.viewportStartOffset - it).coerceAtLeast(0) } ?: 0
+                when {
+                    scrollRight > 0 -> horizontalScrollState.scrollBy(scrollRight.toFloat())
+                    scrollLeft > 0 -> horizontalScrollState.scrollBy(-scrollLeft.toFloat())
                 }
             }
             Column(modifier = Modifier.fillMaxSize()) {
@@ -164,7 +170,7 @@ internal fun ComposeSplitWorkspace(
                                 items = windows,
                                 key = { it.id },
                             ) { window ->
-                                SplitPanelItem(
+                                splitPanelItem(
                                     state = reorderableState,
                                     window = window,
                                     visible = window.visible,
@@ -238,7 +244,7 @@ internal fun ComposeSplitWorkspace(
                 exit = fadeOut(animationSpec = workspacePanelAnimationSpec()),
                 label = "empty workspace visibility",
             ) {
-                EmptyWorkspace()
+                emptyWorkspace()
             }
         }
     }

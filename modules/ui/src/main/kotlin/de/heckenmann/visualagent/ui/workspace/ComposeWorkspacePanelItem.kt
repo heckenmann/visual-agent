@@ -1,5 +1,3 @@
-@file:Suppress("ktlint:standard:no-wildcard-imports", "FunctionName")
-
 package de.heckenmann.visualagent.ui.workspace
 
 import androidx.compose.animation.core.animateDpAsState
@@ -30,7 +28,7 @@ import kotlin.math.roundToInt
 
 /** Renders the decorative background behind the workspace panel row. */
 @Composable
-internal fun WorkspaceBackdrop() {
+internal fun workspaceBackdrop() {
     val shape = RoundedCornerShape(8.dp)
     Box(
         modifier =
@@ -44,7 +42,7 @@ internal fun WorkspaceBackdrop() {
 
 /** Renders the empty state shown when no workspace panel is available. */
 @Composable
-internal fun EmptyWorkspace() {
+internal fun emptyWorkspace() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(
             text = "No panels are open. Use the rail to choose a workspace panel.",
@@ -56,7 +54,7 @@ internal fun EmptyWorkspace() {
 
 /** Renders one reorderable workspace panel and its direct-manipulation resizer. */
 @Composable
-internal fun LazyItemScope.SplitPanelItem(
+internal fun LazyItemScope.splitPanelItem(
     state: ReorderableLazyListState,
     window: ComposeWorkspaceWindow,
     visible: Boolean,
