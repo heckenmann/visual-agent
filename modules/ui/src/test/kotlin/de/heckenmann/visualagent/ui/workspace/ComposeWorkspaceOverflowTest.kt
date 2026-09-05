@@ -15,6 +15,7 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.workspace.*
@@ -109,6 +110,21 @@ class ComposeWorkspaceOverflowTest {
             WORKSPACE_PANEL_GAP + 300 + 280 + (2 * WORKSPACE_PANEL_RESIZER_WIDTH) + WORKSPACE_PANEL_GAP,
             workspaceRowWidth(listOf(300, 280)),
         )
+    }
+
+    @Test
+    fun `resizer scroll delta follows both viewport edges`() {
+        assertEquals(-20, resizerScrollDelta(resizerEdge = 80, viewportStart = 100, viewportEnd = 500))
+        assertEquals(0, resizerScrollDelta(resizerEdge = 300, viewportStart = 100, viewportEnd = 500))
+        assertEquals(20, resizerScrollDelta(resizerEdge = 520, viewportStart = 100, viewportEnd = 500))
+    }
+
+    @Test
+    fun `workspace panel gap converts to physical pixels`() {
+        val density = Density(density = 2f)
+
+        assertEquals(32, density.workspacePanelTrailingGapPx(isLast = false))
+        assertEquals(0, density.workspacePanelTrailingGapPx(isLast = true))
     }
 
     private fun testWindow(

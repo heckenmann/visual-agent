@@ -35,7 +35,9 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
@@ -91,6 +93,7 @@ internal fun ComposeSplitWorkspace(
     var activeResizePanelId by remember { mutableStateOf<String?>(null) }
     val horizontalScrollState = rememberLazyListState()
     val scrollScope = rememberCoroutineScope()
+    val density = LocalDensity.current
     val reorderableState =
         rememberReorderableLazyListState(
             lazyListState = horizontalScrollState,
@@ -126,18 +129,34 @@ internal fun ComposeSplitWorkspace(
                 withFrameNanos { }
                 val layoutInfo = horizontalScrollState.layoutInfo
                 val activeItem = layoutInfo.visibleItemsInfo.firstOrNull { it.key == activePanelId }
-                val trailingGap = if (activePanelId == visibleWindows.lastOrNull()?.id) 0 else WORKSPACE_PANEL_GAP
-                val resizerEdge =
-                    activeItem?.let { item ->
-                        item.offset + item.size - trailingGap
+                val activeIndex = windows.indexOfFirst { it.id == activePanelId }
+                if (activeItem == null) {
+                    if (activeIndex >= 0) {
+                        val panelWidth = widthsById[activePanelId] ?: return@LaunchedEffect
+                        val panelWidthPx = with(density) { panelWidth.dp.roundToPx() }
+                        val itemWidthPx = with(density) { (panelWidth + WORKSPACE_PANEL_RESIZER_WIDTH).dp.roundToPx() }
+                        val firstVisibleIndex = layoutInfo.visibleItemsInfo.firstOrNull()?.index ?: activeIndex
+                        val fallbackOffset =
+                            if (activeIndex < firstVisibleIndex) {
+                                panelWidthPx
+                            } else {
+                                (itemWidthPx - (layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset))
+                                    .coerceAtLeast(0)
+                            }
+                        horizontalScrollState.scrollToItem(activeIndex, fallbackOffset)
                     }
-                val scrollRight =
-                    resizerEdge?.let { (it - layoutInfo.viewportEndOffset).coerceAtLeast(0) } ?: 0
-                val scrollLeft =
-                    resizerEdge?.let { (layoutInfo.viewportStartOffset - it).coerceAtLeast(0) } ?: 0
-                when {
-                    scrollRight > 0 -> horizontalScrollState.scrollBy(scrollRight.toFloat())
-                    scrollLeft > 0 -> horizontalScrollState.scrollBy(-scrollLeft.toFloat())
+                    return@LaunchedEffect
+                }
+                val trailingGapPx = density.workspacePanelTrailingGapPx(activePanelId == visibleWindows.lastOrNull()?.id)
+                val resizerEdge = activeItem.offset + activeItem.size - trailingGapPx
+                val scrollDelta =
+                    resizerScrollDelta(
+                        resizerEdge = resizerEdge,
+                        viewportStart = layoutInfo.viewportStartOffset,
+                        viewportEnd = layoutInfo.viewportEndOffset,
+                    )
+                if (scrollDelta != 0) {
+                    horizontalScrollState.scrollBy(scrollDelta.toFloat())
                 }
             }
             Column(modifier = Modifier.fillMaxSize()) {
@@ -251,3 +270,16 @@ internal fun ComposeSplitWorkspace(
 }
 
 private const val HORIZONTAL_WHEEL_SCROLL_STEP = 50f
+
+internal fun resizerScrollDelta(
+    resizerEdge: Int,
+    viewportStart: Int,
+    viewportEnd: Int,
+): Int =
+    when {
+        resizerEdge < viewportStart -> resizerEdge - viewportStart
+        resizerEdge > viewportEnd -> resizerEdge - viewportEnd
+        else -> 0
+    }
+
+internal fun Density.workspacePanelTrailingGapPx(isLast: Boolean): Int = if (isLast) 0 else WORKSPACE_PANEL_GAP.dp.roundToPx()
