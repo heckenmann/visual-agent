@@ -3,44 +3,36 @@
 package de.heckenmann.visualagent.ui.workspace
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.HorizontalScrollbar
 import androidx.compose.foundation.ScrollbarStyle
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.platform.testTag
@@ -57,10 +49,7 @@ import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
 import kotlinx.coroutines.launch
-import sh.calvin.reorderable.ReorderableItem
-import sh.calvin.reorderable.ReorderableLazyListState
 import sh.calvin.reorderable.rememberReorderableLazyListState
-import kotlin.math.roundToInt
 
 /**
  * Renders the visible workspace panels in a single horizontally scrollable row.
@@ -77,7 +66,7 @@ import kotlin.math.roundToInt
  * @param onToggleWindow Callback that toggles the visibility of a panel
  * @param onReorderWindows Callback that receives all panels in their new order after a drag gesture
  * @param onResizeWindow Callback that receives an updated preferred width for a panel
- * @param minPanelWidth Minimum width for each panel in pixels
+ * @param minPanelWidth Minimum width for each panel in density-independent units
  * @param viewport Available workspace dimensions used by resizer math
  * @param modifier Modifier applied to the workspace root
  *
@@ -99,6 +88,7 @@ internal fun ComposeSplitWorkspace(
     val windowsState = rememberUpdatedState(windows)
     val resizeUpdatedState = rememberUpdatedState(onResizeWindow)
     var previewWidths by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
+    var activeResizePanelId by remember { mutableStateOf<String?>(null) }
     val horizontalScrollState = rememberLazyListState()
     val scrollScope = rememberCoroutineScope()
     val reorderableState =
@@ -117,21 +107,40 @@ internal fun ComposeSplitWorkspace(
         if (windows.isEmpty()) {
             EmptyWorkspace()
         } else {
-            val widths = rowPanelWidths(visibleWindows)
-            val widthsById = visibleWindows.mapIndexed { index, window -> window.id to widths[index] }.toMap()
-            val rowWidthPx =
-                widths.sum() +
-                    (visibleWindows.size * WORKSPACE_PANEL_RESIZER_WIDTH) +
-                    ((visibleWindows.size - 1) * WORKSPACE_PANEL_GAP) + WORKSPACE_PANEL_GAP
-            val canScroll = rowWidthPx > viewport.width
+            val persistedWidths = rowPanelWidths(visibleWindows)
+            val widthsById =
+                visibleWindows
+                    .mapIndexed { index, window ->
+                        window.id to (
+                            previewWidths[window.id]
+                                ?: persistedWidths[index].coerceAtLeast(minPanelWidth)
+                        )
+                    }.toMap()
+            val rowWidth = workspaceRowWidth(visibleWindows.map { widthsById.getValue(it.id) })
+            val canScroll = rowWidth > viewport.width
+            val activePreviewWidth = activeResizePanelId?.let(previewWidths::get)
             val panelHeight =
                 (viewport.height - (2 * WORKSPACE_PANEL_GAP)).coerceAtLeast(0)
+            LaunchedEffect(activeResizePanelId, activePreviewWidth, viewport.width) {
+                val activePanelId = activeResizePanelId ?: return@LaunchedEffect
+                withFrameNanos { }
+                val layoutInfo = horizontalScrollState.layoutInfo
+                val activeItem = layoutInfo.visibleItemsInfo.firstOrNull { it.key == activePanelId }
+                val overflow =
+                    activeItem?.let { item ->
+                        (item.offset + item.size - layoutInfo.viewportEndOffset).coerceAtLeast(0)
+                    } ?: 0
+                if (overflow > 0) {
+                    horizontalScrollState.scrollBy(overflow.toFloat())
+                }
+            }
             Column(modifier = Modifier.fillMaxSize()) {
                 Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
                     Box(
                         modifier =
                             Modifier
                                 .fillMaxSize()
+                                .testTag("workspace-viewport")
                                 .onPointerEvent(PointerEventType.Scroll) { event ->
                                     val change = event.changes.firstOrNull()
                                     val scrollDelta = change?.scrollDelta
@@ -148,7 +157,7 @@ internal fun ComposeSplitWorkspace(
                     ) {
                         LazyRow(
                             state = horizontalScrollState,
-                            modifier = Modifier.fillMaxHeight(),
+                            modifier = Modifier.fillMaxSize().testTag("workspace-horizontal-list"),
                             contentPadding = PaddingValues(start = WORKSPACE_PANEL_GAP.dp),
                         ) {
                             items(
@@ -160,18 +169,26 @@ internal fun ComposeSplitWorkspace(
                                     window = window,
                                     visible = window.visible,
                                     panelServices = panelServices,
-                                    width =
-                                        previewWidths[window.id]
-                                            ?: widthsById[window.id]
-                                            ?: window.preferredWidth.coerceAtLeast(minPanelWidth),
+                                    width = widthsById[window.id] ?: window.preferredWidth.coerceAtLeast(minPanelWidth),
                                     isResizing = window.id in previewWidths,
                                     isLast = window.id == visibleWindows.lastOrNull()?.id,
-                                    onPreviewWidthChanged = { next -> previewWidths = previewWidths + (window.id to next) },
+                                    onPreviewWidthChanged = { next ->
+                                        activeResizePanelId = window.id
+                                        previewWidths = previewWidths + (window.id to next)
+                                    },
                                     onWidthCommitted = { next ->
                                         previewWidths = previewWidths - window.id
+                                        if (activeResizePanelId == window.id) {
+                                            activeResizePanelId = null
+                                        }
                                         resizeUpdatedState.value.invoke(window.id, next)
                                     },
-                                    onResizeCancelled = { previewWidths = previewWidths - window.id },
+                                    onResizeCancelled = {
+                                        previewWidths = previewWidths - window.id
+                                        if (activeResizePanelId == window.id) {
+                                            activeResizePanelId = null
+                                        }
+                                    },
                                     onCloseWindow = { onToggleWindow(window.id) },
                                     minPanelWidth = minPanelWidth,
                                     rowHeight = panelHeight,
@@ -202,7 +219,7 @@ internal fun ComposeSplitWorkspace(
                 ) {
                     HorizontalScrollbar(
                         adapter = rememberScrollbarAdapter(horizontalScrollState),
-                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp).testTag("workspace-horizontal-scrollbar"),
                         style =
                             ScrollbarStyle(
                                 minimalHeight = 16.dp,
@@ -222,99 +239,6 @@ internal fun ComposeSplitWorkspace(
                 label = "empty workspace visibility",
             ) {
                 EmptyWorkspace()
-            }
-        }
-    }
-}
-
-@Composable
-private fun WorkspaceBackdrop() {
-    val shape = RoundedCornerShape(8.dp)
-    Box(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .clip(shape)
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0x55 / 255f))
-                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0x1A / 255f), shape),
-    )
-}
-
-@Composable
-private fun EmptyWorkspace() {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(
-            text = "No panels are open. Use the rail to choose a workspace panel.",
-            color = MaterialTheme.colorScheme.tertiary,
-            style = MaterialTheme.typography.bodyMedium,
-        )
-    }
-}
-
-@Composable
-private fun LazyItemScope.SplitPanelItem(
-    state: ReorderableLazyListState,
-    window: ComposeWorkspaceWindow,
-    visible: Boolean,
-    panelServices: ComposePanelServices,
-    width: Int,
-    isResizing: Boolean,
-    isLast: Boolean,
-    onPreviewWidthChanged: (Int) -> Unit,
-    onWidthCommitted: (Int) -> Unit,
-    onResizeCancelled: () -> Unit,
-    onCloseWindow: () -> Unit,
-    minPanelWidth: Int,
-    rowHeight: Int,
-) {
-    val animatedWidth by
-        animateDpAsState(
-            targetValue = width.coerceAtLeast(minPanelWidth).dp,
-            animationSpec = workspacePanelAnimationSpec(),
-            label = "workspace panel width",
-        )
-    val animatedHeight by
-        animateDpAsState(
-            targetValue = rowHeight.dp,
-            animationSpec = workspacePanelAnimationSpec(),
-            label = "workspace panel height",
-        )
-    val renderedWidth = if (isResizing) width.coerceAtLeast(minPanelWidth).dp else animatedWidth
-    val renderedWidthPx = renderedWidth.value.roundToInt()
-    ReorderableItem(
-        state = state,
-        key = window.id,
-        modifier = Modifier.testTag("workspace-panel-${window.id}"),
-    ) { isDragging ->
-        WorkspacePanelVisibility(visible = visible) {
-            Row(
-                modifier =
-                    Modifier
-                        .padding(vertical = WORKSPACE_PANEL_GAP.dp)
-                        .height(animatedHeight),
-            ) {
-                SplitPanelContent(
-                    window = window,
-                    panelServices = panelServices,
-                    isDragging = isDragging,
-                    width = renderedWidthPx,
-                    onCloseWindow = onCloseWindow,
-                    minPanelWidth = minPanelWidth,
-                    modifier =
-                        Modifier
-                            .height(animatedHeight)
-                            .testTag("workspace-panel-content-${window.id}"),
-                )
-                panelResizer(
-                    currentWidth = width,
-                    onPreviewWidthChanged = onPreviewWidthChanged,
-                    onWidthCommitted = onWidthCommitted,
-                    onCancelled = onResizeCancelled,
-                    minPanelWidth = minPanelWidth,
-                )
-                if (!isLast) {
-                    Spacer(modifier = Modifier.width(WORKSPACE_PANEL_GAP.dp))
-                }
             }
         }
     }

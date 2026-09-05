@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -26,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.LayoutSize
 import de.heckenmann.visualagent.protocol.LayoutWindowState
@@ -158,6 +160,7 @@ fun VisualAgentComposeApp(
                             modifier =
                                 Modifier
                                     .fillMaxSize()
+                                    .testTag("workspace-shell")
                                     .focusRequester(workspaceFocusRequester)
                                     .onPreviewKeyEvent { event ->
                                         when {
@@ -194,7 +197,9 @@ fun VisualAgentComposeApp(
                             BoxWithConstraints(
                                 modifier =
                                     Modifier
-                                        .fillMaxSize()
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                        .testTag("workspace-content-slot")
                                         .padding(14.dp),
                             ) {
                                 val viewport =

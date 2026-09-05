@@ -181,14 +181,31 @@ fun rowPanelWidths(visibleWindows: List<ComposeWorkspaceWindow>): List<Int> =
     visibleWindows.map { it.preferredWidth.coerceAtLeast(ComposeWorkspaceWindowBounds.MIN_WIDTH) }
 
 /**
+ * Computes the total horizontal extent of the workspace row.
+ *
+ * The returned value uses the same density-independent units as panel widths and includes
+ * the leading workspace gap, every panel and resizer, and the gaps between adjacent panels.
+ *
+ * @param widths Effective widths of visible panels, including any active resize preview
+ * @return Total row width, or zero when no panels are visible
+ */
+internal fun workspaceRowWidth(widths: List<Int>): Int {
+    if (widths.isEmpty()) return 0
+    return WORKSPACE_PANEL_GAP +
+        widths.sum() +
+        (widths.size * WORKSPACE_PANEL_RESIZER_WIDTH) +
+        ((widths.size - 1) * WORKSPACE_PANEL_GAP)
+}
+
+/**
  * Computes a new preferred width for a panel after a resizer drag.
  *
  * The delta is applied to the current width and clamped to the allowed range.
  * Unlike the previous adjacent-panel resize, this does not shrink the neighbour;
  * it only changes the resized panel, so all panels to the right are pushed right.
  *
- * @param currentWidth Current panel width in pixels
- * @param deltaWidth Horizontal delta in pixels
+ * @param currentWidth Current panel width in density-independent units
+ * @param deltaWidth Horizontal delta in density-independent units
  * @param minPanelWidth Minimum width the panel must keep
  * @param maxPanelWidth Maximum width the panel may reach
  * @return Clamped new width

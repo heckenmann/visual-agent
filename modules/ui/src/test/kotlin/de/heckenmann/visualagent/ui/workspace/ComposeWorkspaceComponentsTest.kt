@@ -163,8 +163,14 @@ class ComposeWorkspaceComponentsTest {
             composeTestRule
                 .onNodeWithTag("workspace-panel-content-first")
                 .getUnclippedBoundsInRoot()
+        val viewportBounds = composeTestRule.onNodeWithTag("workspace-viewport").getUnclippedBoundsInRoot()
+        val listBounds = composeTestRule.onNodeWithTag("workspace-horizontal-list").getUnclippedBoundsInRoot()
 
         assertEquals(WORKSPACE_PANEL_GAP.dp, panelBounds.left)
+        assertEquals(
+            viewportBounds.right - viewportBounds.left,
+            listBounds.right - listBounds.left,
+        )
     }
 
     @Test

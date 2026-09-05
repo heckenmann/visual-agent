@@ -34,6 +34,7 @@ internal fun panelResizer(
     onWidthCommitted: (Int) -> Unit,
     onCancelled: () -> Unit,
     minPanelWidth: Int,
+    modifier: Modifier = Modifier,
 ) {
     val currentWidthState = rememberUpdatedState(currentWidth)
     val onPreviewWidthChangedState = rememberUpdatedState(onPreviewWidthChanged)
@@ -46,7 +47,7 @@ internal fun panelResizer(
     val previewWidth = remember { mutableStateOf<Int?>(null) }
     Box(
         modifier =
-            Modifier
+            modifier
                 .fillMaxHeight()
                 .width(WORKSPACE_PANEL_RESIZER_WIDTH.dp)
                 .semantics { contentDescription = "Resize panel" }
