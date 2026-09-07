@@ -69,7 +69,7 @@ class GraalJavaScriptExecutionServiceTest {
         val result =
             execute(
                 """
-                const numbers = await tools.call('test:numbers', {});
+                const numbers = (await tools.call('test:numbers', {})).data;
                 return numbers.filter(value => value > 1).map(value => value * 2);
                 """.trimIndent(),
                 enabled = setOf("test:numbers"),
@@ -83,9 +83,9 @@ class GraalJavaScriptExecutionServiceTest {
         val result =
             execute(
                 """
-                const numbers = await tools.call('test:numbers', {});
+                const numbers = (await tools.call('test:numbers', {})).data;
                 const doubled = numbers.map(value => value * 2);
-                return await tools.call('test:echo', {values: doubled});
+                return (await tools.call('test:echo', {values: doubled})).data;
                 """.trimIndent(),
                 enabled = setOf("test:numbers", "test:echo"),
             )
@@ -290,19 +290,20 @@ class GraalJavaScriptExecutionServiceTest {
 
     @Test
     fun `nested calls cannot extend the inherited tool deadline`() {
-        assertFailsWith<JavaScriptExecutionException> {
+        val result =
             service.execute(
                 JavaScriptExecutionRequest(
-                    source = "await tools.call('test:slow', {timeoutSeconds: 600});",
+                    source = "return await tools.call('test:slow', {timeoutSeconds: 600});",
                     enabledTools = setOf("test:slow"),
                     requestContext = mapOf("toolDeadlineNanos" to (System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(100))),
                     limits = JavaScriptExecutionLimits(timeoutMillis = 30_000),
                 ),
             )
-        }.also {
-            assertEquals(JavaScriptErrorCategory.TOOL_FAILURE, it.category)
-            assertTrue(it.message.isNotBlank())
-        }
+
+        val envelope = result.value as Map<*, *>
+        val error = envelope["error"] as Map<*, *>
+        assertEquals(false, envelope["success"])
+        assertEquals("TIMEOUT", error["code"])
     }
 
     @Test

@@ -3,7 +3,7 @@ package de.heckenmann.visualagent.agent.javascript
 import de.heckenmann.visualagent.agent.CancellationToken
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.agent.tools.api.ToolId
-import de.heckenmann.visualagent.agent.tools.api.ToolResult
+import de.heckenmann.visualagent.agent.tools.api.ToolResultEnvelope
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -148,9 +148,8 @@ internal class JavaScriptToolBridge(
                     ?: throw failure(JavaScriptErrorCategory.TOOL_ACCESS, "Tool '$name' is not registered")
             val resultJson = registry.execute(tool, input.toString(), requestContext + mapOf("javascript" to true))
             cancellationToken.throwIfCancelled()
-            val result = Json.decodeFromString<ToolResult>(resultJson)
-            if (!result.success) throw failure(JavaScriptErrorCategory.TOOL_FAILURE, result.error ?: "Tool '$name' failed")
-            contentToGuest(result.content)
+            val result = Json.decodeFromString<ToolResultEnvelope>(resultJson)
+            envelopeToGuest(result)
         } catch (error: JavaScriptExecutionException) {
             throw error
         } catch (error: Exception) {
@@ -254,10 +253,25 @@ internal class JavaScriptToolBridge(
         return null
     }
 
-    private fun contentToGuest(content: String): Any? {
-        val element = runCatching { Json.parseToJsonElement(content) }.getOrNull() ?: return content
-        return jsonToGuest(element)
-    }
+    private fun envelopeToGuest(result: ToolResultEnvelope): ProxyObject =
+        ProxyObject.fromMap(
+            mapOf(
+                "toolId" to result.toolId,
+                "success" to result.success,
+                "data" to jsonToGuest(result.data),
+                "error" to
+                    result.error?.let { error ->
+                        ProxyObject.fromMap(
+                            mapOf(
+                                "code" to error.code.name,
+                                "message" to error.message,
+                                "remediation" to error.remediation,
+                                "retryable" to error.retryable,
+                            ),
+                        )
+                    },
+            ),
+        )
 
     private fun jsonToGuest(element: JsonElement): Any? =
         when (element) {

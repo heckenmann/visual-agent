@@ -41,6 +41,7 @@ private fun Todo.toDeletedEntity(): DeletedTodoEntity =
         timelineSequence = timelineSequence,
         completedAt = completedAt,
         dueDate = dueDate,
+        terminalDetail = terminalDetail,
     )
 
 private fun DeletedTodoEntity.toDomain(): Todo =
@@ -55,4 +56,5 @@ private fun DeletedTodoEntity.toDomain(): Todo =
         timelineSequence = timelineSequence,
         completedAt = completedAt,
         dueDate = dueDate,
+        terminalDetail = terminalDetail,
     )

@@ -16,6 +16,7 @@ repositories {
 
 dependencies {
     implementation(libs.kotlin.stdlib)
+    implementation(libs.kotlin.logging)
     compileOnly(platform(libs.spring.boot.bom))
     compileOnly(libs.spring.context)
     implementation(libs.serialization.json)

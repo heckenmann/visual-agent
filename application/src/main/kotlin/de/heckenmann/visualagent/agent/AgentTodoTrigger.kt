@@ -68,10 +68,12 @@ internal class AgentTodoTrigger(
                         else -> return@withLock
                     }
                 if (lifecycle.closing) return@withLock
+                val terminalDetail = terminalTodo.terminalDetail?.takeIf(String::isNotBlank)
+                val detailSuffix = terminalDetail?.let { " Failure detail: $it" }.orEmpty()
                 conversationOps.persist(
                     Message(
                         role = "system",
-                        content = "The todo \"${terminalTodo.description}\" (id=${terminalTodo.id}) $action",
+                        content = "The todo \"${terminalTodo.description}\" (id=${terminalTodo.id}) $action$detailSuffix",
                         metadata =
                             buildJsonObject {
                                 put("type", "todo_review")
@@ -79,6 +81,7 @@ internal class AgentTodoTrigger(
                                 put("todoId", terminalTodo.id)
                                 put("status", terminalTodo.status.name)
                                 put("terminalReason", terminalReason.name)
+                                terminalDetail?.let { put("terminalDetail", it) }
                             }.toString(),
                     ),
                 )

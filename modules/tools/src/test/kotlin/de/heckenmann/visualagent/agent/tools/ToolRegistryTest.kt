@@ -90,7 +90,7 @@ class ToolRegistryTest {
         assertEquals(ToolCallPhase.STARTED, events[0].phase)
         assertEquals(ToolCallPhase.FINISHED, events[1].phase)
         assertFalse(events[1].result.success)
-        assertEquals("boom", events[1].result.error)
+        assertEquals("EXECUTION_FAILED", events[1].result.error?.substringBefore(':'))
     }
 
     @Test
@@ -141,7 +141,7 @@ class ToolRegistryTest {
             val result = registry.execute(registry.resolve(setOf(ToolId("context"))).single(), """{}""", emptyMap())
             val json = Json.parseToJsonElement(result).jsonObject
             assertFalse(json["success"]!!.jsonPrimitive.content.toBoolean())
-            assertTrue(json["error"]!!.jsonPrimitive.content.contains("TOOL_TIMEOUT"))
+            assertEquals("TIMEOUT", json["error"]!!.jsonObject["code"]!!.jsonPrimitive.content)
         } finally {
             timeoutSeconds = previousTimeout
         }
@@ -156,7 +156,7 @@ class ToolRegistryTest {
             val result = registry.execute(registry.resolve(setOf(ToolId("context"))).single(), """{"timeoutSeconds":2}""", emptyMap())
             val json = Json.parseToJsonElement(result).jsonObject
             assertTrue(json["success"]!!.jsonPrimitive.content.toBoolean())
-            assertEquals("ok", json["content"]!!.jsonPrimitive.content)
+            assertEquals("ok", json["data"]!!.jsonPrimitive.content)
         } finally {
             timeoutSeconds = previousTimeout
         }
@@ -173,8 +173,8 @@ class ToolRegistryTest {
         val json = Json.parseToJsonElement(result).jsonObject
 
         assertFalse(json["success"]!!.jsonPrimitive.content.toBoolean())
-        assertContains(json["error"]!!.jsonPrimitive.content, "TOOL_ARGUMENTS")
-        assertContains(json["error"]!!.jsonPrimitive.content, "1 and 600")
+        assertEquals("INVALID_ARGUMENT", json["error"]!!.jsonObject["code"]!!.jsonPrimitive.content)
+        assertContains(json["error"]!!.jsonObject["message"]!!.jsonPrimitive.content, "1 and 600")
         assertEquals(listOf(ToolCallPhase.STARTED, ToolCallPhase.FINISHED), events.map(ToolCallEvent::phase))
         assertFalse(events.last().result.success)
     }
@@ -200,7 +200,7 @@ class ToolRegistryTest {
         val result = registry.execute(registry.resolve(setOf(ToolId("context"))).single(), """{"async":true}""", emptyMap())
         val json = Json.parseToJsonElement(result).jsonObject
         assertTrue(json["success"]!!.jsonPrimitive.content.toBoolean())
-        assertTrue(json["content"]!!.jsonPrimitive.content.contains("scheduled async"))
+        assertTrue(json["data"]!!.jsonPrimitive.content.contains("scheduled async"))
 
         val deadline = System.currentTimeMillis() + 3000
         while (System.currentTimeMillis() < deadline && events.count { it.phase == ToolCallPhase.FINISHED } == 0) {
@@ -222,7 +222,7 @@ class ToolRegistryTest {
         val result = registry.execute(registry.resolve(setOf(ToolId("agent:start"))).single(), """{"async":true}""", emptyMap())
         val json = Json.parseToJsonElement(result).jsonObject
 
-        assertTrue(json["content"]!!.jsonPrimitive.content.contains("scheduled async"))
+        assertTrue(json["data"]!!.jsonPrimitive.content.contains("scheduled async"))
         val deadline = System.currentTimeMillis() + 3_000
         while (System.currentTimeMillis() < deadline && events.count { it.phase == ToolCallPhase.FINISHED } == 0) {
             TimeUnit.MILLISECONDS.sleep(25)
