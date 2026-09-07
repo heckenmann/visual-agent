@@ -42,15 +42,9 @@ internal object CodexDynamicToolResultMapper {
         allowInlineAudio: Boolean = false,
     ): JsonArray {
         val outer = parseObject(serializedResult)
-        val content = outer?.get("content")?.jsonPrimitive?.contentOrNull
-        val error = outer?.get("error")?.jsonPrimitive?.contentOrNull
-        val payload = parseObject(content.orEmpty())
+        val payload = outer?.get("data") as? JsonObject
         val media = payload?.media(allowInlineImage, allowInlineAudio)
-        val fallbackText =
-            listOf(content, error)
-                .filterNot { it.isNullOrBlank() }
-                .joinToString("\n")
-                .ifBlank { serializedResult }
+        val fallbackText = outer?.toString() ?: serializedResult
         return buildJsonArray {
             if (media == null) {
                 add(textItem(fallbackText))

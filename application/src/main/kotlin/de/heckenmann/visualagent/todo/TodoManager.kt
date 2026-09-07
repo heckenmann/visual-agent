@@ -28,6 +28,7 @@ data class TodoChange(
     val todoId: String? = null,
     val previousStatus: TodoStatus? = null,
     val terminalReason: TodoTerminalReason? = null,
+    val terminalDetail: String? = null,
 )
 
 /**
@@ -189,8 +190,10 @@ class TodoManager(
             if (candidate.status != status) {
                 candidate.status = status
                 candidate.completedAt = if (status == TodoStatus.COMPLETED) java.time.Instant.now() else null
+                if (status != TodoStatus.CANCELLED) candidate.terminalDetail = null
             }
         }
+        command.terminalDetail?.let { candidate.terminalDetail = it }
         if (candidate == original) return true
         val previousStatus = original.status
         val effectiveTerminalReason =
@@ -208,6 +211,7 @@ class TodoManager(
                 todo = original,
                 previousStatus = previousStatus,
                 terminalReason = effectiveTerminalReason,
+                terminalDetail = candidate.terminalDetail,
             ),
         )
         return true
@@ -302,10 +306,11 @@ class TodoManager(
     fun cancelTodo(
         todoId: String,
         reason: TodoTerminalReason = TodoTerminalReason.USER_CANCELLED,
+        detail: String? = null,
     ): Boolean {
         val todo = getById(todoId) ?: return false
         if (todo.status == TodoStatus.COMPLETED || todo.status == TodoStatus.CANCELLED) return false
-        return update(TodoUpdateCommand(id = todoId, status = TodoStatus.CANCELLED), reason)
+        return update(TodoUpdateCommand(id = todoId, status = TodoStatus.CANCELLED, terminalDetail = detail), reason)
     }
 
     /**
@@ -423,6 +428,7 @@ class TodoManager(
         target.updatedAt = source.updatedAt
         target.timelineSequence = source.timelineSequence
         target.completedAt = source.completedAt
+        target.terminalDetail = source.terminalDetail
     }
 }
 

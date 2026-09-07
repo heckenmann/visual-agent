@@ -18,7 +18,7 @@ class TerminalToolTest {
             val json = Json.parseToJsonElement(result).jsonObject
 
             assertFalse(json["success"]!!.jsonPrimitive.content.toBoolean())
-            assertContains(json["error"]!!.jsonPrimitive.content, "TOOL_TIMEOUT")
+            assertContains(json["error"]!!.jsonObject["code"]!!.jsonPrimitive.content, "TIMEOUT")
         }
     }
 }

@@ -64,7 +64,7 @@ internal class JavaScriptGuestValueConverter(
     ): JsonElement {
         if (value.isNull) return JsonNull
         if (value.isBoolean) return JsonPrimitive(value.asBoolean()).also { budget.consume(it.content.length) }
-        if (value.isNumber) return JsonPrimitive(value.asDouble()).also { budget.consume(it.content.length) }
+        if (value.isNumber) return number(value).also { budget.consume(it.content.length) }
         if (value.isString) return JsonPrimitive(value.asString()).also { budget.consume(it.content.length) }
         if (value.hasArrayElements()) {
             val arraySize = value.arraySize
@@ -84,6 +84,13 @@ internal class JavaScriptGuestValueConverter(
 
     private fun argumentsFailure(message: String): JavaScriptExecutionException =
         JavaScriptExecutionException(JavaScriptErrorCategory.TOOL_ARGUMENTS, message.take(MAX_ERROR_CHARACTERS))
+
+    private fun number(value: Value): JsonPrimitive =
+        if (value.fitsInLong()) {
+            JsonPrimitive(value.asLong())
+        } else {
+            JsonPrimitive(value.asDouble())
+        }
 
     private companion object {
         const val CONSOLE_LIMIT_MESSAGE = "JavaScript console output limit exceeded"

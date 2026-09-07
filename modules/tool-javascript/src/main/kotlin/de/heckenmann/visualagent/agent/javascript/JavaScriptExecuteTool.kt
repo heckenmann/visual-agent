@@ -86,7 +86,12 @@ class JavaScriptExecuteTool(
                         limits = limits,
                     ),
                 )
-            ToolResult(TOOL_ID, true, resultContent(result.value))
+            ToolResult(
+                toolId = TOOL_ID,
+                success = true,
+                content = resultContent(result.value),
+                data = resultToJson(result.value),
+            )
         } catch (error: JavaScriptExecutionException) {
             ToolResult(TOOL_ID, false, "", "${error.category}: ${error.message}")
         } catch (_: Exception) {

@@ -1,6 +1,8 @@
 package de.heckenmann.visualagent.agent.tools.api
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import java.time.Instant
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -36,6 +38,7 @@ data class ToolDefinition(
  * @property success Whether execution succeeded
  * @property content Human-readable result payload
  * @property error Optional error detail for failed execution
+ * @property data Explicit structured payload when a tool intentionally returns JSON data
  */
 @Serializable
 data class ToolResult(
@@ -43,7 +46,50 @@ data class ToolResult(
     val success: Boolean,
     val content: String,
     val error: String? = null,
+    val data: JsonElement? = null,
 )
+
+/** Machine-readable category for a model-visible tool failure. */
+@Serializable
+public enum class ToolErrorCode {
+    INVALID_ARGUMENT,
+    NOT_FOUND,
+    UNAVAILABLE,
+    TIMEOUT,
+    CANCELLED,
+    PERMISSION_DENIED,
+    EXECUTION_FAILED,
+    MALFORMED_RESULT,
+}
+
+/** Safe, actionable failure information returned to a model by a tool callback. */
+@Serializable
+public data class ToolError(
+    val code: ToolErrorCode,
+    val message: String,
+    val remediation: String,
+    val retryable: Boolean,
+)
+
+/**
+ * Canonical JSON-only result returned from every provider-facing tool callback.
+ *
+ * @property toolId Stable identifier of the tool that was invoked
+ * @property success Whether execution completed successfully
+ * @property data Typed JSON payload, or [JsonNull] when no payload is available
+ * @property error Safe actionable failure information, or `null` for successful calls
+ */
+@Serializable
+public data class ToolResultEnvelope(
+    val toolId: String,
+    val success: Boolean,
+    val data: JsonElement = JsonNull,
+    val error: ToolError? = null,
+) {
+    init {
+        require(success == (error == null)) { "Successful tool results must not contain errors and failed results must contain one." }
+    }
+}
 
 /**
  * Lifecycle event emitted around one tool call.

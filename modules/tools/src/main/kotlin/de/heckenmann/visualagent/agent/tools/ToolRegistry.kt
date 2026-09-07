@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import mu.KotlinLogging
 import java.time.Instant
 import java.util.concurrent.CancellationException
 import java.util.concurrent.Executors
@@ -21,6 +22,7 @@ class ToolRegistry(
     private val toolEventBus: ToolEventBus,
     private val defaultTimeoutSeconds: () -> Int = { DEFAULT_TOOL_TIMEOUT_SECONDS },
 ) : AutoCloseable {
+    private val logger = KotlinLogging.logger {}
     private val toolsById = tools.associateBy { it.definition.id }
     private val executor = Executors.newCachedThreadPool()
 
@@ -134,7 +136,7 @@ class ToolRegistry(
                     definition.id.value,
                     "scheduled async tool call (timeout=${options.timeoutSeconds}s)",
                 )
-            return Json.encodeToString(accepted)
+            return serialize(accepted)
         }
         val result =
             try {
@@ -144,7 +146,7 @@ class ToolRegistry(
             }
         val finishedAt = Instant.now()
         publishEvent(definition, ToolCallPhase.FINISHED, functionInput, effectiveContext, result, startedAt, finishedAt)
-        return Json.encodeToString(result)
+        return serialize(result)
     }
 
     override fun close() {
@@ -227,8 +229,9 @@ class ToolRegistry(
             if (cancellationToken.isCancelled) {
                 failure(toolId, "TOOL_CANCELLED: Tool call was cancelled.")
             } else {
-                val root = generateSequence(error as Throwable?) { it.cause }.lastOrNull()
-                failure(toolId, root?.message ?: error.message ?: error::class.simpleName.orEmpty())
+                val safeError = ToolResultNormalization.executionError(error)
+                logger.warn { "Tool execution failed for toolId=$toolId code=${safeError.code}" }
+                failure(toolId, ToolResultNormalization.legacyError(safeError))
             }
         } finally {
             cancellationRegistration.close()
@@ -271,8 +274,10 @@ class ToolRegistry(
             startedAt,
             Instant.now(),
         )
-        return Json.encodeToString(result)
+        return serialize(result)
     }
+
+    private fun serialize(result: ToolResult): String = envelopeJson.encodeToString(ToolResultNormalization.envelope(result))
 
     private fun publishEvent(
         definition: ToolDefinition,
@@ -321,4 +326,12 @@ class ToolRegistry(
         } else {
             "${TimeUnit.NANOSECONDS.toSeconds(timeoutNanos)}s"
         }
+
+    private companion object {
+        val envelopeJson =
+            Json {
+                encodeDefaults = true
+                explicitNulls = true
+            }
+    }
 }

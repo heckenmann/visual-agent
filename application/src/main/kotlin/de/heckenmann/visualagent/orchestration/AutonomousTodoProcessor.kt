@@ -185,7 +185,11 @@ internal suspend fun processTodoWithLLM(
                         executionId = executionId,
                         todoId = todoId,
                     )
-                    todoManager.cancelTodo(todoId, TodoTerminalReason.RETRIES_EXHAUSTED)
+                    todoManager.cancelTodo(
+                        todoId,
+                        TodoTerminalReason.RETRIES_EXHAUSTED,
+                        "${userError.summary}: ${userError.detail}",
+                    )
                     return
                 }
                 persistSubAgentMessage(
@@ -215,7 +219,12 @@ internal suspend fun processTodoWithLLM(
             executionId = executionId,
             todoId = todoId,
         )
-        todoManager.cancelTodo(todoId, TodoTerminalReason.EXECUTION_FAILED)
+        val userError = ErrorMessageMapper.map(error)
+        todoManager.cancelTodo(
+            todoId,
+            TodoTerminalReason.EXECUTION_FAILED,
+            "${userError.summary}: ${userError.detail}",
+        )
     } finally {
         todoEventBus.publishProgress(
             TodoProgressUpdate(

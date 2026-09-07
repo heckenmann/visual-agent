@@ -36,6 +36,7 @@ enum class TodoTerminalReason {
  * @property timelineSequence Database-backed total ordering key for the latest activity
  * @property completedAt Completion timestamp, set only after completion
  * @property dueDate Optional deadline supplied by the user or planner
+ * @property terminalDetail Safe explanation of a terminal failure, when applicable
  */
 data class Todo(
     val id: String,
@@ -48,6 +49,7 @@ data class Todo(
     var timelineSequence: Long = 0,
     var completedAt: Instant? = null,
     val dueDate: Instant? = null,
+    var terminalDetail: String? = null,
 )
 
 /** Assignment mutation requested together with a todo update. */
@@ -70,4 +72,5 @@ internal data class TodoUpdateCommand(
     val description: String? = null,
     val assignment: TodoAssignmentChange = TodoAssignmentChange.Unchanged,
     val status: TodoStatus? = null,
+    val terminalDetail: String? = null,
 )

@@ -14,7 +14,7 @@ class CodexDynamicToolResultMapperTest {
     @Test
     fun `dynamic tool media results map images and reserve audio content items`() {
         val imagePayload =
-            """{"content":"{\"path\":\"diagram.png\",\"mimeType\":\"image/png\",\"base64\":\"AQI=\"}"}"""
+            """{"toolId":"workspace:file","success":true,"data":{"path":"diagram.png","mimeType":"image/png","base64":"AQI="},"error":null}"""
         val imageItems =
             CodexDynamicToolResultMapper.contentItems(
                 imagePayload,
@@ -23,16 +23,16 @@ class CodexDynamicToolResultMapperTest {
         val untrustedImageItems = CodexDynamicToolResultMapper.contentItems(imagePayload)
         val audioItems =
             CodexDynamicToolResultMapper.contentItems(
-                """{"content":"{\"mimeType\":\"audio/wav\",\"base64\":\"AQI=\"}"}""",
+                """{"toolId":"workspace:file","success":true,"data":{"mimeType":"audio/wav","base64":"AQI="},"error":null}""",
             )
         val futureAudioItems =
             CodexDynamicToolResultMapper.contentItems(
-                """{"content":"{\"mimeType\":\"audio/wav\",\"base64\":\"AQI=\"}"}""",
+                """{"toolId":"workspace:file","success":true,"data":{"mimeType":"audio/wav","base64":"AQI="},"error":null}""",
                 allowInlineAudio = true,
             )
         val failureResponse =
             CodexDynamicToolResultMapper.response(
-                """{"success":false,"content":"","error":"workspace timeout"}""",
+                """{"toolId":"workspace:file","success":false,"data":null,"error":{"code":"TIMEOUT","message":"workspace timeout","remediation":"retry","retryable":true}}""",
                 allowInlineImage = false,
             )
         val imageType = content(imageItems[0].jsonObject, "type")
@@ -52,7 +52,7 @@ class CodexDynamicToolResultMapperTest {
         assertEquals("inputAudio", futureAudioType)
         assertFalse(failureResponse["success"]?.jsonPrimitive?.booleanOrNull ?: true)
         assertEquals(
-            "workspace timeout",
+            """{"toolId":"workspace:file","success":false,"data":null,"error":{"code":"TIMEOUT","message":"workspace timeout","remediation":"retry","retryable":true}}""",
             failureResponse["contentItems"]
                 ?.jsonArray
                 ?.single()

@@ -141,6 +141,8 @@ internal class TodoEntity(
     @Convert(converter = InstantStringConverter::class)
     @Column(name = "due_date", columnDefinition = "TIMESTAMP")
     var dueDate: Instant? = null,
+    @Column(name = "terminal_detail")
+    var terminalDetail: String? = null,
 )
 
 @Entity
@@ -168,6 +170,8 @@ internal class DeletedTodoEntity(
     @Convert(converter = InstantStringConverter::class)
     @Column(name = "due_date", columnDefinition = "TIMESTAMP")
     var dueDate: Instant? = null,
+    @Column(name = "terminal_detail")
+    var terminalDetail: String? = null,
 )
 
 @Entity
