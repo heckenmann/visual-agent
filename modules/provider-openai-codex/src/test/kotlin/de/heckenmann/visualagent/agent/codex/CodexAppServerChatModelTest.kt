@@ -17,6 +17,7 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlin.io.path.createTempDirectory
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** Verifies the clean-room Codex app-server protocol adapter. */
@@ -171,12 +172,49 @@ class CodexAppServerChatModelTest {
             }
         }
 
+    @Test
+    fun `each completed request closes its process and leaves an ephemeral thread`() =
+        runBlocking {
+            val directory = createTempDirectory("codex-app-server-lifecycle-test-")
+            val executable = fakeServer(directory)
+            try {
+                CodexAppServerChatModel(executable, "gpt-test", emptyList(), directory)
+                    .complete(Prompt("hello"))
+
+                val threadRequest = Files.readString(directory.resolve("thread-start.json"))
+                val processId = Files.readString(directory.resolve("pid"))
+
+                assertTrue(threadRequest.contains("\"ephemeral\":true"))
+                assertTrue(threadRequest.contains("\"sandbox\":\"read-only\""))
+                assertTrue(threadRequest.contains("\"approvalPolicy\":\"never\""))
+                assertFalse(ProcessHandle.of(processId.toLong()).map(ProcessHandle::isAlive).orElse(false))
+            } finally {
+                deleteRecursively(directory)
+            }
+        }
+
+    @Test
+    fun `server tool requests outside the allowlist receive a protocol error`() =
+        runBlocking {
+            val directory = createTempDirectory("codex-app-server-tool-boundary-test-")
+            val executable = fakeServer(directory, toolName = "not-enabled")
+            try {
+                CodexAppServerChatModel(executable, "gpt-test", emptyList(), directory)
+                    .complete(Prompt("hello"))
+
+                assertTrue(Files.readString(directory.resolve("tool-response.json")).contains("-32602"))
+            } finally {
+                deleteRecursively(directory)
+            }
+        }
+
     private fun fakeServer(
         directory: Path,
         singleDelta: Boolean = false,
         secondItem: Boolean = false,
         reasoningSummary: Boolean = false,
         turnStatus: String = "completed",
+        toolName: String = "context",
     ): Path {
         val executable = directory.resolve("codex")
         val deltaEvents =
@@ -191,6 +229,7 @@ class CodexAppServerChatModelTest {
             executable,
             """
             #!/bin/sh
+            printf '%s' "${'$'}${'$'}" > '${directory.resolve("pid")}'
             while IFS= read -r line; do
               case "${'$'}line" in
                 *'"method":"initialize"'*)
@@ -204,14 +243,16 @@ class CodexAppServerChatModelTest {
                   esac
                   ;;
                 *'"method":"thread/start"'*)
+                  printf '%s' "${'$'}line" > '${directory.resolve("thread-start.json")}'
                   printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{"thread":{"id":"thread-1"}}}'
                   ;;
                 *'"method":"turn/start"'*)
                   printf '%s' "${'$'}line" > '${directory.resolve("turn-start.json")}'
                   printf '%s\n' '{"jsonrpc":"2.0","id":3,"result":{"threadId":"thread-1","turn":{"id":"turn-1"}}}'
                   ${if (reasoningSummary) "printf '%s\\n' '{\"jsonrpc\":\"2.0\",\"method\":\"item/reasoning/summaryTextDelta\",\"params\":{\"delta\":\"planning\",\"itemId\":\"item-1\",\"summaryIndex\":0,\"threadId\":\"thread-1\",\"turnId\":\"turn-1\"}}'" else ""}
-                  printf '%s\n' '{"jsonrpc":"2.0","id":99,"method":"item/tool/call","params":{"arguments":{},"callId":"call-1","threadId":"thread-1","tool":"context","turnId":"turn-1"}}'
+                  printf '%s\n' '{"jsonrpc":"2.0","id":99,"method":"item/tool/call","params":{"arguments":{},"callId":"call-1","threadId":"thread-1","tool":"$toolName","turnId":"turn-1"}}'
                   IFS= read -r tool_response
+                  printf '%s' "${'$'}tool_response" > '${directory.resolve("tool-response.json")}'
                   $deltaEvents
                   printf '%s\n' '{"jsonrpc":"2.0","method":"turn/completed","params":{"threadId":"thread-1","turn":{"id":"turn-1","status":"$turnStatus","error":{"message":"turn failed"}}}}'
                   ;;

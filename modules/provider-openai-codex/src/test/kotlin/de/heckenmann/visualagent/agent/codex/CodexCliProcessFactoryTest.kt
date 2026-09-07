@@ -24,4 +24,28 @@ class CodexCliProcessFactoryTest {
             assertEquals(0, result.exitCode)
             assertEquals("codex-cli test", result.stdout.text.trim())
         }
+
+    @Test
+    fun `removes provider api keys from child process environment`() =
+        runTest {
+            val executable = temporaryDirectory.resolve("environment-codex")
+            Files.writeString(
+                executable,
+                "#!/bin/sh\nprintf '%s|%s' \"${'$'}OPENAI_API_KEY\" \"${'$'}OPENAI_CODEX_API_KEY\"\n",
+            )
+            check(executable.toFile().setExecutable(true)) { "Test executable permission could not be set" }
+
+            val result =
+                CodexCliProcessFactory().run(
+                    listOf(executable.toString()),
+                    timeoutSeconds = 5,
+                    environment =
+                        mapOf(
+                            "OPENAI_API_KEY" to "sentinel-api-key",
+                            "OPENAI_CODEX_API_KEY" to "sentinel-codex-key",
+                        ),
+                )
+
+            assertEquals("|", result.stdout.text)
+        }
 }
