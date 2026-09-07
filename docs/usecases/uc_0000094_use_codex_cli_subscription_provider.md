@@ -23,7 +23,7 @@ Allow a desktop user to use an authenticated, user-local OpenAI Codex CLI instal
 
 ## Prompt and input mapping
 
-System messages are sent as Codex `developerInstructions`. User and assistant messages are sent as turn text inputs; assistant history is explicitly marked with an `[assistant]` prefix because the app-server turn input contract accepts user input items rather than arbitrary Spring message roles. No API key or provider credential is inserted into the prompt.
+System messages are sent as Codex `baseInstructions`. User and assistant messages, including conversation history, are sent only as turn text inputs; each is explicitly role-marked because the app-server turn input contract accepts user input items rather than arbitrary Spring message roles. No API key or provider credential is inserted into the prompt.
 
 ## Configuration
 

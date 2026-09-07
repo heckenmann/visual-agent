@@ -190,6 +190,7 @@ class TodoManager(
             if (candidate.status != status) {
                 candidate.status = status
                 candidate.completedAt = if (status == TodoStatus.COMPLETED) java.time.Instant.now() else null
+                if (status != TodoStatus.CANCELLED) candidate.terminalDetail = null
             }
         }
         command.terminalDetail?.let { candidate.terminalDetail = it }
@@ -427,6 +428,7 @@ class TodoManager(
         target.updatedAt = source.updatedAt
         target.timelineSequence = source.timelineSequence
         target.completedAt = source.completedAt
+        target.terminalDetail = source.terminalDetail
     }
 }
 

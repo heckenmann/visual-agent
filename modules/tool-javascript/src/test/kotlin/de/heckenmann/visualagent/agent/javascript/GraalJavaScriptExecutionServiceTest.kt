@@ -7,6 +7,7 @@ import de.heckenmann.visualagent.agent.tools.VisualAgentTool
 import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
+import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.AfterEach
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -404,7 +405,13 @@ class GraalJavaScriptExecutionServiceTest {
         override fun execute(
             inputJson: String,
             context: Map<String, Any>,
-        ): ToolResult = ToolResult(definition.id.value, true, inputJson)
+        ): ToolResult =
+            ToolResult(
+                toolId = definition.id.value,
+                success = true,
+                content = inputJson,
+                data = Json.parseToJsonElement(inputJson),
+            )
     }
 
     private class NumbersTool : VisualAgentTool {
@@ -419,7 +426,13 @@ class GraalJavaScriptExecutionServiceTest {
         override fun execute(
             inputJson: String,
             context: Map<String, Any>,
-        ): ToolResult = ToolResult(definition.id.value, true, "[1,2,3]")
+        ): ToolResult =
+            ToolResult(
+                toolId = definition.id.value,
+                success = true,
+                content = "[1,2,3]",
+                data = Json.parseToJsonElement("[1,2,3]"),
+            )
     }
 
     private class SlowTool : VisualAgentTool {

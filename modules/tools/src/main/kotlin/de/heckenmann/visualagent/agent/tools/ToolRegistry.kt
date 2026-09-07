@@ -229,8 +229,9 @@ class ToolRegistry(
             if (cancellationToken.isCancelled) {
                 failure(toolId, "TOOL_CANCELLED: Tool call was cancelled.")
             } else {
-                logger.warn(error) { "Tool execution failed for toolId=$toolId" }
-                failure(toolId, ToolResultNormalization.legacyError(ToolResultNormalization.executionError(error)))
+                val safeError = ToolResultNormalization.executionError(error)
+                logger.warn { "Tool execution failed for toolId=$toolId code=${safeError.code}" }
+                failure(toolId, ToolResultNormalization.legacyError(safeError))
             }
         } finally {
             cancellationRegistration.close()
@@ -276,7 +277,7 @@ class ToolRegistry(
         return serialize(result)
     }
 
-    private fun serialize(result: ToolResult): String = Json.encodeToString(ToolResultNormalization.envelope(result))
+    private fun serialize(result: ToolResult): String = envelopeJson.encodeToString(ToolResultNormalization.envelope(result))
 
     private fun publishEvent(
         definition: ToolDefinition,
@@ -325,4 +326,12 @@ class ToolRegistry(
         } else {
             "${TimeUnit.NANOSECONDS.toSeconds(timeoutNanos)}s"
         }
+
+    private companion object {
+        val envelopeJson =
+            Json {
+                encodeDefaults = true
+                explicitNulls = true
+            }
+    }
 }

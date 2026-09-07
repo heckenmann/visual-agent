@@ -38,6 +38,7 @@ data class ToolDefinition(
  * @property success Whether execution succeeded
  * @property content Human-readable result payload
  * @property error Optional error detail for failed execution
+ * @property data Explicit structured payload when a tool intentionally returns JSON data
  */
 @Serializable
 data class ToolResult(
@@ -45,6 +46,7 @@ data class ToolResult(
     val success: Boolean,
     val content: String,
     val error: String? = null,
+    val data: JsonElement? = null,
 )
 
 /** Machine-readable category for a model-visible tool failure. */

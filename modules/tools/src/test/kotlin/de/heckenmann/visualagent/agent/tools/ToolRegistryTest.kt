@@ -4,6 +4,7 @@ import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.util.concurrent.TimeUnit
@@ -56,6 +57,9 @@ class ToolRegistryTest {
 
         assertEquals("context", json["toolId"]!!.jsonPrimitive.content)
         assertTrue(json["success"]!!.jsonPrimitive.content.toBoolean())
+        assertEquals(setOf("toolId", "success", "data", "error"), json.keys)
+        assertEquals("ok", json["data"]!!.jsonPrimitive.content)
+        assertTrue(json["error"] == JsonNull)
         assertEquals(2, events.size)
         assertEquals(ToolCallPhase.STARTED, events[0].phase)
         assertEquals(ToolCallPhase.FINISHED, events[1].phase)
@@ -91,6 +95,22 @@ class ToolRegistryTest {
         assertEquals(ToolCallPhase.FINISHED, events[1].phase)
         assertFalse(events[1].result.success)
         assertEquals("EXECUTION_FAILED", events[1].result.error?.substringBefore(':'))
+    }
+
+    @Test
+    fun `legacy JSON-looking content remains textual data`() {
+        val envelope = ToolResultNormalization.envelope(ToolResult("context", true, "{\"files\":[1,2]}"))
+
+        assertEquals("{\"files\":[1,2]}", envelope.data.jsonPrimitive.content)
+    }
+
+    @Test
+    fun `failed results retain textual output as data`() {
+        val envelope = ToolResultNormalization.envelope(ToolResult("terminal", false, "stderr output", "not configured"))
+
+        assertFalse(envelope.success)
+        assertEquals("stderr output", envelope.data.jsonPrimitive.content)
+        assertEquals("UNAVAILABLE", envelope.error!!.code.name)
     }
 
     @Test

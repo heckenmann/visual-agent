@@ -4,7 +4,6 @@ import de.heckenmann.visualagent.agent.tools.api.ToolError
 import de.heckenmann.visualagent.agent.tools.api.ToolErrorCode
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
 import de.heckenmann.visualagent.agent.tools.api.ToolResultEnvelope
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
@@ -18,12 +17,12 @@ internal object ToolResultNormalization {
 
     fun envelope(result: ToolResult): ToolResultEnvelope =
         if (result.success) {
-            ToolResultEnvelope(toolId = result.toolId, success = true, data = data(result.content))
+            ToolResultEnvelope(toolId = result.toolId, success = true, data = data(result))
         } else {
             ToolResultEnvelope(
                 toolId = result.toolId,
                 success = false,
-                data = JsonNull,
+                data = data(result),
                 error = legacyError(result.error),
             )
         }
@@ -66,12 +65,8 @@ internal object ToolResultNormalization {
 
     fun legacyError(error: ToolError): String = "${error.code.name}: ${error.message}"
 
-    private fun data(content: String): JsonElement =
-        if (content.isBlank()) {
-            JsonNull
-        } else {
-            runCatching { Json.parseToJsonElement(content) }.getOrElse { JsonPrimitive(content) }
-        }
+    private fun data(result: ToolResult): JsonElement =
+        result.data ?: result.content.takeIf(String::isNotBlank)?.let(::JsonPrimitive) ?: JsonNull
 
     private fun legacyError(error: String?): ToolError {
         val message = sanitize(error).ifBlank { "The tool could not complete the requested operation." }
@@ -84,16 +79,21 @@ internal object ToolResultNormalization {
         )
     }
 
-    private fun errorCode(error: String?): ToolErrorCode =
-        when (error?.substringBefore(':')?.trim()?.uppercase()) {
-            "TOOL_ARGUMENTS" -> ToolErrorCode.INVALID_ARGUMENT
-            "TOOL_TIMEOUT" -> ToolErrorCode.TIMEOUT
-            "TOOL_CANCELLED" -> ToolErrorCode.CANCELLED
-            "PERMISSION_DENIED" -> ToolErrorCode.PERMISSION_DENIED
-            "NOT_FOUND" -> ToolErrorCode.NOT_FOUND
-            "UNAVAILABLE" -> ToolErrorCode.UNAVAILABLE
+    private fun errorCode(error: String?): ToolErrorCode {
+        val prefix = error?.substringBefore(':')?.trim()?.uppercase()
+        return when {
+            prefix == "TOOL_ARGUMENTS" -> ToolErrorCode.INVALID_ARGUMENT
+            prefix == "TOOL_TIMEOUT" -> ToolErrorCode.TIMEOUT
+            prefix == "TOOL_CANCELLED" -> ToolErrorCode.CANCELLED
+            prefix == "PERMISSION_DENIED" -> ToolErrorCode.PERMISSION_DENIED
+            prefix == "NOT_FOUND" -> ToolErrorCode.NOT_FOUND
+            prefix == "UNAVAILABLE" -> ToolErrorCode.UNAVAILABLE
+            error?.contains("not configured", ignoreCase = true) == true -> ToolErrorCode.UNAVAILABLE
+            error?.contains("not found", ignoreCase = true) == true -> ToolErrorCode.NOT_FOUND
+            error?.contains("permission denied", ignoreCase = true) == true -> ToolErrorCode.PERMISSION_DENIED
             else -> ToolErrorCode.EXECUTION_FAILED
         }
+    }
 
     private fun remediation(code: ToolErrorCode): String =
         when (code) {

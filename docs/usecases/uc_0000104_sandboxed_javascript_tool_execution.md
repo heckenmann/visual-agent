@@ -21,7 +21,7 @@ Allow an enabled agent to run a JavaScript program for deterministic multi-tool 
 1. The agent calls `javascript:execute` with inline `source` or a workspace-relative JavaScript `path`.
 2. The server creates a fresh GraalJS context with host access, IO, process, network, and polyglot access disabled. Script source length is not capped.
 3. The context receives only `tools.call(name, arguments)`, `tools.list()`, `tools.describe(name)`, the hardened `workspace.write/read/delete(...)` helpers, and bounded simulated `console` methods.
-4. Each `tools.call` verifies the request-scoped allowlist and invokes the existing `ToolRegistry` path. Nested activity keeps normal lifecycle events, cancellation, authorization, and the outer call deadline.
+4. Each `tools.call` verifies the request-scoped allowlist and invokes the existing `ToolRegistry` path. It returns `{ toolId, success, data, error }`; scripts read a successful payload from `data` and inspect `error` before handling a failure. Nested activity keeps normal lifecycle events, cancellation, authorization, and the outer call deadline.
 5. The script filters, aggregates, transforms, or combines results locally. For complex deterministic logic or large generated text (for example CSV exports and Markdown tables), it assembles the complete output before returning it. It can return a string, Markdown document, primitive, array, object, or null.
 6. Only the final `return` value becomes the model-visible tool result. Console diagnostics remain bounded execution metadata and never use the server's real stdout/stderr.
 7. If execution fails, the tool returns a compact category and message to the model. The model can correct the source or arguments and retry; an unchanged failing script must not be repeated.
@@ -40,7 +40,8 @@ The script's return value is the authoritative output. Markdown is returned as a
 
 ```javascript
 const workspace = await tools.call("workspace:file", { action: "list" });
-return ["# Files", "", ...workspace.files.map(file => `- ${file.name}`)].join("\n");
+if (!workspace.success) throw new Error(workspace.error.message);
+return ["# Files", "", ...workspace.data.files.map(file => `- ${file.name}`)].join("\n");
 ```
 
 `console.log`, `console.info`, `console.warn`, and `console.error` are simulated, bounded diagnostics. They are not a second model result channel, are not written to process logs, and cannot access host output streams.

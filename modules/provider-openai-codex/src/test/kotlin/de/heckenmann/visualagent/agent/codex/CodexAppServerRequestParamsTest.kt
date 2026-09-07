@@ -11,12 +11,11 @@ import org.springframework.ai.chat.prompt.Prompt
 import java.nio.file.Path
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 
 /** Verifies role-preserving request mapping for the Codex app-server protocol. */
 class CodexAppServerRequestParamsTest {
     @Test
-    fun `history is contextualized while the latest user request remains the current turn`() {
+    fun `conversation history remains turn-level input`() {
         val prompt =
             Prompt(
                 listOf(
@@ -29,7 +28,6 @@ class CodexAppServerRequestParamsTest {
 
         val thread = CodexAppServerRequestParams.thread(prompt, "model", Path.of("."), emptyList())
         val baseInstructions = thread.getValue("baseInstructions").jsonPrimitive.content
-        val developerInstructions = thread.getValue("developerInstructions").jsonPrimitive.content
         val providerConfig = thread.getValue("config").jsonObject
         val turn = CodexAppServerRequestParams.turn(prompt, "thread", "model", false, null)
         val inputs = turn.getValue("input").jsonArray
@@ -57,19 +55,16 @@ class CodexAppServerRequestParamsTest {
                 .content
                 .toBoolean(),
         )
-        assertTrue(developerInstructions.contains("[user]\nold request"))
-        assertTrue(developerInstructions.contains("[assistant]\nold response"))
-        assertTrue(developerInstructions.contains("context only"))
-        assertFalse(developerInstructions.contains("say hello to me"))
-        assertEquals(1, inputs.size)
+        assertFalse("developerInstructions" in thread)
+        assertEquals(3, inputs.size)
         assertEquals(
-            "say hello to me",
-            inputs
-                .single()
-                .jsonObject
-                .getValue("text")
-                .jsonPrimitive
-                .content,
+            listOf("[user]\nold request", "[assistant]\nold response", "[user]\nsay hello to me"),
+            inputs.map {
+                it.jsonObject
+                    .getValue("text")
+                    .jsonPrimitive
+                    .content
+            },
         )
     }
 
@@ -93,6 +88,6 @@ class CodexAppServerRequestParamsTest {
                     .content
             }
 
-        assertEquals(listOf("complete the result", "[assistant]\ntool results"), texts)
+        assertEquals(listOf("[user]\ncomplete the result", "[assistant]\ntool results"), texts)
     }
 }
