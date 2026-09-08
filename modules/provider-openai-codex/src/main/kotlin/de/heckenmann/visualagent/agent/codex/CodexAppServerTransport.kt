@@ -27,6 +27,7 @@ import java.io.IOException
 import java.nio.file.Path
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
 /** Owns one short-lived line-delimited JSON-RPC Codex app-server process. */
@@ -129,7 +130,10 @@ internal class CodexAppServerTransport(
         writer?.runCatching { close() }
         process?.let { child ->
             child.destroy()
-            if (child.isAlive) child.destroyForcibly()
+            if (!child.waitFor(TERMINATION_GRACE_MILLIS, TimeUnit.MILLISECONDS) && child.isAlive) {
+                child.destroyForcibly()
+                child.waitFor(TERMINATION_GRACE_MILLIS, TimeUnit.MILLISECONDS)
+            }
         }
         process = null
         writer = null
@@ -208,5 +212,6 @@ internal class CodexAppServerTransport(
 
     private companion object {
         private val OPERATION_TIMEOUT: Duration = Duration.ofMinutes(5)
+        private const val TERMINATION_GRACE_MILLIS = 250L
     }
 }

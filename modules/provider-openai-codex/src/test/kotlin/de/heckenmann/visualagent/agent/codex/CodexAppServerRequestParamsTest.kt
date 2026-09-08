@@ -11,6 +11,7 @@ import org.springframework.ai.chat.prompt.Prompt
 import java.nio.file.Path
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /** Verifies role-preserving request mapping for the Codex app-server protocol. */
 class CodexAppServerRequestParamsTest {
@@ -89,5 +90,38 @@ class CodexAppServerRequestParamsTest {
             }
 
         assertEquals(listOf("[user]\ncomplete the result", "[assistant]\ntool results"), texts)
+    }
+
+    @Test
+    fun `thread requests are ephemeral and sandboxed without implicit collaboration context`() {
+        val thread =
+            CodexAppServerRequestParams.thread(
+                Prompt(UserMessage("request")),
+                "model",
+                Path.of("workspace"),
+                emptyList(),
+            )
+
+        assertEquals(
+            true,
+            thread
+                .getValue("ephemeral")
+                .jsonPrimitive
+                .content
+                .toBoolean(),
+        )
+        assertEquals("read-only", thread.getValue("sandbox").jsonPrimitive.content)
+        assertEquals("never", thread.getValue("approvalPolicy").jsonPrimitive.content)
+        assertEquals(
+            false,
+            thread
+                .getValue("config")
+                .jsonObject
+                .getValue("include_collaboration_mode_instructions")
+                .jsonPrimitive
+                .content
+                .toBoolean(),
+        )
+        assertTrue("dynamicTools" in thread)
     }
 }

@@ -21,6 +21,7 @@ internal class CodexCliProcessFactory {
      * @param command Executable followed by literal arguments
      * @param workingDirectory Deliberate child working directory, when needed
      * @param timeoutSeconds Maximum process duration in seconds
+     * @param environment Environment inherited by the child before provider credentials are removed
      * @param onOutput Optional bounded cumulative output callback invoked from [Dispatchers.IO]
      * @return Exit, timeout, and bounded output data
      */
@@ -30,6 +31,7 @@ internal class CodexCliProcessFactory {
         timeoutSeconds: Long,
         maxOutputCharacters: Int = MAX_OUTPUT_CHARACTERS,
         onOutput: suspend (String) -> Unit = {},
+        environment: Map<String, String> = System.getenv(),
     ): CodexCliProcessResult {
         require(command.isNotEmpty()) { "Codex command must include an executable" }
         require(timeoutSeconds > 0) { "Codex timeout must be positive" }
@@ -40,6 +42,8 @@ internal class CodexCliProcessFactory {
                     ProcessBuilder(command)
                         .apply {
                             workingDirectory?.let { directory(it.toFile()) }
+                            environment().clear()
+                            environment().putAll(environment)
                             environment().remove(OPENAI_API_KEY)
                             environment().remove(OPENAI_CODEX_API_KEY)
                         }.start()
