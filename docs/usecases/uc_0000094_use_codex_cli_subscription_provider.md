@@ -84,8 +84,8 @@ The app-server protocol supports request-scoped `dynamicTools`, server-initiated
 ## Verification
 
 - Protocol tests use a controlled fake app-server process and cover initialization, native delta streaming, assistant item boundaries, textual and inline image tool callbacks, structured tool failures, audio fallback, terminal completion, and cleanup.
-- Request-boundary tests verify that every thread is ephemeral, read-only, uses the `never` approval policy, receives only the request-scoped tool allowlist, and cannot expose provider API keys to the child process.
-- Lifecycle tests verify that successful completion, failed turns, rejected tool calls, and transport shutdown do not leave the app-server process or request state alive for a later request; the cancellation callback closes the same transport path.
+- Request-boundary tests verify that every thread is ephemeral, read-only, uses the `never` approval policy, and rejects a server tool request outside the request-scoped allowlist. The CLI process-factory test verifies API-key removal with controlled sentinel values.
+- Lifecycle tests verify successful completion process termination and failed-turn/rejected-tool error propagation. The transport cleanup path also waits for normal or forced child termination, and cancellation is wired to that same close path.
 - Provider wiring tests cover the new dependency-free adapter.
 - The optional real-CLI smoke test remains outside the default suite because it requires a locally authenticated Codex account; enable it with `-Dvisualagent.codex.smoke=true` and `-Dvisualagent.codex.smoke.model=...`. An executable path can be supplied with `-Dvisualagent.codex.smoke.executable=...`. The authenticated smoke test was run successfully against the locally installed CLI.
 
