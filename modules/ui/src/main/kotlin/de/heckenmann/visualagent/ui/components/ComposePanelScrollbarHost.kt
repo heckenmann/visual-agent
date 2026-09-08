@@ -1,27 +1,13 @@
-@file:Suppress("ktlint:standard:no-wildcard-imports", "FunctionName", "ktlint:standard:import-ordering")
-
 package de.heckenmann.visualagent.ui.components
 
-import de.heckenmann.visualagent.ui.agents.*
-import de.heckenmann.visualagent.ui.application.*
-import de.heckenmann.visualagent.ui.canvas.*
-import de.heckenmann.visualagent.ui.components.*
-import de.heckenmann.visualagent.ui.conversation.*
-import de.heckenmann.visualagent.ui.files.*
-import de.heckenmann.visualagent.ui.modal.*
-import de.heckenmann.visualagent.ui.settings.*
-import de.heckenmann.visualagent.ui.status.*
-import de.heckenmann.visualagent.ui.todo.*
-import de.heckenmann.visualagent.ui.workspace.*
-
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollbarAdapter
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.v2.ScrollbarAdapter
-import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -35,6 +21,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import de.heckenmann.visualagent.ui.agents.*
+import de.heckenmann.visualagent.ui.application.*
+import de.heckenmann.visualagent.ui.canvas.*
+import de.heckenmann.visualagent.ui.components.*
+import de.heckenmann.visualagent.ui.conversation.*
+import de.heckenmann.visualagent.ui.files.*
+import de.heckenmann.visualagent.ui.modal.*
+import de.heckenmann.visualagent.ui.settings.*
+import de.heckenmann.visualagent.ui.status.*
+import de.heckenmann.visualagent.ui.todo.*
+import de.heckenmann.visualagent.ui.workspace.*
 
 /**
  * Holds the scrollbar adapter contributed by the scrollable body of one workspace panel.

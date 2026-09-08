@@ -54,7 +54,7 @@ class TodosToolReorderTest {
         val manager = mockk<AgentManager>()
         every { manager.getSubAgent(any()) } returns SubAgent(id = "agent-1", name = "Coder", role = "Implementation")
         every { manager.todoManager } returns TodoManager(db, TodoEventBus())
-        return TodosTool(db, db, manager)
+        return todosTool(db, db, manager)
     }
 }
 

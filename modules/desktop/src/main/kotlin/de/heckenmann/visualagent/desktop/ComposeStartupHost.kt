@@ -1,5 +1,3 @@
-@file:Suppress("FunctionName")
-
 package de.heckenmann.visualagent.desktop
 
 import androidx.compose.runtime.Composable

@@ -1,5 +1,3 @@
-@file:Suppress("FunctionName")
-
 package de.heckenmann.visualagent.agent.tools.canvas
 
 import de.heckenmann.visualagent.agent.tools.AgentTool

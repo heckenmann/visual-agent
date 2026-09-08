@@ -54,7 +54,7 @@ class ConversationMessageListLoadingIndicatorTest {
         composeTestRule.setContent {
             MaterialTheme {
                 LazyColumn {
-                    ConversationTimeline(
+                    conversationTimeline(
                         items =
                             buildConversationTimeline(
                                 history = emptyList(),
@@ -111,7 +111,7 @@ class ConversationMessageListLoadingIndicatorTest {
         composeTestRule.setContent {
             MaterialTheme {
                 LazyColumn {
-                    ConversationMessageList(
+                    conversationMessageList(
                         history = emptyList(),
                         sending = sending,
                         inFlight = inFlight,

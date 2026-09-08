@@ -1,18 +1,4 @@
-@file:Suppress("ktlint:standard:no-wildcard-imports", "FunctionName", "ktlint:standard:import-ordering")
-
 package de.heckenmann.visualagent.ui.canvas
-
-import de.heckenmann.visualagent.ui.agents.*
-import de.heckenmann.visualagent.ui.application.*
-import de.heckenmann.visualagent.ui.canvas.*
-import de.heckenmann.visualagent.ui.components.*
-import de.heckenmann.visualagent.ui.conversation.*
-import de.heckenmann.visualagent.ui.files.*
-import de.heckenmann.visualagent.ui.modal.*
-import de.heckenmann.visualagent.ui.settings.*
-import de.heckenmann.visualagent.ui.status.*
-import de.heckenmann.visualagent.ui.todo.*
-import de.heckenmann.visualagent.ui.workspace.*
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
@@ -30,13 +16,13 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.focusTarget
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusTarget
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
@@ -44,9 +30,20 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.CanvasFigureSnapshot
-import de.heckenmann.visualagent.protocol.CanvasPort
 import de.heckenmann.visualagent.protocol.CanvasPoint
+import de.heckenmann.visualagent.protocol.CanvasPort
 import de.heckenmann.visualagent.protocol.CanvasSnapshot
+import de.heckenmann.visualagent.ui.agents.*
+import de.heckenmann.visualagent.ui.application.*
+import de.heckenmann.visualagent.ui.canvas.*
+import de.heckenmann.visualagent.ui.components.*
+import de.heckenmann.visualagent.ui.conversation.*
+import de.heckenmann.visualagent.ui.files.*
+import de.heckenmann.visualagent.ui.modal.*
+import de.heckenmann.visualagent.ui.settings.*
+import de.heckenmann.visualagent.ui.status.*
+import de.heckenmann.visualagent.ui.todo.*
+import de.heckenmann.visualagent.ui.workspace.*
 import io.github.xingray.compose.infinitecanvas.CanvasNode
 import io.github.xingray.compose.infinitecanvas.CanvasNodeState
 import io.github.xingray.compose.infinitecanvas.InfiniteCanvas

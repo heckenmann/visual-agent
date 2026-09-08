@@ -27,7 +27,7 @@ class TodosToolReadOnlyTest {
             val manager = mockk<AgentManager>()
             every { manager.getSubAgent(any()) } returns SubAgent(id = "agent-1", name = "Coder", role = "Implementation")
             every { manager.todoManager } returns TodoManager(db, TodoEventBus())
-            val tool = TodosTool(db, db, manager)
+            val tool = todosTool(db, db, manager)
             val added = tool.execute(jsonReadOnly("action" to "add", "description" to "Protected task", "assignedAgentId" to "agent-1"))
             val id = added.content.removePrefix("Added todo ")
             val workerContext = mapOf<String, Any>("agentId" to "agent-1")

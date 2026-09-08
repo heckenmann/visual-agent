@@ -162,7 +162,6 @@ class ConversationMessageGroupRowTest {
                         onEdit = {},
                         onDelete = {},
                         onRetry = {},
-                        onCopied = {},
                         timestamp = 1_000L,
                         showTimestamp = showTimestamp,
                     )

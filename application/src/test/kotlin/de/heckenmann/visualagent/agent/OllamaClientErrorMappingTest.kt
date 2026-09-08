@@ -1,7 +1,7 @@
 package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
-import de.heckenmann.visualagent.agent.tools.ToolRegistry
+import de.heckenmann.visualagent.agent.tools.toolRegistry
 import de.heckenmann.visualagent.config.AppConfigBean
 import io.mockk.every
 import io.mockk.mockk
@@ -19,7 +19,7 @@ class OllamaClientErrorMappingTest {
         runTest {
             val chatModel = mockk<ChatModel>()
             val ollamaApi = mockk<OllamaApi>()
-            val registry = ToolRegistry(emptyList(), ToolEventBus(), AppConfigBean(mockk(relaxed = true)))
+            val registry = toolRegistry(emptyList(), ToolEventBus(), AppConfigBean(mockk(relaxed = true)))
             every { ollamaApi.chat(any()) } throws
                 ForbiddenLikeException(
                     "403 Forbidden from POST http://localhost:11434/api/chat",
@@ -42,7 +42,7 @@ class OllamaClientErrorMappingTest {
         runTest {
             val chatModel = mockk<ChatModel>()
             val ollamaApi = mockk<OllamaApi>()
-            val registry = ToolRegistry(emptyList(), ToolEventBus(), AppConfigBean(mockk(relaxed = true)))
+            val registry = toolRegistry(emptyList(), ToolEventBus(), AppConfigBean(mockk(relaxed = true)))
             every { ollamaApi.chat(any()) } throws
                 ForbiddenLikeException(
                     "404 Not Found from POST http://localhost:11434/api/chat",

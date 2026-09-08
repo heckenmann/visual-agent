@@ -1,5 +1,3 @@
-@file:Suppress("FunctionName")
-
 package de.heckenmann.visualagent.ui.todo
 
 import androidx.compose.animation.AnimatedVisibility

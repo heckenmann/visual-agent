@@ -1,5 +1,3 @@
-@file:Suppress("ktlint:standard:no-wildcard-imports", "FunctionName")
-
 package de.heckenmann.visualagent.ui.conversation
 
 import androidx.compose.foundation.layout.Arrangement
@@ -29,7 +27,7 @@ import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
 import de.heckenmann.visualagent.protocol.ConversationMessage as Message
 
-internal fun LazyListScope.ConversationTimeline(
+internal fun LazyListScope.conversationTimeline(
     items: List<ConversationTimelineItem>,
     sending: Boolean,
     deletingMessageIds: Set<String>,
@@ -136,7 +134,7 @@ private fun ConversationMessageTimelineRow(
 }
 
 /** Renders conversation history messages in a [LazyListScope]. */
-internal fun LazyListScope.ConversationMessageList(
+internal fun LazyListScope.conversationMessageList(
     history: List<Message>,
     sending: Boolean,
     inFlight: InFlightStateHolder,
@@ -155,7 +153,7 @@ internal fun LazyListScope.ConversationMessageList(
     pendingUserEntryId: String? = null,
     streamingEntryId: String? = null,
 ) {
-    ConversationTimeline(
+    conversationTimeline(
         items =
             buildConversationTimeline(
                 history = history.reversed(),
