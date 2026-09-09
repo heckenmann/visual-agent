@@ -8,6 +8,7 @@ import de.heckenmann.visualagent.agent.config.SubAgentToolConfig
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.knowledge.ConversationStore
+import de.heckenmann.visualagent.knowledge.MainAgentLongTermMemoryStore
 import de.heckenmann.visualagent.knowledge.Memory
 import de.heckenmann.visualagent.knowledge.MemoryStore
 import de.heckenmann.visualagent.knowledge.PersistedSubAgent
@@ -62,6 +63,7 @@ class TestPersistence internal constructor(
     val todoStore: TodoStore = context.getBean(TodoStore::class.java)
     val subAgentStore: SubAgentStore = context.getBean(SubAgentStore::class.java)
     val memoryStore: MemoryStore = context.getBean(MemoryStore::class.java)
+    val mainAgentLongTermMemoryStore: MainAgentLongTermMemoryStore = context.getBean(MainAgentLongTermMemoryStore::class.java)
     val preferenceStore: PreferenceStore = context.getBean(PreferenceStore::class.java)
     val subAgentConfigStore: SubAgentConfigStore = context.getBean(SubAgentConfigStore::class.java)
     val workspaceFileStore: WorkspaceFileStore = context.getBean(WorkspaceFileStore::class.java)

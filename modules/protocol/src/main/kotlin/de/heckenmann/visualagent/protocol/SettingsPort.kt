@@ -42,6 +42,7 @@ data class SettingsSnapshot(
     val userModelInstruction: String = "",
     val favoriteModels: List<String> = emptyList(),
     val queueFlushMode: String = "ONE_BY_ONE",
+    val maxMainAgentMemoryChars: Int = 12_000,
 )
 
 /**

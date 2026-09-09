@@ -5,6 +5,8 @@ import de.heckenmann.visualagent.agent.AgentManagerConstants
 import de.heckenmann.visualagent.agent.CancellationToken
 import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.Message
+import de.heckenmann.visualagent.agent.ToolId
+import de.heckenmann.visualagent.agent.context.MainAgentLongTermMemoryPrompt
 
 /** Builds bounded, provider-safe request context for the main agent. */
 internal class AgentManagerContextOps(
@@ -18,8 +20,18 @@ internal class AgentManagerContextOps(
         token: CancellationToken? = null,
     ): ChatRequestContext {
         val contextPrompt = buildMainSystemContextPrompt()
+        val enabledTools = owner.agentToolConfigService.mainAgentTools()
         val preparedMessages = mutableListOf<Message>()
         preparedMessages += Message("system", contextPrompt)
+        preparedMessages +=
+            Message(
+                "system",
+                MainAgentLongTermMemoryPrompt.compose(
+                    owner.mainAgentLongTermMemoryStore.snapshot(),
+                    owner.appConfig.maxMainAgentMemoryChars,
+                    ToolId("memory") in enabledTools,
+                ),
+            )
         preparedMessages +=
             contextAssembler
                 .assemble(history, contextPrompt, owner.appConfig.contextLength)
@@ -34,7 +46,7 @@ internal class AgentManagerContextOps(
             }
         return ChatRequestContext(
             messages = preparedMessages,
-            enabledTools = owner.agentToolConfigService.mainAgentTools(),
+            enabledTools = enabledTools,
             metadata = metadata,
             cancellationToken = token,
         )

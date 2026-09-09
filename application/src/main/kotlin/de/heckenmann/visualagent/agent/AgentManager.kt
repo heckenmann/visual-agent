@@ -10,6 +10,8 @@ import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.knowledge.ConversationStore
+import de.heckenmann.visualagent.knowledge.InMemoryMainAgentLongTermMemoryStore
+import de.heckenmann.visualagent.knowledge.MainAgentLongTermMemoryStore
 import de.heckenmann.visualagent.knowledge.MemoryStore
 import de.heckenmann.visualagent.knowledge.PersistenceStores
 import de.heckenmann.visualagent.knowledge.SubAgentStore
@@ -43,6 +45,7 @@ class AgentManager
         internal val todoStore: TodoStore,
         internal val subAgentStore: SubAgentStore,
         internal val memoryStore: MemoryStore,
+        internal val mainAgentLongTermMemoryStore: MainAgentLongTermMemoryStore,
         val llmProvider: LLMProvider,
         internal val agentToolConfigService: AgentToolConfigService,
         internal val toolEventBus: ToolEventBus,
@@ -62,6 +65,7 @@ class AgentManager
             toolEventBus: ToolEventBus,
             todoEventBus: TodoEventBus,
             appConfig: AppConfigBean,
+            mainAgentLongTermMemoryStore: MainAgentLongTermMemoryStore = InMemoryMainAgentLongTermMemoryStore(),
             scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
             lifecycle: LifecyclePort = LifecycleState(),
             parallelismProvider: ParallelismProvider = ParallelismProvider(appConfig),
@@ -73,6 +77,7 @@ class AgentManager
             stores,
             stores,
             stores,
+            mainAgentLongTermMemoryStore,
             llmProvider,
             agentToolConfigService,
             toolEventBus,

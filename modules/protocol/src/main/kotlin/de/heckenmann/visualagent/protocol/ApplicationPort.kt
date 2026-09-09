@@ -17,6 +17,9 @@ interface ApplicationPort {
     /** Runtime and presentation settings. */
     val settings: SettingsPort
 
+    /** Durable editable memory owned by the main agent. */
+    val mainAgentMemory: MainAgentMemoryPort
+
     /** Workspace file commands. */
     val workspaceFiles: WorkspaceFilePort
 

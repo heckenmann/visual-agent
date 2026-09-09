@@ -3,6 +3,8 @@ package de.heckenmann.visualagent.server
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.config.ThemeMode
+import de.heckenmann.visualagent.knowledge.MainAgentLongTermMemory
+import de.heckenmann.visualagent.knowledge.MainAgentLongTermMemoryStore
 import de.heckenmann.visualagent.protocol.ProviderAdapter
 import de.heckenmann.visualagent.protocol.ProviderConfiguration
 import de.heckenmann.visualagent.protocol.ProviderModel
@@ -13,6 +15,7 @@ import io.mockk.mockk
 import io.mockk.verify
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import de.heckenmann.visualagent.protocol.ThemeMode as ProtocolThemeMode
 
 /** Verifies that settings exposed to the UI are read from and written to the server bean. */
@@ -29,7 +32,7 @@ class SpringSettingsPortTest {
         every { catalog.activeProviderId() } returns "openai"
         every { catalog.activeModelId() } returns "gpt-test"
 
-        val snapshot = SpringSettingsPort(config, catalog).snapshot()
+        val snapshot = SpringSettingsPort(config, catalog, memoryStore()).snapshot()
 
         assertEquals("openai", snapshot.providerId)
         assertEquals("gpt-test", snapshot.modelId)
@@ -42,7 +45,7 @@ class SpringSettingsPortTest {
     fun `save writes the complete settings snapshot to the server bean`() {
         val config = AppConfigBean()
         val catalog = mockk<ProviderCatalogService>(relaxed = true)
-        val port = SpringSettingsPort(config, catalog)
+        val port = SpringSettingsPort(config, catalog, memoryStore())
 
         port.save(
             SettingsSnapshot(
@@ -64,7 +67,7 @@ class SpringSettingsPortTest {
     fun `save persists a staged provider configuration with its settings draft`() {
         val config = AppConfigBean()
         val catalog = mockk<ProviderCatalogService>(relaxed = true)
-        val port = SpringSettingsPort(config, catalog)
+        val port = SpringSettingsPort(config, catalog, memoryStore())
         val provider =
             ProviderProfile(
                 id = "openai",
@@ -90,4 +93,18 @@ class SpringSettingsPortTest {
         }
         assertEquals("gpt-test", config.favoriteModels)
     }
+
+    @Test
+    fun `save rejects a memory limit lower than the stored document`() {
+        val port = SpringSettingsPort(AppConfigBean(), mockk(relaxed = true), memoryStore("x".repeat(1_001)))
+
+        val error = assertFailsWith<IllegalArgumentException> { port.save(SettingsSnapshot(maxMainAgentMemoryChars = 1_000)) }
+
+        assertEquals("Main-agent memory has 1001 characters; reduce it before lowering the limit below that size", error.message)
+    }
+
+    private fun memoryStore(content: String = ""): MainAgentLongTermMemoryStore =
+        mockk {
+            every { snapshot() } returns MainAgentLongTermMemory(content, content.length, 0, java.time.Instant.EPOCH)
+        }
 }

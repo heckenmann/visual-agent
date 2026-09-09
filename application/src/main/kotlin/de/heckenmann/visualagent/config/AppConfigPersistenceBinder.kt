@@ -57,6 +57,12 @@ class AppConfigPersistenceBinder(
             preferenceStore.getPreference(AppConfigBean.KEY_SESSION_FAVORITE_MODELS) ?: appConfigBean.favoriteModels
         appConfigBean.queueFlushMode =
             preferenceStore.getPreference(AppConfigBean.KEY_SESSION_QUEUE_FLUSH_MODE) ?: appConfigBean.queueFlushMode
+        appConfigBean.maxMainAgentMemoryChars =
+            preferenceStore
+                .getPreference(AppConfigBean.KEY_MAIN_AGENT_MEMORY_CHARS)
+                ?.toIntOrNull()
+                ?.takeIf { it in AppConfigBean.MAIN_AGENT_MEMORY_CHARS_RANGE }
+                ?: appConfigBean.maxMainAgentMemoryChars
         // The bootstrap database path is resolved before the data source is created and is
         // the single source of truth for locating the database/workspace directory.
         appConfigBean.databasePath = databasePath
