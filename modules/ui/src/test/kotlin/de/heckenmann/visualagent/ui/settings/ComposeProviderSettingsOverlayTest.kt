@@ -4,6 +4,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import de.heckenmann.visualagent.protocol.MainAgentMemoryPort
+import de.heckenmann.visualagent.protocol.MainAgentMemorySnapshot
 import de.heckenmann.visualagent.protocol.ProviderAdapter
 import de.heckenmann.visualagent.protocol.ProviderModel
 import de.heckenmann.visualagent.protocol.ProviderPort
@@ -35,13 +37,15 @@ class ComposeProviderSettingsOverlayTest {
                 models = listOf(ProviderModel("llama")),
             )
         val providers = mockk<ProviderPort>(relaxed = true)
+        val memory = mockk<MainAgentMemoryPort>()
         coEvery { settings.snapshotAsync() } returns SettingsSnapshot(providerId = "ollama", modelId = "llama")
         every { settings.snapshot() } returns SettingsSnapshot(providerId = "ollama", modelId = "llama")
         every { providers.listProviders() } returns listOf(provider)
+        every { memory.snapshot() } returns MainAgentMemorySnapshot("", 0, 12_000, 0)
 
         composeTestRule.setContent {
             MaterialTheme {
-                providerSettingsOverlay(settings, providers, onSettingsChanged = {})
+                providerSettingsOverlay(settings, memory, providers, onSettingsChanged = {})
             }
         }
 
@@ -50,6 +54,8 @@ class ComposeProviderSettingsOverlayTest {
         composeTestRule.onNodeWithText("Conversation").assertExists()
         composeTestRule.onNodeWithText("Model instruction").assertExists()
         composeTestRule.onNodeWithText("Queue flush").assertExists()
+        composeTestRule.onNodeWithText("Main-agent memory").assertExists()
+        composeTestRule.onNodeWithText("Revision 0 · 0 / 12000 characters").assertExists()
         listOf(
             "Model instruction",
             "Context length",

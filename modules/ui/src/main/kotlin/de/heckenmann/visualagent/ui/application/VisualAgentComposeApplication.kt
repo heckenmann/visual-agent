@@ -66,6 +66,7 @@ fun VisualAgentComposeApp(
         remember {
             ComposePanelServices(
                 settings = deps.applicationPort.settings,
+                mainAgentMemory = deps.applicationPort.mainAgentMemory,
                 agents = deps.applicationPort.agents,
                 providers = deps.applicationPort.providers,
                 activity = deps.applicationPort.activity,

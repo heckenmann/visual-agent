@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -28,6 +29,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import de.heckenmann.visualagent.protocol.MainAgentMemoryPort
+import de.heckenmann.visualagent.protocol.MainAgentMemorySnapshot
+import de.heckenmann.visualagent.protocol.MainAgentMemoryUpdate
 import de.heckenmann.visualagent.protocol.ProviderConfiguration
 import de.heckenmann.visualagent.protocol.ProviderModel
 import de.heckenmann.visualagent.protocol.ProviderPort
@@ -51,23 +55,27 @@ import kotlinx.coroutines.withContext
 @Composable
 internal fun providerSettingsOverlay(
     settingsPort: SettingsPort,
+    mainAgentMemoryPort: MainAgentMemoryPort,
     providerPort: ProviderPort,
     onSettingsChanged: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     var persisted by remember { mutableStateOf(ProviderSettingsDraft()) }
     var draft by remember { mutableStateOf(ProviderSettingsDraft()) }
+    var persistedMemory by remember { mutableStateOf(MainAgentMemorySnapshot("", 0, 12_000, 0)) }
+    var draftMemory by remember { mutableStateOf("") }
     var loaded by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var refreshing by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("Loading provider settings...") }
     var editingProfile by remember { mutableStateOf<ProviderProfile?>(null) }
     var creatingProfile by remember { mutableStateOf(false) }
-    val hasUnsavedChanges = loaded && draft != persisted
+    val hasUnsavedChanges = loaded && (draft != persisted || draftMemory != persistedMemory.content)
     val enabledProviders = draft.providers.filter(ProviderProfile::enabled)
     val selectedProvider = draft.providers.firstOrNull { it.id == draft.providerId }
     val models = selectedProvider?.selectableModels().orEmpty()
     val canSave = draft.providerId.isNotBlank() && draft.modelId.isNotBlank()
+    val memoryFitsLimit = draftMemory.codePointCount(0, draftMemory.length) <= draft.conversationSettings.maxMainAgentMemoryChars
 
     /** Loads the persisted catalog, optionally reporting that local edits were discarded. */
     fun loadPersistedDraft(discardingLocalEdits: Boolean) {
@@ -75,11 +83,13 @@ internal fun providerSettingsOverlay(
         scope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
-                    providerSettingsDraft(settingsPort.snapshotAsync(), providerPort.listProviders())
+                    providerSettingsDraft(settingsPort.snapshotAsync(), providerPort.listProviders()) to mainAgentMemoryPort.snapshot()
                 }
-            }.onSuccess { current ->
+            }.onSuccess { (current, memory) ->
                 persisted = current
                 draft = current
+                persistedMemory = memory
+                draftMemory = memory.content
                 loaded = true
                 status = if (discardingLocalEdits) "Discarded unsaved changes" else "Provider settings loaded"
             }.onFailure { error -> status = error.toUiErrorMessage() }
@@ -89,6 +99,17 @@ internal fun providerSettingsOverlay(
     /** Saves the provider catalog, main-agent selection, and model favorites as one server operation. */
     fun saveDraft() {
         if (!loaded || saving || !hasUnsavedChanges || !canSave) return
+        if (!memoryFitsLimit) {
+            status = "Reduce main-agent memory before saving its lower limit"
+            return
+        }
+        if (
+            draftMemory != persistedMemory.content &&
+            draft.conversationSettings.maxMainAgentMemoryChars < persistedMemory.limit
+        ) {
+            status = "Save the reduced memory before lowering its limit"
+            return
+        }
         saving = true
         scope.launch {
             runCatching {
@@ -108,10 +129,27 @@ internal fun providerSettingsOverlay(
                         nextSettings,
                         ProviderConfiguration(draft.providers, draft.providerId, draft.modelId),
                     )
+                    if (draftMemory != persistedMemory.content) {
+                        mainAgentMemoryPort.replace(draftMemory, persistedMemory.revision)
+                    } else {
+                        null
+                    }
                 }
-            }.onSuccess {
+            }.onSuccess { memoryUpdate ->
                 persisted = draft
-                status = "Saved provider and model settings"
+                when (memoryUpdate) {
+                    is MainAgentMemoryUpdate.Saved -> {
+                        persistedMemory = memoryUpdate.snapshot
+                        draftMemory = memoryUpdate.snapshot.content
+                        status = "Saved provider, model, and main-agent memory settings"
+                    }
+                    is MainAgentMemoryUpdate.Conflict -> {
+                        persistedMemory = memoryUpdate.snapshot
+                        draftMemory = memoryUpdate.snapshot.content
+                        status = "Memory changed elsewhere; loaded its latest version"
+                    }
+                    null -> status = "Saved provider and model settings"
+                }
                 onSettingsChanged()
             }.onFailure { error -> status = error.toUiErrorMessage() }
             saving = false
@@ -166,6 +204,12 @@ internal fun providerSettingsOverlay(
                 conversationSettingsSection(
                     settings = draft.conversationSettings,
                     onChange = { conversationSettings -> draft = draft.copy(conversationSettings = conversationSettings) },
+                )
+                mainAgentMemorySection(
+                    content = draftMemory,
+                    snapshot = persistedMemory,
+                    limit = draft.conversationSettings.maxMainAgentMemoryChars,
+                    onContentChange = { draftMemory = it },
                 )
                 PanelSection(title = "Main agent connection") {
                     PanelDropdownField(
@@ -247,6 +291,29 @@ internal fun providerSettingsOverlay(
             )
             PanelStatus(status)
         }
+    }
+}
+
+/** Renders a revision-aware draft for the main agent's durable reference document. */
+@Composable
+private fun mainAgentMemorySection(
+    content: String,
+    snapshot: MainAgentMemorySnapshot,
+    limit: Int,
+    onContentChange: (String) -> Unit,
+) {
+    val size = content.codePointCount(0, content.length)
+    PanelSection(title = "Main-agent memory") {
+        OutlinedTextField(
+            value = content,
+            onValueChange = onContentChange,
+            label = { Text("Durable model reference") },
+            supportingText = { Text("Revision ${snapshot.revision} · $size / $limit characters") },
+            isError = size > limit,
+            minLines = 5,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        PanelInfoBox("The main agent receives this durable reference on every request. Do not store secrets or credentials here.")
     }
 }
 

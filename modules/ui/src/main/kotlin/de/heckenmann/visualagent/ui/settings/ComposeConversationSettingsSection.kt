@@ -72,6 +72,15 @@ internal fun conversationSettingsSection(
             onChange = { value -> onChange(settings.copy(maxParallelSubAgents = value)) },
         )
         conversationNumberSetting(
+            label = "Main-agent memory limit",
+            value = settings.maxMainAgentMemoryChars,
+            help =
+                "Maximum Unicode character count of the durable main-agent memory document. " +
+                    "Lowering it requires reducing the document first.",
+            range = 1000..100000,
+            onChange = { value -> onChange(settings.copy(maxMainAgentMemoryChars = value)) },
+        )
+        conversationNumberSetting(
             label = "Default tool timeout (seconds)",
             value = settings.timeoutSeconds,
             help =

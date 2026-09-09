@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.ui.conversation
 
+import de.heckenmann.visualagent.protocol.MainAgentMemoryPort
 import de.heckenmann.visualagent.protocol.ProviderPort
 import de.heckenmann.visualagent.protocol.SettingsPort
 import de.heckenmann.visualagent.ui.modal.ComposeModalRequester
@@ -11,6 +12,7 @@ import de.heckenmann.visualagent.ui.settings.providerSettingsOverlay
 internal fun openConversationProviderSettings(
     modalRequester: ComposeModalRequester,
     settingsPort: SettingsPort,
+    mainAgentMemoryPort: MainAgentMemoryPort,
     providerPort: ProviderPort,
     onSettingsChanged: () -> Unit,
 ) {
@@ -18,6 +20,7 @@ internal fun openConversationProviderSettings(
         ComposeSettingsModal(title = "Providers and models") {
             providerSettingsOverlay(
                 settingsPort = settingsPort,
+                mainAgentMemoryPort = mainAgentMemoryPort,
                 providerPort = providerPort,
                 onSettingsChanged = onSettingsChanged,
             )

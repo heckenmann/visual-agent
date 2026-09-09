@@ -59,6 +59,7 @@ internal fun ReorderableCollectionItemScope.SplitPanelContent(
                 openConversationProviderSettings(
                     modalRequester = panelServices.modalRequester,
                     settingsPort = panelServices.settings,
+                    mainAgentMemoryPort = panelServices.mainAgentMemory,
                     providerPort = panelServices.providers,
                     onSettingsChanged = panelServices.onSettingsChanged,
                 )
