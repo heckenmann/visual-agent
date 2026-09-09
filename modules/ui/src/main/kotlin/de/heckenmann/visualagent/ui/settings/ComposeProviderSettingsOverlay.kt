@@ -17,7 +17,6 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -30,14 +29,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.MainAgentMemoryPort
-import de.heckenmann.visualagent.protocol.MainAgentMemorySnapshot
 import de.heckenmann.visualagent.protocol.MainAgentMemoryUpdate
 import de.heckenmann.visualagent.protocol.ProviderConfiguration
-import de.heckenmann.visualagent.protocol.ProviderModel
 import de.heckenmann.visualagent.protocol.ProviderPort
 import de.heckenmann.visualagent.protocol.ProviderProfile
 import de.heckenmann.visualagent.protocol.SettingsPort
-import de.heckenmann.visualagent.protocol.SettingsSnapshot
 import de.heckenmann.visualagent.ui.components.PanelDropdownField
 import de.heckenmann.visualagent.ui.components.PanelInfoBox
 import de.heckenmann.visualagent.ui.components.PanelScrollbarHost
@@ -62,7 +58,7 @@ internal fun providerSettingsOverlay(
     val scope = rememberCoroutineScope()
     var persisted by remember { mutableStateOf(ProviderSettingsDraft()) }
     var draft by remember { mutableStateOf(ProviderSettingsDraft()) }
-    var persistedMemory by remember { mutableStateOf(MainAgentMemorySnapshot("", 0, 12_000, 0)) }
+    var persistedMemory by remember { mutableStateOf(initialMainAgentMemorySnapshot()) }
     var draftMemory by remember { mutableStateOf("") }
     var loaded by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
@@ -293,81 +289,3 @@ internal fun providerSettingsOverlay(
         }
     }
 }
-
-/** Renders a revision-aware draft for the main agent's durable reference document. */
-@Composable
-private fun mainAgentMemorySection(
-    content: String,
-    snapshot: MainAgentMemorySnapshot,
-    limit: Int,
-    onContentChange: (String) -> Unit,
-) {
-    val size = content.codePointCount(0, content.length)
-    PanelSection(title = "Main-agent memory") {
-        OutlinedTextField(
-            value = content,
-            onValueChange = onContentChange,
-            label = { Text("Durable model reference") },
-            supportingText = { Text("Revision ${snapshot.revision} · $size / $limit characters") },
-            isError = size > limit,
-            minLines = 5,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        PanelInfoBox("The main agent receives this durable reference on every request. Do not store secrets or credentials here.")
-    }
-}
-
-/** Holds the complete local provider edit until the settings overlay is saved or reset. */
-internal data class ProviderSettingsDraft(
-    val providers: List<ProviderProfile> = emptyList(),
-    val providerId: String = "",
-    val modelId: String = "",
-    val favoriteModels: Set<String> = emptySet(),
-    val conversationSettings: SettingsSnapshot = SettingsSnapshot(),
-)
-
-private fun providerSettingsDraft(
-    settings: SettingsSnapshot,
-    providers: List<ProviderProfile>,
-): ProviderSettingsDraft =
-    ProviderSettingsDraft(
-        providers = providers,
-        providerId = settings.providerId,
-        modelId = settings.modelId,
-        favoriteModels = settings.favoriteModels.toSet(),
-        conversationSettings = settings,
-    )
-
-/** Replaces one staged profile and retains a valid enabled provider/model selection. */
-internal fun ProviderSettingsDraft.upsert(profile: ProviderProfile): ProviderSettingsDraft =
-    copy(providers = providers.filterNot { it.id == profile.id } + profile).normalizeSelection()
-
-private fun ProviderSettingsDraft.remove(providerId: String): ProviderSettingsDraft =
-    copy(providers = providers.filterNot { it.id == providerId }).normalizeSelection()
-
-/** Keeps the draft selection aligned with an enabled provider and one of its selectable models. */
-internal fun ProviderSettingsDraft.normalizeSelection(): ProviderSettingsDraft {
-    val nextProvider =
-        providerId.takeIf { id -> providers.any { it.id == id && it.enabled } }
-            ?: providers.firstOrNull(ProviderProfile::enabled)?.id.orEmpty()
-    val selectableModels = providers.firstOrNull { it.id == nextProvider }?.selectableModels().orEmpty()
-    val nextModel = modelId.takeIf { id -> selectableModels.any { it.id == id } } ?: selectableModels.firstOrNull()?.id.orEmpty()
-    return copy(providerId = nextProvider, modelId = nextModel)
-}
-
-private fun ProviderSettingsDraft.withModels(
-    providerId: String,
-    models: List<ProviderModel>,
-): ProviderSettingsDraft {
-    val updated = providers.map { profile -> if (profile.id == providerId) profile.copy(models = models) else profile }
-    val selectedModel = modelId.takeIf { id -> models.any { it.id == id } } ?: models.firstOrNull()?.id.orEmpty()
-    return copy(providers = updated, modelId = selectedModel)
-}
-
-private fun ProviderProfile.selectableModels(): List<ProviderModel> =
-    models.filter { model ->
-        model.id !in modelBlacklist &&
-            (modelWhitelist.isEmpty() || model.id in modelWhitelist) &&
-            model.status != de.heckenmann.visualagent.protocol.ModelStatus.DEPRECATED &&
-            model.status != de.heckenmann.visualagent.protocol.ModelStatus.DISABLED
-    }

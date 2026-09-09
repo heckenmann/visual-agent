@@ -13,6 +13,8 @@ import de.heckenmann.visualagent.protocol.ConversationHistoryPage
 import de.heckenmann.visualagent.protocol.ConversationPort
 import de.heckenmann.visualagent.protocol.ConversationPreferences
 import de.heckenmann.visualagent.protocol.LayoutWindowState
+import de.heckenmann.visualagent.protocol.MainAgentMemoryPort
+import de.heckenmann.visualagent.protocol.MainAgentMemorySnapshot
 import de.heckenmann.visualagent.protocol.ProviderPort
 import de.heckenmann.visualagent.protocol.SettingsPort
 import de.heckenmann.visualagent.protocol.SettingsSnapshot
@@ -96,6 +98,9 @@ class VisualAgentComposeAppProtocolTest {
         coEvery { settings.snapshotAsync() } returns SettingsSnapshot()
         every { settings.addChangeListener(any()) } returns AutoCloseable { }
 
+        val mainAgentMemory = mockk<MainAgentMemoryPort>(relaxed = true)
+        every { mainAgentMemory.snapshot() } returns MainAgentMemorySnapshot("", 0, 12_000, 0)
+
         val files = mockk<WorkspaceFilePort>(relaxed = true)
         every { files.listFiles() } returns emptyList()
         every { files.workspaceRoot() } returns "workspace"
@@ -117,6 +122,7 @@ class VisualAgentComposeAppProtocolTest {
         every { application.agents } returns agents
         every { application.providers } returns providers
         every { application.settings } returns settings
+        every { application.mainAgentMemory } returns mainAgentMemory
         every { application.workspaceFiles } returns files
         every { application.canvas } returns canvas
         every { application.layout } returns layout
