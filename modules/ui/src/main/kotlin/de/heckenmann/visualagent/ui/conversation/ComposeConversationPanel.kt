@@ -1,5 +1,3 @@
-@file:Suppress("ktlint:standard:no-wildcard-imports", "FunctionName")
-
 package de.heckenmann.visualagent.ui.conversation
 
 import androidx.compose.foundation.layout.Arrangement
@@ -218,7 +216,7 @@ internal fun ConversationPanel(
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
-                    ConversationTimeline(
+                    conversationTimeline(
                         items = timeline,
                         sending = conversationState.sending,
                         deletingMessageIds = conversationState.deletingMessageIds,

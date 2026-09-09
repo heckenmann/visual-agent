@@ -46,7 +46,7 @@ class ConversationTimelineRowsTest {
         composeTestRule.setContent {
             MaterialTheme {
                 LazyColumn {
-                    ConversationTimeline(
+                    conversationTimeline(
                         items =
                             buildConversationTimeline(
                                 history = listOf(Message(role = "sub_agent", content = "## Result", metadata = metadata)),
@@ -80,11 +80,11 @@ class ConversationTimelineRowsTest {
     }
 
     @Test
-    fun `persisted conversation messages retain their copy action`() {
+    fun `persisted conversation messages retain selectable content`() {
         composeTestRule.setContent {
             MaterialTheme {
                 LazyColumn {
-                    ConversationTimeline(
+                    conversationTimeline(
                         items =
                             buildConversationTimeline(
                                 history = listOf(Message(role = "user", content = "Copy me", id = "message-1")),
@@ -105,6 +105,6 @@ class ConversationTimelineRowsTest {
             }
         }
 
-        composeTestRule.onNodeWithContentDescription("Copy user message").assertExists()
+        composeTestRule.onNodeWithContentDescription("Message actions").assertExists()
     }
 }

@@ -23,6 +23,7 @@ dependencies {
     implementation(compose.desktop.currentOs)
     implementation(libs.compose.material3)
     implementation(libs.compose.material.icons)
+    implementation(libs.cmp.clipboard)
     implementation(libs.reorderable)
     implementation(libs.infinite.canvas)
     implementation(libs.filekit.dialogs.compose)

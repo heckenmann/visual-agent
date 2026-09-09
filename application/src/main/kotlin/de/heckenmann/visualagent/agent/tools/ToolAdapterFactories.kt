@@ -1,5 +1,3 @@
-@file:Suppress("FunctionName")
-
 package de.heckenmann.visualagent.agent.tools
 
 import de.heckenmann.visualagent.agent.AgentManager
@@ -20,14 +18,14 @@ import de.heckenmann.visualagent.workspace.layout.WorkspaceLayoutService
 import org.springframework.beans.factory.ObjectProvider
 
 /** Compatibility factory routing application canvas collaborators through the tool-owned port. */
-fun CanvasTool(
+fun canvasTool(
     canvas: CanvasOperations,
     conversations: ConversationStore,
 ) = de.heckenmann.visualagent.agent.tools.canvas
     .CanvasTool(CanvasToolPortAdapter(canvas, conversations))
 
 /** Compatibility factory routing application workspace collaborators through the tool-owned port. */
-fun WorkspaceFileTool(
+fun workspaceFileTool(
     files: WorkspaceFileService,
     provider: ObjectProvider<LLMProvider>,
     downloads: WorkspaceDownloadService? = null,
@@ -35,12 +33,12 @@ fun WorkspaceFileTool(
     .WorkspaceFileTool(WorkspaceFileToolPortAdapter(files, provider, downloads))
 
 /** Compatibility factory routing application layout collaborators through the tool-owned port. */
-fun WorkspaceLayoutTool(layout: WorkspaceLayoutService) =
+fun workspaceLayoutTool(layout: WorkspaceLayoutService) =
     de.heckenmann.visualagent.agent.tools
         .WorkspaceLayoutTool(WorkspaceLayoutToolPortAdapter(layout))
 
 /** Compatibility factory routing application todo collaborators through the tool-owned port. */
-fun TodosTool(
+fun todosTool(
     todoStore: TodoStore,
     memoryStore: MemoryStore,
     manager: AgentManager,
@@ -48,40 +46,40 @@ fun TodosTool(
     .TodosTool(TodoToolPortAdapter(todoStore, memoryStore, { manager.todoManager }, { manager }))
 
 /** Compatibility factory routing application agent collaborators through the tool-owned port. */
-fun AgentListTool(
+fun agentListTool(
     manager: AgentManager,
     config: AgentToolConfigService,
 ) = AgentListTool(AgentToolPortAdapter(manager, config, manager.memoryStore))
 
 /** Compatibility factory routing application agent collaborators through the tool-owned port. */
-fun AgentCreateTool(manager: AgentManager) =
+fun agentCreateTool(manager: AgentManager) =
     AgentCreateTool(AgentToolPortAdapter(manager, manager.agentToolConfigService, manager.memoryStore))
 
 /** Compatibility factory routing application agent collaborators through the tool-owned port. */
-fun AgentUpdateTool(manager: AgentManager) =
+fun agentUpdateTool(manager: AgentManager) =
     AgentUpdateTool(AgentToolPortAdapter(manager, manager.agentToolConfigService, manager.memoryStore))
 
 /** Compatibility factory routing application agent collaborators through the tool-owned port. */
-fun AgentDeleteTool(manager: AgentManager) =
+fun agentDeleteTool(manager: AgentManager) =
     AgentDeleteTool(AgentToolPortAdapter(manager, manager.agentToolConfigService, manager.memoryStore))
 
 /** Compatibility factory routing application agent collaborators through the tool-owned port. */
-fun AgentLogTool(manager: AgentManager) = AgentLogTool(AgentToolPortAdapter(manager, manager.agentToolConfigService, manager.memoryStore))
+fun agentLogTool(manager: AgentManager) = AgentLogTool(AgentToolPortAdapter(manager, manager.agentToolConfigService, manager.memoryStore))
 
 /** Compatibility factory routing application agent collaborators through the tool-owned port. */
-fun AgentShowTool(
+fun agentShowTool(
     manager: AgentManager,
     config: AgentToolConfigService,
 ) = AgentShowTool(AgentToolPortAdapter(manager, config, manager.memoryStore))
 
 /** Factory for isolated context-tool tests with the persisted provider catalog. */
-fun ContextTool(
+fun contextTool(
     appConfig: AppConfigBean,
     providerCatalog: ProviderCatalogService,
 ) = ContextTool(LegacySettingsPort(appConfig, providerCatalog))
 
 /** Compatibility factory supplying the mutable application timeout to the provider-neutral registry. */
-fun ToolRegistry(
+fun toolRegistry(
     tools: List<VisualAgentTool>,
     eventBus: ToolEventBus,
     appConfig: AppConfigBean,

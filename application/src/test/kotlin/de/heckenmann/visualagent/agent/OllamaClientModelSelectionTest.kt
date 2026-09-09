@@ -2,6 +2,7 @@ package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
+import de.heckenmann.visualagent.agent.tools.toolRegistry
 import de.heckenmann.visualagent.config.AppConfigBean
 import io.mockk.every
 import io.mockk.mockk
@@ -47,7 +48,7 @@ class OllamaClientModelSelectionTest {
                             null,
                         ),
                     )
-                val client = createClient(chatModel, ollamaApi, ToolRegistry(emptyList(), ToolEventBus(), AppConfigBean()), appConfig)
+                val client = createClient(chatModel, ollamaApi, toolRegistry(emptyList(), ToolEventBus(), AppConfigBean()), appConfig)
 
                 client.stream(listOf(Message("user", "hello"))).collect {}
 
@@ -80,7 +81,7 @@ class OllamaClientModelSelectionTest {
                         null,
                         null,
                     )
-                val client = createClient(chatModel, ollamaApi, ToolRegistry(emptyList(), ToolEventBus(), AppConfigBean()), appConfig)
+                val client = createClient(chatModel, ollamaApi, toolRegistry(emptyList(), ToolEventBus(), AppConfigBean()), appConfig)
 
                 val response = client.chat(listOf(Message("user", "hello")))
 
@@ -134,7 +135,7 @@ class OllamaClientModelSelectionTest {
         runTest {
             val chatModel = mockk<ChatModel>()
             val ollamaApi = mockk<OllamaApi>(relaxed = true)
-            val registry = ToolRegistry(listOf(FakeTool("todos")), ToolEventBus(), AppConfigBean())
+            val registry = toolRegistry(listOf(FakeTool("todos")), ToolEventBus(), AppConfigBean())
             every { chatModel.call(any<Prompt>()) } answers {
                 val prompt = firstArg<Prompt>()
                 val options = prompt.options as ToolCallingChatOptions
@@ -167,7 +168,7 @@ class OllamaClientModelSelectionTest {
         runTest {
             val chatModel = mockk<ChatModel>()
             val ollamaApi = mockk<OllamaApi>(relaxed = true)
-            val registry = ToolRegistry(listOf(FakeTool("todos")), ToolEventBus(), AppConfigBean())
+            val registry = toolRegistry(listOf(FakeTool("todos")), ToolEventBus(), AppConfigBean())
             every { chatModel.stream(any<Prompt>()) } throws
                 IllegalStateException("No function callback found for function name: todo:list")
             every { chatModel.call(any<Prompt>()) } returns springResponse("tool-model", "Recovered stream fallback")
@@ -195,7 +196,7 @@ class OllamaClientModelSelectionTest {
         runTest {
             val chatModel = mockk<ChatModel>()
             val ollamaApi = mockk<OllamaApi>(relaxed = true)
-            val registry = ToolRegistry(listOf(FakeTool("todos")), ToolEventBus(), AppConfigBean())
+            val registry = toolRegistry(listOf(FakeTool("todos")), ToolEventBus(), AppConfigBean())
             every { chatModel.call(any<Prompt>()) } throws
                 IllegalStateException("No function callback found for function name: todo:list")
             val client = createClient(chatModel, ollamaApi, registry, appConfig)
@@ -225,7 +226,7 @@ class OllamaClientModelSelectionTest {
                 val ollamaApi = mockk<OllamaApi>(relaxed = true)
                 val promptSlot = io.mockk.slot<Prompt>()
                 every { chatModel.call(capture(promptSlot)) } returns springResponse("vision-model", "image description")
-                val client = createClient(chatModel, ollamaApi, ToolRegistry(emptyList(), ToolEventBus(), AppConfigBean()), appConfig)
+                val client = createClient(chatModel, ollamaApi, toolRegistry(emptyList(), ToolEventBus(), AppConfigBean()), appConfig)
 
                 val response = client.vision(byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47), "describe")
 
@@ -245,7 +246,7 @@ class OllamaClientModelSelectionTest {
             val ollamaApi = mockk<OllamaApi>(relaxed = true)
             val promptSlot = io.mockk.slot<Prompt>()
             every { chatModel.call(capture(promptSlot)) } returns springResponse("catalog-vision-model", "image description")
-            val client = createClient(chatModel, ollamaApi, ToolRegistry(emptyList(), ToolEventBus(), AppConfigBean()), appConfig)
+            val client = createClient(chatModel, ollamaApi, toolRegistry(emptyList(), ToolEventBus(), AppConfigBean()), appConfig)
 
             client.vision(byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47), "describe", "catalog-vision-model")
 
@@ -280,7 +281,7 @@ class OllamaClientModelSelectionTest {
                     listOf("vision"),
                     Instant.EPOCH,
                 )
-            val client = createClient(chatModel, ollamaApi, ToolRegistry(emptyList(), ToolEventBus(), AppConfigBean()), appConfig)
+            val client = createClient(chatModel, ollamaApi, toolRegistry(emptyList(), ToolEventBus(), AppConfigBean()), appConfig)
 
             assertEquals(listOf(1.0, 2.0), client.embeddings("hello", "catalog-embedding-model"))
             assertEquals("catalog-embedding-model", embeddingsSlot.captured.model())

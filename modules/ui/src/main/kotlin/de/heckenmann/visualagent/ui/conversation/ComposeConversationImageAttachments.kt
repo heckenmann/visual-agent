@@ -1,5 +1,3 @@
-@file:Suppress("FunctionName")
-
 package de.heckenmann.visualagent.ui.conversation
 
 import androidx.compose.foundation.Image

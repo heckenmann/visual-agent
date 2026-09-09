@@ -23,7 +23,7 @@ class TodosToolTest {
         val manager = mockk<AgentManager>()
         every { manager.getSubAgent(any()) } returns SubAgent(id = "agent-1", name = "Coder", role = "Implementation")
         every { manager.todoManager } returns TodoManager(db, TodoEventBus())
-        return TodosTool(db, db, manager)
+        return todosTool(db, db, manager)
     }
 
     @Test
@@ -160,7 +160,7 @@ class TodosToolTest {
             every { manager.getSubAgent("missing") } returns null
             every { manager.getSubAgent("agent-1") } returns SubAgent(id = "agent-1", name = "Coder", role = "Implementation")
             every { manager.todoManager } returns TodoManager(db, TodoEventBus())
-            val tool = TodosTool(db, db, manager)
+            val tool = todosTool(db, db, manager)
 
             val missing = tool.execute(json("action" to "add", "description" to "No agent"))
             assertFalse(missing.success)
@@ -219,7 +219,7 @@ class TodosToolTest {
             every { manager.getSubAgent("missing") } returns null
             every { manager.getSubAgent("agent-1") } returns SubAgent(id = "agent-1", name = "Coder", role = "Implementation")
             every { manager.todoManager } returns TodoManager(db, TodoEventBus())
-            val tool = TodosTool(db, db, manager)
+            val tool = todosTool(db, db, manager)
             val added = tool.execute(json("action" to "add", "description" to "Task", "assignedAgentId" to "agent-1"))
             val id = added.content.removePrefix("Added todo ")
 

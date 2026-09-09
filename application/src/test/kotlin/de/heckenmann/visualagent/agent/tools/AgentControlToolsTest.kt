@@ -39,7 +39,7 @@ class AgentControlToolsTest {
         every { agentToolConfigService.toolsFor(agent) } returns setOf(ToolId("file:write"), ToolId("terminal"))
         every { agentToolConfigService.findConfigIdFor(agent) } returns "coder"
 
-        val result = AgentListTool(manager, agentToolConfigService).execute("{}")
+        val result = agentListTool(manager, agentToolConfigService).execute("{}")
 
         assertTrue(result.content.contains("active=1, queued=2"))
         assertTrue(result.content.contains("todo=todo-1"))
@@ -63,16 +63,16 @@ class AgentControlToolsTest {
         every { manager.deleteAgent("created") } returns true
         every { manager.deleteAgent("missing") } returns false
 
-        val createResult = AgentCreateTool(manager).execute("""{"name":"Coder","role":"Implementation"}""")
+        val createResult = agentCreateTool(manager).execute("""{"name":"Coder","role":"Implementation"}""")
         assertTrue(createResult.success)
         assertTrue(createResult.content.contains("To assign work, create a todo"))
 
-        val updateResult = AgentUpdateTool(manager).execute("""{"id":"created","name":"Senior Coder","templateName":"coder"}""")
+        val updateResult = agentUpdateTool(manager).execute("""{"id":"created","name":"Senior Coder","templateName":"coder"}""")
         assertTrue(updateResult.success)
         assertTrue(updateResult.content.contains("Assigned tools:"))
-        assertFalse(AgentUpdateTool(manager).execute("""{"id":"missing"}""").success)
-        assertTrue(AgentDeleteTool(manager).execute("""{"id":"created"}""").success)
-        assertFalse(AgentDeleteTool(manager).execute("""{"id":"missing"}""").success)
+        assertFalse(agentUpdateTool(manager).execute("""{"id":"missing"}""").success)
+        assertTrue(agentDeleteTool(manager).execute("""{"id":"created"}""").success)
+        assertFalse(agentDeleteTool(manager).execute("""{"id":"missing"}""").success)
     }
 
     @Test
@@ -105,7 +105,7 @@ class AgentControlToolsTest {
         every { manager.getSubAgent("agent-1") } returns updated
 
         val result =
-            AgentUpdateTool(manager).execute(
+            agentUpdateTool(manager).execute(
                 """
                 {
                     "id":"agent-1",
@@ -165,7 +165,7 @@ class AgentControlToolsTest {
                     )
             }
 
-        val result = AgentLogTool(manager).execute("""{"id":"agent-1"}""")
+        val result = agentLogTool(manager).execute("""{"id":"agent-1"}""")
 
         assertTrue(result.success)
         assertTrue(result.content.contains("Worked on todo-1"))
@@ -175,7 +175,7 @@ class AgentControlToolsTest {
     fun `agent log fails for unknown agent`() {
         every { manager.getSubAgent("missing") } returns null
 
-        val result = AgentLogTool(manager).execute("""{"id":"missing"}""")
+        val result = agentLogTool(manager).execute("""{"id":"missing"}""")
 
         assertFalse(result.success)
     }
@@ -200,7 +200,7 @@ class AgentControlToolsTest {
         every { agentToolConfigService.findConfigIdFor(agent) } returns "coder"
         every { agentToolConfigService.descriptionForConfigId("coder") } returns "Implement code changes"
 
-        val result = AgentShowTool(manager, agentToolConfigService).execute("""{"id":"agent-1"}""")
+        val result = agentShowTool(manager, agentToolConfigService).execute("""{"id":"agent-1"}""")
 
         assertTrue(result.success)
         assertTrue(result.content.contains("CanvasCleaner"))
@@ -212,7 +212,7 @@ class AgentControlToolsTest {
     fun `agent show fails for unknown agent`() {
         every { manager.getSubAgent("missing") } returns null
 
-        val result = AgentShowTool(manager, agentToolConfigService).execute("""{"id":"missing"}""")
+        val result = agentShowTool(manager, agentToolConfigService).execute("""{"id":"missing"}""")
 
         assertFalse(result.success)
     }

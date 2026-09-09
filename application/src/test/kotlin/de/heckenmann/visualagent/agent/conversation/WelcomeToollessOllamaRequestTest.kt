@@ -10,7 +10,7 @@ import de.heckenmann.visualagent.agent.ollama.OllamaPromptFactory
 import de.heckenmann.visualagent.agent.ollama.OllamaToolRecovery
 import de.heckenmann.visualagent.agent.tools.SpringAiToolCallbacksAdapter
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
-import de.heckenmann.visualagent.agent.tools.ToolRegistry
+import de.heckenmann.visualagent.agent.tools.toolRegistry
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.todo.TodoEventBus
 import io.mockk.every
@@ -71,7 +71,7 @@ class WelcomeToollessOllamaRequestTest {
                 .options(OllamaChatOptions.builder().model("welcome-model").build())
                 .build()
         val appConfig = AppConfigBean(db)
-        val toolRegistry = ToolRegistry(emptyList(), ToolEventBus(), appConfig)
+        val toolRegistry = toolRegistry(emptyList(), ToolEventBus(), appConfig)
         val callbacks = SpringAiToolCallbacksAdapter(toolRegistry)
         val promptFactory = OllamaPromptFactory(callbacks)
         val toolRecovery = OllamaToolRecovery(chatModel, promptFactory)

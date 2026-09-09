@@ -9,6 +9,7 @@ spring-integration = "7.1.1"
 compose = "1.12.0"
 compose-material3 = "1.9.0"
 compose-material-icons = "1.7.3"
+cmp-clipboard = "3.2.2"
 sqlite = "3.53.4.0"
 coroutines = "1.11.0"
 serialization = "1.11.0"
@@ -66,6 +67,8 @@ junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "jun
 junit-vintage-engine = { module = "org.junit.vintage:junit-vintage-engine", version.ref = "junit" }
 compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "compose-material3" }
 compose-material-icons = { module = "org.jetbrains.compose.material:material-icons-extended", version.ref = "compose-material-icons" }
+compose-components-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "compose" }
+cmp-clipboard = { module = "io.github.mobilebytelabs:cmp-clipboard", version.ref = "cmp-clipboard" }
 compose-ui-test-junit4-desktop = { module = "org.jetbrains.compose.ui:ui-test-junit4-desktop", version.ref = "compose" }
 reorderable = { module = "sh.calvin.reorderable:reorderable", version.ref = "reorderable" }
 infinite-canvas = { module = "io.github.xingray:compose-infinite-canvas-core", version.ref = "infinite-canvas" }

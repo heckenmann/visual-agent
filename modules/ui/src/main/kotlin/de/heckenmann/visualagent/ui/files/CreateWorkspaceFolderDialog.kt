@@ -1,5 +1,3 @@
-@file:Suppress("FunctionName")
-
 package de.heckenmann.visualagent.ui.files
 
 import androidx.compose.foundation.layout.fillMaxWidth

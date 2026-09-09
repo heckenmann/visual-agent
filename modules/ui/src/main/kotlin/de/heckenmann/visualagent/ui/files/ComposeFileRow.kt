@@ -1,5 +1,3 @@
-@file:Suppress("ktlint:standard:no-wildcard-imports", "FunctionName")
-
 package de.heckenmann.visualagent.ui.files
 
 import androidx.compose.foundation.layout.Arrangement
@@ -21,10 +19,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.mobilebytelabs.kmptoolkit.clipboard.copyToClipboard
 import de.heckenmann.visualagent.protocol.CANVAS_MIME_TYPE
 import de.heckenmann.visualagent.protocol.CanvasPort
 import de.heckenmann.visualagent.protocol.WorkspaceFile
@@ -54,8 +51,6 @@ internal fun WorkspaceFileRow(
     setStatus: (String) -> Unit,
     locked: Boolean = false,
 ) {
-    @Suppress("DEPRECATION")
-    val clipboard = LocalClipboardManager.current
     PanelContentCard(
         modifier = Modifier.fillMaxWidth().padding(bottom = 7.dp),
     ) {
@@ -66,6 +61,14 @@ internal fun WorkspaceFileRow(
             color = MaterialTheme.colorScheme.tertiary,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            ActionIconButton(
+                icon = Icons.Filled.ContentCopy,
+                description = "Copy file metadata",
+                onClick = {
+                    copyToClipboard(file.toClipboardMetadata())
+                    setStatus("Copied metadata for ${file.relativePath}")
+                },
+            )
             ActionIconButton(
                 icon = Icons.Filled.Edit,
                 description = "Rename workspace file",
@@ -88,14 +91,6 @@ internal fun WorkspaceFileRow(
                             )
                         },
                     )
-                },
-            )
-            ActionIconButton(
-                icon = Icons.Filled.ContentCopy,
-                description = "Copy file metadata",
-                onClick = {
-                    clipboard.setText(AnnotatedString(file.toClipboardMetadata()))
-                    setStatus("Copied metadata for ${file.relativePath}")
                 },
             )
             if (file.mimeType == CANVAS_MIME_TYPE) {
@@ -133,6 +128,15 @@ internal fun WorkspaceFileRow(
     }
 }
 
+/** Formats the complete file metadata used by the copy action. */
+internal fun WorkspaceFile.toClipboardMetadata(): String =
+    buildString {
+        appendLine("path=$relativePath")
+        appendLine("mimeType=$mimeType")
+        appendLine("sizeBytes=$sizeBytes")
+        appendLine("sha256=$sha256")
+    }.trimEnd()
+
 @Composable
 private fun RenameFileDialog(
     currentName: String,
@@ -160,11 +164,3 @@ private fun RenameFileDialog(
         },
     )
 }
-
-private fun WorkspaceFile.toClipboardMetadata(): String =
-    buildString {
-        appendLine("path=$relativePath")
-        appendLine("mimeType=$mimeType")
-        appendLine("sizeBytes=$sizeBytes")
-        appendLine("sha256=$sha256")
-    }.trimEnd()

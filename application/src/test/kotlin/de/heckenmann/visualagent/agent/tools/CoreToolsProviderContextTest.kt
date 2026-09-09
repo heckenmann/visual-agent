@@ -25,7 +25,7 @@ class CoreToolsProviderContextTest {
             val catalog = mockk<ProviderCatalogService>()
             every { catalog.activeModelId() } returns "gpt-context"
 
-            val result = ContextTool(appConfig = appConfig, providerCatalog = catalog).execute("""{}""", emptyMap())
+            val result = contextTool(appConfig = appConfig, providerCatalog = catalog).execute("""{}""", emptyMap())
 
             assertTrue(result.content.contains("Provider: openai"))
             assertTrue(result.content.contains("Model: gpt-context"))

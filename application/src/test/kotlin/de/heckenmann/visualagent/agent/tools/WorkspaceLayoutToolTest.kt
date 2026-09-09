@@ -25,7 +25,7 @@ class WorkspaceLayoutToolTest {
                 listOf(WorkspaceWindowState("conversation", order = 1, visible = true, preferredWidth = 640.0)),
             ),
         )
-        val tool = WorkspaceLayoutTool(WorkspaceLayoutService(persistence))
+        val tool = workspaceLayoutTool(WorkspaceLayoutService(persistence))
 
         val result = tool.execute("""{"action":"get"}""")
         val content = Json.parseToJsonElement(result.content).jsonObject
@@ -46,7 +46,7 @@ class WorkspaceLayoutToolTest {
                 listOf(WorkspaceWindowState("conversation", order = 1, visible = true, preferredWidth = 640.0)),
             ),
         )
-        val tool = WorkspaceLayoutTool(WorkspaceLayoutService(persistence))
+        val tool = workspaceLayoutTool(WorkspaceLayoutService(persistence))
 
         val result =
             tool.execute(

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
@@ -29,6 +30,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
+import com.mobilebytelabs.kmptoolkit.clipboard.copyToClipboard
 import de.heckenmann.visualagent.ui.components.ActionIconButton
 import java.time.Instant
 import java.time.ZoneId
@@ -47,7 +49,7 @@ internal fun conversationMessageActionMenu(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onRetry: () -> Unit,
-    onCopied: () -> Unit,
+    onCopied: () -> Unit = {},
     timestamp: Long? = null,
     showTimestamp: Boolean = false,
     modifier: Modifier = Modifier,
@@ -79,6 +81,25 @@ internal fun conversationMessageActionMenu(
             conversationTimestampPopup(timestamp)
         }
     }
+}
+
+/** Copies the exact unrendered content of one conversation message. */
+@Composable
+internal fun ConversationCopyAction(
+    message: Message,
+    onCopied: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    ActionIconButton(
+        icon = Icons.Filled.ContentCopy,
+        description = "Copy ${message.role} message",
+        tooltipDescription = null,
+        modifier = modifier.size(24.dp).alpha(0.6f),
+        onClick = {
+            copyToClipboard(message.content)
+            onCopied()
+        },
+    )
 }
 
 /** Displays a timestamp outside the message layout without intercepting pointer input. */

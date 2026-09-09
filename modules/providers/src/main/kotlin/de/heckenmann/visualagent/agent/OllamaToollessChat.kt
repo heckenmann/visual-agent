@@ -113,7 +113,6 @@ internal object OllamaToollessChat {
         val optionsArg: Map<String, Any>? = filteredOptions.takeIf { it.isNotEmpty() }
         val constructor = OllamaApi.ChatRequest::class.java.declaredConstructors[0]
         constructor.isAccessible = true
-        @Suppress("UNCHECKED_CAST")
         return constructor.newInstance(
             selectedModel,
             messages,
@@ -123,7 +122,8 @@ internal object OllamaToollessChat {
             null,
             optionsArg,
             null,
-        ) as OllamaApi.ChatRequest
+        ) as? OllamaApi.ChatRequest
+            ?: error("Ollama chat request constructor returned an unexpected type")
     }
 
     private val TOP_LEVEL_OPTION_KEYS = setOf("model", "format", "keep_alive", "truncate")

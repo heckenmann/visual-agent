@@ -272,6 +272,17 @@ val kotlinMainSourceRoots =
         rootProject.projectDir.toPath().resolve("modules/provider-openai-codex/src/main/kotlin"),
         rootProject.projectDir.toPath().resolve("modules/tools/src/main/kotlin"),
     )
+val kotlinProductionSourceRoots =
+    buildList {
+        add(projectDir.toPath().resolve("src/main/kotlin"))
+        Files.list(rootProject.projectDir.toPath().resolve("modules")).use { modules ->
+            modules
+                .filter(Files::isDirectory)
+                .map { module -> module.resolve("src/main/kotlin") }
+                .filter(Files::exists)
+                .forEach(::add)
+        }
+    }
 val kotlinSourceRoots =
     kotlinMainSourceRoots +
         listOf(
@@ -455,6 +466,7 @@ tasks.register("ktlintJavadocCheck") {
 tasks.named("ktlintCheck") {
     dependsOn("ktlintJavadocCheck")
     dependsOn("unusedCodeCheck")
+    dependsOn("productionSuppressionCheck")
 }
 
 tasks.named("build") {
@@ -534,6 +546,7 @@ tasks.named("check") {
     dependsOn("desktopApiUsageCheck")
     dependsOn("useCaseDocumentationCheck")
     dependsOn("jacocoTestCoverageVerification")
+    dependsOn("productionSuppressionCheck")
 }
 
 tasks.register("desktopApiUsageCheck") {
@@ -674,6 +687,115 @@ tasks.register("unusedCodeCheck") {
                     violations.forEach { appendLine(it) }
                 },
             )
+        }
+    }
+}
+
+private fun String.maskKotlinCommentsAndLiterals(): String {
+    val masked = StringBuilder(length)
+    var index = 0
+
+    fun maskNext() {
+        masked.append(if (this[index] == '\n') '\n' else ' ')
+        index++
+    }
+
+    fun maskCount(count: Int) {
+        repeat(count) { maskNext() }
+    }
+
+    while (index < length) {
+        when {
+            startsWith("//", index) -> {
+                while (index < length && this[index] != '\n') maskNext()
+            }
+            startsWith("/*", index) -> {
+                var depth = 0
+                while (index < length) {
+                    when {
+                        startsWith("/*", index) -> {
+                            depth++
+                            maskCount(2)
+                        }
+                        startsWith("*/", index) -> {
+                            depth--
+                            maskCount(2)
+                            if (depth == 0) break
+                        }
+                        else -> maskNext()
+                    }
+                }
+            }
+            startsWith("\"\"\"", index) -> {
+                maskCount(3)
+                while (index < length) {
+                    if (startsWith("\"\"\"", index)) {
+                        maskCount(3)
+                        break
+                    }
+                    maskNext()
+                }
+            }
+            this[index] == '"' || this[index] == '\'' -> {
+                val delimiter = this[index]
+                maskNext()
+                while (index < length) {
+                    if (this[index] == '\\') {
+                        maskCount(minOf(2, length - index))
+                    } else {
+                        val closesLiteral = this[index] == delimiter
+                        maskNext()
+                        if (closesLiteral) break
+                    }
+                }
+            }
+            else -> {
+                masked.append(this[index])
+                index++
+            }
+        }
+    }
+    return masked.toString()
+}
+
+tasks.register("productionSuppressionCheck") {
+    group = "verification"
+    description = "Fails when production Kotlin sources contain @Suppress annotations."
+    inputs.files(kotlinProductionSourceRoots)
+    doLast {
+        val suppressAliasImportRegex =
+            Regex("""(?m)^\s*import\s+kotlin\.Suppress\s+as\s+([A-Za-z_][A-Za-z0-9_]*)\s*$""")
+        val violations = mutableListOf<String>()
+
+        kotlinProductionSourceRoots.forEach { root ->
+            Files.walk(root).use { stream ->
+                stream
+                    .filter { Files.isRegularFile(it) && it.extension == "kt" }
+                    .forEach { file ->
+                        val source = Files.readString(file)
+                        val code = source.maskKotlinCommentsAndLiterals()
+                        val annotationNames =
+                            listOf("(?:kotlin\\.)?Suppress") +
+                                suppressAliasImportRegex
+                                    .findAll(code)
+                                    .map { alias -> Regex.escape(alias.groupValues[1]) }
+                        val suppressAnnotationRegex =
+                            Regex(
+                                "@(?:[A-Za-z_][A-Za-z0-9_]*:)?(?:${annotationNames.joinToString("|")})\\s*\\(",
+                            )
+                        suppressAnnotationRegex.findAll(code).forEach { match ->
+                            val line = code.substring(0, match.range.first).count { it == '\n' } + 1
+                            violations += "${file.toAbsolutePath()}:$line contains a production @Suppress annotation"
+                        }
+                    }
+            }
+        }
+
+        check(violations.isEmpty()) {
+            buildString {
+                appendLine("Production-suppression check failed with ${violations.size} violation(s):")
+                violations.forEach(::appendLine)
+            }
         }
     }
 }

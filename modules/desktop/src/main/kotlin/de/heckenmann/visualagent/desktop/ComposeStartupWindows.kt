@@ -1,5 +1,3 @@
-@file:Suppress("FunctionName")
-
 package de.heckenmann.visualagent.desktop
 
 import androidx.compose.foundation.Image
@@ -22,7 +20,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.FrameWindowScope
@@ -32,6 +29,8 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.rememberWindowState
 import de.heckenmann.visualagent.AppIdentity
+import de.heckenmann.visualagent.desktop.generated.resources.Res
+import de.heckenmann.visualagent.desktop.generated.resources.visual_agent
 import de.heckenmann.visualagent.protocol.LayoutSize
 import de.heckenmann.visualagent.protocol.LayoutWindowState
 import de.heckenmann.visualagent.protocol.WorkspaceLayoutSnapshot
@@ -41,6 +40,7 @@ import de.heckenmann.visualagent.ui.application.StartupStatus
 import de.heckenmann.visualagent.ui.application.VisualAgentComposeApp
 import de.heckenmann.visualagent.ui.workspace.visualAgentDarkColorScheme
 import de.heckenmann.visualagent.ui.workspace.visualAgentTypography
+import org.jetbrains.compose.resources.painterResource
 
 /** Identifies which native window the desktop host must currently render. */
 internal enum class StartupWindowMode {
@@ -76,6 +76,7 @@ internal fun ComposeStartupSplashWindow(
     onRetry: () -> Unit,
     onCloseRequest: () -> Unit,
 ) {
+    val applicationIcon = painterResource(Res.drawable.visual_agent)
     val windowState =
         rememberWindowState(
             width = DEFAULT_SPLASH_WIDTH,
@@ -85,7 +86,7 @@ internal fun ComposeStartupSplashWindow(
     Window(
         onCloseRequest = onCloseRequest,
         title = "$STARTUP_WINDOW_TITLE – Starting",
-        icon = @Suppress("DEPRECATION") painterResource("icons/visual-agent.png"),
+        icon = applicationIcon,
         state = windowState,
         decoration = WindowDecoration.Undecorated(),
         resizable = false,
@@ -102,6 +103,7 @@ internal fun ComposeMainWindow(
     persistedWindows: List<LayoutWindowState>,
     onCloseApplication: (WindowState) -> Unit,
 ) {
+    val applicationIcon = painterResource(Res.drawable.visual_agent)
     val initialStage = persistedLayout.stage
     val initialPosition = persistedLayout.stagePosition
     var geometryRestored by remember { mutableStateOf(false) }
@@ -117,7 +119,7 @@ internal fun ComposeMainWindow(
         visible = geometryRestored,
         onCloseRequest = { onCloseApplication(windowState) },
         title = STARTUP_WINDOW_TITLE,
-        icon = @Suppress("DEPRECATION") painterResource("icons/visual-agent.png"),
+        icon = applicationIcon,
         state = windowState,
     ) {
         LaunchedEffect(persistedLayout) {
@@ -174,6 +176,7 @@ internal fun ComposeStartupSplash(
     status: StartupStatus,
     onRetry: () -> Unit,
 ) {
+    val applicationIcon = painterResource(Res.drawable.visual_agent)
     MaterialTheme(
         colorScheme = visualAgentDarkColorScheme(),
         typography = visualAgentTypography(DEFAULT_STARTUP_FONT_SIZE),
@@ -185,7 +188,7 @@ internal fun ComposeStartupSplash(
                 verticalArrangement = Arrangement.Center,
             ) {
                 Image(
-                    painter = @Suppress("DEPRECATION") painterResource("icons/visual-agent.png"),
+                    painter = applicationIcon,
                     contentDescription = AppIdentity.DISPLAY_NAME,
                     modifier = Modifier.padding(bottom = 28.dp).size(STARTUP_ICON_SIZE),
                 )

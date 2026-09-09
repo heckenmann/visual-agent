@@ -1,4 +1,3 @@
-@file:Suppress("ktlint:standard:no-wildcard-imports", "FunctionName")
 @file:OptIn(kotlinx.coroutines.FlowPreview::class)
 
 package de.heckenmann.visualagent.ui.status

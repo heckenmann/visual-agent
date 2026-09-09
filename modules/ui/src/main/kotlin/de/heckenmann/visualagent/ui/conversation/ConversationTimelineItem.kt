@@ -1,5 +1,3 @@
-@file:Suppress("ktlint:standard:no-wildcard-imports", "FunctionName")
-
 package de.heckenmann.visualagent.ui.conversation
 
 import de.heckenmann.visualagent.protocol.TodoItem

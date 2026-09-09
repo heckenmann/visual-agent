@@ -42,7 +42,7 @@ class WorkspaceFileToolTest {
         TestPng.write(imageFile, 1, 1)
         val text = service.importFile(textFile.toFile())
         val image = service.importFile(imageFile.toFile())
-        val tool = WorkspaceFileTool(service, SingleObjectProvider(FakeVisionProvider()))
+        val tool = workspaceFileTool(service, SingleObjectProvider(FakeVisionProvider()))
 
         assertTrue(tool.definition.description.contains("![alt text](workspace:<path>)"))
         assertTrue(tool.definition.description.contains("Do not invent paths"))
@@ -71,7 +71,7 @@ class WorkspaceFileToolTest {
         val pdfFile = tempDir().resolve("sample.pdf")
         writePdf(pdfFile, "Tool PDF")
         val pdf = service.importFile(pdfFile.toFile())
-        val tool = WorkspaceFileTool(service, SingleObjectProvider(FakeVisionProvider()))
+        val tool = workspaceFileTool(service, SingleObjectProvider(FakeVisionProvider()))
 
         val info = tool.execute("""{"action":"info","id":"${pdf.id}"}""")
         val text = tool.execute("""{"action":"extractPdfText","path":"${pdf.relativePath}"}""")
@@ -93,7 +93,7 @@ class WorkspaceFileToolTest {
         val unmanaged = service.workspaceRoot().resolve("imports/manual.txt")
         unmanaged.parent.toFile().mkdirs()
         unmanaged.writeText("manual")
-        val tool = WorkspaceFileTool(service, SingleObjectProvider(FakeVisionProvider()))
+        val tool = workspaceFileTool(service, SingleObjectProvider(FakeVisionProvider()))
 
         service.createDirectory("", "needle-directory")
         val search = tool.execute("""{"action":"search","query":"needle"}""")
@@ -119,7 +119,7 @@ class WorkspaceFileToolTest {
             service.createManagedFile("imports", "match-$index.bin", byteArrayOf(1), "application/octet-stream")
         }
         val text = service.createManagedFile("imports", "match-text.txt", "content".toByteArray(), "text/plain")
-        val tool = WorkspaceFileTool(service, SingleObjectProvider(FakeVisionProvider()))
+        val tool = workspaceFileTool(service, SingleObjectProvider(FakeVisionProvider()))
 
         val result = tool.execute("""{"action":"search","query":"match","mimeType":"text/plain"}""")
 
@@ -145,7 +145,7 @@ class WorkspaceFileToolTest {
         val source = tempDir().resolve("remove-me.txt")
         Files.writeString(source, "remove")
         val imported = service.importFile(source.toFile())
-        val tool = WorkspaceFileTool(service, SingleObjectProvider(FakeVisionProvider()))
+        val tool = workspaceFileTool(service, SingleObjectProvider(FakeVisionProvider()))
 
         val result = Json.parseToJsonElement(tool.execute("""{"action":"delete","id":"${imported.id}"}""").content).jsonObject
 
@@ -159,7 +159,7 @@ class WorkspaceFileToolTest {
         val dbPath = tempDir().resolve("data/visual-agent.db").toString()
         val service = WorkspaceFileService(FakeWorkspaceFileStore(), dbPath)
         val imported = service.importFile("remove-me/nested", "file.txt", "remove".toByteArray())
-        val tool = WorkspaceFileTool(service, SingleObjectProvider(FakeVisionProvider()))
+        val tool = workspaceFileTool(service, SingleObjectProvider(FakeVisionProvider()))
 
         val result =
             Json

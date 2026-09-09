@@ -1,5 +1,3 @@
-@file:Suppress("ktlint:standard:no-wildcard-imports", "FunctionName")
-
 package de.heckenmann.visualagent.ui.conversation
 
 import androidx.compose.animation.AnimatedVisibility
@@ -20,7 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
@@ -35,8 +32,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.ui.agents.*
@@ -61,7 +56,7 @@ internal fun MessageRow(
     canEdit: Boolean,
     canDelete: Boolean,
     isDeleting: Boolean,
-    onCopied: () -> Unit,
+    onCopied: () -> Unit = {},
     onRetry: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -123,27 +118,6 @@ internal fun MessageRow(
             ConversationMessageContent(message, isStreamingPlaceholder, isStreaming)
         }
     }
-}
-
-/** Copies one conversation message without changing its timeline state. */
-@Composable
-internal fun ConversationCopyAction(
-    message: Message,
-    onCopied: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    @Suppress("DEPRECATION")
-    val clipboard = LocalClipboardManager.current
-    ActionIconButton(
-        icon = Icons.Filled.ContentCopy,
-        description = "Copy ${message.role} message",
-        tooltipDescription = null,
-        modifier = modifier.size(24.dp).alpha(0.6f),
-        onClick = {
-            clipboard.setText(AnnotatedString(message.content))
-            onCopied()
-        },
-    )
 }
 
 @Composable

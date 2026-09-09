@@ -201,19 +201,26 @@ class VisualAgentGrpcSessionService(
             }
         }
 
-        private fun cancelActiveRequest(requestId: String? = null) {
+        private fun cancelActiveRequest(
+            requestId: String? = null,
+            cause: Throwable? = null,
+        ) {
             val current = activeRequest ?: return
             if (requestId != null && requestId.isNotBlank() && current.requestId != requestId) return
             if (activeRequest === current) activeRequest = null
             current.token.cancel()
-            current.job?.cancel()
+            current.job?.cancel(
+                cause?.let { failure ->
+                    java.util.concurrent.CancellationException("gRPC session transport failed").also { cancellation ->
+                        cancellation.initCause(failure)
+                    }
+                },
+            )
         }
 
         /** Cancels work when the transport reports a connection failure. */
-        fun close(
-            @Suppress("UNUSED_PARAMETER") cause: Throwable,
-        ) {
-            cancelActiveRequest()
+        fun close(cause: Throwable) {
+            cancelActiveRequest(cause = cause)
         }
 
         /** Cancels work and closes the response stream when the client completes it. */

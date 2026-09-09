@@ -1,5 +1,3 @@
-@file:Suppress("ktlint:standard:no-wildcard-imports")
-
 package de.heckenmann.visualagent.ui.application
 
 import androidx.compose.ui.input.key.Key

@@ -32,7 +32,7 @@ class MessageRowsTest {
     val composeTestRule = createComposeRule()
 
     @Test
-    fun `message row shows user role and invokes copy`() {
+    fun `message row copies the exact user message source`() {
         var copied = false
         composeTestRule.setContent {
             MaterialTheme {
@@ -70,7 +70,6 @@ class MessageRowsTest {
                     canEdit = false,
                     canDelete = false,
                     isDeleting = false,
-                    onCopied = {},
                     onRetry = { retried = true },
                     onEdit = {},
                     onDelete = {},
@@ -94,7 +93,6 @@ class MessageRowsTest {
                     canEdit = true,
                     canDelete = false,
                     isDeleting = false,
-                    onCopied = {},
                     onRetry = {},
                     onEdit = { edited = true },
                     onDelete = {},
@@ -117,7 +115,6 @@ class MessageRowsTest {
                     canEdit = false,
                     canDelete = false,
                     isDeleting = true,
-                    onCopied = {},
                     onRetry = {},
                     onEdit = {},
                     onDelete = {},
@@ -140,7 +137,6 @@ class MessageRowsTest {
                     canEdit = false,
                     canDelete = true,
                     isDeleting = false,
-                    onCopied = {},
                     onRetry = {},
                     onEdit = {},
                     onDelete = { deleted = true },
@@ -152,7 +148,7 @@ class MessageRowsTest {
     }
 
     @Test
-    fun `message row with retry only shows retry and copy buttons`() {
+    fun `message row with retry only shows retry button`() {
         composeTestRule.setContent {
             MaterialTheme {
                 MessageRow(
@@ -163,14 +159,12 @@ class MessageRowsTest {
                     canEdit = false,
                     canDelete = false,
                     isDeleting = false,
-                    onCopied = {},
                     onRetry = {},
                     onEdit = {},
                     onDelete = {},
                 )
             }
         }
-        composeTestRule.onNodeWithContentDescription("Copy assistant message").assertExists()
         composeTestRule.onNodeWithContentDescription("Retry from previous user message").assertExists()
         composeTestRule.onNodeWithContentDescription("Edit assistant message").assertDoesNotExist()
         composeTestRule.onNodeWithContentDescription("Delete assistant message").assertDoesNotExist()
@@ -188,7 +182,6 @@ class MessageRowsTest {
                     canEdit = false,
                     canDelete = false,
                     isDeleting = false,
-                    onCopied = {},
                     onRetry = {},
                     onEdit = {},
                     onDelete = {},
@@ -210,7 +203,6 @@ class MessageRowsTest {
                     canEdit = false,
                     canDelete = false,
                     isDeleting = false,
-                    onCopied = {},
                     onRetry = {},
                     onEdit = {},
                     onDelete = {},
@@ -237,7 +229,6 @@ class MessageRowsTest {
                     canEdit = false,
                     canDelete = false,
                     isDeleting = false,
-                    onCopied = {},
                     onRetry = {},
                     onEdit = {},
                     onDelete = {},
@@ -261,7 +252,6 @@ class MessageRowsTest {
                     canEdit = false,
                     canDelete = false,
                     isDeleting = false,
-                    onCopied = {},
                     onRetry = {},
                     onEdit = {},
                     onDelete = {},
@@ -286,7 +276,6 @@ class MessageRowsTest {
                     canEdit = false,
                     canDelete = false,
                     isDeleting = false,
-                    onCopied = {},
                     onRetry = {},
                     onEdit = {},
                     onDelete = {},

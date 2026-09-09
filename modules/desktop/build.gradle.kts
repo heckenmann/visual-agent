@@ -1,6 +1,7 @@
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.tasks.SourceSetContainer
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.jlleitschuh.gradle.ktlint.tasks.BaseKtLintCheckTask
 import org.springframework.boot.gradle.tasks.bundling.BootJar
 import java.net.URI
 import java.security.MessageDigest
@@ -59,6 +60,7 @@ dependencies {
     implementation(libs.grpc.inprocess)
     implementation(libs.grpc.netty.shaded)
     implementation(libs.compose.material3)
+    implementation(libs.compose.components.resources)
     implementation(libs.spring.boot.starter)
     implementation(platform(libs.spring.boot.bom))
     macOsDnsResolverClassifier?.let { classifier ->
@@ -610,4 +612,12 @@ kotlin {
 ktlint {
     version.set("1.5.0")
     android.set(false)
+}
+
+tasks.named<BaseKtLintCheckTask>("runKtlintCheckOverMainSourceSet") {
+    setSource(fileTree("src/main/kotlin"))
+}
+
+tasks.named<BaseKtLintCheckTask>("runKtlintFormatOverMainSourceSet") {
+    setSource(fileTree("src/main/kotlin"))
 }

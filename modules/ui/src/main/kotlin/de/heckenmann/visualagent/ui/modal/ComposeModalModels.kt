@@ -1,5 +1,3 @@
-@file:Suppress("ktlint:standard:no-wildcard-imports")
-
 package de.heckenmann.visualagent.ui.modal
 
 import androidx.compose.runtime.Composable

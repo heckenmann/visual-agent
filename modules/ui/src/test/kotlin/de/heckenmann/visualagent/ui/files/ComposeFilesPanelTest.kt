@@ -33,6 +33,26 @@ class ComposeFilesPanelTest {
     }
 
     @Test
+    fun `metadata copy format retains the complete sha256`() {
+        val file =
+            WorkspaceFile(
+                "f1",
+                "data/notes.txt",
+                "notes.txt",
+                "text/plain",
+                12,
+                "a".repeat(64),
+                "now",
+                "now",
+            )
+
+        assertEquals(
+            "path=data/notes.txt\nmimeType=text/plain\nsizeBytes=12\nsha256=${"a".repeat(64)}",
+            file.toClipboardMetadata(),
+        )
+    }
+
+    @Test
     fun `browser exposes direct files and child folders`() {
         val root = browseWorkspaceFiles(sampleFiles(), "")
         assertEquals(listOf("data"), root.directories.map { it.name })
