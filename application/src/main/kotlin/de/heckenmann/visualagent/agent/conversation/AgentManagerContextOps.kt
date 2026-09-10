@@ -21,20 +21,18 @@ internal class AgentManagerContextOps(
     ): ChatRequestContext {
         val contextPrompt = buildMainSystemContextPrompt()
         val enabledTools = owner.agentToolConfigService.mainAgentTools()
+        val memoryPrompt =
+            MainAgentLongTermMemoryPrompt.compose(
+                owner.mainAgentLongTermMemoryStore.snapshot(),
+                owner.appConfig.maxMainAgentMemoryChars,
+                ToolId("memory") in enabledTools,
+            )
         val preparedMessages = mutableListOf<Message>()
         preparedMessages += Message("system", contextPrompt)
-        preparedMessages +=
-            Message(
-                "system",
-                MainAgentLongTermMemoryPrompt.compose(
-                    owner.mainAgentLongTermMemoryStore.snapshot(),
-                    owner.appConfig.maxMainAgentMemoryChars,
-                    ToolId("memory") in enabledTools,
-                ),
-            )
+        preparedMessages += Message("system", memoryPrompt)
         preparedMessages +=
             contextAssembler
-                .assemble(history, contextPrompt, owner.appConfig.contextLength)
+                .assemble(history, "$contextPrompt\n\n$memoryPrompt", owner.appConfig.contextLength)
                 .map(::normalizeHistoryRoleForProvider)
         val metadata =
             mutableMapOf<String, Any>(

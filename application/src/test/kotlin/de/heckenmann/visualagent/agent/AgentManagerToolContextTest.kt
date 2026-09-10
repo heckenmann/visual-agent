@@ -120,6 +120,33 @@ class AgentManagerToolContextTest {
             assertTrue(requestSlot.captured.messages.any { it.content.contains("currently unavailable") })
         }
 
+    @Test
+    fun `durable memory consumes the history context budget`() =
+        runTest {
+            val db = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+            val provider = mockk<LLMProvider>(relaxed = true)
+            val requests = mutableListOf<ChatRequestContext>()
+            coEvery { provider.chat(capture(requests)) } returns ChatResponse("test", Message("assistant", "ok"), true)
+            val manager =
+                AgentManager(
+                    db,
+                    provider,
+                    AgentToolConfigService(db),
+                    ToolEventBus(),
+                    TodoEventBus(),
+                    AppConfigBean(db),
+                    mainAgentLongTermMemoryStore = RecordingMemoryStore("m".repeat(12_000)),
+                )
+
+            manager.sendMessage("old-marker " + "x".repeat(2_000))
+            manager.sendMessage("current-marker")
+
+            val latestContent = requests.last().messages.joinToString("\n") { it.content }
+            assertTrue(latestContent.contains("current-marker"))
+            assertFalse(latestContent.contains("old-marker"))
+            assertTrue(latestContent.contains("older conversation turn(s) omitted"))
+        }
+
     private class RecordingMemoryStore(
         content: String,
     ) : MainAgentLongTermMemoryStore {
