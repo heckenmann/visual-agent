@@ -40,6 +40,7 @@ class AppConfigBean(
     var userModelInstruction: String = ""
     var favoriteModels: String = ""
     var queueFlushMode: String = "ONE_BY_ONE"
+    var maxMainAgentMemoryChars: Int = DEFAULT_MAIN_AGENT_MEMORY_CHARS
 
     /**
      * Returns the currently selected model for the active provider.
@@ -113,6 +114,7 @@ class AppConfigBean(
         preferenceStore.setPreference(KEY_SESSION_USER_MODEL_INSTRUCTION, userModelInstruction)
         preferenceStore.setPreference(KEY_SESSION_FAVORITE_MODELS, favoriteModels)
         preferenceStore.setPreference(KEY_SESSION_QUEUE_FLUSH_MODE, queueFlushMode)
+        preferenceStore.setPreference(KEY_MAIN_AGENT_MEMORY_CHARS, maxMainAgentMemoryChars.toString())
         publishChanges()
     }
 
@@ -145,6 +147,7 @@ class AppConfigBean(
             KEY_SESSION_USER_MODEL_INSTRUCTION to userModelInstruction,
             KEY_SESSION_FAVORITE_MODELS to favoriteModels,
             KEY_SESSION_QUEUE_FLUSH_MODE to queueFlushMode,
+            KEY_MAIN_AGENT_MEMORY_CHARS to maxMainAgentMemoryChars.toString(),
         )
 
     companion object {
@@ -169,6 +172,9 @@ class AppConfigBean(
         internal const val KEY_SESSION_USER_MODEL_INSTRUCTION = "session.user.model.instruction"
         internal const val KEY_SESSION_FAVORITE_MODELS = "session.favorite.models"
         internal const val KEY_SESSION_QUEUE_FLUSH_MODE = "session.queue.flush.mode"
+        internal const val KEY_MAIN_AGENT_MEMORY_CHARS = "agent.main.memory.max.chars"
+        const val DEFAULT_MAIN_AGENT_MEMORY_CHARS = 12_000
+        val MAIN_AGENT_MEMORY_CHARS_RANGE = 1_000..100_000
         internal const val UI_SCALE_AUTOMATIC = "auto"
     }
 }

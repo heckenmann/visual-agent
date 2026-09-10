@@ -3,6 +3,7 @@ package de.heckenmann.visualagent.server
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderConfiguration
 import de.heckenmann.visualagent.config.AppConfigBean
+import de.heckenmann.visualagent.knowledge.MainAgentLongTermMemoryStore
 import de.heckenmann.visualagent.protocol.SettingsPort
 import de.heckenmann.visualagent.protocol.SettingsSnapshot
 import de.heckenmann.visualagent.protocol.ThemeMode
@@ -15,6 +16,7 @@ import de.heckenmann.visualagent.config.ThemeMode as ApplicationThemeMode
 class SpringSettingsPort(
     private val config: AppConfigBean,
     private val providerCatalog: ProviderCatalogService,
+    private val mainAgentMemoryStore: MainAgentLongTermMemoryStore,
 ) : SettingsPort {
     override fun snapshot(): SettingsSnapshot = config.toProtocol(providerCatalog)
 
@@ -23,6 +25,11 @@ class SpringSettingsPort(
         settings: SettingsSnapshot,
         providerConfiguration: de.heckenmann.visualagent.protocol.ProviderConfiguration?,
     ) {
+        val currentMemory = mainAgentMemoryStore.snapshot()
+        val memoryLimit = settings.maxMainAgentMemoryChars.coerceIn(AppConfigBean.MAIN_AGENT_MEMORY_CHARS_RANGE)
+        require(memoryLimit >= currentMemory.contentLength) {
+            "Main-agent memory has ${currentMemory.contentLength} characters; reduce it before lowering the limit below that size"
+        }
         providerConfiguration?.let { configuration ->
             providerCatalog.replaceConfiguration(
                 ProviderConfiguration(
@@ -44,6 +51,7 @@ class SpringSettingsPort(
             userModelInstruction = settings.userModelInstruction
             favoriteModels = settings.favoriteModels.joinToString(",")
             queueFlushMode = settings.queueFlushMode
+            maxMainAgentMemoryChars = memoryLimit
             save()
         }
     }
@@ -66,6 +74,7 @@ private fun AppConfigBean.toProtocol(providerCatalog: ProviderCatalogService): S
         userModelInstruction = userModelInstruction,
         favoriteModels = favoriteModels.split(',').map(String::trim).filter(String::isNotBlank),
         queueFlushMode = queueFlushMode,
+        maxMainAgentMemoryChars = maxMainAgentMemoryChars,
     )
 
 private fun ApplicationThemeMode.toProtocol(): ThemeMode = ThemeMode.valueOf(name)

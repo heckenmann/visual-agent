@@ -44,6 +44,7 @@ class AgentToolConfigService(
             "workspace:mime",
             "workspace:download",
             "javascript:execute",
+            "memory",
         ).let(::filterEnabledTools).map(::ToolId).toSet()
 
     /**

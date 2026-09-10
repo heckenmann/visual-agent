@@ -74,13 +74,9 @@ class MainSystemPromptComposerTest {
     fun `prompt contains delegation decision tree`() {
         val prompt = MainSystemPromptComposer.compose(emptyTodos, null, toolConfigService)
         assertTrue("When to Delegate" in prompt || "When to delegate" in prompt)
-        assertTrue("Answer directly" in prompt)
-        assertTrue("Repository file operations" in prompt)
-        assertTrue("Terminal commands" in prompt)
-        assertTrue("Browser or search" in prompt)
-        assertTrue("Canvas operations" in prompt)
-        assertTrue("Research or analysis" in prompt)
-        assertTrue("History search" in prompt)
+        assertTrue("call every tool listed under Your Available Tools directly" in prompt)
+        assertTrue("work requires a tool you do not have" in prompt)
+        assertTrue("Parallel or independent work" in prompt)
         assertTrue("workspace:file" in prompt)
         assertTrue("You may perform these workspace actions yourself or delegate them" in prompt)
         assertTrue("Never include a native write-permission preflight" in prompt)
@@ -108,8 +104,17 @@ class MainSystemPromptComposerTest {
     fun `prompt contains todo-driven execution guidance`() {
         val prompt = MainSystemPromptComposer.compose(emptyTodos, null, toolConfigService)
         assertTrue("Todo Workflow" in prompt || "Todo workflow" in prompt)
-        assertTrue("non-trivial" in prompt)
+        assertTrue("durable planning, delegation, or parallel execution" in prompt)
         assertTrue("assignedAgentId" in prompt)
+    }
+
+    @Test
+    fun `prompt permits direct use of every enabled main-agent tool without a todo`() {
+        val prompt = MainSystemPromptComposer.compose(emptyTodos, null, toolConfigService)
+
+        assertTrue("authorized to call every tool listed under Your Available Tools directly" in prompt)
+        assertTrue("A todo is never a prerequisite for a direct tool call" in prompt)
+        assertTrue("planning and delegation mechanism, not a permission boundary" in prompt)
     }
 
     @Test
