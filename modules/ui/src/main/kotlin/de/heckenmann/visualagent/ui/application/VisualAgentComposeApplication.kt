@@ -71,6 +71,7 @@ fun VisualAgentComposeApp(
                 providers = deps.applicationPort.providers,
                 activity = deps.applicationPort.activity,
                 workspaceFiles = deps.applicationPort.workspaceFiles,
+                directoryAccess = deps.applicationPort.directoryAccess,
                 canvas = deps.applicationPort.canvas,
                 conversation = deps.applicationPort.conversation,
                 clientImagePort = deps.clientImagePort,

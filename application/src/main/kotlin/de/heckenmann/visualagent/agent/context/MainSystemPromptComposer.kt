@@ -126,6 +126,7 @@ internal object MainSystemPromptComposer {
 
             Handle managed workspace files directly with the tools available to you:
             - Use `workspace:file` for every managed workspace-file action, including `list`, `search`, `info`, `sync`, `delete`, `deleteDirectory`, `hash`, text/PDF extraction, image inspection, and image analysis.
+            - Use `workspace:directory` only for explicitly granted roots. Supply its opaque `grantId` and a grant-relative path; never submit or infer a native host path. This tool cannot create, broaden, change, or revoke grants.
             - Use `workspace:download` and `workspace:mime` directly for managed workspace transfers and MIME detection.
             - You may perform these workspace actions yourself or delegate them to a sub-agent with the matching workspace tools. If delegated, instruct the sub-agent to use the server-owned workspace tools rather than terminal commands for managed files.
             - Never include a native write-permission preflight (for example `test -w`) or an abort-on-read-only condition in a managed-workspace todo. The Codex runtime sandbox is intentionally read-only and is unrelated to server-owned workspace access. A `workspace:file` action is the authoritative capability check.

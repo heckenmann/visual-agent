@@ -6,6 +6,7 @@ import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
 import de.heckenmann.visualagent.ui.components.*
 import de.heckenmann.visualagent.ui.conversation.*
+import de.heckenmann.visualagent.ui.directories.DirectoryAccessPanel
 import de.heckenmann.visualagent.ui.files.*
 import de.heckenmann.visualagent.ui.modal.*
 import de.heckenmann.visualagent.ui.settings.*
@@ -66,6 +67,11 @@ internal fun WindowBody(
                 workspaceFileService = panelServices.workspaceFiles,
                 modalRequester = panelServices.modalRequester,
                 activityPort = panelServices.activity,
+            )
+        "directories" ->
+            DirectoryAccessPanel(
+                directoryAccess = panelServices.directoryAccess,
+                modalRequester = panelServices.modalRequester,
             )
     }
 }

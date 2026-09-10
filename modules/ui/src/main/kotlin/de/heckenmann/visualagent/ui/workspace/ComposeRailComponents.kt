@@ -270,6 +270,7 @@ internal fun ComposeWorkspaceWindow.railIcon(): ImageVector =
         "agents" -> Icons.Filled.Group
         "settings" -> Icons.Filled.Settings
         "canvas" -> Icons.Filled.Brush
+        "directories" -> Icons.Filled.Folder
         else -> Icons.Filled.Description
     }
 

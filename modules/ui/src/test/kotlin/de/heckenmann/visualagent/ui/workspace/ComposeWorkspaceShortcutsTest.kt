@@ -26,12 +26,13 @@ class ComposeWorkspaceShortcutsTest {
         assertEquals("agents", panelIdForShortcutDigit(4))
         assertEquals("settings", panelIdForShortcutDigit(5))
         assertEquals("canvas", panelIdForShortcutDigit(6))
+        assertEquals("directories", panelIdForShortcutDigit(7))
     }
 
     @Test
     fun `unsupported shortcut digits return null`() {
         assertNull(panelIdForShortcutDigit(0))
-        assertNull(panelIdForShortcutDigit(7))
+        assertNull(panelIdForShortcutDigit(8))
     }
 
     @Test

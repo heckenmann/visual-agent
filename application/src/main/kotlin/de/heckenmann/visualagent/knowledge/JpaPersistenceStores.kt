@@ -72,6 +72,34 @@ internal class JpaPreferenceStore(
 }
 
 @Service
+internal class JpaDirectoryGrantStore(
+    private val repository: DirectoryGrantRepository,
+) : DirectoryGrantStore {
+    @Transactional
+    override fun saveDirectoryGrant(record: DirectoryGrantRecord) {
+        repository.save(record.toEntity())
+    }
+
+    @Transactional(readOnly = true)
+    override fun listDirectoryGrants(): List<DirectoryGrantRecord> =
+        repository.findAllByOrderByCreatedAtAscIdAsc().map(DirectoryGrantEntity::toRecord)
+
+    @Transactional(readOnly = true)
+    override fun getDirectoryGrant(id: String): DirectoryGrantRecord? = repository.findById(id).orElse(null)?.toRecord()
+
+    @Transactional(readOnly = true)
+    override fun getDirectoryGrantByCanonicalRoot(canonicalRoot: String): DirectoryGrantRecord? =
+        repository.findByCanonicalRoot(canonicalRoot)?.toRecord()
+
+    @Transactional
+    override fun deleteDirectoryGrant(id: String): Boolean {
+        if (!repository.existsById(id)) return false
+        repository.deleteById(id)
+        return true
+    }
+}
+
+@Service
 internal class JpaTodoStore(
     private val repository: TodoRepository,
     private val deletedArchive: DeletedTodoArchive,
@@ -223,3 +251,9 @@ private fun PersistedSubAgent.toEntity(originalCreatedAt: Instant): SubAgentEnti
 
 private fun SubAgentEntity.toRecord(): PersistedSubAgent =
     PersistedSubAgent(id, name, role, status, currentTask, parentAgentId, config, createdAt, updatedAt)
+
+private fun DirectoryGrantRecord.toEntity() =
+    DirectoryGrantEntity(id, displayName, canonicalRoot, origin, mode, clientBindingId, createdAt, updatedAt)
+
+private fun DirectoryGrantEntity.toRecord() =
+    DirectoryGrantRecord(id, displayName, canonicalRoot, origin, mode, clientBindingId, createdAt, updatedAt)

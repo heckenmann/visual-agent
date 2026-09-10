@@ -37,6 +37,12 @@ internal interface ProjectKnowledgeRepository : JpaRepository<ProjectKnowledgeEn
 
 internal interface PreferenceRepository : JpaRepository<PreferenceEntity, String>
 
+internal interface DirectoryGrantRepository : JpaRepository<DirectoryGrantEntity, String> {
+    fun findByCanonicalRoot(canonicalRoot: String): DirectoryGrantEntity?
+
+    fun findAllByOrderByCreatedAtAscIdAsc(): List<DirectoryGrantEntity>
+}
+
 internal interface ConversationRepository :
     JpaRepository<ConversationEntity, String>,
     ConversationRepositoryCustom {

@@ -117,6 +117,29 @@ internal class WorkspaceFileEntity(
 )
 
 @Entity
+@Table(name = "directory_grants")
+internal class DirectoryGrantEntity(
+    @Id
+    var id: String = "",
+    @Column(name = "display_name", nullable = false)
+    var displayName: String = "",
+    @Column(name = "canonical_root", unique = true)
+    var canonicalRoot: String? = null,
+    @Column(nullable = false)
+    var origin: String = "SERVER",
+    @Column(nullable = false)
+    var mode: String = "READ_ONLY",
+    @Column(name = "client_binding_id")
+    var clientBindingId: String? = null,
+    @Convert(converter = InstantStringConverter::class)
+    @Column(name = "created_at", columnDefinition = "TIMESTAMP")
+    var createdAt: Instant = Instant.EPOCH,
+    @Convert(converter = InstantStringConverter::class)
+    @Column(name = "updated_at", columnDefinition = "TIMESTAMP")
+    var updatedAt: Instant = Instant.EPOCH,
+)
+
+@Entity
 @Table(name = "todos")
 internal class TodoEntity(
     @Id
