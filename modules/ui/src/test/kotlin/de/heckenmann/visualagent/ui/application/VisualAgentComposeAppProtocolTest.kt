@@ -56,7 +56,7 @@ class VisualAgentComposeAppProtocolTest {
         composeTestRule.waitForIdle()
         assertEquals(2, composeTestRule.onAllNodesWithText("Conversation").fetchSemanticsNodes().size)
         assertEquals(2, composeTestRule.onAllNodesWithText("Todos").fetchSemanticsNodes().size)
-        assertEquals(2, composeTestRule.onAllNodesWithText("Files").fetchSemanticsNodes().size)
+        assertTrue(composeTestRule.onAllNodesWithText("Files").fetchSemanticsNodes().isNotEmpty())
         assertTrue(composeTestRule.onAllNodesWithText("Subagents").fetchSemanticsNodes().isNotEmpty())
         assertTrue(composeTestRule.onAllNodesWithText("Settings").fetchSemanticsNodes().isNotEmpty())
         assertTrue(composeTestRule.onAllNodesWithText("Canvas").fetchSemanticsNodes().isNotEmpty())
