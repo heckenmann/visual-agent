@@ -1,6 +1,6 @@
 [versions]
 visual-agent = "1.0.0"
-kotlin = "2.4.10"
+kotlin = "2.4.20"
 ktlint = "14.2.0"
 spring-boot = "4.1.1"
 spring-dependency-management = "1.1.7"
