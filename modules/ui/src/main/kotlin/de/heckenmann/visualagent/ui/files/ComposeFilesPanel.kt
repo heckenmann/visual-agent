@@ -112,7 +112,7 @@ internal fun FilesPanel(
     }
     ToolEventRefreshEffect(
         activityPort = activityPort,
-        toolIds = setOf("file:write", "file:edit", "workspace:file", "javascript:execute"),
+        toolIds = setOf("workspace:file", "javascript:execute"),
         onRefresh = refresh,
     )
     val listing = browseWorkspaceFiles(files, currentDirectory, directories)

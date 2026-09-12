@@ -1,9 +1,9 @@
 package de.heckenmann.visualagent.desktop
 
-import de.heckenmann.visualagent.protocol.ClientDirectoryGrantAdministrationPort
 import de.heckenmann.visualagent.protocol.ClientDirectoryCapabilityRegistration
 import de.heckenmann.visualagent.protocol.ClientDirectoryEntry
 import de.heckenmann.visualagent.protocol.ClientDirectoryFileAccess
+import de.heckenmann.visualagent.protocol.ClientDirectoryGrantAdministrationPort
 import de.heckenmann.visualagent.protocol.ClientDirectoryMatch
 import de.heckenmann.visualagent.protocol.DirectoryAccessMode
 import de.heckenmann.visualagent.workspace.ClientDirectoryCapabilityRegistry

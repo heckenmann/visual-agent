@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.ui.application
 
+import de.heckenmann.visualagent.protocol.ClientDirectoryGrantAdministrationPort
 import de.heckenmann.visualagent.protocol.ClientImagePort
 import de.heckenmann.visualagent.protocol.LayoutWindowState
 import de.heckenmann.visualagent.ui.modal.ComposeModalRequester
@@ -39,10 +40,11 @@ data class ComposePanelServices(
     val providers: de.heckenmann.visualagent.protocol.ProviderPort,
     val activity: de.heckenmann.visualagent.protocol.ActivityPort,
     val workspaceFiles: de.heckenmann.visualagent.protocol.WorkspaceFilePort,
-    val directoryAccess: de.heckenmann.visualagent.protocol.DirectoryAccessPort,
+    val directoryAccess: de.heckenmann.visualagent.protocol.DirectoryGrantAdministrationPort,
     val canvas: de.heckenmann.visualagent.protocol.CanvasPort,
     val conversation: de.heckenmann.visualagent.protocol.ConversationPort,
     val clientImagePort: ClientImagePort,
+    val clientDirectoryAccess: ClientDirectoryGrantAdministrationPort,
     val todos: de.heckenmann.visualagent.protocol.TodoPort,
     val modalRequester: ComposeModalRequester,
     val onSettingsChanged: () -> Unit,

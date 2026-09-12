@@ -75,6 +75,7 @@ fun VisualAgentComposeApp(
                 canvas = deps.applicationPort.canvas,
                 conversation = deps.applicationPort.conversation,
                 clientImagePort = deps.clientImagePort,
+                clientDirectoryAccess = deps.clientDirectoryAccess,
                 todos = deps.applicationPort.todos,
                 modalRequester = ComposeModalRequester { requested -> modal = requested },
                 onSettingsChanged = {

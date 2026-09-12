@@ -127,6 +127,11 @@ private fun ComposeStartupHost(exitApplication: () -> Unit) {
                     applicationPort = applicationPort,
                     beanDefinitionCount = context.beanDefinitionCount,
                     clientImagePort = LocalClientImagePort(),
+                    clientDirectoryAccess =
+                        LocalClientDirectoryGrantAdministrationPort(
+                            context.getBean(de.heckenmann.visualagent.workspace.ClientDirectoryCapabilityRegistry::class.java),
+                            context.getBean(de.heckenmann.visualagent.workspace.VisualAgentProtectedDirectoryPolicy::class.java),
+                        ),
                 )
             val loadedLayout = withContext(Dispatchers.IO) { applicationPort.layout.report() }
             dependencies = loadedDependencies

@@ -71,6 +71,7 @@ internal fun WindowBody(
         "directories" ->
             DirectoryAccessPanel(
                 directoryAccess = panelServices.directoryAccess,
+                clientDirectoryAccess = panelServices.clientDirectoryAccess,
                 modalRequester = panelServices.modalRequester,
             )
     }
