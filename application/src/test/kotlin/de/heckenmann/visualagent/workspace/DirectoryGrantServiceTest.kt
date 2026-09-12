@@ -81,6 +81,20 @@ class DirectoryGrantServiceTest {
     }
 
     @Test
+    fun `server grant supports bounded bytes search and glob`() {
+        Files.writeString(temp.resolve("notes.txt"), "Needle in a text file")
+        Files.writeString(temp.resolve("other.md"), "No match")
+        val grant = service.addServerGrant(temp.toString(), "Project", DirectoryAccessMode.READ_ONLY)
+
+        assertEquals("Needle in a text file", service.readBytes(grant.id, "notes.txt", 100).decodeToString())
+        assertEquals("notes.txt", service.glob(grant.id, "", "*.txt").single().path)
+        val matches = service.search(grant.id, "needle")
+        assertEquals(1, matches.size)
+        assertEquals("notes.txt", matches.single().path)
+        assertThrows(IllegalArgumentException::class.java) { service.readBytes(grant.id, "notes.txt", 5) }
+    }
+
+    @Test
     fun `copy and move transfer files across server grant ids`() {
         val sourceDirectory = temp.resolve("source")
         val targetDirectory = temp.resolve("target")
