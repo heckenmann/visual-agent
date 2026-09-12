@@ -11,7 +11,6 @@ import de.heckenmann.visualagent.agent.tools.api.ToolDirectoryMatch
 import de.heckenmann.visualagent.agent.tools.api.ToolDirectoryMimeType
 import de.heckenmann.visualagent.testsupport.TestPng
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
-import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -31,6 +30,7 @@ import java.nio.file.Path
 import java.util.stream.Stream
 import kotlin.io.path.writeText
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -130,15 +130,13 @@ class WorkspaceFileToolTest {
     }
 
     @Test
-    fun `workspace file tool creates an empty directory through the server port`() {
-        val port = mockk<de.heckenmann.visualagent.agent.tools.api.WorkspaceFileToolPort>()
-        every { port.createDirectory("projects", "demo") } returns "projects/demo"
-        val tool = WorkspaceFileTool(port)
+    fun `workspace writes reject skill documents so skills remain database owned`() {
+        val service = WorkspaceFileService(FakeWorkspaceFileStore(), tempDir().resolve("data/visual-agent.db").toString())
 
-        val result = tool.execute("""{"action":"createDirectory","parentDirectory":"projects","name":"demo"}""")
+        val error = assertFailsWith<IllegalArgumentException> { service.writeText("skills/SKILL.md", "# Wrong storage") }
 
-        assertTrue(result.success)
-        assertTrue(result.content.contains("projects/demo"))
+        assertTrue(error.message!!.contains("SKILL_DOCUMENT_NOT_ALLOWED"))
+        assertFalse(Files.exists(service.workspaceRoot().resolve("skills/SKILL.md")))
     }
 
     @Test

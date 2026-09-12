@@ -182,7 +182,7 @@ the runtime split is:
 Main-agent tool set (`agentToolConfigService.mainAgentTools()`):
 `agent:list`, `agent:show`, `agent:create`, `agent:update`, `agent:delete`,
 `agent:log`, `todos`, `workspace:file`,
-`workspace:download`, and `javascript:execute`.
+`workspace:download`, `memory`, `skills`, and `javascript:execute`.
 
 Sub-agent role-based sets (`AgentToolConfigService.toolsFor(agent)`,
 default templates `researcher`, `coder`, `analyst`): `todos` plus the
@@ -196,6 +196,9 @@ Common tools: `ui`, `history`, `todos`, `context`, `manual`,
 that returns "not configured"), `search` (placeholder that returns
 "not configured"), `workspace:layout`, `workspace:file`,
 `workspace:download`, `canvas`.
+The `skills` tool is main-agent-only by default; sub-agents require an explicit
+role or agent override. Skill content is stored in the database and is never
+automatically injected into prompts.
 `javascript:execute` is available to the default role templates for complex
 deterministic multi-tool filtering, aggregation, and large CSV, string, or
 Markdown assembly. Execution errors are returned to the model as compact,

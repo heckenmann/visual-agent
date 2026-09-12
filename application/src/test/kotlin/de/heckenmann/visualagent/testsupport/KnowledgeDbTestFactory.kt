@@ -14,6 +14,7 @@ import de.heckenmann.visualagent.knowledge.MemoryStore
 import de.heckenmann.visualagent.knowledge.PersistedSubAgent
 import de.heckenmann.visualagent.knowledge.PersistenceStores
 import de.heckenmann.visualagent.knowledge.PreferenceStore
+import de.heckenmann.visualagent.knowledge.SkillStore
 import de.heckenmann.visualagent.knowledge.SubAgentConfigStore
 import de.heckenmann.visualagent.knowledge.SubAgentStore
 import de.heckenmann.visualagent.knowledge.TodoStore
@@ -67,6 +68,7 @@ class TestPersistence internal constructor(
     val preferenceStore: PreferenceStore = context.getBean(PreferenceStore::class.java)
     val subAgentConfigStore: SubAgentConfigStore = context.getBean(SubAgentConfigStore::class.java)
     val workspaceFileStore: WorkspaceFileStore = context.getBean(WorkspaceFileStore::class.java)
+    val skillStore: SkillStore = context.getBean(SkillStore::class.java)
 
     fun createAgentManager(
         provider: LLMProvider,

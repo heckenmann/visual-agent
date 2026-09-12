@@ -78,6 +78,10 @@ the source or arguments, and retry without repeating the unchanged failure.
 - `analyst`: same as `researcher` minus `browser` and `search`,
   plus review-friendly tools.
 
+The optional `skills` tool is never granted implicitly to sub-agents. A role or
+agent override must explicitly include it before that agent can search or edit
+the durable Markdown catalog.
+
 The main agent receives `agent:list`, `agent:show`, `agent:create`,
 `agent:update`, `agent:delete`, `agent:log`, and `todos` through
 `mainAgentTools()`. The `MainSystemPromptComposer` execution policy

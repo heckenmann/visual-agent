@@ -22,6 +22,7 @@ class AgentToolConfigServiceTest {
         assertTrue("agent:delete" in tools)
         assertTrue("agent:log" in tools)
         assertTrue("todos" in tools)
+        assertTrue("skills" in tools)
         assertTrue("workspace:file" in tools)
         assertTrue("workspace:download" in tools)
         assertFalse("agent:start" in tools)

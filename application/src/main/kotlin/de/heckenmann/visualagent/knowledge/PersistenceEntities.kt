@@ -117,6 +117,48 @@ internal class WorkspaceFileEntity(
 )
 
 @Entity
+@Table(name = "skills")
+internal class SkillEntity(
+    @Id
+    var id: String = "",
+    @Column(nullable = false)
+    var title: String = "",
+    @Lob
+    @Column(nullable = false)
+    var content: String = "",
+    @Column(name = "content_fingerprint", nullable = false, unique = true)
+    var contentFingerprint: String = "",
+    @Convert(converter = InstantStringConverter::class)
+    @Column(name = "created_at", nullable = false, columnDefinition = "TIMESTAMP")
+    var createdAt: Instant = Instant.EPOCH,
+    @Convert(converter = InstantStringConverter::class)
+    @Column(name = "updated_at", nullable = false, columnDefinition = "TIMESTAMP")
+    var updatedAt: Instant = Instant.EPOCH,
+    @Column(nullable = false)
+    var revision: Long = 1,
+    @Column(name = "read_count", nullable = false)
+    var readCount: Long = 0,
+    @Convert(converter = InstantStringConverter::class)
+    @Column(name = "last_read_at", columnDefinition = "TIMESTAMP")
+    var lastReadAt: Instant? = null,
+)
+
+@Entity
+@Table(name = "deleted_skill_audit")
+internal class DeletedSkillAuditEntity(
+    @Id
+    @Column(name = "skill_id")
+    var skillId: String = "",
+    @Column(nullable = false)
+    var title: String = "",
+    @Column(nullable = false)
+    var revision: Long = 1,
+    @Convert(converter = InstantStringConverter::class)
+    @Column(name = "deleted_at", nullable = false, columnDefinition = "TIMESTAMP")
+    var deletedAt: Instant = Instant.EPOCH,
+)
+
+@Entity
 @Table(name = "directory_grants")
 internal class DirectoryGrantEntity(
     @Id

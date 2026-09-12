@@ -7,7 +7,7 @@ errors, protocol-version negotiation, and the gRPC schema.
 ## Responsibilities
 
 - Defines ports for conversation, todos, settings, providers, workspace files, canvas, activity,
-  lifecycle, and application control.
+  lifecycle, searchable skills, and application control.
 - Owns `visual_agent_session.proto` and generated gRPC bindings.
 - Remains implementation-neutral: it does not depend on Spring, Compose, providers, or tools.
 

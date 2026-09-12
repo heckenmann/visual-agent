@@ -32,6 +32,12 @@ class MainSystemPromptComposerTest {
         assertTrue("search" in prompt)
         assertTrue("canvas" in prompt)
         assertTrue("history" in prompt)
+        assertTrue("Reusable Skills" in prompt)
+        assertTrue("skills` search" in prompt)
+        assertTrue("skills` get" in prompt)
+        assertTrue("skills` create" in prompt)
+        assertTrue("Never create `SKILL.md`" in prompt)
+        assertTrue("Never delegate a skill request" in prompt)
     }
 
     @Test

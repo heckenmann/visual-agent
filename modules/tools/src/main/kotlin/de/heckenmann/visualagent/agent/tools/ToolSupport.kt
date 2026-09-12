@@ -30,23 +30,36 @@ private val sensitiveUriQuery =
  * Tool input is still passed unchanged to the tool itself. This boundary only protects
  * activity listeners and conversation persistence from recording model-provided secrets.
  */
-internal fun sanitizeToolInputForEvent(inputJson: String): String {
+internal fun sanitizeToolInputForEvent(
+    inputJson: String,
+    toolId: String? = null,
+): String {
     val sanitized =
         runCatching {
-            redactJson(json.parseToJsonElement(inputJson)).toString()
+            redactJson(json.parseToJsonElement(inputJson), toolId).toString()
         }.getOrElse { inputJson }
     return redactUriSecrets(sanitized)
 }
 
-private fun redactJson(element: JsonElement): JsonElement =
+private fun redactJson(
+    element: JsonElement,
+    toolId: String? = null,
+): JsonElement =
     when (element) {
         is JsonObject ->
             buildJsonObject {
                 element.forEach { (key, value) ->
-                    put(key, if (sensitiveInputKey.containsMatchIn(key)) JsonPrimitive("[redacted]") else redactJson(value))
+                    put(
+                        key,
+                        when {
+                            sensitiveInputKey.containsMatchIn(key) -> JsonPrimitive("[redacted]")
+                            toolId == "skills" && key == "content" -> JsonPrimitive("[skill content omitted]")
+                            else -> redactJson(value, toolId)
+                        },
+                    )
                 }
             }
-        is JsonArray -> buildJsonArray { element.forEach { add(redactJson(it)) } }
+        is JsonArray -> buildJsonArray { element.forEach { add(redactJson(it, toolId)) } }
         else -> element
     }
 

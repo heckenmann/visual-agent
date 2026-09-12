@@ -5,7 +5,9 @@ internal fun workspaceFileToolDescription(): String =
     "Manage workspace files through the Visual Agent server. This tool remains available even when " +
         "the model runtime's native filesystem sandbox is read-only. For managed workspace files, do not run " +
         "native or terminal permission preflight checks such as `test -w`, and do not abort because they report " +
-        "read-only. Use the relevant action below; its result is authoritative. Actions:\n" +
+        "read-only. This tool is not the skill catalog: never create or modify `SKILL.md`, a skill directory, or " +
+        "another durable skill document here; use the `skills` tool for database-owned skills. Use the relevant " +
+        "action below; its result is authoritative. Actions:\n" +
         "- listRoots: {\"action\":\"listRoots\"}. Lists the managed workspace and every explicitly granted directory. " +
         "Each root has an opaque id; do not infer native paths.\n" +
         "- list: {\"action\":\"list\",\"rootId\":\"workspace|...\",\"path\":\"\"}. Lists entries in a root. " +

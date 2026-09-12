@@ -100,7 +100,7 @@ Tools are defined through app-level `ToolDefinition` and executed through `Visua
 ### Main-agent tool set
 
 The main agent receives the sub-agent definition IDs (`agent:*`), `todos`,
-managed workspace tools, and `javascript:execute` through
+managed workspace tools, `memory`, `skills`, and `javascript:execute` through
 `AgentToolConfigService.mainAgentTools()`. It delegates repository file,
 browser, search, history, manual, use-case, and canvas work to
 sub-agents. JavaScript may call only tools enabled for this request through
@@ -171,6 +171,9 @@ role-based sets above and the global blocklist:
   multi-tool processing and return strings, Markdown, or JSON-compatible
   values. The sandbox has no direct host, filesystem, process, network,
   JVM, environment, or credential access.
+- `skills`: search, read, create, update, and delete reusable Markdown skills.
+  Search is bounded and indexed by SQLite FTS5; model reads update persisted
+  read statistics, while user-panel reads do not.
 
 ### Canvas Tool
 
