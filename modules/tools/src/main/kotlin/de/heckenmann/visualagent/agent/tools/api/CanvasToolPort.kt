@@ -51,8 +51,11 @@ interface CanvasToolPort {
         fillColor: String,
     ): String
 
-    /** Inserts a workspace image. */
-    fun insertImage(path: String): String
+    /** Inserts a registered managed-workspace image addressed by ID or relative path. */
+    fun insertImage(
+        id: String?,
+        path: String?,
+    ): String
 
     /** Selects figure indices. */
     fun select(indices: Set<Int>): String

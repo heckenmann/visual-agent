@@ -9,7 +9,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 /**
  * Stable identifier for a model-callable tool.
  *
- * @property value External identifier such as `file:read` or `ui`
+ * @property value External identifier such as `workspace:file` or `ui`
  */
 @JvmInline
 value class ToolId(

@@ -21,8 +21,9 @@ import org.springframework.beans.factory.ObjectProvider
 fun canvasTool(
     canvas: CanvasOperations,
     conversations: ConversationStore,
+    workspaceFiles: WorkspaceFileService,
 ) = de.heckenmann.visualagent.agent.tools.canvas
-    .CanvasTool(CanvasToolPortAdapter(canvas, conversations))
+    .CanvasTool(CanvasToolPortAdapter(canvas, conversations, workspaceFiles))
 
 /** Compatibility factory routing application workspace collaborators through the tool-owned port. */
 fun workspaceFileTool(

@@ -3,10 +3,6 @@ package de.heckenmann.visualagent.agent.tools
 import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
-import java.nio.file.Files
-import kotlin.io.path.isRegularFile
-import kotlin.io.path.name
-import kotlin.io.path.readText
 
 /**
  * Exposes packaged Visual Agent use-case documents to enabled model calls.
@@ -95,7 +91,6 @@ class UseCaseTool : VisualAgentTool {
 
     private fun loadDocuments(): List<UseCaseDocument> =
         loadPackagedIndex()
-            .ifEmpty { loadFilesystemIndex() }
             .mapNotNull(::loadDocument)
             .sortedBy { it.fileName }
 
@@ -107,23 +102,10 @@ class UseCaseTool : VisualAgentTool {
             ?.toList()
             .orEmpty()
 
-    private fun loadFilesystemIndex(): List<String> {
-        val root = workspaceRoot().resolve("docs/usecases")
-        if (!Files.isDirectory(root)) return emptyList()
-        return Files.list(root).use { stream ->
-            stream
-                .filter { it.isRegularFile() && isValidUseCaseFileName(it.name) }
-                .map { it.name }
-                .sorted()
-                .toList()
-        }
-    }
-
     private fun loadDocument(fileName: String): UseCaseDocument? {
         if (!isValidUseCaseFileName(fileName)) return null
         val content =
             readResourceText("$RESOURCE_ROOT/$fileName")
-                ?: readFilesystemText(fileName)
                 ?: return null
         return UseCaseDocument(
             fileName = fileName,
@@ -131,13 +113,6 @@ class UseCaseTool : VisualAgentTool {
             title = content.titleOrFallback(fileName),
             content = content,
         )
-    }
-
-    private fun readFilesystemText(fileName: String): String? {
-        val root = workspaceRoot().resolve("docs/usecases").normalize()
-        val file = root.resolve(fileName).normalize()
-        if (!file.startsWith(root) || !file.isRegularFile()) return null
-        return file.readText()
     }
 
     private fun readResourceText(name: String): String? =

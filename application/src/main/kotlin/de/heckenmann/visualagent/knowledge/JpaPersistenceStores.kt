@@ -253,7 +253,7 @@ private fun SubAgentEntity.toRecord(): PersistedSubAgent =
     PersistedSubAgent(id, name, role, status, currentTask, parentAgentId, config, createdAt, updatedAt)
 
 private fun DirectoryGrantRecord.toEntity() =
-    DirectoryGrantEntity(id, displayName, canonicalRoot, origin, mode, clientBindingId, createdAt, updatedAt)
+    DirectoryGrantEntity(id, displayName, canonicalRoot, origin, mode, ownerClientId, createdAt, updatedAt)
 
 private fun DirectoryGrantEntity.toRecord() =
-    DirectoryGrantRecord(id, displayName, canonicalRoot, origin, mode, clientBindingId, createdAt, updatedAt)
+    DirectoryGrantRecord(id, displayName, canonicalRoot, origin, mode, ownerClientId, createdAt, updatedAt)

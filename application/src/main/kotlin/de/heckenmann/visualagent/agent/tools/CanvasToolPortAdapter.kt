@@ -6,6 +6,7 @@ import de.heckenmann.visualagent.agent.tools.api.ToolCanvasPoint
 import de.heckenmann.visualagent.canvas.CanvasOperations
 import de.heckenmann.visualagent.canvas.CanvasPoint
 import de.heckenmann.visualagent.knowledge.ConversationStore
+import de.heckenmann.visualagent.workspace.WorkspaceFileService
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
@@ -18,6 +19,7 @@ import java.util.Base64
 class CanvasToolPortAdapter(
     private val canvas: CanvasOperations,
     private val conversations: ConversationStore,
+    private val workspaceFiles: WorkspaceFileService,
 ) : CanvasToolPort {
     override fun snapshot(): String = encode(canvas.snapshot())
 
@@ -61,7 +63,13 @@ class CanvasToolPortAdapter(
         fillColor: String,
     ): String = encode(canvas.drawCircle(centerX, centerY, radius, fillColor))
 
-    override fun insertImage(path: String): String = encode(canvas.insertImage(path))
+    override fun insertImage(
+        id: String?,
+        path: String?,
+    ): String {
+        val record = workspaceFiles.requireFile(id, path)
+        return encode(canvas.insertImage(workspaceFiles.resolveManagedPath(record.relativePath).toString()))
+    }
 
     override fun select(indices: Set<Int>): String = encode(canvas.selectFigures(indices))
 

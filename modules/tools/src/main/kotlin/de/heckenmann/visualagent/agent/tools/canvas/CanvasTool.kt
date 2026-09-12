@@ -1,7 +1,6 @@
 package de.heckenmann.visualagent.agent.tools.canvas
 
 import de.heckenmann.visualagent.agent.tools.AgentTool
-import de.heckenmann.visualagent.agent.tools.PathResolution
 import de.heckenmann.visualagent.agent.tools.STRING_SCHEMA
 import de.heckenmann.visualagent.agent.tools.VisualAgentTool
 import de.heckenmann.visualagent.agent.tools.api.CanvasToolPort
@@ -10,7 +9,6 @@ import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
 import de.heckenmann.visualagent.agent.tools.failure
 import de.heckenmann.visualagent.agent.tools.parseObject
-import de.heckenmann.visualagent.agent.tools.resolveWorkspacePathOrFailure
 import de.heckenmann.visualagent.agent.tools.string
 import de.heckenmann.visualagent.agent.tools.success
 import de.heckenmann.visualagent.agent.tools.toFunctionName
@@ -44,7 +42,8 @@ class CanvasTool(
                     "\"points\":[{\"x\":100,\"y\":200},{\"x\":150,\"y\":250}],\"color\":\"#1f6feb\",\"width\":2}.\n" +
                     "- drawCircle: {\"action\":\"drawCircle\",\"centerX\":200,\"centerY\":200," +
                     "\"radius\":50,\"fillColor\":\"#ffffff\"}.\n" +
-                    "- insertImage: {\"action\":\"insertImage\",\"path\":\"relative/path/image.png\"}.\n" +
+                    "- insertImage: {\"action\":\"insertImage\",\"id\":\"managed-file-id\"} or " +
+                    "{\"action\":\"insertImage\",\"path\":\"relative/path/image.png\"}.\n" +
                     "- select: {\"action\":\"select\",\"indices\":[0,1]} or {\"action\":\"select\",\"index\":0}.\n" +
                     "- selectAt: {\"action\":\"selectAt\",\"x\":100,\"y\":200}. Select figure at coordinates.\n" +
                     "- moveFigure: {\"action\":\"moveFigure\",\"index\":0,\"deltaX\":50,\"deltaY\":30}.\n" +
@@ -151,15 +150,8 @@ class CanvasTool(
         )
 
     private fun insertImage(input: JsonObject): ToolResult {
-        val path = input.requiredString("path")
-        return when (val resolved = resolveWorkspacePathOrFailure(CanvasToolConstants.TOOL_ID, path)) {
-            is PathResolution.Failure -> resolved.result
-            is PathResolution.Success ->
-                success(
-                    CanvasToolConstants.TOOL_ID,
-                    canvas.insertImage(resolved.path.toString()),
-                )
-        }
+        require(input.string("id") != null || input.string("path") != null) { "Missing image id or path" }
+        return success(CanvasToolConstants.TOOL_ID, canvas.insertImage(input.string("id"), input.string("path")))
     }
 
     private fun select(input: JsonObject): ToolResult {

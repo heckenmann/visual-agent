@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
 import de.heckenmann.visualagent.protocol.ConversationImageResolution
 import de.heckenmann.visualagent.protocol.MAX_MARKDOWN_IMAGE_BYTES
 import de.heckenmann.visualagent.testsupport.TestPng
+import de.heckenmann.visualagent.workspace.UnifiedFileService
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
 import io.mockk.every
 import io.mockk.mockk
@@ -271,5 +272,5 @@ class ConversationMediaResolverTest {
     }
 
     private fun newResolver(fetcher: ConversationImageFetcher): ConversationMediaResolver =
-        ConversationMediaResolver(workspace, fetcher, Tika())
+        ConversationMediaResolver(workspace, mockk<UnifiedFileService>(relaxed = true), fetcher, Tika())
 }

@@ -63,26 +63,6 @@ class SettingsTool(
     }
 }
 
-/** Tool that returns the workspace root used for file and terminal operations. */
-@AgentTool
-class PwdTool : VisualAgentTool {
-    override val definition =
-        ToolDefinition(
-            id = ToolId("pwd"),
-            name = ToolId("pwd").toFunctionName(),
-            description =
-                "Return the current Visual Agent workspace directory. " +
-                    "No input parameters required. " +
-                    "Input: {}.",
-            inputSchema = STRING_SCHEMA,
-        )
-
-    override fun execute(
-        inputJson: String,
-        context: Map<String, Any>,
-    ): ToolResult = success("pwd", workspaceRoot().toString())
-}
-
 /** Tool that summarizes request metadata, workspace state, and provider selection. */
 @AgentTool
 class ContextTool(
@@ -106,7 +86,7 @@ class ContextTool(
         success(
             "context",
             buildString {
-                appendLine("Workspace: ${workspaceRoot()}")
+                appendLine("Workspace: use workspace:file action listRoots for authorized roots.")
                 val current = settings.read()
                 appendLine("Provider: ${current.provider}")
                 appendLine("Model: ${current.model}")

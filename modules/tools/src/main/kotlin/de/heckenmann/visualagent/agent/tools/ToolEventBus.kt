@@ -8,7 +8,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 /**
  * Event emitted for every tool call execution.
  *
- * @property toolId Tool identifier such as `file:read`
+ * @property toolId Tool identifier such as `workspace:file`
  * @property functionName Provider-safe function callback name
  * @property providerToolCallId Provider request-scoped call identity
  * @property requestId Visual Agent request identity

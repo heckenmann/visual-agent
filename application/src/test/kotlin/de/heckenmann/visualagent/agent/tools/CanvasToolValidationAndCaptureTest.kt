@@ -1,6 +1,9 @@
 package de.heckenmann.visualagent.agent.tools
 
 import de.heckenmann.visualagent.agent.tools.canvas.CanvasTool
+import de.heckenmann.visualagent.workspace.WorkspaceFileService
+import io.mockk.every
+import io.mockk.mockk
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -9,7 +12,7 @@ import kotlin.test.assertTrue
 class CanvasToolValidationAndCaptureTest {
     @Test
     fun `missing required fields return a tool failure`() {
-        val tool = CanvasTool(CanvasToolPortAdapter(FakeCanvasOperations(), FakeConversationStore()))
+        val tool = newCanvasTool()
 
         val result = tool.execute("""{"action":"drawText","x":1,"y":2}""")
 
@@ -20,7 +23,17 @@ class CanvasToolValidationAndCaptureTest {
 
     @Test
     fun `insert image rejects paths outside workspace`() {
-        val tool = CanvasTool(CanvasToolPortAdapter(FakeCanvasOperations(), FakeConversationStore()))
+        val workspaceFiles = mockk<WorkspaceFileService>()
+        every { workspaceFiles.requireFile(null, "../outside.png") } throws
+            IllegalArgumentException("Workspace path escapes the workspace")
+        val tool =
+            CanvasTool(
+                CanvasToolPortAdapter(
+                    FakeCanvasOperations(),
+                    FakeConversationStore(),
+                    workspaceFiles,
+                ),
+            )
 
         val result = tool.execute("""{"action":"insertImage","path":"../outside.png"}""")
 
@@ -32,7 +45,7 @@ class CanvasToolValidationAndCaptureTest {
     fun `capture image persists immutable history image and returns compact result`() {
         val canvas = FakeCanvasOperations()
         val store = FakeConversationStore()
-        val tool = CanvasTool(CanvasToolPortAdapter(canvas, store))
+        val tool = newCanvasTool(canvas, store)
 
         assertTrue(tool.definition.description.contains("conversation image attachment"))
 
@@ -53,11 +66,23 @@ class CanvasToolValidationAndCaptureTest {
 
     @Test
     fun `capture image reports unsupported formats as tool failure`() {
-        val tool = CanvasTool(CanvasToolPortAdapter(FakeCanvasOperations(), FakeConversationStore()))
+        val tool = newCanvasTool()
 
         val result = tool.execute("""{"action":"captureImage","format":"jpg"}""")
 
         assertFalse(result.success)
         assertEquals("Unsupported canvas image format: jpg", result.error)
     }
+
+    private fun newCanvasTool(
+        canvas: FakeCanvasOperations = FakeCanvasOperations(),
+        conversations: FakeConversationStore = FakeConversationStore(),
+    ): CanvasTool =
+        CanvasTool(
+            CanvasToolPortAdapter(
+                canvas,
+                conversations,
+                mockk<WorkspaceFileService>(relaxed = true),
+            ),
+        )
 }

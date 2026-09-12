@@ -129,8 +129,8 @@ internal class DirectoryGrantEntity(
     var origin: String = "SERVER",
     @Column(nullable = false)
     var mode: String = "READ_ONLY",
-    @Column(name = "client_binding_id")
-    var clientBindingId: String? = null,
+    @Column(name = "owner_client_id")
+    var ownerClientId: String? = null,
     @Convert(converter = InstantStringConverter::class)
     @Column(name = "created_at", columnDefinition = "TIMESTAMP")
     var createdAt: Instant = Instant.EPOCH,

@@ -5,7 +5,7 @@ import de.heckenmann.visualagent.protocol.AgentPort
 import de.heckenmann.visualagent.protocol.ApplicationPort
 import de.heckenmann.visualagent.protocol.CanvasPort
 import de.heckenmann.visualagent.protocol.ConversationPort
-import de.heckenmann.visualagent.protocol.DirectoryAccessPort
+import de.heckenmann.visualagent.protocol.DirectoryGrantAdministrationPort
 import de.heckenmann.visualagent.protocol.LifecyclePort
 import de.heckenmann.visualagent.protocol.MainAgentMemoryPort
 import de.heckenmann.visualagent.protocol.ProviderPort
@@ -24,7 +24,7 @@ class SpringApplicationPort(
     override val settings: SettingsPort,
     override val mainAgentMemory: MainAgentMemoryPort,
     override val workspaceFiles: WorkspaceFilePort,
-    override val directoryAccess: DirectoryAccessPort,
+    override val directoryAccess: DirectoryGrantAdministrationPort,
     override val canvas: CanvasPort,
     override val layout: de.heckenmann.visualagent.protocol.WorkspaceLayoutPort,
     override val activity: ActivityPort,

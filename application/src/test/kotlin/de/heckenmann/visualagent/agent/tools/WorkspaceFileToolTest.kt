@@ -4,6 +4,11 @@ import de.heckenmann.visualagent.agent.ChatResponse
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ShowResponse
+import de.heckenmann.visualagent.agent.tools.api.DirectoryToolPort
+import de.heckenmann.visualagent.agent.tools.api.ToolDirectoryEntry
+import de.heckenmann.visualagent.agent.tools.api.ToolDirectoryGrant
+import de.heckenmann.visualagent.agent.tools.api.ToolDirectoryMatch
+import de.heckenmann.visualagent.agent.tools.api.ToolDirectoryMimeType
 import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
 import de.heckenmann.visualagent.knowledge.WorkspaceFileStore
 import de.heckenmann.visualagent.testsupport.TestPng
@@ -171,6 +176,44 @@ class WorkspaceFileToolTest {
         assertTrue(service.listFiles().none { it.id == imported.id })
     }
 
+    @Test
+    fun `workspace file tool uses opaque roots for directory grants without host paths`() {
+        val tool = WorkspaceFileTool(mockk(relaxed = true), FakeDirectoryToolPort())
+
+        val roots = tool.execute("""{"action":"listRoots"}""")
+        val read = tool.execute("""{"action":"readText","rootId":"grant-client","path":"notes.txt"}""")
+        val write =
+            tool.execute(
+                """{"action":"writeText","rootId":"grant-client","path":"notes.txt","content":"updated"}""",
+            )
+
+        assertTrue(roots.success)
+        assertTrue(roots.content.contains("grant-client"))
+        assertFalse(roots.content.contains("/home/"))
+        assertTrue(read.content.contains("client content"))
+        assertTrue(write.content.contains("notes.txt"))
+    }
+
+    @Test
+    fun `workspace file tool transfers files across grant ids`() {
+        val directories = FakeDirectoryToolPort()
+        val tool = WorkspaceFileTool(mockk(relaxed = true), directories)
+
+        val copy =
+            tool.execute(
+                """{"action":"copy","sourceRootId":"grant-source","sourcePath":"report.md","targetRootId":"grant-target","targetPath":"archive/report.md"}""",
+            )
+        val move =
+            tool.execute(
+                """{"action":"move","sourceRootId":"grant-source","sourcePath":"draft.md","targetRootId":"grant-target","targetPath":"published/draft.md"}""",
+            )
+
+        assertTrue(copy.success)
+        assertTrue(move.success)
+        assertEquals(Transfer("grant-source", "report.md", "grant-target", "archive/report.md"), directories.copyRequest)
+        assertEquals(Transfer("grant-source", "draft.md", "grant-target", "published/draft.md"), directories.moveRequest)
+    }
+
     private fun tempDir(): Path = Files.createTempDirectory("visual-agent-workspace-tool-test")
 
     private fun writePdf(
@@ -249,4 +292,84 @@ class WorkspaceFileToolTest {
 
         override fun deleteWorkspaceFile(id: String): Boolean = records.remove(id) != null
     }
+
+    private class FakeDirectoryToolPort : DirectoryToolPort {
+        var copyRequest: Transfer? = null
+        var moveRequest: Transfer? = null
+
+        override fun listGrants(): List<ToolDirectoryGrant> =
+            listOf(ToolDirectoryGrant("grant-client", "Client documents", "CLIENT", "READ_WRITE", available = true))
+
+        override fun list(
+            grantId: String,
+            path: String,
+        ): List<ToolDirectoryEntry> = listOf(ToolDirectoryEntry("notes.txt", directory = false, sizeBytes = 14))
+
+        override fun readText(
+            grantId: String,
+            path: String,
+        ): String = "client content"
+
+        override fun detectMimeType(
+            grantId: String,
+            path: String,
+        ): ToolDirectoryMimeType = ToolDirectoryMimeType("text/plain", 14)
+
+        override fun search(
+            grantId: String,
+            query: String,
+            path: String,
+        ): List<ToolDirectoryMatch> = emptyList()
+
+        override fun glob(
+            grantId: String,
+            path: String,
+            pattern: String,
+        ): List<ToolDirectoryEntry> = emptyList()
+
+        override fun writeText(
+            grantId: String,
+            path: String,
+            content: String,
+        ): String = path
+
+        override fun editText(
+            grantId: String,
+            path: String,
+            oldText: String,
+            newText: String,
+        ): String = path
+
+        override fun createDirectory(
+            grantId: String,
+            path: String,
+        ): String = path
+
+        override fun delete(
+            grantId: String,
+            path: String,
+            recursive: Boolean,
+        ) = Unit
+
+        override fun copy(
+            sourceGrantId: String,
+            sourcePath: String,
+            targetGrantId: String,
+            targetPath: String,
+        ): String = targetPath.also { copyRequest = Transfer(sourceGrantId, sourcePath, targetGrantId, targetPath) }
+
+        override fun move(
+            sourceGrantId: String,
+            sourcePath: String,
+            targetGrantId: String,
+            targetPath: String,
+        ): String = targetPath.also { moveRequest = Transfer(sourceGrantId, sourcePath, targetGrantId, targetPath) }
+    }
+
+    private data class Transfer(
+        val sourceRootId: String,
+        val sourcePath: String,
+        val targetRootId: String,
+        val targetPath: String,
+    )
 }

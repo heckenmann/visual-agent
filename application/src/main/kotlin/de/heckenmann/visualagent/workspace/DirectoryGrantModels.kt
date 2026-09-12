@@ -11,7 +11,7 @@ data class DirectoryGrant(
     val canonicalRoot: String?,
     val origin: DirectoryGrantOrigin,
     val mode: DirectoryAccessMode,
-    val clientBindingId: String?,
+    val ownerClientId: String?,
     val createdAt: Instant,
     val updatedAt: Instant,
 )

@@ -1,37 +1,44 @@
 package de.heckenmann.visualagent.server
 
+import de.heckenmann.visualagent.protocol.ClientDirectoryCapabilityRegistration
 import de.heckenmann.visualagent.protocol.DirectoryAccessMode
-import de.heckenmann.visualagent.protocol.DirectoryAccessPort
+import de.heckenmann.visualagent.protocol.DirectoryGrantAdministrationPort
 import de.heckenmann.visualagent.protocol.DirectoryGrantView
+import de.heckenmann.visualagent.protocol.ServerDirectoryPickerPage
 import de.heckenmann.visualagent.workspace.DirectoryGrant
 import de.heckenmann.visualagent.workspace.DirectoryGrantService
+import de.heckenmann.visualagent.workspace.ServerDirectoryBrowserService
 import org.springframework.stereotype.Component
 
 /** Spring protocol adapter for direct-user directory grant management. */
 @Component
-class SpringDirectoryAccessPort(
+class SpringDirectoryGrantAdministrationPort(
     private val grants: DirectoryGrantService,
-) : DirectoryAccessPort {
+    private val serverDirectories: ServerDirectoryBrowserService,
+) : DirectoryGrantAdministrationPort {
     override fun listGrants(): List<DirectoryGrantView> = grants.listGrants().map(::view)
 
-    override fun inspectServerDirectory(absolutePath: String): DirectoryGrantView {
-        val canonical = grants.inspectServerDirectory(absolutePath)
-        return DirectoryGrantView(
-            "",
-            canonical.fileName?.toString() ?: canonical.toString(),
-            de.heckenmann.visualagent.protocol.DirectoryGrantOrigin.SERVER,
-            DirectoryAccessMode.READ_ONLY,
-            canonical.toString(),
-            true,
-            null,
-        )
-    }
+    override fun listServerDirectoryRoots(pageToken: String?): ServerDirectoryPickerPage = serverDirectories.roots(pageToken)
+
+    override fun listServerDirectoryChildren(
+        selectionId: String,
+        pageToken: String?,
+    ): ServerDirectoryPickerPage = serverDirectories.children(selectionId, pageToken)
 
     override fun addServerGrant(
-        absolutePath: String,
+        selectionId: String,
         displayName: String,
         mode: DirectoryAccessMode,
-    ): DirectoryGrantView = view(grants.addServerGrant(absolutePath, displayName, mode))
+    ): DirectoryGrantView = view(grants.addServerGrant(serverDirectories.resolve(selectionId).toString(), displayName, mode))
+
+    override fun addClientGrant(
+        registration: ClientDirectoryCapabilityRegistration,
+        displayName: String,
+        mode: DirectoryAccessMode,
+    ): DirectoryGrantView = view(grants.addClientGrant(registration, displayName, mode))
+
+    override fun reactivateClientGrant(registration: ClientDirectoryCapabilityRegistration): DirectoryGrantView =
+        view(grants.reactivateClientGrant(registration))
 
     override fun updateGrant(
         id: String,
@@ -46,6 +53,11 @@ class SpringDirectoryAccessPort(
             grant.id,
             grant.displayName,
             grant.origin,
+            if (grant.origin == de.heckenmann.visualagent.protocol.DirectoryGrantOrigin.CLIENT) {
+                "This desktop client"
+            } else {
+                "Application server"
+            },
             grant.mode,
             grant.canonicalRoot,
             grants.isAvailable(grant),

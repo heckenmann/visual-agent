@@ -14,8 +14,11 @@ class WorkspaceMimeTypeDetector(
     /** Detects a MIME type from the first bounded content bytes. */
     fun detect(path: Path): String {
         val bytes = Files.newInputStream(path).use { it.readNBytes(MAX_DETECTION_BYTES) }
-        return tika.detect(bytes).trim().ifBlank { WorkspaceFilePaths.detectMimeType(path) }
+        return detect(bytes).ifBlank { WorkspaceFilePaths.detectMimeType(path) }
     }
+
+    /** Detects a MIME type from already authorization-bounded content bytes. */
+    fun detect(bytes: ByteArray): String = tika.detect(bytes).trim().ifBlank { "application/octet-stream" }
 
     /** Builds content-derived metadata for a managed workspace file. */
     fun metadata(

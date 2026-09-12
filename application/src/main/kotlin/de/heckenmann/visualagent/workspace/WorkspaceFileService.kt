@@ -7,8 +7,12 @@ import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.io.File
+import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption.ATOMIC_MOVE
+import java.nio.file.StandardOpenOption
 import java.time.Instant
 import java.util.UUID
 import kotlin.io.path.createDirectories
@@ -58,8 +62,7 @@ class WorkspaceFileService(
         val parent = resolveWorkspaceDirectory(parentDirectory)
         val directory = parent.resolve(normalizedName).normalize()
         require(directory.parent == parent) { "Folder must be a direct child of its parent" }
-        directory.createDirectories()
-        require(directory.toRealPath().startsWith(workspaceRoot().toRealPath())) { "Workspace directory escapes the workspace" }
+        ensureWorkspaceDirectory(directory, workspaceRoot().toRealPath())
         return WorkspaceFilePaths.relativePath(directory, databasePath).also {
             recordActivity("Workspace folder created: $it.", it, "create-directory")
         }
@@ -74,8 +77,7 @@ class WorkspaceFileService(
         val root = workspaceRoot().toRealPath()
         val directory = root.resolve(normalized).normalize()
         require(directory.startsWith(root)) { "Workspace directory escapes the workspace" }
-        directory.createDirectories()
-        require(directory.toRealPath().startsWith(root)) { "Workspace directory escapes the workspace" }
+        ensureWorkspaceDirectory(directory, root)
         return directory
     }
 
@@ -345,6 +347,59 @@ class WorkspaceFileService(
         }
     }
 
+    /** Copies a managed regular file to a new path within the managed workspace. */
+    fun copyFile(
+        sourcePath: String,
+        targetPath: String,
+    ): WorkspaceFileRecord {
+        val sourceRecord = requireFile(null, sourcePath)
+        val source = resolveManagedPath(sourceRecord.relativePath)
+        val target = prepareNewWorkspaceTarget(targetPath)
+        Files.copy(source, target)
+        return recordManagedFile(target, target.name, sourceRecord.mimeType).also { copied ->
+            recordActivity(
+                "Workspace file copied: ${sourceRecord.relativePath} to ${copied.relativePath}.",
+                copied.relativePath,
+                "copy",
+                copied.mimeType,
+                copied.sizeBytes,
+            )
+        }
+    }
+
+    /** Moves a managed regular file to a new path within the managed workspace. */
+    fun moveFile(
+        sourcePath: String,
+        targetPath: String,
+    ): WorkspaceFileRecord {
+        val sourceRecord = requireFile(null, sourcePath)
+        val source = resolveManagedPath(sourceRecord.relativePath)
+        val target = prepareNewWorkspaceTarget(targetPath)
+        try {
+            Files.move(source, target, ATOMIC_MOVE)
+        } catch (_: AtomicMoveNotSupportedException) {
+            Files.move(source, target)
+        }
+        return sourceRecord
+            .copy(
+                relativePath = WorkspaceFilePaths.relativePath(target, databasePath),
+                originalName = target.name,
+                mimeType = mimeDetector.detect(target),
+                sizeBytes = target.fileSize(),
+                sha256 = WorkspaceFilePaths.sha256(target),
+                updatedAt = Instant.now(),
+            ).also { moved ->
+                store.saveWorkspaceFile(moved)
+                recordActivity(
+                    "Workspace file moved: ${sourceRecord.relativePath} to ${moved.relativePath}.",
+                    moved.relativePath,
+                    "move",
+                    moved.mimeType,
+                    moved.sizeBytes,
+                )
+            }
+    }
+
     /**
      * Computes the current SHA-256 hash for a managed file.
      *
@@ -358,6 +413,77 @@ class WorkspaceFileService(
      * Use cases: UC-0000027.
      */
     fun readText(record: WorkspaceFileRecord): String = contentOperations.readText(record)
+
+    /**
+     * Reads at most [maximumBytes] from a managed binary file.
+     *
+     * The limit is checked against the current filesystem entry as well as while reading, so a
+     * stale metadata record cannot cause an unbounded allocation.
+     */
+    fun readBytes(
+        record: WorkspaceFileRecord,
+        maximumBytes: Long,
+    ): ByteArray {
+        require(maximumBytes > 0) { "maximumBytes must be positive" }
+        require(maximumBytes <= Int.MAX_VALUE - 1L) { "maximumBytes is too large" }
+        val path = resolveManagedPath(record.relativePath)
+        require(path.isRegularFile()) { "Workspace path is not a regular file" }
+        require(path.fileSize() <= maximumBytes) { "File exceeds the $maximumBytes-byte limit" }
+        return Files.newInputStream(path).use { input -> input.readNBytes(maximumBytes.toInt() + 1) }.also { bytes ->
+            require(bytes.size.toLong() <= maximumBytes) { "File exceeds the $maximumBytes-byte limit" }
+        }
+    }
+
+    /**
+     * Writes UTF-8 text below the managed workspace and persists its metadata.
+     *
+     * @param relativePath Workspace-relative target path
+     * @param content Text content to write
+     * @return Updated managed workspace record
+     */
+    fun writeText(
+        relativePath: String,
+        content: String,
+    ): WorkspaceFileRecord {
+        val target = WorkspaceFilePaths.resolveWorkspacePath(relativePath, databasePath)
+        val root = workspaceRoot().toRealPath()
+        val parent = requireNotNull(target.parent) { "Workspace file must have a parent directory" }
+        ensureWorkspaceDirectory(parent, root)
+        require(!Files.exists(target, LinkOption.NOFOLLOW_LINKS) || Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS)) {
+            "Workspace target is not a regular file"
+        }
+        Files.writeString(target, content, Charsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
+        return recordManagedFile(target, target.name, "text/plain").also {
+            recordActivity("Workspace file written: ${it.relativePath}.", it.relativePath, "write", it.mimeType, it.sizeBytes)
+        }
+    }
+
+    /** Creates each missing parent only after confirming it is not a link escaping [root]. */
+    private fun ensureWorkspaceDirectory(
+        directory: Path,
+        root: Path,
+    ) {
+        require(directory.startsWith(root)) { "Workspace directory escapes the workspace" }
+        var current = root
+        root.relativize(directory).forEach { segment ->
+            current = current.resolve(segment)
+            if (Files.exists(current, LinkOption.NOFOLLOW_LINKS)) {
+                require(Files.isDirectory(current, LinkOption.NOFOLLOW_LINKS)) { "Workspace path contains a symbolic link or file" }
+            } else {
+                Files.createDirectory(current)
+            }
+            require(current.toRealPath().startsWith(root)) { "Workspace directory escapes the workspace" }
+        }
+    }
+
+    private fun prepareNewWorkspaceTarget(relativePath: String): Path {
+        val target = WorkspaceFilePaths.resolveWorkspacePath(relativePath, databasePath)
+        val root = workspaceRoot().toRealPath()
+        val parent = requireNotNull(target.parent) { "Workspace file must have a parent directory" }
+        ensureWorkspaceDirectory(parent, root)
+        require(!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) { "Workspace target already exists" }
+        return target
+    }
 
     /**
      * Extracts and caches text from a managed PDF.

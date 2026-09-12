@@ -41,8 +41,6 @@ class AgentToolConfigService(
             "subagents:execution",
             "todos",
             "workspace:file",
-            "workspace:directory",
-            "workspace:mime",
             "workspace:download",
             "javascript:execute",
             "memory",
@@ -85,7 +83,7 @@ class AgentToolConfigService(
      * @return true when the tool is not globally disabled
      * @see docs/usecases/uc_0000019_configure_agent_tools.md
      */
-    fun isToolGloballyEnabled(toolId: String): Boolean = toolId !in disabledToolIds()
+    fun isToolGloballyEnabled(toolId: String): Boolean = toolId !in RESTRICTED_HOST_ACCESS_TOOL_IDS && toolId !in disabledToolIds()
 
     /**
      * Returns the persisted tool configuration id for the given sub-agent.
@@ -120,6 +118,9 @@ class AgentToolConfigService(
         toolId: String,
         enabled: Boolean,
     ) {
+        require(!enabled || toolId !in RESTRICTED_HOST_ACCESS_TOOL_IDS) {
+            "Unsandboxed host-access tools are permanently disabled; use workspace:file instead"
+        }
         val next =
             if (enabled) {
                 disabledToolIds() - toolId
@@ -190,14 +191,9 @@ class AgentToolConfigService(
                 description = "Search, read, and analyze code, files, and documentation.",
                 tools =
                     listOf(
-                        "file:read",
-                        "file:list",
-                        "file:glob",
-                        "file:grep",
                         "browser",
                         "search",
                         "context",
-                        "pwd",
                         "todos",
                         "history",
                         "manual",
@@ -205,8 +201,6 @@ class AgentToolConfigService(
                         "sleep",
                         "workspace:layout",
                         "workspace:file",
-                        "workspace:directory",
-                        "workspace:mime",
                         "workspace:download",
                         "canvas",
                         "javascript:execute",
@@ -218,15 +212,7 @@ class AgentToolConfigService(
                 description = "Implement code changes, write new functions, fix bugs, and modify files.",
                 tools =
                     listOf(
-                        "file:read",
-                        "file:write",
-                        "file:edit",
-                        "terminal",
-                        "file:list",
-                        "file:glob",
-                        "file:grep",
                         "context",
-                        "pwd",
                         "todos",
                         "history",
                         "manual",
@@ -234,8 +220,6 @@ class AgentToolConfigService(
                         "sleep",
                         "workspace:layout",
                         "workspace:file",
-                        "workspace:directory",
-                        "workspace:mime",
                         "workspace:download",
                         "canvas",
                         "javascript:execute",
@@ -248,12 +232,7 @@ class AgentToolConfigService(
                 description = "Deep analysis, review, and explanation of code and architecture.",
                 tools =
                     listOf(
-                        "file:read",
-                        "file:list",
-                        "file:glob",
-                        "file:grep",
                         "context",
-                        "pwd",
                         "todos",
                         "history",
                         "manual",
@@ -261,8 +240,6 @@ class AgentToolConfigService(
                         "sleep",
                         "workspace:layout",
                         "workspace:file",
-                        "workspace:directory",
-                        "workspace:mime",
                         "workspace:download",
                         "canvas",
                         "javascript:execute",
@@ -272,6 +249,18 @@ class AgentToolConfigService(
 }
 
 private const val DISABLED_TOOLS_KEY = "tools.disabled.global"
+
+private val RESTRICTED_HOST_ACCESS_TOOL_IDS =
+    setOf(
+        "file:read",
+        "file:list",
+        "file:glob",
+        "file:grep",
+        "file:write",
+        "file:edit",
+        "terminal",
+        "pwd",
+    )
 
 /**
  * Persisted tool configuration for one agent template.

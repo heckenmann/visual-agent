@@ -27,7 +27,7 @@ class ManualTool(
                     "- list: {\"action\":\"list\"}. Lists all available topics.\n" +
                     "- show: {\"action\":\"show\",\"topic\":\"todos\"}. Shows a manual page for a tool or topic. " +
                     "Use topic=markdown for markdown formatting reference. " +
-                    "Use topic=<tool_id> (e.g. file:read, todos, canvas) for tool-specific documentation.",
+                    "Use topic=<tool_id> (e.g. workspace:file, todos, canvas) for tool-specific documentation.",
             inputSchema = STRING_SCHEMA,
         )
 
@@ -149,10 +149,10 @@ class ManualTool(
         ### Conversation Image Sources
         Use a complete image node with meaningful alt text:
         ![diagram](workspace:generated/diagram.png)
-        ![diagram](server-file:generated/diagram.png)
+        ![diagram](visual-agent-file://<root-id>/generated/diagram.png)
         ![diagram](https://example.com/diagram.png)
         ![diagram](data:image/png;base64,<validated-data>)
-        `workspace:` and `server-file:` refer to server-managed files. `client-file:` is reserved for an exact client-local path supplied by the user. Use only sources returned by a tool or supplied by the user; do not invent paths or base64 data. Remote URLs must point directly to image bytes. A canvas capture is stored as a conversation attachment automatically.
+        `workspace:` and `visual-agent-file:` are resolved through the Visual Agent server. Use only sources returned by a tool or supplied by the user; do not invent paths or base64 data. Remote URLs must point directly to image bytes. A canvas capture is stored as a conversation attachment automatically.
 
         ## Code
         `inline code`

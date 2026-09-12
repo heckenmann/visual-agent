@@ -13,14 +13,18 @@ import de.heckenmann.visualagent.agent.tools.api.ToolWorkspaceFile
 import de.heckenmann.visualagent.agent.tools.api.ToolWorkspaceMatch
 import de.heckenmann.visualagent.agent.tools.api.ToolWorkspaceSearch
 import de.heckenmann.visualagent.agent.tools.api.ToolWorkspaceSync
+import de.heckenmann.visualagent.agent.tools.api.ToolWorkspaceTextMatch
 import de.heckenmann.visualagent.agent.tools.api.WorkspaceFileToolPort
 import de.heckenmann.visualagent.agent.tools.api.WorkspaceLayoutToolPort
 import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
 import de.heckenmann.visualagent.workspace.WorkspaceDownloadRequest
 import de.heckenmann.visualagent.workspace.WorkspaceDownloadService
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
+import de.heckenmann.visualagent.workspace.globFiles
+import de.heckenmann.visualagent.workspace.grepText
 import de.heckenmann.visualagent.workspace.layout.WorkspaceLayoutService
 import de.heckenmann.visualagent.workspace.layout.WorkspaceWindowState
+import de.heckenmann.visualagent.workspace.replaceText
 import de.heckenmann.visualagent.workspace.searchFiles
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
@@ -53,6 +57,16 @@ class WorkspaceFileToolPortAdapter(
             ToolWorkspaceSearch(result.query, result.matches.map { ToolWorkspaceMatch(it.matchType, it.snippet, toToolFile(it.record)) })
         }
 
+    override fun glob(
+        path: String,
+        pattern: String,
+    ): List<ToolWorkspaceFile> = files.globFiles(path, pattern).map(::toToolFile)
+
+    override fun grep(
+        query: String,
+        path: String,
+    ): List<ToolWorkspaceTextMatch> = files.grepText(query, path).map { ToolWorkspaceTextMatch(it.path, it.line, it.snippet) }
+
     override fun sync(): ToolWorkspaceSync =
         files.syncMetadataWithFilesystem().let { ToolWorkspaceSync(it.added, it.updated, it.removed, it.total) }
 
@@ -74,6 +88,27 @@ class WorkspaceFileToolPortAdapter(
     override fun hash(file: ToolWorkspaceFile): String = files.hash(requireRecord(file))
 
     override fun readText(file: ToolWorkspaceFile): String = files.readText(requireRecord(file))
+
+    override fun writeText(
+        relativePath: String,
+        content: String,
+    ): ToolWorkspaceFile = toToolFile(files.writeText(relativePath, content))
+
+    override fun editText(
+        path: String,
+        oldText: String,
+        newText: String,
+    ): ToolWorkspaceFile = toToolFile(files.replaceText(path, oldText, newText))
+
+    override fun copy(
+        sourcePath: String,
+        targetPath: String,
+    ): ToolWorkspaceFile = toToolFile(files.copyFile(sourcePath, targetPath))
+
+    override fun move(
+        sourcePath: String,
+        targetPath: String,
+    ): ToolWorkspaceFile = toToolFile(files.moveFile(sourcePath, targetPath))
 
     override fun extractPdfText(file: ToolWorkspaceFile): ToolExtractedText =
         files.extractPdfText(requireRecord(file)).let { ToolExtractedText(it.cached, it.text) }

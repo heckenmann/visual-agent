@@ -23,7 +23,6 @@ class AgentToolConfigServiceTest {
         assertTrue("agent:log" in tools)
         assertTrue("todos" in tools)
         assertTrue("workspace:file" in tools)
-        assertTrue("workspace:mime" in tools)
         assertTrue("workspace:download" in tools)
         assertFalse("agent:start" in tools)
         assertFalse("agent:message" in tools)
@@ -41,7 +40,8 @@ class AgentToolConfigServiceTest {
         val agent = SubAgent(id = "a", name = "Coder", role = "Implementation", config = AgentConfig.fromTemplate("coder"))
 
         assertTrue(service.findConfigIdFor(agent) == "coder")
-        assertTrue(ToolId("file:write") in service.toolsFor(agent))
+        assertTrue(ToolId("workspace:file") in service.toolsFor(agent))
+        assertFalse(ToolId("file:write") in service.toolsFor(agent))
     }
 
     @Test
@@ -51,7 +51,8 @@ class AgentToolConfigServiceTest {
         val agent = SubAgent(id = "a", name = "CanvasPainter", role = "Painting", config = AgentConfig())
 
         assertTrue(service.findConfigIdFor(agent) == null)
-        assertTrue(ToolId("file:read") in service.toolsFor(agent))
+        assertTrue(ToolId("workspace:file") in service.toolsFor(agent))
+        assertFalse(ToolId("file:read") in service.toolsFor(agent))
     }
 
     @Test

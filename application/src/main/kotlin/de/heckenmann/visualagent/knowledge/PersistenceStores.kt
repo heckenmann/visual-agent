@@ -58,7 +58,7 @@ data class DirectoryGrantRecord(
     val canonicalRoot: String?,
     val origin: String,
     val mode: String,
-    val clientBindingId: String?,
+    val ownerClientId: String?,
     val createdAt: Instant,
     val updatedAt: Instant,
 )
