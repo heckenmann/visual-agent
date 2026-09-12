@@ -1,15 +1,9 @@
 package de.heckenmann.visualagent.ui.conversation
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import de.heckenmann.visualagent.protocol.CancellationTokenImpl
 import de.heckenmann.visualagent.protocol.ConversationCompletionEvent
 import de.heckenmann.visualagent.protocol.ConversationSuggestionPort
 import de.heckenmann.visualagent.protocol.ConversationSuggestionRequest
-import de.heckenmann.visualagent.protocol.SettingsPort
 import de.heckenmann.visualagent.protocol.SettingsSnapshot
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -53,8 +47,10 @@ internal class ConversationSuggestionController(
     private var animationJob: Job? = null
     private var requestToken: CancellationTokenImpl? = null
     private var generation = 0L
+    private var attemptedGeneration: Long? = null
     private var pendingCompletion: ConversationCompletionEvent? = null
     private var settings = SuggestionSettings()
+    private var settingsLoaded = false
     private var input = ""
     private var sending = false
     private var queuedMessages = 0
@@ -73,6 +69,7 @@ internal class ConversationSuggestionController(
                     delaySeconds = snapshot.followUpSuggestionIdleDelaySeconds,
                     questionCount = snapshot.followUpSuggestionCount,
                 )
+            settingsLoaded = true
             if (!settings.enabled) {
                 cancelLocked(clearPending = true)
             } else {
@@ -86,6 +83,7 @@ internal class ConversationSuggestionController(
         synchronized(lock) {
             if (closed) return
             generation++
+            attemptedGeneration = null
             pendingCompletion = event
             cancelLocked(clearPending = false)
             scheduleLocked()
@@ -174,7 +172,17 @@ internal class ConversationSuggestionController(
     }
 
     private fun scheduleLocked() {
-        if (closed || !settings.enabled || !eligibleLocked() || pendingCompletion == null || animationJob?.isActive == true) return
+        if (
+            closed ||
+            !settingsLoaded ||
+            !settings.enabled ||
+            !eligibleLocked() ||
+            pendingCompletion == null ||
+            attemptedGeneration == generation ||
+            animationJob?.isActive == true
+        ) {
+            return
+        }
         val event = pendingCompletion ?: return
         val runGeneration = generation
         val runSettings = settings
@@ -187,6 +195,7 @@ internal class ConversationSuggestionController(
                     val token = CancellationTokenImpl()
                     synchronized(lock) {
                         if (!isEligibleLocked(runGeneration)) return@launch
+                        attemptedGeneration = runGeneration
                         requestToken = token
                         stateHolder.value = ConversationSuggestionUiState(phase = ConversationSuggestionPhase.REQUESTING)
                     }
@@ -314,29 +323,4 @@ internal class ConversationSuggestionController(
         private const val NEXT_QUESTION_GAP_MILLIS = 250L
         private const val CURSOR_TOGGLE_INTERVAL_CHARS = 12
     }
-}
-
-/** Remembers and wires a suggestion controller to the server port and persisted settings. */
-@Composable
-internal fun rememberConversationSuggestionController(
-    suggestionPort: ConversationSuggestionPort,
-    settingsPort: SettingsPort,
-): ConversationSuggestionController {
-    val scope = rememberCoroutineScope()
-    val controller = remember(suggestionPort) { ConversationSuggestionController(suggestionPort, scope) }
-    DisposableEffect(suggestionPort) {
-        val handle = suggestionPort.addCompletionListener(controller::onCompletion)
-        onDispose {
-            handle.close()
-            controller.close()
-        }
-    }
-    DisposableEffect(settingsPort) {
-        val handle = settingsPort.addChangeListener(controller::updateSettings)
-        onDispose { handle.close() }
-    }
-    LaunchedEffect(settingsPort) {
-        controller.updateSettings(settingsPort.snapshotAsync())
-    }
-    return controller
 }

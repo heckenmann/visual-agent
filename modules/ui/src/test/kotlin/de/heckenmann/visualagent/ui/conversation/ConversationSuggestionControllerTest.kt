@@ -38,6 +38,7 @@ class ConversationSuggestionControllerTest {
             val port = RecordingSuggestionPort()
             val controller = ConversationSuggestionController(port, backgroundScope, pause = {})
 
+            controller.updateSettings(SettingsSnapshot())
             controller.onFocusChanged(true)
             controller.onCompletion(ConversationCompletionEvent(assistantId, 4))
             runCurrent()
@@ -52,6 +53,7 @@ class ConversationSuggestionControllerTest {
             val port = RecordingSuggestionPort()
             val controller = ConversationSuggestionController(port, backgroundScope, pause = {})
 
+            controller.updateSettings(SettingsSnapshot())
             controller.onCompletion(ConversationCompletionEvent(assistantId, 4))
             controller.onFocusChanged(true)
             runCurrent()
@@ -72,6 +74,7 @@ class ConversationSuggestionControllerTest {
                 )
             val controller = ConversationSuggestionController(port, backgroundScope, pause = {})
 
+            controller.updateSettings(SettingsSnapshot())
             controller.onFocusChanged(true)
             controller.onCompletion(ConversationCompletionEvent(assistantId, 4))
             runCurrent()
@@ -87,6 +90,7 @@ class ConversationSuggestionControllerTest {
             val port = RecordingSuggestionPort()
             val controller = ConversationSuggestionController(port, backgroundScope, pause = {})
 
+            controller.updateSettings(SettingsSnapshot())
             controller.onCompletion(ConversationCompletionEvent(assistantId, 4))
             controller.onUserInteraction()
             runCurrent()
@@ -102,6 +106,7 @@ class ConversationSuggestionControllerTest {
             val port = RecordingSuggestionPort()
             val controller = ConversationSuggestionController(port, backgroundScope, pause = {})
 
+            controller.updateSettings(SettingsSnapshot())
             controller.onSendingChanged(true)
             controller.onQueueSizeChanged(1)
             controller.onCompletion(ConversationCompletionEvent(assistantId, 4))
@@ -124,10 +129,41 @@ class ConversationSuggestionControllerTest {
             val port = RecordingSuggestionPort(resultId = "33333333-3333-4333-8333-333333333333")
             val controller = ConversationSuggestionController(port, backgroundScope, pause = {})
 
+            controller.updateSettings(SettingsSnapshot())
             controller.onCompletion(ConversationCompletionEvent(assistantId, 4))
             runCurrent()
 
             assertEquals(ConversationSuggestionPhase.IDLE, controller.state.value.phase)
+            controller.close()
+        }
+
+    @Test
+    fun `does not request suggestions before settings are loaded`() =
+        runTest {
+            val port = RecordingSuggestionPort()
+            val controller = ConversationSuggestionController(port, backgroundScope, pause = {})
+
+            controller.onCompletion(ConversationCompletionEvent(assistantId, 4))
+            runCurrent()
+
+            assertEquals(0, port.requests.size)
+            controller.close()
+        }
+
+    @Test
+    fun `does not retry an empty result for the same completed turn`() =
+        runTest {
+            val port = RecordingSuggestionPort()
+            val controller = ConversationSuggestionController(port, backgroundScope, pause = {})
+            controller.updateSettings(SettingsSnapshot())
+
+            controller.onCompletion(ConversationCompletionEvent(assistantId, 4))
+            runCurrent()
+            controller.onFocusChanged(true)
+            controller.updateSettings(SettingsSnapshot())
+            runCurrent()
+
+            assertEquals(1, port.requests.size)
             controller.close()
         }
 
