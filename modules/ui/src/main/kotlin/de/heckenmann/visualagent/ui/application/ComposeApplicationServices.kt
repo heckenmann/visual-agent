@@ -44,6 +44,7 @@ data class ComposePanelServices(
     val directoryAccess: de.heckenmann.visualagent.protocol.DirectoryGrantAdministrationPort,
     val canvas: de.heckenmann.visualagent.protocol.CanvasPort,
     val conversation: de.heckenmann.visualagent.protocol.ConversationPort,
+    val conversationSuggestions: de.heckenmann.visualagent.protocol.ConversationSuggestionPort,
     val clientImagePort: ClientImagePort,
     val clientDirectoryAccess: ClientDirectoryGrantAdministrationPort,
     val todos: de.heckenmann.visualagent.protocol.TodoPort,
