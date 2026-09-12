@@ -45,6 +45,9 @@ class AppConfig private constructor() {
     var userModelInstruction: String = ""
     var favoriteModels: String = ""
     var queueFlushMode: String = "ONE_BY_ONE"
+    var followUpSuggestionsEnabled: Boolean = true
+    var followUpSuggestionIdleDelaySeconds: Int = 3
+    var followUpSuggestionCount: Int = 3
 
     private val listeners = CopyOnWriteArrayList<(AppConfigChange) -> Unit>()
     private var lastSnapshot = snapshot()
@@ -76,6 +79,9 @@ class AppConfig private constructor() {
         internal const val KEY_SESSION_USER_MODEL_INSTRUCTION = "session.user.model.instruction"
         internal const val KEY_SESSION_FAVORITE_MODELS = "session.favorite.models"
         internal const val KEY_SESSION_QUEUE_FLUSH_MODE = "session.queue.flush.mode"
+        internal const val KEY_FOLLOW_UP_SUGGESTIONS_ENABLED = "conversation.follow_up_suggestions.enabled"
+        internal const val KEY_FOLLOW_UP_SUGGESTION_DELAY_SECONDS = "conversation.follow_up_suggestions.delay.seconds"
+        internal const val KEY_FOLLOW_UP_SUGGESTION_COUNT = "conversation.follow_up_suggestions.count"
     }
 
     /**
@@ -221,6 +227,9 @@ class AppConfig private constructor() {
                 KEY_SESSION_USER_MODEL_INSTRUCTION to userModelInstruction,
                 KEY_SESSION_FAVORITE_MODELS to favoriteModels,
                 KEY_SESSION_QUEUE_FLUSH_MODE to queueFlushMode,
+                KEY_FOLLOW_UP_SUGGESTIONS_ENABLED to followUpSuggestionsEnabled.toString(),
+                KEY_FOLLOW_UP_SUGGESTION_DELAY_SECONDS to followUpSuggestionIdleDelaySeconds.toString(),
+                KEY_FOLLOW_UP_SUGGESTION_COUNT to followUpSuggestionCount.toString(),
             ),
         )
 
@@ -246,6 +255,9 @@ class AppConfig private constructor() {
             db.setPreference(KEY_SESSION_USER_MODEL_INSTRUCTION, userModelInstruction)
             db.setPreference(KEY_SESSION_FAVORITE_MODELS, favoriteModels)
             db.setPreference(KEY_SESSION_QUEUE_FLUSH_MODE, queueFlushMode)
+            db.setPreference(KEY_FOLLOW_UP_SUGGESTIONS_ENABLED, followUpSuggestionsEnabled.toString())
+            db.setPreference(KEY_FOLLOW_UP_SUGGESTION_DELAY_SECONDS, followUpSuggestionIdleDelaySeconds.toString())
+            db.setPreference(KEY_FOLLOW_UP_SUGGESTION_COUNT, followUpSuggestionCount.toString())
         }
     }
 
@@ -285,6 +297,20 @@ class AppConfig private constructor() {
             userModelInstruction = db.getPreference(KEY_SESSION_USER_MODEL_INSTRUCTION) ?: userModelInstruction
             favoriteModels = db.getPreference(KEY_SESSION_FAVORITE_MODELS) ?: favoriteModels
             queueFlushMode = db.getPreference(KEY_SESSION_QUEUE_FLUSH_MODE) ?: queueFlushMode
+            followUpSuggestionsEnabled =
+                db.getPreference(KEY_FOLLOW_UP_SUGGESTIONS_ENABLED)?.toBooleanStrictOrNull() ?: followUpSuggestionsEnabled
+            followUpSuggestionIdleDelaySeconds =
+                db
+                    .getPreference(KEY_FOLLOW_UP_SUGGESTION_DELAY_SECONDS)
+                    ?.toIntOrNull()
+                    ?.coerceIn(1..60)
+                    ?: followUpSuggestionIdleDelaySeconds
+            followUpSuggestionCount =
+                db
+                    .getPreference(KEY_FOLLOW_UP_SUGGESTION_COUNT)
+                    ?.toIntOrNull()
+                    ?.coerceIn(1..5)
+                    ?: followUpSuggestionCount
         }
     }
 }

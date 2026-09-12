@@ -27,6 +27,12 @@ class SpringSettingsPort(
     ) {
         val currentMemory = mainAgentMemoryStore.snapshot()
         val memoryLimit = settings.maxMainAgentMemoryChars.coerceIn(AppConfigBean.MAIN_AGENT_MEMORY_CHARS_RANGE)
+        require(settings.followUpSuggestionIdleDelaySeconds in AppConfigBean.FOLLOW_UP_SUGGESTION_DELAY_RANGE) {
+            "Follow-up suggestion delay is outside the supported range"
+        }
+        require(settings.followUpSuggestionCount in AppConfigBean.FOLLOW_UP_SUGGESTION_COUNT_RANGE) {
+            "Follow-up suggestion count is outside the supported range"
+        }
         require(memoryLimit >= currentMemory.contentLength) {
             "Main-agent memory has ${currentMemory.contentLength} characters; reduce it before lowering the limit below that size"
         }
@@ -52,6 +58,9 @@ class SpringSettingsPort(
             favoriteModels = settings.favoriteModels.joinToString(",")
             queueFlushMode = settings.queueFlushMode
             maxMainAgentMemoryChars = memoryLimit
+            followUpSuggestionsEnabled = settings.followUpSuggestionsEnabled
+            followUpSuggestionIdleDelaySeconds = settings.followUpSuggestionIdleDelaySeconds
+            followUpSuggestionCount = settings.followUpSuggestionCount
             save()
         }
     }
@@ -75,6 +84,9 @@ private fun AppConfigBean.toProtocol(providerCatalog: ProviderCatalogService): S
         favoriteModels = favoriteModels.split(',').map(String::trim).filter(String::isNotBlank),
         queueFlushMode = queueFlushMode,
         maxMainAgentMemoryChars = maxMainAgentMemoryChars,
+        followUpSuggestionsEnabled = followUpSuggestionsEnabled,
+        followUpSuggestionIdleDelaySeconds = followUpSuggestionIdleDelaySeconds,
+        followUpSuggestionCount = followUpSuggestionCount,
     )
 
 private fun ApplicationThemeMode.toProtocol(): ThemeMode = ThemeMode.valueOf(name)

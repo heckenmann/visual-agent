@@ -221,7 +221,9 @@ internal class AgentConversationHistoryOps(
                     ),
                 )
                 val response = owner.llmProvider.chat(request.copy(messages = messages))
-                persist(Message("assistant", owner.responseCoordinator.normalizeAssistantPresentationContent(response.message.content)))
+                val persisted =
+                    persist(Message("assistant", owner.responseCoordinator.normalizeAssistantPresentationContent(response.message.content)))
+                owner.conversationOps.publishAssistantCompletion(persisted)
                 owner.pendingResumeMessage = null
             }.onFailure { error ->
                 val detail = ProviderErrorMessages.userFacing(error)
@@ -231,7 +233,7 @@ internal class AgentConversationHistoryOps(
         }
     }
 
-    internal fun persist(message: Message) {
+    internal fun persist(message: Message): Message {
         val messageId =
             message.id ?: java.util.UUID
                 .randomUUID()
@@ -259,6 +261,7 @@ internal class AgentConversationHistoryOps(
         } else {
             owner.conversationHistory.add(persisted)
         }
+        return persisted
     }
 
     private fun toMessage(row: ConversationRecord): Message? =
