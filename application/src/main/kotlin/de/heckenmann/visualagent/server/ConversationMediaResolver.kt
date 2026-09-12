@@ -2,10 +2,12 @@ package de.heckenmann.visualagent.server
 
 import de.heckenmann.visualagent.protocol.ConversationImageResolution
 import de.heckenmann.visualagent.protocol.ConversationImageSources
+import de.heckenmann.visualagent.protocol.FileReference
 import de.heckenmann.visualagent.protocol.MAX_MARKDOWN_IMAGE_BYTES
 import de.heckenmann.visualagent.protocol.MAX_MARKDOWN_IMAGE_DIMENSION
 import de.heckenmann.visualagent.protocol.MAX_MARKDOWN_IMAGE_PIXELS
 import de.heckenmann.visualagent.workspace.ImageHeaderReader
+import de.heckenmann.visualagent.workspace.UnifiedFileService
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
 import okhttp3.Dns
 import okhttp3.OkHttpClient
@@ -83,6 +85,7 @@ class OkHttpConversationImageFetcher(
 @Service
 class ConversationMediaResolver(
     private val workspaceFiles: WorkspaceFileService,
+    private val unifiedFiles: UnifiedFileService,
     private val remoteFetcher: ConversationImageFetcher,
     private val mimeDetector: Tika,
 ) {
@@ -99,6 +102,8 @@ class ConversationMediaResolver(
             normalized.startsWith("data:", ignoreCase = true) -> resolveEmbedded(normalized)
             normalized.startsWith(ConversationImageSources.SERVER_FILE_PREFIX, ignoreCase = true) ->
                 resolveWorkspace(normalized.substring(ConversationImageSources.SERVER_FILE_PREFIX.length))
+            normalized.startsWith(ConversationImageSources.GRANTED_FILE_PREFIX, ignoreCase = true) ->
+                resolveGrantedFile(normalized.substring(ConversationImageSources.GRANTED_FILE_PREFIX.length))
             normalized.startsWith(ConversationImageSources.WORKSPACE_PREFIX, ignoreCase = true) ->
                 resolveWorkspace(normalized)
             hasUriScheme(normalized) -> rejected("Image source scheme is not supported")
@@ -143,6 +148,23 @@ class ConversationMediaResolver(
         }
         val bytes = runCatching { file.readBytes() }.getOrNull() ?: return rejected("Workspace image could not be read")
         return validatePayload(record.mimeType.lowercase(), bytes)
+    }
+
+    private fun resolveGrantedFile(source: String): ConversationImageResolution {
+        val reference = source.removePrefix("//")
+        val rootId = reference.substringBefore('/').trim()
+        val relativePath = reference.substringAfter('/', "").trim()
+        if (rootId.isBlank() || relativePath.isBlank() || relativePath.split('/', '\\').any { it == ".." }) {
+            return rejected("Granted image reference is invalid")
+        }
+        val bytes =
+            (
+                runCatching { unifiedFiles.readBytes(FileReference(rootId, relativePath), MAX_MARKDOWN_IMAGE_BYTES) }
+                    .getOrNull()
+                    ?: return rejected("Granted image could not be read")
+            )
+        val contentType = runCatching { mimeDetector.detect(bytes).lowercase() }.getOrNull()
+        return validatePayload(contentType, bytes)
     }
 
     private fun validatePayload(

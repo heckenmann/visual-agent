@@ -1,46 +1,33 @@
 package de.heckenmann.visualagent.agent.tools
 
+import de.heckenmann.visualagent.agent.config.AgentToolConfigService
+import de.heckenmann.visualagent.agent.config.SubAgentToolConfig
+import de.heckenmann.visualagent.knowledge.SubAgentConfigStore
 import org.junit.jupiter.api.Test
-import java.nio.file.Files
-import java.nio.file.Path
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 
+/** Ensures removed host-filesystem tools cannot be re-enabled through configuration. */
 class FileToolsTest {
     @Test
-    fun `file tools support write read edit list glob and grep`() {
-        val directory = testDirectory()
-        val relativeFile = "$directory/notes.txt"
+    fun `legacy host filesystem tools stay permanently unavailable`() {
+        val service = AgentToolConfigService(InMemorySubAgentConfigStore())
 
-        assertTrue(FileWriteTool().execute("""{"path":"$relativeFile","content":"Alpha\nBeta"}""").success)
-        assertTrue(FileReadTool().execute("""{"path":"$relativeFile"}""").content.contains("Alpha"))
-        assertTrue(FileEditTool().execute("""{"path":"$relativeFile","oldText":"Beta","newText":"Gamma"}""").success)
-        assertTrue(FileListTool().execute("""{"path":"$directory"}""").content.contains("notes.txt"))
-        assertTrue(FileGlobTool().execute("""{"pattern":"$directory/*.txt"}""").content.contains(relativeFile))
+        listOf("file:read", "file:list", "file:glob", "file:grep", "file:write", "file:edit", "terminal", "pwd").forEach {
+            assertFalse(service.isToolGloballyEnabled(it))
+            assertFailsWith<IllegalArgumentException> { service.setToolGloballyEnabled(it, enabled = true) }
+        }
+    }
+}
 
-        val grep = FileGrepTool().execute("""{"path":"$directory","query":"gamma"}""")
-        assertTrue(grep.success)
-        assertTrue(grep.content.contains("notes.txt:2: Gamma"))
+private class InMemorySubAgentConfigStore : SubAgentConfigStore {
+    private val configurations = mutableMapOf<String, SubAgentToolConfig>()
+
+    override fun saveSubAgentConfig(config: SubAgentToolConfig) {
+        configurations[config.id] = config
     }
 
-    @Test
-    fun `file tools reject invalid paths and missing content`() {
-        val directory = testDirectory()
-        val missing = "$directory/missing.txt"
+    override fun getSubAgentConfig(id: String): SubAgentToolConfig? = configurations[id]
 
-        assertFalse(FileReadTool().execute("""{"path":"$missing"}""").success)
-        assertFalse(FileEditTool().execute("""{"path":"$missing","oldText":"a","newText":"b"}""").success)
-        assertFalse(FileListTool().execute("""{"path":"$missing"}""").success)
-        assertFalse(FileReadTool().execute("""{"path":"../outside.txt"}""").success)
-
-        val existing = "$directory/existing.txt"
-        FileWriteTool().execute("""{"path":"$existing","content":"unchanged"}""")
-        assertFalse(FileEditTool().execute("""{"path":"$existing","oldText":"absent","newText":"new"}""").success)
-    }
-
-    private fun testDirectory(): String {
-        val relative = "build/tool-tests/${java.util.UUID.randomUUID()}"
-        Files.createDirectories(Path.of(relative))
-        return relative
-    }
+    override fun listSubAgentConfigs(): List<SubAgentToolConfig> = configurations.values.toList()
 }

@@ -7,7 +7,7 @@ When the main agent or a sub-agent modifies data through a tool call, the UI pan
 ## Tool Calls
 
 - `ToolEventRefreshEffect` subscribes to protocol-owned `ActivityPort` FINISHED events and debounces refresh calls.
-- Files panel refreshes on `file:write`, `file:edit`, `workspace:file` FINISHED.
+- Files panel refreshes on `workspace:file` FINISHED.
 - Todos panel refreshes through `TodoPort` change and progress listeners.
 - Sub-agents panel refreshes on `agent:create`, `agent:update`, `agent:delete`, and `agent:list` FINISHED.
 - Canvas panel refreshes on `canvas` FINISHED.

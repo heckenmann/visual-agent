@@ -61,9 +61,9 @@ Main components:
 the agent is allowed to call. The set is selected by matching the
 agent's `name` or `role` against the default templates:
 
-- `researcher`: read-only file tools, `history`, `context`, `pwd`,
+- `researcher`: read-only `workspace:file` actions, `history`, `context`,
   `todos`, `manual`, `usecases`, `sleep`, `browser`, `search`,
-  `workspace:layout`, `workspace:file`, `workspace:mime`,
+  `workspace:layout`, `workspace:file`,
 `workspace:download`, `canvas`.
 
 Agents with `javascript:execute` enabled may use it for complex deterministic
@@ -73,8 +73,8 @@ may use hardened `workspace.write/read/delete(...)` for workspace-relative text 
 and return the complete final value; it cannot access the host directly. If the
 execution returns an exception, inspect the actionable category/message, correct
 the source or arguments, and retry without repeating the unchanged failure.
-- `coder`: adds `file:write`, `file:edit`, and `terminal`; raises
-  the default `maxTurns` to 8.
+- `coder`: uses read-write `workspace:file` actions; raises the default
+  `maxTurns` to 8.
 - `analyst`: same as `researcher` minus `browser` and `search`,
   plus review-friendly tools.
 
@@ -118,7 +118,7 @@ public entry points are `assignNextTodo`, `assignTodoToAgent`,
 `AgentConfig.TEMPLATES` holds the default templates:
 
 - `researcher`: read-only, broad tool set, default `maxTurns = 4`.
-- `coder`: write/edit/terminal, default `maxTurns = 8`.
+- `coder`: authorized workspace-file mutation, default `maxTurns = 8`.
 - `documenter`: documentation focus, default `maxTurns = 4`.
 - `reviewer`: review focus, default `maxTurns = 4`.
 - `tester`: test focus, default `maxTurns = 4`.

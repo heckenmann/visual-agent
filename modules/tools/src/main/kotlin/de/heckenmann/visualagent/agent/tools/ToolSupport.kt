@@ -13,9 +13,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.io.path.absolute
 
 /** Shared JSON parser for tool input. */
 public val json = Json { ignoreUnknownKeys = true }
@@ -182,40 +180,6 @@ public fun toolTimeoutGuidance(defaultTimeoutSeconds: Int): String {
         "If a call returns TOOL_TIMEOUT, inspect the result and retry with a larger timeoutSeconds value when useful."
 }
 
-/** Returns the normalized process workspace root. */
-public fun workspaceRoot(): Path = Path.of(System.getProperty("user.dir")).absolute().normalize()
-
-private fun resolveWorkspacePath(path: String): Path {
-    val resolved = workspaceRoot().resolve(path).normalize()
-    require(resolved.startsWith(workspaceRoot())) { "Path escapes workspace root" }
-    return resolved
-}
-
-/** Resolves a workspace-relative path and converts traversal errors to a tool result. */
-public fun resolveWorkspacePathOrFailure(
-    toolId: String,
-    path: String,
-): PathResolution =
-    runCatching { PathResolution.Success(resolveWorkspacePath(path)) }
-        .getOrElse { PathResolution.Failure(failure(toolId, it.message ?: "Invalid path")) }
-
-/** Result of resolving a workspace path. */
-public sealed interface PathResolution {
-    /**
-     * Successful workspace path resolution.
-     */
-    data class Success(
-        val path: Path,
-    ) : PathResolution
-
-    /**
-     * Failed path resolution represented as a tool result.
-     */
-    data class Failure(
-        val result: ToolResult,
-    ) : PathResolution
-}
-
 /** Creates a successful tool result. */
 public fun success(
     toolId: String,
@@ -227,9 +191,6 @@ public fun failure(
     toolId: String,
     error: String,
 ): ToolResult = ToolResult(toolId, false, "", error)
-
-/** Returns the standard schema for a workspace path argument. */
-public fun pathSchema(): String = requiredStringSchema("path")
 
 /** Builds a required single-string JSON schema. */
 public fun requiredStringSchema(name: String): String =

@@ -24,7 +24,7 @@ class ManualToolTest {
         assertTrue(result.content.contains("```kotlin"))
         assertTrue(result.content.contains("Conversation Image Sources"))
         assertTrue(result.content.contains("![diagram](workspace:generated/diagram.png)"))
-        assertTrue(result.content.contains("client-file:"))
+        assertTrue(result.content.contains("visual-agent-file://<root-id>/generated/diagram.png"))
     }
 
     /**

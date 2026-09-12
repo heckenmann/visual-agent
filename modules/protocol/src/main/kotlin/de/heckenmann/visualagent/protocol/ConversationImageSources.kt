@@ -11,6 +11,9 @@ object ConversationImageSources {
     /** Prefix for a registered workspace file managed by the application server. */
     const val WORKSPACE_PREFIX = "workspace:"
 
+    /** Prefix for an opaque root ID and root-relative path resolved by the application server. */
+    const val GRANTED_FILE_PREFIX = "visual-agent-file:"
+
     /** Returns whether [source] explicitly targets the client filesystem. */
     fun isClientFile(source: String): Boolean = source.trim().startsWith(CLIENT_FILE_PREFIX, ignoreCase = true)
 }

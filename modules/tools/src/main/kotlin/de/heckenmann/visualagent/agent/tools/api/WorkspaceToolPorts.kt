@@ -22,6 +22,18 @@ interface WorkspaceFileToolPort {
         mimeType: String? = null,
     ): ToolWorkspaceSearch
 
+    /** Finds managed workspace files below [path] whose path matches [pattern]. */
+    fun glob(
+        path: String,
+        pattern: String,
+    ): List<ToolWorkspaceFile>
+
+    /** Finds text lines below [path] that contain [query], case-insensitively. */
+    fun grep(
+        query: String,
+        path: String,
+    ): List<ToolWorkspaceTextMatch>
+
     /** Synchronizes persisted metadata. */
     fun sync(): ToolWorkspaceSync
 
@@ -45,6 +57,31 @@ interface WorkspaceFileToolPort {
 
     /** Reads bounded text. */
     fun readText(file: ToolWorkspaceFile): String
+
+    /** Writes text to a workspace-relative path and returns its managed metadata. */
+    fun writeText(
+        relativePath: String,
+        content: String,
+    ): ToolWorkspaceFile
+
+    /** Replaces one exact occurrence of [oldText] in a managed workspace text file. */
+    fun editText(
+        path: String,
+        oldText: String,
+        newText: String,
+    ): ToolWorkspaceFile
+
+    /** Copies one managed regular file to a new workspace-relative target path. */
+    fun copy(
+        sourcePath: String,
+        targetPath: String,
+    ): ToolWorkspaceFile
+
+    /** Moves one managed regular file to a new workspace-relative target path. */
+    fun move(
+        sourcePath: String,
+        targetPath: String,
+    ): ToolWorkspaceFile
 
     /** Extracts PDF text. */
     fun extractPdfText(file: ToolWorkspaceFile): ToolExtractedText
@@ -98,6 +135,13 @@ data class ToolWorkspaceMatch(
 data class ToolWorkspaceSearch(
     val query: String,
     val matches: List<ToolWorkspaceMatch>,
+)
+
+/** One bounded line match from a managed workspace text file. */
+data class ToolWorkspaceTextMatch(
+    val path: String,
+    val line: Int,
+    val snippet: String,
 )
 
 /** Workspace synchronization counts. */

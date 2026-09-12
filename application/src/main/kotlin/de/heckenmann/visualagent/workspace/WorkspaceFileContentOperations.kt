@@ -5,6 +5,8 @@ import de.heckenmann.visualagent.knowledge.WorkspaceFileStore
 import org.apache.pdfbox.Loader
 import org.apache.pdfbox.text.PDFTextStripper
 import java.nio.file.Path
+import kotlin.io.path.fileSize
+import kotlin.io.path.isRegularFile
 import kotlin.io.path.readText
 
 /** Performs content reads for the workspace file facade. */
@@ -18,6 +20,19 @@ internal class WorkspaceFileContentOperations(
 
     /** Reads bounded UTF-8 text from a managed file. */
     fun readText(record: WorkspaceFileRecord): String = resolvePath(record.relativePath).readText(Charsets.UTF_8).take(MAX_TEXT_CHARS)
+
+    /** Reads a bounded binary file without allowing stale metadata to allocate unbounded memory. */
+    fun readBytes(
+        record: WorkspaceFileRecord,
+        maximumBytes: Long,
+    ): ByteArray {
+        require(maximumBytes > 0 && maximumBytes <= Int.MAX_VALUE - 1L) { "maximumBytes is invalid" }
+        val path = resolvePath(record.relativePath)
+        require(path.isRegularFile() && path.fileSize() <= maximumBytes) { "File exceeds the $maximumBytes-byte limit" }
+        return java.nio.file.Files.newInputStream(path).use { it.readNBytes(maximumBytes.toInt() + 1) }.also {
+            require(it.size.toLong() <= maximumBytes) { "File exceeds the $maximumBytes-byte limit" }
+        }
+    }
 
     /** Extracts and caches text from a managed PDF. */
     fun extractPdfText(record: WorkspaceFileRecord): WorkspaceFileText {

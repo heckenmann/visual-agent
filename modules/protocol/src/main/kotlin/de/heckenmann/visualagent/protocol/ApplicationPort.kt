@@ -23,6 +23,9 @@ interface ApplicationPort {
     /** Workspace file commands. */
     val workspaceFiles: WorkspaceFilePort
 
+    /** Explicitly approved additional directory roots. */
+    val directoryAccess: DirectoryGrantAdministrationPort
+
     /** Structured canvas commands. */
     val canvas: CanvasPort
 

@@ -6,6 +6,7 @@ import de.heckenmann.visualagent.agent.tools.api.ToolResult
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
 
 /**
@@ -34,7 +35,7 @@ class TerminalTool : VisualAgentTool {
         val command = input.requiredString("command")
         val process =
             ProcessBuilder(shellCommand(command))
-                .directory(workspaceRoot().toFile())
+                .directory(terminalWorkspaceRoot().toFile())
                 .redirectErrorStream(true)
                 .start()
         val cancellationRegistration =
@@ -82,6 +83,8 @@ class TerminalTool : VisualAgentTool {
             .any { Files.isExecutable(it) }
     }
 }
+
+private fun terminalWorkspaceRoot(): Path = Paths.get(System.getProperty("user.dir")).toAbsolutePath().normalize()
 
 /**
  * Placeholder tool for browser automation when no browser backend is configured.

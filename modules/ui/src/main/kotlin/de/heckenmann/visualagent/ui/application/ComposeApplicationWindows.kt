@@ -67,6 +67,15 @@ internal fun defaultWindows(): List<ComposeWorkspaceWindow> =
                     bounds = ComposeWorkspaceWindowBounds(x = 260, y = 170, width = 620, height = 460),
                     visible = false,
                 )
+            "directories" ->
+                ComposeWorkspaceWindow(
+                    id = "directories",
+                    icon = "R",
+                    title = "Directory access",
+                    subtitle = "Explicit server and client filesystem grants",
+                    bounds = ComposeWorkspaceWindowBounds(x = 300, y = 180, width = 520, height = 520),
+                    visible = false,
+                )
             else -> error("Unsupported workspace panel id: $id")
         }
     }

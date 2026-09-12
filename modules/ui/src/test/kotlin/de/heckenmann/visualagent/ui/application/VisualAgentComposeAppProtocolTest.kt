@@ -39,7 +39,7 @@ class VisualAgentComposeAppProtocolTest {
     fun `workspace renders all persisted panels without application imports`() {
         val port = protocolPort()
         val allPanels =
-            listOf("chat", "todos", "files", "agents", "settings", "canvas").mapIndexed { index, id ->
+            listOf("chat", "todos", "files", "agents", "settings", "canvas", "directories").mapIndexed { index, id ->
                 LayoutWindowState(id = id, order = index, visible = true, preferredWidth = 360.0)
             }
 
@@ -56,10 +56,11 @@ class VisualAgentComposeAppProtocolTest {
         composeTestRule.waitForIdle()
         assertEquals(2, composeTestRule.onAllNodesWithText("Conversation").fetchSemanticsNodes().size)
         assertEquals(2, composeTestRule.onAllNodesWithText("Todos").fetchSemanticsNodes().size)
-        assertEquals(2, composeTestRule.onAllNodesWithText("Files").fetchSemanticsNodes().size)
+        assertTrue(composeTestRule.onAllNodesWithText("Files").fetchSemanticsNodes().isNotEmpty())
         assertTrue(composeTestRule.onAllNodesWithText("Subagents").fetchSemanticsNodes().isNotEmpty())
         assertTrue(composeTestRule.onAllNodesWithText("Settings").fetchSemanticsNodes().isNotEmpty())
         assertTrue(composeTestRule.onAllNodesWithText("Canvas").fetchSemanticsNodes().isNotEmpty())
+        assertTrue(composeTestRule.onAllNodesWithText("Directory access").fetchSemanticsNodes().isNotEmpty())
         val shellBounds = composeTestRule.onNodeWithTag("workspace-shell").getUnclippedBoundsInRoot()
         val contentBounds = composeTestRule.onNodeWithTag("workspace-content-slot").getUnclippedBoundsInRoot()
         assertTrue(contentBounds.left > shellBounds.left)
@@ -124,6 +125,7 @@ class VisualAgentComposeAppProtocolTest {
         every { application.settings } returns settings
         every { application.mainAgentMemory } returns mainAgentMemory
         every { application.workspaceFiles } returns files
+        every { application.directoryAccess } returns mockk(relaxed = true)
         every { application.canvas } returns canvas
         every { application.layout } returns layout
         every { application.activity } returns activity

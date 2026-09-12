@@ -72,14 +72,6 @@ class ToolRegistryTest {
     }
 
     @Test
-    fun `workspace file tools reject paths outside workspace`() {
-        val result = FileReadTool().execute("""{"path":"../../outside.txt"}""")
-
-        assertFalse(result.success)
-        assertEquals("file:read", result.toolId)
-    }
-
-    @Test
     fun `tool event is fired for tool execution errors`() {
         val events = mutableListOf<ToolCallEvent>()
         val bus = ToolEventBus()

@@ -69,7 +69,7 @@ class AgentUpdateTool(
                     "Input: {\"id\":\"123\",\"name\":\"Coder\",\"role\":\"Implementation\"," +
                     "\"timeout\":120,\"maxRetries\":3,\"memoryLimitMb\":1024,\"provider\":\"ollama\",\"model\":\"llama3\"," +
                     "\"temperature\":0.7,\"topP\":0.9,\"maxTokens\":4096,\"variant\":\"chat\"," +
-                    "\"options\":{\"seed\":\"42\"},\"tools\":[\"file:read\",\"terminal\"],\"templateName\":\"coder\"}. " +
+                    "\"options\":{\"seed\":\"42\"},\"tools\":[\"workspace:file\",\"javascript:execute\"],\"templateName\":\"coder\"}. " +
                     "All fields except id are optional. Only provided fields are updated.",
             inputSchema = STRING_SCHEMA,
         )

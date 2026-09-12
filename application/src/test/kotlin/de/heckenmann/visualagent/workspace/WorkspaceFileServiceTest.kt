@@ -1,8 +1,6 @@
 package de.heckenmann.visualagent.workspace
 
 import de.heckenmann.visualagent.agent.javascript.JavaScriptWorkspaceReadLimitExceededException
-import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
-import de.heckenmann.visualagent.knowledge.WorkspaceFileStore
 import de.heckenmann.visualagent.testsupport.TestPng
 import org.apache.pdfbox.pdmodel.PDDocument
 import org.apache.pdfbox.pdmodel.PDPage
@@ -58,8 +56,7 @@ class WorkspaceFileServiceTest {
         withDatabasePath(tempDir().resolve("data/visual-agent.db").toString()) { dbPath ->
             val store = FakeWorkspaceFileStore()
             val service = WorkspaceFileService(store, dbPath)
-            val events = WorkspaceFileActivityEventBus()
-            val writer = WorkspaceJavaScriptWriter(service, events)
+            val writer = WorkspaceJavaScriptWriter(service)
 
             val first = writer.write("reports/result.md", "old")
             val second = writer.write("reports/result.md", "new content")
@@ -73,10 +70,27 @@ class WorkspaceFileServiceTest {
         }
 
     @Test
+    fun `copy and move retain managed workspace metadata`() =
+        withDatabasePath(tempDir().resolve("data/visual-agent.db").toString()) { dbPath ->
+            val service = WorkspaceFileService(FakeWorkspaceFileStore(), dbPath)
+            service.createManagedFile("reports", "source.md", "content".toByteArray(), "text/markdown")
+
+            val copied = service.copyFile("reports/source.md", "archive/copied.md")
+            val moved = service.moveFile("reports/source.md", "published/moved.md")
+
+            assertEquals("archive/copied.md", copied.relativePath)
+            assertEquals("published/moved.md", moved.relativePath)
+            assertEquals("content", service.resolveManagedPath(copied.relativePath).readText())
+            assertEquals("content", service.resolveManagedPath(moved.relativePath).readText())
+            assertTrue(!service.workspaceRoot().resolve("reports/source.md").exists())
+            assertEquals(setOf("archive/copied.md", "published/moved.md"), service.listFiles().map { it.relativePath }.toSet())
+        }
+
+    @Test
     fun `javascript workspace reads enforce their byte limit before string materialization`() =
         withDatabasePath(tempDir().resolve("data/visual-agent.db").toString()) { dbPath ->
             val service = WorkspaceFileService(FakeWorkspaceFileStore(), dbPath)
-            val writer = WorkspaceJavaScriptWriter(service, WorkspaceFileActivityEventBus())
+            val writer = WorkspaceJavaScriptWriter(service)
             writer.write("reports/large.txt", "0123456789")
 
             assertFailsWith<JavaScriptWorkspaceReadLimitExceededException> {
@@ -89,8 +103,7 @@ class WorkspaceFileServiceTest {
     fun `javascript writer rejects symlinked ancestor before creating children`() =
         withDatabasePath(tempDir().resolve("data/visual-agent.db").toString()) { dbPath ->
             val service = WorkspaceFileService(FakeWorkspaceFileStore(), dbPath)
-            val events = WorkspaceFileActivityEventBus()
-            val writer = WorkspaceJavaScriptWriter(service, events)
+            val writer = WorkspaceJavaScriptWriter(service)
             val outside = tempDir().resolve("outside").also { it.createDirectories() }
             val link = service.workspaceRoot().resolve("linked")
             val linkCreated = runCatching { Files.createSymbolicLink(link, outside) }.isSuccess
@@ -109,7 +122,7 @@ class WorkspaceFileServiceTest {
             val messages = mutableListOf<String>()
             val registration = events.addListener { messages += it.message }
             val service = WorkspaceFileService(FakeWorkspaceFileStore(), dbPath, activityEvents = events)
-            val writer = WorkspaceJavaScriptWriter(service, events)
+            val writer = WorkspaceJavaScriptWriter(service)
 
             val file = writer.write("reports/result.md", "content")
             writer.delete(file.relativePath)
@@ -327,22 +340,5 @@ class WorkspaceFileServiceTest {
             }
             document.save(path.toFile())
         }
-    }
-
-    private class FakeWorkspaceFileStore : WorkspaceFileStore {
-        private val records = linkedMapOf<String, WorkspaceFileRecord>()
-
-        override fun saveWorkspaceFile(record: WorkspaceFileRecord) {
-            records[record.id] = record
-        }
-
-        override fun listWorkspaceFiles(): List<WorkspaceFileRecord> = records.values.sortedByDescending(WorkspaceFileRecord::importedAt)
-
-        override fun getWorkspaceFile(id: String): WorkspaceFileRecord? = records[id]
-
-        override fun getWorkspaceFileByPath(relativePath: String): WorkspaceFileRecord? =
-            records.values.firstOrNull { it.relativePath == relativePath }
-
-        override fun deleteWorkspaceFile(id: String): Boolean = records.remove(id) != null
     }
 }

@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent.tools
 
+import de.heckenmann.visualagent.agent.tools.api.DirectoryToolPort
 import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
@@ -18,7 +19,11 @@ import kotlinx.serialization.json.put
 @AgentTool
 class WorkspaceFileTool(
     private val workspaceFiles: WorkspaceFileToolPort,
+    directories: DirectoryToolPort = UnsupportedDirectoryToolPort,
 ) : VisualAgentTool {
+    private val grantedDirectories = WorkspaceGrantedDirectoryActions(directories)
+    private val mediaActions = WorkspaceFileToolMediaActions(workspaceFiles)
+    private val mutations = WorkspaceFileToolMutationActions(workspaceFiles, grantedDirectories)
     override val definition =
         ToolDefinition(
             id = ToolId(TOOL_ID),
@@ -34,15 +39,30 @@ class WorkspaceFileTool(
         val input = parseObject(inputJson)
         return runCatching {
             when (input.string("action") ?: "list") {
-                "list" -> list()
-                "createDirectory" -> createDirectory(input.string("parentDirectory").orEmpty(), input.requiredString("name"))
-                "search" -> search(input.requiredString("query"), input.string("entryType"), input.string("mimeType"))
+                "listRoots" -> success(TOOL_ID, grantedDirectories.rootsJson().toString())
+                "list" -> list(input.string("rootId"), input.string("path").orEmpty())
+                "createDirectory" -> mutations.createDirectory(input)
+                "search" ->
+                    search(
+                        input.string("rootId"),
+                        input.requiredString("query"),
+                        input.string("path").orEmpty(),
+                        input.string("entryType"),
+                        input.string("mimeType"),
+                    )
+                "glob" -> glob(input.string("rootId"), input.string("path").orEmpty(), input.requiredString("pattern"))
+                "grep" -> grep(input.string("rootId"), input.requiredString("query"), input.string("path").orEmpty())
+                "writeText" -> mutations.writeText(input)
+                "edit" -> mutations.edit(input)
+                "copy" -> mutations.transfer(input, move = false)
+                "move" -> mutations.transfer(input, move = true)
                 "info" -> info(file(input))
                 "sync" -> sync()
-                "delete" -> delete(file(input))
-                "deleteDirectory" -> deleteDirectory(input.requiredString("path"), input.boolean("recursive") ?: false)
+                "delete" -> mutations.delete(input)
+                "deleteDirectory" -> mutations.deleteDirectory(input)
                 "hash" -> hash(file(input))
-                "readText" -> readText(file(input))
+                "readText" -> readText(input)
+                "mime" -> mime(input)
                 "extractPdfText" -> extractPdfText(file(input))
                 "renderPdfPage" -> renderPdfPage(file(input), input.int("page") ?: 1)
                 "imageInfo" -> imageInfo(file(input))
@@ -55,14 +75,27 @@ class WorkspaceFileTool(
         }
     }
 
-    private fun list(): ToolResult =
+    private fun list(
+        rootId: String?,
+        path: String,
+    ): ToolResult {
+        if (rootId != null && rootId != WorkspaceGrantedDirectoryActions.WORKSPACE_ROOT_ID) {
+            return success(TOOL_ID, grantedDirectories.entriesJson(rootId, path).toString())
+        }
+        if (rootId == WorkspaceGrantedDirectoryActions.WORKSPACE_ROOT_ID) {
+            return success(TOOL_ID, mediaActions.workspaceEntries(path).toString())
+        }
+        return listWorkspace()
+    }
+
+    private fun listWorkspace(): ToolResult =
         success(
             TOOL_ID,
             buildJsonObject {
                 put(
                     "files",
                     buildJsonArray {
-                        workspaceFiles.list().forEach { add(recordJson(it)) }
+                        workspaceFiles.list().forEach { add(workspaceFileJson(it)) }
                     },
                 )
                 put(
@@ -74,47 +107,12 @@ class WorkspaceFileTool(
             }.toString(),
         )
 
-    private fun createDirectory(
-        parentDirectory: String,
-        name: String,
-    ): ToolResult =
-        success(
-            TOOL_ID,
-            buildJsonObject {
-                put("path", workspaceFiles.createDirectory(parentDirectory, name))
-            }.toString(),
-        )
-
-    private fun info(record: ToolWorkspaceFile): ToolResult = success(TOOL_ID, recordJson(record).toString())
-
-    private fun delete(record: ToolWorkspaceFile): ToolResult =
-        success(
-            TOOL_ID,
-            buildJsonObject {
-                put("id", record.id)
-                put("path", record.relativePath)
-                put("deleted", workspaceFiles.delete(record))
-            }.toString(),
-        )
-
-    private fun deleteDirectory(
-        path: String,
-        recursive: Boolean,
-    ): ToolResult =
-        workspaceFiles.deleteDirectory(path, recursive).let { result ->
-            success(
-                TOOL_ID,
-                buildJsonObject {
-                    put("path", result.relativePath)
-                    put("recursive", result.recursive)
-                    put("deletedFiles", result.deletedFiles)
-                    put("deletedMetadata", result.deletedMetadata)
-                }.toString(),
-            )
-        }
+    private fun info(record: ToolWorkspaceFile): ToolResult = success(TOOL_ID, workspaceFileJson(record).toString())
 
     private fun search(
+        rootId: String?,
         query: String,
+        path: String,
         entryType: String?,
         mimeType: String?,
     ): ToolResult {
@@ -123,6 +121,11 @@ class WorkspaceFileTool(
         }
         require(entryType != "directory" || mimeType == null) {
             "mimeType cannot be combined with entryType directory"
+        }
+        if (rootId != null && rootId != WorkspaceGrantedDirectoryActions.WORKSPACE_ROOT_ID) {
+            require(entryType == null || entryType == "file") { "entryType directory is not supported for granted-directory search" }
+            require(mimeType == null) { "mimeType is not supported for granted-directory search" }
+            return success(TOOL_ID, grantedDirectories.searchJson(rootId, query, path).toString())
         }
         val result = workspaceFiles.search(query, mimeType)
         val directories =
@@ -145,7 +148,7 @@ class WorkspaceFileTool(
                                         put("entryType", "file")
                                         put("matchType", match.matchType)
                                         put("snippet", match.snippet)
-                                        put("file", recordJson(match.file))
+                                        put("file", workspaceFileJson(match.file))
                                     },
                                 )
                             }
@@ -159,6 +162,56 @@ class WorkspaceFileTool(
                                     },
                                 )
                             }
+                        }
+                    },
+                )
+            }.toString(),
+        )
+    }
+
+    private fun glob(
+        rootId: String?,
+        path: String,
+        pattern: String,
+    ): ToolResult {
+        if (rootId != null && rootId != WorkspaceGrantedDirectoryActions.WORKSPACE_ROOT_ID) {
+            return success(TOOL_ID, grantedDirectories.globJson(rootId, path, pattern).toString())
+        }
+        return success(
+            TOOL_ID,
+            buildJsonObject {
+                put(
+                    "files",
+                    buildJsonArray {
+                        workspaceFiles.glob(path, pattern).forEach { add(workspaceFileJson(it)) }
+                    },
+                )
+            }.toString(),
+        )
+    }
+
+    private fun grep(
+        rootId: String?,
+        query: String,
+        path: String,
+    ): ToolResult {
+        if (rootId != null && rootId != WorkspaceGrantedDirectoryActions.WORKSPACE_ROOT_ID) {
+            return success(TOOL_ID, grantedDirectories.searchJson(rootId, query, path).toString())
+        }
+        return success(
+            TOOL_ID,
+            buildJsonObject {
+                put(
+                    "matches",
+                    buildJsonArray {
+                        workspaceFiles.grep(query, path).forEach { match ->
+                            add(
+                                buildJsonObject {
+                                    put("path", match.path)
+                                    put("line", match.line)
+                                    put("snippet", match.snippet)
+                                },
+                            )
                         }
                     },
                 )
@@ -190,7 +243,21 @@ class WorkspaceFileTool(
             }.toString(),
         )
 
-    private fun readText(record: ToolWorkspaceFile): ToolResult =
+    private fun readText(input: kotlinx.serialization.json.JsonObject): ToolResult {
+        val rootId = input.string("rootId")
+        if (rootId != null && rootId != WorkspaceGrantedDirectoryActions.WORKSPACE_ROOT_ID) {
+            return success(
+                TOOL_ID,
+                buildJsonObject {
+                    put("path", input.requiredString("path"))
+                    put("content", grantedDirectories.readText(rootId, input.requiredString("path")))
+                }.toString(),
+            )
+        }
+        return readWorkspaceText(file(input))
+    }
+
+    private fun readWorkspaceText(record: ToolWorkspaceFile): ToolResult =
         success(
             TOOL_ID,
             buildJsonObject {
@@ -199,6 +266,27 @@ class WorkspaceFileTool(
                 put("content", workspaceFiles.readText(record))
             }.toString(),
         )
+
+    private fun mime(input: kotlinx.serialization.json.JsonObject): ToolResult {
+        val rootId = input.string("rootId")
+        val path = input.string("path")
+        if (rootId != null && rootId != WorkspaceGrantedDirectoryActions.WORKSPACE_ROOT_ID) {
+            return success(TOOL_ID, grantedDirectories.mimeJson(rootId, requireNotNull(path) { "Missing path" }).toString())
+        }
+        val record = file(input)
+        val detected = workspaceFiles.detectMimeType(record)
+        return success(
+            TOOL_ID,
+            buildJsonObject {
+                put("id", record.id)
+                put("path", record.relativePath)
+                put("detectedMimeType", detected.detectedMimeType)
+                put("storedMimeType", detected.storedMimeType)
+                put("sizeBytes", detected.sizeBytes)
+                put("sha256", detected.sha256)
+            }.toString(),
+        )
+    }
 
     private fun extractPdfText(record: ToolWorkspaceFile): ToolResult {
         val text = workspaceFiles.extractPdfText(record)
@@ -216,68 +304,19 @@ class WorkspaceFileTool(
     private fun renderPdfPage(
         record: ToolWorkspaceFile,
         page: Int,
-    ): ToolResult = success(TOOL_ID, recordJson(workspaceFiles.renderPdfPage(record, page)).toString())
+    ): ToolResult = success(TOOL_ID, workspaceFileJson(workspaceFiles.renderPdfPage(record, page)).toString())
 
-    private fun imageInfo(record: ToolWorkspaceFile): ToolResult {
-        val info = workspaceFiles.imageInfo(record)
-        return success(
-            TOOL_ID,
-            buildJsonObject {
-                put("id", record.id)
-                put("path", record.relativePath)
-                put("mimeType", info.mimeType)
-                put("width", info.width)
-                put("height", info.height)
-                put("sizeBytes", info.sizeBytes)
-                put("sha256", info.sha256)
-            }.toString(),
-        )
-    }
+    private fun imageInfo(record: ToolWorkspaceFile): ToolResult = success(TOOL_ID, mediaActions.imageInfo(record).toString())
 
-    private fun imageBytes(record: ToolWorkspaceFile): ToolResult {
-        val bytes = workspaceFiles.imageBytes(record)
-        return success(
-            TOOL_ID,
-            buildJsonObject {
-                put("id", record.id)
-                put("path", record.relativePath)
-                put("mimeType", bytes.mimeType)
-                put("base64", bytes.base64)
-            }.toString(),
-        )
-    }
+    private fun imageBytes(record: ToolWorkspaceFile): ToolResult = success(TOOL_ID, mediaActions.imageBytes(record).toString())
 
     private fun analyzeImage(
         record: ToolWorkspaceFile,
         prompt: String,
-    ): ToolResult {
-        val response = workspaceFiles.analyzeImage(record, prompt)
-        return success(
-            TOOL_ID,
-            buildJsonObject {
-                put("id", record.id)
-                put("path", record.relativePath)
-                put("model", response.model)
-                put("content", response.content)
-            }.toString(),
-        )
-    }
+    ): ToolResult = success(TOOL_ID, mediaActions.analyzeImage(record, prompt).toString())
 
     private fun file(input: kotlinx.serialization.json.JsonObject): ToolWorkspaceFile =
         workspaceFiles.requireFile(input.string("id"), input.string("path"))
-
-    private fun recordJson(record: ToolWorkspaceFile) =
-        buildJsonObject {
-            put("id", record.id)
-            put("path", record.relativePath)
-            put("originalName", record.originalName)
-            put("mimeType", record.mimeType)
-            put("sizeBytes", record.sizeBytes)
-            put("sha256", record.sha256)
-            put("importedAt", record.importedAt.toString())
-            put("updatedAt", record.updatedAt.toString())
-            put("hasExtractedText", record.hasExtractedText)
-        }
 
     private companion object {
         const val TOOL_ID = "workspace:file"

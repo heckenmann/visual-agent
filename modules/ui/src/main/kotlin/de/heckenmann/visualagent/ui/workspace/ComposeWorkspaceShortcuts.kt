@@ -16,7 +16,7 @@ import de.heckenmann.visualagent.ui.workspace.*
  * Stable panel order used by keyboard shortcuts and the left rail.
  */
 internal val workspacePanelShortcutIds: List<String> =
-    listOf("chat", "todos", "files", "agents", "settings", "canvas")
+    listOf("chat", "todos", "files", "agents", "settings", "canvas", "directories")
 
 /**
  * Command metadata shown by the internal command palette.
@@ -31,7 +31,7 @@ data class ComposeCommand(
 /**
  * Resolves a 1-based shortcut digit to the matching workspace panel ID.
  *
- * @param digit 1-based shortcut digit from `Cmd/Ctrl+1..6`
+ * @param digit 1-based shortcut digit from `Cmd/Ctrl+1..7`
  * @return Workspace panel ID or `null` when the digit is not mapped
  */
 internal fun panelIdForShortcutDigit(digit: Int): String? = workspacePanelShortcutIds.getOrNull(digit - 1)

@@ -2,22 +2,20 @@ package de.heckenmann.visualagent.workspace
 
 import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
 import de.heckenmann.visualagent.knowledge.WorkspaceFileStore
-import de.heckenmann.visualagent.protocol.MAX_WORKSPACE_FILE_IMPORT_BYTES
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.io.File
 import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.nio.file.Path
 import java.time.Instant
 import java.util.UUID
-import kotlin.io.path.createDirectories
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
 import kotlin.io.path.fileSize
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.name
-import kotlin.io.path.writeBytes
 import kotlin.streams.asSequence
 
 /**
@@ -34,6 +32,26 @@ class WorkspaceFileService(
     private val activityEvents: WorkspaceFileActivityEventBus? = null,
 ) {
     private val contentOperations = WorkspaceFileContentOperations(store, mimeDetector, ::resolveManagedPath)
+    private val importOperations =
+        WorkspaceFileImportOperations(
+            workspaceRoot = ::workspaceRoot,
+            resolveDirectory = ::resolveWorkspaceDirectory,
+            recordFile = ::recordManagedFile,
+            recordActivity = ::recordActivity,
+        )
+    private val transferOperations =
+        WorkspaceFileTransferOperations(
+            findByPath = { requireFile(null, it) },
+            resolvePath = ::resolveManagedPath,
+            prepareTarget = ::prepareNewWorkspaceTarget,
+            persist = store::saveWorkspaceFile,
+            databasePath = databasePath,
+            mimeDetector = mimeDetector,
+            recordActivity = ::recordActivity,
+        )
+    private val writeOperations =
+        WorkspaceFileWriteOperations(::workspaceRoot, databasePath, ::ensureWorkspaceDirectory, ::recordManagedFile, ::recordActivity)
+    private val renameOperations = WorkspaceFileRenameOperations(store, ::resolveManagedPath, databasePath, mimeDetector, ::recordActivity)
 
     /**
      * Returns the managed workspace root directory, creating it when necessary.
@@ -58,8 +76,7 @@ class WorkspaceFileService(
         val parent = resolveWorkspaceDirectory(parentDirectory)
         val directory = parent.resolve(normalizedName).normalize()
         require(directory.parent == parent) { "Folder must be a direct child of its parent" }
-        directory.createDirectories()
-        require(directory.toRealPath().startsWith(workspaceRoot().toRealPath())) { "Workspace directory escapes the workspace" }
+        ensureWorkspaceDirectory(directory, workspaceRoot().toRealPath())
         return WorkspaceFilePaths.relativePath(directory, databasePath).also {
             recordActivity("Workspace folder created: $it.", it, "create-directory")
         }
@@ -74,8 +91,7 @@ class WorkspaceFileService(
         val root = workspaceRoot().toRealPath()
         val directory = root.resolve(normalized).normalize()
         require(directory.startsWith(root)) { "Workspace directory escapes the workspace" }
-        directory.createDirectories()
-        require(directory.toRealPath().startsWith(root)) { "Workspace directory escapes the workspace" }
+        ensureWorkspaceDirectory(directory, root)
         return directory
     }
 
@@ -86,18 +102,7 @@ class WorkspaceFileService(
      * @return Persisted metadata for the imported copy
      * @see docs/usecases/uc_0000023_import_workspace_file.md
      */
-    fun importFile(source: File): WorkspaceFileRecord {
-        require(source.isFile) { "File does not exist: ${source.name}" }
-        require(source.length() <= MAX_WORKSPACE_FILE_IMPORT_BYTES) {
-            "File is larger than ${MAX_WORKSPACE_FILE_IMPORT_BYTES / 1024 / 1024} MB"
-        }
-        val importsDir = workspaceRoot().resolve("imports").also { it.createDirectories() }
-        val destination = WorkspaceFilePaths.uniqueDestination(importsDir, source.name)
-        Files.copy(source.toPath(), destination)
-        return recordManagedFile(destination, source.name).also {
-            recordActivity("Workspace file imported: ${it.relativePath}.", it.relativePath, "import", it.mimeType, it.sizeBytes)
-        }
-    }
+    fun importFile(source: File): WorkspaceFileRecord = importOperations.importFile(source)
 
     /**
      * Imports file bytes supplied by a presentation or transport adapter.
@@ -109,24 +114,14 @@ class WorkspaceFileService(
     fun importFile(
         originalName: String,
         bytes: ByteArray,
-    ): WorkspaceFileRecord = importFile("imports", originalName, bytes)
+    ): WorkspaceFileRecord = importOperations.importFile(originalName, bytes)
 
     /** Imports file bytes into a workspace-relative directory. */
     fun importFile(
         directoryName: String,
         originalName: String,
         bytes: ByteArray,
-    ): WorkspaceFileRecord {
-        require(bytes.size <= MAX_WORKSPACE_FILE_IMPORT_BYTES) {
-            "File is larger than ${MAX_WORKSPACE_FILE_IMPORT_BYTES / 1024 / 1024} MB"
-        }
-        val directory = resolveWorkspaceDirectory(directoryName)
-        val destination = WorkspaceFilePaths.uniqueDestination(directory, originalName)
-        destination.writeBytes(bytes)
-        return recordManagedFile(destination, originalName).also {
-            recordActivity("Workspace file imported: ${it.relativePath}.", it.relativePath, "import", it.mimeType, it.sizeBytes)
-        }
-    }
+    ): WorkspaceFileRecord = importOperations.importFile(directoryName, originalName, bytes)
 
     /**
      * Creates a managed workspace file from application-owned bytes.
@@ -143,17 +138,7 @@ class WorkspaceFileService(
         requestedName: String,
         bytes: ByteArray,
         mimeType: String? = null,
-    ): WorkspaceFileRecord {
-        require(bytes.size <= MAX_WORKSPACE_FILE_IMPORT_BYTES) {
-            "File is larger than ${MAX_WORKSPACE_FILE_IMPORT_BYTES / 1024 / 1024} MB"
-        }
-        val directory = workspaceRoot().resolve(WorkspaceFilePaths.safeDirectoryName(directoryName)).also { it.createDirectories() }
-        val destination = WorkspaceFilePaths.uniqueDestination(directory, requestedName)
-        destination.writeBytes(bytes)
-        return recordManagedFile(destination, requestedName, mimeType).also {
-            recordActivity("Workspace file created: ${it.relativePath}.", it.relativePath, "create", it.mimeType, it.sizeBytes)
-        }
-    }
+    ): WorkspaceFileRecord = importOperations.createManagedFile(directoryName, requestedName, bytes, mimeType)
 
     internal fun recordManagedFile(
         destination: Path,
@@ -312,38 +297,19 @@ class WorkspaceFileService(
     fun renameFile(
         id: String,
         requestedName: String,
-    ): WorkspaceFileRecord {
-        val current =
-            store.getWorkspaceFile(id)
-                ?: throw de.heckenmann.visualagent.error.WorkspaceFileException(
-                    summary = "File not found",
-                    detail = "The workspace file to rename was not found. Refresh the file list and try again.",
-                    retryable = true,
-                )
-        val source = resolveManagedPath(current.relativePath)
-        val safeName = WorkspaceFilePaths.safeFileName(requestedName)
-        val targetName = WorkspaceFilePaths.preserveExtensionIfMissing(source, safeName)
-        val destination = WorkspaceFilePaths.uniqueDestination(source.parent, targetName)
-        Files.move(source, destination)
-        val updated =
-            current.copy(
-                relativePath = WorkspaceFilePaths.relativePath(destination, databasePath),
-                mimeType = mimeDetector.detect(destination),
-                sizeBytes = destination.fileSize(),
-                sha256 = WorkspaceFilePaths.sha256(destination),
-                updatedAt = Instant.now(),
-            )
-        store.saveWorkspaceFile(updated)
-        return updated.also {
-            recordActivity(
-                "Workspace file renamed: ${current.relativePath} to ${it.relativePath}.",
-                it.relativePath,
-                "rename",
-                it.mimeType,
-                it.sizeBytes,
-            )
-        }
-    }
+    ): WorkspaceFileRecord = renameOperations.rename(id, requestedName)
+
+    /** Copies a managed regular file to a new path within the managed workspace. */
+    fun copyFile(
+        sourcePath: String,
+        targetPath: String,
+    ): WorkspaceFileRecord = transferOperations.copy(sourcePath, targetPath)
+
+    /** Moves a managed regular file to a new path within the managed workspace. */
+    fun moveFile(
+        sourcePath: String,
+        targetPath: String,
+    ): WorkspaceFileRecord = transferOperations.move(sourcePath, targetPath)
 
     /**
      * Computes the current SHA-256 hash for a managed file.
@@ -358,6 +324,56 @@ class WorkspaceFileService(
      * Use cases: UC-0000027.
      */
     fun readText(record: WorkspaceFileRecord): String = contentOperations.readText(record)
+
+    /**
+     * Reads at most [maximumBytes] from a managed binary file.
+     *
+     * The limit is checked against the current filesystem entry as well as while reading, so a
+     * stale metadata record cannot cause an unbounded allocation.
+     */
+    fun readBytes(
+        record: WorkspaceFileRecord,
+        maximumBytes: Long,
+    ): ByteArray = contentOperations.readBytes(record, maximumBytes)
+
+    /**
+     * Writes UTF-8 text below the managed workspace and persists its metadata.
+     *
+     * @param relativePath Workspace-relative target path
+     * @param content Text content to write
+     * @return Updated managed workspace record
+     */
+    fun writeText(
+        relativePath: String,
+        content: String,
+    ): WorkspaceFileRecord = writeOperations.writeText(relativePath, content)
+
+    /** Creates each missing parent only after confirming it is not a link escaping [root]. */
+    private fun ensureWorkspaceDirectory(
+        directory: Path,
+        root: Path,
+    ) {
+        require(directory.startsWith(root)) { "Workspace directory escapes the workspace" }
+        var current = root
+        root.relativize(directory).forEach { segment ->
+            current = current.resolve(segment)
+            if (Files.exists(current, LinkOption.NOFOLLOW_LINKS)) {
+                require(Files.isDirectory(current, LinkOption.NOFOLLOW_LINKS)) { "Workspace path contains a symbolic link or file" }
+            } else {
+                Files.createDirectory(current)
+            }
+            require(current.toRealPath().startsWith(root)) { "Workspace directory escapes the workspace" }
+        }
+    }
+
+    private fun prepareNewWorkspaceTarget(relativePath: String): Path {
+        val target = WorkspaceFilePaths.resolveWorkspacePath(relativePath, databasePath)
+        val root = workspaceRoot().toRealPath()
+        val parent = requireNotNull(target.parent) { "Workspace file must have a parent directory" }
+        ensureWorkspaceDirectory(parent, root)
+        require(!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) { "Workspace target already exists" }
+        return target
+    }
 
     /**
      * Extracts and caches text from a managed PDF.

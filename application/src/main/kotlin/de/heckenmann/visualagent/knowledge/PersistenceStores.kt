@@ -51,6 +51,36 @@ data class WorkspaceFileRecord(
     val updatedAt: Instant,
 )
 
+/** Persisted access grant for a filesystem root owned by the server or a connected client. */
+data class DirectoryGrantRecord(
+    val id: String,
+    val displayName: String,
+    val canonicalRoot: String?,
+    val origin: String,
+    val mode: String,
+    val ownerClientId: String?,
+    val createdAt: Instant,
+    val updatedAt: Instant,
+)
+
+/** Stores directory grants without caching filesystem authorization state. */
+interface DirectoryGrantStore {
+    /** Persists a new or updated grant. */
+    fun saveDirectoryGrant(record: DirectoryGrantRecord)
+
+    /** Lists grants in stable creation order. */
+    fun listDirectoryGrants(): List<DirectoryGrantRecord>
+
+    /** Looks up a grant by opaque identifier. */
+    fun getDirectoryGrant(id: String): DirectoryGrantRecord?
+
+    /** Looks up a server grant by its canonical root for alias detection. */
+    fun getDirectoryGrantByCanonicalRoot(canonicalRoot: String): DirectoryGrantRecord?
+
+    /** Revokes a grant and returns whether it existed. */
+    fun deleteDirectoryGrant(id: String): Boolean
+}
+
 /**
  * Persisted sub-agent state exposed to orchestration consumers.
  *

@@ -243,7 +243,7 @@ data class ModelParameters(
 /**
  * Stable identifier for an application tool.
  *
- * @property value External tool ID such as `file:read` or `ui`
+ * @property value External tool ID such as `workspace:file` or `ui`
  * @see docs/usecases/uc_0000019_configure_agent_tools.md
  * @see docs/usecases/uc_0000020_execute_tool_call.md
  */
