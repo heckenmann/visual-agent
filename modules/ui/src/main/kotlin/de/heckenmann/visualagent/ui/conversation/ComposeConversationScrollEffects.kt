@@ -16,7 +16,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.ui.agents.*
@@ -68,26 +67,32 @@ internal fun ConversationScrollOnChangeEffect(
     isAtLatest: Boolean = listState.conversationPosition().isAtLatest,
     onNewContentWhileBrowsing: () -> Unit = {},
 ) {
-    var lastCount by remember { mutableStateOf(history.size) }
     var lastNewestMessage by remember { mutableStateOf(history.lastOrNull()) }
     var lastPendingUserMessage by remember { mutableStateOf(pendingUserMessage) }
     var lastStreamingContent by remember { mutableStateOf(streamingContent) }
+    var lastIsAtLatest by remember { mutableStateOf(isAtLatest) }
     val newestMessage = history.lastOrNull()
     LaunchedEffect(history.size, newestMessage?.id, newestMessage?.timelineSequence, pendingUserMessage, streamingContent, isAtLatest) {
+        val wasAtLatest = lastIsAtLatest
         val appendedLatestHistory =
             history.isNotEmpty() && newestMessage != lastNewestMessage
         val displayedPendingMessage = pendingUserMessage != null && pendingUserMessage != lastPendingUserMessage
         val updatedStreamingContent = streamingContent.isNotEmpty() && streamingContent != lastStreamingContent
-        if (isAtLatest && (appendedLatestHistory || displayedPendingMessage || updatedStreamingContent)) {
+        val newContent = appendedLatestHistory || displayedPendingMessage || updatedStreamingContent
+        // In reverseLayout, inserting index 0 can make the freshly measured list report
+        // isAtLatest=false before this effect gets scheduled.  Keep following when the
+        // previous frame was already at the newest end; only a continuously browsed list
+        // should receive the New messages affordance.
+        if (newContent && (isAtLatest || wasAtLatest)) {
             withFrameNanos { }
             listState.scrollToBottom()
-        } else if (!isAtLatest && (appendedLatestHistory || displayedPendingMessage || updatedStreamingContent)) {
+        } else if (newContent && !isAtLatest && !wasAtLatest) {
             onNewContentWhileBrowsing()
         }
-        lastCount = history.size
         lastNewestMessage = newestMessage
         lastPendingUserMessage = pendingUserMessage
         lastStreamingContent = streamingContent
+        lastIsAtLatest = isAtLatest
     }
 }
 
@@ -133,7 +138,6 @@ internal fun ConversationQueueFlushEffect(
     inFlight: InFlightStateHolder,
     queue: MessageQueue,
     messageGateway: ConversationMessageGateway,
-    inputFocusRequester: FocusRequester,
     onInputChange: (String) -> Unit,
     onSendingChange: (Boolean) -> Unit,
     onStatusChange: (String) -> Unit,
@@ -158,7 +162,6 @@ internal fun ConversationQueueFlushEffect(
                                     content = msg.content,
                                     messageGateway = messageGateway,
                                     inFlight = inFlight,
-                                    inputFocusRequester = inputFocusRequester,
                                     onInputChange = onInputChange,
                                     onSendingChange = onSendingChange,
                                     onStatusChange = onStatusChange,
@@ -178,7 +181,6 @@ internal fun ConversationQueueFlushEffect(
                                 content = combined,
                                 messageGateway = messageGateway,
                                 inFlight = inFlight,
-                                inputFocusRequester = inputFocusRequester,
                                 onInputChange = onInputChange,
                                 onSendingChange = onSendingChange,
                                 onStatusChange = onStatusChange,

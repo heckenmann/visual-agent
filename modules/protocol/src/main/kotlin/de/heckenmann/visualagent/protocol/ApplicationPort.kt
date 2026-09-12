@@ -5,6 +5,9 @@ interface ApplicationPort {
     /** Conversation commands and streaming responses. */
     val conversation: ConversationPort
 
+    /** Non-persistent follow-up question inspiration and response completion events. */
+    val conversationSuggestions: ConversationSuggestionPort
+
     /** Todo commands and asynchronous updates. */
     val todos: TodoPort
 

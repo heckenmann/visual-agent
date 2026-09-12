@@ -1,13 +1,10 @@
 package de.heckenmann.visualagent.ui.conversation
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
@@ -24,8 +21,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.ActivityPort
@@ -33,6 +28,8 @@ import de.heckenmann.visualagent.protocol.CancellationToken
 import de.heckenmann.visualagent.protocol.ClientImagePort
 import de.heckenmann.visualagent.protocol.ConversationInputPlacement
 import de.heckenmann.visualagent.protocol.ConversationPort
+import de.heckenmann.visualagent.protocol.ConversationSuggestionPort
+import de.heckenmann.visualagent.protocol.SettingsPort
 import de.heckenmann.visualagent.protocol.TodoPort
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
@@ -45,8 +42,6 @@ import de.heckenmann.visualagent.ui.settings.*
 import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 internal typealias ConversationScrollStateObserver = (ConversationUiState, LazyListState) -> Unit
 
@@ -62,6 +57,8 @@ internal fun ConversationPanel(
     activityPort: ActivityPort,
     todoPort: TodoPort,
     conversationPort: ConversationPort,
+    suggestionPort: ConversationSuggestionPort,
+    settingsPort: SettingsPort,
     clientImagePort: ClientImagePort? = null,
     onScrollStateObserved: ConversationScrollStateObserver? = null,
 ) {
@@ -80,8 +77,13 @@ internal fun ConversationPanel(
     val preferences = remember(conversationPort) { conversationPort.preferences() }
     var inputPlacement by remember { mutableStateOf(preferences.inputPlacement) }
     val streamingContent by conversationState.streaming.collectAsState()
+    val suggestionController = rememberConversationSuggestionController(suggestionPort, settingsPort)
+    val suggestionState by suggestionController.state.collectAsState()
     val todoState = rememberConversationTodoState(todoPort, conversationPort, conversationState)
     val queue = remember { MessageQueue() }
+    LaunchedEffect(queue.messages.size) {
+        suggestionController.onQueueSizeChanged(queue.messages.size)
+    }
     LaunchedEffect(preferences.queueFlushMode) {
         queue.flushMode =
             try {
@@ -116,45 +118,27 @@ internal fun ConversationPanel(
         gateway = conversationGateway,
     )
     ConversationActivityHistoryEffect(activityPort, conversationPort, conversationState)
-    val sendContent: (String) -> Unit = { rawContent ->
-        val content = rawContent.trim()
-        if (content.isNotBlank()) {
-            if (conversationState.sending) {
-                queueUserMessage(
-                    content = content,
-                    enqueue = { message -> queue.enqueue(message, QueuedMessageSource.USER) },
-                    queuedMessageCount = { queue.size },
-                    onInputChange = { conversationState.input = it },
-                    onStatusChange = { conversationState.status = it },
-                )
-            } else {
-                scope.launch {
-                    executeSend(
-                        content = content,
-                        messageGateway = conversationGateway,
-                        inFlight = inFlight,
-                        inputFocusRequester = inputFocusRequester,
-                        onInputChange = { conversationState.input = it },
-                        onSendingChange = { conversationState.sending = it },
-                        onStatusChange = { conversationState.status = it },
-                        onActiveTokenChange = { activeToken = it },
-                        onPendingUserMessageChange = { conversationState.pendingUserMessage = it },
-                        onPendingUserEntryIdChange = { conversationState.pendingUserEntryId = it },
-                        onStreamingEntryIdChange = { conversationState.streamingEntryId = it },
-                        onStreamCompletion = conversationState::completeStream,
-                        streamingFlow = conversationState.streaming,
-                    )
-                }
-            }
-        }
-    }
+    val sendContent =
+        conversationSendAction(
+            scope = scope,
+            queue = queue,
+            messageGateway = conversationGateway,
+            inFlight = inFlight,
+            conversationState = conversationState,
+            suggestionController = suggestionController,
+            onActiveTokenChange = { activeToken = it },
+        )
     val clearConversation = {
+        suggestionController.onUserInteraction()
         handleClearConversation(
             scope = scope,
             modalRequester = modalRequester,
             conversationPort = conversationPort,
             activeToken = { activeToken },
-            onSendingChange = { conversationState.sending = it },
+            onSendingChange = { value ->
+                conversationState.sending = value
+                suggestionController.onSendingChanged(value)
+            },
             onStatusChange = { conversationState.status = it },
             onHistoryRefresh = { conversationState.resetHistory(conversationPort.currentHistory()) },
             onTodosCleared = todoState::clear,
@@ -187,9 +171,14 @@ internal fun ConversationPanel(
         inFlight = inFlight,
         queue = queue,
         messageGateway = conversationGateway,
-        inputFocusRequester = inputFocusRequester,
-        onInputChange = { conversationState.input = it },
-        onSendingChange = { conversationState.sending = it },
+        onInputChange = { value ->
+            conversationState.input = value
+            suggestionController.onInputChanged(value)
+        },
+        onSendingChange = { value ->
+            conversationState.sending = value
+            suggestionController.onSendingChanged(value)
+        },
         onStatusChange = { conversationState.status = it },
         onActiveTokenChange = { activeToken = it },
         onPendingUserMessageChange = { conversationState.pendingUserMessage = it },
@@ -206,66 +195,54 @@ internal fun ConversationPanel(
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             Box(modifier = Modifier.weight(1f).fillMaxWidth().onSizeChanged { viewportSize = it }) {
-                LazyColumn(
-                    state = listState,
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .semantics { contentDescription = "Conversation history" },
-                    reverseLayout = true,
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    conversationTimeline(
-                        items = timeline,
-                        sending = conversationState.sending,
-                        deletingMessageIds = conversationState.deletingMessageIds,
-                        onDeleteMessage = { id ->
-                            conversationState.deletingMessageIds += id
-                            scope.launch {
-                                delay(DELETE_ANIMATION_DURATION_MS.toLong())
-                                val deleted = conversationPort.deleteMessage(id)
-                                conversationState.replaceHistory(conversationPort.currentHistory())
-                                conversationState.deletingMessageIds -= id
-                                conversationState.status = if (deleted) "Message deleted" else "Message could not be deleted"
-                            }
-                        },
-                        onStatusChange = { conversationState.status = it },
-                        onEditMessage = { conversationState.editingId = it },
-                        sendContent = sendContent,
-                        onOpenTodoResponse = { todo, responseState ->
-                            modalRequester.requestTodoResponse(todo, responseState) {
-                                todoState.todos.firstOrNull { current -> current.id == todo.id }
-                                    ?: todoState.deletedSnapshots[todo.id]
-                            }
-                        },
-                        shouldAnimateEntry = conversationState::shouldAnimateEntry,
-                        onMessageEntryRendered = conversationState::markEntryKnown,
-                        inlineComposer = {
-                            ConversationInputCard(
-                                input = conversationState.input,
-                                sending = conversationState.sending,
-                                onInputChange = { conversationState.input = it },
-                                onSend = { sendContent(conversationState.input) },
-                                onCancel = { activeToken?.cancel() },
-                                onClear = clearConversation,
-                                inputPlacement = inputPlacement,
-                                onInputPlacementChange = onInputPlacementChange,
-                                inputFocusRequester = inputFocusRequester,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        },
-                    )
-                }
+                ConversationPanelHistory(
+                    listState = listState,
+                    timeline = timeline,
+                    conversationState = conversationState,
+                    conversationPort = conversationPort,
+                    modalRequester = modalRequester,
+                    todoState = todoState,
+                    scope = scope,
+                    sendContent = sendContent,
+                    inlineComposer = {
+                        ConversationInputCard(
+                            input = conversationState.input,
+                            sending = conversationState.sending,
+                            onInputChange = { value ->
+                                conversationState.input = value
+                                suggestionController.onInputChanged(value)
+                            },
+                            onSend = { sendContent(conversationState.input) },
+                            onCancel = {
+                                suggestionController.onUserInteraction()
+                                activeToken?.cancel()
+                            },
+                            onClear = clearConversation,
+                            inputPlacement = inputPlacement,
+                            onInputPlacementChange = onInputPlacementChange,
+                            inputFocusRequester = inputFocusRequester,
+                            ghostText = suggestionState.text,
+                            ghostCursorVisible = suggestionState.cursorVisible,
+                            onFocusChanged = suggestionController::onFocusChanged,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                )
                 ConversationPanelQueueStrip(
                     queue = queue,
                     scope = scope,
                     inFlight = inFlight,
                     messageGateway = conversationGateway,
-                    inputFocusRequester = inputFocusRequester,
                     activeToken = { activeToken },
-                    onInputChange = { conversationState.input = it },
-                    onSendingChange = { conversationState.sending = it },
+                    onInputChange = { value ->
+                        conversationState.input = value
+                        suggestionController.onInputChanged(value)
+                    },
+                    onSendingChange = { value ->
+                        conversationState.sending = value
+                        suggestionController.onSendingChanged(value)
+                    },
                     onStatusChange = { conversationState.status = it },
                     onActiveTokenChange = { activeToken = it },
                     onPendingUserMessageChange = { conversationState.pendingUserMessage = it },
@@ -287,13 +264,22 @@ internal fun ConversationPanel(
                 ConversationInputCard(
                     input = conversationState.input,
                     sending = conversationState.sending,
-                    onInputChange = { conversationState.input = it },
+                    onInputChange = { value ->
+                        conversationState.input = value
+                        suggestionController.onInputChanged(value)
+                    },
                     onSend = { sendContent(conversationState.input) },
-                    onCancel = { activeToken?.cancel() },
+                    onCancel = {
+                        suggestionController.onUserInteraction()
+                        activeToken?.cancel()
+                    },
                     onClear = clearConversation,
                     inputPlacement = inputPlacement,
                     onInputPlacementChange = onInputPlacementChange,
                     inputFocusRequester = inputFocusRequester,
+                    ghostText = suggestionState.text,
+                    ghostCursorVisible = suggestionState.cursorVisible,
+                    onFocusChanged = suggestionController::onFocusChanged,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
                 )
             }

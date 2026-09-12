@@ -20,6 +20,8 @@ Desktop user.
 3. Options: "One by one" (each queued message sent as a separate request) or "All at once" (all queued messages combined into one request).
 4. The user saves settings.
 5. The flush mode is persisted and applied immediately.
+6. A successfully completed queued response is eligible for the optional idle
+   follow-up suggestion flow described in UC-0000112 once the queue is empty.
 
 ## Result
 
@@ -43,3 +45,5 @@ The queue delivery behavior matches the user's preference.
 - Selecting "All at once" sets `queueFlushMode` to `ALL_AT_ONCE`.
 - The setting is persisted across application restarts.
 - The setting is included in configuration export/import.
+- Queued responses never trigger suggestions while another queued message is
+  pending.

@@ -12,6 +12,7 @@ import de.heckenmann.visualagent.protocol.CanvasPort
 import de.heckenmann.visualagent.protocol.ConversationHistoryPage
 import de.heckenmann.visualagent.protocol.ConversationPort
 import de.heckenmann.visualagent.protocol.ConversationPreferences
+import de.heckenmann.visualagent.protocol.ConversationSuggestionPort
 import de.heckenmann.visualagent.protocol.LayoutWindowState
 import de.heckenmann.visualagent.protocol.MainAgentMemoryPort
 import de.heckenmann.visualagent.protocol.MainAgentMemorySnapshot
@@ -120,6 +121,7 @@ class VisualAgentComposeAppProtocolTest {
         every { activity.addAgentListener(any()) } returns AutoCloseable { }
         val application = mockk<ApplicationPort>()
         every { application.conversation } returns conversation
+        every { application.conversationSuggestions } returns mockk<ConversationSuggestionPort>(relaxed = true)
         every { application.todos } returns todos
         every { application.agents } returns agents
         every { application.providers } returns providers
