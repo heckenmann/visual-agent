@@ -23,6 +23,7 @@ class WorkspaceFileTool(
 ) : VisualAgentTool {
     private val grantedDirectories = WorkspaceGrantedDirectoryActions(directories)
     private val mediaActions = WorkspaceFileToolMediaActions(workspaceFiles)
+    private val mutations = WorkspaceFileToolMutationActions(workspaceFiles, grantedDirectories)
     override val definition =
         ToolDefinition(
             id = ToolId(TOOL_ID),
@@ -40,7 +41,7 @@ class WorkspaceFileTool(
             when (input.string("action") ?: "list") {
                 "listRoots" -> success(TOOL_ID, grantedDirectories.rootsJson().toString())
                 "list" -> list(input.string("rootId"), input.string("path").orEmpty())
-                "createDirectory" -> createDirectory(input)
+                "createDirectory" -> mutations.createDirectory(input)
                 "search" ->
                     search(
                         input.string("rootId"),
@@ -51,25 +52,14 @@ class WorkspaceFileTool(
                     )
                 "glob" -> glob(input.string("rootId"), input.string("path").orEmpty(), input.requiredString("pattern"))
                 "grep" -> grep(input.string("rootId"), input.requiredString("query"), input.string("path").orEmpty())
-                "writeText" ->
-                    writeText(
-                        input.string("rootId"),
-                        input.requiredString("path"),
-                        input.requiredString("content"),
-                    )
-                "edit" ->
-                    edit(
-                        input.string("rootId"),
-                        input.requiredString("path"),
-                        input.requiredString("oldText"),
-                        input.requiredString("newText"),
-                    )
-                "copy" -> transfer(input, move = false)
-                "move" -> transfer(input, move = true)
+                "writeText" -> mutations.writeText(input)
+                "edit" -> mutations.edit(input)
+                "copy" -> mutations.transfer(input, move = false)
+                "move" -> mutations.transfer(input, move = true)
                 "info" -> info(file(input))
                 "sync" -> sync()
-                "delete" -> delete(input)
-                "deleteDirectory" -> deleteDirectory(input)
+                "delete" -> mutations.delete(input)
+                "deleteDirectory" -> mutations.deleteDirectory(input)
                 "hash" -> hash(file(input))
                 "readText" -> readText(input)
                 "mime" -> mime(input)
@@ -117,77 +107,7 @@ class WorkspaceFileTool(
             }.toString(),
         )
 
-    private fun createDirectory(input: kotlinx.serialization.json.JsonObject): ToolResult {
-        val rootId = input.string("rootId")
-        if (rootId != null && rootId != WorkspaceGrantedDirectoryActions.WORKSPACE_ROOT_ID) {
-            return success(
-                TOOL_ID,
-                buildJsonObject { put("path", grantedDirectories.createDirectory(rootId, input.requiredString("path"))) }.toString(),
-            )
-        }
-        return success(
-            TOOL_ID,
-            buildJsonObject {
-                put("path", workspaceFiles.createDirectory(input.string("parentDirectory").orEmpty(), input.requiredString("name")))
-            }.toString(),
-        )
-    }
-
     private fun info(record: ToolWorkspaceFile): ToolResult = success(TOOL_ID, workspaceFileJson(record).toString())
-
-    private fun delete(input: kotlinx.serialization.json.JsonObject): ToolResult {
-        val rootId = input.string("rootId")
-        val path = input.string("path")
-        if (rootId != null && rootId != WorkspaceGrantedDirectoryActions.WORKSPACE_ROOT_ID) {
-            val relativePath = requireNotNull(path) { "Missing path" }
-            grantedDirectories.delete(rootId, relativePath, input.boolean("recursive") ?: false)
-            return success(
-                TOOL_ID,
-                buildJsonObject {
-                    put("path", relativePath)
-                    put("deleted", true)
-                }.toString(),
-            )
-        }
-        return deleteWorkspace(file(input))
-    }
-
-    private fun deleteWorkspace(record: ToolWorkspaceFile): ToolResult =
-        success(
-            TOOL_ID,
-            buildJsonObject {
-                put("id", record.id)
-                put("path", record.relativePath)
-                put("deleted", workspaceFiles.delete(record))
-            }.toString(),
-        )
-
-    private fun deleteDirectory(input: kotlinx.serialization.json.JsonObject): ToolResult {
-        val rootId = input.string("rootId")
-        val path = input.requiredString("path")
-        val recursive = input.boolean("recursive") ?: false
-        if (rootId != null && rootId != WorkspaceGrantedDirectoryActions.WORKSPACE_ROOT_ID) {
-            grantedDirectories.delete(rootId, path, recursive)
-            return success(
-                TOOL_ID,
-                buildJsonObject {
-                    put("path", path)
-                    put("deleted", true)
-                }.toString(),
-            )
-        }
-        return workspaceFiles.deleteDirectory(path, recursive).let { result ->
-            success(
-                TOOL_ID,
-                buildJsonObject {
-                    put("path", result.relativePath)
-                    put("recursive", result.recursive)
-                    put("deletedFiles", result.deletedFiles)
-                    put("deletedMetadata", result.deletedMetadata)
-                }.toString(),
-            )
-        }
-    }
 
     private fun search(
         rootId: String?,
@@ -364,72 +284,6 @@ class WorkspaceFileTool(
                 put("storedMimeType", detected.storedMimeType)
                 put("sizeBytes", detected.sizeBytes)
                 put("sha256", detected.sha256)
-            }.toString(),
-        )
-    }
-
-    private fun writeText(
-        rootId: String?,
-        path: String,
-        content: String,
-    ): ToolResult {
-        if (rootId != null && rootId != WorkspaceGrantedDirectoryActions.WORKSPACE_ROOT_ID) {
-            return success(
-                TOOL_ID,
-                buildJsonObject { put("path", grantedDirectories.writeText(rootId, path, content)) }.toString(),
-            )
-        }
-        return success(TOOL_ID, workspaceFileJson(workspaceFiles.writeText(path, content)).toString())
-    }
-
-    private fun edit(
-        rootId: String?,
-        path: String,
-        oldText: String,
-        newText: String,
-    ): ToolResult {
-        if (rootId != null && rootId != WorkspaceGrantedDirectoryActions.WORKSPACE_ROOT_ID) {
-            return success(
-                TOOL_ID,
-                buildJsonObject { put("path", grantedDirectories.editText(rootId, path, oldText, newText)) }.toString(),
-            )
-        }
-        return success(TOOL_ID, workspaceFileJson(workspaceFiles.editText(path, oldText, newText)).toString())
-    }
-
-    private fun transfer(
-        input: kotlinx.serialization.json.JsonObject,
-        move: Boolean,
-    ): ToolResult {
-        val sourceRootId = input.requiredString("sourceRootId")
-        val sourcePath = input.requiredString("sourcePath")
-        val targetRootId = input.requiredString("targetRootId")
-        val targetPath = input.requiredString("targetPath")
-        val target =
-            when {
-                sourceRootId == WorkspaceGrantedDirectoryActions.WORKSPACE_ROOT_ID &&
-                    targetRootId == WorkspaceGrantedDirectoryActions.WORKSPACE_ROOT_ID -> {
-                    if (move) workspaceFiles.move(sourcePath, targetPath) else workspaceFiles.copy(sourcePath, targetPath)
-                    targetPath
-                }
-                sourceRootId != WorkspaceGrantedDirectoryActions.WORKSPACE_ROOT_ID &&
-                    targetRootId != WorkspaceGrantedDirectoryActions.WORKSPACE_ROOT_ID -> {
-                    if (move) {
-                        grantedDirectories.move(sourceRootId, sourcePath, targetRootId, targetPath)
-                    } else {
-                        grantedDirectories.copy(sourceRootId, sourcePath, targetRootId, targetPath)
-                    }
-                }
-                else -> error("CROSS_ROOT_TRANSFER_UNAVAILABLE: workspace and granted roots require the file-exchange transport")
-            }
-        return success(
-            TOOL_ID,
-            buildJsonObject {
-                put("sourceRootId", sourceRootId)
-                put("sourcePath", sourcePath)
-                put("targetRootId", targetRootId)
-                put("targetPath", target)
-                put("moved", move)
             }.toString(),
         )
     }

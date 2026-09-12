@@ -1,8 +1,6 @@
 package de.heckenmann.visualagent.workspace
 
 import de.heckenmann.visualagent.agent.javascript.JavaScriptWorkspaceReadLimitExceededException
-import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
-import de.heckenmann.visualagent.knowledge.WorkspaceFileStore
 import de.heckenmann.visualagent.testsupport.TestPng
 import org.apache.pdfbox.pdmodel.PDDocument
 import org.apache.pdfbox.pdmodel.PDPage
@@ -342,22 +340,5 @@ class WorkspaceFileServiceTest {
             }
             document.save(path.toFile())
         }
-    }
-
-    private class FakeWorkspaceFileStore : WorkspaceFileStore {
-        private val records = linkedMapOf<String, WorkspaceFileRecord>()
-
-        override fun saveWorkspaceFile(record: WorkspaceFileRecord) {
-            records[record.id] = record
-        }
-
-        override fun listWorkspaceFiles(): List<WorkspaceFileRecord> = records.values.sortedByDescending(WorkspaceFileRecord::importedAt)
-
-        override fun getWorkspaceFile(id: String): WorkspaceFileRecord? = records[id]
-
-        override fun getWorkspaceFileByPath(relativePath: String): WorkspaceFileRecord? =
-            records.values.firstOrNull { it.relativePath == relativePath }
-
-        override fun deleteWorkspaceFile(id: String): Boolean = records.remove(id) != null
     }
 }

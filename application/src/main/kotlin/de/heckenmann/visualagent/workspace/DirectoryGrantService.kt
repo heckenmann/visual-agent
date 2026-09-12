@@ -7,12 +7,9 @@ import de.heckenmann.visualagent.protocol.DirectoryAccessMode
 import de.heckenmann.visualagent.protocol.DirectoryGrantOrigin
 import org.springframework.stereotype.Service
 import java.nio.charset.StandardCharsets
-import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption.ATOMIC_MOVE
-import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 import java.nio.file.StandardOpenOption
 import java.time.Instant
 import java.util.UUID
@@ -24,12 +21,22 @@ class DirectoryGrantService(
     private val clientCapabilities: ClientDirectoryCapabilityRegistry,
     private val protectedDirectories: VisualAgentProtectedDirectoryPolicy,
 ) {
+    private val pathPolicy = DirectoryGrantPathPolicy()
+    private val serverAuthorization = DirectoryGrantServerAuthorization(::requireServerGrant, pathPolicy)
+    private val serverReads = DirectoryGrantServerReadOperations(::authorizeExisting, ::grantRelative)
+    private val transfers =
+        DirectoryGrantTransferOperations(
+            authorizeSource = ::authorizeTransferSource,
+            authorizeTarget = ::authorizeTransferTarget,
+            targetRelativePath = { grantId, path -> grantRelative(requireServerGrant(grantId), path) },
+        )
+
     /** Lists grants without exposing their absolute roots to model-facing callers. */
     fun listGrants(): List<DirectoryGrant> = store.listDirectoryGrants().map(DirectoryGrantRecord::toDomain)
 
     /** Validates and canonicalizes an existing readable server directory. */
     fun inspectServerDirectory(absolutePath: String): Path {
-        requireSafePathText(absolutePath)
+        pathPolicy.requireSafePathText(absolutePath)
         val requested = Path.of(absolutePath)
         require(requested.isAbsolute()) { "Directory path must be absolute" }
         val root = requested.toRealPath()
@@ -129,21 +136,7 @@ class DirectoryGrantService(
         if (grant.origin == DirectoryGrantOrigin.CLIENT) {
             return clientAccess(grant).list(relativePath).map { GrantedDirectoryEntry(it.path, it.directory, it.sizeBytes) }
         }
-        val target = authorizeExisting(grantId, relativePath, requireDirectory = true)
-        return Files.list(target).use { children ->
-            children
-                .limit(MAX_ENTRIES.toLong())
-                .map { child ->
-                    val real = child.toRealPath()
-                    requireContained(grant, real)
-                    GrantedDirectoryEntry(
-                        path = grantRelative(grant, real),
-                        directory = Files.isDirectory(real, LinkOption.NOFOLLOW_LINKS),
-                        sizeBytes = if (Files.isRegularFile(real, LinkOption.NOFOLLOW_LINKS)) Files.size(real) else null,
-                    )
-                }.toList()
-                .sortedBy(GrantedDirectoryEntry::path)
-        }
+        return serverReads.list(grant, grantId, relativePath)
     }
 
     /** Reads bounded UTF-8 text from a regular file. */
@@ -153,10 +146,7 @@ class DirectoryGrantService(
     ): String {
         val grant = requireGrant(grantId)
         if (grant.origin == DirectoryGrantOrigin.CLIENT) return clientAccess(grant).readText(relativePath)
-        val file = authorizeExisting(grantId, relativePath, requireDirectory = false)
-        require(Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) { "Path is not a regular file" }
-        require(Files.size(file) <= MAX_TEXT_BYTES) { "File exceeds the ${MAX_TEXT_BYTES}-byte text limit" }
-        return Files.readString(file, StandardCharsets.UTF_8)
+        return serverReads.readText(grantId, relativePath)
     }
 
     /** Reads a bounded binary file using its persisted opaque grant identity. */
@@ -169,12 +159,7 @@ class DirectoryGrantService(
         require(maximumBytes <= Int.MAX_VALUE - 1L) { "maximumBytes is too large" }
         val grant = requireGrant(grantId)
         if (grant.origin == DirectoryGrantOrigin.CLIENT) return clientAccess(grant).readBytes(relativePath, maximumBytes)
-        val file = authorizeExisting(grantId, relativePath, requireDirectory = false)
-        require(Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) { "Path is not a regular file" }
-        require(Files.size(file) <= maximumBytes) { "File exceeds the $maximumBytes-byte limit" }
-        return Files.newInputStream(file).use { input -> input.readNBytes(maximumBytes.toInt() + 1) }.also {
-            require(it.size.toLong() <= maximumBytes) { "File exceeds the $maximumBytes-byte limit" }
-        }
+        return serverReads.readBytes(grantId, relativePath, maximumBytes)
     }
 
     /** Searches bounded UTF-8 files without following symbolic links. */
@@ -188,27 +173,7 @@ class DirectoryGrantService(
         if (clientGrant.origin == DirectoryGrantOrigin.CLIENT) {
             return clientAccess(clientGrant).search(query, relativePath).map { GrantedDirectoryMatch(it.path, it.line, it.snippet) }
         }
-        val root = authorizeExisting(grantId, relativePath, requireDirectory = true)
-        val matches = mutableListOf<GrantedDirectoryMatch>()
-        Files.walk(root).use { paths ->
-            paths
-                .filter { Files.isRegularFile(it, LinkOption.NOFOLLOW_LINKS) }
-                .limit(MAX_SEARCH_FILES.toLong())
-                .forEach { file ->
-                    val authorized = authorizeExisting(grantId, grantRelative(requireGrant(grantId), file), requireDirectory = false)
-                    if (Files.size(authorized) <= MAX_TEXT_BYTES) {
-                        runCatching { Files.readAllLines(authorized, StandardCharsets.UTF_8) }
-                            .getOrNull()
-                            ?.forEachIndexed { index, line ->
-                                if (matches.size < MAX_MATCHES && line.contains(query, ignoreCase = true)) {
-                                    matches +=
-                                        GrantedDirectoryMatch(grantRelative(requireGrant(grantId), authorized), index + 1, line.take(240))
-                                }
-                            }
-                    }
-                }
-        }
-        return matches
+        return serverReads.search(clientGrant, grantId, query, relativePath)
     }
 
     /** Finds bounded regular-file entries matching [pattern] below a grant-relative directory. */
@@ -222,18 +187,7 @@ class DirectoryGrantService(
         if (grant.origin == DirectoryGrantOrigin.CLIENT) {
             return clientAccess(grant).glob(relativePath, pattern).map { GrantedDirectoryEntry(it.path, it.directory, it.sizeBytes) }
         }
-        val scope = authorizeExisting(grantId, relativePath, requireDirectory = true)
-        val matcher = FileSystems.getDefault().getPathMatcher("glob:$pattern")
-        return Files.walk(scope).use { paths ->
-            paths
-                .filter { Files.isRegularFile(it, LinkOption.NOFOLLOW_LINKS) }
-                .map { file -> file.toRealPath() }
-                .peek { requireContained(grant, it) }
-                .filter { matcher.matches(scope.relativize(it)) }
-                .limit(MAX_GLOB_MATCHES.toLong())
-                .map { file -> GrantedDirectoryEntry(grantRelative(grant, file), directory = false, sizeBytes = Files.size(file)) }
-                .toList()
-        }
+        return serverReads.glob(grant, grantId, relativePath, pattern)
     }
 
     /** Writes bounded UTF-8 content after a final database and parent-containment check. */
@@ -314,12 +268,7 @@ class DirectoryGrantService(
         sourcePath: String,
         targetGrantId: String,
         targetPath: String,
-    ): String {
-        val source = authorizeTransferSource(sourceGrantId, sourcePath, requireSourceWrite = false)
-        val target = authorizeTransferTarget(targetGrantId, targetPath)
-        copyVerified(source, target)
-        return grantRelative(requireServerGrant(targetGrantId), target.toRealPath())
-    }
+    ): String = transfers.copy(sourceGrantId, sourcePath, targetGrantId, targetPath)
 
     /** Copies and verifies a regular file before deleting the source from [sourceGrantId]. */
     fun move(
@@ -327,102 +276,29 @@ class DirectoryGrantService(
         sourcePath: String,
         targetGrantId: String,
         targetPath: String,
-    ): String {
-        val source = authorizeTransferSource(sourceGrantId, sourcePath, requireSourceWrite = true)
-        val target = authorizeTransferTarget(targetGrantId, targetPath)
-        copyVerified(source, target)
-        Files.delete(source)
-        return grantRelative(requireServerGrant(targetGrantId), target.toRealPath())
-    }
-
-    private fun copyVerified(
-        source: Path,
-        target: Path,
-    ) {
-        val sourceSize = Files.size(source)
-        val sourceHash = WorkspaceFilePaths.sha256(source)
-        val temporary = Files.createTempFile(requireNotNull(target.parent), ".visual-agent-transfer-", ".part")
-        try {
-            Files.copy(source, temporary, REPLACE_EXISTING)
-            require(Files.size(temporary) == sourceSize && WorkspaceFilePaths.sha256(temporary) == sourceHash) {
-                "FILE_CHANGED_DURING_TRANSFER: copied file verification failed"
-            }
-            try {
-                Files.move(temporary, target, ATOMIC_MOVE)
-            } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
-                Files.move(temporary, target)
-            }
-        } finally {
-            Files.deleteIfExists(temporary)
-        }
-    }
+    ): String = transfers.move(sourceGrantId, sourcePath, targetGrantId, targetPath)
 
     private fun authorizeExisting(
         grantId: String,
         relativePath: String,
         requireDirectory: Boolean,
-    ): Path {
-        val grant = requireServerGrant(grantId)
-        val candidate = resolveRelative(grant, relativePath).toRealPath()
-        requireContained(grant, candidate)
-        if (requireDirectory) require(Files.isDirectory(candidate, LinkOption.NOFOLLOW_LINKS)) { "Path is not a directory" }
-        return candidate
-    }
+    ): Path = serverAuthorization.existing(grantId, relativePath, requireDirectory)
 
     private fun authorizeMutationTarget(
         grantId: String,
         relativePath: String,
-    ): Path {
-        val grant = requireServerGrant(grantId)
-        require(grant.mode == DirectoryAccessMode.READ_WRITE) { "ACCESS_DENIED: directory is read-only" }
-        val candidate = resolveRelative(grant, relativePath)
-        val parent = requireNotNull(candidate.parent) { "A grant root cannot be replaced" }.toRealPath()
-        requireContained(requireServerGrant(grantId), parent)
-        if (Files.exists(candidate, LinkOption.NOFOLLOW_LINKS)) {
-            requireContained(requireServerGrant(grantId), candidate.toRealPath())
-        }
-        return candidate
-    }
+    ): Path = serverAuthorization.mutationTarget(grantId, relativePath)
 
     private fun authorizeTransferSource(
         grantId: String,
         relativePath: String,
         requireSourceWrite: Boolean,
-    ): Path {
-        val grant = requireServerGrant(grantId)
-        if (requireSourceWrite) require(grant.mode == DirectoryAccessMode.READ_WRITE) { "ACCESS_DENIED: directory is read-only" }
-        val source = authorizeExisting(grantId, relativePath, requireDirectory = false)
-        require(Files.isRegularFile(source, LinkOption.NOFOLLOW_LINKS)) { "Path is not a regular file" }
-        return source
-    }
+    ): Path = serverAuthorization.transferSource(grantId, relativePath, requireSourceWrite)
 
     private fun authorizeTransferTarget(
         grantId: String,
         relativePath: String,
-    ): Path {
-        val target = authorizeMutationTarget(grantId, relativePath)
-        require(!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) { "Target file already exists" }
-        return target
-    }
-
-    private fun resolveRelative(
-        grant: DirectoryGrant,
-        relativePath: String,
-    ): Path {
-        requireSafePathText(relativePath)
-        val relative = Path.of(relativePath.ifBlank { "." })
-        require(!relative.isAbsolute()) { "Grant paths must be relative" }
-        require(relative.none { it.toString() == ".." }) { "Parent traversal is not allowed" }
-        return Path.of(requireNotNull(grant.canonicalRoot)).resolve(relative).normalize()
-    }
-
-    private fun requireContained(
-        grant: DirectoryGrant,
-        candidate: Path,
-    ) {
-        val root = Path.of(requireNotNull(grant.canonicalRoot)).toRealPath()
-        require(candidate.startsWith(root)) { "ACCESS_DENIED: path escapes granted directory" }
-    }
+    ): Path = serverAuthorization.transferTarget(grantId, relativePath)
 
     private fun requireGrant(id: String): DirectoryGrant =
         requireNotNull(store.getDirectoryGrant(id)) { "Unknown or revoked directory grant" }.toDomain()
@@ -456,10 +332,6 @@ class DirectoryGrantService(
         const val MAX_GLOB_MATCHES = 500
         const val MAX_TEXT_BYTES = 262_144L
     }
-}
-
-private fun requireSafePathText(value: String) {
-    require(value.none { it == '\u0000' || it.code < 0x20 }) { "Path contains control characters" }
 }
 
 private fun DirectoryGrantRecord.toDomain() =

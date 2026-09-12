@@ -1,13 +1,9 @@
 package de.heckenmann.visualagent.ui.directories
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -15,8 +11,6 @@ import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -27,11 +21,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.PointerIcon
-import androidx.compose.ui.input.pointer.pointerHoverIcon
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.ClientDirectoryGrantAdministrationPort
 import de.heckenmann.visualagent.protocol.DirectoryAccessMode
@@ -274,118 +263,6 @@ private fun GrantRow(
                     withContext(Dispatchers.IO) { directoryAccess.updateGrant(grant.id, name, mode) }
                     refresh()
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DirectoryAccessModeSelector(
-    selectedMode: DirectoryAccessMode,
-    onModeChange: (DirectoryAccessMode) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        DirectoryAccessModeOption(
-            mode = DirectoryAccessMode.READ_ONLY,
-            selectedMode = selectedMode,
-            label = "Read only",
-            description = "Browse, search, and read files without making changes.",
-            onModeChange = onModeChange,
-        )
-        DirectoryAccessModeOption(
-            mode = DirectoryAccessMode.READ_WRITE,
-            selectedMode = selectedMode,
-            label = "Read and write",
-            description = "Also create, edit, and delete files or folders in this directory.",
-            onModeChange = onModeChange,
-        )
-    }
-}
-
-@Composable
-private fun DirectoryGrantOriginSelector(
-    selectedOrigin: DirectoryGrantOrigin,
-    onOriginChange: (DirectoryGrantOrigin) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        DirectoryGrantOriginOption(
-            origin = DirectoryGrantOrigin.CLIENT,
-            selectedOrigin = selectedOrigin,
-            label = "This device",
-            description = "Choose a directory with this device's native file picker.",
-            onOriginChange = onOriginChange,
-        )
-        DirectoryGrantOriginOption(
-            origin = DirectoryGrantOrigin.SERVER,
-            selectedOrigin = selectedOrigin,
-            label = "Application server",
-            description = "Browse directories available to the configured application server.",
-            onOriginChange = onOriginChange,
-        )
-    }
-}
-
-@Composable
-private fun DirectoryGrantOriginOption(
-    origin: DirectoryGrantOrigin,
-    selectedOrigin: DirectoryGrantOrigin,
-    label: String,
-    description: String,
-    onOriginChange: (DirectoryGrantOrigin) -> Unit,
-) {
-    val selected = origin == selectedOrigin
-    DirectoryRadioOption(selected, label, description) { onOriginChange(origin) }
-}
-
-@Composable
-private fun DirectoryAccessModeOption(
-    mode: DirectoryAccessMode,
-    selectedMode: DirectoryAccessMode,
-    label: String,
-    description: String,
-    onModeChange: (DirectoryAccessMode) -> Unit,
-) {
-    val selected = mode == selectedMode
-    DirectoryRadioOption(selected, label, description) { onModeChange(mode) }
-}
-
-/** Renders one full-width, descriptive radio choice in the directory-access panel. */
-@Composable
-private fun DirectoryRadioOption(
-    selected: Boolean,
-    label: String,
-    description: String,
-    onClick: () -> Unit,
-) {
-    val colors = MaterialTheme.colorScheme
-    val shape = RoundedCornerShape(8.dp)
-    Surface(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(shape)
-                .selectable(selected = selected, onClick = onClick)
-                .pointerHoverIcon(PointerIcon.Hand),
-        shape = shape,
-        color = if (selected) colors.secondaryContainer.copy(alpha = 0.52f) else colors.surfaceVariant.copy(alpha = 0.18f),
-        contentColor = if (selected) colors.onSecondaryContainer else colors.onSurface,
-        border = BorderStroke(1.dp, if (selected) colors.primary else colors.outlineVariant.copy(alpha = 0.65f)),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            RadioButton(selected = selected, onClick = null)
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                Text(
-                    description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (selected) colors.onSecondaryContainer.copy(alpha = 0.82f) else colors.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
             }
         }
     }
