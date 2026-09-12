@@ -1,27 +1,5 @@
 package de.heckenmann.visualagent.ui.skills
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Restore
-import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -29,9 +7,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.mobilebytelabs.kmptoolkit.clipboard.copyToClipboard
 import de.heckenmann.visualagent.protocol.ActivityPort
 import de.heckenmann.visualagent.protocol.SkillCreateResult
@@ -40,19 +15,9 @@ import de.heckenmann.visualagent.protocol.SkillDocument
 import de.heckenmann.visualagent.protocol.SkillPort
 import de.heckenmann.visualagent.protocol.SkillSearchResult
 import de.heckenmann.visualagent.protocol.SkillUpdateResult
-import de.heckenmann.visualagent.ui.components.ActionIconButton
-import de.heckenmann.visualagent.ui.components.ComposeMarkdown
-import de.heckenmann.visualagent.ui.components.PanelContentCard
-import de.heckenmann.visualagent.ui.components.PanelEmptyState
-import de.heckenmann.visualagent.ui.components.PanelInfoBox
-import de.heckenmann.visualagent.ui.components.RegisterPanelVerticalScrollbar
 import de.heckenmann.visualagent.ui.modal.ComposeConfirmationModal
 import de.heckenmann.visualagent.ui.modal.ComposeContentModal
 import de.heckenmann.visualagent.ui.modal.ComposeModalRequester
-import de.heckenmann.visualagent.ui.modal.modalDialogLayout
-import de.heckenmann.visualagent.ui.modal.modalPrimaryButton
-import de.heckenmann.visualagent.ui.modal.modalSaveButton
-import de.heckenmann.visualagent.ui.modal.modalSecondaryButton
 import de.heckenmann.visualagent.ui.modal.requestConfirmation
 import de.heckenmann.visualagent.ui.status.ToolEventRefreshEffect
 import kotlinx.coroutines.Dispatchers
@@ -74,6 +39,7 @@ internal fun SkillsPanel(
     var title by remember { mutableStateOf("") }
     var content by remember { mutableStateOf("") }
     var conflict by remember { mutableStateOf<SkillConflict?>(null) }
+    var saveError by remember { mutableStateOf<String?>(null) }
     var status by remember { mutableStateOf("Loading skills…") }
     val scope = rememberCoroutineScope()
     lateinit var selectSkill: (String) -> Unit
@@ -124,6 +90,7 @@ internal fun SkillsPanel(
     fun closeEditor() {
         editing = false
         conflict = null
+        saveError = null
     }
 
     /** Reloads the selected skill after an optimistic-concurrency conflict. */
@@ -147,6 +114,7 @@ internal fun SkillsPanel(
 
     /** Persists the current draft and reopens the saved document in the detail modal. */
     fun saveSkill(dismiss: () -> Unit) {
+        saveError = null
         scope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
@@ -165,13 +133,19 @@ internal fun SkillsPanel(
                 var savedId: String? = null
                 when (result) {
                     is SkillCreateResult.Created -> savedId = result.skill.id
-                    is SkillCreateResult.Duplicate -> status = "An equivalent skill already exists."
+                    is SkillCreateResult.Duplicate -> {
+                        saveError = "An equivalent skill already exists: ${result.skill.title}."
+                        status = "An equivalent skill already exists."
+                    }
                     is SkillUpdateResult.Updated -> savedId = result.skill.id
                     is SkillUpdateResult.Conflict -> {
                         conflict = SkillConflict.Changed(result.skill)
                         status = "Skill changed elsewhere; reload it or keep your draft."
                     }
-                    is SkillUpdateResult.Duplicate -> status = "An equivalent skill already exists."
+                    is SkillUpdateResult.Duplicate -> {
+                        saveError = "An equivalent skill already exists: ${result.skill.title}."
+                        status = "An equivalent skill already exists."
+                    }
                     SkillUpdateResult.NotFound -> {
                         conflict = SkillConflict.Deleted
                         status = "Skill was deleted elsewhere; save the draft as a new skill or discard it."
@@ -200,6 +174,7 @@ internal fun SkillsPanel(
                     content = content,
                     isNew = selected == null,
                     conflict = conflict,
+                    saveError = saveError,
                     onTitleChanged = { title = it },
                     onContentChanged = { content = it },
                     onCancel = {
@@ -301,196 +276,21 @@ internal fun SkillsPanel(
     }
     ToolEventRefreshEffect(activityPort, setOf("skills"), onRefresh = ::refresh)
 
-    val listScrollState = rememberScrollState()
-    RegisterPanelVerticalScrollbar(listScrollState)
-    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                label = { Text("Search skills") },
-                singleLine = true,
-                isError = query.codePointCount(0, query.length) > MAX_QUERY_CODE_POINTS,
-                supportingText = {
-                    Text("${query.codePointCount(0, query.length)}/$MAX_QUERY_CODE_POINTS")
-                },
-                modifier = Modifier.weight(1f),
-            )
-            ActionIconButton(Icons.Filled.Search, "Search skills", ::refresh)
-            ActionIconButton(Icons.Filled.Refresh, "Refresh skills", ::refresh)
-            ActionIconButton(
-                Icons.Filled.Add,
-                "Create skill",
-                onClick = {
-                    selected = null
-                    title = ""
-                    content = ""
-                    conflict = null
-                    openEditor()
-                },
-            )
-        }
-        Column(
-            modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(listScrollState),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            if (skills.isEmpty()) {
-                PanelEmptyState(
-                    "No skills found",
-                    "Save stable, reusable Markdown results here for later model work, then open one to view or edit it.",
-                )
-            } else {
-                skills.forEach { skill ->
-                    PanelContentCard(
-                        modifier = Modifier.clickable { selectSkill(skill.id) },
-                        backgroundColor =
-                            if (selected?.summary?.id == skill.id) {
-                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.38f)
-                            } else {
-                                null
-                            },
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(skill.title, style = MaterialTheme.typography.titleSmall)
-                                Text(
-                                    "Revision ${skill.revision} · ${skill.readCount} model reads · Updated ${skill.updatedAt}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                Text(
-                                    skill.snippet.ifBlank { "No matching excerpt" },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 2,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        Text(status, color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.bodySmall)
-    }
-}
-
-@Composable
-private fun SkillEditor(
-    title: String,
-    content: String,
-    isNew: Boolean,
-    conflict: SkillConflict?,
-    onTitleChanged: (String) -> Unit,
-    onContentChanged: (String) -> Unit,
-    onCancel: () -> Unit,
-    onReset: () -> Unit,
-    onSave: () -> Unit,
-    onReload: () -> Unit,
-    onKeepDraft: () -> Unit,
-    onSaveAsNew: () -> Unit,
-    onDiscard: () -> Unit,
-) {
-    val titleLength = title.codePointCount(0, title.length)
-    val contentLength = content.codePointCount(0, content.length)
-    val titleInvalid = title.isBlank() || titleLength > MAX_TITLE_CODE_POINTS
-    val contentInvalid = content.isBlank() || contentLength > MAX_CONTENT_CODE_POINTS
-    modalDialogLayout(
-        body = {
-            conflict?.let { state ->
-                PanelInfoBox(
-                    when (state) {
-                        is SkillConflict.Changed ->
-                            "This skill changed elsewhere (revision ${state.skill.revision}). " +
-                                "Reload the stored version or keep this draft."
-                        SkillConflict.Deleted -> "This skill was deleted elsewhere. Save this draft as a new skill or discard it."
-                    },
-                )
-            }
-            OutlinedTextField(
-                value = title,
-                onValueChange = onTitleChanged,
-                label = { Text("Title") },
-                singleLine = true,
-                isError = titleInvalid,
-                supportingText = { Text("$titleLength/$MAX_TITLE_CODE_POINTS Unicode code points") },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = content,
-                onValueChange = onContentChanged,
-                label = { Text("Markdown") },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 12,
-                isError = contentInvalid,
-                supportingText = { Text("$contentLength/$MAX_CONTENT_CODE_POINTS Unicode code points") },
-            )
+    SkillsCatalogContent(
+        query = query,
+        skills = skills,
+        selectedId = selected?.summary?.id,
+        status = status,
+        onQueryChanged = { query = it },
+        onSearch = ::refresh,
+        onCreate = {
+            selected = null
+            title = ""
+            content = ""
+            conflict = null
+            saveError = null
+            openEditor()
         },
-        footer = {
-            when (val state = conflict) {
-                is SkillConflict.Changed -> {
-                    modalSecondaryButton("Reload stored version", icon = Icons.Filled.Restore, onClick = onReload)
-                    modalSecondaryButton("Keep draft", icon = Icons.Filled.Edit, onClick = onKeepDraft)
-                }
-                SkillConflict.Deleted -> {
-                    modalSecondaryButton("Save as new", icon = Icons.Filled.Save, onClick = onSaveAsNew)
-                    modalSecondaryButton("Discard draft", icon = Icons.Filled.Close, onClick = onDiscard)
-                }
-                null -> Unit
-            }
-            modalSecondaryButton("Reset", icon = Icons.Filled.Restore, onClick = onReset)
-            modalSecondaryButton("Cancel", onClick = onCancel)
-            modalSaveButton(
-                label = if (isNew) "Create skill" else "Save skill",
-                enabled = !titleInvalid && !contentInvalid,
-                onClick = onSave,
-            )
-        },
-    )
-}
-
-private const val MAX_TITLE_CODE_POINTS = 200
-private const val MAX_CONTENT_CODE_POINTS = 120_000
-private const val MAX_QUERY_CODE_POINTS = 500
-
-private sealed interface SkillConflict {
-    data class Changed(
-        val skill: SkillSearchResult,
-    ) : SkillConflict
-
-    data object Deleted : SkillConflict
-}
-
-@Composable
-private fun SkillDetail(
-    document: SkillDocument,
-    onEdit: () -> Unit,
-    onCopy: () -> Unit,
-    onDelete: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    modalDialogLayout(
-        body = {
-            Text(
-                "Revision ${document.summary.revision} · ${document.summary.readCount} model reads" +
-                    (document.summary.lastReadAt?.let { " · last read $it" } ?: ""),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            SelectionContainer {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    ComposeMarkdown(document.content)
-                }
-            }
-        },
-        footer = {
-            modalSecondaryButton("Copy Markdown", icon = Icons.Filled.ContentCopy, onClick = onCopy)
-            modalSecondaryButton("Edit skill", icon = Icons.Filled.Edit, onClick = onEdit)
-            modalSecondaryButton("Delete skill", icon = Icons.Filled.Delete, onClick = onDelete)
-            modalPrimaryButton("Close", icon = Icons.Filled.Close, onClick = onDismiss)
-        },
+        onSelect = selectSkill,
     )
 }

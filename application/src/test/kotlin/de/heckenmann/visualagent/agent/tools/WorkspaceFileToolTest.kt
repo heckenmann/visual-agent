@@ -11,7 +11,6 @@ import de.heckenmann.visualagent.agent.tools.api.ToolDirectoryMatch
 import de.heckenmann.visualagent.agent.tools.api.ToolDirectoryMimeType
 import de.heckenmann.visualagent.testsupport.TestPng
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
-import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -128,18 +127,6 @@ class WorkspaceFileToolTest {
         val result = tool.execute("""{"action":"search","query":"match","mimeType":"text/plain"}""")
 
         assertTrue(result.content.contains(text.relativePath))
-    }
-
-    @Test
-    fun `workspace file tool creates an empty directory through the server port`() {
-        val port = mockk<de.heckenmann.visualagent.agent.tools.api.WorkspaceFileToolPort>()
-        every { port.createDirectory("projects", "demo") } returns "projects/demo"
-        val tool = WorkspaceFileTool(port)
-
-        val result = tool.execute("""{"action":"createDirectory","parentDirectory":"projects","name":"demo"}""")
-
-        assertTrue(result.success)
-        assertTrue(result.content.contains("projects/demo"))
     }
 
     @Test
