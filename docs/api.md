@@ -102,7 +102,7 @@ Tools are defined through app-level `ToolDefinition` and executed through `Visua
 The main agent receives the sub-agent definition IDs (`agent:*`), `todos`,
 managed workspace tools, and `javascript:execute` through
 `AgentToolConfigService.mainAgentTools()`. It delegates repository file,
-terminal, browser, search, history, manual, use-case, and canvas work to
+browser, search, history, manual, use-case, and canvas work to
 sub-agents. JavaScript may call only tools enabled for this request through
 the shared registry; it does not bypass that delegation or permission policy.
 
@@ -122,10 +122,10 @@ the shared registry; it does not bypass that delegation or permission policy.
 `AgentToolConfigService.toolsFor(agent)` selects a tool set by
 matching the agent's name or role to a default template:
 
-- `researcher`: read-only file tools, history, context, pwd, todos,
-  manual, usecases, sleep, browser, search, workspace:* and canvas.
-- `coder`: adds `file:write`, `file:edit`, and `terminal`; raises the
-  default `maxTurns` to 8.
+- `researcher`: read-only `workspace:file` actions, history, context, todos,
+  manual, usecases, sleep, browser, search, and canvas.
+- `coder`: adds read-write `workspace:file` actions; raises the default
+  `maxTurns` to 8.
 - `analyst`: same as `researcher` minus `browser` and `search`,
   plus review-friendly tools.
 
@@ -151,11 +151,6 @@ role-based sets above and the global blocklist:
   valid `assignedAgentId`.
 - `context`: runtime context (active provider/model/key configured/
   streaming/thinking).
-- `pwd`: returns the managed workspace root path.
-- `file:read`, `file:list`, `file:glob`, `file:grep`, `file:write`,
-  `file:edit`: scoped to the managed workspace root.
-- `terminal`: runs `zsh -lc`/`bash -lc`/`sh -c` in the workspace
-  root with a 1..30 second timeout and 8 000 character output cap.
 - `sleep`: blocks the calling coroutine for `seconds.coerceIn(0, 300)`.
 - `browser`: placeholder that returns "not configured" until a real
   backend is wired (issues #16 and #40).
@@ -164,11 +159,10 @@ role-based sets above and the global blocklist:
 - `workspace:layout`: actions `get` (screens, main window, desktop,
   panel positions) and `set` (replace panel positions). Persists
   changes and notifies the live Compose workspace.
-- `workspace:file`: list/search/info/sync/delete/hash/readText/extractPdfText/
-  renderPdfPage/imageInfo/imageBytes/analyzeImage against the
-  managed workspace directory.
-- `workspace:mime`: detect a registered workspace file MIME type from
-  bounded content bytes with Apache Tika.
+- `workspace:file`: all model-visible filesystem access. Its root-ID based
+  actions include list, glob, grep, search, readText, writeText, edit,
+  createDirectory, delete, MIME detection, and managed-workspace media
+  operations. It never accepts a host filesystem path.
 - `workspace:download`: download an HTTP(S), FTP, SFTP, or SCP
   resource into `workspace/downloads` or another workspace-relative
   directory, then register it with managed metadata.
@@ -226,14 +220,19 @@ The `workspace:file` tool is available to sub-agents. It operates on files impor
 
 Supported actions:
 
-- `list`: returns imported file IDs, relative paths, MIME types, sizes, timestamps, and SHA-256 hashes.
+- `listRoots`: returns the managed workspace plus explicitly granted roots as opaque IDs.
+- `list`: returns immediate entries below the selected opaque root and relative path.
+- `glob` and `grep`: find regular files or bounded matching text lines below an authorized root-relative path.
+- `search`: searches managed metadata/content or granted-root text content without exposing native paths.
 - `search`: requires `query`; searches metadata and bounded text/PDF content.
 - `info`: requires `id` or `path`; returns persisted metadata.
-- `delete`: requires `id` or `path`; removes the managed file and its persisted metadata through the server-owned workspace service. Use this instead of terminal commands.
+- `delete`: removes an authorized file or directory through its filesystem owner; it never receives a host path.
 - `deleteDirectory`: requires `path`; deletes an empty managed directory. Add `recursive:true` explicitly to delete nested files and directories, including their persisted metadata. The workspace root cannot be deleted.
 - `sync`: reconciles workspace files on disk with persisted metadata and reports added, updated, and removed records.
 - `hash`: requires `id` or `path`; computes the current SHA-256 hash from file bytes.
-- `readText`: requires `id` or `path`; reads bounded UTF-8 text content.
+- `readText`: requires an ID/path in the managed workspace or an opaque root ID plus relative path; reads bounded UTF-8 text content.
+- `writeText` and `edit`: create/update text through the same owner-side authorization boundary; edit requires exactly one old-text occurrence.
+- `mime`: detects a content-derived MIME type from bounded bytes through the selected root.
 - `extractPdfText`: requires `id` or `path`; extracts bounded PDF text and caches it.
 - `renderPdfPage`: requires `id` or `path` and optional `page`; renders extracted page text into a generated PNG preview under the managed workspace.
 - `imageInfo`: requires `id` or `path`; returns dimensions, MIME type, size, and hash.
@@ -245,8 +244,6 @@ Saved canvas documents are regular managed workspace files with MIME type `appli
 
 ### Workspace Transfer Tools
 
-`workspace:mime` accepts a managed file `id` or relative `path` and reports
-the content-derived MIME type, stored MIME type, byte size, and SHA-256 hash.
 `workspace:download` accepts a remote `source` plus optional workspace-relative
 `directory` and safe `filename`. It rejects credentials in model-provided
 sources, redirects, private network targets, unsupported protocols, and

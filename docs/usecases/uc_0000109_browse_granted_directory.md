@@ -12,12 +12,12 @@ Let an enabled model inspect only explicitly granted directory contents without 
 ## Preconditions
 
 - A direct user action created an available directory grant.
-- `workspace:directory` is enabled for the requesting agent.
+- `workspace:file` is enabled for the requesting agent.
 
 ## Main Flow
 
-1. The model lists grants and receives opaque IDs, names, origins, modes, and availability only.
-2. The model supplies one grant ID and a relative path to list entries or read bounded UTF-8 text.
+1. The model calls `workspace:file` with `listRoots` and receives opaque root IDs, names, origins, modes, and availability only.
+2. The model supplies one root ID and a relative path to list entries or read bounded UTF-8 text.
 3. The filesystem owner reloads the grant, rejects absolute paths, parent traversal, control characters, and symlink escapes, and canonicalizes the target.
 4. Search visits a bounded number of regular files and returns bounded relative-path matches.
 5. Missing, revoked, unreadable, disconnected-client, and unavailable grants fail closed.
@@ -25,13 +25,15 @@ Let an enabled model inspect only explicitly granted directory contents without 
 ## Result
 
 The model can query only the authorized grant-relative namespace and never learns the persisted server root automatically.
+The legacy direct `file:*` tools and unsandboxed `terminal` are unavailable to every agent;
+`workspace:file` is the sole model-facing file API.
 
 ## Tool Calls
 
-- `workspace:directory` — `listGrants`, `list`, `readText`, and `search` use opaque grant IDs and relative paths.
+- `workspace:file` — `listRoots`, `list`, `readText`, and `search` use opaque root IDs and relative paths.
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.agent.tools.WorkspaceDirectoryTool`
+- `de.heckenmann.visualagent.agent.tools.WorkspaceFileTool`
 - `de.heckenmann.visualagent.agent.tools.DirectoryToolPortAdapter`
 - `de.heckenmann.visualagent.workspace.DirectoryGrantService`

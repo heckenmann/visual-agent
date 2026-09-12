@@ -2,7 +2,7 @@
 
 ## Goal
 
-Allow a model to perform a narrowly defined text mutation beneath an explicitly read-write server grant.
+Allow a model to perform a narrowly defined text mutation beneath an explicitly read-write server or client grant.
 
 ## Primary Actors
 
@@ -11,8 +11,8 @@ Allow a model to perform a narrowly defined text mutation beneath an explicitly 
 
 ## Preconditions
 
-- The user created a server grant and explicitly selected **Read and write**.
-- `workspace:directory` is enabled for the requesting agent.
+- The user created a grant and explicitly selected **Read and write**.
+- `workspace:file` is enabled for the requesting agent.
 
 ## Main Flow
 
@@ -28,11 +28,11 @@ The mutation is confined to the approved root and does not grant terminal, JavaS
 
 ## Tool Calls
 
-- `workspace:directory` — `writeText` is available only for a currently authorized `READ_WRITE` server grant.
+- `workspace:file` — `writeText` is available only for a currently authorized `READ_WRITE` root.
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.agent.tools.WorkspaceDirectoryTool`
+- `de.heckenmann.visualagent.agent.tools.WorkspaceFileTool`
 - `de.heckenmann.visualagent.workspace.DirectoryGrantService`
 
 ## Acceptance Criteria

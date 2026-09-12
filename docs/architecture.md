@@ -181,7 +181,7 @@ the runtime split is:
 
 Main-agent tool set (`agentToolConfigService.mainAgentTools()`):
 `agent:list`, `agent:show`, `agent:create`, `agent:update`, `agent:delete`,
-`agent:log`, `todos`, `workspace:file`, `workspace:mime`,
+`agent:log`, `todos`, `workspace:file`,
 `workspace:download`, and `javascript:execute`.
 
 Sub-agent role-based sets (`AgentToolConfigService.toolsFor(agent)`,
@@ -191,11 +191,10 @@ non-agent tool IDs applicable to the configured role.
 Globally disabled tools are kept in the `tools.disabled.global`
 preference as a newline-separated blocklist.
 
-Common tools: `ui`, `history`, `todos`, `context`, `pwd`, `manual`,
-`usecases`, `file:read`, `file:list`, `file:glob`, `file:grep`,
-`file:write`, `file:edit`, `terminal`, `sleep`, `browser` (placeholder
+Common tools: `ui`, `history`, `todos`, `context`, `manual`,
+`usecases`, `sleep`, `browser` (placeholder
 that returns "not configured"), `search` (placeholder that returns
-"not configured"), `workspace:layout`, `workspace:file`, `workspace:mime`,
+"not configured"), `workspace:layout`, `workspace:file`,
 `workspace:download`, `canvas`.
 `javascript:execute` is available to the default role templates for complex
 deterministic multi-tool filtering, aggregation, and large CSV, string, or
