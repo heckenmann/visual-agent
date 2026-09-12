@@ -31,6 +31,7 @@ import java.nio.file.Path
 import java.util.stream.Stream
 import kotlin.io.path.writeText
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -139,6 +140,16 @@ class WorkspaceFileToolTest {
 
         assertTrue(result.success)
         assertTrue(result.content.contains("projects/demo"))
+    }
+
+    @Test
+    fun `workspace writes reject skill documents so skills remain database owned`() {
+        val service = WorkspaceFileService(FakeWorkspaceFileStore(), tempDir().resolve("data/visual-agent.db").toString())
+
+        val error = assertFailsWith<IllegalArgumentException> { service.writeText("skills/SKILL.md", "# Wrong storage") }
+
+        assertTrue(error.message!!.contains("SKILL_DOCUMENT_NOT_ALLOWED"))
+        assertFalse(Files.exists(service.workspaceRoot().resolve("skills/SKILL.md")))
     }
 
     @Test
