@@ -2,8 +2,9 @@
 visual-agent = "1.0.0"
 kotlin = "2.4.20"
 ktlint = "14.2.0"
+ktlint-core = "1.5.0"
+ktlint-kotlin = "2.1.0"
 spring-boot = "4.1.1"
-spring-dependency-management = "1.1.7"
 spring-ai = "2.0.1"
 spring-integration = "7.1.1"
 compose = "1.12.0"
@@ -51,6 +52,7 @@ spring-ai-openai = { module = "org.springframework.ai:spring-ai-openai" }
 spring-integration-sftp = { module = "org.springframework.integration:spring-integration-sftp", version.ref = "spring-integration" }
 sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite" }
 coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+coroutines-bom = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-bom", version.ref = "coroutines" }
 coroutines-reactor = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactor", version.ref = "coroutines" }
 coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
@@ -100,4 +102,3 @@ compose = { id = "org.jetbrains.compose", version.ref = "compose" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }
 protobuf = { id = "com.google.protobuf", version.ref = "protobuf" }
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
-spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "spring-dependency-management" }

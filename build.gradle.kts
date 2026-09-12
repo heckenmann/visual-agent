@@ -38,7 +38,37 @@ tasks.named("check") {
         ":tools:check",
         "verifyCentralizedVersions",
         "verifyModuleDependencies",
+        "verifyKtlintCompilerCompatibility",
     )
+}
+
+tasks.register("verifyKtlintCompilerCompatibility") {
+    group = "verification"
+    description = "Ensures KtLint resolves the compiler version it was built against."
+    doLast {
+        val expectedVersion = libs.versions.ktlint.kotlin.get()
+        val mismatches =
+            subprojects
+                .mapNotNull { project ->
+                    val configuration = project.configurations.findByName("ktlint") ?: return@mapNotNull null
+                    val compiler =
+                        configuration.incoming.resolutionResult.allComponents
+                            .mapNotNull { component -> component.moduleVersion }
+                            .firstOrNull { module ->
+                                module.group == "org.jetbrains.kotlin" &&
+                                    module.name == "kotlin-compiler-embeddable"
+                            }
+                    project.path to compiler?.version
+                }.filter { (_, actualVersion) -> actualVersion != expectedVersion }
+        check(mismatches.isEmpty()) {
+            mismatches.joinToString(
+                prefix = "KtLint compiler compatibility check failed: ",
+                separator = "; ",
+            ) { (projectPath, actualVersion) ->
+                "$projectPath resolved ${actualVersion ?: "no compiler"}, expected $expectedVersion"
+            }
+        }
+    }
 }
 
 tasks.named("build") {

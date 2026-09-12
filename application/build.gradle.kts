@@ -11,7 +11,6 @@ plugins {
     alias(libs.plugins.kotlin.spring)
     alias(libs.plugins.ktlint)
     alias(libs.plugins.spring.boot)
-    alias(libs.plugins.spring.dependency.management)
     jacoco
 }
 
@@ -34,6 +33,10 @@ dependencies {
     implementation(project(":protocol"))
 
     // Spring Boot & AI
+    implementation(platform(libs.spring.boot.bom))
+    implementation(platform(libs.grpc.bom))
+    implementation(platform(libs.protobuf.bom))
+    implementation(platform(libs.coroutines.bom))
     implementation(libs.spring.boot.starter)
     implementation(libs.grpc.inprocess)
     implementation(libs.grpc.netty.shaded)
@@ -77,37 +80,8 @@ dependencies {
     testImplementation(libs.coroutines.test)
 }
 
-val coroutinesVersion = libs.versions.coroutines.get()
-val grpcVersion = libs.versions.grpc.get()
-val protobufJavaVersion =
-    libs.versions.protobuf.java
-        .get()
 val databaseTestTag = "database"
 val databaseCategoryTag = "de.heckenmann.visualagent.testsupport.DatabaseTestCategory"
-
-dependencyManagement {
-    dependencies {
-        listOf(
-            "grpc-api",
-            "grpc-context",
-            "grpc-core",
-            "grpc-inprocess",
-            "grpc-netty-shaded",
-            "grpc-protobuf",
-            "grpc-protobuf-lite",
-            "grpc-stub",
-            "grpc-util",
-        ).forEach { dependency("io.grpc:$it:$grpcVersion") }
-        dependency("com.google.protobuf:protobuf-java:$protobufJavaVersion")
-        dependency("org.jetbrains.kotlinx:kotlinx-coroutines-bom:$coroutinesVersion")
-        dependency("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
-        dependency("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:$coroutinesVersion")
-        dependency("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:$coroutinesVersion")
-        dependency("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:$coroutinesVersion")
-        dependency("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesVersion")
-        dependency("org.jetbrains.kotlinx:kotlinx-coroutines-test-jvm:$coroutinesVersion")
-    }
-}
 
 val databaseTest =
     tasks.register<Test>("databaseTest") {
@@ -260,7 +234,13 @@ tasks.register<Copy>("copyAllDependencies") {
 }
 
 ktlint {
-    version.set("1.5.0")
+    version.set(
+        libs
+            .versions
+            .ktlint
+            .core
+            .get(),
+    )
     android.set(false)
 }
 
