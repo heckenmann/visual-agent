@@ -67,6 +67,32 @@ class ComposeSkillsPanelTest {
         assertNotNull(port.lastRequestedId)
     }
 
+    @Test
+    fun `duplicate save feedback is visible inside the editor`() {
+        composeTestRule.setContent {
+            MaterialTheme {
+                SkillEditor(
+                    title = "Existing skill",
+                    content = "# Existing skill",
+                    isNew = false,
+                    conflict = null,
+                    saveError = "An equivalent skill already exists: Existing skill.",
+                    onTitleChanged = {},
+                    onContentChanged = {},
+                    onCancel = {},
+                    onReset = {},
+                    onSave = {},
+                    onReload = {},
+                    onKeepDraft = {},
+                    onSaveAsNew = {},
+                    onDiscard = {},
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("An equivalent skill already exists: Existing skill.").assertExists()
+    }
+
     private class FakeSkillPort(
         private val skill: SkillSearchResult,
         private val document: SkillDocument,
