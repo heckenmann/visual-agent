@@ -16,7 +16,7 @@ import de.heckenmann.visualagent.ui.workspace.*
  * Stable panel order used by keyboard shortcuts and the left rail.
  */
 internal val workspacePanelShortcutIds: List<String> =
-    listOf("chat", "todos", "files", "agents", "settings", "canvas", "directories")
+    listOf("chat", "todos", "files", "agents", "settings", "canvas", "skills", "directories")
 
 /**
  * Command metadata shown by the internal command palette.

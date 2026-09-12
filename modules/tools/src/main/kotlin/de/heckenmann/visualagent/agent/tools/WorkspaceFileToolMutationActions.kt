@@ -79,6 +79,7 @@ internal class WorkspaceFileToolMutationActions(
     fun writeText(input: JsonObject): ToolResult {
         val rootId = input.string("rootId")
         val path = input.requiredString("path")
+        requireNotSkillDocument(path)
         val content = input.requiredString("content")
         return if (rootId != null &&
             rootId != WorkspaceGrantedDirectoryActions.WORKSPACE_ROOT_ID
@@ -92,6 +93,7 @@ internal class WorkspaceFileToolMutationActions(
     fun edit(input: JsonObject): ToolResult {
         val rootId = input.string("rootId")
         val path = input.requiredString("path")
+        requireNotSkillDocument(path)
         val oldText = input.requiredString("oldText")
         val newText = input.requiredString("newText")
         return if (rootId != null &&
@@ -111,6 +113,8 @@ internal class WorkspaceFileToolMutationActions(
         val sourcePath = input.requiredString("sourcePath")
         val targetRootId = input.requiredString("targetRootId")
         val targetPath = input.requiredString("targetPath")
+        requireNotSkillDocument(sourcePath)
+        requireNotSkillDocument(targetPath)
         val target =
             when {
                 sourceRootId == WorkspaceGrantedDirectoryActions.WORKSPACE_ROOT_ID &&
@@ -142,6 +146,12 @@ internal class WorkspaceFileToolMutationActions(
                 put("moved", move)
             }.toString(),
         )
+    }
+
+    private fun requireNotSkillDocument(path: String) {
+        require(!path.substringAfterLast('/').equals("SKILL.md", ignoreCase = true)) {
+            "SKILL_DOCUMENT_NOT_ALLOWED: skills are stored in the database; use the skills tool instead of workspace files"
+        }
     }
 
     private companion object {

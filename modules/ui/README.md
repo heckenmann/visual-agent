@@ -6,6 +6,8 @@ ports supplied by the desktop host.
 ## Responsibilities
 
 - Provides Compose components that do not require application or provider implementation details.
+- Provides the hidden-by-default Skills workspace panel for searching, rendering, and editing
+  reusable Markdown skills through `SkillPort`.
 - Declares narrow UI contracts when a component needs application-provided behavior.
 - Keeps UI implementation independent from all other Visual Agent modules.
 

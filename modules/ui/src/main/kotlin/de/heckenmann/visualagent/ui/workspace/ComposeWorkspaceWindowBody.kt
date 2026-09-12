@@ -10,6 +10,7 @@ import de.heckenmann.visualagent.ui.directories.DirectoryAccessPanel
 import de.heckenmann.visualagent.ui.files.*
 import de.heckenmann.visualagent.ui.modal.*
 import de.heckenmann.visualagent.ui.settings.*
+import de.heckenmann.visualagent.ui.skills.SkillsPanel
 import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
@@ -60,6 +61,12 @@ internal fun WindowBody(
             settingsPanel(
                 settingsPort = panelServices.settings,
                 onSettingsChanged = panelServices.onSettingsChanged,
+            )
+        "skills" ->
+            SkillsPanel(
+                skillPort = panelServices.skills,
+                activityPort = panelServices.activity,
+                modalRequester = panelServices.modalRequester,
             )
         "canvas" ->
             CanvasPanel(

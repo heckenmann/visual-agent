@@ -20,6 +20,8 @@ Current contracts live under `de.heckenmann.visualagent.agent.tools.api`:
 - Registers tools and adapts them to provider-facing callbacks.
 - Publishes tool execution events and provides JSON schemas and result contracts.
 - Contains standard agent, todo, workspace, canvas, terminal, and support tools.
+- Includes the provider-neutral `skills` tool contract and implementation; the application supplies
+  its persistence through `SkillToolPort`.
 
 ## Commands
 

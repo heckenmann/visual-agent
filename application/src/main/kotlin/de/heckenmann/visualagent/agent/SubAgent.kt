@@ -179,6 +179,22 @@ data class SubAgent(
                                     "host, filesystem, network, process, or credential access.",
                             )
                         }
+                        if (enabledTools.any { it.value == "skills" }) {
+                            append(
+                                " Search the skills catalog before expensive or repetitive work with skills search, " +
+                                    "read a matching skill before relying on it, and save only stable reusable Markdown " +
+                                    "results with skills create or update. Never store secrets, PII, transient progress, " +
+                                    "or raw provider responses. Skills are database records, never workspace files: " +
+                                    "do not create SKILL.md or another skill document with workspace:file, JavaScript, " +
+                                    "or terminal.",
+                            )
+                        } else {
+                            append(
+                                " Skill requests are handled by the main agent's skills tool. Do not create, write, " +
+                                    "or modify SKILL.md or any other skill document in the workspace; report the " +
+                                    "request to the orchestrator instead.",
+                            )
+                        }
                     },
                 ),
                 Message("user", description),

@@ -58,6 +58,15 @@ internal fun defaultWindows(): List<ComposeWorkspaceWindow> =
                     bounds = ComposeWorkspaceWindowBounds(x = 760, y = 140, width = 420, height = 360),
                     visible = false,
                 )
+            "skills" ->
+                ComposeWorkspaceWindow(
+                    id = "skills",
+                    icon = "K",
+                    title = "Skills",
+                    subtitle = "Searchable reusable Markdown knowledge",
+                    bounds = ComposeWorkspaceWindowBounds(x = 280, y = 160, width = 620, height = 520),
+                    visible = false,
+                )
             "canvas" ->
                 ComposeWorkspaceWindow(
                     id = "canvas",

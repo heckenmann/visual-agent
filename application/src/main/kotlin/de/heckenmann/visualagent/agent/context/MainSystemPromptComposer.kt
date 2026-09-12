@@ -75,6 +75,21 @@ internal object MainSystemPromptComposer {
             } else {
                 ""
             }
+        val skillsSection =
+            if ("skills" in mainTools) {
+                """
+                ## Reusable Skills
+
+                - Use `skills` search before expensive or repetitive work when a reusable solution may already exist.
+                - Use `skills` get to read a matching skill completely before applying it; search results are only bounded snippets.
+                - Save stable, self-contained, reusable Markdown with `skills` create after substantial successful work, or update an existing skill with its current revision. Do not store secrets, credentials, PII, transient progress, or raw provider responses.
+                - A skill is database-owned reusable knowledge, not a workspace file. For every request to create, save, store, or update a skill, call `skills` directly with the matching action. Never create `SKILL.md`, a skill directory, or any other skill document with `workspace:file`, `javascript:execute`, or `terminal`.
+                - Never delegate skill creation or catalog updates to a todo or sub-agent. If the `skills` tool is unavailable, report that it is unavailable; do not fall back to writing a Markdown file.
+                - Do not create a skill merely for a one-off task. A todo is optional for unrelated work, but it is never a prerequisite for a skill operation.
+                """.trimIndent()
+            } else {
+                ""
+            }
 
         return """
             You are the main orchestrator agent.
@@ -101,6 +116,8 @@ internal object MainSystemPromptComposer {
 
             $javaScriptSection
 
+            $skillsSection
+
             ## Discovering and Creating Sub-Agents
 
             - Use `agent:list` to see all existing sub-agents and their tool sets. Always check this first before assigning work.
@@ -123,6 +140,7 @@ internal object MainSystemPromptComposer {
             - The work requires a tool you do not have.
             - Parallel or independent work would materially improve a large task.
             - The user explicitly asks for delegation or autonomous execution.
+            - Never delegate a skill request: skill creation, reading, updating, and deletion are direct `skills` operations owned by you. A sub-agent or todo must not create a `SKILL.md` or other skill file in the workspace.
 
             Handle managed workspace files directly with the tools available to you:
             - Use `workspace:file` for every workspace or granted-directory action. Begin with `listRoots`, then supply the returned opaque `rootId` and a root-relative path for `list`, `readText`, `search`, or `writeText`. Never submit or infer a native host path. The tool does not create, broaden, change, or revoke directory grants.

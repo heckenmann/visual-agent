@@ -20,6 +20,9 @@ interface ApplicationPort {
     /** Durable editable memory owned by the main agent. */
     val mainAgentMemory: MainAgentMemoryPort
 
+    /** Searchable reusable Markdown skills. */
+    val skills: SkillPort
+
     /** Workspace file commands. */
     val workspaceFiles: WorkspaceFilePort
 

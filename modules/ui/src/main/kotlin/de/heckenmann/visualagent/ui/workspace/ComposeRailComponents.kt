@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Description
@@ -271,6 +272,7 @@ internal fun ComposeWorkspaceWindow.railIcon(): ImageVector =
         "settings" -> Icons.Filled.Settings
         "canvas" -> Icons.Filled.Brush
         "directories" -> Icons.Filled.Folder
+        "skills" -> Icons.Filled.AutoStories
         else -> Icons.Filled.Description
     }
 

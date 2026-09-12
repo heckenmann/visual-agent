@@ -42,6 +42,8 @@ Supported native release platforms are macOS (Apple Silicon and Intel), Windows 
 - Managed workspace files the model can import, read, search, and render (including PDF page previews).
 - Todo list and sub-agents that can work on tasks autonomously.
 - Per-agent tool configuration, provider profiles, and persisted settings.
+- Searchable reusable Markdown skills that the main agent can save and retrieve explicitly,
+  with a user-facing Skills panel and SQLite FTS5 indexing.
 - Command palette (`Cmd/Ctrl+K`) and customizable workspace panel layout.
 - Icon-only actions with descriptive tooltips throughout the Compose workspace.
 

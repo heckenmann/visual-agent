@@ -67,6 +67,15 @@ Used for:
 
 The table stores relative workspace paths only. External source paths are never persisted.
 
+### `skills`
+
+Stores bounded reusable Markdown authored by the model or user. SQLite FTS5
+indexes title and content through database triggers. Each row has an optimistic
+revision, a SHA-256 duplicate fingerprint, and model-read telemetry. Reads from
+the model increment `read_count` and `last_read_at` atomically; user-panel
+views do not. Deletion removes the searchable body and keeps only a minimal
+body-free audit tombstone.
+
 ### `user_preferences`
 
 Stores user configuration values persisted beyond app restarts.

@@ -7,6 +7,7 @@
 - Owns the Spring Boot server composition root used by both standalone and embedded desktop startup.
 - Exposes application capabilities through the protocol ports consumed by the desktop UI.
 - Retains agent, persistence, workspace, canvas, todo, knowledge, orchestration, and configuration logic until those capabilities receive dedicated extraction increments.
+- Owns the transactional `SkillStore`, SQLite FTS5 skill index, and the model/UI adapters for the searchable skills catalog.
 - Owns cross-module integration tests and the application JaCoCo verification rule.
 
 The desktop lifecycle host lives in `:desktop`. In local desktop mode it embeds exactly one

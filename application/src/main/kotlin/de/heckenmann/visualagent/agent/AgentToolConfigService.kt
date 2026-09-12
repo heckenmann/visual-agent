@@ -44,6 +44,7 @@ class AgentToolConfigService(
             "workspace:download",
             "javascript:execute",
             "memory",
+            "skills",
         ).let(::filterEnabledTools).map(::ToolId).toSet()
 
     /**

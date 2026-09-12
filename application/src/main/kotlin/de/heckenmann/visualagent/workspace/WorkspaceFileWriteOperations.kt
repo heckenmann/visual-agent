@@ -19,6 +19,9 @@ internal class WorkspaceFileWriteOperations(
         relativePath: String,
         content: String,
     ): WorkspaceFileRecord {
+        require(!relativePath.substringAfterLast('/').equals("SKILL.md", ignoreCase = true)) {
+            "SKILL_DOCUMENT_NOT_ALLOWED: skills are stored in the database; use the skills tool instead of workspace files"
+        }
         val target = WorkspaceFilePaths.resolveWorkspacePath(relativePath, databasePath)
         val root = workspaceRoot().toRealPath()
         ensureDirectory(requireNotNull(target.parent) { "Workspace file must have a parent directory" }, root)

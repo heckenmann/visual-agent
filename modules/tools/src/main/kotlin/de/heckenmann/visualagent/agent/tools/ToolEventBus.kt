@@ -69,7 +69,7 @@ class ToolEventBus {
      * @param event Event payload to broadcast
      */
     fun publish(event: ToolCallEvent) {
-        val safeEvent = event.copy(inputJson = sanitizeToolInputForEvent(event.inputJson))
+        val safeEvent = event.copy(inputJson = sanitizeToolInputForEvent(event.inputJson, event.toolId))
         listeners.forEach { listener ->
             runCatching { listener(safeEvent) }
         }

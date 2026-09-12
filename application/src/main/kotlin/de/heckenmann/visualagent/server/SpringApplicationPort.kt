@@ -10,6 +10,7 @@ import de.heckenmann.visualagent.protocol.LifecyclePort
 import de.heckenmann.visualagent.protocol.MainAgentMemoryPort
 import de.heckenmann.visualagent.protocol.ProviderPort
 import de.heckenmann.visualagent.protocol.SettingsPort
+import de.heckenmann.visualagent.protocol.SkillPort
 import de.heckenmann.visualagent.protocol.TodoPort
 import de.heckenmann.visualagent.protocol.WorkspaceFilePort
 import org.springframework.stereotype.Component
@@ -23,6 +24,7 @@ class SpringApplicationPort(
     override val providers: ProviderPort,
     override val settings: SettingsPort,
     override val mainAgentMemory: MainAgentMemoryPort,
+    override val skills: SkillPort,
     override val workspaceFiles: WorkspaceFilePort,
     override val directoryAccess: DirectoryGrantAdministrationPort,
     override val canvas: CanvasPort,
