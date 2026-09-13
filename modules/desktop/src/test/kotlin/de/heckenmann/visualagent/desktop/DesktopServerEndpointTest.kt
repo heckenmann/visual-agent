@@ -51,4 +51,17 @@ class DesktopServerEndpointTest {
             }.exceptionOrNull()
         assertTrue(exception is IllegalArgumentException)
     }
+
+    @Test
+    fun `remote endpoint parser rejects credentials paths queries and fragments`() {
+        listOf(
+            "grpcs://user@server.example:7443",
+            "grpcs://server.example:7443/path",
+            "grpcs://server.example:7443?debug=true",
+            "grpcs://server.example:7443#fragment",
+        ).forEach { endpoint ->
+            val exception = runCatching { DesktopServerEndpointSelector.parseRemoteEndpoint(endpoint) }.exceptionOrNull()
+            assertTrue(exception is IllegalArgumentException)
+        }
+    }
 }

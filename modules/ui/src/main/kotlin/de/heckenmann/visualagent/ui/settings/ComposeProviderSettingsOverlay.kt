@@ -27,6 +27,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.MainAgentMemoryPort
 import de.heckenmann.visualagent.protocol.MainAgentMemoryUpdate
@@ -54,6 +56,7 @@ internal fun providerSettingsOverlay(
     mainAgentMemoryPort: MainAgentMemoryPort,
     providerPort: ProviderPort,
     onSettingsChanged: () -> Unit,
+    onRunOnboarding: () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     var persisted by remember { mutableStateOf(ProviderSettingsDraft()) }
@@ -208,6 +211,17 @@ internal fun providerSettingsOverlay(
                     onContentChange = { draftMemory = it },
                 )
                 PanelSection(title = "Main agent connection") {
+                    OutlinedButton(
+                        onClick = onRunOnboarding,
+                        modifier = Modifier.semantics { contentDescription = "Run onboarding again" },
+                    ) {
+                        Icon(Icons.Filled.Edit, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Run onboarding again")
+                    }
+                    PanelInfoBox(
+                        "Reopens the guided provider and model readiness check without changing saved settings until you finish it.",
+                    )
                     PanelDropdownField(
                         label = "Provider",
                         selectedValue = draft.providerId,

@@ -7,6 +7,8 @@ import de.heckenmann.visualagent.protocol.ApplicationPort
 import de.heckenmann.visualagent.protocol.LayoutPosition
 import de.heckenmann.visualagent.protocol.LayoutSize
 import de.heckenmann.visualagent.protocol.LifecyclePort
+import de.heckenmann.visualagent.protocol.OnboardingState
+import de.heckenmann.visualagent.protocol.OnboardingStatus
 import de.heckenmann.visualagent.protocol.WorkspaceLayoutPort
 import de.heckenmann.visualagent.protocol.WorkspaceLayoutSnapshot
 import de.heckenmann.visualagent.ui.application.ComposeApplicationDependencies
@@ -78,6 +80,14 @@ class ComposeStartupHostLifecycleTest {
         assertEquals(StartupWindowMode.SPLASH, startupWindowMode(StartupStatus.startingServer(), dependencies))
         assertEquals(StartupWindowMode.SPLASH, startupWindowMode(StartupStatus.failed(), dependencies))
         assertEquals(StartupWindowMode.MAIN, startupWindowMode(StartupStatus.ready(), dependencies))
+        assertEquals(
+            StartupWindowMode.ONBOARDING,
+            startupWindowMode(StartupStatus.ready(), dependencies, OnboardingState(OnboardingStatus.NOT_STARTED, 1)),
+        )
+        assertEquals(
+            StartupWindowMode.ONBOARDING,
+            startupWindowMode(StartupStatus.ready(), dependencies, manualOnboardingRequested = true),
+        )
     }
 
     @Test

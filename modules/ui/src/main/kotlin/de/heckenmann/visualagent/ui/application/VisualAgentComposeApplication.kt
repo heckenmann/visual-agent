@@ -21,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -52,6 +53,7 @@ fun VisualAgentComposeApp(
     deps: ComposeApplicationDependencies,
     onCloseApplication: () -> Unit,
     persistedWindows: List<LayoutWindowState>,
+    onRunOnboarding: () -> Unit = {},
 ) {
     var windows by remember { mutableStateOf(restoreWorkspaceWindows(defaultWindows(), persistedWindows)) }
     var modal by remember { mutableStateOf<ComposeModal?>(null) }
@@ -87,6 +89,7 @@ fun VisualAgentComposeApp(
                         settingsRevision += 1
                     }
                 },
+                onRunOnboarding = onRunOnboarding,
                 inFlight = inFlight,
                 lifecycle = deps.applicationPort.lifecycle,
             )
@@ -137,6 +140,7 @@ fun VisualAgentComposeApp(
             }
         } + ComposeCommand("close-application", "Close application", "Close Visual Agent and persist workspace state", onCloseApplication)
     LaunchedEffect(Unit) {
+        withFrameNanos { }
         workspaceFocusRequester.requestFocus()
     }
     RegisterAgentStatusCallback(inFlight, deps.applicationPort.activity, deps.applicationPort.todos)
@@ -260,7 +264,7 @@ fun VisualAgentComposeApp(
                                 }
                             }
                         }
-                        composeModalHost(modal = modal, onDismiss = { modal = null })
+                        ComposeModalHost(modal = modal, onDismiss = { modal = null })
                         ComposeCommandPaletteHost(
                             visible = commandPaletteVisible,
                             commands = commands,

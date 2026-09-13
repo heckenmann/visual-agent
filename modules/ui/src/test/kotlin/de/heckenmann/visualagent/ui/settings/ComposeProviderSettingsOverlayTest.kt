@@ -72,6 +72,7 @@ class ComposeProviderSettingsOverlayTest {
         listOf("Add provider", "Edit provider", "Remove provider", "Refresh models").forEach { label ->
             composeTestRule.onNodeWithText(label).assertExists()
         }
+        composeTestRule.onNodeWithText("Run onboarding again").assertExists()
         verify(exactly = 0) { settings.save(any(), any()) }
     }
 }
