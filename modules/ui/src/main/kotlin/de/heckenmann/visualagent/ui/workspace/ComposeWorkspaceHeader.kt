@@ -77,7 +77,7 @@ internal fun PanelWidthSlider(
     onDismiss: () -> Unit,
 ) {
     var sliderValue by remember(current) { mutableFloatStateOf(current.toFloat()) }
-    modalDialogLayout(
+    ModalDialogLayout(
         body = {
             Text(
                 text = "${sliderValue.toInt()} px",

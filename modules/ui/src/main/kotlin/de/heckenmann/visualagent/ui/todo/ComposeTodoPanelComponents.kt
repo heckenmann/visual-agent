@@ -257,7 +257,7 @@ internal fun TodoEditor(
     val agentOptions =
         listOf(PanelSelectOption(UNASSIGNED_AGENT_ID, "Unassigned")) +
             agents.map { PanelSelectOption(it.id, it.name) }
-    modalDialogLayout(
+    ModalDialogLayout(
         body = {
             OutlinedTextField(
                 value = description,

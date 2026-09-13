@@ -62,6 +62,7 @@ internal fun ReorderableCollectionItemScope.SplitPanelContent(
                     mainAgentMemoryPort = panelServices.mainAgentMemory,
                     providerPort = panelServices.providers,
                     onSettingsChanged = panelServices.onSettingsChanged,
+                    onRunOnboarding = panelServices.onRunOnboarding,
                 )
             }
         } else {

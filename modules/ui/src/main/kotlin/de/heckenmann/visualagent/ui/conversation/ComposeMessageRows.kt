@@ -203,7 +203,7 @@ internal fun EditMessageForm(
     onSave: (String) -> Unit,
 ) {
     var edited by remember { mutableStateOf(content) }
-    modalDialogLayout(
+    ModalDialogLayout(
         body = {
             OutlinedTextField(
                 value = edited,

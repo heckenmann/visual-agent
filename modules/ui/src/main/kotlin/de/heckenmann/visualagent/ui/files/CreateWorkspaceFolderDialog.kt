@@ -9,7 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import de.heckenmann.visualagent.ui.modal.modalDialogLayout
+import de.heckenmann.visualagent.ui.modal.ModalDialogLayout
 import de.heckenmann.visualagent.ui.modal.modalPrimaryButton
 import de.heckenmann.visualagent.ui.modal.modalSecondaryButton
 
@@ -20,7 +20,7 @@ internal fun CreateWorkspaceFolderDialog(
     onCreate: (String) -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
-    modalDialogLayout(
+    ModalDialogLayout(
         body = {
             OutlinedTextField(
                 value = name,

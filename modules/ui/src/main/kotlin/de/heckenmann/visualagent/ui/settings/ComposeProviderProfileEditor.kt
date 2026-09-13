@@ -22,7 +22,7 @@ import de.heckenmann.visualagent.protocol.ProviderProfile
 import de.heckenmann.visualagent.ui.components.PanelCheckbox
 import de.heckenmann.visualagent.ui.components.PanelDropdownField
 import de.heckenmann.visualagent.ui.components.PanelSelectOption
-import de.heckenmann.visualagent.ui.modal.modalDialogLayout
+import de.heckenmann.visualagent.ui.modal.ModalDialogLayout
 import de.heckenmann.visualagent.ui.modal.modalPrimaryButton
 import de.heckenmann.visualagent.ui.modal.modalSaveButton
 import de.heckenmann.visualagent.ui.modal.modalSecondaryButton
@@ -52,7 +52,7 @@ internal fun ProviderProfileEditor(
     var state by remember { mutableStateOf(initial) }
     var apiKeyVisible by remember { mutableStateOf(false) }
     val validation = state.validationError()
-    modalDialogLayout(
+    ModalDialogLayout(
         body = {
             OutlinedTextField(
                 value = state.id,

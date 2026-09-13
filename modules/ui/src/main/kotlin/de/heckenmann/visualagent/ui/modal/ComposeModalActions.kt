@@ -19,7 +19,7 @@ import de.heckenmann.visualagent.ui.components.saveActionButton
 
 /** Renders the standard secondary text action used in every modal title bar and footer. */
 @Composable
-internal fun modalSecondaryButton(
+fun modalSecondaryButton(
     label: String,
     icon: ImageVector = Icons.Filled.Close,
     enabled: Boolean = true,
@@ -38,7 +38,7 @@ internal fun modalSecondaryButton(
 
 /** Renders the standard primary text action used in every modal footer. */
 @Composable
-internal fun modalPrimaryButton(
+fun modalPrimaryButton(
     label: String,
     icon: ImageVector = Icons.Filled.Check,
     enabled: Boolean = true,
@@ -57,7 +57,7 @@ internal fun modalPrimaryButton(
 
 /** Renders the shared green save action in a modal footer. */
 @Composable
-internal fun modalSaveButton(
+fun modalSaveButton(
     label: String = "Save changes",
     enabled: Boolean = true,
     onClick: () -> Unit,

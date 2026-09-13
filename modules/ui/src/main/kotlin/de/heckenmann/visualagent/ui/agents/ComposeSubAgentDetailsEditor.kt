@@ -106,7 +106,7 @@ internal fun SubAgentDetailsEditor(
             optionsText.toOptionsMapOrNull() != null
     val canSave = name.isNotBlank() && role.isNotBlank() && numericFieldsAreValid
 
-    modalDialogLayout(
+    ModalDialogLayout(
         body = {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(

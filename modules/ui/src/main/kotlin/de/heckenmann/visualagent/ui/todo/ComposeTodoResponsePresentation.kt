@@ -40,7 +40,7 @@ import de.heckenmann.visualagent.ui.components.ComposeMarkdown
 import de.heckenmann.visualagent.ui.components.labelizeEnumName
 import de.heckenmann.visualagent.ui.modal.ComposeContentModal
 import de.heckenmann.visualagent.ui.modal.ComposeModalRequester
-import de.heckenmann.visualagent.ui.modal.modalDialogLayout
+import de.heckenmann.visualagent.ui.modal.ModalDialogLayout
 import de.heckenmann.visualagent.ui.modal.modalPrimaryButton
 
 /** Maximum number of response lines rendered in a compact todo card. */
@@ -176,7 +176,7 @@ internal fun TodoResponseOverlay(
     responseState: TodoResponseState,
     onDismiss: () -> Unit,
 ) {
-    modalDialogLayout(
+    ModalDialogLayout(
         body = {
             Text(todo.description, style = MaterialTheme.typography.titleMedium)
             Text(

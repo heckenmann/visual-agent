@@ -6,7 +6,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import de.heckenmann.visualagent.protocol.TodoItem
 import de.heckenmann.visualagent.ui.modal.ComposeContentModal
-import de.heckenmann.visualagent.ui.modal.composeModalHost
+import de.heckenmann.visualagent.ui.modal.ComposeModalHost
 import org.junit.Rule
 import org.junit.Test
 import kotlin.test.assertTrue
@@ -42,7 +42,7 @@ class ComposeTodoResponseOverlayTest {
         responseState.apply("execution", "agent", (1..500).joinToString("\n"), completed = true)
         composeTestRule.setContent {
             MaterialTheme {
-                composeModalHost(
+                ComposeModalHost(
                     modal =
                         ComposeContentModal(title = "Todo response") {
                             TodoResponseOverlay(
