@@ -9,6 +9,7 @@ import de.heckenmann.visualagent.protocol.ConversationSuggestionPort
 import de.heckenmann.visualagent.protocol.DirectoryGrantAdministrationPort
 import de.heckenmann.visualagent.protocol.LifecyclePort
 import de.heckenmann.visualagent.protocol.MainAgentMemoryPort
+import de.heckenmann.visualagent.protocol.OnboardingPort
 import de.heckenmann.visualagent.protocol.ProviderPort
 import de.heckenmann.visualagent.protocol.SettingsPort
 import de.heckenmann.visualagent.protocol.SkillPort
@@ -25,6 +26,7 @@ class SpringApplicationPort(
     override val agents: AgentPort,
     override val providers: ProviderPort,
     override val settings: SettingsPort,
+    override val onboarding: OnboardingPort,
     override val mainAgentMemory: MainAgentMemoryPort,
     override val skills: SkillPort,
     override val workspaceFiles: WorkspaceFilePort,
