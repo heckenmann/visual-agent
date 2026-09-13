@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.ui.onboarding
 
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -7,6 +8,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Close
@@ -78,25 +82,27 @@ fun ComposeOnboardingWizard(
         }
 
     val discoverModels: () -> Unit = {
-        val providerDraft = draft ?: return
-        scope.launch {
-            loadingModels = true
-            validationError = null
-            runCatching {
-                withContext(Dispatchers.IO) { onboarding.discoverModels(providerDraft) }
-            }.onSuccess { discovered ->
-                models = discovered
-                selectedModel = discovered.firstOrNull()
-                if (discovered.isEmpty()) {
-                    validationError =
-                        "No selectable model was found for this provider. Check the provider and refresh later."
+        draft?.let { providerDraft ->
+            scope.launch {
+                loadingModels = true
+                validationError = null
+                runCatching {
+                    withContext(Dispatchers.IO) { onboarding.discoverModels(providerDraft) }
+                }.onSuccess { discovered ->
+                    models = discovered
+                    selectedModel = discovered.firstOrNull()
+                    if (discovered.isEmpty()) {
+                        validationError =
+                            "No selectable model was found for this provider. Check the provider and refresh later."
+                    }
+                }.onFailure {
+                    validationError = "Models could not be discovered from this Visual Agent server."
                 }
-            }.onFailure {
-                validationError = "Models could not be discovered from this Visual Agent server."
+                loadingModels = false
             }
-            loadingModels = false
         }
     }
+    val stepScrollState = rememberScrollState()
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier.fillMaxSize().padding(48.dp),
@@ -107,40 +113,53 @@ fun ComposeOnboardingWizard(
                 "You are connected to a Visual Agent server. Choose the LLM provider and model used by that server.",
                 style = MaterialTheme.typography.bodyLarge,
             )
-            when (step) {
-                0 -> OnboardingWelcome()
-                1 ->
-                    OnboardingProviderStep(
-                        profiles = profiles,
-                        selected = selected,
-                        customDraft = customDraft,
-                        loading = loadingProfiles,
-                        onSelect = {
-                            selected = it
-                            customDraft = null
-                            models = emptyList()
-                            selectedModel = null
-                            validationError = null
-                        },
-                        onDraftChange = {
-                            selected = null
-                            customDraft = it
-                            models = emptyList()
-                            selectedModel = null
-                            validationError = null
-                        },
+            Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                Column(
+                    modifier = Modifier.fillMaxSize().verticalScroll(stepScrollState),
+                    verticalArrangement = Arrangement.spacedBy(20.dp),
+                ) {
+                    when (step) {
+                        0 -> OnboardingWelcome()
+                        1 ->
+                            OnboardingProviderStep(
+                                profiles = profiles,
+                                selected = selected,
+                                customDraft = customDraft,
+                                loading = loadingProfiles,
+                                onSelect = {
+                                    selected = it
+                                    customDraft = null
+                                    models = emptyList()
+                                    selectedModel = null
+                                    validationError = null
+                                },
+                                onDraftChange = {
+                                    selected = null
+                                    customDraft = it
+                                    models = emptyList()
+                                    selectedModel = null
+                                    validationError = null
+                                },
+                            )
+                        2 ->
+                            OnboardingModelStep(
+                                draft = draft,
+                                models = models,
+                                selectedModel = selectedModel,
+                                loading = loadingModels,
+                                error = validationError,
+                                onSelect = { model -> selectedModel = model },
+                                onRefresh = discoverModels,
+                            )
+                        else -> OnboardingReviewStep(draft, credentialConfigured, selectedModel, validationError)
+                    }
+                }
+                if (stepScrollState.maxValue > 0) {
+                    VerticalScrollbar(
+                        adapter = rememberScrollbarAdapter(stepScrollState),
+                        modifier = Modifier.align(Alignment.CenterEnd),
                     )
-                2 ->
-                    OnboardingModelStep(
-                        draft = draft,
-                        models = models,
-                        selectedModel = selectedModel,
-                        loading = loadingModels,
-                        error = validationError,
-                        onSelect = { model -> selectedModel = model },
-                        onRefresh = discoverModels,
-                    )
-                else -> OnboardingReviewStep(draft, credentialConfigured, selectedModel, validationError)
+                }
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),

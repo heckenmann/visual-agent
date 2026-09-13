@@ -83,7 +83,7 @@ private fun OnboardingProviderEditor(
     Text("Provider type", style = MaterialTheme.typography.labelLarge)
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         ProviderAdapter.entries.forEach { adapter ->
-            OutlinedButton(onClick = { onChange(draft.copy(adapter = adapter)) }) {
+            OutlinedButton(onClick = { onChange(draft.withAdapter(adapter)) }) {
                 Text(if (adapter == draft.adapter) "✓ ${adapter.label()}" else adapter.label())
             }
         }
@@ -172,6 +172,10 @@ internal fun OnboardingReviewStep(
 /** Converts a safe persisted provider view into a write-only staged draft. */
 internal fun OnboardingProviderProfile.toDraft(): OnboardingProviderDraft =
     OnboardingProviderDraft(id, name, adapter, baseUrl, CredentialUpdate.Unchanged, enabled, defaultModel)
+
+/** Updates a staged provider adapter without retaining an invalid HTTP endpoint for Codex CLI. */
+internal fun OnboardingProviderDraft.withAdapter(adapter: ProviderAdapter): OnboardingProviderDraft =
+    copy(adapter = adapter, baseUrl = if (adapter == ProviderAdapter.CODEX_CLI) "" else baseUrl)
 
 private fun ProviderAdapter.label(): String =
     when (this) {
