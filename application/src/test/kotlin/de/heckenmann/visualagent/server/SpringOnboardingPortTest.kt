@@ -200,6 +200,68 @@ class SpringOnboardingPortTest {
         }
 
     @Test
+    fun `finish preserves existing provider model configuration`() =
+        runTest {
+            val provider = mockk<LLMProvider>()
+            val transactionTemplate = mockk<TransactionTemplate>()
+            val port = SpringOnboardingPort(preferences, catalog, provider, transactionTemplate)
+            val configured =
+                ProviderProfile(
+                    id = "openai",
+                    name = "OpenAI",
+                    adapter = ProviderAdapter.OPENAI_COMPATIBLE,
+                    baseUrl = "https://api.example",
+                    models =
+                        listOf(
+                            ProviderModelConfig(
+                                id = "selected-model",
+                                options = mapOf("temperature" to "0.2"),
+                                variants = mapOf("fast" to mapOf("reasoning" to "low")),
+                                contextLimit = 65536,
+                            ),
+                            ProviderModelConfig(id = "other-model", contextLimit = 32768),
+                        ),
+                )
+            val draft =
+                OnboardingProviderDraft(
+                    id = "openai",
+                    name = "OpenAI",
+                    adapter = ProtocolProviderAdapter.OPENAI_COMPATIBLE,
+                    baseUrl = "https://api.example",
+                )
+            every { catalog.getProvider("openai") } returns configured
+            every { catalog.listProviders() } returns listOf(configured)
+            every { catalog.replaceConfiguration(any()) } returns Unit
+            every { preferences.setPreference(any(), any()) } returns Unit
+            every { transactionTemplate.executeWithoutResult(any()) } answers {
+                firstArg<Consumer<org.springframework.transaction.TransactionStatus>>().accept(mockk())
+            }
+            coEvery { provider.getModelConfigs(any<ProviderProfile>()) } returns listOf(ProviderModelConfig("selected-model"))
+            coEvery { provider.chat(any<ChatRequestContext>()) } returns
+                ChatResponse("selected-model", Message("assistant", "READY"), true)
+
+            val validation = port.validate(draft, "selected-model")
+            port.finish(draft, ProviderModel("selected-model"), checkNotNull(validation.validationFingerprint))
+
+            verify {
+                catalog.replaceConfiguration(
+                    match { configuration ->
+                        val models =
+                            configuration.providers
+                                .single()
+                                .models
+                                .associateBy { it.id }
+                        models.keys == setOf("selected-model", "other-model") &&
+                            models.getValue("selected-model").options == mapOf("temperature" to "0.2") &&
+                            models.getValue("selected-model").variants == mapOf("fast" to mapOf("reasoning" to "low")) &&
+                            models.getValue("selected-model").contextLimit == 65536 &&
+                            models.getValue("other-model").contextLimit == 32768
+                    },
+                )
+            }
+        }
+
+    @Test
     fun `model discovery preserves provider metadata`() =
         runTest {
             val provider = mockk<LLMProvider>()

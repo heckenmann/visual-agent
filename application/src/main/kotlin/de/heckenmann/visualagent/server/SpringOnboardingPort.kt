@@ -102,11 +102,15 @@ class SpringOnboardingPort(
             discoverModels(draft).singleOrNull { it.id == model.id }
                 ?: error("The selected model is no longer available.")
         transactionTemplate.executeWithoutResult {
+            val existing = providerCatalog.getProvider(draft.id)
+            val selectedModel = discoveredModel.toApplication()
             val profile =
                 draft
-                    .toApplication(
-                        providerCatalog.getProvider(draft.id),
-                    ).copy(defaultModel = discoveredModel.id, models = listOf(discoveredModel.toApplication()))
+                    .toApplication(existing)
+                    .copy(
+                        defaultModel = discoveredModel.id,
+                        models = existing?.models?.mergeSelectedModel(selectedModel) ?: listOf(selectedModel),
+                    )
             val profiles = providerCatalog.listProviders().filterNot { it.id == profile.id } + profile
             providerCatalog.replaceConfiguration(ApplicationProviderConfiguration(profiles, profile.id, discoveredModel.id))
             preferenceStore.setPreference(ONBOARDING_KEY, OnboardingStatus.COMPLETED.name)
@@ -176,6 +180,19 @@ class SpringOnboardingPort(
             outputLimit,
             capabilities,
         )
+
+    private fun List<ApplicationProviderModel>.mergeSelectedModel(selected: ApplicationProviderModel): List<ApplicationProviderModel> {
+        val existing = firstOrNull { it.id == selected.id } ?: return this + selected
+        val merged =
+            existing.copy(
+                name = existing.name.takeUnless { it == existing.id } ?: selected.name,
+                status = selected.status,
+                contextLimit = existing.contextLimit ?: selected.contextLimit,
+                outputLimit = existing.outputLimit ?: selected.outputLimit,
+                capabilities = existing.capabilities.ifEmpty { selected.capabilities },
+            )
+        return map { model -> if (model.id == selected.id) merged else model }
+    }
 
     private fun fingerprint(
         draft: OnboardingProviderDraft,
