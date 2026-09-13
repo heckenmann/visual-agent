@@ -34,6 +34,8 @@ internal fun WindowBody(
                 activityPort = panelServices.activity,
                 todoPort = panelServices.todos,
                 conversationPort = panelServices.conversation,
+                suggestionPort = panelServices.conversationSuggestions,
+                settingsPort = panelServices.settings,
                 clientImagePort = panelServices.clientImagePort,
             )
         "todos" ->

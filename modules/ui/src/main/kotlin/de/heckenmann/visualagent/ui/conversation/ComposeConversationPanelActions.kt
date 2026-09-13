@@ -46,6 +46,58 @@ internal fun conversationInputPlacementChange(
         scope.launch { persistConversationInputPlacement(conversationPort, placement) }
     }
 
+/** Creates the send action shared by inline and fixed conversation composers. */
+internal fun conversationSendAction(
+    scope: CoroutineScope,
+    queue: MessageQueue,
+    messageGateway: ConversationMessageGateway,
+    inFlight: InFlightStateHolder,
+    conversationState: ConversationUiState,
+    suggestionController: ConversationSuggestionController,
+    onActiveTokenChange: (CancellationToken?) -> Unit,
+): (String) -> Unit =
+    { rawContent ->
+        val content = rawContent.trim()
+        if (content.isNotBlank()) {
+            suggestionController.onUserInteraction()
+            if (conversationState.sending) {
+                queueUserMessage(
+                    content = content,
+                    enqueue = { message -> queue.enqueue(message, QueuedMessageSource.USER) },
+                    queuedMessageCount = { queue.size },
+                    onInputChange = {
+                        conversationState.input = it
+                        suggestionController.onInputChanged(it)
+                    },
+                    onStatusChange = { conversationState.status = it },
+                )
+            } else {
+                scope.launch {
+                    executeSend(
+                        content = content,
+                        messageGateway = messageGateway,
+                        inFlight = inFlight,
+                        onInputChange = {
+                            conversationState.input = it
+                            suggestionController.onInputChanged(it)
+                        },
+                        onSendingChange = {
+                            conversationState.sending = it
+                            suggestionController.onSendingChanged(it)
+                        },
+                        onStatusChange = { conversationState.status = it },
+                        onActiveTokenChange = onActiveTokenChange,
+                        onPendingUserMessageChange = { conversationState.pendingUserMessage = it },
+                        onPendingUserEntryIdChange = { conversationState.pendingUserEntryId = it },
+                        onStreamingEntryIdChange = { conversationState.streamingEntryId = it },
+                        onStreamCompletion = conversationState::completeStream,
+                        streamingFlow = conversationState.streaming,
+                    )
+                }
+            }
+        }
+    }
+
 /**
  * Extracted conversation panel actions to keep [ConversationPanel] under the 300-LOC limit.
  */
@@ -156,7 +208,6 @@ internal suspend fun executeSend(
     content: String,
     messageGateway: ConversationMessageGateway,
     inFlight: InFlightStateHolder,
-    inputFocusRequester: androidx.compose.ui.focus.FocusRequester,
     onInputChange: (String) -> Unit,
     onSendingChange: (Boolean) -> Unit,
     onStatusChange: (String) -> Unit,
@@ -208,6 +259,5 @@ internal suspend fun executeSend(
             inFlight.markStreamEnd(streamRequestId)
             onSendingChange(false)
             onActiveTokenChange(null)
-            inputFocusRequester.requestFocus()
         }
 }

@@ -36,12 +36,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -99,6 +101,9 @@ internal fun ConversationInputArea(
     inputPlacement: ConversationInputPlacement = ConversationInputPlacement.CONVERSATION_MESSAGE,
     onInputPlacementChange: (ConversationInputPlacement) -> Unit = {},
     inputFocusRequester: FocusRequester,
+    ghostText: String = "",
+    ghostCursorVisible: Boolean = false,
+    onFocusChanged: (Boolean) -> Unit = {},
 ) {
     Column {
         Row(
@@ -143,7 +148,24 @@ internal fun ConversationInputArea(
             value = input,
             onValueChange = onInputChange,
             label = null,
-            placeholder = { Text("Type a message…") },
+            placeholder = {
+                if (ghostText.isBlank()) {
+                    Text("Type a message…")
+                } else {
+                    Row(modifier = Modifier.clearAndSetSemantics {}) {
+                        Text(
+                            text = ghostText,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.62f),
+                        )
+                        if (ghostCursorVisible) {
+                            Text(
+                                text = "|",
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                            )
+                        }
+                    }
+                }
+            },
             minLines = 1,
             maxLines = 5,
             trailingIcon = {
@@ -169,6 +191,7 @@ internal fun ConversationInputArea(
                     .fillMaxWidth()
                     .padding(horizontal = 8.dp)
                     .focusRequester(inputFocusRequester)
+                    .onFocusChanged { onFocusChanged(it.isFocused) }
                     .onPreviewKeyEvent { event ->
                         if (event.type == KeyEventType.KeyDown && event.key == Key.Enter && !event.isShiftPressed) {
                             onSend()

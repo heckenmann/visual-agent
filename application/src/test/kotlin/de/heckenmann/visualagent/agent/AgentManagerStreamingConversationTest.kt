@@ -5,6 +5,8 @@ import de.heckenmann.visualagent.agent.provider.ProviderUserFacingError
 import de.heckenmann.visualagent.agent.provider.ProviderUserFacingException
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfigBean
+import de.heckenmann.visualagent.protocol.ConversationCompletionEvent
+import de.heckenmann.visualagent.protocol.ConversationCompletionEventBus
 import de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
 import de.heckenmann.visualagent.todo.TodoEventBus
 import io.mockk.coEvery
@@ -29,7 +31,19 @@ class AgentManagerStreamingConversationTest {
                     ChatResponse(model = "test", message = Message("assistant", "Hello"), done = false),
                     ChatResponse(model = "test", message = Message("assistant", " world"), done = true),
                 )
-            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
+            val events = mutableListOf<ConversationCompletionEvent>()
+            val completionEvents = ConversationCompletionEventBus()
+            completionEvents.addListener(events::add)
+            val manager =
+                AgentManager(
+                    db,
+                    provider,
+                    AgentToolConfigService(db),
+                    ToolEventBus(),
+                    TodoEventBus(),
+                    AppConfigBean(db),
+                    conversationCompletionEvents = completionEvents,
+                )
             val chunks = mutableListOf<String>()
 
             val result = manager.streamMessage("hi", onChunk = { chunks += it }, userEntryId = USER_ID, assistantEntryId = ASSISTANT_ID)
@@ -40,6 +54,7 @@ class AgentManagerStreamingConversationTest {
             assertEquals("user", history.first().role)
             assertEquals("assistant", history.last().role)
             assertEquals(listOf(USER_ID, ASSISTANT_ID), history.mapNotNull(Message::id))
+            assertEquals(listOf(ASSISTANT_ID), events.map(ConversationCompletionEvent::assistantEntryId))
         }
 
     @Test
@@ -104,6 +119,37 @@ class AgentManagerStreamingConversationTest {
             assertEquals(listOf("user", "assistant"), manager.getHistory().map(Message::role))
             assertEquals(result, manager.getHistory().last().content)
             assertEquals(ASSISTANT_ID, manager.getHistory().last().id)
+        }
+
+    @Test
+    fun `cancelled partial stream does not publish a suggestion completion`() =
+        runBlocking {
+            val db = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+            val provider = mockk<LLMProvider>(relaxed = true)
+            val token = CancellationToken()
+            val events = mutableListOf<ConversationCompletionEvent>()
+            val completionEvents = ConversationCompletionEventBus()
+            completionEvents.addListener(events::add)
+            coEvery { provider.stream(any<ChatRequestContext>()) } returns
+                flow {
+                    emit(ChatResponse(model = "test", message = Message("assistant", "partial"), done = false))
+                    token.cancel()
+                    emit(ChatResponse(model = "test", message = Message("assistant", "ignored"), done = true))
+                }
+            val manager =
+                AgentManager(
+                    db,
+                    provider,
+                    AgentToolConfigService(db),
+                    ToolEventBus(),
+                    TodoEventBus(),
+                    AppConfigBean(db),
+                    conversationCompletionEvents = completionEvents,
+                )
+
+            manager.streamMessage("hi", token, onChunk = {}, userEntryId = USER_ID, assistantEntryId = ASSISTANT_ID)
+
+            assertEquals(emptyList(), events)
         }
 
     @Test

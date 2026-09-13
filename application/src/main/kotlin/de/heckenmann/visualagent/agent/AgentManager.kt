@@ -17,6 +17,7 @@ import de.heckenmann.visualagent.knowledge.PersistenceStores
 import de.heckenmann.visualagent.knowledge.SubAgentStore
 import de.heckenmann.visualagent.knowledge.TodoStore
 import de.heckenmann.visualagent.orchestration.AutonomousCoordinator
+import de.heckenmann.visualagent.protocol.ConversationCompletionEventBus
 import de.heckenmann.visualagent.protocol.LifecyclePort
 import de.heckenmann.visualagent.protocol.LifecycleState
 import de.heckenmann.visualagent.todo.Todo
@@ -57,6 +58,7 @@ class AgentManager
         internal val agentStatusCallbackAdapter: AgentStatusCallbackAdapter,
         val subAgentExecutionControl: SubAgentExecutionControl,
         internal val providerCatalog: ProviderCatalogService,
+        internal val conversationCompletionEvents: ConversationCompletionEventBus,
     ) : DisposableBean {
         internal constructor(
             stores: PersistenceStores,
@@ -72,6 +74,7 @@ class AgentManager
             agentStatusCallbackAdapter: AgentStatusCallbackAdapter = AgentStatusCallbackAdapter(),
             subAgentExecutionControl: SubAgentExecutionControl = SubAgentExecutionControl(stores),
             providerCatalog: ProviderCatalogService = ProviderCatalogService(stores, appConfig),
+            conversationCompletionEvents: ConversationCompletionEventBus = ConversationCompletionEventBus(),
         ) : this(
             stores,
             stores,
@@ -89,6 +92,7 @@ class AgentManager
             agentStatusCallbackAdapter,
             subAgentExecutionControl,
             providerCatalog,
+            conversationCompletionEvents,
         )
 
         internal lateinit var autonomousCoordinator: AutonomousCoordinator
@@ -148,6 +152,7 @@ class AgentManager
                     responseCoordinator = responseCoordinator,
                     toolEventBus = toolEventBus,
                     lifecycle = lifecycle,
+                    completionEvents = conversationCompletionEvents,
                 )
             registerTodoTerminalReviewListener()
             toolEventListenerHandle = conversationOpsProvider.registerToolEventListener()
@@ -179,7 +184,7 @@ class AgentManager
          */
         fun getTodosFromDb(): List<Todo> = lifecycleOps.getTodosFromDb()
 
-        /** Returns a summary of todos (counts by status) from the database. */
+        /** Returns a summary of todo counts from the database. */
         fun getTodoSummaryFromDb(): TodoSummary = lifecycleOps.getTodoSummaryFromDb()
 
         /**
@@ -212,77 +217,13 @@ class AgentManager
          */
         fun deleteAgent(id: String): Boolean = lifecycleOps.deleteAgent(id)
 
-        /**
-         * Sends a chat message to a sub-agent and returns its text response.
-         */
-        suspend fun sendMessageToAgent(
-            agentId: String,
-            content: String,
-        ): String {
-            subAgentExecutionControl.awaitExecutionAllowed(agentId)
-            return conversationOps.sendMessageToAgent(agentId, content)
-        }
-
-        /**
-         * Runs a sub-agent job synchronously (awaits completion) and returns the result.
-         */
-        suspend fun runAgentJob(
-            agentId: String,
-            content: String,
-        ): AgentJobResult =
-            subAgentJobScheduler.run(agentId) {
-                conversationOps.runAgentJob(agentId, content)
-            }
-
-        /**
-         * Enqueues a sub-agent job for an existing agent and returns the job ID.
-         */
-        fun enqueueAgentJob(
-            agentId: String,
-            content: String,
-        ): String =
-            subAgentJobScheduler.enqueue(
-                agentId = agentId,
-                block = { conversationOps.runAgentJob(agentId, content) },
-                onFinished = conversationOps::notifyMainAgentOfJobCompletion,
-            )
-
-        /**
-         * Creates a temporary sub-agent, runs a job synchronously, and returns the result.
-         */
-        suspend fun startAgentJob(
-            name: String,
-            role: String,
-            templateName: String,
-            content: String,
-        ): AgentJobResult =
-            subAgentJobScheduler.run {
-                conversationOps.startAgentJob(name, role, templateName, content)
-            }
-
-        /**
-         * Creates a temporary sub-agent, enqueues a job, and returns the job ID.
-         */
-        fun enqueueAgentJob(
-            name: String,
-            role: String,
-            templateName: String,
-            content: String,
-        ): String =
-            subAgentJobScheduler.enqueue(
-                block = { conversationOps.startAgentJob(name, role, templateName, content) },
-                onFinished = conversationOps::notifyMainAgentOfJobCompletion,
-            )
+        /** Returns all sub-agents directly from the database. */
+        fun getSubAgentsFromDb(): List<SubAgent> = lifecycleOps.getSubAgentsFromDb()
 
         /**
          * Returns a snapshot of the current sub-agent job queue.
          */
         fun getSubAgentJobQueueSnapshot(): SubAgentJobQueueSnapshot = subAgentJobScheduler.snapshot()
-
-        /**
-         * Returns the number of active jobs for a given agent ID.
-         */
-        fun getActiveJobCount(agentId: String): Int = activeJobsByAgentId[agentId] ?: 0
 
         /**
          * Sends a user message to the main agent and returns the assistant response.
@@ -300,11 +241,6 @@ class AgentManager
             userEntryId: String,
             assistantEntryId: String,
         ): String = conversationOps.streamMessage(content, token, onChunk, userEntryId, assistantEntryId)
-
-        /**
-         * Cancels a sub-agent job by job ID. Returns true if the job was found and cancelled.
-         */
-        fun cancelSubAgentJob(jobId: String): Boolean = subAgentJobScheduler.cancelJob(jobId)
 
         /**
          * Cancels all running sub-agent jobs. Returns the set of cancelled job IDs.
@@ -404,23 +340,12 @@ class AgentManager
         fun refreshHistoryToLatest(limit: Int = AgentManagerConstants.HISTORY_PAGE_SIZE): List<Message> =
             conversationOps.refreshHistoryToLatest(limit)
 
-        /**
-         * Returns all sub-agents from the database (bypasses the in-memory cache).
-         */
-        fun getSubAgentsFromDb(): List<SubAgent> = lifecycleOps.getSubAgentsFromDb()
-
-        /**
-         * Seeds the default UX improvement todos if they do not already exist.
-         */
+        /** Seeds the default UX improvement todos when they are not already present. */
         fun seedUxTodos() = autonomyOps.seedUxTodos()
 
-        /**
-         * Starts the autonomous todo-processing loop. Optionally seeds UX todos first.
-         */
+        /** Starts autonomous todo processing, optionally seeding the default backlog. */
         fun startAutonomousProcessing(seed: Boolean = true) = autonomyOps.startAutonomousProcessing(seed)
 
-        /**
-         * Starts autonomous mode with a specific goal, adding it as a todo first.
-         */
+        /** Starts autonomous mode with a user-provided goal. */
         fun startAutonomousMode(goal: String) = autonomyOps.startAutonomousMode(goal)
     }

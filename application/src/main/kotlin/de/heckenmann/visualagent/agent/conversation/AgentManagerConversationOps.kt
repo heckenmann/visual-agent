@@ -12,6 +12,7 @@ import de.heckenmann.visualagent.agent.text.ResponseRepetitionGuard
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.error.ErrorMessageMapper
+import de.heckenmann.visualagent.protocol.ConversationCompletionEvent
 import de.heckenmann.visualagent.protocol.ConversationStreamRequest
 import kotlinx.coroutines.flow.collect
 import kotlinx.serialization.json.buildJsonObject
@@ -128,17 +129,20 @@ internal class AgentManagerConversationOps(
                 .randomUUID()
                 .toString()
         token?.throwIfCancelled()
+        var providerFailed = false
         val assistantContent =
             try {
                 owner.responseCoordinator.generateAssistantContentWithRepetitionGuard(requestId, token)
             } catch (error: kotlinx.coroutines.CancellationException) {
                 throw error
             } catch (error: Throwable) {
+                providerFailed = true
                 providerFailureMessage(error)
             }
         token?.throwIfCancelled()
         val assistantMessage = Message(role = "assistant", content = assistantContent)
-        persist(assistantMessage)
+        val persistedAssistant = persist(assistantMessage)
+        if (!providerFailed) publishAssistantCompletion(persistedAssistant)
         owner.finishedToolEventsByRequestId.remove(requestId)
         return assistantMessage.content
     }
@@ -223,12 +227,18 @@ internal class AgentManagerConversationOps(
                 metadata = providerTurn?.let { ResponseTelemetryMetadata.encode(it, true) },
                 id = assistantEntryId,
             )
-        persist(assistantMessage)
+        val persistedAssistant = persist(assistantMessage)
+        if (!cancelled) publishAssistantCompletion(persistedAssistant)
         owner.finishedToolEventsByRequestId.remove(requestId)
         return assistantText
     }
 
     fun clearHistory() = historyOps.clearHistory()
+
+    internal fun publishAssistantCompletion(message: Message) {
+        val id = message.id ?: return
+        owner.conversationCompletionEvents.publish(ConversationCompletionEvent(id, message.timelineSequence))
+    }
 
     private fun conversationTurnMetadata(assistantEntryId: String): String =
         buildJsonObject {

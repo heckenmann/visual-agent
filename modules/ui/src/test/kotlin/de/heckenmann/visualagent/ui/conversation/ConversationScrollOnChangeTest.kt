@@ -41,6 +41,7 @@ class ConversationScrollOnChangeTest {
     fun `scrolls to bottom when a new message is appended`() {
         val messages: SnapshotStateList<Message> = (1..20).map { Message("user", "message $it") }.toMutableStateList()
         val listState = mutableListOf<androidx.compose.foundation.lazy.LazyListState>()
+        var browsingNotifications = 0
         composeTestRule.setContent {
             val state = rememberLazyListState()
             listState.add(state)
@@ -57,7 +58,11 @@ class ConversationScrollOnChangeTest {
                         )
                     }
                 }
-                ConversationScrollOnChangeEffect(messages, state)
+                ConversationScrollOnChangeEffect(
+                    history = messages,
+                    listState = state,
+                    onNewContentWhileBrowsing = { browsingNotifications++ },
+                )
             }
         }
         composeTestRule.waitForIdle()
@@ -70,6 +75,10 @@ class ConversationScrollOnChangeTest {
         assertTrue(
             !listState.single().canScrollBackward,
             "expected canScrollBackward=false after new message appended",
+        )
+        assertTrue(
+            browsingNotifications == 0,
+            "new content while following latest must not show the New messages affordance",
         )
     }
 

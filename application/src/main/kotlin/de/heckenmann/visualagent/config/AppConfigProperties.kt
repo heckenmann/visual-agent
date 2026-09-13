@@ -31,6 +31,9 @@ internal object AppConfigProperties {
             setProperty(AppConfig.KEY_SESSION_TIMEOUT_SECONDS, config.timeoutSeconds.toString())
             setProperty(AppConfig.KEY_SESSION_USER_MODEL_INSTRUCTION, config.userModelInstruction)
             setProperty(AppConfig.KEY_SESSION_QUEUE_FLUSH_MODE, config.queueFlushMode)
+            setProperty(AppConfig.KEY_FOLLOW_UP_SUGGESTIONS_ENABLED, config.followUpSuggestionsEnabled.toString())
+            setProperty(AppConfig.KEY_FOLLOW_UP_SUGGESTION_DELAY_SECONDS, config.followUpSuggestionIdleDelaySeconds.toString())
+            setProperty(AppConfig.KEY_FOLLOW_UP_SUGGESTION_COUNT, config.followUpSuggestionCount.toString())
         }
 
     fun applyBootstrapTo(
@@ -68,6 +71,12 @@ internal object AppConfigProperties {
             properties.string(AppConfig.KEY_SESSION_USER_MODEL_INSTRUCTION, config.userModelInstruction)
         config.favoriteModels = properties.string(AppConfig.KEY_SESSION_FAVORITE_MODELS, config.favoriteModels)
         config.queueFlushMode = properties.string(AppConfig.KEY_SESSION_QUEUE_FLUSH_MODE, config.queueFlushMode)
+        config.followUpSuggestionsEnabled =
+            properties.boolean(AppConfig.KEY_FOLLOW_UP_SUGGESTIONS_ENABLED, config.followUpSuggestionsEnabled)
+        config.followUpSuggestionIdleDelaySeconds =
+            properties.int(AppConfig.KEY_FOLLOW_UP_SUGGESTION_DELAY_SECONDS, config.followUpSuggestionIdleDelaySeconds, 1..60)
+        config.followUpSuggestionCount =
+            properties.int(AppConfig.KEY_FOLLOW_UP_SUGGESTION_COUNT, config.followUpSuggestionCount, 1..5)
     }
 
     private fun Properties.string(

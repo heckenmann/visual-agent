@@ -26,11 +26,30 @@ import de.heckenmann.visualagent.ui.workspace.*
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.yield
 
 /** Scrolls a reverse-layout conversation list to its visual newest end. */
 internal suspend fun LazyListState.scrollToBottom() {
     if (layoutInfo.totalItemsCount == 0) return
+    // Request the position for the next measurement as well as applying it now.  A newly
+    // inserted Markdown row can still be measured after the first scroll call; the second
+    // frame correction keeps the newest message visible instead of leaving a small gap.
+    requestScrollToItem(0)
     scrollToItem(0)
+    repeat(2) {
+        awaitLayoutFrame()
+        if (layoutInfo.totalItemsCount > 0) scrollToItem(0)
+    }
+}
+
+private suspend fun awaitLayoutFrame() {
+    try {
+        withFrameNanos { }
+    } catch (_: IllegalStateException) {
+        // Unit tests and non-Compose callers have no frame clock; yielding still lets a
+        // pending list mutation run without making this utility unusable there.
+        yield()
+    }
 }
 
 /** Cancels an active user scroll before performing an explicit jump to the newest conversation item. */

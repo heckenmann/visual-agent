@@ -40,6 +40,9 @@ internal fun ConversationInputCard(
     inputFocusRequester: FocusRequester,
     modifier: Modifier = Modifier,
     onSizeChanged: ((IntSize) -> Unit)? = null,
+    ghostText: String = "",
+    ghostCursorVisible: Boolean = false,
+    onFocusChanged: (Boolean) -> Unit = {},
 ) {
     val sizedModifier = onSizeChanged?.let { modifier.onSizeChanged(it) } ?: modifier
     Column(
@@ -59,6 +62,9 @@ internal fun ConversationInputCard(
             inputPlacement = inputPlacement,
             onInputPlacementChange = onInputPlacementChange,
             inputFocusRequester = inputFocusRequester,
+            ghostText = ghostText,
+            ghostCursorVisible = ghostCursorVisible,
+            onFocusChanged = onFocusChanged,
         )
     }
 }

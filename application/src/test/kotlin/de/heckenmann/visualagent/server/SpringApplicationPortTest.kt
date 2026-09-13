@@ -16,6 +16,7 @@ class SpringApplicationPortTest {
         val port =
             SpringApplicationPort(
                 conversation = mockk(),
+                conversationSuggestions = mockk(),
                 todos = mockk(),
                 agents = mockk(),
                 providers = mockk(),
@@ -45,6 +46,7 @@ class SpringApplicationPortTest {
         val port =
             SpringApplicationPort(
                 conversation = mockk(),
+                conversationSuggestions = mockk(),
                 todos = mockk(),
                 agents = mockk(),
                 providers = mockk(),

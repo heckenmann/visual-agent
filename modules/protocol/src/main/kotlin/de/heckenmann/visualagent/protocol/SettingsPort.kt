@@ -43,6 +43,9 @@ data class SettingsSnapshot(
     val favoriteModels: List<String> = emptyList(),
     val queueFlushMode: String = "ONE_BY_ONE",
     val maxMainAgentMemoryChars: Int = 12_000,
+    val followUpSuggestionsEnabled: Boolean = true,
+    val followUpSuggestionIdleDelaySeconds: Int = 3,
+    val followUpSuggestionCount: Int = 3,
 )
 
 /**

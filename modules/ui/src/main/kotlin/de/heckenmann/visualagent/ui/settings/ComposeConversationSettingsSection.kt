@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -88,6 +89,40 @@ internal fun conversationSettingsSection(
                     "different timeout within the supported range.",
             range = 5..600,
             onChange = { value -> onChange(settings.copy(timeoutSeconds = value)) },
+        )
+        conversationSettingField(
+            label = "Follow-up suggestions",
+            help =
+                "When enabled, the active model may suggest questions after an idle, completed answer. " +
+                    "Suggestions remain ghost text and are never sent automatically.",
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(
+                    checked = settings.followUpSuggestionsEnabled,
+                    onCheckedChange = { enabled -> onChange(settings.copy(followUpSuggestionsEnabled = enabled)) },
+                )
+                Text("Suggest questions after an idle response")
+            }
+        }
+        conversationNumberSetting(
+            label = "Suggestion idle delay (seconds)",
+            value = settings.followUpSuggestionIdleDelaySeconds,
+            help =
+                "Wait time after a completed answer before requesting suggestions. Higher values reduce " +
+                    "provider requests while the user is still reading.",
+            range = 1..60,
+            useStepper = true,
+            onChange = { value -> onChange(settings.copy(followUpSuggestionIdleDelaySeconds = value)) },
+        )
+        conversationNumberSetting(
+            label = "Suggestion count",
+            value = settings.followUpSuggestionCount,
+            help =
+                "Number of questions requested per idle response. More questions increase provider usage " +
+                    "and animation time.",
+            range = 1..5,
+            useStepper = true,
+            onChange = { value -> onChange(settings.copy(followUpSuggestionCount = value)) },
         )
         conversationSettingField(
             label = "Queue flush",

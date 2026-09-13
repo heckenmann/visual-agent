@@ -25,6 +25,9 @@ Desktop user.
 8. After the final chunk, the completed assistant turn is persisted with the
    same UUID as the streaming row; the existing row receives its final data
    without disappearing or replaying its enter animation.
+9. The server emits a completion event for the persisted assistant turn. If
+   the user remains idle and the composer stays eligible, UC-0000112 may use
+   that event to request optional follow-up question inspiration.
 
 ## Result
 

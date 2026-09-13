@@ -57,14 +57,9 @@ class AgentResponseCoordinator
          * @param content Message content that may contain reasoning markup
          * @return Content without complete or partial reasoning tags
          */
-        fun removeThinkingMarkup(content: String): String =
-            content
-                .replace(THINKING_BLOCK_PATTERN, "")
-                .replace(UNFINISHED_THINKING_BLOCK_PATTERN, "")
-                .replace(CLOSE_THINKING_TAG_PATTERN, "")
+        fun removeThinkingMarkup(content: String): String = ThinkingMarkup.remove(content)
 
-        private fun hasThinkingMarkup(content: String): Boolean =
-            OPEN_THINKING_TAG_PATTERN.containsMatchIn(content) || CLOSE_THINKING_TAG_PATTERN.containsMatchIn(content)
+        private fun hasThinkingMarkup(content: String): Boolean = ThinkingMarkup.isPresent(content)
 
         /**
          * Generates assistant content with repetition-guard retry logic. If the initial response
@@ -146,13 +141,6 @@ class AgentResponseCoordinator
             return compact == """{"tool_calls":[]}""" ||
                 compact == """```json{"tool_calls":[]}```""" ||
                 compact == """```{"tool_calls":[]}```"""
-        }
-
-        private companion object {
-            private val THINKING_BLOCK_PATTERN = Regex("(?is)<think>.*?</think>")
-            private val OPEN_THINKING_TAG_PATTERN = Regex("(?i)<think>")
-            private val UNFINISHED_THINKING_BLOCK_PATTERN = Regex("(?is)<think>.*$")
-            private val CLOSE_THINKING_TAG_PATTERN = Regex("(?i)</think>")
         }
 
         private suspend fun runRepetitionGuardRetry(token: CancellationToken? = null): String {

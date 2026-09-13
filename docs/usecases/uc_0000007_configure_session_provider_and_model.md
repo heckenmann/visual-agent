@@ -19,7 +19,7 @@ Desktop user.
 2. The UI shows enabled provider connections and models selectable for the selected connection.
 3. The user stages a provider, model, favorite, or profile change without affecting active agent requests.
 4. The user may refresh the remote model catalog to update the local selection choices.
-5. The user configures model instruction, context, startup history, parallel agents, tool timeout, and queue behavior in the same local draft.
+5. The user configures model instruction, context, startup history, parallel agents, tool timeout, queue behavior, and optional idle follow-up suggestions in the same local draft.
 6. The user selects **Save changes** to persist the staged catalog, conversation settings, and active provider/model together, or **Reset changes** to reload the persisted state from SQLite.
 7. The user may press **Esc** or select the title-bar close action to discard the local draft without saving.
 8. Later model requests resolve against the saved provider/model.
@@ -63,3 +63,6 @@ Main-agent requests use the user-selected provider and model unless an agent-spe
 - Saving the main-agent selection does not mutate a profile beyond explicitly staged profile edits.
 - Credentials are not exposed to model context or logs.
 - Streaming is used automatically whenever the active provider supports it.
+- Follow-up suggestions can be enabled or disabled and have bounded idle-delay
+  and question-count settings; they remain ghost text and are never sent
+  automatically.

@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.protocol.AgentPort
 import de.heckenmann.visualagent.protocol.ApplicationPort
 import de.heckenmann.visualagent.protocol.CanvasPort
 import de.heckenmann.visualagent.protocol.ConversationPort
+import de.heckenmann.visualagent.protocol.ConversationSuggestionPort
 import de.heckenmann.visualagent.protocol.DirectoryGrantAdministrationPort
 import de.heckenmann.visualagent.protocol.LifecyclePort
 import de.heckenmann.visualagent.protocol.MainAgentMemoryPort
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Component
 @Component
 class SpringApplicationPort(
     override val conversation: ConversationPort,
+    override val conversationSuggestions: ConversationSuggestionPort,
     override val todos: TodoPort,
     override val agents: AgentPort,
     override val providers: ProviderPort,

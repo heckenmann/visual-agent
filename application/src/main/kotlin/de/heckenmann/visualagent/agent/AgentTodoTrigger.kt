@@ -5,6 +5,8 @@ import de.heckenmann.visualagent.agent.text.AgentResponseCoordinator
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
+import de.heckenmann.visualagent.protocol.ConversationCompletionEvent
+import de.heckenmann.visualagent.protocol.ConversationCompletionEventBus
 import de.heckenmann.visualagent.protocol.LifecyclePort
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoStatus
@@ -33,6 +35,7 @@ internal class AgentTodoTrigger(
     private val responseCoordinator: AgentResponseCoordinator,
     private val toolEventBus: ToolEventBus,
     private val lifecycle: LifecyclePort,
+    private val completionEvents: ConversationCompletionEventBus,
 ) {
     private val logger = KotlinLogging.logger {}
     private val terminalReviewMutex = Mutex()
@@ -111,7 +114,15 @@ internal class AgentTodoTrigger(
                     val response = llmProvider.chat(request)
                     val content = responseCoordinator.normalizeAssistantPresentationContent(response.message.content)
                     if (lifecycle.closing) return@withLock
-                    conversationOps.persist(Message(role = "assistant", content = content))
+                    val persistedAssistant = conversationOps.persist(Message(role = "assistant", content = content))
+                    persistedAssistant.id?.let { assistantId ->
+                        completionEvents.publish(
+                            ConversationCompletionEvent(
+                                assistantEntryId = assistantId,
+                                timelineSequence = persistedAssistant.timelineSequence,
+                            ),
+                        )
+                    }
                 } catch (cancelled: CancellationException) {
                     // Cancellation is expected while the application is shutting down. Do not
                     // log it as a failed trigger or attempt a database write after cancellation.

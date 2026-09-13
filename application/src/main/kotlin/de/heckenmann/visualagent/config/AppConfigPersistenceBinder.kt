@@ -57,6 +57,21 @@ class AppConfigPersistenceBinder(
             preferenceStore.getPreference(AppConfigBean.KEY_SESSION_FAVORITE_MODELS) ?: appConfigBean.favoriteModels
         appConfigBean.queueFlushMode =
             preferenceStore.getPreference(AppConfigBean.KEY_SESSION_QUEUE_FLUSH_MODE) ?: appConfigBean.queueFlushMode
+        appConfigBean.followUpSuggestionsEnabled =
+            preferenceStore.getPreference(AppConfigBean.KEY_FOLLOW_UP_SUGGESTIONS_ENABLED)?.toBooleanStrictOrNull()
+                ?: appConfigBean.followUpSuggestionsEnabled
+        appConfigBean.followUpSuggestionIdleDelaySeconds =
+            preferenceStore
+                .getPreference(AppConfigBean.KEY_FOLLOW_UP_SUGGESTION_DELAY_SECONDS)
+                ?.toIntOrNull()
+                ?.coerceIn(AppConfigBean.FOLLOW_UP_SUGGESTION_DELAY_RANGE)
+                ?: appConfigBean.followUpSuggestionIdleDelaySeconds
+        appConfigBean.followUpSuggestionCount =
+            preferenceStore
+                .getPreference(AppConfigBean.KEY_FOLLOW_UP_SUGGESTION_COUNT)
+                ?.toIntOrNull()
+                ?.coerceIn(AppConfigBean.FOLLOW_UP_SUGGESTION_COUNT_RANGE)
+                ?: appConfigBean.followUpSuggestionCount
         appConfigBean.maxMainAgentMemoryChars =
             preferenceStore
                 .getPreference(AppConfigBean.KEY_MAIN_AGENT_MEMORY_CHARS)
