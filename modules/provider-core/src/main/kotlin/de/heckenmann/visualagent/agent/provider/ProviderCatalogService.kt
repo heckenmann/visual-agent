@@ -6,6 +6,8 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.springframework.context.annotation.DependsOn
 import org.springframework.stereotype.Service
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
@@ -73,7 +75,6 @@ class ProviderCatalogService(
                 providers.first { it.id == nextActiveProviderId }.defaultModel
             }
         save(state.copy(activeProviderId = nextActiveProviderId, activeModelId = nextActiveModelId, providers = providers))
-        appConfig.llmProvider = nextActiveProviderId
     }
 
     /**
@@ -103,7 +104,6 @@ class ProviderCatalogService(
                 providers = providers,
             ),
         )
-        appConfig.llmProvider = configuration.providerId
     }
 
     /**
@@ -125,7 +125,6 @@ class ProviderCatalogService(
         val nextActiveModel =
             if (nextActive == state.activeProviderId) state.activeModelId else remaining.first { it.id == nextActive }.defaultModel
         save(state.copy(activeProviderId = nextActive, activeModelId = nextActiveModel, providers = remaining))
-        appConfig.llmProvider = nextActive
         return true
     }
 
@@ -220,7 +219,6 @@ class ProviderCatalogService(
         require(provider != null) { "Provider is missing or disabled: $providerId" }
         val state = load()
         save(state.copy(activeProviderId = providerId, activeModelId = provider.defaultModel))
-        appConfig.llmProvider = providerId
     }
 
     /**
@@ -236,7 +234,6 @@ class ProviderCatalogService(
         resolve(providerId, modelId)
         val state = load()
         save(state.copy(activeProviderId = providerId, activeModelId = modelId))
-        appConfig.llmProvider = providerId
     }
 
     /**
@@ -406,7 +403,23 @@ class ProviderCatalogService(
 
     private fun save(state: CatalogState) {
         preferenceStore.setPreference(KEY_CATALOG, json.encodeToString(state))
-        changeListeners.forEach { listener -> runCatching(listener) }
+        publishProviderChange(state.activeProviderId)
+    }
+
+    private fun publishProviderChange(providerId: String) {
+        val publish = {
+            appConfig.llmProvider = providerId
+            changeListeners.forEach { listener -> runCatching(listener) }
+        }
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(
+                object : TransactionSynchronization {
+                    override fun afterCommit() = publish()
+                },
+            )
+        } else {
+            publish()
+        }
     }
 
     @Serializable

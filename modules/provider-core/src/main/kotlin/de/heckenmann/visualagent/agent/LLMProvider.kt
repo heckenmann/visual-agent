@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent
 
+import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.Serializable
@@ -152,6 +153,20 @@ interface LLMProvider {
      * @see docs/usecases/uc_0000009_discover_available_models.md
      */
     suspend fun getModels(profile: ProviderProfile): List<String> = getModels()
+
+    /**
+     * Discovers structured model metadata using a caller-supplied provider profile without changing
+     * persisted configuration.
+     *
+     * Adapters that cannot supply metadata retain the provider-facing model identifier as the
+     * display name. Implementations should override this when their discovery API exposes
+     * additional capabilities or limits.
+     *
+     * @param profile Provider connection, credentials, and adapter settings used for discovery
+     * @return Discovered model configurations with any available provider metadata
+     * @see docs/usecases/uc_0000009_discover_available_models.md
+     */
+    suspend fun getModelConfigs(profile: ProviderProfile): List<ProviderModelConfig> = getModels(profile).map(::ProviderModelConfig)
 
     /**
      * Get detailed information about a specific model.
