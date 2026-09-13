@@ -25,11 +25,13 @@ Desktop user.
 6. The cycle repeats while the same assistant turn remains eligible.
 7. Any actual edit, paste, send, queue, cancellation, conversation switch, or newer response removes
    the ghost text and consumes that turn's suggestion opportunity. Focus changes alone do not remove it.
+8. When the Compose motion scale is disabled, the panel shows only the first suggestion as static ghost text.
 
 ## Alternative Flows
 
 - If the provider is unavailable, times out, is cancelled, or returns malformed, unsafe, duplicated, or oversized output, no suggestion is shown and no disruptive error is displayed.
 - If settings disable suggestions, pending work is cancelled immediately.
+- If reduced motion is enabled, no typing, blinking, holding, erasing, or cycling animation runs.
 - Initial history, welcome/fallback messages, and partial or failed responses do not start this flow.
 
 ## Result
@@ -55,4 +57,5 @@ The user may use the inspiration to compose a message while retaining complete c
 - Invalid, duplicate, unsafe, stale, failed, timed-out, or cancelled results render nothing.
 - Ghost text never changes the actual input, selection, send state, accessibility semantics, or conversation history.
 - Grapheme-aware typing, cursor blinking, hold, erasing, and cycling are deterministic and cancellable.
+- Reduced-motion users receive a static suggestion without a perpetual animation loop.
 - Settings are persisted, bounded, editable, and applied without restarting the application.

@@ -5,7 +5,9 @@ import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ModelParameters
+import de.heckenmann.visualagent.agent.text.ThinkingMarkup
 import de.heckenmann.visualagent.config.AppConfigBean
+import de.heckenmann.visualagent.knowledge.ConversationRecord
 import de.heckenmann.visualagent.knowledge.ConversationStore
 import de.heckenmann.visualagent.protocol.CancellationToken
 import de.heckenmann.visualagent.protocol.ConversationCompletionEvent
@@ -30,6 +32,8 @@ class SpringConversationSuggestionPort(
     private val appConfig: AppConfigBean,
     private val completionEvents: de.heckenmann.visualagent.protocol.ConversationCompletionEventBus,
 ) : ConversationSuggestionPort {
+    private val contextAssembler = SuggestionContextAssembler()
+
     override suspend fun generate(
         request: ConversationSuggestionRequest,
         token: CancellationToken,
@@ -47,11 +51,20 @@ class SpringConversationSuggestionPort(
                 rows
                     .subList((anchorIndex - 9).coerceAtLeast(0), anchorIndex + 1)
                     .filter { it.role == "user" || it.role == "assistant" }
+            val systemInstruction = suggestionSystemInstruction(appConfig.followUpSuggestionCount)
+            val finalRequest = "Return the follow-up question JSON array now."
+            val providerContext =
+                contextAssembler.assemble(
+                    history = contextRows.map(::toProviderMessage),
+                    systemInstruction = systemInstruction,
+                    finalRequest = finalRequest,
+                    contextLength = appConfig.contextLength,
+                )
             val messages =
                 buildList {
-                    add(Message("system", suggestionSystemInstruction(appConfig.followUpSuggestionCount)))
-                    contextRows.forEach { row -> add(Message(row.role, row.content.take(12_000))) }
-                    add(Message("user", "Return the follow-up question JSON array now."))
+                    add(Message("system", systemInstruction))
+                    addAll(providerContext)
+                    add(Message("user", finalRequest))
                 }
             val applicationToken = ApplicationCancellationToken()
             token.onCancelled(applicationToken::cancel)
@@ -78,12 +91,17 @@ class SpringConversationSuggestionPort(
             applicationToken.cancel()
             val response = raw ?: return@withContext empty
             val questions = runCatching { Json.decodeFromString<List<String>>(response) }.getOrNull() ?: return@withContext empty
-            val validated = validateQuestions(questions, appConfig.followUpSuggestionCount, previous, contextRows.map { it.content })
+            val validated = validateQuestions(questions, appConfig.followUpSuggestionCount, previous, contextRows.map(::providerContent))
             ConversationSuggestionResult(request.assistantEntryId, validated)
         }
 
     override fun addCompletionListener(listener: (ConversationCompletionEvent) -> Unit): AutoCloseable =
         completionEvents.addListener(listener)
+
+    private fun toProviderMessage(row: ConversationRecord): Message = Message(role = row.role, content = providerContent(row))
+
+    private fun providerContent(row: ConversationRecord): String =
+        if (row.role == "assistant") ThinkingMarkup.remove(row.content).trim() else row.content
 
     private fun validateQuestions(
         questions: List<String>,

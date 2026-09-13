@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.ui.conversation
 
+import androidx.compose.ui.MotionDurationScale
 import de.heckenmann.visualagent.protocol.CancellationTokenImpl
 import de.heckenmann.visualagent.protocol.ConversationCompletionEvent
 import de.heckenmann.visualagent.protocol.ConversationSuggestionPort
@@ -12,8 +13,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.text.BreakIterator
-import java.util.Locale
 
 /** Rendering phase for an idle follow-up suggestion. */
 internal enum class ConversationSuggestionPhase {
@@ -41,6 +40,9 @@ internal class ConversationSuggestionController(
     private val port: ConversationSuggestionPort,
     private val scope: CoroutineScope,
     private val pause: suspend (Long) -> Unit = { delay(it) },
+    private val reducedMotion: () -> Boolean = {
+        scope.coroutineContext[MotionDurationScale.Key]?.scaleFactor == 0f
+    },
 ) {
     private val stateHolder = MutableStateFlow(ConversationSuggestionUiState())
     private val lock = Any()
@@ -56,6 +58,13 @@ internal class ConversationSuggestionController(
     private var queuedMessages = 0
     private var previousQuestions: List<String> = emptyList()
     private var closed = false
+    private val animator =
+        ConversationSuggestionAnimator(
+            stateHolder = stateHolder,
+            pause = pause,
+            isEligible = ::isEligible,
+            reducedMotion = reducedMotion,
+        )
 
     /** Current ghost-text rendering state. */
     val state: StateFlow<ConversationSuggestionUiState> = stateHolder.asStateFlow()
@@ -82,6 +91,7 @@ internal class ConversationSuggestionController(
     fun onCompletion(event: ConversationCompletionEvent) {
         synchronized(lock) {
             if (closed) return
+            if (!isNewerThanPending(event)) return
             generation++
             attemptedGeneration = null
             pendingCompletion = event
@@ -162,6 +172,18 @@ internal class ConversationSuggestionController(
         cancelLocked(clearPending = true)
     }
 
+    private fun isNewerThanPending(event: ConversationCompletionEvent): Boolean {
+        val pending = pendingCompletion ?: return true
+        if (pending.assistantEntryId == event.assistantEntryId) return false
+        val pendingSequence = pending.timelineSequence
+        val eventSequence = event.timelineSequence
+        return when {
+            pendingSequence != null && eventSequence != null -> eventSequence > pendingSequence
+            pendingSequence != null -> false
+            else -> true
+        }
+    }
+
     private fun cancelLocked(clearPending: Boolean) {
         animationJob?.cancel()
         animationJob = null
@@ -220,7 +242,7 @@ internal class ConversationSuggestionController(
                         return@launch
                     }
                     previousQuestions = questions
-                    animateQuestions(questions, runGeneration)
+                    animator.animate(questions, runGeneration)
                 }.also { job ->
                     job.invokeOnCompletion {
                         synchronized(lock) {
@@ -237,77 +259,6 @@ internal class ConversationSuggestionController(
 
     private fun eligibleLocked(): Boolean = input.isBlank() && !sending && queuedMessages == 0
 
-    private suspend fun animateQuestions(
-        questions: List<String>,
-        runGeneration: Long,
-    ) {
-        while (isEligible(runGeneration)) {
-            for (question in questions) {
-                if (!isEligible(runGeneration)) return
-                val boundaries = graphemeBoundaries(question)
-                stateHolder.value = ConversationSuggestionUiState(phase = ConversationSuggestionPhase.TYPING)
-                for (index in 1 until boundaries.size) {
-                    if (!isEligible(runGeneration)) return
-                    val visible = question.substring(0, boundaries[index])
-                    stateHolder.value =
-                        ConversationSuggestionUiState(
-                            text = visible,
-                            cursorVisible = (index / CURSOR_TOGGLE_INTERVAL_CHARS) % 2 == 0,
-                            phase = ConversationSuggestionPhase.TYPING,
-                        )
-                    pause(TYPE_INTERVAL_MILLIS)
-                }
-                if (!isEligible(runGeneration)) return
-                blinkAndHold(question, runGeneration)
-                val eraseBoundaries = graphemeBoundaries(question)
-                for (index in eraseBoundaries.lastIndex - 1 downTo 0) {
-                    if (!isEligible(runGeneration)) return
-                    stateHolder.value =
-                        ConversationSuggestionUiState(
-                            text = question.substring(0, eraseBoundaries[index]),
-                            cursorVisible = (index / CURSOR_TOGGLE_INTERVAL_CHARS) % 2 == 0,
-                            phase = ConversationSuggestionPhase.ERASING,
-                        )
-                    pause(ERASE_INTERVAL_MILLIS)
-                }
-                stateHolder.value = ConversationSuggestionUiState()
-                pause(NEXT_QUESTION_GAP_MILLIS)
-            }
-        }
-    }
-
-    private suspend fun blinkAndHold(
-        question: String,
-        runGeneration: Long,
-    ) {
-        var elapsed = 0L
-        while (elapsed < HOLD_INTERVAL_MILLIS) {
-            if (!isEligible(runGeneration)) return
-            stateHolder.value =
-                ConversationSuggestionUiState(
-                    text = question,
-                    cursorVisible = (elapsed / CURSOR_BLINK_MILLIS) % 2L == 0L,
-                    phase = ConversationSuggestionPhase.HOLDING,
-                )
-            val step = CURSOR_BLINK_MILLIS.coerceAtMost(HOLD_INTERVAL_MILLIS - elapsed)
-            pause(step)
-            elapsed += step
-        }
-    }
-
-    private fun graphemeBoundaries(value: String): List<Int> {
-        val iterator = BreakIterator.getCharacterInstance(Locale.ROOT)
-        iterator.setText(value)
-        return buildList {
-            add(iterator.first())
-            var boundary = iterator.next()
-            while (boundary != BreakIterator.DONE) {
-                add(boundary)
-                boundary = iterator.next()
-            }
-        }
-    }
-
     private data class SuggestionSettings(
         val enabled: Boolean = true,
         val delaySeconds: Int = 3,
@@ -316,11 +267,5 @@ internal class ConversationSuggestionController(
 
     private companion object {
         private const val MAX_QUESTION_LENGTH = 140
-        private const val TYPE_INTERVAL_MILLIS = 45L
-        private const val CURSOR_BLINK_MILLIS = 500L
-        private const val HOLD_INTERVAL_MILLIS = 2_000L
-        private const val ERASE_INTERVAL_MILLIS = 25L
-        private const val NEXT_QUESTION_GAP_MILLIS = 250L
-        private const val CURSOR_TOGGLE_INTERVAL_CHARS = 12
     }
 }

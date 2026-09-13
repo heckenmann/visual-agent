@@ -14,10 +14,14 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
+import org.springframework.ai.tokenizer.JTokkitTokenCountEstimator
 import java.time.Instant
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /** Verifies bounded, tool-less server-side suggestion generation. */
 class SpringConversationSuggestionPortTest {
@@ -81,6 +85,38 @@ class SpringConversationSuggestionPortTest {
         }
 
     @Test
+    fun `strips reasoning markup before sending context to a provider`() =
+        runTest {
+            configureEnabled()
+            every { store.getConversationMessages("main", 500) } returns
+                history().map { row ->
+                    if (row.id == assistantId) row.copy(content = "Visible answer.<think>private reasoning</think>") else row
+                }
+            val request = slot<ChatRequestContext>()
+            coEvery { provider.chat(capture(request)) } returns validResponse()
+
+            port.generate(ConversationSuggestionRequest(assistantId), CancellationTokenImpl())
+
+            assertFalse(request.captured.messages.any { "<think>" in it.content || "private reasoning" in it.content })
+        }
+
+    @Test
+    fun `bounds long suggestion context to the configured context length`() =
+        runTest {
+            configureEnabled(contextLength = 1_024)
+            every { store.getConversationMessages("main", 500) } returns longHistory()
+            val request = slot<ChatRequestContext>()
+            coEvery { provider.chat(capture(request)) } returns validResponse()
+
+            port.generate(ConversationSuggestionRequest(assistantId), CancellationTokenImpl())
+
+            assertTrue(request.captured.messages.any { it.role == "assistant" })
+            assertTrue(
+                JTokkitTokenCountEstimator().estimate(request.captured.messages.joinToString("\n") { it.content }) <= 1_024,
+            )
+        }
+
+    @Test
     fun `disabled setting skips database and provider work`() =
         runTest {
             every { config.followUpSuggestionsEnabled } returns false
@@ -92,10 +128,22 @@ class SpringConversationSuggestionPortTest {
             coVerify(exactly = 0) { provider.chat(any<ChatRequestContext>()) }
         }
 
-    private fun configureEnabled() {
+    private fun configureEnabled(contextLength: Int = 4_096) {
         every { config.followUpSuggestionsEnabled } returns true
         every { config.followUpSuggestionCount } returns 3
+        every { config.contextLength } returns contextLength
     }
+
+    private fun validResponse(): ChatResponse =
+        ChatResponse(
+            model = "active-model",
+            message =
+                Message(
+                    "assistant",
+                    "[\"What should we explore next?\",\"Which risk deserves attention?\",\"How would you validate this?\"]",
+                ),
+            done = true,
+        )
 
     private fun history(): List<ConversationRecord> =
         listOf(
@@ -116,4 +164,30 @@ class SpringConversationSuggestionPortTest {
                 timelineSequence = 2,
             ),
         )
+
+    private fun longHistory(): List<ConversationRecord> =
+        buildList {
+            repeat(5) { index ->
+                add(
+                    ConversationRecord(
+                        id = "00000000-0000-4000-8000-00000000000${index + 1}",
+                        role = "user",
+                        content = "question ".repeat(8_000),
+                        metadata = null,
+                        createdAt = Instant.EPOCH,
+                        timelineSequence = (index * 2 + 1).toLong(),
+                    ),
+                )
+                add(
+                    ConversationRecord(
+                        id = if (index == 4) assistantId else "10000000-0000-4000-8000-00000000000${index + 1}",
+                        role = "assistant",
+                        content = "answer ".repeat(8_000),
+                        metadata = null,
+                        createdAt = Instant.EPOCH,
+                        timelineSequence = (index * 2 + 2).toLong(),
+                    ),
+                )
+            }
+        }
 }

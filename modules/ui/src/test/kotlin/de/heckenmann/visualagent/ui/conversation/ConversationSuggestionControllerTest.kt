@@ -16,6 +16,7 @@ import kotlin.test.assertEquals
 @OptIn(ExperimentalCoroutinesApi::class)
 class ConversationSuggestionControllerTest {
     private val assistantId = "22222222-2222-4222-8222-222222222222"
+    private val newerAssistantId = "33333333-3333-4333-8333-333333333333"
 
     @Test
     fun `completed turn requests suggestions after eligibility delay`() =
@@ -164,6 +165,43 @@ class ConversationSuggestionControllerTest {
             runCurrent()
 
             assertEquals(1, port.requests.size)
+            controller.close()
+        }
+
+    @Test
+    fun `ignores a delayed completion older than the current suggestion anchor`() =
+        runTest {
+            val port = RecordingSuggestionPort()
+            val controller = ConversationSuggestionController(port, backgroundScope, pause = {})
+            controller.updateSettings(SettingsSnapshot())
+
+            controller.onCompletion(ConversationCompletionEvent(assistantId, 2))
+            controller.onCompletion(ConversationCompletionEvent(newerAssistantId, 3))
+            controller.onCompletion(ConversationCompletionEvent(assistantId, 2))
+            runCurrent()
+
+            assertEquals(listOf(newerAssistantId), port.requests.map(ConversationSuggestionRequest::assistantEntryId))
+            controller.close()
+        }
+
+    @Test
+    fun `reduced motion keeps one static ghost suggestion`() =
+        runTest {
+            val port = RecordingSuggestionPort(result = listOf("What should we explore next?"))
+            val controller =
+                ConversationSuggestionController(
+                    port = port,
+                    scope = backgroundScope,
+                    pause = {},
+                    reducedMotion = { true },
+                )
+            controller.updateSettings(SettingsSnapshot(followUpSuggestionCount = 1))
+
+            controller.onCompletion(ConversationCompletionEvent(assistantId, 4))
+            runCurrent()
+
+            assertEquals("What should we explore next?", controller.state.value.text)
+            assertEquals(ConversationSuggestionPhase.HOLDING, controller.state.value.phase)
             controller.close()
         }
 
