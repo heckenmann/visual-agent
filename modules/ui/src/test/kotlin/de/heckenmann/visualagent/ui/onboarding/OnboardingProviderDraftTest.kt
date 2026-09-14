@@ -19,6 +19,7 @@ class OnboardingProviderDraftTest {
 
         assertEquals(ProviderAdapter.OPENAI_COMPATIBLE, updated.adapter)
         assertEquals("https://api.openai.com", updated.baseUrl)
+        assertEquals("http://localhost:11434", ProviderAdapter.OLLAMA.defaultEndpoint())
     }
 
     @Test
