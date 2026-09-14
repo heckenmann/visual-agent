@@ -18,9 +18,9 @@ internal object WorkspaceFilePaths {
     val TEXT_EXTENSIONS = setOf("txt", "md", "csv", "json", "xml", "log", "kt", "java", "draw", "jhd", "canvas")
 
     /** Returns the managed workspace root directory, creating it when necessary. */
-    fun workspaceRoot(databasePath: String = "./data/visual-agent.db"): Path {
+    fun workspaceRoot(databasePath: String): Path {
         val dbPath = normalizedDatabasePath(databasePath)
-        val parent = dbPath.parent ?: Path.of("data").toAbsolutePath().normalize()
+        val parent = requireNotNull(dbPath.parent) { "The database path must have a parent directory" }
         return parent
             .resolve("workspace")
             .toAbsolutePath()
@@ -31,7 +31,7 @@ internal object WorkspaceFilePaths {
     /** Resolves a workspace-relative file path and rejects path traversal. */
     fun resolveManagedPath(
         relativePath: String,
-        databasePath: String = "./data/visual-agent.db",
+        databasePath: String,
     ): Path {
         val resolved = resolveWorkspacePath(relativePath, databasePath)
         require(resolved.exists() && resolved.isRegularFile()) { "Workspace file does not exist" }
@@ -41,7 +41,7 @@ internal object WorkspaceFilePaths {
     /** Resolves a workspace-relative path and rejects path traversal without requiring the file to exist. */
     fun resolveWorkspacePath(
         relativePath: String,
-        databasePath: String = "./data/visual-agent.db",
+        databasePath: String,
     ): Path {
         val root = workspaceRoot(databasePath)
         val resolved = root.resolve(normalizeRelativePath(relativePath)).normalize()
@@ -52,7 +52,7 @@ internal object WorkspaceFilePaths {
     /** Returns a path relative to the managed workspace root. */
     fun relativePath(
         path: Path,
-        databasePath: String = "./data/visual-agent.db",
+        databasePath: String,
     ): String {
         val root = workspaceRoot(databasePath).toRealPath()
         val target = path.toRealPath()
@@ -134,7 +134,20 @@ internal object WorkspaceFilePaths {
 
     private fun normalizedDatabasePath(databasePath: String): Path {
         val raw = databasePath.removePrefix("jdbc:sqlite:")
-        val path = Path.of(raw.ifBlank { "./data/visual-agent.db" })
-        return if (path.isAbsolute) path.normalize() else Path.of(System.getProperty("user.dir")).resolve(path).normalize()
+        if (raw == ":memory:") {
+            return Path
+                .of(System.getProperty("java.io.tmpdir"))
+                .resolve("visual-agent-memory-workspace-${ProcessHandle.current().pid()}")
+                .resolve("memory.db")
+        }
+        require(raw.isNotBlank()) { "A file-backed database path is required for the managed workspace" }
+        require(!raw.startsWith("file:")) {
+            "A file-backed database path is required for the managed workspace"
+        }
+        val path = Path.of(raw)
+        require(path.isAbsolute) {
+            "The managed workspace requires an absolute database path"
+        }
+        return path.normalize()
     }
 }

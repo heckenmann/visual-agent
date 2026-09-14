@@ -6,11 +6,6 @@ import java.util.Properties
  * Converts application configuration to and from non-secret properties.
  */
 internal object AppConfigProperties {
-    fun bootstrapFrom(config: AppConfig): Properties =
-        Properties().apply {
-            setProperty(AppConfig.KEY_DATABASE_PATH, config.databasePath)
-        }
-
     fun exportFrom(config: AppConfig): Properties =
         Properties().apply {
             setProperty(AppConfig.KEY_LLM_PROVIDER, config.llmProvider)
@@ -35,13 +30,6 @@ internal object AppConfigProperties {
             setProperty(AppConfig.KEY_FOLLOW_UP_SUGGESTION_DELAY_SECONDS, config.followUpSuggestionIdleDelaySeconds.toString())
             setProperty(AppConfig.KEY_FOLLOW_UP_SUGGESTION_COUNT, config.followUpSuggestionCount.toString())
         }
-
-    fun applyBootstrapTo(
-        config: AppConfig,
-        properties: Properties,
-    ) {
-        config.databasePath = properties.string(AppConfig.KEY_DATABASE_PATH, config.databasePath)
-    }
 
     fun applyTo(
         config: AppConfig,

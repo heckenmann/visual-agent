@@ -26,7 +26,7 @@ class AppConfigBean(
     override var openAiApiKey = ""
     override var openAiBaseUrl: String = "https://api.openai.com"
     override var openAiModel: String = ""
-    var databasePath: String = "./data/visual-agent.db"
+    var databasePath: String = ServerDataPathResolver.defaultServerDataRoot().resolve("visual-agent.db").toString()
     var uiThemeMode: ThemeMode = ThemeMode.SYSTEM
     var fontSize: Int = 14
     var uiScalePercent: Int? = null
