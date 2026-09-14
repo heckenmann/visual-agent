@@ -41,7 +41,7 @@ class ComposeErrorUiTest {
             )
         composeTestRule.setContent {
             MaterialTheme {
-                composeModalHost(
+                ComposeModalHost(
                     modal =
                         ComposeErrorModal(
                             userError = userError,
@@ -68,7 +68,7 @@ class ComposeErrorUiTest {
         var retried = false
         composeTestRule.setContent {
             MaterialTheme {
-                composeModalHost(
+                ComposeModalHost(
                     modal =
                         ComposeErrorModal(
                             userError = userError,
@@ -98,7 +98,7 @@ class ComposeErrorUiTest {
         var dismissed = false
         composeTestRule.setContent {
             MaterialTheme {
-                composeModalHost(
+                ComposeModalHost(
                     modal =
                         ComposeErrorModal(
                             userError = userError,

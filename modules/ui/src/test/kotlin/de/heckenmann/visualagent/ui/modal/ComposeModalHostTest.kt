@@ -53,7 +53,7 @@ class ComposeModalHostTest {
                     onConfirm = { confirmed = true },
                 )
             MaterialTheme {
-                composeModalHost(
+                ComposeModalHost(
                     modal = modal,
                     onDismiss = { dismissed = true },
                 )
@@ -79,7 +79,7 @@ class ComposeModalHostTest {
                     onConfirm = {},
                 )
             MaterialTheme {
-                composeModalHost(
+                ComposeModalHost(
                     modal = modal,
                     onDismiss = { dismissed = true },
                 )
@@ -100,7 +100,7 @@ class ComposeModalHostTest {
                     dismissDescription = "Got it",
                 )
             MaterialTheme {
-                composeModalHost(
+                ComposeModalHost(
                     modal = modal,
                     onDismiss = { dismissed = true },
                 )
@@ -116,7 +116,7 @@ class ComposeModalHostTest {
     fun `null modal renders nothing`() {
         composeTestRule.setContent {
             MaterialTheme {
-                composeModalHost(modal = null, onDismiss = {})
+                ComposeModalHost(modal = null, onDismiss = {})
             }
         }
         composeTestRule.onNodeWithText("Info").assertDoesNotExist()
@@ -132,7 +132,7 @@ class ComposeModalHostTest {
                     content = { Text("Custom body") },
                 )
             MaterialTheme {
-                composeModalHost(
+                ComposeModalHost(
                     modal = modal,
                     onDismiss = { dismissed = true },
                 )
@@ -147,7 +147,7 @@ class ComposeModalHostTest {
         var dismissed = false
         composeTestRule.setContent {
             MaterialTheme {
-                composeModalHost(
+                ComposeModalHost(
                     modal =
                         ComposeContentModal(
                             title = "Custom",
@@ -169,7 +169,7 @@ class ComposeModalHostTest {
         var dismissed = false
         composeTestRule.setContent {
             MaterialTheme {
-                composeModalHost(
+                ComposeModalHost(
                     modal = ComposeSettingsModal(title = "Panel settings") { Text("Settings body") },
                     onDismiss = { dismissed = true },
                 )
@@ -186,7 +186,7 @@ class ComposeModalHostTest {
     fun `settings modal keeps content clear of rounded card corners`() {
         composeTestRule.setContent {
             MaterialTheme {
-                composeModalHost(
+                ComposeModalHost(
                     modal =
                         ComposeSettingsModal(title = "Panel settings") {
                             Box(modifier = Modifier.size(300.dp, 100.dp).testTag("Settings modal body"))
@@ -208,7 +208,7 @@ class ComposeModalHostTest {
         var dismissed = false
         composeTestRule.setContent {
             MaterialTheme {
-                composeModalHost(
+                ComposeModalHost(
                     modal = ComposeSettingsModal(title = "Panel settings") { Text("Settings body") },
                     onDismiss = { dismissed = true },
                 )
@@ -225,7 +225,7 @@ class ComposeModalHostTest {
         composeTestRule.setContent {
             MaterialTheme {
                 Box(modifier = Modifier.size(800.dp, 1_000.dp)) {
-                    composeModalHost(
+                    ComposeModalHost(
                         modal = ComposeInfoModal(title = "Info", message = "Short message."),
                         onDismiss = {},
                     )
@@ -247,7 +247,7 @@ class ComposeModalHostTest {
         composeTestRule.setContent {
             MaterialTheme {
                 Box(modifier = Modifier.size(800.dp, 1_000.dp)) {
-                    composeModalHost(
+                    ComposeModalHost(
                         modal = ComposeInfoModal(title = "Info", message = longMessage),
                         onDismiss = {},
                     )
@@ -264,7 +264,7 @@ class ComposeModalHostTest {
         composeTestRule.setContent {
             MaterialTheme {
                 Box(modifier = Modifier.size(800.dp, 400.dp)) {
-                    composeModalHost(
+                    ComposeModalHost(
                         modal =
                             ComposeConfirmationModal(
                                 title = "Confirm",

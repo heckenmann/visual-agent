@@ -50,6 +50,7 @@ data class ComposePanelServices(
     val todos: de.heckenmann.visualagent.protocol.TodoPort,
     val modalRequester: ComposeModalRequester,
     val onSettingsChanged: () -> Unit,
+    val onRunOnboarding: () -> Unit,
     val inFlight: InFlightStateHolder,
     val lifecycle: de.heckenmann.visualagent.protocol.LifecyclePort,
 )

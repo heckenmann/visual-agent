@@ -23,6 +23,7 @@ Desktop user.
 6. The catalog permits multiple profiles using the same adapter, so separate endpoints and credentials can be configured independently.
 7. If the active profile is disabled or deleted, the catalog selects another enabled profile; it never leaves the session without an enabled provider.
 8. Model resolution uses provider, model, agent, and variant settings in deterministic order.
+9. The optional onboarding wizard receives only safe profile information; existing credentials are represented as configured or not configured and are write-only when changed.
 
 ## Result
 
@@ -54,3 +55,4 @@ Different agents and sessions can use different providers and model parameters.
 - At least one provider profile remains enabled.
 - Option merging is deterministic.
 - Raw API keys are not included in tool output, model context, exported config, or logs.
+- Re-running onboarding preserves an existing credential unless the user explicitly replaces or clears it.

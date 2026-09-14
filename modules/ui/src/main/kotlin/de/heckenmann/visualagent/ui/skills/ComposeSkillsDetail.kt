@@ -14,7 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import de.heckenmann.visualagent.protocol.SkillDocument
 import de.heckenmann.visualagent.ui.components.ComposeMarkdown
-import de.heckenmann.visualagent.ui.modal.modalDialogLayout
+import de.heckenmann.visualagent.ui.modal.ModalDialogLayout
 import de.heckenmann.visualagent.ui.modal.modalPrimaryButton
 import de.heckenmann.visualagent.ui.modal.modalSecondaryButton
 
@@ -27,7 +27,7 @@ internal fun SkillDetail(
     onDelete: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    modalDialogLayout(
+    ModalDialogLayout(
         body = {
             Text(
                 "Revision ${document.summary.revision} · ${document.summary.readCount} model reads" +

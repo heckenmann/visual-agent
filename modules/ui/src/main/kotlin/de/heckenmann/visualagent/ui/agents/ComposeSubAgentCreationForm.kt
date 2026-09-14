@@ -45,7 +45,7 @@ internal fun SubAgentCreationForm(
             .sorted()
             .map { PanelSelectOption(it, it.labelizeEnumName()) }
 
-    modalDialogLayout(
+    ModalDialogLayout(
         body = {
             OutlinedTextField(
                 value = name,

@@ -22,7 +22,8 @@ Desktop user.
 5. The user configures model instruction, context, startup history, parallel agents, tool timeout, queue behavior, and optional idle follow-up suggestions in the same local draft.
 6. The user selects **Save changes** to persist the staged catalog, conversation settings, and active provider/model together, or **Reset changes** to reload the persisted state from SQLite.
 7. The user may press **Esc** or select the title-bar close action to discard the local draft without saving.
-8. Later model requests resolve against the saved provider/model.
+8. The user may select **Run onboarding again** to open the server-owned readiness wizard for the currently connected Visual Agent server.
+9. Later model requests resolve against the saved provider/model.
 
 ## Result
 
@@ -66,3 +67,4 @@ Main-agent requests use the user-selected provider and model unless an agent-spe
 - Follow-up suggestions can be enabled or disabled and have bounded idle-delay
   and question-count settings; they remain ghost text and are never sent
   automatically.
+- Re-running onboarding never downloads a stored credential into the desktop client.

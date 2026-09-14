@@ -20,6 +20,9 @@ interface ApplicationPort {
     /** Runtime and presentation settings. */
     val settings: SettingsPort
 
+    /** First-run provider and model onboarding owned by the connected Visual Agent server. */
+    val onboarding: OnboardingPort
+
     /** Durable editable memory owned by the main agent. */
     val mainAgentMemory: MainAgentMemoryPort
 

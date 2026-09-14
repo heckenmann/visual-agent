@@ -144,7 +144,7 @@ private fun RenameFileDialog(
     onRename: (String) -> Unit,
 ) {
     var name by remember(currentName) { mutableStateOf(currentName) }
-    modalDialogLayout(
+    ModalDialogLayout(
         body = {
             OutlinedTextField(
                 value = name,

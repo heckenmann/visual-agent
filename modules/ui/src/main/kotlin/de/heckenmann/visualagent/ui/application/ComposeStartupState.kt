@@ -7,6 +7,9 @@ enum class StartupPhase {
     /** Compose has rendered, but the server bootstrap has not started yet. */
     STARTING_UI,
 
+    /** The user must select a Visual Agent server before connection startup begins. */
+    WAITING_FOR_SERVER_SELECTION,
+
     /** The desktop host is resolving its workstation-local endpoint configuration. */
     RESOLVING_ENDPOINT,
 
@@ -43,6 +46,7 @@ data class StartupStatus(
     fun message(): String =
         when (phase) {
             StartupPhase.STARTING_UI -> "Starting the user interface"
+            StartupPhase.WAITING_FOR_SERVER_SELECTION -> "Choose a Visual Agent server to continue"
             StartupPhase.RESOLVING_ENDPOINT -> "Resolving server endpoint"
             StartupPhase.STARTING_SERVER -> "Starting the local server"
             StartupPhase.CONNECTING_REMOTE -> "Connecting to remote server"
@@ -55,6 +59,9 @@ data class StartupStatus(
     companion object {
         /** Creates the first state visible before the bootstrap coroutine runs. */
         fun initial(): StartupStatus = StartupStatus(StartupPhase.STARTING_UI)
+
+        /** Creates the idle server-selection state shown before any server is started. */
+        fun waitingForServerSelection(): StartupStatus = StartupStatus(StartupPhase.WAITING_FOR_SERVER_SELECTION)
 
         /** Creates the local server bootstrap state. */
         fun startingServer(): StartupStatus = StartupStatus(StartupPhase.STARTING_SERVER)

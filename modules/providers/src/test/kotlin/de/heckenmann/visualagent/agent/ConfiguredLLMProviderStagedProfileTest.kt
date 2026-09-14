@@ -1,0 +1,45 @@
+package de.heckenmann.visualagent.agent
+
+import de.heckenmann.visualagent.agent.openai.OpenAiClient
+import de.heckenmann.visualagent.agent.provider.ProviderAdapter
+import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
+import de.heckenmann.visualagent.agent.provider.ProviderProfile
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.mockk
+import kotlinx.coroutines.test.runTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+
+/** Verifies catalog-independent routing of a transient onboarding provider profile. */
+class ConfiguredLLMProviderStagedProfileTest {
+    @Test
+    fun `staged provider profile validates without reading or mutating the catalog`() =
+        runTest {
+            val catalog = mockk<ProviderCatalogService>()
+            val ollama = mockk<OllamaClient>(relaxed = true)
+            val openAi = mockk<OpenAiClient>()
+            val requestSlot = io.mockk.slot<ChatRequestContext>()
+            coEvery { openAi.chat(capture(requestSlot)) } returns ChatResponse("staged-model", Message("assistant", "READY"), true)
+            val staged =
+                ProviderProfile(
+                    id = "staged-openai",
+                    name = "Staged OpenAI",
+                    adapter = ProviderAdapter.OPENAI_COMPATIBLE,
+                    baseUrl = "https://api.example",
+                    apiKey = "transient-key",
+                    defaultModel = "staged-model",
+                )
+
+            ConfiguredLLMProvider(ollama, openAi, catalog).chat(
+                ChatRequestContext(
+                    messages = listOf(Message("user", "Reply with READY.")),
+                    providerProfile = staged,
+                ),
+            )
+
+            assertEquals(staged, requestSlot.captured.providerProfile)
+            assertEquals("staged-model", requestSlot.captured.model)
+            coVerify(exactly = 0) { catalog.resolve(any(), any(), any(), any()) }
+        }
+}

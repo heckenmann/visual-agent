@@ -1,16 +1,8 @@
 package de.heckenmann.visualagent.desktop
 
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -28,16 +20,19 @@ import androidx.compose.ui.window.WindowDecoration
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.rememberWindowState
-import de.heckenmann.visualagent.AppIdentity
 import de.heckenmann.visualagent.desktop.generated.resources.Res
 import de.heckenmann.visualagent.desktop.generated.resources.visual_agent
+import de.heckenmann.visualagent.protocol.ApplicationPort
 import de.heckenmann.visualagent.protocol.LayoutSize
 import de.heckenmann.visualagent.protocol.LayoutWindowState
+import de.heckenmann.visualagent.protocol.OnboardingState
+import de.heckenmann.visualagent.protocol.OnboardingStatus
 import de.heckenmann.visualagent.protocol.WorkspaceLayoutSnapshot
 import de.heckenmann.visualagent.ui.application.ComposeApplicationDependencies
 import de.heckenmann.visualagent.ui.application.StartupPhase
 import de.heckenmann.visualagent.ui.application.StartupStatus
 import de.heckenmann.visualagent.ui.application.VisualAgentComposeApp
+import de.heckenmann.visualagent.ui.onboarding.ComposeOnboardingWizard
 import de.heckenmann.visualagent.ui.workspace.visualAgentDarkColorScheme
 import de.heckenmann.visualagent.ui.workspace.visualAgentTypography
 import org.jetbrains.compose.resources.painterResource
@@ -49,6 +44,9 @@ internal enum class StartupWindowMode {
 
     /** The server is ready and the persisted workspace can be shown. */
     MAIN,
+
+    /** The connected server requires provider/model setup before the workspace may open. */
+    ONBOARDING,
 }
 
 /**
@@ -61,11 +59,13 @@ internal enum class StartupWindowMode {
 internal fun startupWindowMode(
     status: StartupStatus,
     dependencies: ComposeApplicationDependencies?,
+    onboarding: OnboardingState? = null,
+    manualOnboardingRequested: Boolean = false,
 ): StartupWindowMode =
-    if (status.phase == StartupPhase.READY && dependencies != null) {
-        StartupWindowMode.MAIN
-    } else {
-        StartupWindowMode.SPLASH
+    when {
+        status.phase != StartupPhase.READY || dependencies == null -> StartupWindowMode.SPLASH
+        manualOnboardingRequested || onboarding?.status == OnboardingStatus.NOT_STARTED -> StartupWindowMode.ONBOARDING
+        else -> StartupWindowMode.MAIN
     }
 
 /** Renders the independent, centered, frameless startup window. */
@@ -73,6 +73,9 @@ internal fun startupWindowMode(
 @Composable
 internal fun ComposeStartupSplashWindow(
     status: StartupStatus,
+    bookmarks: DesktopServerBookmarkLoadResult = DesktopServerBookmarkLoadResult.Loaded(DesktopServerBookmarkState()),
+    onSaveBookmarks: (DesktopServerBookmarkState) -> Unit = {},
+    onStartLocal: () -> Unit = {},
     onRetry: () -> Unit,
     onCloseRequest: () -> Unit,
 ) {
@@ -91,7 +94,45 @@ internal fun ComposeStartupSplashWindow(
         decoration = WindowDecoration.Undecorated(),
         resizable = false,
     ) {
-        ComposeStartupSplash(status = status, onRetry = onRetry)
+        ComposeStartupSplash(
+            status = status,
+            bookmarks = bookmarks,
+            onSaveBookmarks = onSaveBookmarks,
+            onStartLocal = onStartLocal,
+            onRetry = onRetry,
+        )
+    }
+}
+
+/** Renders the explicit provider/model onboarding phase for the connected Visual Agent server. */
+@Composable
+internal fun ComposeOnboardingWindow(
+    applicationPort: ApplicationPort,
+    automatic: Boolean,
+    onFinished: () -> Unit,
+    onCloseRequest: () -> Unit,
+) {
+    val applicationIcon = painterResource(Res.drawable.visual_agent)
+    var skipRequested by remember { mutableStateOf(false) }
+    Window(
+        onCloseRequest = {
+            if (automatic) skipRequested = true else onCloseRequest()
+        },
+        title = "$STARTUP_WINDOW_TITLE – Setup",
+        icon = applicationIcon,
+        state = rememberWindowState(width = 880.dp, height = 600.dp, position = WindowPosition.Aligned(Alignment.Center)),
+    ) {
+        MaterialTheme(colorScheme = visualAgentDarkColorScheme(), typography = visualAgentTypography(DEFAULT_STARTUP_FONT_SIZE)) {
+            Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                ComposeOnboardingWizard(
+                    onboarding = applicationPort.onboarding,
+                    automatic = automatic,
+                    onFinished = onFinished,
+                    skipRequested = skipRequested,
+                    onSkipRequestHandled = { skipRequested = false },
+                )
+            }
+        }
     }
 }
 
@@ -102,6 +143,7 @@ internal fun ComposeMainWindow(
     persistedLayout: WorkspaceLayoutSnapshot,
     persistedWindows: List<LayoutWindowState>,
     onCloseApplication: (WindowState) -> Unit,
+    onRunOnboarding: () -> Unit,
 ) {
     val applicationIcon = painterResource(Res.drawable.visual_agent)
     val initialStage = persistedLayout.stage
@@ -130,6 +172,7 @@ internal fun ComposeMainWindow(
             deps = dependencies,
             onCloseApplication = { onCloseApplication(windowState) },
             persistedWindows = persistedWindows,
+            onRunOnboarding = onRunOnboarding,
         )
     }
 }
@@ -170,43 +213,37 @@ private fun FrameWindowScope.currentScreenBounds(): ScreenBounds? {
     )
 }
 
-/** Renders startup progress and the actionable retry state inside the splash window. */
+/** Applies the startup theme and renders the server-selection splash surface. */
 @Composable
 internal fun ComposeStartupSplash(
     status: StartupStatus,
+    bookmarks: DesktopServerBookmarkLoadResult = DesktopServerBookmarkLoadResult.Loaded(DesktopServerBookmarkState()),
+    onSaveBookmarks: (DesktopServerBookmarkState) -> Unit = {},
+    onStartLocal: () -> Unit = {},
     onRetry: () -> Unit,
 ) {
-    val applicationIcon = painterResource(Res.drawable.visual_agent)
+    val bookmarksState = (bookmarks as? DesktopServerBookmarkLoadResult.Loaded)?.state ?: DesktopServerBookmarkState()
+    var bookmarkDialog by remember { mutableStateOf<StartupServerBookmarkDialog?>(null) }
     MaterialTheme(
         colorScheme = visualAgentDarkColorScheme(),
         typography = visualAgentTypography(DEFAULT_STARTUP_FONT_SIZE),
     ) {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 64.dp, vertical = 48.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Image(
-                    painter = applicationIcon,
-                    contentDescription = AppIdentity.DISPLAY_NAME,
-                    modifier = Modifier.padding(bottom = 28.dp).size(STARTUP_ICON_SIZE),
-                )
-                Text(text = AppIdentity.DISPLAY_NAME, style = MaterialTheme.typography.headlineLarge)
-                Text(
-                    text = status.message(),
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(top = 16.dp),
-                )
-                if (status.phase == StartupPhase.FAILED) {
-                    Button(onClick = onRetry, modifier = Modifier.padding(top = 28.dp)) { Text("Retry") }
-                } else {
-                    CircularProgressIndicator(
-                        modifier = Modifier.padding(top = 32.dp).size(STARTUP_PROGRESS_SIZE),
-                        strokeWidth = 3.dp,
-                    )
-                }
-            }
+            ComposeStartupSplashPresentation(
+                status = status,
+                bookmarks = bookmarks,
+                onStartLocal = onStartLocal,
+                onRetry = onRetry,
+                onCreateServer = { bookmarkDialog = StartupServerBookmarkDialog.Create },
+                onEditServer = { bookmarkDialog = StartupServerBookmarkDialog.Edit(it) },
+            )
+            ComposeStartupServerBookmarkDialog(
+                dialog = bookmarkDialog,
+                state = bookmarksState,
+                onSave = onSaveBookmarks,
+                onDismiss = { bookmarkDialog = null },
+                onDialogChange = { bookmarkDialog = it },
+            )
         }
     }
 }
@@ -214,8 +251,6 @@ internal fun ComposeStartupSplash(
 private const val DEFAULT_STARTUP_FONT_SIZE = 14
 private val DEFAULT_SPLASH_WIDTH = 880.dp
 private val DEFAULT_SPLASH_HEIGHT = 600.dp
-private val STARTUP_ICON_SIZE = 180.dp
-private val STARTUP_PROGRESS_SIZE = 44.dp
 private val DEFAULT_MAIN_WINDOW_WIDTH = 1280.dp
 private val DEFAULT_MAIN_WINDOW_HEIGHT = 820.dp
 private const val STARTUP_WINDOW_TITLE = "Visual Agent"

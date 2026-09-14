@@ -23,6 +23,7 @@ dependencies {
     implementation(platform(libs.spring.ai.bom))
     implementation(libs.spring.ai.model)
     implementation(libs.spring.context)
+    implementation(libs.spring.tx)
     implementation(libs.coroutines.core)
     implementation(libs.coroutines.reactor)
     implementation(libs.serialization.json)

@@ -6,6 +6,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.application
@@ -16,6 +17,7 @@ import de.heckenmann.visualagent.protocol.ApplicationPort
 import de.heckenmann.visualagent.protocol.LayoutPosition
 import de.heckenmann.visualagent.protocol.LayoutSize
 import de.heckenmann.visualagent.protocol.LayoutWindowState
+import de.heckenmann.visualagent.protocol.OnboardingState
 import de.heckenmann.visualagent.protocol.WorkspaceLayoutSnapshot
 import de.heckenmann.visualagent.server.VisualAgentGrpcServer
 import de.heckenmann.visualagent.ui.application.ComposeApplicationDependencies
@@ -23,6 +25,7 @@ import de.heckenmann.visualagent.ui.application.StartupStatus
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
@@ -41,20 +44,34 @@ fun runVisualAgentComposeApplication() {
 @Composable
 private fun ComposeStartupHost(exitApplication: () -> Unit) {
     var startupAttempt by remember { mutableStateOf(0) }
-    var startupStatus by remember { mutableStateOf(StartupStatus.initial()) }
+    var startupStatus by remember { mutableStateOf(StartupStatus.waitingForServerSelection()) }
+    var startRequested by remember { mutableStateOf(false) }
     var springContext by remember { mutableStateOf<ConfigurableApplicationContext?>(null) }
     var serverConnection by remember { mutableStateOf<ApplicationConnection?>(null) }
     var dependencies by remember { mutableStateOf<ComposeApplicationDependencies?>(null) }
     var persistedLayout by remember { mutableStateOf<WorkspaceLayoutSnapshot?>(null) }
     var persistedWindows by remember { mutableStateOf<List<LayoutWindowState>>(emptyList()) }
+    var onboardingState by remember { mutableStateOf<OnboardingState?>(null) }
+    var manualOnboardingRequested by remember { mutableStateOf(false) }
     val currentContext = rememberUpdatedState(springContext)
     val currentConnection = rememberUpdatedState(serverConnection)
     val shutdownCoordinator = remember { DesktopShutdownCoordinator() }
+    val bookmarkStore = remember { DesktopServerBookmarkStore() }
+    var bookmarks by remember {
+        mutableStateOf<DesktopServerBookmarkLoadResult>(DesktopServerBookmarkLoadResult.Loaded(DesktopServerBookmarkState()))
+    }
+    val composeScope = rememberCoroutineScope()
 
-    LaunchedEffect(startupAttempt) {
+    LaunchedEffect(bookmarkStore) {
+        bookmarks = withContext(Dispatchers.IO) { bookmarkStore.load() }
+    }
+
+    LaunchedEffect(startupAttempt, startRequested) {
+        if (!startRequested) return@LaunchedEffect
         startupStatus = StartupStatus.resolvingEndpoint()
         dependencies = null
         persistedLayout = null
+        onboardingState = null
         val previousConnection = serverConnection
         serverConnection = null
         val previousContext = springContext
@@ -137,6 +154,7 @@ private fun ComposeStartupHost(exitApplication: () -> Unit) {
             dependencies = loadedDependencies
             persistedLayout = loadedLayout
             persistedWindows = loadedLayout.windows
+            onboardingState = withContext(Dispatchers.IO) { applicationPort.onboarding.state() }
             startupStatus = StartupStatus.ready()
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -162,30 +180,77 @@ private fun ComposeStartupHost(exitApplication: () -> Unit) {
     }
 
     val readyDependencies = dependencies
-    if (startupWindowMode(startupStatus, readyDependencies) == StartupWindowMode.SPLASH) {
-        ComposeStartupSplashWindow(
-            status = startupStatus,
-            onRetry = { startupAttempt += 1 },
-            onCloseRequest = {
-                if (shutdownCoordinator.requestExit()) {
-                    exitApplication()
-                }
-            },
-        )
-    } else {
-        ComposeMainWindow(
-            dependencies = checkNotNull(readyDependencies),
-            persistedLayout = checkNotNull(persistedLayout),
-            persistedWindows = persistedWindows,
-            onCloseApplication = { windowState ->
-                closeApplication(
-                    dependencies = checkNotNull(readyDependencies),
-                    windowState = windowState,
-                    exitApplication = exitApplication,
-                    shutdownCoordinator = shutdownCoordinator,
-                )
-            },
-        )
+    when (startupWindowMode(startupStatus, readyDependencies, onboardingState, manualOnboardingRequested)) {
+        StartupWindowMode.SPLASH ->
+            ComposeStartupSplashWindow(
+                status = startupStatus,
+                bookmarks = bookmarks,
+                onSaveBookmarks = { next ->
+                    composeScope.launch {
+                        bookmarks =
+                            runCatching {
+                                withContext(Dispatchers.IO) {
+                                    bookmarkStore.save(next)
+                                    DesktopServerBookmarkLoadResult.Loaded(next)
+                                }
+                            }.getOrElse {
+                                DesktopServerBookmarkLoadResult.Invalid(
+                                    "Could not save server bookmarks. The previous file was left unchanged.",
+                                )
+                            }
+                    }
+                },
+                onStartLocal = { startRequested = true },
+                onRetry = {
+                    startRequested = true
+                    startupAttempt += 1
+                },
+                onCloseRequest = {
+                    if (shutdownCoordinator.requestExit()) {
+                        exitApplication()
+                    }
+                },
+            )
+        StartupWindowMode.ONBOARDING ->
+            ComposeOnboardingWindow(
+                applicationPort = checkNotNull(readyDependencies).applicationPort,
+                automatic = !manualOnboardingRequested,
+                onFinished = {
+                    manualOnboardingRequested = false
+                    composeScope.launch {
+                        onboardingState =
+                            withContext(Dispatchers.IO) {
+                                checkNotNull(readyDependencies).applicationPort.onboarding.state()
+                            }
+                    }
+                },
+                onCloseRequest = {
+                    if (manualOnboardingRequested) {
+                        manualOnboardingRequested = false
+                    } else {
+                        composeScope.launch {
+                            val applicationPort = checkNotNull(readyDependencies).applicationPort
+                            withContext(Dispatchers.IO) { applicationPort.onboarding.dismiss() }
+                            onboardingState = withContext(Dispatchers.IO) { applicationPort.onboarding.state() }
+                        }
+                    }
+                },
+            )
+        StartupWindowMode.MAIN ->
+            ComposeMainWindow(
+                dependencies = checkNotNull(readyDependencies),
+                persistedLayout = checkNotNull(persistedLayout),
+                persistedWindows = persistedWindows,
+                onRunOnboarding = { manualOnboardingRequested = true },
+                onCloseApplication = { windowState ->
+                    closeApplication(
+                        dependencies = checkNotNull(readyDependencies),
+                        windowState = windowState,
+                        exitApplication = exitApplication,
+                        shutdownCoordinator = shutdownCoordinator,
+                    )
+                },
+            )
     }
 }
 

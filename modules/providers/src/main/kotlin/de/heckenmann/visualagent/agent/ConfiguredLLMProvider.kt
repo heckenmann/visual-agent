@@ -91,6 +91,8 @@ class ConfiguredLLMProvider(
 
     override suspend fun getModels(profile: ProviderProfile): List<String> = discoverModelConfigs(profile).map { it.id }
 
+    override suspend fun getModelConfigs(profile: ProviderProfile): List<ProviderModelConfig> = discoverModelConfigs(profile)
+
     override suspend fun getModelDetails(modelName: String): ShowResponse = getModelDetails(providerCatalog.activeProviderId(), modelName)
 
     override suspend fun getModelDetails(
@@ -145,6 +147,15 @@ class ConfiguredLLMProvider(
     }
 
     private fun ChatRequestContext.resolve(): ChatRequestContext {
+        providerProfile?.let { stagedProfile ->
+            val stagedModel = model?.takeIf(String::isNotBlank) ?: stagedProfile.defaultModel
+            require(stagedModel.isNotBlank()) { "A staged provider request requires a model." }
+            return copy(
+                provider = stagedProfile.id,
+                model = stagedModel,
+                providerProfile = stagedProfile,
+            )
+        }
         val explicitOptions =
             buildMap {
                 putAll(options)

@@ -9,6 +9,7 @@ import java.util.jar.JarFile
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.compose)
     alias(libs.plugins.ktlint)
@@ -60,6 +61,7 @@ dependencies {
     implementation(libs.grpc.inprocess)
     implementation(libs.grpc.netty.shaded)
     implementation(libs.compose.material3)
+    implementation(libs.compose.material.icons)
     implementation(libs.compose.components.resources)
     implementation(libs.spring.boot.starter)
     implementation(platform(libs.spring.boot.bom))
@@ -71,6 +73,8 @@ dependencies {
         )
     }
     implementation(libs.tika.core)
+    implementation(libs.appdirs)
+    implementation(libs.serialization.json)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.compose.ui.test.junit4.desktop)
     testImplementation(libs.mockk)

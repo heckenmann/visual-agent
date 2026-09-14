@@ -12,7 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import de.heckenmann.visualagent.protocol.SkillSearchResult
 import de.heckenmann.visualagent.ui.components.PanelInfoBox
-import de.heckenmann.visualagent.ui.modal.modalDialogLayout
+import de.heckenmann.visualagent.ui.modal.ModalDialogLayout
 import de.heckenmann.visualagent.ui.modal.modalSaveButton
 import de.heckenmann.visualagent.ui.modal.modalSecondaryButton
 
@@ -38,7 +38,7 @@ internal fun SkillEditor(
     val contentLength = content.codePointCount(0, content.length)
     val titleInvalid = title.isBlank() || titleLength > MAX_TITLE_CODE_POINTS
     val contentInvalid = content.isBlank() || contentLength > MAX_CONTENT_CODE_POINTS
-    modalDialogLayout(
+    ModalDialogLayout(
         body = {
             saveError?.let { PanelInfoBox(it) }
             conflict?.let { state ->

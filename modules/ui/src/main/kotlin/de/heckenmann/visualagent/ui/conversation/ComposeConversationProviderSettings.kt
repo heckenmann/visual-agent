@@ -15,6 +15,7 @@ internal fun openConversationProviderSettings(
     mainAgentMemoryPort: MainAgentMemoryPort,
     providerPort: ProviderPort,
     onSettingsChanged: () -> Unit,
+    onRunOnboarding: () -> Unit = {},
 ) {
     modalRequester.requestSettings(
         ComposeSettingsModal(title = "Providers and models") {
@@ -23,6 +24,7 @@ internal fun openConversationProviderSettings(
                 mainAgentMemoryPort = mainAgentMemoryPort,
                 providerPort = providerPort,
                 onSettingsChanged = onSettingsChanged,
+                onRunOnboarding = onRunOnboarding,
             )
         },
     )
