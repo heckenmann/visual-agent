@@ -12,7 +12,8 @@ Desktop user.
 
 - Java 21 or newer is available.
 - Application dependencies are present.
-- The SQLite database path from configuration is readable and writable.
+- The desktop can read or create its client-local bootstrap/configuration directory.
+- The selected server can read or create its own server data directory and SQLite database.
 - For a release package, the user runs a supported native build: macOS (Apple Silicon or Intel), Windows x64, or Linux x86_64 (DEB, RPM, or AppImage).
 - For the platform-specific executable JAR, Java 24 is available on the matching operating system.
 
@@ -20,11 +21,12 @@ Desktop user.
 
 1. The user starts the application.
 2. The Compose Multiplatform launcher creates a dedicated, centered, frameless splash window and shows startup status.
-3. The desktop host resolves the configured endpoint before contacting a server.
-4. With no remote endpoint, it starts the local Spring Boot server in the same JVM; with a remote endpoint, it performs a TLS gRPC handshake and never falls back to local startup.
-5. Spring initializes configuration, persistence, activity, and protocol port adapters.
-6. The desktop host resolves the protocol application port and loads the initial workspace snapshot.
-7. UI panels are wired, the splash window is disposed, and a separate main application window is created.
+3. The desktop host loads client-local Visual Agent server bookmarks before contacting any server.
+4. The desktop host resolves the selected endpoint without resolving or transmitting a server database path.
+5. With no remote endpoint, it starts the local Spring Boot server in the same JVM; with a remote endpoint, it performs a TLS gRPC handshake and never falls back to local startup.
+6. The server resolves its own data root, then initializes configuration, persistence, activity, and protocol port adapters.
+7. The desktop host resolves the protocol application port and loads the initial workspace snapshot through the server boundary.
+8. UI panels are wired, the splash window is disposed, and a separate main application window is created.
 
 ## Result
 
@@ -54,5 +56,7 @@ The user sees the Visual Agent main window and can interact with chat, session s
 - A startup failure keeps only the actionable splash window open; retry does not create a main window prematurely.
 - Closing either window requests shutdown at most once and releases the server session without orphaned resources.
 - Startup does not lose persisted runtime state.
+- Client bootstrap configuration remains client-owned and server runtime data remains server-owned, including when both run in one JVM.
+- The UI never opens SQLite or receives a server filesystem path; server-owned settings are accessed through protocol ports after readiness.
 - The portable Linux AppImage starts without installation and provides the same Visual Agent desktop window as the DEB and RPM packages.
 - The matching executable JAR starts with `java -jar` on its target platform and Java 24.
