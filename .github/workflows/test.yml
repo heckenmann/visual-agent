@@ -55,7 +55,10 @@ jobs:
             local status=0
             log_path="$(mktemp)"
 
-            timeout --kill-after=10s 25s xvfb-run -a java -jar "$jar_path" \
+            # The desktop JAR needs a deterministic renderer in the virtual display used by CI.
+            # Skiko's software renderer is supported by Compose Desktop and avoids relying on
+            # whichever OpenGL provider happens to be installed on the GitHub runner.
+            timeout --kill-after=10s 25s xvfb-run -a java -Dskiko.renderApi=SOFTWARE -jar "$jar_path" \
               --spring.main.web-application-type=none >"$log_path" 2>&1 || status=$?
 
             if ! grep -Eq "Started .+ in [0-9]+(\\.[0-9]+)? seconds" "$log_path"; then
