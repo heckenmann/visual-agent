@@ -2,15 +2,13 @@ package de.heckenmann.visualagent.knowledge
 
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
+import de.heckenmann.visualagent.config.ServerDataPathResolver
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.env.Environment
 import org.sqlite.SQLiteConfig
-import java.io.File
-import java.io.FileInputStream
 import java.nio.file.Files
 import java.nio.file.Path
-import java.util.Properties
 import javax.sql.DataSource
 
 /**
@@ -24,7 +22,7 @@ internal class KnowledgePersistenceConfig {
      * @return Shared application data source
      */
     @Bean
-    fun databasePath(environment: Environment): String = environment.getProperty("visual-agent.db.path") ?: bootstrapDatabasePath()
+    fun databasePath(environment: Environment): String = ServerDataPathResolver.databasePath(environment)
 
     @Bean
     fun dataSource(databasePath: String): DataSource {
@@ -48,14 +46,6 @@ internal class KnowledgePersistenceConfig {
         )
     }
 
-    private fun bootstrapDatabasePath(): String {
-        val configFile = File("application/src/main/resources/config/app.properties")
-        if (!configFile.exists()) return "./data/visual-agent.db"
-        val props = Properties()
-        FileInputStream(configFile).use { props.load(it) }
-        return props.getProperty("database.path", "./data/visual-agent.db")
-    }
-
     private fun createParentDirectory(databasePath: String) {
         val path =
             if (databasePath.startsWith("jdbc:sqlite:")) {
@@ -66,6 +56,13 @@ internal class KnowledgePersistenceConfig {
         if (path.isBlank() || path == ":memory:" || path.startsWith("file:")) {
             return
         }
-        Path.of(path).parent?.let(Files::createDirectories)
+        val parent = Path.of(path).parent ?: return
+        runCatching { Files.createDirectories(parent) }.getOrElse { cause ->
+            throw IllegalStateException(
+                "Unable to create the Visual Agent server data directory '$parent'. " +
+                    "Check its permissions or set visual-agent.db.path to a writable location.",
+                cause,
+            )
+        }
     }
 }

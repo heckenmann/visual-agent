@@ -49,6 +49,7 @@ dependencies {
 
     // SQLite JDBC
     implementation(libs.sqlite.jdbc)
+    implementation(libs.appdirs)
 
     // Kotlinx Coroutines
     implementation(libs.coroutines.core)
@@ -218,6 +219,21 @@ tasks.register("runServer") {
 tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
     workingDir(rootProject.projectDir)
     systemProperty("spring.output.ansi.enabled", "ALWAYS")
+    // Forward explicit overrides to the forked JVM; use the repository database only as the
+    // development fallback when neither the Gradle property nor the environment is configured.
+    val explicitDbPath =
+        System
+            .getProperty("visual-agent.db.path")
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?: System
+                .getenv("VISUAL_AGENT_DB_PATH")
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+    systemProperty(
+        "visual-agent.db.path",
+        explicitDbPath ?: rootProject.file("data/visual-agent.db").absolutePath,
+    )
 }
 
 kotlin {

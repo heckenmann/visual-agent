@@ -31,7 +31,10 @@ Install Linux DEB/RPM files with the system package manager. Make the AppImage e
 it directly; it does not need to be installed. Run a platform-matched JAR with `java -jar`; it does
 not provide native operating-system integration.
 
-The native launcher supplies the Visual Agent name and icon to the operating system. On first launch it creates a local SQLite database under `./data/` and opens the Compose UI.
+The native launcher supplies the Visual Agent name and icon to the operating system. On first
+launch the server creates its SQLite database in the platform-specific per-user server data
+directory and the Compose UI loads its client-local server bootstrap configuration before opening
+the selected connection.
 
 Supported native release platforms are macOS (Apple Silicon and Intel), Windows x64, and Linux x86_64. The Linux AppImage is portable; the DEB and RPM packages integrate with the system package manager and application menu. A platform-matched executable JAR is additionally available for Java 24 environments.
 

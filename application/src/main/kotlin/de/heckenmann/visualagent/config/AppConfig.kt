@@ -8,8 +8,8 @@ import java.util.Properties
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
- * Loads the database connection bootstrap from `application/src/main/resources/config/app.properties`.
- * Runtime configuration is persisted in SQLite preferences after the database is available.
+ * Represents server-owned runtime configuration after the database is available.
+ * The database path is resolved by [ServerDataPathResolver] before this object is bound.
  *
  * @property llmProvider Active provider identifier (`ollama` or `openai`)
  * @property ollamaLocalUrl Ollama API endpoint (default: http://localhost:11434)
@@ -32,7 +32,7 @@ class AppConfig private constructor() {
     var openAiApiKey: String = ""
     var openAiBaseUrl: String = "https://api.openai.com"
     var openAiModel: String = ""
-    var databasePath: String = "./data/visual-agent.db"
+    var databasePath: String = ServerDataPathResolver.defaultServerDataRoot().resolve("visual-agent.db").toString()
     var uiThemeMode: ThemeMode = ThemeMode.SYSTEM
     var fontSize: Int = 14
     var showPanelLabels: Boolean = true
@@ -152,12 +152,9 @@ class AppConfig private constructor() {
     }
 
     /**
-     * Reloads settings from persistence.
-     *
-     * Loads file-backed bootstrap settings first and then overlays values stored in the DB.
+     * Reloads settings from the database-backed preference store.
      */
     fun reload(): AppConfig {
-        loadFromProperties()
         loadFromDatabase()
         publishChanges()
         return this
@@ -258,18 +255,6 @@ class AppConfig private constructor() {
             db.setPreference(KEY_FOLLOW_UP_SUGGESTIONS_ENABLED, followUpSuggestionsEnabled.toString())
             db.setPreference(KEY_FOLLOW_UP_SUGGESTION_DELAY_SECONDS, followUpSuggestionIdleDelaySeconds.toString())
             db.setPreference(KEY_FOLLOW_UP_SUGGESTION_COUNT, followUpSuggestionCount.toString())
-        }
-    }
-
-    private fun loadFromProperties() {
-        val configFile = File("application/src/main/resources/config/app.properties")
-
-        if (configFile.exists()) {
-            val props = Properties()
-            FileInputStream(configFile).use { fis ->
-                props.load(fis)
-            }
-            AppConfigProperties.applyBootstrapTo(this, props)
         }
     }
 

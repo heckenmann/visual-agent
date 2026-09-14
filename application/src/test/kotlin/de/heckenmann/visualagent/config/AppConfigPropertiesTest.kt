@@ -9,30 +9,6 @@ import kotlin.test.assertTrue
 
 class AppConfigPropertiesTest {
     @Test
-    fun `bootstrap properties only contain database path`() {
-        val config = AppConfig.instance
-        val originalPath = config.databasePath
-
-        val properties = AppConfigProperties.bootstrapFrom(config)
-
-        assertEquals(originalPath, properties[AppConfig.KEY_DATABASE_PATH])
-        assertEquals(1, properties.size)
-    }
-
-    @Test
-    fun `apply bootstrap loads database path`() {
-        val config = AppConfig.instance
-        val originalPath = config.databasePath
-        val properties = Properties()
-        properties.setProperty(AppConfig.KEY_DATABASE_PATH, "./data/custom.db")
-
-        AppConfigProperties.applyBootstrapTo(config, properties)
-
-        assertEquals("./data/custom.db", config.databasePath)
-        config.databasePath = originalPath
-    }
-
-    @Test
     fun `export properties contain all session keys`() {
         val config = AppConfig.instance
         config.contextLength = 8192

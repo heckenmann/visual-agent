@@ -168,7 +168,7 @@ DB-first behavior is used app-wide:
 - sub-agent configurations are loaded from DB and maintained via CRUD
 - persistence access is routed through typed stores, not a JDBC facade
 - workspace file metadata is persisted in DB while the file bytes live
-  on disk under `./data/workspace/`
+  on disk under the server-owned platform data root's `workspace/` directory
 
 Values are not treated as long-lived in-memory truth; the database is
 the authoritative source.
@@ -260,11 +260,16 @@ The standalone gRPC server is disabled by default (`visualagent.server.port=0`).
 enabled, it binds to loopback unless a future authenticated listener is configured; non-loopback
 binding is rejected rather than exposing an unauthenticated service.
 
-Gradle desktop and standalone-server tasks run with the repository root as working directory so
-the configured `./data/visual-agent.db` remains stable across the refactored modules. Existing
-preferences are therefore read from the same database rather than a module-local `data/` copy.
-Those tasks also set `spring.output.ansi.enabled=ALWAYS`, because Gradle's child JVM does not
-expose an interactive `System.console()` even when its output is attached to a terminal.
+The desktop and server have separate storage ownership. Before a connection exists, `:desktop`
+loads client-local server bookmarks from its platform config directory. After the selected
+`ApplicationPort` is ready, server-owned settings and runtime data are read through that port;
+the UI never opens the server database directly. A remote server resolves its own data root from
+its operating-system environment and server-side overrides.
+
+Gradle desktop and standalone-server tasks explicitly opt into the repository-local database for
+development, while packaged launches use the server's platform data-root resolver. Those tasks
+also set `spring.output.ansi.enabled=ALWAYS`, because Gradle's child JVM does not expose an
+interactive `System.console()` even when its output is attached to a terminal.
 
 ## UI Architecture Notes
 
@@ -320,9 +325,9 @@ implemented by `canvas/InMemoryCanvasService.kt` (the current
 Compose-migration backend). `canvas/CanvasPngRenderer.kt` rasterizes
 figures to PNG; `canvas/CanvasDocumentCodec.kt` encodes editable
 `.canvas` JSON (versioned). The default document lives at
-`data/workspace/canvas/current.canvas` and is auto-saved on every
+`<server-data-root>/workspace/canvas/current.canvas` and is auto-saved on every
 mutation; explicit saves use `canvas.saveDocument(name)` to write a
-named managed workspace file under `data/workspace/canvas/`.
+named managed workspace file under `<server-data-root>/workspace/canvas/`.
 
 Image rendering is in-house: `image/RgbaPngEncoder.kt` (no AWT or
 `ImageIO`), `workspace/ImageHeaderReader.kt` for PNG/JPEG/GIF

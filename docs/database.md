@@ -6,13 +6,35 @@ Visual Agent uses SQLite through Spring Data JPA repositories and Flyway migrati
 
 Runtime defaults:
 
-- DB path from config (`./data/visual-agent.db`)
+- Server data root from the platform-specific per-user application-data directory, in the
+  `server/` namespace.
+- Database: `<server-data-root>/visual-agent.db`
 - `PRAGMA journal_mode=WAL`
 - `PRAGMA busy_timeout=5000`
 - Hibernate schema validation in production, migration-driven schema creation through Flyway
 
 The application uses DB-first reads for conversation, todos, and related runtime context.
-Managed workspace files are stored on disk next to the configured database directory, defaulting to `./data/workspace/`.
+Managed workspace files are stored on disk below the resolved server data root at
+`<server-data-root>/workspace/`.
+
+The desktop client has a separate client-local bootstrap/configuration root. Its versioned
+`startup-servers.json` contains only Visual Agent server bookmarks and the last selection. It is
+loaded before any server connection and is never stored in this database.
+
+For a packaged or standalone server, the default locations are resolved by the server process:
+
+- Linux: `$XDG_DATA_HOME/Visual Agent/server/`, or `~/.local/share/Visual Agent/server/`
+- macOS: `~/Library/Application Support/Visual Agent/server/`
+- Windows: `%LOCALAPPDATA%/Visual Agent/server/`
+
+Before a connection exists, the desktop client stores `startup-servers.json` in the platform
+config directory: Linux `$XDG_CONFIG_HOME/Visual Agent/` (fallback `~/.config/Visual Agent/`),
+macOS `~/Library/Preferences/Visual Agent/`, or Windows `%LOCALAPPDATA%/Visual Agent/`.
+
+Set `visual-agent.server.data-root` to override the server root, or set the more specific
+`visual-agent.db.path` to override only the database file. File-backed overrides must be absolute.
+These values are server-side and are never supplied by a remote UI. Gradle development tasks explicitly set the repository-local
+`data/visual-agent.db` path; this is a development override, not the packaged default.
 
 ## Active Tables
 
@@ -82,7 +104,9 @@ Stores user configuration values persisted beyond app restarts.
 
 It now backs the application settings binder through the `PreferenceStore` abstraction.
 
-`application/src/main/resources/config/app.properties` is only used to bootstrap the database path. Runtime configuration changes are written to this table instead of rewriting the properties file. The database path itself is not loaded from this table because the application needs it before it can open SQLite.
+The server data path is resolved before SQLite opens and is not stored in this table. Runtime
+configuration changes are written to `user_preferences`; they do not rewrite a packaged resource
+file.
 
 Provider-related entries include:
 
@@ -98,7 +122,7 @@ Provider-related entries include:
 Legacy provider entries are migrated into the catalog when no catalog exists. API keys are currently stored as plaintext by product decision. They are excluded from file-based configuration exports and must not be exposed to model context, tool output, or logs.
 
 Canvas documents are stored as regular managed workspace files
-under `data/workspace/canvas/` with MIME type
+under `<server-data-root>/workspace/canvas/` with MIME type
 `application/vnd.visual-agent.canvas+xml` (see
 `workspace/WorkspaceFilePaths.kt` `CANVAS_MIME_TYPE`). The default
 auto-saved document is `current.canvas`; explicit saves use
@@ -123,13 +147,19 @@ These entries are restored on restart and rendered in conversation UI as minimiz
 - The production app no longer creates tables with ad hoc JDBC schema helpers.
 - The initial schema is defined in `db/migration/V1__initial_knowledge_schema.sql`.
 - Existing local databases keep their data; Flyway adds schema history and applies migrations without resetting content.
+- A repository-local legacy `./data/` directory is not auto-migrated because a desktop client may
+  be connected to a different server. To keep using that store, stop Visual Agent and pass its
+  absolute database path explicitly with `-Dvisual-agent.db.path=/absolute/path/data/visual-agent.db`.
+  The workspace is then derived from that database's parent. Do not merge legacy and target roots;
+  copy the complete directory only while the application is stopped and only when the target does
+  not already exist.
 
 ## Operational Notes
 
 If stale WAL/SHM files remain after an unclean shutdown and lock errors persist:
 
 ```bash
-rm data/visual-agent.db-wal data/visual-agent.db-shm
+rm <server-data-root>/visual-agent.db-wal <server-data-root>/visual-agent.db-shm
 ```
 
 Then restart the application.

@@ -16,7 +16,7 @@ remote Visual Agent server bookmarks before any application server is contacted.
 
 ## Main Flow
 
-1. The splash screen loads client-local server bookmarks from the operating-system user-data directory.
+1. The splash screen loads client-local server bookmarks from the operating-system user-config directory.
 2. The built-in Local server is always shown as the only currently executable target.
 3. The user can add, edit, or delete a remote Visual Agent server bookmark in the shared modal frame.
 4. Bookmark changes are validated and atomically persisted without contacting a Visual Agent server.
@@ -26,7 +26,7 @@ remote Visual Agent server bookmarks before any application server is contacted.
 
 ## Result
 
-Server-location bootstrap data remains separate from LLM provider configuration, credentials, models, and server persistence.
+Server-location bootstrap data remains separate from LLM provider configuration, credentials, models, and server persistence. The client-local bootstrap file remains client-owned after connection; server-owned settings are read later through `ApplicationPort`, never through direct database access.
 
 ## Tool Calls
 
@@ -45,3 +45,4 @@ Server-location bootstrap data remains separate from LLM provider configuration,
 - Remote server bookmarks cannot start an unsupported remote transport.
 - Rendering the splash or loading bookmarks never starts a local server.
 - Selecting Local starts the bundled server only after the selection action.
+- Client and server storage roots are resolved independently; a remote client never receives or computes the server database path.

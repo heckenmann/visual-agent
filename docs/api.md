@@ -219,7 +219,8 @@ The `workspace:layout` tool is available to sub-agents, not to the main orchestr
 
 ### Workspace File Tool
 
-The `workspace:file` tool is available to sub-agents. It operates on files imported into the managed workspace directory next to the configured SQLite database, defaulting to `./data/workspace/`.
+The `workspace:file` tool is available to sub-agents. It operates on files imported into the
+server-owned managed workspace directory below the configured SQLite database.
 
 Supported actions:
 

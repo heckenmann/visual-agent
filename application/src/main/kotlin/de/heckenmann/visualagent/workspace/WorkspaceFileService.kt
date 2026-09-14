@@ -27,7 +27,7 @@ import kotlin.streams.asSequence
 class WorkspaceFileService(
     private val store: WorkspaceFileStore,
     @Qualifier("databasePath")
-    private val databasePath: String = "./data/visual-agent.db",
+    private val databasePath: String,
     private val mimeDetector: WorkspaceMimeTypeDetector = WorkspaceMimeTypeDetector(),
     private val activityEvents: WorkspaceFileActivityEventBus? = null,
 ) {

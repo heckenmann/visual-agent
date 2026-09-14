@@ -107,12 +107,25 @@ Leaving the key blank omits the `Authorization` header. Profile URL and key chan
 
 ## Persistence Runtime
 
-- Database path defaults to `./data/visual-agent.db`
-- `application/src/main/resources/config/app.properties` is bootstrap-only and stores the database path.
-- Runtime configuration is stored in SQLite `user_preferences`; normal saves do not rewrite `app.properties`.
-- Imported workspace files default to `./data/workspace/`
+- Packaged and standalone server data defaults to the platform-specific server data root:
+  Linux `$XDG_DATA_HOME/Visual Agent/server/` (fallback `~/.local/share/Visual Agent/server/`),
+  macOS `~/Library/Application Support/Visual Agent/server/`, or Windows
+  `%LOCALAPPDATA%/Visual Agent/server/`.
+- The database is `<server-data-root>/visual-agent.db`; the managed workspace is
+  `<server-data-root>/workspace/`.
+- Override the server root with `visual-agent.server.data-root` or the database directly with
+  `visual-agent.db.path` (use absolute file-backed paths). The UI never resolves or transmits
+  these paths for a remote server.
+- The desktop client stores pre-connection server bookmarks separately in its per-user config
+  directory (`startup-servers.json`): Linux `$XDG_CONFIG_HOME/Visual Agent/` (fallback
+  `~/.config/Visual Agent/`), macOS `~/Library/Preferences/Visual Agent/`, or Windows
+  `%LOCALAPPDATA%/Visual Agent/`. This file contains no provider settings or secrets.
+- Runtime configuration is stored in SQLite `user_preferences`; it is unavailable to the UI until
+  the selected server connection is ready.
+- Gradle development tasks explicitly opt into repository-local `data/visual-agent.db`; installed
+  packages do not depend on the process working directory.
 - Files panel search covers metadata and bounded text/PDF content. The `Sync DB` action reconciles metadata with files found below the managed workspace directory.
-- Editable canvas documents saved from the Canvas or Files panel are stored as regular workspace files under `./data/workspace/canvas/`.
+- Editable canvas documents saved from the Canvas or Files panel are stored as regular workspace files under `<server-data-root>/workspace/canvas/`.
 - Schema changes are applied through Flyway migrations at startup
 - Hibernate validates the mapped entities, but does not generate schema in production
 - Conversation search uses SQLite FTS5 with a fallback `LIKE` path
@@ -147,14 +160,18 @@ An HTTP `401` or `403` usually indicates a missing or invalid API key, or an end
 
 ### SQLite lock issues
 
-If lock persists after a crash:
+If a lock persists after a crash, remove the WAL sidecars below the resolved server data root:
 
 ```bash
-rm data/visual-agent.db-wal data/visual-agent.db-shm
+rm <server-data-root>/visual-agent.db-wal <server-data-root>/visual-agent.db-shm
 ```
 
 Restart the app afterwards.
 
 ### Migration startup issues
 
-If Flyway or JPA fails during startup, check the `data/visual-agent.db` file path in `application/src/main/resources/config/app.properties` and ensure the application can create or write to the `data/` directory.
+If Flyway or JPA fails during startup, verify the resolved server data root and that the server
+process can create and write its per-user directory. For an intentional legacy repository-local
+store, pass its absolute path explicitly with `-Dvisual-agent.db.path=/path/to/data/visual-agent.db`.
+The application never merges a legacy `./data/` directory into an existing target automatically;
+keep the server stopped while copying a complete legacy database/workspace to a new empty root.

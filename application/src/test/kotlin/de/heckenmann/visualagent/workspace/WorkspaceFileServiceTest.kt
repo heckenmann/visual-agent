@@ -23,6 +23,13 @@ import kotlin.test.assertTrue
 
 class WorkspaceFileServiceTest {
     @Test
+    fun `workspace rejects relative database paths instead of using the working directory`() {
+        val service = WorkspaceFileService(FakeWorkspaceFileStore(), "relative/visual-agent.db")
+
+        assertFailsWith<IllegalArgumentException> { service.workspaceRoot() }
+    }
+
+    @Test
     fun `workspace root is derived from database directory`() =
         withDatabasePath("jdbc:sqlite:${tempDir().resolve("db/visual-agent.db")}") { dbPath ->
             val service = WorkspaceFileService(FakeWorkspaceFileStore(), dbPath)
