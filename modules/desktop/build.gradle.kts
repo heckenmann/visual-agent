@@ -172,6 +172,14 @@ val runNativeApplication =
         description = "Runs the current operating system's native Visual Agent application bundle."
         dependsOn("createDistributable")
         workingDir(rootProject.projectDir)
+        // Development runs intentionally opt into repository-local data. Packaged
+        // applications do not inherit this Gradle task environment and use the
+        // server-side platform data resolver instead.
+        environment(
+            "VISUAL_AGENT_DB_PATH",
+            System.getProperty("visual-agent.db.path")
+                ?: rootProject.file("data/visual-agent.db").absolutePath,
+        )
         doFirst {
             val distributionDirectory =
                 layout.buildDirectory

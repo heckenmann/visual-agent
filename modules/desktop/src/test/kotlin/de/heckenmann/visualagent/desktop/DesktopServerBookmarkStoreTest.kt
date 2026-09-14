@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.desktop
 
+import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import java.util.UUID
 import kotlin.test.Test
@@ -70,6 +71,61 @@ class DesktopServerBookmarkStoreTest {
 
         assertIs<DesktopServerBookmarkLoadResult.Invalid>(result)
         assertEquals("not json", Files.readString(file))
+    }
+
+    @Test
+    fun `valid legacy bookmark file is copied to the client config root`() {
+        val directory = Files.createTempDirectory("visual-agent-bookmarks")
+        val primary = directory.resolve("config/startup-servers.json")
+        val legacy = directory.resolve("legacy/startup-servers.json")
+        val bookmark = bookmark(name = "Migrated")
+        val state = DesktopServerBookmarkState(visualAgentServerBookmarks = listOf(bookmark))
+        val legacyStore = DesktopServerBookmarkStore(legacy, legacyStorageFile = null)
+        legacyStore.save(state)
+
+        val loaded = DesktopServerBookmarkStore(primary, legacy).load()
+
+        assertEquals(state, assertIs<DesktopServerBookmarkLoadResult.Loaded>(loaded).state)
+        assertTrue(Files.exists(primary))
+        assertTrue(Files.exists(legacy))
+    }
+
+    @Test
+    fun `existing client config wins over legacy bookmarks without being overwritten`() {
+        val directory = Files.createTempDirectory("visual-agent-bookmarks")
+        val primary = directory.resolve("config/startup-servers.json")
+        val legacy = directory.resolve("legacy/startup-servers.json")
+        val primaryState = DesktopServerBookmarkState(visualAgentServerBookmarks = listOf(bookmark(name = "Current")))
+        val legacyState = DesktopServerBookmarkState(visualAgentServerBookmarks = listOf(bookmark(name = "Legacy")))
+        DesktopServerBookmarkStore(primary, legacy, Json { prettyPrint = true }).save(primaryState)
+        DesktopServerBookmarkStore(legacy, legacyStorageFile = null, json = Json { prettyPrint = true }).save(legacyState)
+
+        val loaded = DesktopServerBookmarkStore(primary, legacy).load()
+
+        assertEquals(primaryState, assertIs<DesktopServerBookmarkLoadResult.Loaded>(loaded).state)
+        assertEquals(legacyState, assertIs<DesktopServerBookmarkLoadResult.Loaded>(DesktopServerBookmarkStore(legacy).load()).state)
+    }
+
+    @Test
+    fun `legacy publication never replaces a concurrently created destination`() {
+        val directory = Files.createTempDirectory("visual-agent-bookmarks")
+        val source = directory.resolve("legacy.tmp")
+        val target = directory.resolve("startup-servers.json")
+        Files.writeString(source, "legacy")
+        Files.writeString(target, "current")
+
+        assertTrue(!copyFileWithoutReplacement(source, target))
+        assertEquals("current", Files.readString(target))
+    }
+
+    @Test
+    fun `client config root override resolves without consulting the working directory`() {
+        val configuredRoot = Files.createTempDirectory("visual-agent-client-config")
+
+        assertEquals(
+            configuredRoot.resolve("startup-servers.json").toAbsolutePath().normalize(),
+            ClientConfigPathResolver.resolveBookmarkFile(configuredRoot.toString()),
+        )
     }
 
     private fun bookmark(

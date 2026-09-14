@@ -4,9 +4,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import net.harawata.appdirs.AppDirsFactory
 import java.nio.charset.StandardCharsets
 import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -50,20 +50,43 @@ sealed interface DesktopServerBookmarkLoadResult {
  * provider settings, model selections, credentials, or application-server state.
  */
 class DesktopServerBookmarkStore(
-    private val storageFile: Path = defaultDesktopServerBookmarkFile(),
+    private val storageFile: Path,
+    private val legacyStorageFile: Path? = null,
     private val json: Json =
         Json {
             ignoreUnknownKeys = false
             prettyPrint = true
         },
 ) {
+    /** Creates the production store with the current config location and legacy migration source. */
+    constructor() : this(ClientConfigPathResolver.bookmarkFile(), ClientConfigPathResolver.legacyBookmarkFile())
+
     /** Loads bookmarks without creating a file for a first-time user. */
     fun load(): DesktopServerBookmarkLoadResult {
-        if (!Files.exists(storageFile)) return DesktopServerBookmarkLoadResult.Loaded(DesktopServerBookmarkState())
+        val sourceFile =
+            when {
+                Files.exists(storageFile) -> storageFile
+                legacyStorageFile?.let(Files::exists) == true -> legacyStorageFile
+                else -> return DesktopServerBookmarkLoadResult.Loaded(DesktopServerBookmarkState())
+            }
         return runCatching {
-            validateState(json.decodeFromString<DesktopServerBookmarkState>(Files.readString(storageFile)))
+            readValidatedState(sourceFile)
         }.fold(
-            onSuccess = { DesktopServerBookmarkLoadResult.Loaded(it) },
+            onSuccess = { state ->
+                val effectiveState =
+                    if (sourceFile != storageFile) {
+                        try {
+                            migrateLegacyState(state)
+                        } catch (_: Exception) {
+                            return DesktopServerBookmarkLoadResult.Invalid(
+                                "The previous server bookmark file was found but could not be migrated to the client config directory.",
+                            )
+                        }
+                    } else {
+                        state
+                    }
+                DesktopServerBookmarkLoadResult.Loaded(effectiveState)
+            },
             onFailure = { DesktopServerBookmarkLoadResult.Invalid("Saved server bookmarks are invalid and were left unchanged.") },
         )
     }
@@ -104,6 +127,9 @@ class DesktopServerBookmarkStore(
         return state.copy(visualAgentServerBookmarks = bookmarks.sortedBy(DesktopServerBookmark::name))
     }
 
+    private fun readValidatedState(file: Path): DesktopServerBookmarkState =
+        validateState(json.decodeFromString<DesktopServerBookmarkState>(Files.readString(file)))
+
     private fun validateBookmark(bookmark: DesktopServerBookmark): DesktopServerBookmark {
         require(runCatching { UUID.fromString(bookmark.id) }.isSuccess) { "Server bookmark identifier must be a UUID" }
         require(bookmark.name.trim().isNotEmpty()) { "Server bookmark name is required" }
@@ -125,6 +151,27 @@ class DesktopServerBookmarkStore(
         }
     }
 
+    private fun migrateLegacyState(state: DesktopServerBookmarkState): DesktopServerBookmarkState {
+        Files.createDirectories(storageFile.parent)
+        val temporary = Files.createTempFile(storageFile.parent, storageFile.fileName.toString(), ".migration.tmp")
+        try {
+            Files.writeString(
+                temporary,
+                json.encodeToString(state),
+                StandardCharsets.UTF_8,
+                StandardOpenOption.TRUNCATE_EXISTING,
+            )
+            restrictPermissions(temporary)
+            if (!copyFileWithoutReplacement(temporary, storageFile)) {
+                return readValidatedState(storageFile)
+            }
+            restrictPermissions(storageFile)
+            return state
+        } finally {
+            Files.deleteIfExists(temporary)
+        }
+    }
+
     private fun restrictPermissions(file: Path) {
         runCatching {
             Files.setPosixFilePermissions(file, PosixFilePermissions.fromString("rw-------"))
@@ -132,11 +179,18 @@ class DesktopServerBookmarkStore(
     }
 }
 
-/** Returns the versioned client-local bootstrap file used before server connection. */
-internal fun defaultDesktopServerBookmarkFile(): Path {
-    val dataDirectory = AppDirsFactory.getInstance().getUserDataDir("Visual Agent", null, "de.heckenmann")
-    return Path.of(dataDirectory).resolve("startup-servers.json")
-}
-
 internal const val LOCAL_SERVER_ID = "local"
 private const val CURRENT_BOOKMARK_VERSION = 1
+
+/** Copies a migration file only when the destination does not already exist. */
+internal fun copyFileWithoutReplacement(
+    source: Path,
+    target: Path,
+): Boolean =
+    runCatching { Files.copy(source, target) }
+        .fold(
+            onSuccess = { true },
+            onFailure = { failure ->
+                if (failure is FileAlreadyExistsException) false else throw failure
+            },
+        )
