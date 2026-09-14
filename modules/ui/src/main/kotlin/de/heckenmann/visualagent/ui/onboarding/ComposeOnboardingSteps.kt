@@ -56,7 +56,7 @@ internal fun OnboardingProviderStep(
                     id = UUID.randomUUID().toString(),
                     name = "Ollama",
                     adapter = ProviderAdapter.OLLAMA,
-                    baseUrl = "http://localhost:11434",
+                    baseUrl = ProviderAdapter.OLLAMA.defaultEndpoint(),
                 ),
             )
         },
@@ -173,9 +173,17 @@ internal fun OnboardingReviewStep(
 internal fun OnboardingProviderProfile.toDraft(): OnboardingProviderDraft =
     OnboardingProviderDraft(id, name, adapter, baseUrl, CredentialUpdate.Unchanged, enabled, defaultModel)
 
-/** Updates a staged provider adapter without retaining an invalid HTTP endpoint for Codex CLI. */
+/** Updates a staged provider adapter with the matching default endpoint. */
 internal fun OnboardingProviderDraft.withAdapter(adapter: ProviderAdapter): OnboardingProviderDraft =
-    copy(adapter = adapter, baseUrl = if (adapter == ProviderAdapter.CODEX_CLI) "" else baseUrl)
+    copy(adapter = adapter, baseUrl = adapter.defaultEndpoint())
+
+/** Returns the documented default endpoint for an HTTP provider adapter. */
+internal fun ProviderAdapter.defaultEndpoint(): String =
+    when (this) {
+        ProviderAdapter.OLLAMA -> "http://localhost:11434"
+        ProviderAdapter.OPENAI_COMPATIBLE -> "https://api.openai.com"
+        ProviderAdapter.CODEX_CLI -> ""
+    }
 
 private fun ProviderAdapter.label(): String =
     when (this) {
