@@ -58,6 +58,19 @@ data class OnboardingValidationResult(
     val validationFingerprint: String? = null,
 )
 
+/** Safe sub-agent summary shown during onboarding. */
+data class OnboardingAgent(
+    val id: String,
+    val name: String,
+    val role: String,
+)
+
+/** Result of asking the configured main model to create an onboarding sub-agent. */
+data class OnboardingAgentCreationResult(
+    val message: String,
+    val agents: List<OnboardingAgent>,
+)
+
 /** Provider readiness outcomes exposed without raw SDK exceptions or secret values. */
 enum class OnboardingValidationCode {
     SUCCESS,
@@ -77,6 +90,9 @@ interface OnboardingPort {
     /** Returns safe provider views without returning stored credential values. */
     fun providers(): List<OnboardingProviderProfile>
 
+    /** Returns the current persisted sub-agent inventory without provider credentials or execution logs. */
+    fun agents(): List<OnboardingAgent>
+
     /** Marks automatic onboarding as dismissed without changing provider configuration. */
     fun dismiss()
 
@@ -89,10 +105,16 @@ interface OnboardingPort {
         modelId: String,
     ): OnboardingValidationResult
 
-    /** Atomically commits a previously validated provider/model configuration and completion state. */
+    /** Commits a previously validated provider/model configuration so the model can be used by the next onboarding step. */
     suspend fun finish(
         draft: OnboardingProviderDraft,
         model: ProviderModel,
         validationFingerprint: String,
     )
+
+    /** Sends a natural-language creation request to the configured main model and returns the refreshed inventory. */
+    suspend fun createAgent(description: String): OnboardingAgentCreationResult
+
+    /** Marks onboarding completed after the optional sub-agent creation step. */
+    fun complete()
 }

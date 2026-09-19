@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent.context
 
+import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.config.SubAgentToolConfig
 import de.heckenmann.visualagent.knowledge.PreferenceStore
@@ -70,10 +71,23 @@ class MainSystemPromptComposerTest {
 
     @Test
     fun `prompt instructs to discover sub-agents via agent list`() {
-        val prompt = MainSystemPromptComposer.compose(emptyTodos, null, toolConfigService)
+        val agent = SubAgent(id = "agent-1", name = "Coder", role = "Implementation")
+        val prompt = MainSystemPromptComposer.compose(emptyTodos, null, toolConfigService, listOf(agent))
         assertTrue("agent:list" in prompt)
         assertTrue("agent:show" in prompt)
         assertTrue("Discovering and Creating Sub-Agents" in prompt || "Discovering" in prompt)
+        assertTrue("Current sub-agent inventory (authoritative for this request)" in prompt)
+        assertTrue("Coder (id=agent-1" in prompt)
+        assertTrue("Before creating or assigning" in prompt)
+        assertTrue("never create one implicitly" in prompt)
+    }
+
+    @Test
+    fun `prompt directs delegation through explicit creation when inventory is empty`() {
+        val prompt = MainSystemPromptComposer.compose(emptyTodos, null, toolConfigService)
+
+        assertTrue("no persisted sub-agents" in prompt)
+        assertTrue("first create an appropriate sub-agent with `agent:create`" in prompt)
     }
 
     @Test

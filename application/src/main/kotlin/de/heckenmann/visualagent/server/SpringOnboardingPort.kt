@@ -7,6 +7,8 @@ import de.heckenmann.visualagent.agent.ModelParameters
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.knowledge.PreferenceStore
 import de.heckenmann.visualagent.protocol.CredentialUpdate
+import de.heckenmann.visualagent.protocol.OnboardingAgent
+import de.heckenmann.visualagent.protocol.OnboardingAgentCreationResult
 import de.heckenmann.visualagent.protocol.OnboardingPort
 import de.heckenmann.visualagent.protocol.OnboardingProviderDraft
 import de.heckenmann.visualagent.protocol.OnboardingProviderProfile
@@ -31,6 +33,7 @@ class SpringOnboardingPort(
     private val providerCatalog: ProviderCatalogService,
     private val llmProvider: LLMProvider,
     private val transactionTemplate: TransactionTemplate,
+    private val onboardingAgentService: OnboardingAgentService,
 ) : OnboardingPort {
     override fun state(): OnboardingState =
         OnboardingState(
@@ -46,6 +49,8 @@ class SpringOnboardingPort(
         )
 
     override fun providers(): List<OnboardingProviderProfile> = providerCatalog.listProviders().map { profile -> profile.toSafeView() }
+
+    override fun agents(): List<OnboardingAgent> = onboardingAgentService.agents()
 
     override fun dismiss() {
         preferenceStore.setPreference(ONBOARDING_KEY, OnboardingStatus.DISMISSED.name)
@@ -113,8 +118,13 @@ class SpringOnboardingPort(
                     )
             val profiles = providerCatalog.listProviders().filterNot { it.id == profile.id } + profile
             providerCatalog.replaceConfiguration(ApplicationProviderConfiguration(profiles, profile.id, discoveredModel.id))
-            preferenceStore.setPreference(ONBOARDING_KEY, OnboardingStatus.COMPLETED.name)
         }
+    }
+
+    override suspend fun createAgent(description: String): OnboardingAgentCreationResult = onboardingAgentService.createAgent(description)
+
+    override fun complete() {
+        preferenceStore.setPreference(ONBOARDING_KEY, OnboardingStatus.COMPLETED.name)
     }
 
     private fun OnboardingProviderDraft.toApplication(existing: ApplicationProviderProfile?): ApplicationProviderProfile {

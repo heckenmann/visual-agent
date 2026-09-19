@@ -67,7 +67,6 @@ class AutonomousCoordinator
                 subAgents = subAgents,
                 llmProvider = llmProvider,
                 agentToolConfigService = agentToolConfigService,
-                createAgent = { name, role, templateName -> subAgentOps.createAgent(name, role, templateName) },
             )
         private val decompositionScheduler =
             AutonomousTodoDecompositionScheduler(

@@ -18,7 +18,6 @@ internal class AutonomousTaskPlanner(
     private val subAgents: Map<String, SubAgent>,
     private val llmProvider: LLMProvider,
     private val agentToolConfigService: AgentToolConfigService,
-    private val createAgent: (name: String, role: String, templateName: String) -> SubAgent,
 ) {
     suspend fun expandComplexTodoIfNeeded(todos: List<Todo>): Boolean {
         val candidate = todos.firstOrNull { it.status == TodoStatus.PENDING && isComplex(it.description) } ?: return false
@@ -27,9 +26,10 @@ internal class AutonomousTaskPlanner(
 
     suspend fun expandComplexTodo(
         candidate: Todo,
-        analyst: SubAgent = ensureAnalysisAgent(),
+        analyst: SubAgent? = analysisAgent(),
     ): Boolean {
         if (candidate.status != TodoStatus.PENDING || !isComplex(candidate.description)) return false
+        analyst ?: return false
         val prompt = OrchestrationConstants.decompositionPrompt(candidate.description)
         val response = analyst.chat(prompt, llmProvider, agentToolConfigService.toolsFor(analyst)).message.content
         val subtasks =
@@ -49,9 +49,7 @@ internal class AutonomousTaskPlanner(
     fun selectWorkerAgentForNextTodo(): SubAgent? {
         val pending = todoManager.getPending().firstOrNull() ?: return null
         val idleAgents = subAgents.values.filter { it.status == AgentStatus.IDLE }
-        if (idleAgents.isEmpty()) {
-            return if (subAgents.isEmpty()) createDynamicWorkerFor(pending.description) else null
-        }
+        if (idleAgents.isEmpty()) return null
         return idleAgents.firstOrNull { matchesSpecialty(it, pending.description) }
             ?: idleAgents.first()
     }
@@ -87,16 +85,9 @@ internal class AutonomousTaskPlanner(
         return OrchestrationConstants.COMPLEXITY_HINTS.any(lower::contains)
     }
 
-    /** Returns the dedicated analyst, creating it when the system has none yet. */
-    internal fun analysisAgent(): SubAgent = ensureAnalysisAgent()
-
-    private fun ensureAnalysisAgent(): SubAgent =
+    /** Returns a persisted analysis agent, or null when the main model has not created one. */
+    internal fun analysisAgent(): SubAgent? =
         subAgents.values.firstOrNull { it.name.contains("analyst", true) || it.role.contains("analysis", true) }
-            ?: createAgent(
-                OrchestrationConstants.AnalysisAgent.NAME,
-                OrchestrationConstants.AnalysisAgent.ROLE,
-                OrchestrationConstants.AnalysisAgent.TEMPLATE,
-            )
 
     private fun matchesSpecialty(
         agent: SubAgent,
@@ -109,38 +100,5 @@ internal class AutonomousTaskPlanner(
             agent.name.contains("coder", true) ||
             researchTask &&
             agent.name.contains("research", true)
-    }
-
-    private fun createDynamicWorkerFor(description: String): SubAgent {
-        val lower = description.lowercase()
-        return when {
-            OrchestrationConstants.TEST_HINT in lower ->
-                createAgent(
-                    OrchestrationConstants.DynamicAgent.TESTER_NAME,
-                    OrchestrationConstants.DynamicAgent.TESTER_ROLE,
-                    OrchestrationConstants.DynamicAgent.TESTER_TEMPLATE,
-                )
-
-            OrchestrationConstants.REVIEW_HINT in lower ->
-                createAgent(
-                    OrchestrationConstants.DynamicAgent.REVIEWER_NAME,
-                    OrchestrationConstants.DynamicAgent.REVIEWER_ROLE,
-                    OrchestrationConstants.DynamicAgent.REVIEWER_TEMPLATE,
-                )
-
-            OrchestrationConstants.DOC_HINT in lower ->
-                createAgent(
-                    OrchestrationConstants.DynamicAgent.DOCUMENTER_NAME,
-                    OrchestrationConstants.DynamicAgent.DOCUMENTER_ROLE,
-                    OrchestrationConstants.DynamicAgent.DOCUMENTER_TEMPLATE,
-                )
-
-            else ->
-                createAgent(
-                    "Worker-${java.util.UUID.randomUUID().toString().take(4)}",
-                    OrchestrationConstants.DynamicAgent.GENERAL_WORKER_ROLE,
-                    OrchestrationConstants.DynamicAgent.GENERAL_WORKER_TEMPLATE,
-                )
-        }
     }
 }

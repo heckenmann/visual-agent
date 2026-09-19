@@ -35,18 +35,19 @@ class AgentManagerActiveJobCountTest {
 
             try {
                 config.maxParallelSubAgents = 2
-                val first = async { manager.runAgentJob("1", "first") }
-                val second = async { manager.runAgentJob("1", "second") }
+                val agent = manager.createAgent("Worker", "Concurrent test worker")
+                val first = async { manager.runAgentJob(agent.id, "first") }
+                val second = async { manager.runAgentJob(agent.id, "second") }
 
                 bothStarted.await()
-                assertEquals(2, manager.getActiveJobCount("1"))
-                assertEquals(AgentStatus.BUSY, manager.getSubAgent("1")?.status)
+                assertEquals(2, manager.getActiveJobCount(agent.id))
+                assertEquals(AgentStatus.BUSY, manager.getSubAgent(agent.id)?.status)
 
                 release.complete(Unit)
                 first.await()
                 second.await()
-                assertEquals(0, manager.getActiveJobCount("1"))
-                assertEquals(AgentStatus.IDLE, manager.getSubAgent("1")?.status)
+                assertEquals(0, manager.getActiveJobCount(agent.id))
+                assertEquals(AgentStatus.IDLE, manager.getSubAgent(agent.id)?.status)
             } finally {
                 config.maxParallelSubAgents = 4
                 manager.destroy()

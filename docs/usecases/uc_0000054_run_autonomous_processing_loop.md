@@ -20,6 +20,7 @@ Desktop user or main orchestration agent.
 3. The task planner decomposes complex pending todos when needed.
 4. A conflated work signal makes the coordinator select pending todos by `position` while compatible agents are idle.
    - If the todo has no `assignedAgentId`, the coordinator assigns the first idle sub-agent before starting it.
+   - If no suitable persisted sub-agent exists, the coordinator leaves the todo pending; it never creates a worker itself.
 5. The selected agent is marked busy, the todo moves to `IN_PROGRESS`, and a start message is persisted.
 6. The scheduler enforces `maxParallelSubAgents`; excess work waits for a slot-release, resume, or parallelism-change signal.
 7. Worker results are reviewed; approved results complete the todo and rejected or failed results cancel it.
@@ -49,6 +50,7 @@ The application can process a backlog without manual assignment for every task. 
 - Newly created eligible todos wake the coordinator immediately after persistence.
 - Todos with a valid `assignedAgentId` are picked up by that agent.
 - Todos without an assignment are auto-assigned to an idle sub-agent.
+- An empty inventory leaves work pending without retries or implicit agent creation until the main model or user explicitly creates an agent.
 - Parallelism respects configured limits.
 - With no immediately executable work, the coordinator waits without polling for the next committed work or capacity signal.
 - Worker failures retry or cancel according to policy.
