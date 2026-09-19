@@ -141,57 +141,6 @@ location of your Java installation."
     fi
 fi
 
-wrapper_jar="$APP_HOME/gradle/wrapper/gradle-wrapper.jar"
-wrapper_properties="$APP_HOME/gradle/wrapper/gradle-wrapper.properties"
-
-download_wrapper_file () {
-    if command -v curl >/dev/null 2>&1 ; then
-        curl --fail --location --silent --show-error --output "$2" "$1"
-    elif command -v wget >/dev/null 2>&1 ; then
-        wget --quiet --output-document="$2" "$1"
-    else
-        die "ERROR: gradle-wrapper.jar is missing and neither curl nor wget is available."
-    fi
-}
-
-wrapper_sha256 () {
-    if command -v sha256sum >/dev/null 2>&1 ; then
-        sha256sum "$1" | awk '{ print $1 }'
-    elif command -v shasum >/dev/null 2>&1 ; then
-        shasum -a 256 "$1" | awk '{ print $1 }'
-    else
-        die "ERROR: gradle-wrapper.jar is missing and no SHA-256 command is available."
-    fi
-}
-
-if [ ! -f "$wrapper_jar" ] ; then
-    wrapper_version=$(sed -n 's#.*gradle-\([0-9][0-9.]*\)-[^/]*\.zip.*#\1#p' "$wrapper_properties")
-    [ -n "$wrapper_version" ] || die "ERROR: Unable to determine the Gradle Wrapper version."
-
-    # The project intentionally excludes binary JARs from version control.
-    # Download the tagged Gradle source JAR and verify it with Gradle's published checksum.
-    wrapper_url="https://raw.githubusercontent.com/gradle/gradle/v$wrapper_version/gradle/wrapper/gradle-wrapper.jar"
-    wrapper_checksum_url="https://services.gradle.org/distributions/gradle-$wrapper_version-wrapper.jar.sha256"
-    wrapper_temp_jar=$(mktemp "$wrapper_jar.tmp.XXXXXX") || die "ERROR: Unable to create a temporary Wrapper JAR."
-    wrapper_temp_checksum=$(mktemp "$wrapper_jar.sha256.XXXXXX") || die "ERROR: Unable to create a temporary checksum file."
-
-    if ! download_wrapper_file "$wrapper_url" "$wrapper_temp_jar" ||
-        ! download_wrapper_file "$wrapper_checksum_url" "$wrapper_temp_checksum" ; then
-        rm -f "$wrapper_temp_jar" "$wrapper_temp_checksum"
-        die "ERROR: Unable to download Gradle Wrapper $wrapper_version."
-    fi
-
-    expected_checksum=$(awk '{ print $1 }' "$wrapper_temp_checksum")
-    actual_checksum=$(wrapper_sha256 "$wrapper_temp_jar")
-    if [ "$actual_checksum" != "$expected_checksum" ] ; then
-        rm -f "$wrapper_temp_jar" "$wrapper_temp_checksum"
-        die "ERROR: Downloaded Gradle Wrapper checksum does not match the official checksum."
-    fi
-
-    mv "$wrapper_temp_jar" "$wrapper_jar" || die "ERROR: Unable to install Gradle Wrapper $wrapper_version."
-    rm -f "$wrapper_temp_checksum"
-fi
-
 # Increase the maximum file descriptors if we can.
 if ! "$cygwin" && ! "$darwin" && ! "$nonstop" ; then
     case $MAX_FD in #(

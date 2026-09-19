@@ -55,6 +55,7 @@ See the [use-case catalog](docs/usecases/) for the full list of user-visible fun
 ## Prerequisites and Build from Source
 
 See [Setup Guide](docs/setup.md) for prerequisites, build/run commands, Ollama configuration, persistence, and troubleshooting.
+In a fresh clone, generate the intentionally unversioned Gradle Wrapper JAR as described there before invoking `./gradlew`.
 
 ```bash
 ./gradlew build

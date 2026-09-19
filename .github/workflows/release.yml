@@ -36,15 +36,32 @@ jobs:
           distribution: temurin
           java-version: "24"
 
+      - name: Read Gradle wrapper version
+        id: gradle_wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's#.*gradle-\([0-9][0-9.]*\)-[^/]*\.zip.*#\1#p' gradle/wrapper/gradle-wrapper.properties)"
+          test -n "$version"
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6.3.0
+        with:
+          gradle-version: ${{ steps.gradle_wrapper.outputs.version }}
+
+      - name: Generate Gradle wrapper
+        run: gradle wrapper --gradle-version "${{ steps.gradle_wrapper.outputs.version }}"
+
+      - name: Validate generated Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v6.3.0
 
       - name: Verify release tag matches Gradle version
         env:
           RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
-          gradle_version="$(gradle --quiet printProjectVersion --no-daemon --no-configuration-cache)"
+          gradle_version="$(./gradlew --quiet printProjectVersion --no-daemon --no-configuration-cache)"
           expected_tag="v${gradle_version}"
           test "$RELEASE_TAG" = "$expected_tag" || {
             echo "Release tag must be $expected_tag, but was $RELEASE_TAG."
