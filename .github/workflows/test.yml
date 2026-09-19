@@ -57,7 +57,7 @@ jobs:
         uses: gradle/actions/wrapper-validation@v6.3.0
 
       - name: Run tests
-        run: xvfb-run -a ./gradlew ktlintCheck check test --build-cache --no-daemon --no-configuration-cache -PdatabaseTestMaxParallelForks=4
+        run: xvfb-run -a ./gradlew ktlintCheck check test --build-cache --no-daemon --parallel --max-workers=4 -PdatabaseTestMaxParallelForks=4
 
       - name: Verify executable JARs can launch
         shell: bash

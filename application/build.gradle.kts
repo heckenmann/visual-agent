@@ -128,7 +128,6 @@ tasks.test {
     systemProperty("visualagent.ollama.smoke", System.getProperty("visualagent.ollama.smoke", "false"))
     systemProperty("visualagent.codex.smoke", System.getProperty("visualagent.codex.smoke", "false"))
     jvmArgs("-Xshare:off", "-Xmx2g", "-Dkotlinx.coroutines.debug=off")
-    finalizedBy(tasks.jacocoTestReport)
 }
 
 val jacocoExcludedClasses = emptyList<String>()

@@ -48,7 +48,6 @@ tasks.test {
     filter {
         isFailOnNoMatchingTests = false
     }
-    finalizedBy(tasks.jacocoTestReport)
 }
 
 kotlin {

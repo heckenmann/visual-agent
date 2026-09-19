@@ -38,15 +38,6 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
     filter { isFailOnNoMatchingTests = false }
-    finalizedBy(tasks.jacocoTestReport)
-}
-
-tasks.jacocoTestReport {
-    dependsOn(tasks.test)
-    reports {
-        xml.required.set(true)
-        html.required.set(true)
-    }
 }
 
 kotlin {
