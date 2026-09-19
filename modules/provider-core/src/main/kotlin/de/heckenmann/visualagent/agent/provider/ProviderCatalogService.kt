@@ -11,7 +11,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
- * Stores provider profiles, model catalogs, and active selection in SQLite.
+ * Stores provider profiles, model catalogs, and active selection in the database.
  *
  * Legacy Ollama/OpenAI preferences are migrated into profiles when no catalog exists.
  *

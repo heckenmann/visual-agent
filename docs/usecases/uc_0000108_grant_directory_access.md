@@ -20,7 +20,7 @@ Let a user explicitly approve an additional server- or client-owned directory wi
 2. For **This device**, the native FileKit picker selects a client directory. For **Application server**, the dialog browses paged server-owned directories through short-lived opaque server selections.
 3. The filesystem owner rejects missing, relative, unreadable, non-directory, duplicate, traversal, symlink-escaping, Visual-Agent-data, Visual-Agent-configuration, and ancestor roots.
 4. The user supplies a display name and chooses **Read only** or **Read and write**.
-5. The server persists an opaque grant ID, origin, mode, and owner client ID. A client root path never crosses the client/server boundary or enters SQLite.
+5. The server persists an opaque grant ID, origin, mode, and owner client ID. A client root path never crosses the client/server boundary or enters H2.
 6. The panel shows its origin, access mode, display name, and current availability without exposing a native root path.
 7. The user may explicitly save a new name or mode and may revoke access through a confirmation modal.
 8. When a client grant becomes unavailable after reconnect or restart, the card offers **Reconnect directory**. The user selects the client directory again; the same device registers a fresh non-persisted capability for the existing grant ID.

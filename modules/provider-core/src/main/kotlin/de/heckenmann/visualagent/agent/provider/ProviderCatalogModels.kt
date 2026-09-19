@@ -53,7 +53,7 @@ data class ProviderModelConfig(
  * @property name Human-readable provider name
  * @property adapter Runtime protocol adapter
  * @property baseUrl Provider API endpoint
- * @property apiKey Optional plaintext key stored in SQLite by current product decision
+ * @property apiKey Optional plaintext key stored in the database by current product decision
  * @property enabled Whether the profile may be selected
  * @property defaultModel Default model identifier
  * @property options Provider-level request options inherited by models and agents

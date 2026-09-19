@@ -20,7 +20,7 @@ Desktop user.
 3. The user stages a provider, model, favorite, or profile change without affecting active agent requests.
 4. The user may refresh the remote model catalog to update the local selection choices.
 5. The user configures model instruction, context, startup history, parallel agents, tool timeout, queue behavior, and optional idle follow-up suggestions in the same local draft.
-6. The user selects **Save changes** to persist the staged catalog, conversation settings, and active provider/model together, or **Reset changes** to reload the persisted state from SQLite.
+6. The user selects **Save changes** to persist the staged catalog, conversation settings, and active provider/model together, or **Reset changes** to reload the persisted state from H2.
 7. The user may press **Esc** or select the title-bar close action to discard the local draft without saving.
 8. The user may select **Run onboarding again** to open the server-owned readiness wizard for the currently connected Visual Agent server.
 9. Later model requests resolve against the saved provider/model.

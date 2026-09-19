@@ -45,7 +45,7 @@ Reusable project knowledge survives conversation cleanup, restart, and provider 
 ## Acceptance Criteria
 
 - Skill titles are bounded to 200 Unicode code points and Markdown bodies to 120,000 Unicode code points.
-- SQLite FTS5 indexes title and body content, with bounded ranked results and a safe fallback for invalid FTS syntax.
+- H2-backed bounded search matches title and body content without engine-specific full-text extensions.
 - Every model read increments `readCount` and `lastReadAt` only after a complete, non-cancelled read.
 - Creates and updates use SHA-256 duplicate detection and optimistic revision checks.
 - Deletes are transactional, remove the FTS row, and retain only a body-free audit tombstone.

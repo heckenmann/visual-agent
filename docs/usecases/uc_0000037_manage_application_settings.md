@@ -39,7 +39,7 @@ User preferences survive restart and affect the application consistently.
 
 ## Acceptance Criteria
 
-- Supported settings persist in SQLite.
+- Supported settings persist in H2.
 - Appearance edits do not apply until **Save changes** is selected.
 - **Reset changes** reloads the persisted database state and never resets provider credentials or configuration.
 - Settings panels keep Reset and Save in a fixed, right-aligned footer while settings content scrolls independently.

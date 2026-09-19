@@ -5,7 +5,7 @@
 - Java 21+ (the project auto-resolves the JDK 24 toolchain locally; CI uses JDK 21 so the Foojay toolchain resolver can fetch 24).
 - The Gradle wrapper version is defined centrally in `gradle/wrapper/gradle-wrapper.properties`; the release workflow validates release tags against the project version.
 - Ollama running locally (`ollama serve`) or a reachable remote Ollama endpoint.
-- SQLite is embedded and managed automatically through Spring Data JPA + Flyway.
+- H2 is embedded and managed automatically through Spring Data JPA + Flyway. R2DBC support is available for the ongoing store migration.
 
 ## Build and Run
 
@@ -97,7 +97,7 @@ The Session panel configures:
 - Selected model and model catalog metadata
 - Model status, context/output limits, whitelist/blacklist rules, and options
 
-The API key is stored as `ollama.api.key` in the SQLite `user_preferences` table. It is not written to `app.properties` or configuration exports. When configured, requests include:
+The API key is stored as `ollama.api.key` in the H2 `user_preferences` table. It is not written to `app.properties` or configuration exports. When configured, requests include:
 
 ```http
 Authorization: Bearer <key>
@@ -120,7 +120,7 @@ Leaving the key blank omits the `Authorization` header. Profile URL and key chan
   directory (`startup-servers.json`): Linux `$XDG_CONFIG_HOME/Visual Agent/` (fallback
   `~/.config/Visual Agent/`), macOS `~/Library/Preferences/Visual Agent/`, or Windows
   `%LOCALAPPDATA%/Visual Agent/`. This file contains no provider settings or secrets.
-- Runtime configuration is stored in SQLite `user_preferences`; it is unavailable to the UI until
+- Runtime configuration is stored in H2 `user_preferences`; it is unavailable to the UI until
   the selected server connection is ready.
 - Gradle development tasks explicitly opt into repository-local `data/visual-agent.db`; installed
   packages do not depend on the process working directory.
@@ -128,7 +128,7 @@ Leaving the key blank omits the `Authorization` header. Profile URL and key chan
 - Editable canvas documents saved from the Canvas or Files panel are stored as regular workspace files under `<server-data-root>/workspace/canvas/`.
 - Schema changes are applied through Flyway migrations at startup
 - Hibernate validates the mapped entities, but does not generate schema in production
-- Conversation search uses SQLite FTS5 with a fallback `LIKE` path
+- Conversation search uses bounded database queries with a safe `LIKE` path
 
 ## Troubleshooting
 
@@ -158,15 +158,9 @@ curl -H "Authorization: Bearer $OLLAMA_API_KEY" \
 
 An HTTP `401` or `403` usually indicates a missing or invalid API key, or an endpoint that expects an authentication scheme other than bearer authentication.
 
-### SQLite lock issues
+### H2 lock issues
 
-If a lock persists after a crash, remove the WAL sidecars below the resolved server data root:
-
-```bash
-rm <server-data-root>/visual-agent.db-wal <server-data-root>/visual-agent.db-shm
-```
-
-Restart the app afterwards.
+If a lock persists after a crash, verify that no Visual Agent process is still running and restart the app. H2 releases its file lock when the owning process exits.
 
 ### Migration startup issues
 
