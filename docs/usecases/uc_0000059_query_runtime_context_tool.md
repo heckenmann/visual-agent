@@ -6,11 +6,11 @@ Let enabled agents query the current runtime context, including workspace, provi
 
 ## Primary Actor
 
-Enabled agent.
+Main agent or explicitly enabled sub-agent.
 
 ## Preconditions
 
-- The context tool is enabled.
+- The context tool is enabled for the requesting agent.
 
 ## Main Flow
 
