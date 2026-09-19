@@ -13,7 +13,6 @@ import de.heckenmann.visualagent.agent.SubAgentOpsProvider
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.knowledge.MemoryStore
 import de.heckenmann.visualagent.knowledge.TodoStore
-import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoChange
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoManager
@@ -78,6 +77,14 @@ class AutonomousCoordinator
                 subAgentOps = subAgentOps,
                 executionControl = executionControl,
                 signalWork = workSignal::signal,
+            )
+        private val candidateSelector =
+            AutonomousTodoCandidateSelector(
+                todoStore = todoStore,
+                subAgents = subAgents,
+                taskPlanner = taskPlanner,
+                decompositionScheduler = decompositionScheduler,
+                executionControl = executionControl,
             )
 
         init {
@@ -250,7 +257,7 @@ class AutonomousCoordinator
                 }
             if (busyCount >= parallelismProvider.get().coerceAtLeast(1)) return false
 
-            val candidate = findNextAssignableTodo(requestedTodoId) ?: return false
+            val candidate = candidateSelector.find(requestedTodoId) ?: return false
             val agent = candidate.agent
             val todo = todoManager.claimPendingTodo(candidate.todo.id, agent.id) ?: return false
             try {
@@ -330,26 +337,4 @@ class AutonomousCoordinator
                 subAgentOps.notifyAgent(agent.id, "STATUS:${agent.status.name}")
             }
         }
-
-        private fun findNextAssignableTodo(requestedTodoId: String? = null): TodoExecutionCandidate? =
-            findNextAssignableTodo(
-                todoStore
-                    .listTodos()
-                    .filterNot {
-                        decompositionScheduler.isDecomposing(it.id) || shouldDecomposeBeforeExecution(it, requestedTodoId)
-                    },
-                subAgents,
-                requestedTodoId = requestedTodoId,
-                isAgentEligible = { agentId ->
-                    executionControl?.isExecutionAllowed(agentId) ?: true
-                },
-            )
-
-        private fun shouldDecomposeBeforeExecution(
-            todo: Todo,
-            requestedTodoId: String?,
-        ): Boolean =
-            requestedTodoId == null &&
-                taskPlanner.isComplex(todo.description) &&
-                !decompositionScheduler.hasAttemptedDecomposition(todo.id)
     }
