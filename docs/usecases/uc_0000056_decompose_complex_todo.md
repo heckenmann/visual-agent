@@ -12,13 +12,13 @@ Autonomous runtime.
 
 - At least one pending todo exists.
 - The todo is complex according to configured heuristics.
-- A provider/model is available for analysis.
+- A persisted analysis sub-agent and provider/model are available for analysis.
 
 ## Main Flow
 
 1. The planner scans pending todos.
 2. It selects a complex candidate.
-3. An analyst agent is found or created.
+3. An existing persisted analyst agent is selected.
 4. The analyst returns concise subtasks.
 5. The original todo is cancelled and subtasks are appended after the current position.
 
@@ -38,6 +38,7 @@ Large tasks become smaller units that can be assigned to workers.
 ## Acceptance Criteria
 
 - Empty decomposition results do not modify the original todo.
+- If no analyst exists, the planner creates no implicit agent and makes the todo available for direct execution by an existing worker.
 - Duplicate subtasks are removed.
 - The original complex todo is cancelled only after subtasks are produced.
 - Subtasks are appended after the decomposed todo's position; the user or model can reorder them afterwards.

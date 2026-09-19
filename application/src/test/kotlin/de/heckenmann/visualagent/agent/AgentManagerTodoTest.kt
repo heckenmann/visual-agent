@@ -3,6 +3,7 @@ import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.knowledge.PersistenceStores
+import de.heckenmann.visualagent.testsupport.seedDefaultTestAgents
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoStatus
@@ -35,6 +36,7 @@ class AgentManagerTodoTest {
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                 .create("jdbc:sqlite::memory:")
         val provider = mockk<LLMProvider>(relaxed = true)
+        seedDefaultTestAgents(db)
         coEvery { provider.isConnected() } returns true
         coEvery { provider.chat(any<ChatRequestContext>()) } coAnswers {
             delay(3000)
@@ -53,6 +55,7 @@ class AgentManagerTodoTest {
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                 .create("jdbc:sqlite::memory:")
         val provider = mockk<LLMProvider>(relaxed = true)
+        seedDefaultTestAgents(db)
         coEvery { provider.isConnected() } returns true
         coEvery { provider.chat(any<ChatRequestContext>()) } returns
             ChatResponse(
@@ -164,18 +167,6 @@ class AgentManagerTodoTest {
             assertEquals(AgentStatus.IDLE, agent.status)
             assertNull(agent.currentTask)
         }
-    }
-
-    @Test
-    fun `agents have expected default roles`() {
-        val (manager, _, _) = createManager()
-        val agents = manager.getSubAgents()
-
-        assertEquals(3, agents.size)
-        val agentsByName = agents.associateBy { it.name }
-        assertTrue(agentsByName.containsKey("Researcher"))
-        assertTrue(agentsByName.containsKey("Coder"))
-        assertTrue(agentsByName.containsKey("Documenter"))
     }
 
     @Test

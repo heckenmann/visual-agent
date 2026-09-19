@@ -21,23 +21,14 @@ import kotlin.test.assertTrue
 
 class AutonomousTaskPlannerTest {
     @Test
-    fun `creates a dynamic worker when no agents exist`() {
+    fun `does not create a dynamic worker when no agents exist`() {
         val todoManager = TodoManager()
         todoManager.add("Add focused tests for the queue")
-        val created = mutableListOf<SubAgent>()
-        val planner =
-            planner(
-                todoManager,
-                mutableMapOf(),
-                createAgent = { name, role, _ ->
-                    SubAgent(id = "created-${created.size}", name = name, role = role).also(created::add)
-                },
-            )
+        val planner = planner(todoManager, mutableMapOf())
 
         val worker = planner.selectWorkerAgentForNextTodo()
 
-        assertEquals("Tester", worker?.name)
-        assertEquals(1, created.size)
+        assertNull(worker)
     }
 
     @Test
@@ -99,6 +90,17 @@ class AutonomousTaskPlannerTest {
         }
 
     @Test
+    fun `does not decompose complex todo without an existing analyst`() =
+        runTest {
+            val todoManager = TodoManager()
+            val original = todoManager.add("Design the architecture and integrate the complete pipeline")
+            val planner = planner(todoManager, mutableMapOf())
+
+            assertFalse(planner.expandComplexTodoIfNeeded(todoManager.getAll()))
+            assertSame(original, todoManager.getById(original.id))
+        }
+
+    @Test
     fun `reviews worker output and builds complete instructions`() =
         runTest {
             val provider = mockk<LLMProvider>()
@@ -132,7 +134,6 @@ class AutonomousTaskPlannerTest {
     private fun planner(
         todoManager: TodoManager,
         agents: MutableMap<String, SubAgent>,
-        createAgent: (String, String, String) -> SubAgent = { _, _, _ -> error("Unexpected agent creation") },
         provider: LLMProvider = mockk(),
         toolConfig: AgentToolConfigService = mockk(),
     ) = AutonomousTaskPlanner(
@@ -140,7 +141,6 @@ class AutonomousTaskPlannerTest {
         subAgents = agents,
         llmProvider = provider,
         agentToolConfigService = toolConfig,
-        createAgent = createAgent,
     )
 
     private fun response(content: String) =

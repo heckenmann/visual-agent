@@ -67,7 +67,6 @@ class AutonomousCoordinator
                 subAgents = subAgents,
                 llmProvider = llmProvider,
                 agentToolConfigService = agentToolConfigService,
-                createAgent = { name, role, templateName -> subAgentOps.createAgent(name, role, templateName) },
             )
         private val decompositionScheduler =
             AutonomousTodoDecompositionScheduler(
@@ -270,8 +269,9 @@ class AutonomousCoordinator
                 val token = CancellationToken().also { activeCancellationTokens[todo.id] = it }
                 val processingJob =
                     scope.launch(start = CoroutineStart.LAZY) {
-                        if (token.isCancelled || todoManager.getById(todo.id)?.status != TodoStatus.IN_PROGRESS) {
+                        if (todoManager.getById(todo.id)?.status != TodoStatus.IN_PROGRESS) {
                             activeCancellationTokens.remove(todo.id, token)
+                            releaseClaimedAgent(agent, todo.id)
                             return@launch
                         }
                         processTodoWithLLM(
@@ -298,7 +298,7 @@ class AutonomousCoordinator
                 activeTodoJobs[todo.id] = processingJob
                 processingJob.invokeOnCompletion {
                     activeTodoJobs.remove(todo.id, processingJob)
-                    releaseUnstartedTodo(agent, todo.id)
+                    workSignal.signal()
                 }
                 processingJob.start()
                 return true
@@ -313,7 +313,7 @@ class AutonomousCoordinator
             }
         }
 
-        private fun releaseUnstartedTodo(
+        private fun releaseClaimedAgent(
             agent: SubAgent,
             todoId: String,
         ) {
@@ -325,7 +325,6 @@ class AutonomousCoordinator
                 subAgentOps.saveSubAgent(agent)
                 subAgentOps.notifyAgent(agent.id, "STATUS:${agent.status.name}")
             }
-            workSignal.signal()
         }
 
         private fun findNextAssignableTodo(requestedTodoId: String? = null): TodoExecutionCandidate? =

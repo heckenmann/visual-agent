@@ -70,6 +70,12 @@ internal class AutonomousTodoDecompositionScheduler(
             return
         }
         val analyst = taskPlanner.analysisAgent()
+        if (analyst == null) {
+            attemptedTodoIds += todo.id
+            decompositionActive.set(false)
+            signalWork()
+            return
+        }
         if (analyst.status != AgentStatus.IDLE || executionControl?.isExecutionAllowed(analyst.id) == false) {
             decompositionActive.set(false)
             return

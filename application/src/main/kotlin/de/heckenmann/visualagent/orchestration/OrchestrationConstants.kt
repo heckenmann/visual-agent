@@ -30,40 +30,6 @@ internal object OrchestrationConstants {
     /** Lexical hints that suggest a research-related task. */
     val RESEARCH_HINTS = listOf("research", "docs", "issue")
 
-    /** Lexical hints that suggest a testing-related dynamic worker. */
-    const val TEST_HINT = "test"
-
-    /** Lexical hints that suggest a review-related dynamic worker. */
-    const val REVIEW_HINT = "review"
-
-    /** Lexical hints that suggest a documentation-related dynamic worker. */
-    const val DOC_HINT = "doc"
-
-    /** Default names and roles used when dynamically creating worker agents. */
-    object DynamicAgent {
-        const val TESTER_NAME = "Tester"
-        const val TESTER_ROLE = "Focused test implementation and validation"
-        const val TESTER_TEMPLATE = "tester"
-
-        const val REVIEWER_NAME = "Reviewer"
-        const val REVIEWER_ROLE = "Code and architecture review"
-        const val REVIEWER_TEMPLATE = "reviewer"
-
-        const val DOCUMENTER_NAME = "Documenter"
-        const val DOCUMENTER_ROLE = "Documentation and developer guides"
-        const val DOCUMENTER_TEMPLATE = "documenter"
-
-        const val GENERAL_WORKER_ROLE = "General execution worker"
-        const val GENERAL_WORKER_TEMPLATE = "coder"
-    }
-
-    /** Default names and roles used when creating the decomposition analysis agent. */
-    object AnalysisAgent {
-        const val NAME = "Analyst"
-        const val ROLE = "Task decomposition and structured planning"
-        const val TEMPLATE = "researcher"
-    }
-
     /**
      * Builds the analysis prompt that decomposes a complex todo into subtasks.
      *

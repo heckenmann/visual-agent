@@ -26,6 +26,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.flowOf
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -134,9 +135,9 @@ internal fun buildFixture(
             ),
         )
     }
-    val notifications = mutableListOf<String>()
-    val savedAgents = mutableListOf<SubAgent>()
-    val messages = mutableListOf<Message>()
+    val notifications = CopyOnWriteArrayList<String>()
+    val savedAgents = CopyOnWriteArrayList<SubAgent>()
+    val messages = CopyOnWriteArrayList<Message>()
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val executionControl = SubAgentExecutionControl(FixturePreferenceStore())
     val parallelismProvider =

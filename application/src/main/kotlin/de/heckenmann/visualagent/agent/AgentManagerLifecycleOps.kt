@@ -24,12 +24,6 @@ internal class AgentManagerLifecycleOps(
     fun loadAgentsFromDb() {
         val agents = owner.subAgentStore.listAgents()
         logger.info { "Found ${agents.size} agents in DB" }
-        if (agents.size < 3) {
-            createDefaultAgents()
-            logger.info { "Created default agents; subAgents size=${owner.subAgentOpsProvider.allSubAgents.size}" }
-            return
-        }
-
         val sortedAgents = agents.sortedBy { it.id.toIntOrNull() ?: Int.MAX_VALUE }
         sortedAgents.forEach { agentMap ->
             try {
@@ -71,26 +65,6 @@ internal class AgentManagerLifecycleOps(
             createdAt = agentRecord.createdAt.toEpochMilli(),
             updatedAt = agentRecord.updatedAt.toEpochMilli(),
         )
-    }
-
-    fun createDefaultAgents() {
-        val defaults =
-            listOf(
-                SubAgent(
-                    "1",
-                    "Researcher",
-                    "Web research and information gathering",
-                    AgentStatus.IDLE,
-                    config = AgentConfig.fromTemplate("researcher"),
-                ),
-                SubAgent("2", "Coder", "Code implementation and review", AgentStatus.IDLE, config = AgentConfig.fromTemplate("coder")),
-                SubAgent("3", "Documenter", "Documentation writing", AgentStatus.IDLE, config = AgentConfig.fromTemplate("documenter")),
-            )
-        defaults.forEach { agent ->
-            saveAgentToDb(agent)
-            owner.subAgentOpsProvider.putSubAgent(agent)
-        }
-        logger.info { "Created ${defaults.size} default agents" }
     }
 
     fun saveAgentToDb(agent: SubAgent) {
