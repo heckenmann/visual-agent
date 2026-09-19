@@ -39,10 +39,10 @@ jobs:
           cache-read-only: false
           cache-cleanup: on-success
           cache-overwrite-existing: true
-          validate-wrappers: false
+          validate-wrappers: true
 
       - name: Run tests
-        run: xvfb-run -a gradle ktlintCheck check test --build-cache --no-daemon --no-configuration-cache
+        run: xvfb-run -a ./gradlew ktlintCheck check test --build-cache --no-daemon --no-configuration-cache -PdatabaseTestMaxParallelForks=4
 
       - name: Verify executable JARs can launch
         shell: bash

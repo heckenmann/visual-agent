@@ -52,7 +52,7 @@ jobs:
           }
 
       - name: Run quality gates
-        run: xvfb-run -a gradle ktlintCheck check test --no-daemon --no-configuration-cache
+        run: xvfb-run -a ./gradlew ktlintCheck check test --no-daemon --no-configuration-cache -PdatabaseTestMaxParallelForks=4
 
   package:
     name: Package ${{ matrix.platform }}

@@ -86,17 +86,24 @@ dependencies {
 
 val databaseTestTag = "database"
 val databaseCategoryTag = "de.heckenmann.visualagent.testsupport.DatabaseTestCategory"
+val databaseTestMaxParallelForks =
+    providers
+        .gradleProperty("databaseTestMaxParallelForks")
+        .map { value ->
+            value.toIntOrNull()?.takeIf { it > 0 }
+                ?: error("databaseTestMaxParallelForks must be a positive integer")
+        }.getOrElse(1)
 
 val databaseTest =
     tasks.register<Test>("databaseTest") {
-        description = "Runs database-backed tests serially."
+        description = "Runs database-backed tests with configurable parallel forks."
         group = "verification"
         useJUnitPlatform {
             includeTags(databaseTestTag, databaseCategoryTag)
         }
         testClassesDirs = sourceSets["test"].output.classesDirs
         classpath = sourceSets["test"].runtimeClasspath
-        maxParallelForks = 1
+        maxParallelForks = databaseTestMaxParallelForks
         filter {
             isFailOnNoMatchingTests = false
         }
