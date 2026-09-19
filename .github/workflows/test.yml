@@ -33,21 +33,38 @@ jobs:
           distribution: temurin
           java-version: "24"
 
+      - name: Read Gradle wrapper version
+        id: gradle_wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's#.*gradle-\([0-9][0-9.]*\)-[^/]*\.zip.*#\1#p' gradle/wrapper/gradle-wrapper.properties)"
+          test -n "$version"
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6.3.0
         with:
+          gradle-version: ${{ steps.gradle_wrapper.outputs.version }}
           cache-read-only: false
           cache-cleanup: on-success
           cache-overwrite-existing: true
-          validate-wrappers: false
+
+      - name: Generate Gradle wrapper
+        run: gradle wrapper --gradle-version "${{ steps.gradle_wrapper.outputs.version }}"
+
+      - name: Validate generated Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v6.3.0
 
       - name: Run tests
-        run: xvfb-run -a gradle ktlintCheck check test --build-cache --no-daemon --no-configuration-cache
+        run: xvfb-run -a ./gradlew ktlintCheck check test --build-cache --no-daemon --parallel --max-workers=4 -PdatabaseTestMaxParallelForks=4
 
       - name: Verify executable JARs can launch
         shell: bash
         run: |
           set -euo pipefail
+          java_cmd="${JAVA_HOME:?JAVA_HOME must be set by setup-java}/bin/java"
+          "$java_cmd" --version
 
           verify_launch() {
             local jar_path="$1"
@@ -59,7 +76,7 @@ jobs:
             # The desktop JAR needs a deterministic renderer in the virtual display used by CI.
             # Skiko's software renderer is supported by Compose Desktop and avoids relying on
             # whichever OpenGL provider happens to be installed on the GitHub runner.
-            timeout --kill-after=10s 25s xvfb-run -a java -Dskiko.renderApi=SOFTWARE -jar "$jar_path" \
+            timeout --kill-after=10s 25s xvfb-run -a "$java_cmd" -Dskiko.renderApi=SOFTWARE -jar "$jar_path" \
               --spring.main.web-application-type=none >"$log_path" 2>&1 || status=$?
 
             if [[ "$require_spring_startup" == "true" ]]; then

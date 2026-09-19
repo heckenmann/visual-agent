@@ -32,7 +32,7 @@ it directly; it does not need to be installed. Run a platform-matched JAR with `
 not provide native operating-system integration.
 
 The native launcher supplies the Visual Agent name and icon to the operating system. On first
-launch the server creates its SQLite database in the platform-specific per-user server data
+launch the server creates its H2 database in the platform-specific per-user server data
 directory and the Compose UI loads its client-local server bootstrap configuration before opening
 the selected connection.
 
@@ -46,7 +46,7 @@ Supported native release platforms are macOS (Apple Silicon and Intel), Windows 
 - Todo list and sub-agents that can work on tasks autonomously.
 - Per-agent tool configuration, provider profiles, and persisted settings.
 - Searchable reusable Markdown skills that the main agent can save and retrieve explicitly,
-  with a user-facing Skills panel and SQLite FTS5 indexing.
+  with a user-facing Skills panel and database-backed search.
 - Command palette (`Cmd/Ctrl+K`) and customizable workspace panel layout.
 - Icon-only actions with descriptive tooltips throughout the Compose workspace.
 
@@ -55,6 +55,7 @@ See the [use-case catalog](docs/usecases/) for the full list of user-visible fun
 ## Prerequisites and Build from Source
 
 See [Setup Guide](docs/setup.md) for prerequisites, build/run commands, Ollama configuration, persistence, and troubleshooting.
+In a fresh clone, generate the intentionally unversioned Gradle Wrapper JAR as described there before invoking `./gradlew`.
 
 ```bash
 ./gradlew build
@@ -120,7 +121,7 @@ See the module READMEs for ownership and migration details: [`:application`](app
 - [Architecture](docs/architecture.md) — runtime layers, provider routing, tool system, persistence, in-flight indicator, current constraints
 - [Gradle Module Architecture](docs/gradle-module-architecture.md) — module graph, dependency rules, migration sequence, and verification commands
 - [API Reference](docs/api.md) — `LLMProvider`, Spring AI integration, tool-calling contracts, activity surface
-- [Database Schema](docs/database.md) — SQLite schema, indexes, persistence behavior
+- [Database Schema](docs/database.md) — H2 schema, indexes, persistence behavior
 - [SubAgents](docs/subagents.md) — autonomous/sub-agent model, tool sets, autonomous loop
 - [Compose Migration Audit](docs/compose-migration-audit.md) — per-requirement evidence for the JavaFX to Compose Multiplatform decision
 - [Development Conventions](docs/conventions.md) — use-case traceability and documentation rules

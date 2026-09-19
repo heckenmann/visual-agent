@@ -23,6 +23,21 @@ class ServerDataPathResolverTest {
     }
 
     @Test
+    fun `explicit database path resolves its parent as the server data root`() {
+        val environment = MockEnvironment().withProperty("visual-agent.db.path", "/tmp/explicit/agent.db")
+
+        assertEquals(Path.of("/tmp/explicit"), ServerDataPathResolver.serverDataRoot(environment))
+    }
+
+    @Test
+    fun `configured server data root is exposed independently from database naming`() {
+        val serverRoot = Files.createTempDirectory("visual-agent-server-root")
+        val environment = MockEnvironment().withProperty("visual-agent.server.data-root", serverRoot.toString())
+
+        assertEquals(serverRoot, ServerDataPathResolver.serverDataRoot(environment))
+    }
+
+    @Test
     fun `server data root determines database file when no database override exists`() {
         val serverRoot = Files.createTempDirectory("visual-agent-server-root")
         val environment = MockEnvironment().withProperty("visual-agent.server.data-root", serverRoot.toString())
@@ -43,11 +58,11 @@ class ServerDataPathResolverTest {
     }
 
     @Test
-    fun `in-memory sqlite override remains available for tests`() {
+    fun `in-memory h2 override remains available for tests`() {
         assertEquals(
-            "jdbc:sqlite::memory:",
+            "jdbc:h2:mem:test",
             ServerDataPathResolver.databasePath(
-                MockEnvironment().withProperty("visual-agent.db.path", "jdbc:sqlite::memory:"),
+                MockEnvironment().withProperty("visual-agent.db.path", "jdbc:h2:mem:test"),
             ),
         )
     }

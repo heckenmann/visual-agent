@@ -50,10 +50,11 @@ internal class ProjectKnowledgeEntity(
 @Table(name = "user_preferences")
 internal class PreferenceEntity(
     @Id
-    @Column(name = "key")
+    @Column(name = "preference_key")
     var key: String = "",
-    @Column(nullable = false)
+    @Column(name = "preference_value", nullable = false)
     var value: String = "",
+    @Column(name = "preference_type")
     var type: String = "string",
     @Convert(converter = InstantStringConverter::class)
     @Column(name = "updated_at", columnDefinition = "TIMESTAMP")
@@ -81,11 +82,12 @@ internal class ConversationEntity(
     var contextPolicy: String = ConversationContextPolicy.SUMMARY_SOURCE.name,
 )
 
-/** Allocates globally ordered activity identifiers within the SQLite database. */
+/** Allocates globally ordered activity identifiers within the relational database. */
 @Entity
 @Table(name = "conversation_timeline_sequence")
 internal class ConversationTimelineSequenceEntity(
     @Id
+    @Column(name = "sequence_value")
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var value: Long = 0,
 )

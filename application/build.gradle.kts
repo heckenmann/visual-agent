@@ -41,14 +41,17 @@ dependencies {
     implementation(libs.grpc.inprocess)
     implementation(libs.grpc.netty.shaded)
     implementation(libs.spring.boot.starter.data.jpa)
+    implementation(libs.spring.data.r2dbc)
+    implementation(libs.spring.r2dbc)
     implementation(platform(libs.spring.ai.bom))
     implementation(libs.spring.ai.ollama)
     implementation(libs.spring.ai.openai)
     implementation("org.hibernate.orm:hibernate-community-dialects")
     implementation("org.springframework.boot:spring-boot-starter-flyway")
 
-    // SQLite JDBC
-    implementation(libs.sqlite.jdbc)
+    // Temporary relational baseline while the store adapters move to R2DBC.
+    runtimeOnly(libs.h2)
+    runtimeOnly(libs.r2dbc.h2)
     implementation(libs.appdirs)
 
     // Kotlinx Coroutines
@@ -83,17 +86,24 @@ dependencies {
 
 val databaseTestTag = "database"
 val databaseCategoryTag = "de.heckenmann.visualagent.testsupport.DatabaseTestCategory"
+val databaseTestMaxParallelForks =
+    providers
+        .gradleProperty("databaseTestMaxParallelForks")
+        .map { value ->
+            value.toIntOrNull()?.takeIf { it > 0 }
+                ?: error("databaseTestMaxParallelForks must be a positive integer")
+        }.getOrElse(1)
 
 val databaseTest =
     tasks.register<Test>("databaseTest") {
-        description = "Runs SQLite-backed tests serially."
+        description = "Runs database-backed tests with configurable parallel forks."
         group = "verification"
         useJUnitPlatform {
             includeTags(databaseTestTag, databaseCategoryTag)
         }
         testClassesDirs = sourceSets["test"].output.classesDirs
         classpath = sourceSets["test"].runtimeClasspath
-        maxParallelForks = 1
+        maxParallelForks = databaseTestMaxParallelForks
         filter {
             isFailOnNoMatchingTests = false
         }
@@ -118,7 +128,6 @@ tasks.test {
     systemProperty("visualagent.ollama.smoke", System.getProperty("visualagent.ollama.smoke", "false"))
     systemProperty("visualagent.codex.smoke", System.getProperty("visualagent.codex.smoke", "false"))
     jvmArgs("-Xshare:off", "-Xmx2g", "-Dkotlinx.coroutines.debug=off")
-    finalizedBy(tasks.jacocoTestReport)
 }
 
 val jacocoExcludedClasses = emptyList<String>()

@@ -2,15 +2,14 @@
 
 ## Overview
 
-Visual Agent uses SQLite through Spring Data JPA repositories and Flyway migrations.
+Visual Agent uses an embedded H2 database through Spring Data JPA repositories and Flyway migrations. An opt-in Spring Data R2DBC H2 foundation is available while stores are migrated incrementally.
 
 Runtime defaults:
 
 - Server data root from the platform-specific per-user application-data directory, in the
   `server/` namespace.
 - Database: `<server-data-root>/visual-agent.db`
-- `PRAGMA journal_mode=WAL`
-- `PRAGMA busy_timeout=5000`
+- H2 file locking and transaction handling
 - Hibernate schema validation in production, migration-driven schema creation through Flyway
 
 The application uses DB-first reads for conversation, todos, and related runtime context.
@@ -47,7 +46,7 @@ Used for:
 - incremental "load older" behavior
 - keyword search via history tool
 
-The table is backed by an FTS5 companion table, `conversation_history_fts`, and triggers keep the search index synchronized.
+Conversation search uses bounded database-neutral queries. No engine-specific full-text companion tables or triggers are required.
 
 ### `todos`
 
@@ -91,8 +90,8 @@ The table stores relative workspace paths only. External source paths are never 
 
 ### `skills`
 
-Stores bounded reusable Markdown authored by the model or user. SQLite FTS5
-indexes title and content through database triggers. Each row has an optimistic
+Stores bounded reusable Markdown authored by the model or user. Database-neutral
+bounded search matches title and content. Each row has an optimistic
 revision, a SHA-256 duplicate fingerprint, and model-read telemetry. Reads from
 the model increment `read_count` and `last_read_at` atomically; user-panel
 views do not. Deletion removes the searchable body and keeps only a minimal
@@ -104,7 +103,7 @@ Stores user configuration values persisted beyond app restarts.
 
 It now backs the application settings binder through the `PreferenceStore` abstraction.
 
-The server data path is resolved before SQLite opens and is not stored in this table. Runtime
+The server data path is resolved before H2 opens and is not stored in this table. Runtime
 configuration changes are written to `user_preferences`; they do not rewrite a packaged resource
 file.
 
@@ -134,8 +133,7 @@ The document format is a versioned JSON document (see
 
 ## Search/Index Notes
 
-Conversation keyword search is implemented with native SQLite FTS5 queries inside the conversation store and used by the `history` tool.  
-When FTS input is invalid, the store falls back to a case-insensitive `LIKE` query.
+Conversation keyword search is implemented with bounded database-neutral queries inside the conversation store and used by the `history` tool. Matching uses a case-insensitive `LIKE` query.
 
 ## Tool History Persistence
 
@@ -145,8 +143,8 @@ These entries are restored on restart and rendered in conversation UI as minimiz
 ## Migration Notes
 
 - The production app no longer creates tables with ad hoc JDBC schema helpers.
-- The initial schema is defined in `db/migration/V1__initial_knowledge_schema.sql`.
-- Existing local databases keep their data; Flyway adds schema history and applies migrations without resetting content.
+- The initial H2 schema is defined in `db/migration-h2/V1__initial_h2_schema.sql`.
+- Legacy database files from the pre-H2 runtime must be exported or migrated through a dedicated migration process before they can be used by the H2 runtime.
 - A repository-local legacy `./data/` directory is not auto-migrated because a desktop client may
   be connected to a different server. To keep using that store, stop Visual Agent and pass its
   absolute database path explicitly with `-Dvisual-agent.db.path=/absolute/path/data/visual-agent.db`.
@@ -156,10 +154,4 @@ These entries are restored on restart and rendered in conversation UI as minimiz
 
 ## Operational Notes
 
-If stale WAL/SHM files remain after an unclean shutdown and lock errors persist:
-
-```bash
-rm <server-data-root>/visual-agent.db-wal <server-data-root>/visual-agent.db-shm
-```
-
-Then restart the application.
+If an H2 lock remains after an unclean shutdown, verify that no Visual Agent process is still running and restart the application. Do not delete database files manually.

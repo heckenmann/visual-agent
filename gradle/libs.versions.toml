@@ -11,7 +11,7 @@ compose = "1.12.0"
 compose-material3 = "1.9.0"
 compose-material-icons = "1.7.3"
 cmp-clipboard = "3.5.28"
-sqlite = "3.53.4.0"
+h2 = "2.4.240"
 coroutines = "1.11.0"
 serialization = "1.11.0"
 pdfbox = "3.0.8"
@@ -45,6 +45,8 @@ spring-boot-starter-data-jpa = { module = "org.springframework.boot:spring-boot-
 spring-boot-starter-flyway = { module = "org.springframework.boot:spring-boot-starter-flyway" }
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
 spring-context = { module = "org.springframework:spring-context" }
+spring-data-r2dbc = { module = "org.springframework.data:spring-data-r2dbc" }
+spring-r2dbc = { module = "org.springframework:spring-r2dbc" }
 spring-tx = { module = "org.springframework:spring-tx" }
 netty-resolver-dns-native-macos = { module = "io.netty:netty-resolver-dns-native-macos" }
 spring-ai-bom = { module = "org.springframework.ai:spring-ai-bom", version.ref = "spring-ai" }
@@ -52,7 +54,8 @@ spring-ai-model = { module = "org.springframework.ai:spring-ai-model" }
 spring-ai-ollama = { module = "org.springframework.ai:spring-ai-starter-model-ollama" }
 spring-ai-openai = { module = "org.springframework.ai:spring-ai-openai" }
 spring-integration-sftp = { module = "org.springframework.integration:spring-integration-sftp", version.ref = "spring-integration" }
-sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite" }
+h2 = { module = "com.h2database:h2", version.ref = "h2" }
+r2dbc-h2 = { module = "io.r2dbc:r2dbc-h2" }
 coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 coroutines-bom = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-bom", version.ref = "coroutines" }
 coroutines-reactor = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactor", version.ref = "coroutines" }

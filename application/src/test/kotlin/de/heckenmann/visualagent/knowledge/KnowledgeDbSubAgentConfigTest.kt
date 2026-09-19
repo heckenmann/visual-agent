@@ -13,7 +13,7 @@ class KnowledgeDbSubAgentConfigTest {
     fun `sub agent config crud persists tool ids`() {
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                .create("jdbc:sqlite::memory:")
+                .create("jdbc:h2:mem:test")
         val service = AgentToolConfigService(db)
         val config =
             SubAgentToolConfig(

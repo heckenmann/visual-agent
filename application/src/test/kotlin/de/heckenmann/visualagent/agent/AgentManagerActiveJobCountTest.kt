@@ -20,7 +20,7 @@ class AgentManagerActiveJobCountTest {
             val config = AppConfigBean()
             val stores =
                 de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                    .create("jdbc:sqlite::memory:")
+                    .create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             val startedCount = AtomicInteger()
             val bothStarted = CompletableDeferred<Unit>()

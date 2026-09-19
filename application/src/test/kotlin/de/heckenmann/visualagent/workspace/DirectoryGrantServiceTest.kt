@@ -31,7 +31,12 @@ class DirectoryGrantServiceTest {
     fun setUp() {
         store = MemoryDirectoryGrantStore()
         capabilities = ClientDirectoryCapabilityRegistry()
-        service = DirectoryGrantService(store, capabilities, VisualAgentProtectedDirectoryPolicy(":memory:"))
+        service =
+            DirectoryGrantService(
+                store,
+                capabilities,
+                VisualAgentProtectedDirectoryPolicy(temp.resolve("protected/database").toString()),
+            )
     }
 
     @Test

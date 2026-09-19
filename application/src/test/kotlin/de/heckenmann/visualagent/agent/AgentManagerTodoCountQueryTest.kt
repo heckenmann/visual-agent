@@ -17,7 +17,7 @@ class AgentManagerTodoCountQueryTest {
         runBlocking {
             val db =
                 de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                    .create("jdbc:sqlite::memory:")
+                    .create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             coEvery { provider.isConnected() } returns true
             coEvery { provider.chat(any<ChatRequestContext>()) } returns
@@ -43,7 +43,7 @@ class AgentManagerTodoCountQueryTest {
         runBlocking {
             val db =
                 de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                    .create("jdbc:sqlite::memory:")
+                    .create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             coEvery { provider.isConnected() } returns true
             coEvery { provider.chat(any<ChatRequestContext>()) } returns

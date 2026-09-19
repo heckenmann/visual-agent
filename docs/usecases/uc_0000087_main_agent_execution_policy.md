@@ -10,7 +10,7 @@ Main orchestration agent.
 
 ## Preconditions
 
-- The main agent is configured with `agent:*`, `todos`, `workspace:file`, and other explicitly enabled server-owned tools.
+- The main agent is configured with `agent:*`, `todos`, `context`, `workspace:file`, and other explicitly enabled server-owned tools.
 - Sub-agents with role-based tool sets (`researcher`, `coder`, `analyst`) exist.
 - The autonomous coordinator processes assigned todos.
 
@@ -36,6 +36,7 @@ The main agent reliably delegates work that requires tools it does not have, sea
 - `agent:delete` — delete a sub-agent
 - `agent:log` — read a sub-agent's work history
 - `todos` — create, update, reorder, and query todos
+- `context` — inspect request-safe runtime, provider, model, and workspace context
 
 ## Code Entry Points
 

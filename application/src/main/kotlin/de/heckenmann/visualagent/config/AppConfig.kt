@@ -13,11 +13,11 @@ import java.util.concurrent.CopyOnWriteArrayList
  *
  * @property llmProvider Active provider identifier (`ollama` or `openai`)
  * @property ollamaLocalUrl Ollama API endpoint (default: http://localhost:11434)
- * @property ollamaApiKey Optional plaintext API key for secured Ollama endpoints, stored in SQLite
- * @property openAiApiKey Plaintext OpenAI API key stored in SQLite by current product decision
+ * @property ollamaApiKey Optional plaintext API key for secured Ollama endpoints, stored in the database
+ * @property openAiApiKey Plaintext OpenAI API key stored in the database by current product decision
  * @property openAiBaseUrl OpenAI-compatible API base URL
  * @property openAiModel Default OpenAI-compatible chat model
- * @property databasePath Path to SQLite database file
+ * @property databasePath Path to the H2 database file
  * @property uiThemeMode UI theme mode (default: SYSTEM)
  * @property fontSize UI font size (default: 14)
  * @property showPanelLabels Whether the navigation rail shows panel labels by default

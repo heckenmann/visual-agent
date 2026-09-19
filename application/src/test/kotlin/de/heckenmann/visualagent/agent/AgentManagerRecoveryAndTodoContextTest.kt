@@ -20,7 +20,7 @@ class AgentManagerRecoveryAndTodoContextTest {
         runBlocking {
             val db =
                 de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                    .create("jdbc:sqlite::memory:")
+                    .create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             val requestSlot = slot<ChatRequestContext>()
             coEvery { provider.chat(capture(requestSlot)) } returns

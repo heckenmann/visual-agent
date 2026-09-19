@@ -89,48 +89,41 @@ tasks.named("build") {
 }
 
 gradle.projectsEvaluated {
+    val moduleProjects =
+        listOf(
+            ":application",
+            ":ui",
+            ":protocol",
+            ":desktop",
+            ":agent-core",
+            ":provider-core",
+            ":provider-standard",
+            ":provider-openai-codex",
+            ":providers",
+            ":tool-standard",
+            ":tool-javascript",
+            ":tools",
+        )
     val moduleMainSourceSets =
-        listOf(":application", ":ui", ":protocol", ":desktop", ":agent-core", ":provider-core", ":provider-standard", ":provider-openai-codex", ":providers", ":tool-standard", ":tool-javascript", ":tools").map { modulePath ->
+        moduleProjects.map { modulePath ->
             project(modulePath).extensions.getByType<SourceSetContainer>().getByName("main")
         }
-    val moduleTestSourceSets =
-        listOf(":application", ":ui", ":protocol", ":desktop", ":agent-core", ":provider-core", ":provider-standard", ":provider-openai-codex", ":providers", ":tool-standard", ":tool-javascript", ":tools").map { modulePath ->
-            project(modulePath).extensions.getByType<SourceSetContainer>().getByName("test")
+    val moduleTestExecutionData =
+        moduleProjects.map { modulePath ->
+            project(modulePath).layout.buildDirectory.file("jacoco/test.exec")
         }
     tasks.named<Test>("test") {
         dependsOn(
-            ":application:testClasses",
-            ":ui:testClasses",
-            ":protocol:testClasses",
-            ":desktop:testClasses",
-            ":agent-core:testClasses",
-            ":provider-core:testClasses",
-            ":provider-standard:testClasses",
-            ":providers:testClasses",
-            ":provider-openai-codex:testClasses",
-            ":tool-standard:testClasses",
-            ":tool-javascript:testClasses",
+            moduleProjects.map { modulePath -> "$modulePath:test" },
+            ":application:databaseTest",
         )
-        useJUnitPlatform {
-            excludeTags("database", "de.heckenmann.visualagent.testsupport.DatabaseTestCategory")
-        }
-        // The aggregate test task produces JaCoCo execution data consumed by the root
-        // coverage verification. Reusing its cached result can pair stale execution data
-        // with current classes and make the coverage gate nondeterministic.
-        outputs.cacheIf { false }
-        mustRunAfter(":application:databaseTest")
-        workingDir = rootProject.projectDir
-        systemProperty("visualagent.ollama.smoke", System.getProperty("visualagent.ollama.smoke", "false"))
-        systemProperty("visualagent.codex.smoke", System.getProperty("visualagent.codex.smoke", "false"))
-        jvmArgs("-Xshare:off", "-Xmx2g", "-Dkotlinx.coroutines.debug=off")
-        testClassesDirs = files(moduleTestSourceSets.map { it.output.classesDirs })
-        classpath = files(moduleTestSourceSets.map { it.runtimeClasspath })
+        // Native module test tasks execute every suite once and preserve their classpaths.
         finalizedBy(tasks.jacocoTestReport)
     }
     tasks.jacocoTestReport {
-        dependsOn(tasks.test, ":application:databaseTest")
+        dependsOn(tasks.test)
         executionData(
-            layout.buildDirectory.file("jacoco/test.exec"),
+            moduleTestExecutionData,
             project(":application").layout.buildDirectory.file("jacoco/databaseTest.exec"),
         )
         classDirectories.setFrom(
@@ -156,11 +149,10 @@ gradle.projectsEvaluated {
         }
     }
     tasks.jacocoTestCoverageVerification {
-        dependsOn(tasks.test, ":application:databaseTest")
+        dependsOn(tasks.test)
         executionData(
-            layout.buildDirectory.file("jacoco/test.exec"),
+            moduleTestExecutionData,
             project(":application").layout.buildDirectory.file("jacoco/databaseTest.exec"),
-            project(":ui").layout.buildDirectory.file("jacoco/databaseTest.exec"),
         )
         classDirectories.setFrom(
             files(

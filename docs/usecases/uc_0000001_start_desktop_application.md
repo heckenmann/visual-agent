@@ -13,7 +13,7 @@ Desktop user.
 - Java 21 or newer is available.
 - Application dependencies are present.
 - The desktop can read or create its client-local bootstrap/configuration directory.
-- The selected server can read or create its own server data directory and SQLite database.
+- The selected server can read or create its own server data directory and H2 database.
 - For a release package, the user runs a supported native build: macOS (Apple Silicon or Intel), Windows x64, or Linux x86_64 (DEB, RPM, or AppImage).
 - For the platform-specific executable JAR, Java 24 is available on the matching operating system.
 
@@ -57,6 +57,6 @@ The user sees the Visual Agent main window and can interact with chat, session s
 - Closing either window requests shutdown at most once and releases the server session without orphaned resources.
 - Startup does not lose persisted runtime state.
 - Client bootstrap configuration remains client-owned and server runtime data remains server-owned, including when both run in one JVM.
-- The UI never opens SQLite or receives a server filesystem path; server-owned settings are accessed through protocol ports after readiness.
+- The UI never opens H2 or receives a server filesystem path; server-owned settings are accessed through protocol ports after readiness.
 - The portable Linux AppImage starts without installation and provides the same Visual Agent desktop window as the DEB and RPM packages.
 - The matching executable JAR starts with `java -jar` on its target platform and Java 24.

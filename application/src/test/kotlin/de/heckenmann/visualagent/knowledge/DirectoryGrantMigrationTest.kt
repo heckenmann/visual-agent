@@ -6,27 +6,32 @@ import java.nio.file.Files
 import java.sql.DriverManager
 import kotlin.test.assertTrue
 
+/** Verifies the directory grant columns exposed by the H2 schema. */
 class DirectoryGrantMigrationTest {
     @Test
     fun `fresh database migration creates the mapped directory grant owner column`() {
-        val database = Files.createTempFile("visual-agent-directory-grants", ".db")
-        val jdbcUrl = "jdbc:sqlite:$database"
+        val directory = Files.createTempDirectory("visual-agent-directory-grants")
+        val jdbcUrl = "jdbc:h2:file:${directory.resolve("database")};DB_CLOSE_ON_EXIT=FALSE"
 
         Flyway
             .configure()
-            .dataSource(jdbcUrl, "", "")
-            .locations("classpath:db/migration")
+            .dataSource(jdbcUrl, "sa", "")
+            .locations("classpath:db/migration-h2")
             .load()
             .migrate()
 
-        DriverManager.getConnection(jdbcUrl).use { connection ->
+        DriverManager.getConnection(jdbcUrl, "sa", "").use { connection ->
             connection.createStatement().use { statement ->
-                statement.executeQuery("PRAGMA table_info(directory_grants)").use { columns ->
-                    val names = generateSequence { if (columns.next()) columns.getString("name") else null }.toSet()
+                statement
+                    .executeQuery(
+                        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS " +
+                            "WHERE TABLE_SCHEMA = 'PUBLIC' AND TABLE_NAME = 'DIRECTORY_GRANTS'",
+                    ).use { columns ->
+                        val names = generateSequence { if (columns.next()) columns.getString("COLUMN_NAME") else null }.toSet()
 
-                    assertTrue("owner_client_id" in names)
-                    assertTrue("client_binding_id" !in names)
-                }
+                        assertTrue("OWNER_CLIENT_ID" in names)
+                        assertTrue("CLIENT_BINDING_ID" !in names)
+                    }
             }
         }
     }

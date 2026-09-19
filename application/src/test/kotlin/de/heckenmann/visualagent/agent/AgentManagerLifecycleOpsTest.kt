@@ -17,7 +17,7 @@ class AgentManagerLifecycleOpsTest {
     fun `empty persisted inventory remains empty on startup`() {
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                .create("jdbc:sqlite::memory:")
+                .create("jdbc:h2:mem:test")
         val manager = createManager(db)
 
         assertTrue(manager.getSubAgents().isEmpty())
@@ -28,7 +28,7 @@ class AgentManagerLifecycleOpsTest {
     fun `startup loads only partial persisted inventory`() {
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                .create("jdbc:sqlite::memory:")
+                .create("jdbc:h2:mem:test")
         val first = createManager(db)
         val one = first.createAgent("Existing researcher", "Research")
         val two = first.createAgent("Existing coder", "Implementation")
@@ -44,7 +44,7 @@ class AgentManagerLifecycleOpsTest {
     fun `deleted agents are not recreated after restart`() {
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                .create("jdbc:sqlite::memory:")
+                .create("jdbc:h2:mem:test")
         val first = createManager(db)
         val deleted = first.createAgent("Researcher", "Research")
         assertTrue(first.deleteAgent(deleted.id))
@@ -60,7 +60,7 @@ class AgentManagerLifecycleOpsTest {
     fun `getTodosFromDb returns stored todos`() {
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                .create("jdbc:sqlite::memory:")
+                .create("jdbc:h2:mem:test")
         val provider = mockk<LLMProvider>(relaxed = true)
         val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
         manager.todoManager.add("first")
@@ -75,7 +75,7 @@ class AgentManagerLifecycleOpsTest {
     fun `getTodoSummaryFromDb returns correct counters`() {
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                .create("jdbc:sqlite::memory:")
+                .create("jdbc:h2:mem:test")
         val provider = mockk<LLMProvider>(relaxed = true)
         val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
         manager.todoManager.add("one")
@@ -96,7 +96,7 @@ class AgentManagerLifecycleOpsTest {
     fun `update agent modifies name role and config`() {
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                .create("jdbc:sqlite::memory:")
+                .create("jdbc:h2:mem:test")
         val provider = mockk<LLMProvider>(relaxed = true)
         val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
         val agent = manager.createAgent("Worker", "Worker role")
@@ -116,7 +116,7 @@ class AgentManagerLifecycleOpsTest {
     fun `update unknown agent returns false`() {
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                .create("jdbc:sqlite::memory:")
+                .create("jdbc:h2:mem:test")
         val provider = mockk<LLMProvider>(relaxed = true)
         val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
@@ -127,7 +127,7 @@ class AgentManagerLifecycleOpsTest {
     fun `delete agent removes from memory and persistence`() {
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                .create("jdbc:sqlite::memory:")
+                .create("jdbc:h2:mem:test")
         val provider = mockk<LLMProvider>(relaxed = true)
         val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
         val agent = manager.createAgent("Worker", "Worker role")
@@ -143,7 +143,7 @@ class AgentManagerLifecycleOpsTest {
     fun `delete unknown agent returns false`() {
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                .create("jdbc:sqlite::memory:")
+                .create("jdbc:h2:mem:test")
         val provider = mockk<LLMProvider>(relaxed = true)
         val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
@@ -154,7 +154,7 @@ class AgentManagerLifecycleOpsTest {
     fun `getSubAgentsFromDb loads persisted agents`() {
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                .create("jdbc:sqlite::memory:")
+                .create("jdbc:h2:mem:test")
         val provider = mockk<LLMProvider>(relaxed = true)
         val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
         val agent = manager.createAgent("Worker", "Worker role")
@@ -168,7 +168,7 @@ class AgentManagerLifecycleOpsTest {
     fun `lifecycle ops maps corrupted config to default`() {
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                .create("jdbc:sqlite::memory:")
+                .create("jdbc:h2:mem:test")
         val provider = mockk<LLMProvider>(relaxed = true)
         val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
         val agent = manager.createAgent("Worker", "Worker role")

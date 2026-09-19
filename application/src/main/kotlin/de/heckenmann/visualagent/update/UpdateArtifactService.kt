@@ -102,7 +102,7 @@ internal class UpdateArtifactService(
     }
 
     private fun stagingRoot(): Path {
-        val database = config.databasePath.removePrefix("jdbc:sqlite:")
+        val database = config.databasePath.removePrefix("jdbc:h2:file:").substringBefore(';')
         val databasePath = Path.of(database).toAbsolutePath().normalize()
         return databasePath.parent.resolve("updates").normalize()
     }

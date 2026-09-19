@@ -38,7 +38,7 @@ User.
 ## Result
 
 Only a complete, digest-verified asset can be started, and the installer handoff clearly requires
-a restart. The current process, SQLite database, workspace files, conversation history, and API
+a restart. The current process, H2 database, workspace files, conversation history, and API
 keys are not overwritten or transmitted.
 
 ## Tool Calls
@@ -59,5 +59,5 @@ keys are not overwritten or transmitted.
 - Assets without a valid SHA-256 digest cannot be installed.
 - Size and SHA-256 verification happen before an installer is started.
 - Installation is never automatic and never overwrites the running process directly.
-- Settings are persisted in SQLite, including automatic-check and preview-channel preferences.
+- Settings are persisted in H2, including automatic-check and preview-channel preferences.
 - Compose UI code and protocol models contain no Reactor types.

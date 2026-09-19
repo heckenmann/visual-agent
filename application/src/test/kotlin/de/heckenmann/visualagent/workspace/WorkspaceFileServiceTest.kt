@@ -31,7 +31,7 @@ class WorkspaceFileServiceTest {
 
     @Test
     fun `workspace root is derived from database directory`() =
-        withDatabasePath("jdbc:sqlite:${tempDir().resolve("db/visual-agent.db")}") { dbPath ->
+        withDatabasePath("jdbc:h2:file:${tempDir().resolve("db/visual-agent")}") { dbPath ->
             val service = WorkspaceFileService(FakeWorkspaceFileStore(), dbPath)
 
             assertTrue(service.workspaceRoot().endsWith("db/workspace"))

@@ -1,13 +1,13 @@
 # Documentation
 
-Visual Agent now uses Spring Data JPA on SQLite with Flyway migrations for persistence. The docs below reflect the current runtime stack.
+Visual Agent uses a transitional Spring Data JPA layer on H2 and an opt-in Spring Data R2DBC foundation. Flyway owns the H2 schema baseline. The docs below reflect the current runtime stack.
 
 ## Table of Contents
 
 - [Architecture](architecture.md) - System architecture, runtime flow, in-flight indicator, current constraints
 - [Setup Guide](setup.md) - Installation, prerequisites, run/test commands, troubleshooting
 - [API Reference](api.md) - `LLMProvider`, Spring AI integration, tool-calling contracts, activity surface
-- [Database Schema](database.md) - SQLite schema, indexes, persistence behavior
+- [Database Schema](database.md) - H2 schema, indexes, persistence behavior
 - [SubAgents](subagents.md) - Autonomous/sub-agent model, tool sets, autonomous loop
 - [Compose Migration Audit](compose-migration-audit.md) - Per-requirement evidence for the JavaFX to Compose Multiplatform decision
 - [Development Conventions](conventions.md) - Use-case traceability and documentation rules

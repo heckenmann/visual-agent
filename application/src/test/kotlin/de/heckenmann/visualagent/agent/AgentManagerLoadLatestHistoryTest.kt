@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
 class AgentManagerLoadLatestHistoryTest {
     @Test
     fun `loadLatestHistory appends newest db messages missing from in-memory history`() {
-        val db = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+        val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
         val provider = mockk<LLMProvider>(relaxed = true)
         val manager =
             AgentManager(
@@ -48,7 +48,7 @@ class AgentManagerLoadLatestHistoryTest {
 
     @Test
     fun `loadLatestHistory does not duplicate messages already in memory`() {
-        val db = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+        val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
         val provider = mockk<LLMProvider>(relaxed = true)
         val manager =
             AgentManager(

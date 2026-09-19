@@ -13,7 +13,7 @@ class HistoryToolTest {
     fun `history tool loads and searches session history`() {
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                .create("jdbc:sqlite::memory:")
+                .create("jdbc:h2:mem:test")
         db.saveConversationMessage("main", "user", "alpha one")
         db.saveConversationMessage("main", "assistant", "beta two")
         db.saveConversationMessage("main", "user", "gamma three")
@@ -34,7 +34,7 @@ class HistoryToolTest {
     fun `history tool rejects unsupported action`() {
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                .create("jdbc:sqlite::memory:")
+                .create("jdbc:h2:mem:test")
         val tool = historyTool(db)
         val result = tool.execute("""{"action":"unknown"}""", mapOf("sessionId" to "main"))
         assertFalse(result.success)

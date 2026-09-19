@@ -19,7 +19,7 @@ class AgentManagerConversationOpsTest {
     fun `clear history removes all messages from memory and store`() {
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                .create("jdbc:sqlite::memory:")
+                .create("jdbc:h2:mem:test")
         val provider = mockk<LLMProvider>(relaxed = true)
         val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
         manager.appendSystemMessage("context")
@@ -34,7 +34,7 @@ class AgentManagerConversationOpsTest {
     fun `delete message by id removes it from memory and store`() {
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                .create("jdbc:sqlite::memory:")
+                .create("jdbc:h2:mem:test")
         val provider = mockk<LLMProvider>(relaxed = true)
         val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
         manager.appendSystemMessage("first")
@@ -51,7 +51,7 @@ class AgentManagerConversationOpsTest {
     fun `update message content by id updates memory and store`() {
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                .create("jdbc:sqlite::memory:")
+                .create("jdbc:h2:mem:test")
         val provider = mockk<LLMProvider>(relaxed = true)
         val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
         manager.appendSystemMessage("old")
@@ -67,7 +67,7 @@ class AgentManagerConversationOpsTest {
     fun `tool call event is recorded as concise history entry`() {
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                .create("jdbc:sqlite::memory:")
+                .create("jdbc:h2:mem:test")
         val provider = mockk<LLMProvider>(relaxed = true)
         val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
         val now = Instant.now()
@@ -108,7 +108,7 @@ class AgentManagerConversationOpsTest {
         runBlocking {
             val db =
                 de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                    .create("jdbc:sqlite::memory:")
+                    .create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
             coEvery { provider.chat(any<ChatRequestContext>()) } returns
@@ -130,7 +130,7 @@ class AgentManagerConversationOpsTest {
         runBlocking {
             val db =
                 de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                    .create("jdbc:sqlite::memory:")
+                    .create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
@@ -143,7 +143,7 @@ class AgentManagerConversationOpsTest {
     fun `append system message persists in history`() {
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                .create("jdbc:sqlite::memory:")
+                .create("jdbc:h2:mem:test")
         val provider = mockk<LLMProvider>(relaxed = true)
         val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
@@ -158,7 +158,7 @@ class AgentManagerConversationOpsTest {
         runBlocking {
             val db =
                 de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                    .create("jdbc:sqlite::memory:")
+                    .create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             coEvery { provider.chat(any<ChatRequestContext>()) } returns
                 ChatResponse(model = "test", message = Message("assistant", "result"), done = true)
@@ -176,7 +176,7 @@ class AgentManagerConversationOpsTest {
         runBlocking {
             val db =
                 de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                    .create("jdbc:sqlite::memory:")
+                    .create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             coEvery { provider.chat(any<ChatRequestContext>()) } returns
                 ChatResponse(model = "test", message = Message("assistant", "done"), done = true)
@@ -194,7 +194,7 @@ class AgentManagerConversationOpsTest {
         runBlocking {
             val db =
                 de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                    .create("jdbc:sqlite::memory:")
+                    .create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             coEvery { provider.chat(any<ChatRequestContext>()) } returns
                 ChatResponse(model = "test", message = Message("assistant", "completed"), done = true)

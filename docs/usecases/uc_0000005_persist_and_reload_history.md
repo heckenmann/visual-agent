@@ -10,7 +10,7 @@ Desktop user.
 
 ## Preconditions
 
-- SQLite persistence is available.
+- H2 persistence is available.
 - Conversation entries can be written to and read from the conversation store.
 
 ## Main Flow

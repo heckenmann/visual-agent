@@ -8,7 +8,7 @@ own output. Today those surfaces include an editable canvas, managed workspace f
 todo/sub-agent system, and a conversation panel; future work will add more rendering and
 interaction surfaces.
 
-The runtime uses Spring AI for model interaction and tool-calling, and Spring Data JPA on SQLite as the persistent state source.
+The runtime uses Spring AI for model interaction and tool-calling, and Spring Data JPA on H2 as the transitional persistent state source. An opt-in Spring Data R2DBC H2 foundation supports the ongoing store migration.
 The desktop host is launched from `:desktop` and the server-only `:application` entry point can
 run without Compose. In desktop mode, `:desktop` starts exactly one non-web Spring context from
 the `:application` module in the same JVM; it does not start a second server. The standalone
@@ -26,7 +26,7 @@ The UI receives only protocol ports; it never receives Spring beans.
    ops classes (`AgentManagerConversationOps`, `AgentManagerLifecycleOps`,
    `AgentManagerAutonomyOps`).
 4. Provider: `ConfiguredLLMProvider` is the `@Primary` Spring `LLMProvider` bean.
-   It resolves each request through the SQLite-backed
+   It resolves each request through the H2-backed
    `agent/provider/ProviderCatalogService` (preference key
    `llm.provider.catalog.v1`) and dispatches to `OllamaClient` or
    `OpenAiClient`. Provider adapters: `OLLAMA`, `OPENAI_COMPATIBLE`.
@@ -41,11 +41,11 @@ The UI receives only protocol ports; it never receives Spring beans.
    uses `AutonomousTaskPlanner` (todo expansion + worker selection) and
    `UxSeedTasks.all()` as the default UX backlog. Concurrency is gated by
    `SubAgentJobScheduler` keyed off `AppConfig.maxParallelSubAgents`.
-7. Persistence: JPA-backed stores on SQLite, with Flyway migrations
-   (`V1__initial_knowledge_schema.sql`, `V2__workspace_files.sql`) and a
-   native FTS5 search path for conversation history with a `LIKE`
-   fallback. `KnowledgePersistenceConfig` creates the SQLite `DataSource`
-   (Hikari, `maximumPoolSize = 1`, WAL, `busy_timeout=5000`).
+7. Persistence: JPA-backed stores on H2, with the consolidated Flyway
+   baseline (`db/migration-h2/V1__initial_h2_schema.sql`) and bounded
+   database-neutral search. `KnowledgePersistenceConfig` creates the
+   transitional Hikari `DataSource`; `ReactiveKnowledgePersistenceConfig`
+   provides the opt-in R2DBC connection factory and preference adapter.
 
 ## Current Implemented Flow
 
@@ -103,7 +103,7 @@ agent by themselves; the next user turn consumes their coalesced summary.
 
 `ProviderCatalogService` is the authoritative source for dynamic provider
 profiles and model metadata. It persists a versioned JSON catalog in
-SQLite, migrates legacy settings, filters unavailable models, and
+   H2, migrates legacy settings, filters unavailable models, and
 resolves `providerId/modelId` references. When the persisted
 `defaultModel` is no longer available on the configured endpoint,
 `resolve()` falls back to the first selectable model instead of

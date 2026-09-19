@@ -24,7 +24,7 @@ class AgentManagerStreamingConversationTest {
     @Test
     fun `stream message emits chunks and persists assistant response`() =
         runBlocking {
-            val db = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+            val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             coEvery { provider.stream(any<ChatRequestContext>()) } returns
                 flowOf(
@@ -60,7 +60,7 @@ class AgentManagerStreamingConversationTest {
     @Test
     fun `transport retry reuses the persisted assistant identity without another provider call`() =
         runBlocking {
-            val db = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+            val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             coEvery { provider.stream(any<ChatRequestContext>()) } returns
                 flowOf(ChatResponse(model = "test", message = Message("assistant", "Answer"), done = true))
@@ -78,7 +78,7 @@ class AgentManagerStreamingConversationTest {
     @Test
     fun `transport retry rejects an assistant identity linked to another user entry`() =
         runBlocking {
-            val db = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+            val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             coEvery { provider.stream(any<ChatRequestContext>()) } returns
                 flowOf(ChatResponse(model = "test", message = Message("assistant", "Answer"), done = true))
@@ -99,7 +99,7 @@ class AgentManagerStreamingConversationTest {
     @Test
     fun `stream message persists a safe provider failure response`() =
         runBlocking {
-            val db = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+            val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             coEvery { provider.stream(any<ChatRequestContext>()) } returns
                 flow {
@@ -124,7 +124,7 @@ class AgentManagerStreamingConversationTest {
     @Test
     fun `cancelled partial stream does not publish a suggestion completion`() =
         runBlocking {
-            val db = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+            val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             val token = CancellationToken()
             val events = mutableListOf<ConversationCompletionEvent>()
@@ -155,7 +155,7 @@ class AgentManagerStreamingConversationTest {
     @Test
     fun `stream message preserves adjacent sentence chunks`() =
         runBlocking {
-            val db = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+            val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             coEvery { provider.stream(any<ChatRequestContext>()) } returns
                 flowOf(
@@ -175,7 +175,7 @@ class AgentManagerStreamingConversationTest {
     @Test
     fun `stream message persists thinking markup but removes it from provider history`() =
         runBlocking {
-            val db = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+            val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             coEvery { provider.stream(any<ChatRequestContext>()) } returns
                 flowOf(

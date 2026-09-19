@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
 class AgentManagerRefreshHistoryToLatestTest {
     @Test
     fun `refreshHistoryToLatest clears memory and loads latest db page`() {
-        val db = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+        val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
         val provider = mockk<LLMProvider>(relaxed = true)
         val manager =
             AgentManager(
@@ -50,7 +50,7 @@ class AgentManagerRefreshHistoryToLatestTest {
 
     @Test
     fun `refreshHistoryToLatest does not duplicate in-memory messages`() {
-        val db = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+        val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
         val provider = mockk<LLMProvider>(relaxed = true)
         val manager =
             AgentManager(
@@ -75,7 +75,7 @@ class AgentManagerRefreshHistoryToLatestTest {
 
     @Test
     fun `refreshHistoryToLatest returns empty list when history is empty`() {
-        val db = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+        val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
         val provider = mockk<LLMProvider>(relaxed = true)
         val manager =
             AgentManager(
@@ -96,7 +96,7 @@ class AgentManagerRefreshHistoryToLatestTest {
 
     @Test
     fun `immutable page reads do not change active in-memory history`() {
-        val db = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+        val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
         val manager =
             AgentManager(
                 db,

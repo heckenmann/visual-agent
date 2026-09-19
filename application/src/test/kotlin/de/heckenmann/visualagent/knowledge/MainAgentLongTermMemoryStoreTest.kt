@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
 class MainAgentLongTermMemoryStoreTest {
     @Test
     fun `memory starts empty and persists a caller supplied replacement with its revision`() {
-        KnowledgeDbTestFactory.create("jdbc:sqlite::memory:").use { db ->
+        KnowledgeDbTestFactory.create("jdbc:h2:mem:test").use { db ->
             val store = db.mainAgentLongTermMemoryStore
 
             val initial = store.snapshot()
@@ -27,7 +27,7 @@ class MainAgentLongTermMemoryStoreTest {
 
     @Test
     fun `stale revisions cannot overwrite the durable document`() {
-        KnowledgeDbTestFactory.create("jdbc:sqlite::memory:").use { db ->
+        KnowledgeDbTestFactory.create("jdbc:h2:mem:test").use { db ->
             val store = db.mainAgentLongTermMemoryStore
             val revision = store.snapshot().revision
             store.replace("first", revision, 12_000)
@@ -41,7 +41,7 @@ class MainAgentLongTermMemoryStoreTest {
 
     @Test
     fun `memory rejects oversized Unicode content without truncating it`() {
-        KnowledgeDbTestFactory.create("jdbc:sqlite::memory:").use { db ->
+        KnowledgeDbTestFactory.create("jdbc:h2:mem:test").use { db ->
             val store = db.mainAgentLongTermMemoryStore
             val oversized = "😀😀😀"
 

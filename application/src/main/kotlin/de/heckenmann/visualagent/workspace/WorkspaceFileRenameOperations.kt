@@ -12,7 +12,7 @@ import kotlin.io.path.fileSize
 internal class WorkspaceFileRenameOperations(
     private val store: WorkspaceFileStore,
     private val resolvePath: (String) -> Path,
-    private val databasePath: String,
+    private val workspaceRoot: () -> Path,
     private val mimeDetector: WorkspaceMimeTypeDetector,
     private val recordActivity: (String, String?, String?, String?, Long?) -> Unit,
 ) {
@@ -36,7 +36,7 @@ internal class WorkspaceFileRenameOperations(
         Files.move(source, destination)
         return current
             .copy(
-                relativePath = WorkspaceFilePaths.relativePath(destination, databasePath),
+                relativePath = WorkspaceFilePaths.relativePath(destination, workspaceRoot()),
                 mimeType = mimeDetector.detect(destination),
                 sizeBytes = destination.fileSize(),
                 sha256 = WorkspaceFilePaths.sha256(destination),

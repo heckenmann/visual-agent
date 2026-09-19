@@ -168,13 +168,13 @@ class ErrorMessageMapperTest {
 
     @Test
     fun `persistence exception preserves category and metadata`() {
-        val error = PersistenceException("Database busy", "SQLite is busy. Try again.", retryable = true)
+        val error = PersistenceException("Database busy", "H2 is busy. Try again.", retryable = true)
 
         val userError = ErrorMessageMapper.map(error)
 
         assertEquals(ErrorCategory.PERSISTENCE, userError.category)
         assertEquals("Database busy", userError.summary)
-        assertEquals("SQLite is busy. Try again.", userError.detail)
+        assertEquals("H2 is busy. Try again.", userError.detail)
         assertEquals(true, userError.retryable)
     }
 

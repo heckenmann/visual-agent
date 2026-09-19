@@ -33,7 +33,7 @@ This is what `AgentManager` sends into the provider.
 
 ## Provider Implementations
 
-`ConfiguredLLMProvider` is the primary `LLMProvider` bean injected into UI and agent orchestration code. It resolves each request through the SQLite-backed `ProviderCatalogService` and delegates to the configured adapter.
+`ConfiguredLLMProvider` is the primary `LLMProvider` bean injected into UI and agent orchestration code. It resolves each request through the H2-backed `ProviderCatalogService` and delegates to the configured adapter.
 
 - `llm.provider=ollama`
 - `llm.provider=openai`
@@ -57,7 +57,7 @@ OpenAI-compatible endpoints also use:
 - `openai.base.url`
 - `openai.api.key`
 
-Current product decision: `ollama.api.key` and `openai.api.key` are stored plaintext in SQLite `user_preferences`. Keys are excluded from configuration exports and must never be included in model context, tool output, or logs.
+Current product decision: `ollama.api.key` and `openai.api.key` are stored plaintext in H2 `user_preferences`. Keys are excluded from configuration exports and must never be included in model context, tool output, or logs.
 
 ### Ollama
 
@@ -144,7 +144,7 @@ role-based sets above and the global blocklist:
   page per registered tool with underscored function names).
 - `usecases`: actions `list`, `show`, `search` over the packaged
   `docs/usecases/*.md` catalog.
-- `history`: actions `load` (paged) and `search` (FTS5 + `LIKE`
+- `history`: actions `load` (paged) and `search` (bounded `LIKE`)
   fallback) of conversation messages.
 - `todos`: actions `list`, `get`, `add`, `update`, `complete`,
   `cancel`, `clear`, `assignToAgent`, `get-result`. `add` requires a
@@ -172,7 +172,7 @@ role-based sets above and the global blocklist:
   values. The sandbox has no direct host, filesystem, process, network,
   JVM, environment, or credential access.
 - `skills`: search, read, create, update, and delete reusable Markdown skills.
-  Search is bounded and indexed by SQLite FTS5; model reads update persisted
+  Search is bounded by database-neutral `LIKE` matching; model reads update persisted
   read statistics, while user-panel reads do not.
 
 ### Canvas Tool
@@ -220,7 +220,7 @@ The `workspace:layout` tool is available to sub-agents, not to the main orchestr
 ### Workspace File Tool
 
 The `workspace:file` tool is available to sub-agents. It operates on files imported into the
-server-owned managed workspace directory below the configured SQLite database.
+server-owned managed workspace directory below the configured H2 database.
 
 Supported actions:
 

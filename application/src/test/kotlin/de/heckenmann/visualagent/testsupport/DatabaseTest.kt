@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Tag
 interface DatabaseTestCategory
 
 /**
- * Marks a Jupiter test class that starts an SQLite-backed persistence context.
+ * Marks a Jupiter test class that starts an H2-backed persistence context.
  *
  * Database tests run in a dedicated Gradle task so they cannot initialize or tear down
  * persistence contexts concurrently with another module's database tests.

@@ -29,7 +29,7 @@ class AgentManagerCancellationTest {
     @Test
     fun `streamMessage can be cancelled and keeps partial assistant message`() =
         runBlocking {
-            val stores = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+            val stores = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             val streamEntered = CompletableDeferred<Unit>()
             val cancelled = CompletableDeferred<Unit>()
@@ -71,7 +71,7 @@ class AgentManagerCancellationTest {
     @Test
     fun `cancelSubAgentJob stops a running job`() =
         runBlocking {
-            val stores = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+            val stores = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             val started = CompletableDeferred<Unit>()
             val cancelled = CompletableDeferred<Unit>()
@@ -98,7 +98,7 @@ class AgentManagerCancellationTest {
     @Test
     fun `cancelAllRunningActions returns all cancelled ids`() =
         runBlocking {
-            val stores = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+            val stores = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             val started = CompletableDeferred<Unit>()
             val cancelled = CompletableDeferred<Unit>()
@@ -125,7 +125,7 @@ class AgentManagerCancellationTest {
 
     @Test
     fun `cancelSubAgentJob for unknown id returns false`() {
-        val stores = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+        val stores = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
         val provider = mockk<LLMProvider>(relaxed = true)
         val manager = AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus(), TodoEventBus(), AppConfigBean(stores))
         try {
@@ -138,7 +138,7 @@ class AgentManagerCancellationTest {
 
     @Test
     fun `cancelAllActiveTodos cancels every non-terminal todo`() {
-        val stores = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+        val stores = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
         val provider = mockk<LLMProvider>(relaxed = true)
         val manager = AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus(), TodoEventBus(), AppConfigBean(stores))
         try {
@@ -165,7 +165,7 @@ class AgentManagerCancellationTest {
     @Test
     fun `shutdown cancellation does not trigger a new main-agent review`(): Unit =
         runBlocking {
-            val stores = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+            val stores = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             val lifecycle = LifecycleState()
             val manager =
@@ -196,7 +196,7 @@ class AgentManagerCancellationTest {
     @Test
     fun `shutdown prevents an already queued todo review from touching the provider`(): Unit =
         runBlocking {
-            val stores = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+            val stores = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             val lifecycle = LifecycleState()
             val dispatcher = StandardTestDispatcher()
@@ -229,7 +229,7 @@ class AgentManagerCancellationTest {
     @Test
     fun `cancelling an active todo review does not persist a cancellation failure`() =
         runBlocking {
-            val stores = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+            val stores = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             val started = CompletableDeferred<Unit>()
             coEvery { provider.chat(any<ChatRequestContext>()) } coAnswers {

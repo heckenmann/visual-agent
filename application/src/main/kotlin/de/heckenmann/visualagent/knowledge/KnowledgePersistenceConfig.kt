@@ -6,53 +6,45 @@ import de.heckenmann.visualagent.config.ServerDataPathResolver
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.env.Environment
-import org.sqlite.SQLiteConfig
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.UUID
 import javax.sql.DataSource
 
 /**
- * Configures the single-connection SQLite data source used by JPA and Flyway.
+ * Configures the transitional H2 data source used while JPA stores are migrated to R2DBC.
  */
 @Configuration
 internal class KnowledgePersistenceConfig {
     /**
-     * Creates the application data source with SQLite WAL and lock timeout settings.
+     * Creates the transitional H2 data source used by the synchronous JPA stores.
      *
      * @return Shared application data source
      */
     @Bean
     fun databasePath(environment: Environment): String = ServerDataPathResolver.databasePath(environment)
 
+    /** Exposes the stable server data root to storage-adjacent services. */
+    @Bean
+    fun serverDataRoot(environment: Environment): Path = ServerDataPathResolver.serverDataRoot(environment)
+
     @Bean
     fun dataSource(databasePath: String): DataSource {
-        val sqliteConfig =
-            SQLiteConfig().apply {
-                setJournalMode(SQLiteConfig.JournalMode.WAL)
-                setBusyTimeout(5_000)
-                enforceForeignKeys(true)
-            }
-        val jdbcUrl = if (databasePath.startsWith("jdbc:sqlite:")) databasePath else "jdbc:sqlite:$databasePath"
+        val jdbcUrl = h2JdbcUrl(databasePath)
         createParentDirectory(databasePath)
         return HikariDataSource(
             HikariConfig().apply {
                 this.jdbcUrl = jdbcUrl
-                driverClassName = "org.sqlite.JDBC"
-                maximumPoolSize = 1
+                driverClassName = "org.h2.Driver"
+                maximumPoolSize = 4
                 minimumIdle = 1
                 connectionTimeout = 5_000
-                dataSourceProperties = sqliteConfig.toProperties()
             },
         )
     }
 
     private fun createParentDirectory(databasePath: String) {
-        val path =
-            if (databasePath.startsWith("jdbc:sqlite:")) {
-                databasePath.removePrefix("jdbc:sqlite:")
-            } else {
-                databasePath
-            }
+        val path = databasePath.removePrefix("jdbc:h2:file:").substringBefore(';')
         if (path.isBlank() || path == ":memory:" || path.startsWith("file:")) {
             return
         }
@@ -64,5 +56,14 @@ internal class KnowledgePersistenceConfig {
                 cause,
             )
         }
+    }
+
+    private fun h2JdbcUrl(databasePath: String): String {
+        if (databasePath.startsWith("jdbc:h2:mem:")) {
+            return "jdbc:h2:mem:visual-agent-${UUID.randomUUID()};DB_CLOSE_DELAY=-1"
+        }
+        if (databasePath.startsWith("jdbc:h2:")) return databasePath
+        val path = databasePath
+        return "jdbc:h2:file:${Path.of(path).toAbsolutePath().normalize()};DB_CLOSE_ON_EXIT=FALSE"
     }
 }

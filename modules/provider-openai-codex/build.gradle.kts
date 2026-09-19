@@ -43,15 +43,6 @@ tasks.test {
     systemProperty("visualagent.codex.smoke", System.getProperty("visualagent.codex.smoke", "false"))
     systemProperty("visualagent.codex.smoke.executable", System.getProperty("visualagent.codex.smoke.executable", ""))
     systemProperty("visualagent.codex.smoke.model", System.getProperty("visualagent.codex.smoke.model", ""))
-    finalizedBy(tasks.jacocoTestReport)
-}
-
-tasks.jacocoTestReport {
-    dependsOn(tasks.test)
-    reports {
-        xml.required.set(true)
-        html.required.set(true)
-    }
 }
 
 kotlin {
