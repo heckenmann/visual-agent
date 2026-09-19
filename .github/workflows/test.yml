@@ -63,6 +63,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          java_cmd="${JAVA_HOME:?JAVA_HOME must be set by setup-java}/bin/java"
+          "$java_cmd" --version
 
           verify_launch() {
             local jar_path="$1"
@@ -74,7 +76,7 @@ jobs:
             # The desktop JAR needs a deterministic renderer in the virtual display used by CI.
             # Skiko's software renderer is supported by Compose Desktop and avoids relying on
             # whichever OpenGL provider happens to be installed on the GitHub runner.
-            timeout --kill-after=10s 25s xvfb-run -a java -Dskiko.renderApi=SOFTWARE -jar "$jar_path" \
+            timeout --kill-after=10s 25s xvfb-run -a "$java_cmd" -Dskiko.renderApi=SOFTWARE -jar "$jar_path" \
               --spring.main.web-application-type=none >"$log_path" 2>&1 || status=$?
 
             if [[ "$require_spring_startup" == "true" ]]; then
