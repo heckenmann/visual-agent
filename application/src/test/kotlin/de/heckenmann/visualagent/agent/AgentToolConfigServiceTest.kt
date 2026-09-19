@@ -25,6 +25,7 @@ class AgentToolConfigServiceTest {
         assertTrue("skills" in tools)
         assertTrue("workspace:file" in tools)
         assertTrue("workspace:download" in tools)
+        assertTrue("update:check" in tools)
         assertFalse("agent:start" in tools)
         assertFalse("agent:message" in tools)
         assertFalse("agent:assign-todo" in tools)

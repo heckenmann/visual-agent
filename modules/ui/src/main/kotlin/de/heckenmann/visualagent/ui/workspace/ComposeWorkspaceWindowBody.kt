@@ -62,6 +62,9 @@ internal fun WindowBody(
         "settings" ->
             settingsPanel(
                 settingsPort = panelServices.settings,
+                updatePort = panelServices.updates,
+                updateState = panelServices.updateState.value,
+                onUpdateStateChanged = panelServices.onUpdateStateChanged,
                 onSettingsChanged = panelServices.onSettingsChanged,
             )
         "skills" ->

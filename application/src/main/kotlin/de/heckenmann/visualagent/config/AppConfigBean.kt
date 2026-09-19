@@ -44,6 +44,8 @@ class AppConfigBean(
     var followUpSuggestionsEnabled: Boolean = true
     var followUpSuggestionIdleDelaySeconds: Int = 3
     var followUpSuggestionCount: Int = 3
+    var automaticUpdatesEnabled: Boolean = true
+    var includePrereleaseUpdates: Boolean = false
 
     /**
      * Returns the currently selected model for the active provider.
@@ -121,6 +123,8 @@ class AppConfigBean(
         preferenceStore.setPreference(KEY_FOLLOW_UP_SUGGESTIONS_ENABLED, followUpSuggestionsEnabled.toString())
         preferenceStore.setPreference(KEY_FOLLOW_UP_SUGGESTION_DELAY_SECONDS, followUpSuggestionIdleDelaySeconds.toString())
         preferenceStore.setPreference(KEY_FOLLOW_UP_SUGGESTION_COUNT, followUpSuggestionCount.toString())
+        preferenceStore.setPreference(KEY_AUTOMATIC_UPDATES_ENABLED, automaticUpdatesEnabled.toString())
+        preferenceStore.setPreference(KEY_INCLUDE_PRERELEASE_UPDATES, includePrereleaseUpdates.toString())
         publishChanges()
     }
 
@@ -157,6 +161,8 @@ class AppConfigBean(
             KEY_FOLLOW_UP_SUGGESTIONS_ENABLED to followUpSuggestionsEnabled.toString(),
             KEY_FOLLOW_UP_SUGGESTION_DELAY_SECONDS to followUpSuggestionIdleDelaySeconds.toString(),
             KEY_FOLLOW_UP_SUGGESTION_COUNT to followUpSuggestionCount.toString(),
+            KEY_AUTOMATIC_UPDATES_ENABLED to automaticUpdatesEnabled.toString(),
+            KEY_INCLUDE_PRERELEASE_UPDATES to includePrereleaseUpdates.toString(),
         )
 
     companion object {
@@ -185,6 +191,8 @@ class AppConfigBean(
         internal const val KEY_FOLLOW_UP_SUGGESTIONS_ENABLED = "conversation.follow_up_suggestions.enabled"
         internal const val KEY_FOLLOW_UP_SUGGESTION_DELAY_SECONDS = "conversation.follow_up_suggestions.delay.seconds"
         internal const val KEY_FOLLOW_UP_SUGGESTION_COUNT = "conversation.follow_up_suggestions.count"
+        internal const val KEY_AUTOMATIC_UPDATES_ENABLED = "updates.automatic.enabled"
+        internal const val KEY_INCLUDE_PRERELEASE_UPDATES = "updates.include.prerelease"
         const val DEFAULT_MAIN_AGENT_MEMORY_CHARS = 12_000
         val MAIN_AGENT_MEMORY_CHARS_RANGE = 1_000..100_000
         val FOLLOW_UP_SUGGESTION_DELAY_RANGE = 1..60

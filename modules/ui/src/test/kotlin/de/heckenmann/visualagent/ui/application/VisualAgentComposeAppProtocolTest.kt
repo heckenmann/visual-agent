@@ -21,6 +21,7 @@ import de.heckenmann.visualagent.protocol.SettingsPort
 import de.heckenmann.visualagent.protocol.SettingsSnapshot
 import de.heckenmann.visualagent.protocol.SkillPort
 import de.heckenmann.visualagent.protocol.TodoPort
+import de.heckenmann.visualagent.protocol.UpdatePort
 import de.heckenmann.visualagent.protocol.WorkspaceFilePort
 import de.heckenmann.visualagent.protocol.WorkspaceLayoutPort
 import de.heckenmann.visualagent.protocol.WorkspaceLayoutSnapshot
@@ -126,6 +127,7 @@ class VisualAgentComposeAppProtocolTest {
         every { application.agents } returns agents
         every { application.providers } returns providers
         every { application.settings } returns settings
+        every { application.updates } returns mockk<UpdatePort>(relaxed = true)
         every { application.skills } returns mockk<SkillPort>(relaxed = true)
         every { application.mainAgentMemory } returns mainAgentMemory
         every { application.workspaceFiles } returns files

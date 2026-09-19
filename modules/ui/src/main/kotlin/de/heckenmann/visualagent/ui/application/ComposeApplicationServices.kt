@@ -1,8 +1,10 @@
 package de.heckenmann.visualagent.ui.application
 
+import androidx.compose.runtime.State
 import de.heckenmann.visualagent.protocol.ClientDirectoryGrantAdministrationPort
 import de.heckenmann.visualagent.protocol.ClientImagePort
 import de.heckenmann.visualagent.protocol.LayoutWindowState
+import de.heckenmann.visualagent.protocol.UpdateStatus
 import de.heckenmann.visualagent.ui.modal.ComposeModalRequester
 import de.heckenmann.visualagent.ui.status.InFlightStateHolder
 import de.heckenmann.visualagent.ui.workspace.ComposeWorkspaceWindow
@@ -35,6 +37,9 @@ fun restoreWorkspaceWindows(
 /** Bundles only transport ports and Compose-owned presentation state. */
 data class ComposePanelServices(
     val settings: de.heckenmann.visualagent.protocol.SettingsPort,
+    val updates: de.heckenmann.visualagent.protocol.UpdatePort,
+    val updateState: State<UpdatePresentationState>,
+    val onUpdateStateChanged: (UpdatePresentationState) -> Unit,
     val mainAgentMemory: de.heckenmann.visualagent.protocol.MainAgentMemoryPort,
     val skills: de.heckenmann.visualagent.protocol.SkillPort,
     val agents: de.heckenmann.visualagent.protocol.AgentPort,
@@ -53,4 +58,10 @@ data class ComposePanelServices(
     val onRunOnboarding: () -> Unit,
     val inFlight: InFlightStateHolder,
     val lifecycle: de.heckenmann.visualagent.protocol.LifecyclePort,
+)
+
+/** Presentation state shared by automatic and manually triggered update checks. */
+data class UpdatePresentationState(
+    val status: UpdateStatus? = null,
+    val message: String? = null,
 )

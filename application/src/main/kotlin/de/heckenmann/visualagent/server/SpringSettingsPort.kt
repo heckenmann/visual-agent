@@ -61,6 +61,8 @@ class SpringSettingsPort(
             followUpSuggestionsEnabled = settings.followUpSuggestionsEnabled
             followUpSuggestionIdleDelaySeconds = settings.followUpSuggestionIdleDelaySeconds
             followUpSuggestionCount = settings.followUpSuggestionCount
+            automaticUpdatesEnabled = settings.automaticUpdatesEnabled
+            includePrereleaseUpdates = settings.includePrereleaseUpdates
             save()
         }
     }
@@ -87,6 +89,8 @@ private fun AppConfigBean.toProtocol(providerCatalog: ProviderCatalogService): S
         followUpSuggestionsEnabled = followUpSuggestionsEnabled,
         followUpSuggestionIdleDelaySeconds = followUpSuggestionIdleDelaySeconds,
         followUpSuggestionCount = followUpSuggestionCount,
+        automaticUpdatesEnabled = automaticUpdatesEnabled,
+        includePrereleaseUpdates = includePrereleaseUpdates,
     )
 
 private fun ApplicationThemeMode.toProtocol(): ThemeMode = ThemeMode.valueOf(name)

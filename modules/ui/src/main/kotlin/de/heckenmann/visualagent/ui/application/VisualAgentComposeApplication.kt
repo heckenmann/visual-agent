@@ -60,6 +60,7 @@ fun VisualAgentComposeApp(
     var commandPaletteVisible by remember { mutableStateOf(false) }
     var settings by remember { mutableStateOf(SettingsSnapshot()) }
     var settingsLoaded by remember { mutableStateOf(false) }
+    val updateState = remember { mutableStateOf(UpdatePresentationState()) }
     var settingsRevision by remember { mutableStateOf(0) }
     val workspaceFocusRequester = remember { FocusRequester() }
     val composeScope = rememberCoroutineScope()
@@ -68,6 +69,9 @@ fun VisualAgentComposeApp(
         remember {
             ComposePanelServices(
                 settings = deps.applicationPort.settings,
+                updates = deps.applicationPort.updates,
+                updateState = updateState,
+                onUpdateStateChanged = { updateState.value = it },
                 mainAgentMemory = deps.applicationPort.mainAgentMemory,
                 skills = deps.applicationPort.skills,
                 agents = deps.applicationPort.agents,
@@ -108,6 +112,12 @@ fun VisualAgentComposeApp(
         settings = deps.applicationPort.settings.snapshotAsync()
         settingsLoaded = true
     }
+    ComposeAutomaticUpdateCheck(
+        settings = settings,
+        settingsLoaded = settingsLoaded,
+        updates = deps.applicationPort.updates,
+        onStateChanged = { updateState.value = it },
+    )
     val toggleWindow: (String) -> Unit = { id ->
         windows = toggleWorkspacePanel(windows, id)
     }

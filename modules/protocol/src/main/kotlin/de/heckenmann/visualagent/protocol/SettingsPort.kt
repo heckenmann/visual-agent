@@ -46,6 +46,8 @@ data class SettingsSnapshot(
     val followUpSuggestionsEnabled: Boolean = true,
     val followUpSuggestionIdleDelaySeconds: Int = 3,
     val followUpSuggestionCount: Int = 3,
+    val automaticUpdatesEnabled: Boolean = true,
+    val includePrereleaseUpdates: Boolean = false,
 )
 
 /**

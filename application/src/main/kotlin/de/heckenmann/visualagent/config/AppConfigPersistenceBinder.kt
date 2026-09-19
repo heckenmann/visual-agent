@@ -72,6 +72,12 @@ class AppConfigPersistenceBinder(
                 ?.toIntOrNull()
                 ?.coerceIn(AppConfigBean.FOLLOW_UP_SUGGESTION_COUNT_RANGE)
                 ?: appConfigBean.followUpSuggestionCount
+        appConfigBean.automaticUpdatesEnabled =
+            preferenceStore.getPreference(AppConfigBean.KEY_AUTOMATIC_UPDATES_ENABLED)?.toBooleanStrictOrNull()
+                ?: appConfigBean.automaticUpdatesEnabled
+        appConfigBean.includePrereleaseUpdates =
+            preferenceStore.getPreference(AppConfigBean.KEY_INCLUDE_PRERELEASE_UPDATES)?.toBooleanStrictOrNull()
+                ?: appConfigBean.includePrereleaseUpdates
         appConfigBean.maxMainAgentMemoryChars =
             preferenceStore
                 .getPreference(AppConfigBean.KEY_MAIN_AGENT_MEMORY_CHARS)
