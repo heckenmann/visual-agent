@@ -23,6 +23,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import mu.KotlinLogging
 import java.util.concurrent.ConcurrentHashMap
@@ -298,6 +299,9 @@ class AutonomousCoordinator
                 activeTodoJobs[todo.id] = processingJob
                 processingJob.invokeOnCompletion {
                     activeTodoJobs.remove(todo.id, processingJob)
+                    if (scope.isActive && todoManager.getById(todo.id)?.status != TodoStatus.IN_PROGRESS) {
+                        releaseClaimedAgent(agent, todo.id)
+                    }
                     workSignal.signal()
                 }
                 processingJob.start()
