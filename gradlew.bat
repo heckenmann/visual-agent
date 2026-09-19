@@ -68,6 +68,36 @@ echo location of your Java installation. 1>&2
 "%COMSPEC%" /c exit 1
 
 :execute
+set WRAPPER_JAR=%APP_HOME%\gradle\wrapper\gradle-wrapper.jar
+if exist "%WRAPPER_JAR%" goto wrapperReady
+
+for /f "tokens=2 delims=-" %%A in ('findstr /R "^distributionUrl=.*gradle-[0-9][0-9.]*-" "%APP_HOME%\gradle\wrapper\gradle-wrapper.properties"') do set WRAPPER_VERSION=%%A
+if not defined WRAPPER_VERSION goto wrapperVersionMissing
+
+@rem The project intentionally excludes binary JARs from version control.
+@rem Download the tagged Gradle source JAR and verify it with Gradle's published checksum.
+set WRAPPER_DOWNLOAD_URL=https://raw.githubusercontent.com/gradle/gradle/v%WRAPPER_VERSION%/gradle/wrapper/gradle-wrapper.jar
+set WRAPPER_CHECKSUM_URL=https://services.gradle.org/distributions/gradle-%WRAPPER_VERSION%-wrapper.jar.sha256
+set WRAPPER_DOWNLOAD_PATH=%WRAPPER_JAR%.download
+powershell -NoProfile -Command "$ErrorActionPreference = 'Stop'; Invoke-WebRequest -Uri $env:WRAPPER_DOWNLOAD_URL -OutFile $env:WRAPPER_DOWNLOAD_PATH; $expected = ((Invoke-WebRequest -Uri $env:WRAPPER_CHECKSUM_URL).Content).Trim().ToLower(); $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $env:WRAPPER_DOWNLOAD_PATH).Hash.ToLower(); if ($actual -ne $expected) { throw 'Downloaded Gradle Wrapper checksum does not match the official checksum.' }"
+if errorlevel 1 goto wrapperDownloadFailed
+
+move /Y "%WRAPPER_DOWNLOAD_PATH%" "%WRAPPER_JAR%" >NUL
+if errorlevel 1 goto wrapperDownloadFailed
+goto wrapperReady
+
+:wrapperVersionMissing
+echo. 1>&2
+echo ERROR: Unable to determine the Gradle Wrapper version. 1>&2
+"%COMSPEC%" /c exit 1
+
+:wrapperDownloadFailed
+if exist "%WRAPPER_DOWNLOAD_PATH%" del "%WRAPPER_DOWNLOAD_PATH%"
+echo. 1>&2
+echo ERROR: Unable to download and verify Gradle Wrapper %WRAPPER_VERSION%. 1>&2
+"%COMSPEC%" /c exit 1
+
+:wrapperReady
 @rem Setup the command line
 
 

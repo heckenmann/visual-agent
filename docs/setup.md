@@ -4,6 +4,7 @@
 
 - Java 21+ (the project auto-resolves the JDK 24 toolchain locally; CI uses JDK 21 so the Foojay toolchain resolver can fetch 24).
 - The Gradle wrapper version is defined centrally in `gradle/wrapper/gradle-wrapper.properties`; the release workflow validates release tags against the project version.
+- `gradle-wrapper.jar` is intentionally excluded from version control. On first use, `gradlew` or `gradlew.bat` downloads the tagged official Gradle Wrapper JAR and verifies it against Gradle's published SHA-256 checksum. This requires `curl` or `wget` on macOS/Linux and PowerShell on Windows.
 - Ollama running locally (`ollama serve`) or a reachable remote Ollama endpoint.
 - H2 is embedded and managed automatically through Spring Data JPA + Flyway. R2DBC support is available for the ongoing store migration.
 
