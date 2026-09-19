@@ -53,7 +53,7 @@ class WorkspaceDownloadServiceTest {
     @Test
     fun `download publishes started and completed status events`() {
         val store = FakeWorkspaceFileStore()
-        val files = WorkspaceFileService(store, tempDir().resolve("db.sqlite").toString())
+        val files = WorkspaceFileService(store, tempDir().resolve("db.h2").toString())
         val events = mutableListOf<de.heckenmann.visualagent.protocol.DownloadActivity>()
         val eventBus = WorkspaceDownloadEventBus()
         eventBus.addListener(events::add)
@@ -78,7 +78,7 @@ class WorkspaceDownloadServiceTest {
         val transfer = WorkspaceDownloadTransfer { _, _, _ -> calls++ }
         val service =
             WorkspaceDownloadService(
-                WorkspaceFileService(FakeWorkspaceFileStore(), tempDir().resolve("db.sqlite").toString()),
+                WorkspaceFileService(FakeWorkspaceFileStore(), tempDir().resolve("db.h2").toString()),
                 transfer,
             )
 
@@ -93,7 +93,7 @@ class WorkspaceDownloadServiceTest {
 
     @Test
     fun `download progress notifications are coalesced`() {
-        val files = WorkspaceFileService(FakeWorkspaceFileStore(), tempDir().resolve("db.sqlite").toString())
+        val files = WorkspaceFileService(FakeWorkspaceFileStore(), tempDir().resolve("db.h2").toString())
         val service =
             WorkspaceDownloadService(
                 files,

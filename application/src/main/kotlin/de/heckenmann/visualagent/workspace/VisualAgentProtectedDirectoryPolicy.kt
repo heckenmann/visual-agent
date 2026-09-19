@@ -10,7 +10,7 @@ import java.nio.file.Path
  * Rejects directory grants that would expose Visual Agent's own configuration or data.
  *
  * A root is unsafe both when it is one of the protected directories and when it is an ancestor
- * of one. The latter prevents indirectly exposing the SQLite database and its credentials by
+ * of one. The latter prevents indirectly exposing the database and its credentials by
  * granting a parent such as the application working directory.
  */
 @Service

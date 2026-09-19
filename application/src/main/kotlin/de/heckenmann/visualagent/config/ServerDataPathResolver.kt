@@ -63,8 +63,11 @@ internal object ServerDataPathResolver {
 
     /** Resolves a server data root from a legacy database path during the transition. */
     internal fun dataRootForDatabasePath(databasePath: String): Path {
-        val path = databasePath.removePrefix("jdbc:sqlite:")
-        if (path == ":memory:" || path.startsWith("file:")) {
+        val path =
+            databasePath
+                .removePrefix("jdbc:h2:file:")
+                .substringBefore(';')
+        if (databasePath.startsWith("jdbc:h2:mem:")) {
             return Path
                 .of(System.getProperty("java.io.tmpdir"))
                 .resolve("visual-agent-memory-${ProcessHandle.current().pid()}")
@@ -76,13 +79,17 @@ internal object ServerDataPathResolver {
     }
 
     private fun validateExplicitDatabasePath(path: String): String {
-        if (path.startsWith("jdbc:sqlite:")) {
-            val sqlitePath = path.removePrefix("jdbc:sqlite:")
-            require(
-                sqlitePath == ":memory:" || sqlitePath.startsWith("file:") || Path.of(sqlitePath).isAbsolute,
-            ) { "visual-agent.db.path must use an absolute path or an explicit SQLite URI" }
+        if (path.startsWith("jdbc:h2:mem:")) {
             return path
         }
+        if (path.startsWith("jdbc:h2:file:")) {
+            val h2Path = path.removePrefix("jdbc:h2:file:").substringBefore(';')
+            require(
+                Path.of(h2Path).isAbsolute,
+            ) { "visual-agent.db.path must use an absolute H2 file path" }
+            return path
+        }
+        require(!path.startsWith("jdbc:")) { "visual-agent.db.path must use an absolute path or an H2 JDBC URL" }
         require(Path.of(path).isAbsolute) { "visual-agent.db.path must be an absolute path" }
         return path
     }

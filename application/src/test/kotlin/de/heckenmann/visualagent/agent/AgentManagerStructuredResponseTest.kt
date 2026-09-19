@@ -20,7 +20,7 @@ class AgentManagerStructuredResponseTest {
         runBlocking {
             val db =
                 de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                    .create("jdbc:sqlite::memory:")
+                    .create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             coEvery { provider.stream(any<ChatRequestContext>()) } returns
                 flowOf(
@@ -76,7 +76,7 @@ class AgentManagerStructuredResponseTest {
         runBlocking {
             val db =
                 de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                    .create("jdbc:sqlite::memory:")
+                    .create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             coEvery { provider.stream(any<ChatRequestContext>()) } returns
                 flowOf(

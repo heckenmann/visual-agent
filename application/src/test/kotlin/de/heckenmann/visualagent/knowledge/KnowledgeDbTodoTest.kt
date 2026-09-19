@@ -28,22 +28,26 @@ class KnowledgeDbTodoTest {
                 .create(tempDb)
         db.close()
 
-        DriverManager.getConnection("jdbc:sqlite:$tempDb").use { connection ->
+        DriverManager.getConnection("jdbc:h2:file:$tempDb;DB_CLOSE_ON_EXIT=FALSE").use { connection ->
             connection.createStatement().use { statement ->
-                statement.executeQuery("PRAGMA table_info(todos)").use { columns ->
-                    val names =
-                        buildList {
-                            while (columns.next()) add(columns.getString("name"))
-                        }
-                    assertFalse(names.contains("priority"))
-                    assertTrue(names.contains("updated_at"))
-                }
+                statement
+                    .executeQuery(
+                        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS " +
+                            "WHERE TABLE_SCHEMA = 'PUBLIC' AND TABLE_NAME = 'TODOS'",
+                    ).use { columns ->
+                        val names =
+                            buildList {
+                                while (columns.next()) add(columns.getString("COLUMN_NAME"))
+                            }
+                        assertFalse(names.contains("PRIORITY"))
+                        assertTrue(names.contains("UPDATED_AT"))
+                    }
             }
         }
     }
 
     @Test
-    fun `todo crud is persisted in sqlite`() {
+    fun `todo crud is persisted in h2`() {
         val tempDb = createTempDirectory("visual-agent-db-todo-test").resolve("todos.db").toString()
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
@@ -75,7 +79,7 @@ class KnowledgeDbTodoTest {
     }
 
     @Test
-    fun `concurrent sqlite claims change a pending todo exactly once`() =
+    fun `concurrent h2 claims change a pending todo exactly once`() =
         runBlocking {
             val tempDb =
                 createTempDirectory("visual-agent-db-todo-claim-test")

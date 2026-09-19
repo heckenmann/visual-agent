@@ -15,7 +15,7 @@ class AgentManagerClearHistoryTest {
     private fun createManager(): AgentManager {
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                .create("jdbc:sqlite::memory:")
+                .create("jdbc:h2:mem:test")
         val provider = mockk<LLMProvider>(relaxed = true)
         coEvery { provider.isConnected() } returns true
         coEvery { provider.getModels() } returns listOf("test-model")

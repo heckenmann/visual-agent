@@ -7,7 +7,7 @@ import java.security.MessageDigest
 import java.time.Instant
 import java.util.UUID
 
-/** SQLite/JPA implementation of the durable searchable skill catalog. */
+/** JPA implementation of the durable searchable skill catalog. */
 @Service
 internal class JpaSkillStore(
     private val repository: SkillRepository,
@@ -41,8 +41,7 @@ internal class JpaSkillStore(
                     .findAllByOrderByUpdatedAtDescIdAsc(PageRequest.of(0, boundedLimit))
                     .map { SkillSearchRow(it.id, it.content.takeCodePoints(MAX_SNIPPET_CODE_POINTS)) }
             } else {
-                runCatching { repository.searchFts(toFtsQuery(query), boundedLimit) }
-                    .getOrElse { repository.searchLike(query.trim(), boundedLimit) }
+                repository.searchLike(query.trim(), boundedLimit)
             }
         val entities = repository.findAllById(rows.map(SkillSearchRow::id)).associateBy(SkillEntity::id)
         return rows.mapNotNull { row -> entities[row.id]?.toSearchRecord(row.snippet) }
@@ -139,11 +138,6 @@ internal class JpaSkillStore(
     private fun requireUuid(id: String): String =
         runCatching { UUID.fromString(id).toString() }.getOrElse { throw IllegalArgumentException("Skill id must be a canonical UUID") }
 
-    private fun toFtsQuery(query: String): String =
-        query.trim().split(Regex("\\s+")).filter(String::isNotBlank).take(MAX_QUERY_TERMS).joinToString(" AND ") { term ->
-            "\"${term.replace("\"", "\"\"")}\""
-        }
-
     private fun fingerprint(
         title: String,
         content: String,
@@ -156,7 +150,6 @@ internal class JpaSkillStore(
         const val MAX_TITLE_CODE_POINTS = 200
         const val MAX_CONTENT_CODE_POINTS = 120_000
         const val MAX_QUERY_CODE_POINTS = 500
-        const val MAX_QUERY_TERMS = 20
         const val MAX_SEARCH_RESULTS = 25
         const val MAX_SNIPPET_CODE_POINTS = 320
     }

@@ -31,13 +31,13 @@ import org.springframework.context.annotation.ComponentScan
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories
 
 /**
- * Builds isolated Spring Data persistence contexts for SQLite integration tests.
+ * Builds isolated Spring Data persistence contexts for H2 integration tests.
  */
 object KnowledgeDbTestFactory {
     /**
-     * Creates a persistence fixture for the given SQLite path or JDBC URL.
+     * Creates a persistence fixture for the given H2 path or JDBC URL.
      *
-     * @param dbPath SQLite file path or `jdbc:sqlite:` URL
+     * @param dbPath H2 file path or `jdbc:h2:` URL
      * @return Isolated persistence fixture
      */
     fun create(dbPath: String): TestPersistence {

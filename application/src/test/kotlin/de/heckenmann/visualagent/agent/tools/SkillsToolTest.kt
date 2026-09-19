@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
 class SkillsToolTest {
     @Test
     fun `create search get update and delete are explicit json actions`() {
-        KnowledgeDbTestFactory.create("jdbc:sqlite::memory:").use { db ->
+        KnowledgeDbTestFactory.create("jdbc:h2:mem:test").use { db ->
             val tool = SkillsTool(SkillToolPortAdapter(db.skillStore))
             val markdown = "# Stored\n\n```kotlin\nval answer = 42\n```"
             val created =

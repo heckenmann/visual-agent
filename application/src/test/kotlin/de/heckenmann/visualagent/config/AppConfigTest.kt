@@ -72,7 +72,7 @@ class AppConfigTest {
             assertEquals("Always respond in German.", db.getPreference("session.user.model.instruction"))
             assertNull(db.getPreference("database.path"))
             assertEquals(propertiesBefore, propertiesFile.readText())
-            assertTrue(File(tempDb).exists())
+            assertTrue(File("$tempDb.mv.db").exists())
         } finally {
             restore(config, original)
         }

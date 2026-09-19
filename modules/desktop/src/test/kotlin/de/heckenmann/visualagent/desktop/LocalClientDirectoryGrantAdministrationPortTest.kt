@@ -22,7 +22,7 @@ class LocalClientDirectoryGrantAdministrationPortTest {
         val port =
             LocalClientDirectoryGrantAdministrationPort(
                 registry,
-                VisualAgentProtectedDirectoryPolicy(":memory:"),
+                VisualAgentProtectedDirectoryPolicy(temp.resolve("protected/database").toString()),
                 clientId = "desktop-a",
             )
 

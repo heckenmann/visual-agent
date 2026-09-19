@@ -58,11 +58,11 @@ class ServerDataPathResolverTest {
     }
 
     @Test
-    fun `in-memory sqlite override remains available for tests`() {
+    fun `in-memory h2 override remains available for tests`() {
         assertEquals(
-            "jdbc:sqlite::memory:",
+            "jdbc:h2:mem:test",
             ServerDataPathResolver.databasePath(
-                MockEnvironment().withProperty("visual-agent.db.path", "jdbc:sqlite::memory:"),
+                MockEnvironment().withProperty("visual-agent.db.path", "jdbc:h2:mem:test"),
             ),
         )
     }

@@ -22,7 +22,7 @@ class AgentManagerToolContextTest {
     @Test
     fun `main agent only exposes sub-agent control tools`() =
         runTest {
-            val db = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+            val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             val requestSlot = slot<ChatRequestContext>()
             coEvery { provider.chat(capture(requestSlot)) } returns
@@ -58,7 +58,7 @@ class AgentManagerToolContextTest {
         runTest {
             val db =
                 de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                    .create("jdbc:sqlite::memory:")
+                    .create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             val requestSlot = slot<ChatRequestContext>()
             coEvery { provider.chat(capture(requestSlot)) } returns ChatResponse("test", Message("assistant", "ok"), true)
@@ -97,7 +97,7 @@ class AgentManagerToolContextTest {
         runTest {
             val db =
                 de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                    .create("jdbc:sqlite::memory:")
+                    .create("jdbc:h2:mem:test")
             val tools = AgentToolConfigService(db)
             tools.setToolGloballyEnabled("memory", enabled = false)
             val provider = mockk<LLMProvider>(relaxed = true)
@@ -123,7 +123,7 @@ class AgentManagerToolContextTest {
     @Test
     fun `durable memory consumes the history context budget`() =
         runTest {
-            val db = KnowledgeDbTestFactory.create("jdbc:sqlite::memory:")
+            val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             val requests = mutableListOf<ChatRequestContext>()
             coEvery { provider.chat(capture(requests)) } returns ChatResponse("test", Message("assistant", "ok"), true)

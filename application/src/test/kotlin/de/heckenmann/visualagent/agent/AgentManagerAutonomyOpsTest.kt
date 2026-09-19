@@ -14,7 +14,7 @@ class AgentManagerAutonomyOpsTest {
     fun `seed ux todos adds predefined tasks when absent`() {
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                .create("jdbc:sqlite::memory:")
+                .create("jdbc:h2:mem:test")
         val provider = mockk<LLMProvider>(relaxed = true)
         val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
@@ -27,7 +27,7 @@ class AgentManagerAutonomyOpsTest {
     fun `seed ux todos adds missing tasks without duplicating existing ones`() {
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                .create("jdbc:sqlite::memory:")
+                .create("jdbc:h2:mem:test")
         val provider = mockk<LLMProvider>(relaxed = true)
         val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
         manager.seedUxTodos()

@@ -49,8 +49,8 @@ dependencies {
     implementation("org.hibernate.orm:hibernate-community-dialects")
     implementation("org.springframework.boot:spring-boot-starter-flyway")
 
-    // SQLite JDBC
-    implementation(libs.sqlite.jdbc)
+    // Temporary relational baseline while the store adapters move to R2DBC.
+    runtimeOnly(libs.h2)
     runtimeOnly(libs.r2dbc.h2)
     implementation(libs.appdirs)
 
@@ -89,7 +89,7 @@ val databaseCategoryTag = "de.heckenmann.visualagent.testsupport.DatabaseTestCat
 
 val databaseTest =
     tasks.register<Test>("databaseTest") {
-        description = "Runs SQLite-backed tests serially."
+        description = "Runs database-backed tests serially."
         group = "verification"
         useJUnitPlatform {
             includeTags(databaseTestTag, databaseCategoryTag)

@@ -110,14 +110,7 @@ internal class ConversationRepositoryCustomImpl(
         sessionId: String,
         query: String,
         limit: Int,
-    ): List<ConversationEntity> =
-        entityManager
-            .createNativeQuery(FTS_QUERY, ConversationEntity::class.java)
-            .setParameter("sessionId", sessionId)
-            .setParameter("query", query)
-            .setMaxResults(limit)
-            .resultList
-            .filterIsInstance<ConversationEntity>()
+    ): List<ConversationEntity> = searchLike(sessionId, query, limit)
 
     override fun searchLike(
         sessionId: String,
@@ -222,17 +215,6 @@ internal class ConversationRepositoryCustomImpl(
         return (dialogue + summaries)
             .distinctBy(ConversationEntity::id)
             .sortedWith(compareBy<ConversationEntity> { it.timelineSequence }.thenBy { it.createdAt }.thenBy { it.id })
-    }
-
-    private companion object {
-        private const val FTS_QUERY =
-            """
-            SELECT ch.*
-            FROM conversation_history_fts fts
-            JOIN conversation_history ch ON ch.id = fts.id
-            WHERE fts.session_id = :sessionId AND fts.content MATCH :query
-            ORDER BY ch.timeline_sequence DESC, ch.created_at DESC, ch.id DESC
-            """
     }
 }
 

@@ -32,14 +32,14 @@ internal object WorkspaceFilePaths {
 
     /** Resolves the compatibility data root for tests and legacy direct service construction. */
     internal fun serverDataRootFromDatabasePath(databasePath: String): Path {
-        val raw = databasePath.removePrefix("jdbc:sqlite:")
-        if (raw == ":memory:" || raw.startsWith("file:")) {
+        if (databasePath.startsWith("jdbc:h2:mem:")) {
             return Path
                 .of(System.getProperty("java.io.tmpdir"))
                 .resolve("visual-agent-memory-workspace-${ProcessHandle.current().pid()}")
                 .toAbsolutePath()
                 .normalize()
         }
+        val raw = databasePath.removePrefix("jdbc:h2:file:").substringBefore(';')
         require(raw.isNotBlank()) { "A file-backed database path is required for the managed workspace" }
         val path = Path.of(raw).normalize()
         return requireNotNull(path.parent) { "The database path must have a parent directory" }

@@ -22,8 +22,10 @@ internal interface SkillRepository :
         value =
             """
             INSERT INTO skills (id, title, content, content_fingerprint, created_at, updated_at, revision, read_count, last_read_at)
-            VALUES (:id, :title, :content, :fingerprint, :createdAt, :updatedAt, 1, 0, NULL)
-            ON CONFLICT(content_fingerprint) DO NOTHING
+            SELECT :id, :title, :content, :fingerprint, :createdAt, :updatedAt, 1, 0, NULL
+            WHERE NOT EXISTS (
+                SELECT 1 FROM skills WHERE content_fingerprint = :fingerprint
+            )
             """,
         nativeQuery = true,
     )
@@ -112,24 +114,7 @@ internal class SkillRepositoryCustomImpl(
     override fun searchFts(
         query: String,
         limit: Int,
-    ): List<SkillSearchRow> =
-        entityManager
-            .createNativeQuery(
-                """
-                SELECT fts.id, snippet(skills_fts, 2, '<mark>', '</mark>', '…', 32)
-                FROM skills_fts fts
-                JOIN skills skill ON skill.id = fts.id
-                WHERE skills_fts MATCH :query
-                ORDER BY bm25(skills_fts, 5.0, 1.0), skill.updated_at DESC, skill.id ASC
-                LIMIT :limit
-                """.trimIndent(),
-            ).setParameter("query", query)
-            .setParameter("limit", limit)
-            .resultList
-            .map { row ->
-                val values = row as Array<*>
-                SkillSearchRow(values[0].toString(), values[1]?.toString().orEmpty())
-            }
+    ): List<SkillSearchRow> = searchLike(query, limit)
 
     override fun searchLike(
         query: String,

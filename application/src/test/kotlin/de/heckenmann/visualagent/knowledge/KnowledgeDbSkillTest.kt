@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
 class KnowledgeDbSkillTest {
     @Test
     fun `create preserves markdown and read records model access`() {
-        KnowledgeDbTestFactory.create("jdbc:sqlite::memory:").use { db ->
+        KnowledgeDbTestFactory.create("jdbc:h2:mem:test").use { db ->
             val markdown = "# Reusable result\n\n```kotlin\nfun answer() = 42\n```"
             val created = assertIs<SkillCreateResult.Created>(db.skillStore.createSkill("Reusable result", markdown))
 
@@ -30,7 +30,7 @@ class KnowledgeDbSkillTest {
 
     @Test
     fun `exact duplicate returns the existing skill instead of creating another row`() {
-        KnowledgeDbTestFactory.create("jdbc:sqlite::memory:").use { db ->
+        KnowledgeDbTestFactory.create("jdbc:h2:mem:test").use { db ->
             val first = assertIs<SkillCreateResult.Created>(db.skillStore.createSkill("Title", "# Body"))
             val duplicate = assertIs<SkillCreateResult.Duplicate>(db.skillStore.createSkill(" Title ", "# Body"))
 
@@ -40,24 +40,24 @@ class KnowledgeDbSkillTest {
     }
 
     @Test
-    fun `fts search is updated atomically and stale revisions cannot overwrite`() {
-        KnowledgeDbTestFactory.create("jdbc:sqlite::memory:").use { db ->
+    fun `database search is updated atomically and stale revisions cannot overwrite`() {
+        KnowledgeDbTestFactory.create("jdbc:h2:mem:test").use { db ->
             val created =
                 assertIs<SkillCreateResult.Created>(
-                    db.skillStore.createSkill("SQLite indexing", "Use FTS5 for durable lookup."),
+                    db.skillStore.createSkill("H2 indexing", "Use database-neutral lookup."),
                 )
-            assertTrue(db.skillStore.searchSkills("FTS5", 5).any { it.id == created.skill.id })
+            assertTrue(db.skillStore.searchSkills("database", 5).any { it.id == created.skill.id })
 
             val updated =
                 assertIs<SkillUpdateResult.Updated>(
                     db.skillStore.updateSkill(
                         created.skill.id,
                         created.skill.revision,
-                        "SQLite migration",
+                        "H2 migration",
                         "Use triggers for atomic indexing.",
                     ),
                 )
-            assertFalse(db.skillStore.searchSkills("FTS5", 5).any { it.id == created.skill.id })
+            assertFalse(db.skillStore.searchSkills("database", 5).any { it.id == created.skill.id })
             assertTrue(db.skillStore.searchSkills("triggers", 5).any { it.id == created.skill.id })
 
             val conflict =
@@ -65,13 +65,13 @@ class KnowledgeDbSkillTest {
                     db.skillStore.updateSkill(created.skill.id, created.skill.revision, "Stale", "Must not overwrite."),
                 )
             assertEquals(updated.skill.revision, conflict.skill.revision)
-            assertEquals("SQLite migration", conflict.skill.title)
+            assertEquals("H2 migration", conflict.skill.title)
         }
     }
 
     @Test
     fun `delete requires current revision and removes indexed result`() {
-        KnowledgeDbTestFactory.create("jdbc:sqlite::memory:").use { db ->
+        KnowledgeDbTestFactory.create("jdbc:h2:mem:test").use { db ->
             val created =
                 assertIs<SkillCreateResult.Created>(
                     db.skillStore.createSkill("Disposable", "Remove this result."),
@@ -92,7 +92,7 @@ class KnowledgeDbSkillTest {
 
     @Test
     fun `blank values and oversized search queries are rejected`() {
-        KnowledgeDbTestFactory.create("jdbc:sqlite::memory:").use { db ->
+        KnowledgeDbTestFactory.create("jdbc:h2:mem:test").use { db ->
             kotlin.test.assertFailsWith<IllegalArgumentException> { db.skillStore.createSkill(" ", "content") }
             kotlin.test.assertFailsWith<IllegalArgumentException> { db.skillStore.createSkill("title", " ") }
             kotlin.test.assertFailsWith<IllegalArgumentException> { db.skillStore.searchSkills("x".repeat(501), 5) }

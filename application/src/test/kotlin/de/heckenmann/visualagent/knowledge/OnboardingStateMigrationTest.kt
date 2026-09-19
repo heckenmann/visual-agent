@@ -6,35 +6,27 @@ import java.nio.file.Files
 import java.sql.DriverManager
 import kotlin.test.assertEquals
 
-/** Verifies that onboarding migration distinguishes new and already-used Visual Agent databases. */
+/** Verifies onboarding state initialization and persistence in the H2 schema. */
 class OnboardingStateMigrationTest {
     @Test
     fun `fresh database starts onboarding`() {
-        val database = Files.createTempFile("visual-agent-onboarding-fresh", ".db")
-        migrate("jdbc:sqlite:$database")
+        val jdbcUrl = newDatabase("visual-agent-onboarding-fresh")
+        migrate(jdbcUrl)
 
-        assertEquals("NOT_STARTED", onboardingState("jdbc:sqlite:$database"))
+        assertEquals("NOT_STARTED", onboardingState(jdbcUrl))
     }
 
     @Test
-    fun `existing conversation migration does not block workspace startup`() {
-        val database = Files.createTempFile("visual-agent-onboarding-existing", ".db")
-        val jdbcUrl = "jdbc:sqlite:$database"
-        Flyway
-            .configure()
-            .dataSource(jdbcUrl, "", "")
-            .locations("classpath:db/migration")
-            .target("14")
-            .load()
-            .migrate()
-        DriverManager.getConnection(jdbcUrl).use { connection ->
+    fun `existing onboarding state survives a repeated migration`() {
+        val jdbcUrl = newDatabase("visual-agent-onboarding-existing")
+        migrate(jdbcUrl)
+        DriverManager.getConnection(jdbcUrl, "sa", "").use { connection ->
             connection
-                .prepareStatement("INSERT INTO conversation_history(id, session_id, role, content) VALUES (?, ?, ?, ?)")
-                .use { statement ->
-                    statement.setString(1, "migration-history")
-                    statement.setString(2, "main")
-                    statement.setString(3, "USER")
-                    statement.setString(4, "Existing user data")
+                .prepareStatement(
+                    "UPDATE user_preferences SET preference_value = ? WHERE preference_key = ?",
+                ).use { statement ->
+                    statement.setString(1, "COMPLETED")
+                    statement.setString(2, "ui.onboarding.v1")
                     statement.executeUpdate()
                 }
         }
@@ -44,24 +36,30 @@ class OnboardingStateMigrationTest {
         assertEquals("COMPLETED", onboardingState(jdbcUrl))
     }
 
+    private fun newDatabase(prefix: String): String {
+        val directory = Files.createTempDirectory(prefix)
+        return "jdbc:h2:file:${directory.resolve("database")};DB_CLOSE_ON_EXIT=FALSE"
+    }
+
     private fun migrate(jdbcUrl: String) {
         Flyway
             .configure()
-            .dataSource(jdbcUrl, "", "")
-            .locations("classpath:db/migration")
+            .dataSource(jdbcUrl, "sa", "")
+            .locations("classpath:db/migration-h2")
             .load()
             .migrate()
     }
 
     private fun onboardingState(jdbcUrl: String): String =
-        DriverManager.getConnection(jdbcUrl).use { connection ->
+        DriverManager.getConnection(jdbcUrl, "sa", "").use { connection ->
             connection
-                .prepareStatement("SELECT value FROM user_preferences WHERE key = ?")
-                .use { statement ->
+                .prepareStatement(
+                    "SELECT preference_value FROM user_preferences WHERE preference_key = ?",
+                ).use { statement ->
                     statement.setString(1, "ui.onboarding.v1")
                     statement.executeQuery().use { result ->
                         check(result.next())
-                        result.getString("value")
+                        result.getString("preference_value")
                     }
                 }
         }

@@ -194,7 +194,7 @@ class KnowledgeDbConversationTest {
             db.saveConversationMessage("main", "user", "Request $index")
             db.saveConversationMessage("main", "assistant", "Answer $index")
         }
-        DriverManager.getConnection("jdbc:sqlite:$tempDb").use { connection ->
+        DriverManager.getConnection("jdbc:h2:file:$tempDb;DB_CLOSE_ON_EXIT=FALSE").use { connection ->
             connection.createStatement().use { statement ->
                 statement.executeUpdate("UPDATE conversation_history SET timeline_sequence = 0")
             }

@@ -34,7 +34,7 @@ class AgentManagerTodoTest {
     private fun createManager(): Triple<AgentManager, LLMProvider, PersistenceStores> {
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                .create("jdbc:sqlite::memory:")
+                .create("jdbc:h2:mem:test")
         val provider = mockk<LLMProvider>(relaxed = true)
         seedDefaultTestAgents(db)
         coEvery { provider.isConnected() } returns true
@@ -53,7 +53,7 @@ class AgentManagerTodoTest {
     private fun createManagerWithInstantResponse(): Triple<AgentManager, LLMProvider, PersistenceStores> {
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
-                .create("jdbc:sqlite::memory:")
+                .create("jdbc:h2:mem:test")
         val provider = mockk<LLMProvider>(relaxed = true)
         seedDefaultTestAgents(db)
         coEvery { provider.isConnected() } returns true

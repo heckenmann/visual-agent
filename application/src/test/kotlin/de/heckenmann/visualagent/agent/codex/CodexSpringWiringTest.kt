@@ -12,7 +12,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 
-@SpringBootTest(properties = ["visual-agent.ui.enabled=false", "visual-agent.db.path=jdbc:sqlite::memory:"])
+@SpringBootTest(properties = ["visual-agent.ui.enabled=false", "visual-agent.db.path=jdbc:h2:mem:test"])
 internal class CodexSpringWiringTest {
     @Autowired
     private lateinit var provider: ConfiguredLLMProvider
