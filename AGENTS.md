@@ -15,6 +15,8 @@
 
 ## Pre-Commit Quality Gates
 
+Run the Gradle formatting task before making any manual formatting adjustments. Manual formatting should only be used to refine the result after `gradle format` has completed.
+
 Always run, in this order:
 ```bash
 ./gradlew ktlintCheck check test
