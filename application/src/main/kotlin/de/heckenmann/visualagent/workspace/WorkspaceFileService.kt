@@ -16,8 +16,6 @@ import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
 import kotlin.io.path.fileSize
 import kotlin.io.path.isRegularFile
-import kotlin.io.path.name
-import kotlin.streams.asSequence
 
 /**
  * Manages imported user files in the application workspace below the server data root.
@@ -43,6 +41,7 @@ class WorkspaceFileService
         ) : this(store, WorkspaceFilePaths.serverDataRootFromDatabasePath(databasePath), mimeDetector, activityEvents)
 
         private val contentOperations = WorkspaceFileContentOperations(store, mimeDetector, ::resolveManagedPath)
+        private val syncOperations = WorkspaceFileSyncOperations(store, ::workspaceRoot, mimeDetector, ::recordActivity)
         private val importOperations =
             WorkspaceFileImportOperations(
                 workspaceRoot = ::workspaceRoot,
@@ -61,7 +60,12 @@ class WorkspaceFileService
                 recordActivity = ::recordActivity,
             )
         private val writeOperations =
-            WorkspaceFileWriteOperations(::workspaceRoot, ::ensureWorkspaceDirectory, ::recordManagedFile, ::recordActivity)
+            WorkspaceFileWriteOperations(
+                ::workspaceRoot,
+                WorkspaceFileDirectories::ensure,
+                ::recordManagedFile,
+                ::recordActivity,
+            )
         private val renameOperations =
             WorkspaceFileRenameOperations(store, ::resolveManagedPath, ::workspaceRoot, mimeDetector, ::recordActivity)
 
@@ -88,7 +92,7 @@ class WorkspaceFileService
             val parent = resolveWorkspaceDirectory(parentDirectory)
             val directory = parent.resolve(normalizedName).normalize()
             require(directory.parent == parent) { "Folder must be a direct child of its parent" }
-            ensureWorkspaceDirectory(directory, workspaceRoot().toRealPath())
+            WorkspaceFileDirectories.ensure(directory, workspaceRoot().toRealPath())
             return WorkspaceFilePaths.relativePath(directory, workspaceRoot()).also {
                 recordActivity("Workspace folder created: $it.", it, "create-directory")
             }
@@ -103,7 +107,7 @@ class WorkspaceFileService
             val root = workspaceRoot().toRealPath()
             val directory = root.resolve(normalized).normalize()
             require(directory.startsWith(root)) { "Workspace directory escapes the workspace" }
-            ensureWorkspaceDirectory(directory, root)
+            WorkspaceFileDirectories.ensure(directory, root)
             return directory
         }
 
@@ -186,55 +190,7 @@ class WorkspaceFileService
          *
          * Use cases: UC-0000026.
          */
-        fun syncMetadataWithFilesystem(): WorkspaceSyncResult {
-            val root = workspaceRoot()
-            val existingRecords = listFiles()
-            val pathsByRelative = existingRecords.associateBy { WorkspaceFilePaths.normalizeRelativePath(it.relativePath) }
-            val filesByRelative =
-                Files
-                    .walk(root)
-                    .use { stream ->
-                        stream
-                            .asSequence()
-                            .filter { it.isRegularFile() }
-                            .associateBy { WorkspaceFilePaths.relativePath(it, root) }
-                    }
-            var added = 0
-            var updated = 0
-            var removed = 0
-            filesByRelative.forEach { (relativePath, path) ->
-                val current = pathsByRelative[relativePath]
-                if (current == null) {
-                    store.saveWorkspaceFile(recordForExistingFile(path, path.name, root, mimeDetector))
-                    added++
-                } else {
-                    val currentHash = WorkspaceFilePaths.sha256(path)
-                    if (
-                        current.sha256 != currentHash ||
-                        current.sizeBytes != path.fileSize() ||
-                        current.mimeType != mimeDetector.detect(path)
-                    ) {
-                        store.saveWorkspaceFile(
-                            current.copy(
-                                mimeType = mimeDetector.detect(path),
-                                sizeBytes = path.fileSize(),
-                                sha256 = currentHash,
-                                updatedAt = Instant.now(),
-                            ),
-                        )
-                        updated++
-                    }
-                }
-            }
-            existingRecords
-                .filter { WorkspaceFilePaths.normalizeRelativePath(it.relativePath) !in filesByRelative.keys }
-                .forEach {
-                    if (store.deleteWorkspaceFile(it.id)) removed++
-                }
-            return WorkspaceSyncResult(added = added, updated = updated, removed = removed, total = listFiles().size).also {
-                recordActivity("Workspace files synchronized: added=$added updated=$updated removed=$removed.", operation = "sync")
-            }
-        }
+        fun syncMetadataWithFilesystem(): WorkspaceSyncResult = syncOperations.syncMetadataWithFilesystem()
 
         /**
          * Resolves a file by ID or relative path.
@@ -360,28 +316,11 @@ class WorkspaceFileService
         ): WorkspaceFileRecord = writeOperations.writeText(relativePath, content)
 
         /** Creates each missing parent only after confirming it is not a link escaping [root]. */
-        private fun ensureWorkspaceDirectory(
-            directory: Path,
-            root: Path,
-        ) {
-            require(directory.startsWith(root)) { "Workspace directory escapes the workspace" }
-            var current = root
-            root.relativize(directory).forEach { segment ->
-                current = current.resolve(segment)
-                if (Files.exists(current, LinkOption.NOFOLLOW_LINKS)) {
-                    require(Files.isDirectory(current, LinkOption.NOFOLLOW_LINKS)) { "Workspace path contains a symbolic link or file" }
-                } else {
-                    Files.createDirectory(current)
-                }
-                require(current.toRealPath().startsWith(root)) { "Workspace directory escapes the workspace" }
-            }
-        }
-
         private fun prepareNewWorkspaceTarget(relativePath: String): Path {
             val target = WorkspaceFilePaths.resolveWorkspacePath(relativePath, workspaceRoot())
             val root = workspaceRoot().toRealPath()
             val parent = requireNotNull(target.parent) { "Workspace file must have a parent directory" }
-            ensureWorkspaceDirectory(parent, root)
+            WorkspaceFileDirectories.ensure(parent, root)
             require(!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) { "Workspace target already exists" }
             return target
         }
