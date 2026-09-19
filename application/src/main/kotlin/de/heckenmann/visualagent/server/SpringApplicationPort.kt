@@ -26,6 +26,7 @@ class SpringApplicationPort(
     override val agents: AgentPort,
     override val providers: ProviderPort,
     override val settings: SettingsPort,
+    override val updates: de.heckenmann.visualagent.protocol.UpdatePort,
     override val onboarding: OnboardingPort,
     override val mainAgentMemory: MainAgentMemoryPort,
     override val skills: SkillPort,

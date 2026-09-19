@@ -2,4 +2,5 @@
 set -eu
 
 app_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Dvisual-agent.package.type=linux-appimage"
 exec "$app_dir/usr/lib/visual-agent/bin/Visual Agent" "$@"

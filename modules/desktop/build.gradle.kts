@@ -105,7 +105,15 @@ if (macOsDnsResolverClassifier != null) {
 compose.desktop {
     application {
         mainClass = "de.heckenmann.visualagent.desktop.DesktopMain"
-        jvmArgs += listOf("-Djava.awt.headless=false")
+        jvmArgs +=
+            listOfNotNull(
+                "-Djava.awt.headless=false",
+                when {
+                    System.getProperty("os.name").contains("win", ignoreCase = true) -> "-Dvisual-agent.package.type=windows-msi"
+                    System.getProperty("os.name").contains("mac", ignoreCase = true) -> "-Dvisual-agent.package.type=macos-dmg"
+                    else -> null
+                },
+            )
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm)
             modules(

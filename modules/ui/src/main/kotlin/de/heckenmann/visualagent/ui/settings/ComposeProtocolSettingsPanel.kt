@@ -21,6 +21,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.SettingsPort
 import de.heckenmann.visualagent.protocol.SettingsSnapshot
+import de.heckenmann.visualagent.protocol.UpdatePort
+import de.heckenmann.visualagent.protocol.UpdateRequest
+import de.heckenmann.visualagent.protocol.UpdateStatus
+import de.heckenmann.visualagent.ui.application.UpdatePresentationState
 import de.heckenmann.visualagent.ui.components.RegisterPanelVerticalScrollbar
 import de.heckenmann.visualagent.ui.components.settingsDraftActionRow
 import de.heckenmann.visualagent.ui.components.toUiErrorMessage
@@ -34,6 +38,9 @@ import kotlinx.coroutines.withContext
 internal fun settingsPanel(
     settingsPort: SettingsPort,
     onSettingsChanged: () -> Unit,
+    updatePort: UpdatePort = DisabledUpdatePort,
+    updateState: UpdatePresentationState = UpdatePresentationState(),
+    onUpdateStateChanged: (UpdatePresentationState) -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     var persisted by remember { mutableStateOf(SettingsSnapshot()) }
@@ -105,6 +112,13 @@ internal fun settingsPanel(
                 modifier = Modifier.verticalScroll(scrollState),
             ) {
                 AppearanceSettingsSection(draft) { draft = it }
+                UpdateSettingsSection(
+                    settings = draft,
+                    updatePort = updatePort,
+                    initialState = updateState,
+                    onStateChanged = onUpdateStateChanged,
+                    onChange = { draft = it },
+                )
             }
         }
         HorizontalDivider()
@@ -127,4 +141,30 @@ internal fun SettingsSnapshot.withAppearanceFrom(appearance: SettingsSnapshot): 
         fontSize = appearance.fontSize,
         uiScalePercent = appearance.uiScalePercent,
         showPanelLabels = appearance.showPanelLabels,
+        automaticUpdatesEnabled = appearance.automaticUpdatesEnabled,
+        includePrereleaseUpdates = appearance.includePrereleaseUpdates,
     )
+
+private object DisabledUpdatePort : UpdatePort {
+    override fun check(request: UpdateRequest): UpdateStatus =
+        UpdateStatus(
+            currentVersion = "unknown",
+            latestVersion = null,
+            updateAvailable = false,
+            channel = "stable",
+            releaseName = null,
+            releaseNotes = null,
+            releaseUrl = null,
+            selectedAsset = null,
+            availableAssets = emptyList(),
+            error = "Update service is unavailable",
+        )
+
+    override fun download(request: UpdateRequest) =
+        de.heckenmann.visualagent.protocol
+            .UpdateDownloadResult(error = "Update service is unavailable")
+
+    override fun install(stagedId: String) =
+        de.heckenmann.visualagent.protocol
+            .UpdateInstallResult(false, "Update service is unavailable")
+}
