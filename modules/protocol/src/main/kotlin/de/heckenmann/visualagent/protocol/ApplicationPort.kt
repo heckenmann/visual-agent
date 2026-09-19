@@ -20,6 +20,9 @@ interface ApplicationPort {
     /** Runtime and presentation settings. */
     val settings: SettingsPort
 
+    /** Application update discovery, staging, and explicit installation commands. */
+    val updates: UpdatePort
+
     /** First-run provider and model onboarding owned by the connected Visual Agent server. */
     val onboarding: OnboardingPort
 

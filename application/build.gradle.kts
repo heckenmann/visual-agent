@@ -291,6 +291,21 @@ val kotlinSourceRoots =
 
 val generatedUseCaseResources = layout.buildDirectory.dir("generated/usecase-resources")
 
+val generatedBuildMetadata = layout.buildDirectory.dir("generated/build-metadata")
+
+val generateBuildMetadata =
+    tasks.register("generateBuildMetadata") {
+        group = "build setup"
+        description = "Generates runtime metadata derived from the Gradle project version."
+        inputs.property("applicationVersion", project.version.toString())
+        outputs.dir(generatedBuildMetadata)
+        doLast {
+            val versionFile = generatedBuildMetadata.get().file("visual-agent-version.txt").asFile
+            versionFile.parentFile.mkdirs()
+            versionFile.writeText(project.version.toString())
+        }
+    }
+
 val generateUseCaseResources =
     tasks.register("generateUseCaseResources") {
         group = "documentation"
@@ -316,6 +331,8 @@ val generateUseCaseResources =
     }
 
 tasks.named<ProcessResources>("processResources") {
+    dependsOn(generateBuildMetadata)
+    from(generatedBuildMetadata)
     dependsOn(generateUseCaseResources)
     from(generatedUseCaseResources)
 }

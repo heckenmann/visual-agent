@@ -42,6 +42,7 @@ class AgentToolConfigService(
             "todos",
             "workspace:file",
             "workspace:download",
+            "update:check",
             "javascript:execute",
             "memory",
             "skills",
