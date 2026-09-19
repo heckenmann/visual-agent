@@ -41,6 +41,8 @@ dependencies {
     implementation(libs.grpc.inprocess)
     implementation(libs.grpc.netty.shaded)
     implementation(libs.spring.boot.starter.data.jpa)
+    implementation(libs.spring.data.r2dbc)
+    implementation(libs.spring.r2dbc)
     implementation(platform(libs.spring.ai.bom))
     implementation(libs.spring.ai.ollama)
     implementation(libs.spring.ai.openai)
@@ -49,6 +51,7 @@ dependencies {
 
     // SQLite JDBC
     implementation(libs.sqlite.jdbc)
+    runtimeOnly(libs.r2dbc.h2)
     implementation(libs.appdirs)
 
     // Kotlinx Coroutines
