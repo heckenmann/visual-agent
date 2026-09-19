@@ -15,7 +15,7 @@ internal class WorkspaceFileTransferOperations(
     private val resolvePath: (String) -> Path,
     private val prepareTarget: (String) -> Path,
     private val persist: (WorkspaceFileRecord) -> Unit,
-    private val databasePath: String,
+    private val workspaceRoot: () -> Path,
     private val mimeDetector: WorkspaceMimeTypeDetector,
     private val recordActivity: (String, String?, String?, String?, Long?) -> Unit,
 ) {
@@ -66,7 +66,7 @@ internal class WorkspaceFileTransferOperations(
         target: Path,
     ): WorkspaceFileRecord =
         source.copy(
-            relativePath = WorkspaceFilePaths.relativePath(target, databasePath),
+            relativePath = WorkspaceFilePaths.relativePath(target, workspaceRoot()),
             originalName = target.name,
             mimeType = mimeDetector.detect(target),
             sizeBytes = target.fileSize(),

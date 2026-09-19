@@ -11,13 +11,13 @@ import kotlin.io.path.name
 internal fun recordForExistingFile(
     path: Path,
     originalName: String = path.name,
-    databasePath: String,
+    workspaceRoot: Path,
     mimeDetector: WorkspaceMimeTypeDetector,
 ): WorkspaceFileRecord {
     val now = Instant.now()
     return WorkspaceFileRecord(
         id = UUID.randomUUID().toString(),
-        relativePath = WorkspaceFilePaths.relativePath(path, databasePath),
+        relativePath = WorkspaceFilePaths.relativePath(path, workspaceRoot),
         originalName = WorkspaceFilePaths.safeFileName(originalName),
         mimeType = mimeDetector.detect(path),
         sizeBytes = path.fileSize(),

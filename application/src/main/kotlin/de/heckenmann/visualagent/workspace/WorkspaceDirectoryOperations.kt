@@ -7,17 +7,14 @@ import java.nio.file.Path
 import kotlin.streams.asSequence
 
 /** Lists workspace-relative directories independently from file metadata operations. */
-internal fun listWorkspaceDirectories(
-    root: Path,
-    databasePath: String,
-): List<String> =
+internal fun listWorkspaceDirectories(root: Path): List<String> =
     Files
         .walk(root)
         .use { paths ->
             paths
                 .asSequence()
                 .filter { it != root && Files.isDirectory(it) }
-                .map { WorkspaceFilePaths.relativePath(it, databasePath) }
+                .map { WorkspaceFilePaths.relativePath(it, root) }
                 .sorted()
                 .toList()
         }
@@ -34,14 +31,13 @@ data class WorkspaceDirectoryDeletion(
 internal fun deleteWorkspaceDirectory(
     root: Path,
     requestedPath: String,
-    databasePath: String,
     recursive: Boolean,
     records: List<WorkspaceFileRecord>,
     deleteMetadata: (String) -> Boolean,
 ): WorkspaceDirectoryDeletion {
     val relativePath = WorkspaceFilePaths.normalizeRelativePath(requestedPath).trim('/')
     require(relativePath.isNotBlank()) { "The workspace root cannot be deleted" }
-    val directory = WorkspaceFilePaths.resolveWorkspacePath(relativePath, databasePath)
+    val directory = WorkspaceFilePaths.resolveWorkspacePath(relativePath, root)
     require(directory.startsWith(root.toAbsolutePath().normalize())) { "Workspace directory escapes the workspace" }
     require(Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)) {
         "Workspace directory does not exist: $relativePath"

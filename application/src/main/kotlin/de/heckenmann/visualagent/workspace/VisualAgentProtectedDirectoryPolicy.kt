@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.workspace
 
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Service
 import java.nio.file.Files
@@ -13,35 +14,33 @@ import java.nio.file.Path
  * granting a parent such as the application working directory.
  */
 @Service
-class VisualAgentProtectedDirectoryPolicy(
-    @Qualifier("databasePath") databasePath: String,
-) {
-    private val protectedRoots = protectedRoots(databasePath)
+class VisualAgentProtectedDirectoryPolicy
+    @Autowired
+    constructor(
+        @Qualifier("serverDataRoot") serverDataRoot: Path,
+    ) {
+        private val protectedRoots = protectedRoots(serverDataRoot)
 
-    /** Fails when [directory] is or contains a Visual Agent-owned protected directory. */
-    fun requireGrantable(directory: Path) {
-        val root = directory.toRealPath()
-        require(protectedRoots.none { protected -> root == protected || protected.startsWith(root) }) {
-            "ACCESS_DENIED: Visual Agent configuration and data directories cannot be granted"
+        /** Compatibility constructor for direct tests and legacy callers. */
+        constructor(databasePath: String) : this(WorkspaceFilePaths.serverDataRootFromDatabasePath(databasePath))
+
+        /** Fails when [directory] is or contains a Visual Agent-owned protected directory. */
+        fun requireGrantable(directory: Path) {
+            val root = directory.toRealPath()
+            require(protectedRoots.none { protected -> root == protected || protected.startsWith(root) }) {
+                "ACCESS_DENIED: Visual Agent configuration and data directories cannot be granted"
+            }
         }
+
+        private fun protectedRoots(serverDataRoot: Path): Set<Path> =
+            buildSet {
+                serverDataRoot
+                    .toAbsolutePath()
+                    .normalize()
+                    .existingCanonicalDirectory()
+                    ?.let(::add)
+                Path.of("application", "src", "main", "resources", "config").existingCanonicalDirectory()?.let(::add)
+            }
+
+        private fun Path.existingCanonicalDirectory(): Path? = takeIf { Files.isDirectory(it) }?.toRealPath()
     }
-
-    private fun protectedRoots(databasePath: String): Set<Path> =
-        buildSet {
-            databaseParent(databasePath)?.let(::add)
-            Path.of("application", "src", "main", "resources", "config").existingCanonicalDirectory()?.let(::add)
-        }
-
-    private fun databaseParent(databasePath: String): Path? {
-        val raw = databasePath.removePrefix("jdbc:sqlite:")
-        if (raw.isBlank() || raw == ":memory:" || raw.startsWith("file:")) return null
-        return Path
-            .of(raw)
-            .toAbsolutePath()
-            .normalize()
-            .parent
-            ?.existingCanonicalDirectory()
-    }
-
-    private fun Path.existingCanonicalDirectory(): Path? = takeIf { Files.isDirectory(it) }?.toRealPath()
-}

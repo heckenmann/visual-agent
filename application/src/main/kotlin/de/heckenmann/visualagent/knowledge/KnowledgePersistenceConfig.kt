@@ -24,6 +24,10 @@ internal class KnowledgePersistenceConfig {
     @Bean
     fun databasePath(environment: Environment): String = ServerDataPathResolver.databasePath(environment)
 
+    /** Exposes the stable server data root to storage-adjacent services. */
+    @Bean
+    fun serverDataRoot(environment: Environment): Path = ServerDataPathResolver.serverDataRoot(environment)
+
     @Bean
     fun dataSource(databasePath: String): DataSource {
         val sqliteConfig =
