@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.todo.TodoStatus
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -168,6 +169,12 @@ class AutonomousCoordinatorLifecycleTest {
                 fixture.coordinator.startAutonomousProcessing(seed = false)
                 delay(400)
                 fixture.todoManager.update(todo.id, "New description")
+
+                withTimeout(2_000) {
+                    while (fixture.messages.none { it.content.contains("Todo ${todo.id} was updated") }) delay(10)
+                }
+                delay(100)
+                assertEquals(AgentStatus.BUSY, fixture.subAgents["agent-1"]?.status)
 
                 delay(4000)
 

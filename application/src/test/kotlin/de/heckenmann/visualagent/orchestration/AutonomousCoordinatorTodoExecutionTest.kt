@@ -153,6 +153,7 @@ class AutonomousCoordinatorTodoExecutionTest {
     fun `complex todo with empty decomposition falls back to direct execution`() =
         runBlocking {
             val fixture = buildFixture(responseContent = "")
+            fixture.putSubAgent(SubAgent(id = "analyst", name = "Analyst", role = "Analysis", status = AgentStatus.IDLE))
             val todo =
                 fixture.todoManager.add(
                     "Analyze and integrate a multi-service architecture pipeline, then plan migration, tests, and documentation",
@@ -165,6 +166,29 @@ class AutonomousCoordinatorTodoExecutionTest {
                     while (fixture.todoManager.getById(todo.id)?.status != TodoStatus.COMPLETED) delay(10)
                 }
                 assertEquals(1, fixture.todoManager.getAll().size)
+                assertTrue(fixture.messages.any { it.content.contains("Started todo ${todo.id}") })
+            } finally {
+                fixture.cancel()
+            }
+        }
+
+    @Test
+    fun `complex todo without analyst falls back to an existing worker`() =
+        runBlocking {
+            val fixture = buildFixture()
+            fixture.putSubAgent(SubAgent(id = "coder", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
+            val todo =
+                fixture.todoManager.add(
+                    "Analyze and integrate a multi-service architecture pipeline, then plan migration, tests, and documentation",
+                )
+
+            try {
+                fixture.coordinator.startAutonomousProcessing(seed = false)
+
+                withTimeout(2_000) {
+                    while (fixture.todoManager.getById(todo.id)?.status != TodoStatus.COMPLETED) delay(10)
+                }
+                assertFalse(fixture.subAgents.values.any { it.name.contains("analyst", ignoreCase = true) })
                 assertTrue(fixture.messages.any { it.content.contains("Started todo ${todo.id}") })
             } finally {
                 fixture.cancel()

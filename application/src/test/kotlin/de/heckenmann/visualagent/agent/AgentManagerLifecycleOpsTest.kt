@@ -14,6 +14,49 @@ import kotlin.test.assertTrue
 @de.heckenmann.visualagent.testsupport.DatabaseTest
 class AgentManagerLifecycleOpsTest {
     @Test
+    fun `empty persisted inventory remains empty on startup`() {
+        val db =
+            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                .create("jdbc:sqlite::memory:")
+        val manager = createManager(db)
+
+        assertTrue(manager.getSubAgents().isEmpty())
+        assertTrue(db.listAgents().isEmpty())
+    }
+
+    @Test
+    fun `startup loads only partial persisted inventory`() {
+        val db =
+            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                .create("jdbc:sqlite::memory:")
+        val first = createManager(db)
+        val one = first.createAgent("Existing researcher", "Research")
+        val two = first.createAgent("Existing coder", "Implementation")
+        first.destroy()
+
+        val restarted = createManager(db)
+
+        assertEquals(setOf(one.id, two.id), restarted.getSubAgents().map { it.id }.toSet())
+        assertEquals(2, db.listAgents().size)
+    }
+
+    @Test
+    fun `deleted agents are not recreated after restart`() {
+        val db =
+            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                .create("jdbc:sqlite::memory:")
+        val first = createManager(db)
+        val deleted = first.createAgent("Researcher", "Research")
+        assertTrue(first.deleteAgent(deleted.id))
+        first.destroy()
+
+        val restarted = createManager(db)
+
+        assertTrue(restarted.getSubAgents().isEmpty())
+        assertTrue(db.listAgents().isEmpty())
+    }
+
+    @Test
     fun `getTodosFromDb returns stored todos`() {
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
@@ -147,5 +190,10 @@ class AgentManagerLifecycleOpsTest {
 
         assertNotNull(fromDb)
         assertEquals(AgentConfig(), fromDb.config)
+    }
+
+    private fun createManager(db: de.heckenmann.visualagent.knowledge.PersistenceStores): AgentManager {
+        val provider = mockk<LLMProvider>(relaxed = true)
+        return AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
     }
 }

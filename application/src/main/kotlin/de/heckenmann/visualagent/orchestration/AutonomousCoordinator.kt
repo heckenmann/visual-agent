@@ -13,7 +13,6 @@ import de.heckenmann.visualagent.agent.SubAgentOpsProvider
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.knowledge.MemoryStore
 import de.heckenmann.visualagent.knowledge.TodoStore
-import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoChange
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoManager
@@ -23,6 +22,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import mu.KotlinLogging
 import java.util.concurrent.ConcurrentHashMap
@@ -67,7 +67,6 @@ class AutonomousCoordinator
                 subAgents = subAgents,
                 llmProvider = llmProvider,
                 agentToolConfigService = agentToolConfigService,
-                createAgent = { name, role, templateName -> subAgentOps.createAgent(name, role, templateName) },
             )
         private val decompositionScheduler =
             AutonomousTodoDecompositionScheduler(
@@ -78,6 +77,14 @@ class AutonomousCoordinator
                 subAgentOps = subAgentOps,
                 executionControl = executionControl,
                 signalWork = workSignal::signal,
+            )
+        private val candidateSelector =
+            AutonomousTodoCandidateSelector(
+                todoStore = todoStore,
+                subAgents = subAgents,
+                taskPlanner = taskPlanner,
+                decompositionScheduler = decompositionScheduler,
+                executionControl = executionControl,
             )
 
         init {
@@ -250,7 +257,7 @@ class AutonomousCoordinator
                 }
             if (busyCount >= parallelismProvider.get().coerceAtLeast(1)) return false
 
-            val candidate = findNextAssignableTodo(requestedTodoId) ?: return false
+            val candidate = candidateSelector.find(requestedTodoId) ?: return false
             val agent = candidate.agent
             val todo = todoManager.claimPendingTodo(candidate.todo.id, agent.id) ?: return false
             try {
@@ -270,8 +277,9 @@ class AutonomousCoordinator
                 val token = CancellationToken().also { activeCancellationTokens[todo.id] = it }
                 val processingJob =
                     scope.launch(start = CoroutineStart.LAZY) {
-                        if (token.isCancelled || todoManager.getById(todo.id)?.status != TodoStatus.IN_PROGRESS) {
+                        if (todoManager.getById(todo.id)?.status != TodoStatus.IN_PROGRESS) {
                             activeCancellationTokens.remove(todo.id, token)
+                            releaseClaimedAgent(agent, todo.id)
                             return@launch
                         }
                         processTodoWithLLM(
@@ -298,7 +306,10 @@ class AutonomousCoordinator
                 activeTodoJobs[todo.id] = processingJob
                 processingJob.invokeOnCompletion {
                     activeTodoJobs.remove(todo.id, processingJob)
-                    releaseUnstartedTodo(agent, todo.id)
+                    if (scope.isActive && todoManager.getById(todo.id)?.status != TodoStatus.IN_PROGRESS) {
+                        releaseClaimedAgent(agent, todo.id)
+                    }
+                    workSignal.signal()
                 }
                 processingJob.start()
                 return true
@@ -313,7 +324,7 @@ class AutonomousCoordinator
             }
         }
 
-        private fun releaseUnstartedTodo(
+        private fun releaseClaimedAgent(
             agent: SubAgent,
             todoId: String,
         ) {
@@ -325,28 +336,5 @@ class AutonomousCoordinator
                 subAgentOps.saveSubAgent(agent)
                 subAgentOps.notifyAgent(agent.id, "STATUS:${agent.status.name}")
             }
-            workSignal.signal()
         }
-
-        private fun findNextAssignableTodo(requestedTodoId: String? = null): TodoExecutionCandidate? =
-            findNextAssignableTodo(
-                todoStore
-                    .listTodos()
-                    .filterNot {
-                        decompositionScheduler.isDecomposing(it.id) || shouldDecomposeBeforeExecution(it, requestedTodoId)
-                    },
-                subAgents,
-                requestedTodoId = requestedTodoId,
-                isAgentEligible = { agentId ->
-                    executionControl?.isExecutionAllowed(agentId) ?: true
-                },
-            )
-
-        private fun shouldDecomposeBeforeExecution(
-            todo: Todo,
-            requestedTodoId: String?,
-        ): Boolean =
-            requestedTodoId == null &&
-                taskPlanner.isComplex(todo.description) &&
-                !decompositionScheduler.hasAttemptedDecomposition(todo.id)
     }

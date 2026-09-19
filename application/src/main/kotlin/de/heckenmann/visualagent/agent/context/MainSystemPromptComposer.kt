@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent.context
 
+import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoStatus
@@ -12,6 +13,7 @@ internal object MainSystemPromptComposer {
      * Composes the full main-agent system prompt with todo summary, active list, and execution rules.
      *
      * @param todos Current persisted todo list
+     * @param subAgents Current authoritative persisted sub-agent inventory
      * @param pendingResumeMessage Optional interrupted-request resume hint
      * @param toolConfigService Service to resolve tool sets for main agent and sub-agent roles
      * @param userModelInstruction Optional custom instruction from user settings
@@ -21,6 +23,7 @@ internal object MainSystemPromptComposer {
         todos: List<Todo>,
         pendingResumeMessage: String?,
         toolConfigService: AgentToolConfigService,
+        subAgents: List<SubAgent> = emptyList(),
         userModelInstruction: String = "",
     ): String {
         val openCount = todos.count { it.status == TodoStatus.PENDING }
@@ -40,6 +43,14 @@ internal object MainSystemPromptComposer {
             pendingResumeMessage?.let {
                 "Resume Hint: The previous app run ended while processing this user request:\n\"$it\""
             } ?: "Resume Hint: no interrupted user request detected."
+        val agentLines =
+            if (subAgents.isEmpty()) {
+                "- no persisted sub-agents"
+            } else {
+                subAgents.joinToString("\n") { agent ->
+                    "- ${agent.name} (id=${agent.id}, role=${agent.role}, status=${agent.status})"
+                }
+            }
 
         val mainTools = toolConfigService.mainAgentTools().map { it.value }.sorted()
         val allSubAgentTools =
@@ -105,6 +116,9 @@ internal object MainSystemPromptComposer {
 
             Current TODO list (ordered by position; the FIRST pending todo is the next one to process):
             $todoLines
+
+            Current sub-agent inventory (authoritative for this request):
+            $agentLines
             $userInstructionSection
             ## Your Available Tools
 
@@ -120,9 +134,10 @@ internal object MainSystemPromptComposer {
 
             ## Discovering and Creating Sub-Agents
 
-            - Use `agent:list` to see all existing sub-agents and their tool sets. Always check this first before assigning work.
+            - Before creating or assigning a sub-agent, call `agent:list` and inspect the complete current inventory. The inventory above is authoritative for this request, but `agent:list` is required because another request may have changed it.
             - Use `agent:show {id}` to inspect a specific sub-agent's full details, tool set, and recent log.
-            - If no existing sub-agent has the right tools for a task, create one with `agent:create`. Give it a descriptive name and select the tool set that matches the required work.
+            - Reuse a suitable existing sub-agent. Only after confirming that none has the right tools, create one with `agent:create`; application startup and autonomous planning never create one implicitly.
+            - If the inventory is empty and work must be delegated, first create an appropriate sub-agent with `agent:create`, then assign the todo to the returned agent id.
             - Match the task to the sub-agent's tool set, not its name or role label. The tool set is what determines capability.
             - You can update an existing sub-agent's tool set with `agent:update` if it needs additional capabilities.
 

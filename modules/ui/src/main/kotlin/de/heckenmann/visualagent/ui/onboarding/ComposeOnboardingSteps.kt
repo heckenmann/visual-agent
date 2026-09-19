@@ -26,6 +26,10 @@ import java.util.UUID
 internal fun OnboardingWelcome() {
     Text("Welcome", style = MaterialTheme.typography.titleLarge)
     Text("Provider settings remain on this Visual Agent server. You can change them later in Providers and models.")
+    Text("How Visual Agent works", style = MaterialTheme.typography.titleMedium)
+    Text("Main Agent — understands your request, plans the work, and coordinates available tools and helpers.")
+    Text("Sub-agents — specialized helpers created for roles such as research, coding, or analysis.")
+    Text("Todos — durable work items the Main Agent can assign to a Sub-agent and track until completion.")
 }
 
 /** Renders selection and staged editing of one LLM provider profile. */

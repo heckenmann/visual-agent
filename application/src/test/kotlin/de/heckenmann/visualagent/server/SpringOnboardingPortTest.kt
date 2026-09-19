@@ -32,7 +32,7 @@ import de.heckenmann.visualagent.protocol.ProviderAdapter as ProtocolProviderAda
 class SpringOnboardingPortTest {
     private val preferences = mockk<PreferenceStore>()
     private val catalog = mockk<ProviderCatalogService>()
-    private val port = SpringOnboardingPort(preferences, catalog, mockk<LLMProvider>(), mockk<TransactionTemplate>())
+    private val port = SpringOnboardingPort(preferences, catalog, mockk<LLMProvider>(), mockk<TransactionTemplate>(), mockk())
 
     @Test
     fun `provider views do not return stored credentials`() {
@@ -56,6 +56,15 @@ class SpringOnboardingPortTest {
     }
 
     @Test
+    fun `complete marks onboarding completed after optional agent setup`() {
+        every { preferences.setPreference(any(), any()) } returns Unit
+
+        port.complete()
+
+        verify { preferences.setPreference("ui.onboarding.v1", OnboardingStatus.COMPLETED.name) }
+    }
+
+    @Test
     fun `invalid persisted status is surfaced as recoverable startup failure`() {
         every { preferences.getPreference("ui.onboarding.v1") } returns "unknown"
 
@@ -66,7 +75,7 @@ class SpringOnboardingPortTest {
     fun `validation probes the exact staged provider and selected model`() =
         runTest {
             val provider = mockk<LLMProvider>()
-            val port = SpringOnboardingPort(preferences, catalog, provider, mockk())
+            val port = SpringOnboardingPort(preferences, catalog, provider, mockk(), mockk())
             val draft =
                 OnboardingProviderDraft(
                     id = "openai",
@@ -96,7 +105,7 @@ class SpringOnboardingPortTest {
     fun `validation reports incomplete http profile as invalid configuration`() =
         runTest {
             val provider = mockk<LLMProvider>()
-            val port = SpringOnboardingPort(preferences, catalog, provider, mockk())
+            val port = SpringOnboardingPort(preferences, catalog, provider, mockk(), mockk())
             val draft =
                 OnboardingProviderDraft(
                     id = "openai",
@@ -113,11 +122,11 @@ class SpringOnboardingPortTest {
         }
 
     @Test
-    fun `finish commits catalog selection and completion together after readiness succeeds`() =
+    fun `finish commits catalog selection after readiness succeeds`() =
         runTest {
             val provider = mockk<LLMProvider>()
             val transactionTemplate = mockk<TransactionTemplate>()
-            val port = SpringOnboardingPort(preferences, catalog, provider, transactionTemplate)
+            val port = SpringOnboardingPort(preferences, catalog, provider, transactionTemplate, mockk())
             val draft =
                 OnboardingProviderDraft(
                     id = "openai",
@@ -145,8 +154,8 @@ class SpringOnboardingPortTest {
                         configuration.providerId == "openai" && configuration.modelId == "verified-model"
                     },
                 )
-                preferences.setPreference("ui.onboarding.v1", OnboardingStatus.COMPLETED.name)
             }
+            verify(exactly = 0) { preferences.setPreference("ui.onboarding.v1", OnboardingStatus.COMPLETED.name) }
         }
 
     @Test
@@ -154,7 +163,7 @@ class SpringOnboardingPortTest {
         runTest {
             val provider = mockk<LLMProvider>()
             val transactionTemplate = mockk<TransactionTemplate>()
-            val port = SpringOnboardingPort(preferences, catalog, provider, transactionTemplate)
+            val port = SpringOnboardingPort(preferences, catalog, provider, transactionTemplate, mockk())
             val draft =
                 OnboardingProviderDraft(
                     id = "openai",
@@ -204,7 +213,7 @@ class SpringOnboardingPortTest {
         runTest {
             val provider = mockk<LLMProvider>()
             val transactionTemplate = mockk<TransactionTemplate>()
-            val port = SpringOnboardingPort(preferences, catalog, provider, transactionTemplate)
+            val port = SpringOnboardingPort(preferences, catalog, provider, transactionTemplate, mockk())
             val configured =
                 ProviderProfile(
                     id = "openai",
@@ -265,7 +274,7 @@ class SpringOnboardingPortTest {
     fun `model discovery preserves provider metadata`() =
         runTest {
             val provider = mockk<LLMProvider>()
-            val port = SpringOnboardingPort(preferences, catalog, provider, mockk())
+            val port = SpringOnboardingPort(preferences, catalog, provider, mockk(), mockk())
             val draft =
                 OnboardingProviderDraft(
                     id = "openai",
@@ -297,7 +306,7 @@ class SpringOnboardingPortTest {
     fun `model discovery excludes disabled models`() =
         runTest {
             val provider = mockk<LLMProvider>()
-            val port = SpringOnboardingPort(preferences, catalog, provider, mockk())
+            val port = SpringOnboardingPort(preferences, catalog, provider, mockk(), mockk())
             val draft =
                 OnboardingProviderDraft(
                     id = "openai",

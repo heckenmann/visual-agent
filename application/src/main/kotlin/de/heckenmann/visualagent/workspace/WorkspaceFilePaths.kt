@@ -26,6 +26,7 @@ internal object WorkspaceFilePaths {
             .toAbsolutePath()
             .normalize()
             .also { it.createDirectories() }
+            .toRealPath()
     }
 
     /** Resolves a workspace-relative file path and rejects path traversal. */
@@ -54,8 +55,9 @@ internal object WorkspaceFilePaths {
         path: Path,
         databasePath: String,
     ): String {
-        val root = workspaceRoot(databasePath).toRealPath()
+        val root = workspaceRoot(databasePath)
         val target = path.toRealPath()
+        require(target.startsWith(root)) { "Path escapes workspace root" }
         return root.relativize(target).toString()
     }
 

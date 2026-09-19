@@ -61,6 +61,12 @@ internal class AgentManagerContextOps(
     internal fun buildMainSystemContextPrompt(): String {
         val todos = owner.todoStore.listTodos()
         return de.heckenmann.visualagent.agent.context.MainSystemPromptComposer
-            .compose(todos, owner.pendingResumeMessage, owner.agentToolConfigService, owner.appConfig.userModelInstruction)
+            .compose(
+                todos = todos,
+                pendingResumeMessage = owner.pendingResumeMessage,
+                toolConfigService = owner.agentToolConfigService,
+                subAgents = owner.getSubAgents(),
+                userModelInstruction = owner.appConfig.userModelInstruction,
+            )
     }
 }
