@@ -111,19 +111,28 @@ internal class R2dbcSkillStore(
         isCancelled: () -> Boolean,
     ): Mono<SkillRecord> {
         val validId = requireUuid(id)
-        return Mono.defer {
-            check(!isCancelled()) { "Skill read was cancelled" }
-            databaseClient
-                .sql("UPDATE skills SET read_count = read_count + 1, last_read_at = :readAt WHERE id = :id")
-                .bind("readAt", Instant.now().toString())
-                .bind("id", validId)
-                .fetch()
-                .rowsUpdated()
-                .flatMap { updated ->
-                    check(!isCancelled()) { "Skill read was cancelled" }
-                    if (updated == 0L) Mono.empty() else selectById(validId)
-                }
-        }
+        return transactionOperator.transactional(
+            Mono.defer {
+                check(!isCancelled()) { "Skill read was cancelled" }
+                databaseClient
+                    .sql("UPDATE skills SET read_count = read_count + 1, last_read_at = :readAt WHERE id = :id")
+                    .bind("readAt", Instant.now().toString())
+                    .bind("id", validId)
+                    .fetch()
+                    .rowsUpdated()
+                    .flatMap { updated ->
+                        check(!isCancelled()) { "Skill read was cancelled" }
+                        if (updated == 0L) {
+                            Mono.empty()
+                        } else {
+                            selectById(validId).flatMap { skill ->
+                                check(!isCancelled()) { "Skill read was cancelled" }
+                                Mono.just(skill)
+                            }
+                        }
+                    }
+            },
+        )
     }
 
     override fun updateSkillReactive(

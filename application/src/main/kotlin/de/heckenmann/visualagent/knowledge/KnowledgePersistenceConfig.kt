@@ -29,17 +29,25 @@ internal class KnowledgePersistenceConfig {
     @Bean
     fun serverDataRoot(environment: Environment): Path = ServerDataPathResolver.serverDataRoot(environment)
 
+    /** Resolves credentials for both legacy and newly created H2 file databases. */
+    @Bean
+    fun h2DatabaseCredentials(
+        databasePath: String,
+        serverDataRoot: Path,
+    ): H2DatabaseCredentials = resolveCredentials(databasePath, serverDataRoot)
+
     /** Creates the JDBC data source used only by Spring Boot's Flyway initializer. */
     @Bean
     @Primary
     fun flywayDataSource(
         databasePath: String,
         serverDataRoot: Path,
+        credentials: H2DatabaseCredentials,
     ): DataSource =
         JdbcDataSource().apply {
             setURL(flywayJdbcUrl(databasePath, serverDataRoot))
-            user = "sa"
-            password = ""
+            user = credentials.user
+            password = credentials.password
         }
 
     /** Creates the embedded file- or memory-backed H2 R2DBC connection factory. */
@@ -47,9 +55,10 @@ internal class KnowledgePersistenceConfig {
     fun connectionFactory(
         databasePath: String,
         serverDataRoot: Path,
+        credentials: H2DatabaseCredentials,
     ): ConnectionFactory {
         Files.createDirectories(serverDataRoot)
-        return ConnectionFactories.get(connectionOptions(databasePath, serverDataRoot))
+        return ConnectionFactories.get(connectionOptions(databasePath, serverDataRoot, credentials))
     }
 
     /** Creates the database client used by all reactive store adapters. */
@@ -69,6 +78,7 @@ internal class KnowledgePersistenceConfig {
     private fun connectionOptions(
         databasePath: String,
         serverDataRoot: Path,
+        credentials: H2DatabaseCredentials,
     ): ConnectionFactoryOptions {
         if (databasePath.startsWith("jdbc:h2:mem:")) {
             val memoryName = databasePath.substringAfter("jdbc:h2:mem:").substringBefore(';').trim()
@@ -77,7 +87,8 @@ internal class KnowledgePersistenceConfig {
                 .option(ConnectionFactoryOptions.DRIVER, "h2")
                 .option(ConnectionFactoryOptions.PROTOCOL, "mem")
                 .option(ConnectionFactoryOptions.DATABASE, memoryName.ifBlank { "visual-agent" })
-                .option(ConnectionFactoryOptions.USER, "sa")
+                .option(ConnectionFactoryOptions.USER, credentials.user)
+                .option(ConnectionFactoryOptions.PASSWORD, credentials.password)
                 .option(Option.valueOf("options"), "DB_CLOSE_DELAY=-1")
                 .build()
         }
@@ -94,8 +105,29 @@ internal class KnowledgePersistenceConfig {
             .option(ConnectionFactoryOptions.DRIVER, "h2")
             .option(ConnectionFactoryOptions.PROTOCOL, "file")
             .option(ConnectionFactoryOptions.DATABASE, databaseFile.toString())
-            .option(ConnectionFactoryOptions.USER, "sa")
+            .option(ConnectionFactoryOptions.USER, credentials.user)
+            .option(ConnectionFactoryOptions.PASSWORD, credentials.password)
             .build()
+    }
+
+    private fun resolveCredentials(
+        databasePath: String,
+        serverDataRoot: Path,
+    ): H2DatabaseCredentials {
+        if (databasePath.startsWith("jdbc:h2:mem:")) return H2DatabaseCredentials("sa", "")
+        val jdbcUrl = flywayJdbcUrl(databasePath, serverDataRoot)
+        val candidates = listOf(H2DatabaseCredentials("", ""), H2DatabaseCredentials("sa", ""))
+        return candidates.firstOrNull { credentials ->
+            runCatching {
+                JdbcDataSource()
+                    .apply {
+                        setURL(jdbcUrl)
+                        user = credentials.user
+                        password = credentials.password
+                    }.connection
+                    .use { }
+            }.isSuccess
+        } ?: error("Unable to authenticate to the H2 database with supported credentials")
     }
 
     private fun flywayJdbcUrl(
@@ -126,3 +158,9 @@ internal class KnowledgePersistenceConfig {
         const val DATABASE_FILE = "visual-agent"
     }
 }
+
+/** Credentials selected for one H2 database so Flyway and R2DBC use the same identity. */
+internal data class H2DatabaseCredentials(
+    val user: String,
+    val password: String,
+)

@@ -67,6 +67,18 @@ class ReactiveKnowledgePersistenceConfigTest {
     }
 
     @Test
+    fun `legacy file database created with an empty user remains accessible`() {
+        val databasePath = Files.createTempDirectory("visual-agent-r2dbc-empty-user").resolve("database")
+        createCurrentV1SchemaWithTimelineValue(databasePath, user = "")
+
+        KnowledgeDbTestFactory.create(databasePath.toString()).use { db ->
+            val id = "33333333-3333-4333-8333-333333333333"
+            db.saveConversationMessage(id, "main", "user", "legacy credentials")
+            assertEquals("legacy credentials", db.conversationStore.getConversationMessage(id)?.content)
+        }
+    }
+
+    @Test
     fun `old preference-only schema is upgraded before reactive stores start`() {
         val databasePath = Files.createTempDirectory("visual-agent-r2dbc-preferences-only").resolve("database")
         createPreferenceOnlyLegacySchema(databasePath)
@@ -86,11 +98,14 @@ class ReactiveKnowledgePersistenceConfigTest {
         db.close()
     }
 
-    private fun createCurrentV1SchemaWithTimelineValue(databasePath: Path) {
+    private fun createCurrentV1SchemaWithTimelineValue(
+        databasePath: Path,
+        user: String = "sa",
+    ) {
         val dataSource =
             JdbcDataSource().apply {
                 setURL("jdbc:h2:file:$databasePath;DB_CLOSE_ON_EXIT=FALSE")
-                user = "sa"
+                this.user = user
                 password = ""
             }
         ResourceDatabasePopulator(ClassPathResource("db/migration-h2/V1__initial_h2_schema.sql")).execute(dataSource)
