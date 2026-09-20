@@ -16,6 +16,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -203,7 +204,7 @@ class VisualAgentGrpcSessionServiceTest {
     }
 
     private class RecordingObserver<T> : StreamObserver<T> {
-        val values = mutableListOf<T>()
+        val values = CopyOnWriteArrayList<T>()
 
         override fun onNext(value: T) {
             values += value
