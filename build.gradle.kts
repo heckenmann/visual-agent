@@ -43,33 +43,49 @@ tasks.named("check") {
     )
 }
 
+val verificationModules =
+    listOf(
+        ":application",
+        ":ui",
+        ":protocol",
+        ":desktop",
+        ":agent-core",
+        ":provider-core",
+        ":provider-standard",
+        ":provider-openai-codex",
+        ":providers",
+        ":tool-standard",
+        ":tool-javascript",
+        ":tools",
+    )
+val clientModules = listOf(":ui", ":protocol")
+
 tasks.register("verifyKtlintCompilerCompatibility") {
     group = "verification"
     description = "Ensures KtLint resolves the compiler version it was built against."
-    doLast {
-        val expectedVersion = libs.versions.ktlint.kotlin.get()
-        val mismatches =
-            subprojects
-                .mapNotNull { project ->
-                    val configuration = project.configurations.findByName("ktlint") ?: return@mapNotNull null
-                    val compiler =
-                        configuration.incoming.resolutionResult.allComponents
+    dependsOn(
+        verificationModules.mapNotNull { modulePath ->
+            val moduleProject = project(modulePath)
+            val ktlintConfiguration = moduleProject.configurations.findByName("ktlint") ?: return@mapNotNull null
+            moduleProject.tasks.register("verifyKtlintCompilerCompatibility") {
+                group = "verification"
+                description = "Ensures this module resolves the expected KtLint compiler version."
+                doLast {
+                    val compilerVersion =
+                        ktlintConfiguration.incoming.resolutionResult.allComponents
                             .mapNotNull { component -> component.moduleVersion }
                             .firstOrNull { module ->
                                 module.group == "org.jetbrains.kotlin" &&
                                     module.name == "kotlin-compiler-embeddable"
-                            }
-                    project.path to compiler?.version
-                }.filter { (_, actualVersion) -> actualVersion != expectedVersion }
-        check(mismatches.isEmpty()) {
-            mismatches.joinToString(
-                prefix = "KtLint compiler compatibility check failed: ",
-                separator = "; ",
-            ) { (projectPath, actualVersion) ->
-                "$projectPath resolved ${actualVersion ?: "no compiler"}, expected $expectedVersion"
+                            }?.version
+                    val expectedVersion = rootProject.libs.versions.ktlint.kotlin.get()
+                    check(compilerVersion == expectedVersion) {
+                        "$modulePath resolved ${compilerVersion ?: "no compiler"}, expected $expectedVersion"
+                    }
+                }
             }
-        }
-    }
+        },
+    )
 }
 
 tasks.named("build") {
@@ -273,19 +289,19 @@ tasks.register("verifyModuleDependencies") {
 tasks.register("verifyReactorBoundaries") {
     group = "verification"
     description = "Prevents Project Reactor from leaking into UI-facing modules."
-    val clientModules = listOf(":ui", ":protocol")
     dependsOn(
         clientModules.map { modulePath ->
-            project(modulePath).tasks.register("verifyReactorBoundary") {
+            val moduleProject = project(modulePath)
+            moduleProject.tasks.register("verifyReactorBoundary") {
                 group = "verification"
                 description = "Prevents Project Reactor from leaking into this UI-facing module."
                 doLast {
                     val dependencyViolations =
                         listOf("compileClasspath", "runtimeClasspath").flatMap { configurationName ->
-                            configurations.findByName(configurationName)?.incoming?.resolutionResult?.allComponents
+                            moduleProject.configurations.findByName(configurationName)?.incoming?.resolutionResult?.allComponents
                                 ?.mapNotNull { component -> component.moduleVersion }
                                 ?.filter { module -> module.group == "io.projectreactor" }
-                                ?.map { module -> "$path:$configurationName resolves ${module.group}:${module.name}:${module.version}" }
+                                ?.map { module -> "$modulePath:$configurationName resolves ${module.group}:${module.name}:${module.version}" }
                                 .orEmpty()
                         }.distinct()
                     check(dependencyViolations.isEmpty()) {
