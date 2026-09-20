@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.agent.tools.toolRegistry
 import de.heckenmann.visualagent.config.AppConfigBean
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.springframework.ai.chat.model.ChatModel
@@ -29,7 +30,7 @@ class OllamaClientErrorMappingTest {
 
             val error =
                 assertFailsWith<IllegalStateException> {
-                    client.chat(listOf(Message("user", "hello")))
+                    client.chatReactive(listOf(Message("user", "hello"))).awaitSingle()
                 }
 
             assertTrue(error.message.orEmpty().contains("not available for this account"))
@@ -52,7 +53,7 @@ class OllamaClientErrorMappingTest {
 
             val error =
                 assertFailsWith<IllegalStateException> {
-                    client.chat(listOf(Message("user", "hello")))
+                    client.chatReactive(listOf(Message("user", "hello"))).awaitSingle()
                 }
 
             assertTrue(error.message.orEmpty().contains("Model not available"))

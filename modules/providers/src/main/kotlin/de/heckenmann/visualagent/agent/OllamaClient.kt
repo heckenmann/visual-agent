@@ -7,17 +7,15 @@ import de.heckenmann.visualagent.agent.provider.ProviderErrorMessages
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.agent.provider.ProviderRuntimeConfig
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.withContext
 import mu.KotlinLogging
 import org.springframework.ai.chat.model.ChatModel
 import org.springframework.ai.ollama.OllamaChatModel
 import org.springframework.ai.ollama.api.OllamaApi
 import org.springframework.ai.ollama.api.OllamaChatOptions
 import org.springframework.stereotype.Component
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
+import reactor.core.scheduler.Schedulers
 
 /**
  * Spring AI backed LLM provider for Ollama endpoints and Ollama-compatible profiles.
@@ -39,112 +37,119 @@ class OllamaClient(
     private val auxiliary = OllamaClientAuxiliary(chatModel, ollamaApi, appConfig)
     private val ops = OllamaClientOps(ollamaApi, appConfig)
 
-    override suspend fun chat(messages: List<Message>): ChatResponse = chat(ChatRequestContext(messages = messages))
+    override fun chatReactive(messages: List<Message>): Mono<ChatResponse> = chatReactive(ChatRequestContext(messages = messages))
 
-    override suspend fun chat(request: ChatRequestContext): ChatResponse =
-        withContext(Dispatchers.IO) {
-            request.cancellationToken?.throwIfCancelled()
-            val selectedModel = request.model ?: appConfig.ollamaModel
-            val allowedFunctionNames = promptFactory.allowedFunctionNames(request, selectedModel)
-            val supportsTools = request.modelCapabilities.contains("tools")
-            val toolsEnabled = request.enabledTools.isNotEmpty()
-            logger.debug {
-                "Ollama chat: model=$selectedModel, supportsTools=$supportsTools, toolsEnabled=$toolsEnabled"
-            }
-            val responseResult =
-                runCatching {
-                    if (supportsTools && toolsEnabled) {
-                        val prompt = promptFactory.buildPrompt(request, selectedModel)
-                        val model = chatModelFor(request)
-                        ToolCallingLoop()
-                            .run(
-                                model,
-                                prompt,
-                                request.cancellationToken,
-                                toolRegistry.functionCallbacks(
-                                    request.enabledTools,
-                                    request.metadata + mapOf("model" to selectedModel) +
-                                        (request.cancellationToken?.let { mapOf("cancellationToken" to it) } ?: emptyMap()),
-                                ),
-                                toolRegistry,
+    override fun chatReactive(request: ChatRequestContext): Mono<ChatResponse> {
+        val selectedModel = request.model ?: appConfig.ollamaModel
+        val allowedFunctionNames = promptFactory.allowedFunctionNames(request, selectedModel)
+        return Mono
+            .defer {
+                request.cancellationToken?.throwIfCancelled()
+                val supportsTools = request.modelCapabilities.contains("tools")
+                val toolsEnabled = request.enabledTools.isNotEmpty()
+                logger.debug {
+                    "Ollama chat: model=$selectedModel, supportsTools=$supportsTools, toolsEnabled=$toolsEnabled"
+                }
+                if (supportsTools && toolsEnabled) {
+                    val prompt = promptFactory.buildPrompt(request, selectedModel)
+                    val model = chatModelFor(request)
+                    ToolCallingLoop()
+                        .runReactive(
+                            model,
+                            prompt,
+                            request.cancellationToken,
+                            toolCallbacks(request, selectedModel),
+                            toolRegistry,
+                        )
+                } else {
+                    Mono
+                        .fromCallable {
+                            OllamaToollessChat.execute(
+                                ollamaApi = ollamaApiFor(request),
+                                promptFactory = promptFactory,
+                                request = request,
+                                selectedModel = selectedModel,
                             )
-                    } else {
-                        OllamaToollessChat.execute(
-                            ollamaApi = ollamaApiFor(request),
-                            promptFactory = promptFactory,
-                            request = request,
-                            selectedModel = selectedModel,
-                        )
-                    }
+                        }.subscribeOn(Schedulers.boundedElastic())
                 }
-            if (responseResult.isFailure) {
-                val error = responseResult.exceptionOrNull()
-                if (error is kotlinx.coroutines.CancellationException) throw error
-                if (error != null && isMissingFunctionCallbackError(error)) {
-                    val recovered = toolRecovery.runUnknownToolRecovery(request, selectedModel, allowedFunctionNames, error)
-                    return@withContext recovered
-                        ?: ChatResponse(
-                            model = selectedModel,
-                            message = Message(role = "assistant", content = toolRecovery.buildToolListResponse(allowedFunctionNames)),
-                            done = true,
-                        )
+            }.onErrorResume { error ->
+                if (error is kotlinx.coroutines.CancellationException) {
+                    Mono.error(error)
+                } else if (isMissingFunctionCallbackError(error)) {
+                    Mono
+                        .fromCallable {
+                            recoverUnknownTool(request, selectedModel, allowedFunctionNames, error)
+                        }.subscribeOn(Schedulers.boundedElastic())
+                } else {
+                    Mono.error(buildDetailedProviderError(error))
                 }
-                throw buildDetailedProviderError(error)
             }
-            responseResult.getOrThrow()
-        }
+    }
 
-    override suspend fun stream(messages: List<Message>): Flow<ChatResponse> = stream(ChatRequestContext(messages = messages))
+    override fun streamReactive(messages: List<Message>): Flux<ChatResponse> = streamReactive(ChatRequestContext(messages = messages))
 
-    override suspend fun stream(request: ChatRequestContext): Flow<ChatResponse> {
+    override fun streamReactive(request: ChatRequestContext): Flux<ChatResponse> {
         val selectedModel = request.model ?: appConfig.ollamaModel
         val allowedFunctionNames = promptFactory.allowedFunctionNames(request, selectedModel)
         val prompt = promptFactory.buildPrompt(request, selectedModel)
         val supportsTools = request.modelCapabilities.contains("tools")
         val toolsEnabled = request.enabledTools.isNotEmpty()
-        val toolCallbacks =
-            if (!supportsTools || !toolsEnabled) {
-                emptyList()
-            } else {
-                toolRegistry.functionCallbacks(
-                    request.enabledTools,
-                    request.metadata + mapOf("model" to selectedModel) +
-                        (request.cancellationToken?.let { mapOf("cancellationToken" to it) } ?: emptyMap()),
-                )
-            }
-        return flow {
-            try {
+        val toolCallbacks = if (!supportsTools || !toolsEnabled) emptyList() else toolCallbacks(request, selectedModel)
+        return Flux
+            .defer {
                 request.cancellationToken?.throwIfCancelled()
                 if (toolCallbacks.isEmpty()) {
                     OllamaToollessChat
-                        .stream(
+                        .streamReactive(
                             ollamaApi = ollamaApiFor(request),
                             promptFactory = promptFactory,
                             request = request,
                             selectedModel = selectedModel,
-                        ).collect { emit(it) }
+                        )
                 } else {
                     val model = chatModelFor(request)
                     ToolCallingLoop()
-                        .runStream(model, prompt, request.cancellationToken, toolCallbacks, toolRegistry)
-                        .collect { emit(it) }
+                        .runStreamReactive(model, prompt, request.cancellationToken, toolCallbacks, toolRegistry)
                 }
-            } catch (error: kotlinx.coroutines.CancellationException) {
-                throw error
-            } catch (error: Throwable) {
-                if (!isMissingFunctionCallbackError(error)) throw buildDetailedProviderError(error)
-                val recovered = toolRecovery.runUnknownToolRecovery(request, selectedModel, allowedFunctionNames, error)
-                emit(
-                    recovered
-                        ?: ChatResponse(
-                            model = selectedModel,
-                            message = Message(role = "assistant", content = toolRecovery.buildToolListResponse(allowedFunctionNames)),
-                            done = true,
-                        ),
-                )
+            }.onErrorResume { error ->
+                when {
+                    error is kotlinx.coroutines.CancellationException -> Flux.error(error)
+                    !isMissingFunctionCallbackError(error) -> Flux.error(buildDetailedProviderError(error))
+                    else ->
+                        Mono
+                            .fromCallable {
+                                recoverUnknownTool(request, selectedModel, allowedFunctionNames, error)
+                            }.subscribeOn(Schedulers.boundedElastic())
+                            .flux()
+                }
             }
-        }.flowOn(Dispatchers.IO)
     }
+
+    private fun toolCallbacks(
+        request: ChatRequestContext,
+        selectedModel: String,
+    ) = toolRegistry.functionCallbacks(
+        request.enabledTools,
+        request.metadata + mapOf("model" to selectedModel) +
+            (request.cancellationToken?.let { mapOf("cancellationToken" to it) } ?: emptyMap()),
+    )
+
+    private fun recoverUnknownTool(
+        request: ChatRequestContext,
+        selectedModel: String,
+        allowedFunctionNames: List<String>,
+        error: Throwable,
+    ): ChatResponse =
+        toolRecovery.runUnknownToolRecovery(request, selectedModel, allowedFunctionNames, error)
+            ?: ChatResponse(
+                model = selectedModel,
+                message =
+                    Message(
+                        role = "assistant",
+                        content = toolRecovery.buildToolListResponse(allowedFunctionNames),
+                    ),
+                done = true,
+            )
 
     /**
      * Returns whether the throwable indicates a missing tool callback registration.
@@ -169,38 +174,41 @@ class OllamaClient(
         return IllegalStateException("${userFacing.summary}: ${userFacing.detail}", throwable)
     }
 
-    override suspend fun vision(
+    override fun visionReactive(
         image: ByteArray,
         prompt: String,
-    ): ChatResponse = auxiliary.vision(image, prompt)
+    ): Mono<ChatResponse> = auxiliary.visionReactive(image, prompt)
 
-    override suspend fun vision(
+    override fun visionReactive(
         image: ByteArray,
         prompt: String,
         modelId: String,
-    ): ChatResponse = auxiliary.vision(image, prompt, modelId)
+    ): Mono<ChatResponse> = auxiliary.visionReactive(image, prompt, modelId)
 
-    override suspend fun embeddings(text: String): List<Double> = auxiliary.embeddings(text)
+    override fun embeddingsReactive(text: String): Mono<List<Double>> = auxiliary.embeddingsReactive(text)
 
-    override suspend fun embeddings(
+    override fun embeddingsReactive(
         text: String,
         modelId: String,
-    ): List<Double> = auxiliary.embeddings(text, modelId)
+    ): Mono<List<Double>> = auxiliary.embeddingsReactive(text, modelId)
 
     override fun isConnected(): Boolean = ops.isConnected()
 
-    override suspend fun checkConnection(): Boolean = ops.checkConnection()
+    override fun checkConnectionReactive(): Mono<Boolean> = ops.checkConnectionReactive()
 
-    override suspend fun getModels(): List<String> = ops.getModels()
+    /** Checks connectivity using the selected Ollama provider profile. */
+    fun checkConnectionReactive(profile: ProviderProfile): Mono<Boolean> = ops.checkConnectionReactive(profile)
 
-    override suspend fun getModels(profile: ProviderProfile): List<String> = ops.getModels(profile)
+    override fun getModelsReactive(): Mono<List<String>> = ops.getModelsReactive()
 
-    internal suspend fun getModelDetails(
+    override fun getModelsReactive(profile: ProviderProfile): Mono<List<String>> = ops.getModelsReactive(profile)
+
+    internal fun getModelDetailsReactive(
         profile: ProviderProfile,
         modelName: String,
-    ): ShowResponse = ops.getModelDetails(profile, modelName)
+    ): Mono<ShowResponse> = ops.getModelDetailsReactive(profile, modelName)
 
-    override suspend fun getModelDetails(modelName: String): ShowResponse = ops.getModelDetails(modelName)
+    override fun getModelDetailsReactive(modelName: String): Mono<ShowResponse> = ops.getModelDetailsReactive(modelName)
 
     private fun chatModelFor(request: ChatRequestContext): ChatModel {
         val profile = request.providerProfile ?: return chatModel

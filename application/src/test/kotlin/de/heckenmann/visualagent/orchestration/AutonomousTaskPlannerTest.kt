@@ -8,10 +8,10 @@ import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.todo.TodoManager
-import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
+import reactor.core.publisher.Mono
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -76,7 +76,8 @@ class AutonomousTaskPlannerTest {
             val provider = mockk<LLMProvider>()
             val toolConfig = mockk<AgentToolConfigService>()
             every { toolConfig.toolsFor(analyst) } returns emptySet()
-            coEvery { provider.chat(any<ChatRequestContext>()) } returns response("- Inspect modules\n- Implement pipeline")
+            every { provider.chatReactive(any<ChatRequestContext>()) } returns
+                Mono.just(response("- Inspect modules\n- Implement pipeline"))
             val planner =
                 planner(
                     todoManager = todoManager,
@@ -104,7 +105,8 @@ class AutonomousTaskPlannerTest {
     fun `reviews worker output and builds complete instructions`() =
         runTest {
             val provider = mockk<LLMProvider>()
-            coEvery { provider.chat(any<ChatRequestContext>()) } returns response("APPROVED\nLooks good.")
+            every { provider.chatReactive(any<ChatRequestContext>()) } returns
+                Mono.just(response("APPROVED\nLooks good."))
             val planner =
                 planner(
                     todoManager = TodoManager(),

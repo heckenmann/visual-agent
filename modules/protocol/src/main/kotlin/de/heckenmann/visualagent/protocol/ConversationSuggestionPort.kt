@@ -1,7 +1,6 @@
 package de.heckenmann.visualagent.protocol
 
 import java.util.UUID
-import java.util.concurrent.CopyOnWriteArrayList
 
 /** Request for server-generated follow-up questions for one completed assistant turn. */
 data class ConversationSuggestionRequest(
@@ -48,25 +47,4 @@ const val MAX_QUESTION_LENGTH: Int = 140
 private fun requireCanonicalUuid(value: String) {
     val canonical = runCatching { UUID.fromString(value).toString() == value }.getOrDefault(false)
     require(canonical) { "Assistant entry ID must be a canonical UUID" }
-}
-
-/** Thread-safe event source used by the local server adapter. */
-class ConversationCompletionEventBus {
-    private val listeners = CopyOnWriteArrayList<(ConversationCompletionEvent) -> Unit>()
-
-    /** Publishes one completion event to all currently registered listeners. */
-    fun publish(event: ConversationCompletionEvent) {
-        listeners.forEach { listener -> runCatching { listener(event) } }
-    }
-
-    /** Publishes a completion using the supplied assistant entry ID. */
-    fun publishCompletion(assistantEntryId: String) {
-        publish(ConversationCompletionEvent(assistantEntryId, null))
-    }
-
-    /** Registers a listener and returns a handle that removes it. */
-    fun addListener(listener: (ConversationCompletionEvent) -> Unit): AutoCloseable {
-        listeners += listener
-        return AutoCloseable { listeners -= listener }
-    }
 }

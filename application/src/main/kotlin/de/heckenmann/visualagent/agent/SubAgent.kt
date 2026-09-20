@@ -2,7 +2,8 @@ package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.conversation.appendStreamPart
 import de.heckenmann.visualagent.knowledge.MemoryStore
-import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.reactor.awaitSingle
+import kotlinx.coroutines.reactor.awaitSingleOrNull
 import mu.KotlinLogging
 
 /**
@@ -118,7 +119,7 @@ data class SubAgent(
         enabledTools: Set<ToolId> = emptySet(),
         token: CancellationToken? = null,
     ): ChatResponse {
-        val response = provider.chat(buildRequest(messages, enabledTools, token))
+        val response = provider.chatReactive(buildRequest(messages, enabledTools, token)).awaitSingle()
         appendChatHistory(messages, response)
         return response
     }
@@ -257,14 +258,17 @@ data class SubAgent(
     ): ChatResponse {
         val collected = StringBuilder()
         var terminalResponse: ChatResponse? = null
-        provider.stream(buildRequest(messages, enabledTools, token)).collect { chunk ->
-            token?.throwIfCancelled()
-            if (chunk.done) terminalResponse = chunk
-            val part = chunk.message.content
-            if (part.isNotEmpty()) {
-                onChunk(appendStreamPart(collected, part))
-            }
-        }
+        provider
+            .streamReactive(buildRequest(messages, enabledTools, token))
+            .doOnNext { chunk ->
+                token?.throwIfCancelled()
+                if (chunk.done) terminalResponse = chunk
+                val part = chunk.message.content
+                if (part.isNotEmpty()) {
+                    onChunk(appendStreamPart(collected, part))
+                }
+            }.then()
+            .awaitSingleOrNull()
         val response = terminalResponse ?: throw IllegalStateException("stream returned no terminal response")
         val completeResponse = response.copy(message = Message("assistant", collected.toString()), done = true)
         appendChatHistory(messages, completeResponse)

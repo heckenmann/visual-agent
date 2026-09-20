@@ -6,7 +6,7 @@ import de.heckenmann.visualagent.config.AppConfigBean
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.springframework.ai.chat.model.ChatModel
@@ -48,14 +48,15 @@ class OllamaClientCapabilityGatingTest {
             val client = createClient(chatModel, ollamaApi, registry)
 
             val response =
-                client.chat(
-                    ChatRequestContext(
-                        messages = listOf(Message("user", "hello")),
-                        model = "no-tools-model",
-                        enabledTools = setOf(ToolId("context")),
-                        modelCapabilities = emptySet(),
-                    ),
-                )
+                client
+                    .chatReactive(
+                        ChatRequestContext(
+                            messages = listOf(Message("user", "hello")),
+                            model = "no-tools-model",
+                            enabledTools = setOf(ToolId("context")),
+                            modelCapabilities = emptySet(),
+                        ),
+                    ).awaitSingle()
 
             assertEquals("plain answer", response.message.content)
             verify(exactly = 0) { chatModel.call(any<Prompt>()) }
@@ -87,17 +88,18 @@ class OllamaClientCapabilityGatingTest {
             val client = createClient(chatModel, ollamaApi, registry)
 
             val response =
-                client.stream(
-                    ChatRequestContext(
-                        messages = listOf(Message("user", "hello")),
-                        model = "no-tools-model",
-                        enabledTools = setOf(ToolId("context")),
-                        modelCapabilities = emptySet(),
-                    ),
-                )
-            val chunks = response.toList()
+                client
+                    .streamReactive(
+                        ChatRequestContext(
+                            messages = listOf(Message("user", "hello")),
+                            model = "no-tools-model",
+                            enabledTools = setOf(ToolId("context")),
+                            modelCapabilities = emptySet(),
+                        ),
+                    ).collectList()
+                    .awaitSingle()
 
-            assertTrue(chunks.isNotEmpty())
+            assertTrue(response.isNotEmpty())
             verify(exactly = 0) { chatModel.call(any<Prompt>()) }
             verify(exactly = 0) { chatModel.stream(any<Prompt>()) }
             verify(exactly = 1) { ollamaApi.streamingChat(any()) }
@@ -117,14 +119,15 @@ class OllamaClientCapabilityGatingTest {
             val client = createClient(chatModel, ollamaApi, registry)
 
             val response =
-                client.chat(
-                    ChatRequestContext(
-                        messages = listOf(Message("user", "hello")),
-                        model = "tools-model",
-                        enabledTools = setOf(ToolId("context")),
-                        modelCapabilities = setOf("completion", "tools"),
-                    ),
-                )
+                client
+                    .chatReactive(
+                        ChatRequestContext(
+                            messages = listOf(Message("user", "hello")),
+                            model = "tools-model",
+                            enabledTools = setOf(ToolId("context")),
+                            modelCapabilities = setOf("completion", "tools"),
+                        ),
+                    ).awaitSingle()
 
             assertEquals("tool answer", response.message.content)
             verify(exactly = 1) { chatModel.call(any<Prompt>()) }

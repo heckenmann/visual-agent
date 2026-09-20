@@ -49,7 +49,6 @@ class JavaScriptWorkspaceBridgeTest {
     @AfterEach
     fun close() {
         service.close()
-        registry.close()
     }
 
     @Test

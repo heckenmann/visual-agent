@@ -8,7 +8,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
-import java.sql.DriverManager
 import java.time.Instant
 import kotlin.io.path.createTempDirectory
 import kotlin.test.assertEquals
@@ -26,24 +25,19 @@ class KnowledgeDbTodoTest {
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                 .create(tempDb)
+        val names =
+            db.databaseClient
+                .sql(
+                    "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS " +
+                        "WHERE TABLE_SCHEMA = 'PUBLIC' AND TABLE_NAME = 'TODOS'",
+                ).map { row, _ -> row.get("COLUMN_NAME", String::class.java) ?: error("Missing column name") }
+                .all()
+                .collectList()
+                .block()
+                .orEmpty()
+        assertFalse(names.contains("PRIORITY"))
+        assertTrue(names.contains("UPDATED_AT"))
         db.close()
-
-        DriverManager.getConnection("jdbc:h2:file:$tempDb;DB_CLOSE_ON_EXIT=FALSE").use { connection ->
-            connection.createStatement().use { statement ->
-                statement
-                    .executeQuery(
-                        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS " +
-                            "WHERE TABLE_SCHEMA = 'PUBLIC' AND TABLE_NAME = 'TODOS'",
-                    ).use { columns ->
-                        val names =
-                            buildList {
-                                while (columns.next()) add(columns.getString("COLUMN_NAME"))
-                            }
-                        assertFalse(names.contains("PRIORITY"))
-                        assertTrue(names.contains("UPDATED_AT"))
-                    }
-            }
-        }
     }
 
     @Test

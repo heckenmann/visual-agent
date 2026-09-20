@@ -1,6 +1,6 @@
 package de.heckenmann.visualagent.server
 
-import de.heckenmann.visualagent.protocol.ConversationCompletionEventBus
+import de.heckenmann.visualagent.agent.conversation.ConversationCompletionEventBus
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 

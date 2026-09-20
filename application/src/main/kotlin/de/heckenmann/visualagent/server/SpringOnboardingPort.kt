@@ -18,8 +18,9 @@ import de.heckenmann.visualagent.protocol.OnboardingValidationCode
 import de.heckenmann.visualagent.protocol.OnboardingValidationResult
 import de.heckenmann.visualagent.protocol.ProviderAdapter
 import de.heckenmann.visualagent.protocol.ProviderModel
+import kotlinx.coroutines.reactor.awaitSingle
+import kotlinx.coroutines.reactor.awaitSingleOrNull
 import org.springframework.stereotype.Component
-import org.springframework.transaction.support.TransactionTemplate
 import java.security.MessageDigest
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter as ApplicationProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderConfiguration as ApplicationProviderConfiguration
@@ -32,7 +33,6 @@ class SpringOnboardingPort(
     private val preferenceStore: PreferenceStore,
     private val providerCatalog: ProviderCatalogService,
     private val llmProvider: LLMProvider,
-    private val transactionTemplate: TransactionTemplate,
     private val onboardingAgentService: OnboardingAgentService,
 ) : OnboardingPort {
     override fun state(): OnboardingState =
@@ -58,7 +58,8 @@ class SpringOnboardingPort(
 
     override suspend fun discoverModels(draft: OnboardingProviderDraft): List<ProviderModel> =
         llmProvider
-            .getModelConfigs(draft.toApplication(providerCatalog.getProvider(draft.id)))
+            .getModelConfigsReactive(draft.toApplication(providerCatalog.getProvider(draft.id)))
+            .awaitSingle()
             .distinctBy { it.id }
             .map { model -> model.toProtocol() }
             .filter { model -> model.status != de.heckenmann.visualagent.protocol.ModelStatus.DISABLED }
@@ -74,15 +75,16 @@ class SpringOnboardingPort(
                 OnboardingValidationResult(false, OnboardingValidationCode.MODEL_UNAVAILABLE, "The selected model is not available.")
             } else {
                 val profile = draft.toApplication(providerCatalog.getProvider(draft.id))
-                llmProvider.chat(
-                    ChatRequestContext(
-                        messages = listOf(Message(role = "user", content = "Reply with READY.")),
-                        provider = profile.id,
-                        model = modelId,
-                        parameters = ModelParameters(maxTokens = READINESS_MAX_TOKENS),
-                        providerProfile = profile,
-                    ),
-                )
+                llmProvider
+                    .chatReactive(
+                        ChatRequestContext(
+                            messages = listOf(Message(role = "user", content = "Reply with READY.")),
+                            provider = profile.id,
+                            model = modelId,
+                            parameters = ModelParameters(maxTokens = READINESS_MAX_TOKENS),
+                            providerProfile = profile,
+                        ),
+                    ).awaitSingle()
                 OnboardingValidationResult(
                     true,
                     OnboardingValidationCode.SUCCESS,
@@ -106,19 +108,19 @@ class SpringOnboardingPort(
         val discoveredModel =
             discoverModels(draft).singleOrNull { it.id == model.id }
                 ?: error("The selected model is no longer available.")
-        transactionTemplate.executeWithoutResult {
-            val existing = providerCatalog.getProvider(draft.id)
-            val selectedModel = discoveredModel.toApplication()
-            val profile =
-                draft
-                    .toApplication(existing)
-                    .copy(
-                        defaultModel = discoveredModel.id,
-                        models = existing?.models?.mergeSelectedModel(selectedModel) ?: listOf(selectedModel),
-                    )
-            val profiles = providerCatalog.listProviders().filterNot { it.id == profile.id } + profile
-            providerCatalog.replaceConfiguration(ApplicationProviderConfiguration(profiles, profile.id, discoveredModel.id))
-        }
+        val existing = providerCatalog.getProvider(draft.id)
+        val selectedModel = discoveredModel.toApplication()
+        val profile =
+            draft
+                .toApplication(existing)
+                .copy(
+                    defaultModel = discoveredModel.id,
+                    models = existing?.models?.mergeSelectedModel(selectedModel) ?: listOf(selectedModel),
+                )
+        val profiles = providerCatalog.listProviders().filterNot { it.id == profile.id } + profile
+        providerCatalog
+            .replaceConfigurationReactive(ApplicationProviderConfiguration(profiles, profile.id, discoveredModel.id))
+            .awaitSingleOrNull()
     }
 
     override suspend fun createAgent(description: String): OnboardingAgentCreationResult = onboardingAgentService.createAgent(description)

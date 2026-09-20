@@ -5,10 +5,11 @@ import de.heckenmann.visualagent.agent.conversation.ResponseTelemetryMetadata
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.todo.TodoEventBus
-import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -22,8 +23,8 @@ class AgentManagerStructuredResponseTest {
                 de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                     .create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
-            coEvery { provider.stream(any<ChatRequestContext>()) } returns
-                flowOf(
+            every { provider.streamReactive(any<ChatRequestContext>()) } returns
+                Flux.just(
                     ChatResponse(
                         model = "test",
                         message = Message("assistant", "answer"),
@@ -78,8 +79,8 @@ class AgentManagerStructuredResponseTest {
                 de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                     .create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
-            coEvery { provider.stream(any<ChatRequestContext>()) } returns
-                flowOf(
+            every { provider.streamReactive(any<ChatRequestContext>()) } returns
+                Flux.just(
                     ChatResponse(
                         model = "test",
                         message = Message("assistant", "repeated response ".repeat(30)),
@@ -87,8 +88,8 @@ class AgentManagerStructuredResponseTest {
                         providerTurn = ProviderTurnResponse("test", "", finishReason = ProviderFinishReason.STOP),
                     ),
                 )
-            coEvery { provider.chat(any<ChatRequestContext>()) } returns
-                ChatResponse(model = "test", message = Message("assistant", "replacement"), done = true)
+            every { provider.chatReactive(any<ChatRequestContext>()) } returns
+                Mono.just(ChatResponse(model = "test", message = Message("assistant", "replacement"), done = true))
             val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
             assertEquals(

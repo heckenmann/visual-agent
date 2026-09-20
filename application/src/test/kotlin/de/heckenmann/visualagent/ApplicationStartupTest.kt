@@ -14,6 +14,7 @@ class ApplicationStartupTest {
                 .web(WebApplicationType.NONE)
                 .properties(
                     "visual-agent.ui.enabled=false",
+                    "visual-agent.db.path=jdbc:h2:mem:application-startup",
                     "spring.main.lazy-initialization=true",
                 ).run()
         try {

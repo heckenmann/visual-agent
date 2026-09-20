@@ -134,7 +134,7 @@ with those defaults and `status = IDLE`.
 
 ## Persistence
 
-State is persisted via typed Spring Data JPA stores over H2
+State is persisted via typed Spring Data R2DBC stores over H2
 tables:
 
 - `sub_agents`: per-agent identity, status, current task, parent

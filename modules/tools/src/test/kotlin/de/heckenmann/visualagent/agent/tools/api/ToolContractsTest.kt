@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent.tools.api
 
+import reactor.test.StepVerifier
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -24,6 +25,19 @@ class ToolContractsTest {
         bus.publish(event(ToolCallPhase.FINISHED))
 
         assertEquals(listOf(event), received)
+    }
+
+    /** Exposes lifecycle events through the Reactor stream contract. */
+    @Test
+    fun `event bus publishes through flux`() {
+        val bus = ToolEventBus()
+        val event = event(ToolCallPhase.STARTED)
+
+        StepVerifier
+            .create(bus.events.take(1))
+            .then { bus.publish(event) }
+            .expectNext(event)
+            .verifyComplete()
     }
 
     /**

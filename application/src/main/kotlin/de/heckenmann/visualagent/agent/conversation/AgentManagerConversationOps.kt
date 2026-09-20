@@ -14,7 +14,7 @@ import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.error.ErrorMessageMapper
 import de.heckenmann.visualagent.protocol.ConversationCompletionEvent
 import de.heckenmann.visualagent.protocol.ConversationStreamRequest
-import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.reactor.awaitSingleOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import mu.KotlinLogging
@@ -181,14 +181,17 @@ internal class AgentManagerConversationOps(
             val request =
                 buildMainRequest(loadMainAgentContextFromDb(), requestId)
                     .copy(cancellationToken = token)
-            owner.llmProvider.stream(request).collect { chunk ->
-                token?.throwIfCancelled()
-                chunk.providerTurn?.let { providerTurn = ProviderTurnAccumulator.merge(providerTurn, it) }
-                val part = chunk.message.content
-                if (part.isNotBlank()) {
-                    onChunk(appendStreamPart(collected, part))
-                }
-            }
+            owner.llmProvider
+                .streamReactive(request)
+                .doOnNext { chunk ->
+                    token?.throwIfCancelled()
+                    chunk.providerTurn?.let { providerTurn = ProviderTurnAccumulator.merge(providerTurn, it) }
+                    val part = chunk.message.content
+                    if (part.isNotBlank()) {
+                        onChunk(appendStreamPart(collected, part))
+                    }
+                }.then()
+                .awaitSingleOrNull()
         } catch (_: kotlinx.coroutines.CancellationException) {
             cancelled = true
             logger.info { "Main agent request $requestId cancelled by user" }

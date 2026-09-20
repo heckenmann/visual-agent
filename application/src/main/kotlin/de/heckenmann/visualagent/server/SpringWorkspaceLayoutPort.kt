@@ -50,7 +50,10 @@ class SpringWorkspaceLayoutPort(
     }
 
     override fun addWindowStateListener(listener: (List<LayoutWindowState>) -> Unit): AutoCloseable =
-        service.addWindowStateListener { states -> listener(states.map(WorkspaceWindowState::toProtocol)) }
+        AutoCloseable(
+            service.stateChanges
+                .subscribe { states -> listener(states.map(WorkspaceWindowState::toProtocol)) }::dispose,
+        )
 }
 
 private fun StageState.toProtocol() = LayoutSize(width, height)

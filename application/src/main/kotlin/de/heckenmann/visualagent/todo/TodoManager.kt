@@ -2,7 +2,6 @@ package de.heckenmann.visualagent.todo
 
 import de.heckenmann.visualagent.knowledge.TodoStore
 import java.util.UUID
-import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Mutation type emitted when the todo list changes.
@@ -48,7 +47,6 @@ class TodoManager(
     internal constructor() : this(NoOpTodoStore(), TodoEventBus())
 
     private val todos = mutableListOf<Todo>()
-    private val listeners = CopyOnWriteArrayList<(TodoChange) -> Unit>()
 
     /**
      * Loads initial todos from the store after Spring wiring is complete.
@@ -64,10 +62,7 @@ class TodoManager(
      * @param listener Callback invoked after each state mutation
      * @return Handle that removes the listener when closed
      */
-    fun addListener(listener: (TodoChange) -> Unit): AutoCloseable {
-        listeners += listener
-        return AutoCloseable { listeners.remove(listener) }
-    }
+    fun addListener(listener: (TodoChange) -> Unit): AutoCloseable = eventBus.addListener(listener)
 
     /**
      * Returns a defensive snapshot of all todos ordered by position.
@@ -375,15 +370,8 @@ class TodoManager(
         publishChange(TodoChange(TodoChangeType.CLEARED))
     }
 
-    /**
-     * Publishes one change event to legacy callback and registered listeners.
-     *
-     * @param change Event payload
-     */
+    /** Publishes one change event to the shared reactive todo bus. */
     private fun publishChange(change: TodoChange) {
-        listeners.forEach { listener ->
-            runCatching { listener(change) }
-        }
         eventBus.publish(change)
     }
 

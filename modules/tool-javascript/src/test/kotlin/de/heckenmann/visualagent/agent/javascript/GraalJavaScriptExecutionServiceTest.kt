@@ -32,7 +32,6 @@ class GraalJavaScriptExecutionServiceTest {
     @AfterEach
     fun close() {
         service.close()
-        registry.close()
     }
 
     @Test
@@ -155,14 +154,10 @@ class GraalJavaScriptExecutionServiceTest {
     fun `model facing registry path reports the JavaScript timeout category`() {
         val tool = JavaScriptExecuteTool(service)
         val modelRegistry = ToolRegistry(listOf(tool), ToolEventBus()) { 1 }
-        try {
-            val result = modelRegistry.execute(tool, """{"source":"while (true) {}"}""", emptyMap())
+        val result = modelRegistry.executeBlocking(tool, """{"source":"while (true) {}"}""", emptyMap())
 
-            assertTrue(result.contains("\"success\":false"))
-            assertTrue(result.contains("TIMEOUT"))
-        } finally {
-            modelRegistry.close()
-        }
+        assertTrue(result.contains("\"success\":false"))
+        assertTrue(result.contains("TIMEOUT"))
     }
 
     @Test
@@ -170,19 +165,15 @@ class GraalJavaScriptExecutionServiceTest {
         val tool = JavaScriptExecuteTool(service)
         val parentCancellationToken = CancellationToken()
         val modelRegistry = ToolRegistry(listOf(tool), ToolEventBus()) { 1 }
-        try {
-            val result =
-                modelRegistry.execute(
-                    tool,
-                    """{"source":"while (true) {}"}""",
-                    mapOf("cancellationToken" to parentCancellationToken),
-                )
+        val result =
+            modelRegistry.executeBlocking(
+                tool,
+                """{"source":"while (true) {}"}""",
+                mapOf("cancellationToken" to parentCancellationToken),
+            )
 
-            assertTrue(result.contains("TOOL_TIMEOUT"))
-            assertFalse(parentCancellationToken.isCancelled)
-        } finally {
-            modelRegistry.close()
-        }
+        assertTrue(result.contains("TOOL_TIMEOUT"))
+        assertFalse(parentCancellationToken.isCancelled)
     }
 
     @Test

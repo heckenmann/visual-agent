@@ -7,6 +7,7 @@ import de.heckenmann.visualagent.agent.tools.api.WorkspaceFileToolPort
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import reactor.core.publisher.Mono
 
 /** Keeps image-specific workspace-file tool serialization independent from command dispatch. */
 internal class WorkspaceFileToolMediaActions(
@@ -79,6 +80,19 @@ internal class WorkspaceFileToolMediaActions(
             put("content", response.content)
         }
     }
+
+    fun analyzeImageReactive(
+        record: ToolWorkspaceFile,
+        prompt: String,
+    ): Mono<kotlinx.serialization.json.JsonObject> =
+        workspaceFiles.analyzeImageReactive(record, prompt).map { response ->
+            buildJsonObject {
+                put("id", record.id)
+                put("path", record.relativePath)
+                put("model", response.model)
+                put("content", response.content)
+            }
+        }
 }
 
 /** Returns a safe metadata representation of a managed workspace file. */

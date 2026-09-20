@@ -3,6 +3,7 @@ package de.heckenmann.visualagent.agent
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
+import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty
@@ -36,20 +37,21 @@ class OllamaGemmaToolSmokeTest {
             val listener = toolEventBus.addListener { events += it }
             try {
                 val response =
-                    llmProvider.chat(
-                        ChatRequestContext(
-                            messages =
-                                listOf(
-                                    Message(
-                                        role = "user",
-                                        content = "Use the todos tool with action count. Do not answer from memory.",
+                    llmProvider
+                        .chatReactive(
+                            ChatRequestContext(
+                                messages =
+                                    listOf(
+                                        Message(
+                                            role = "user",
+                                            content = "Use the todos tool with action count. Do not answer from memory.",
+                                        ),
                                     ),
-                                ),
-                            model = "gemma4:e2b",
-                            enabledTools = setOf(ToolId("todos")),
-                            metadata = mapOf("sessionId" to "main", "agent" to "tool-smoke-test"),
-                        ),
-                    )
+                                model = "gemma4:e2b",
+                                enabledTools = setOf(ToolId("todos")),
+                                metadata = mapOf("sessionId" to "main", "agent" to "tool-smoke-test"),
+                            ),
+                        ).awaitSingle()
 
                 println("[OllamaGemmaToolSmokeTest] response=${response.message.content}")
                 println("[OllamaGemmaToolSmokeTest] events=${events.map { "${it.phase}:${it.toolId}:${it.result.content}" }}")

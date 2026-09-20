@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent.tools.api
 
+import reactor.core.publisher.Mono
 import java.time.Instant
 
 /** Managed workspace-file operations needed by the workspace file tool. */
@@ -103,6 +104,12 @@ interface WorkspaceFileToolPort {
         file: ToolWorkspaceFile,
         prompt: String,
     ): ToolImageAnalysis
+
+    /** Analyzes an image through the active model without blocking the server tool pipeline. */
+    fun analyzeImageReactive(
+        file: ToolWorkspaceFile,
+        prompt: String,
+    ): Mono<ToolImageAnalysis> = Mono.fromCallable { analyzeImage(file, prompt) }
 
     /** Detects a managed file MIME type from its content rather than its name. */
     fun detectMimeType(file: ToolWorkspaceFile): ToolMimeType

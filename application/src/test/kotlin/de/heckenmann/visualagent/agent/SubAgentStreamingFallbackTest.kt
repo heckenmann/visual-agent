@@ -1,11 +1,11 @@
 package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.knowledge.MemoryStore
-import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -15,10 +15,10 @@ class SubAgentStreamingFallbackTest {
     fun `performTodo resets the stream before publishing fallback output`() =
         runBlocking {
             val provider = mockk<LLMProvider>()
-            coEvery { provider.stream(any<ChatRequestContext>()) } returns
-                flowOf(ChatResponse("test", Message("assistant", "partial"), false))
-            coEvery { provider.chat(any<ChatRequestContext>()) } returns
-                ChatResponse("test", Message("assistant", "complete response"), true)
+            every { provider.streamReactive(any<ChatRequestContext>()) } returns
+                Flux.just(ChatResponse("test", Message("assistant", "partial"), false))
+            every { provider.chatReactive(any<ChatRequestContext>()) } returns
+                Mono.just(ChatResponse("test", Message("assistant", "complete response"), true))
             val memoryStore = mockk<MemoryStore>(relaxed = true)
             every { memoryStore.saveStructuredKnowledge(any(), any(), any()) } returns "memory-id"
             val events = mutableListOf<String>()

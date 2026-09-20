@@ -6,12 +6,12 @@ import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderPreferenceStore
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
-import io.mockk.coEvery
-import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
+import reactor.core.publisher.Mono
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
@@ -34,8 +34,8 @@ class ConfiguredLLMProviderVisionTest {
             catalog.setActiveSelection("codex-custom", "gpt-codex")
             val codex = mockk<ProfiledProviderAdapter>()
             every { codex.adapter } returns ProviderAdapter.CODEX_CLI
-            coEvery { codex.vision(any(), "describe", "gpt-codex", any()) } returns
-                ChatResponse("gpt-codex", Message("assistant", "codex image ok"), done = true)
+            every { codex.visionReactive(any(), "describe", "gpt-codex", any()) } returns
+                Mono.just(ChatResponse("gpt-codex", Message("assistant", "codex image ok"), done = true))
             val router =
                 ConfiguredLLMProvider(
                     mockk(relaxed = true),
@@ -44,8 +44,14 @@ class ConfiguredLLMProviderVisionTest {
                     profiledAdapters = listOf(codex),
                 )
 
-            assertEquals("codex image ok", router.vision(byteArrayOf(1), "describe").message.content)
-            coVerify(exactly = 1) { codex.vision(any(), "describe", "gpt-codex", any()) }
+            assertEquals(
+                "codex image ok",
+                router
+                    .visionReactive(byteArrayOf(1), "describe")
+                    .awaitSingle()
+                    .message.content,
+            )
+            io.mockk.verify(exactly = 1) { codex.visionReactive(any(), "describe", "gpt-codex", any()) }
         }
 
     @Test
@@ -66,7 +72,8 @@ class ConfiguredLLMProviderVisionTest {
             val error =
                 assertFailsWith<IllegalStateException> {
                     ConfiguredLLMProvider(mockk(relaxed = true), mockk(relaxed = true), catalog)
-                        .vision(byteArrayOf(1), "describe")
+                        .visionReactive(byteArrayOf(1), "describe")
+                        .awaitSingle()
                 }
 
             assertEquals("Model Text only/text-model does not support image input", error.message)

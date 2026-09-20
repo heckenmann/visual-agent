@@ -2,7 +2,7 @@
 
 ## Overview
 
-Visual Agent uses an embedded H2 database through Spring Data JPA repositories and Flyway migrations. An opt-in Spring Data R2DBC H2 foundation is available while stores are migrated incrementally.
+Visual Agent uses an embedded H2 database through Spring Data R2DBC stores. Spring Boot Flyway manages versioned schema migrations through a dedicated JDBC data source; JDBC is used only during startup migration, not for runtime persistence. JPA, Hibernate, SQLite, and HikariCP are not application persistence APIs.
 
 Runtime defaults:
 
@@ -10,7 +10,7 @@ Runtime defaults:
   `server/` namespace.
 - Database: `<server-data-root>/visual-agent.db`
 - H2 file locking and transaction handling
-- Hibernate schema validation in production, migration-driven schema creation through Flyway
+- versioned schema migration through Flyway and `flyway_schema_history`
 
 The application uses DB-first reads for conversation, todos, and related runtime context.
 Managed workspace files are stored on disk below the resolved server data root at
@@ -142,8 +142,14 @@ These entries are restored on restart and rendered in conversation UI as minimiz
 
 ## Migration Notes
 
-- The production app no longer creates tables with ad hoc JDBC schema helpers.
-- The initial H2 schema is defined in `db/migration-h2/V1__initial_h2_schema.sql`.
+- Flyway runs before the R2DBC store beans through Spring Boot's `flywayInitializer`.
+- Migration resources use Flyway's `V<number>__<description>.sql` convention under `db/migration-h2/`.
+- The initial H2 schema is defined in `db/migration-h2/V1__initial_h2_schema.sql` and is recorded in `flyway_schema_history`.
+- Future schema changes add a new versioned resource; existing migrations must never be edited after release.
+- Flyway validates applied migrations and records checksums, execution order, success, and timestamps.
+- A failed migration prevents application startup. After the cause is fixed, startup retries the pending migration.
+- `spring.flyway.baseline-on-migrate=true` provides the one-time transition for databases already initialized by the former R2DBC runner. New databases execute `V1` normally.
+- Runtime queries and writes continue to use R2DBC; the JDBC data source exists only for Flyway.
 - Legacy database files from the pre-H2 runtime must be exported or migrated through a dedicated migration process before they can be used by the H2 runtime.
 - A repository-local legacy `./data/` directory is not auto-migrated because a desktop client may
   be connected to a different server. To keep using that store, stop Visual Agent and pass its
@@ -154,4 +160,4 @@ These entries are restored on restart and rendered in conversation UI as minimiz
 
 ## Operational Notes
 
-If an H2 lock remains after an unclean shutdown, verify that no Visual Agent process is still running and restart the application. Do not delete database files manually.
+If an H2 lock remains after an unclean shutdown, verify that no Visual Agent process is still running and restart the application. If a migration fails, preserve the database and inspect the startup exception; do not delete database files manually.

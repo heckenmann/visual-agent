@@ -26,11 +26,11 @@ import de.heckenmann.visualagent.workspace.layout.WorkspaceLayoutService
 import de.heckenmann.visualagent.workspace.layout.WorkspaceWindowState
 import de.heckenmann.visualagent.workspace.replaceText
 import de.heckenmann.visualagent.workspace.searchFiles
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.stereotype.Component
+import reactor.core.publisher.Mono
 import java.util.Base64
 
 /** Application adapter for managed workspace-file operations consumed by tools. */
@@ -129,8 +129,26 @@ class WorkspaceFileToolPortAdapter(
         prompt: String,
     ): ToolImageAnalysis {
         val bytes = files.imageBytes(requireRecord(file))
-        val response = runBlocking { llmProvider.getObject().vision(Base64.getDecoder().decode(bytes.base64), prompt) }
+        // This synchronous compatibility port is invoked on boundedElastic by ToolRegistry;
+        // the provider operation itself remains natively reactive.
+        val response =
+            llmProvider
+                .getObject()
+                .visionReactive(Base64.getDecoder().decode(bytes.base64), prompt)
+                .block()
+                ?: error("Vision provider returned no response")
         return ToolImageAnalysis(response.model, response.message.content)
+    }
+
+    override fun analyzeImageReactive(
+        file: ToolWorkspaceFile,
+        prompt: String,
+    ): Mono<ToolImageAnalysis> {
+        val bytes = files.imageBytes(requireRecord(file))
+        return llmProvider
+            .getObject()
+            .visionReactive(Base64.getDecoder().decode(bytes.base64), prompt)
+            .map { response -> ToolImageAnalysis(response.model, response.message.content) }
     }
 
     override fun detectMimeType(file: ToolWorkspaceFile): ToolMimeType =

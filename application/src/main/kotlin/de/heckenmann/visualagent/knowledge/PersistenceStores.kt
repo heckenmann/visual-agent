@@ -1,38 +1,11 @@
 package de.heckenmann.visualagent.knowledge
 
-import de.heckenmann.visualagent.agent.ConversationContextPolicy
 import de.heckenmann.visualagent.agent.config.SubAgentToolConfig
 import de.heckenmann.visualagent.agent.provider.ProviderPreferenceStore
 import de.heckenmann.visualagent.todo.Todo
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import java.time.Instant
-
-/**
- * Persisted conversation message exposed to agent and tool consumers.
- *
- * Use cases: UC-0000005, UC-0000041.
- */
-data class ConversationRecord(
-    val id: String,
-    val role: String,
-    val content: String,
-    val metadata: String?,
-    val createdAt: Instant,
-    val timelineSequence: Long = 0,
-    val contextPolicy: ConversationContextPolicy = ConversationContextPolicy.SUMMARY_SOURCE,
-) {
-    /** Returns a field value by its persistence-facing name. */
-    operator fun get(key: String): Any? =
-        when (key) {
-            "id" -> id
-            "role" -> role
-            "content" -> content
-            "metadata" -> metadata
-            "createdAt" -> createdAt.toString()
-            "timelineSequence" -> timelineSequence
-            "contextPolicy" -> contextPolicy.name
-            else -> null
-        }
-}
 
 /**
  * Persisted metadata for one managed workspace file.
@@ -50,120 +23,6 @@ data class WorkspaceFileRecord(
     val importedAt: Instant,
     val updatedAt: Instant,
 )
-
-/** Persisted reusable Markdown knowledge authored by a model or user. */
-data class SkillRecord(
-    val id: String,
-    val title: String,
-    val content: String,
-    val createdAt: Instant,
-    val updatedAt: Instant,
-    val revision: Long,
-    val readCount: Long,
-    val lastReadAt: Instant?,
-)
-
-/** Bounded indexed result for a skill search. */
-data class SkillSearchRecord(
-    val id: String,
-    val title: String,
-    val snippet: String,
-    val updatedAt: Instant,
-    val revision: Long,
-    val readCount: Long,
-    val lastReadAt: Instant?,
-)
-
-/** Outcome of creating a skill. */
-sealed interface SkillCreateResult {
-    /** A new skill was stored. */
-    data class Created(
-        val skill: SkillRecord,
-    ) : SkillCreateResult
-
-    /** An exact duplicate already exists. */
-    data class Duplicate(
-        val skill: SkillRecord,
-    ) : SkillCreateResult
-}
-
-/** Outcome of updating a skill. */
-sealed interface SkillUpdateResult {
-    /** The skill was updated. */
-    data class Updated(
-        val skill: SkillRecord,
-    ) : SkillUpdateResult
-
-    /** The supplied revision did not match the stored revision. */
-    data class Conflict(
-        val skill: SkillRecord,
-    ) : SkillUpdateResult
-
-    /** An exact duplicate already exists under another ID. */
-    data class Duplicate(
-        val skill: SkillRecord,
-    ) : SkillUpdateResult
-
-    /** No skill exists for the requested ID. */
-    data object NotFound : SkillUpdateResult
-}
-
-/** Outcome of deleting a skill. */
-sealed interface SkillDeleteResult {
-    /** The skill was deleted and its minimal audit record was written. */
-    data class Deleted(
-        val id: String,
-        val title: String,
-        val revision: Long,
-        val deletedAt: Instant,
-    ) : SkillDeleteResult
-
-    /** The supplied revision did not match the stored revision. */
-    data class Conflict(
-        val skill: SkillRecord,
-    ) : SkillDeleteResult
-
-    /** No skill exists for the requested ID. */
-    data object NotFound : SkillDeleteResult
-}
-
-/** Stores, searches, reads, updates, and deletes reusable Markdown skills. */
-interface SkillStore {
-    /** Creates a skill or returns the existing exact duplicate. */
-    fun createSkill(
-        title: String,
-        content: String,
-    ): SkillCreateResult
-
-    /** Searches title and Markdown content using the database FTS index. */
-    fun searchSkills(
-        query: String,
-        limit: Int = 5,
-    ): List<SkillSearchRecord>
-
-    /** Returns a skill without recording model-read telemetry. */
-    fun getSkill(id: String): SkillRecord?
-
-    /** Returns a skill and atomically records one successful model read. */
-    fun readSkill(
-        id: String,
-        isCancelled: () -> Boolean = { false },
-    ): SkillRecord?
-
-    /** Updates a skill only when the expected revision is current. */
-    fun updateSkill(
-        id: String,
-        expectedRevision: Long,
-        title: String,
-        content: String,
-    ): SkillUpdateResult
-
-    /** Deletes a skill only when the expected revision is current. */
-    fun deleteSkill(
-        id: String,
-        expectedRevision: Long,
-    ): SkillDeleteResult
-}
 
 /** Persisted access grant for a filesystem root owned by the server or a connected client. */
 data class DirectoryGrantRecord(
@@ -193,6 +52,22 @@ interface DirectoryGrantStore {
 
     /** Revokes a grant and returns whether it existed. */
     fun deleteDirectoryGrant(id: String): Boolean
+
+    /** Reactive counterpart of [saveDirectoryGrant]. */
+    fun saveDirectoryGrantReactive(record: DirectoryGrantRecord): Mono<Void> = Mono.fromRunnable { saveDirectoryGrant(record) }
+
+    /** Reactive counterpart of [listDirectoryGrants]. */
+    fun listDirectoryGrantsReactive(): Flux<DirectoryGrantRecord> = Flux.defer { Flux.fromIterable(listDirectoryGrants()) }
+
+    /** Reactive counterpart of [getDirectoryGrant]. */
+    fun getDirectoryGrantReactive(id: String): Mono<DirectoryGrantRecord> = Mono.fromCallable { getDirectoryGrant(id) }
+
+    /** Reactive counterpart of [getDirectoryGrantByCanonicalRoot]. */
+    fun getDirectoryGrantByCanonicalRootReactive(canonicalRoot: String): Mono<DirectoryGrantRecord> =
+        Mono.fromCallable { getDirectoryGrantByCanonicalRoot(canonicalRoot) }
+
+    /** Reactive counterpart of [deleteDirectoryGrant]. */
+    fun deleteDirectoryGrantReactive(id: String): Mono<Boolean> = Mono.fromCallable { deleteDirectoryGrant(id) }
 }
 
 /**
@@ -247,6 +122,25 @@ interface MemoryStore {
         query: String,
         limit: Int = 10,
     ): List<Memory>
+
+    /** Reactive counterpart of [saveMemory]. */
+    fun saveMemoryReactive(
+        content: String,
+        tags: List<String> = emptyList(),
+    ): Mono<String> = Mono.fromCallable { saveMemory(content, tags) }
+
+    /** Reactive counterpart of [saveStructuredKnowledge]. */
+    fun saveStructuredKnowledgeReactive(
+        subject: String,
+        summary: String,
+        nextSteps: String?,
+    ): Mono<String> = Mono.fromCallable { saveStructuredKnowledge(subject, summary, nextSteps) }
+
+    /** Reactive counterpart of [searchMemories]. */
+    fun searchMemoriesReactive(
+        query: String,
+        limit: Int = 10,
+    ): Flux<Memory> = Flux.defer { Flux.fromIterable(searchMemories(query, limit)) }
 }
 
 /** Stores application preferences by key. Use cases: UC-0000030, UC-0000035, UC-0000037, UC-0000038. */
@@ -259,79 +153,15 @@ interface PreferenceStore : ProviderPreferenceStore {
         key: String,
         value: String,
     )
-}
 
-/** Stores, pages, searches, and deletes conversation messages. Use cases: UC-0000005, UC-0000032, UC-0000041. */
-interface ConversationStore {
-    /** Persists one conversation message using the caller-provided immutable identifier. */
-    fun saveConversationMessage(
-        id: String,
-        sessionId: String,
-        role: String,
-        content: String,
-        metadata: String? = null,
-    ): String
+    /** Reactive counterpart of [getPreference]. */
+    override fun getPreferenceReactive(key: String): Mono<String> = Mono.fromCallable { getPreference(key) }
 
-    /** Persists one message with an explicit model-context policy. */
-    fun saveConversationMessage(
-        id: String,
-        sessionId: String,
-        role: String,
-        content: String,
-        metadata: String? = null,
-        contextPolicy: ConversationContextPolicy,
-    ): String = saveConversationMessage(id, sessionId, role, content, metadata)
-
-    /** Returns messages eligible for a bounded main-agent context projection. */
-    fun getConversationMessagesForContext(
-        sessionId: String,
-        userTurnLimit: Int,
-        recordLimit: Int,
-    ): List<ConversationRecord> =
-        getConversationMessages(sessionId, recordLimit.coerceAtLeast(1))
-            .let { rows ->
-                val users = rows.filter { it.role == "user" }
-                val boundary = users.takeLast(userTurnLimit.coerceAtLeast(1)).firstOrNull()?.timelineSequence
-                rows.filter { row ->
-                    (boundary == null || row.timelineSequence >= boundary) &&
-                        row.contextPolicy != ConversationContextPolicy.AUDIT_ONLY
-                }
-            }
-
-    /** Returns one persisted message, including its durable timeline ordering key. */
-    fun getConversationMessage(id: String): ConversationRecord? = null
-
-    /** Returns the latest messages for a session. */
-    fun getConversationMessages(
-        sessionId: String,
-        limit: Int = 500,
-    ): List<ConversationRecord>
-
-    /** Returns one deterministic page of session messages. */
-    fun getConversationMessagesPage(
-        sessionId: String,
-        limit: Int,
-        offset: Int,
-    ): List<ConversationRecord>
-
-    /** Searches session messages by text query. */
-    fun searchConversationMessages(
-        sessionId: String,
-        query: String,
-        limit: Int = 20,
-    ): List<ConversationRecord>
-
-    /** Deletes all messages for a session and returns the affected count. */
-    fun deleteConversationMessages(sessionId: String): Int
-
-    /** Deletes a single message by id and returns the affected count. */
-    fun deleteConversationMessageById(id: String): Int
-
-    /** Updates the content of a single message by id and returns the affected count. */
-    fun updateConversationMessageContent(
-        id: String,
-        newContent: String,
-    ): Int
+    /** Reactive counterpart of [setPreference]. */
+    override fun setPreferenceReactive(
+        key: String,
+        value: String,
+    ): Mono<Void> = Mono.fromRunnable { setPreference(key, value) }
 }
 
 /** Stores metadata for files imported into the managed workspace. Use cases: UC-0000023, UC-0000024, UC-0000026, UC-0000031. */
@@ -350,6 +180,22 @@ interface WorkspaceFileStore {
 
     /** Deletes one workspace file metadata record. */
     fun deleteWorkspaceFile(id: String): Boolean
+
+    /** Reactive counterpart of [saveWorkspaceFile]. */
+    fun saveWorkspaceFileReactive(record: WorkspaceFileRecord): Mono<Void> = Mono.fromRunnable { saveWorkspaceFile(record) }
+
+    /** Reactive counterpart of [listWorkspaceFiles]. */
+    fun listWorkspaceFilesReactive(): Flux<WorkspaceFileRecord> = Flux.defer { Flux.fromIterable(listWorkspaceFiles()) }
+
+    /** Reactive counterpart of [getWorkspaceFile]. */
+    fun getWorkspaceFileReactive(id: String): Mono<WorkspaceFileRecord> = Mono.fromCallable { getWorkspaceFile(id) }
+
+    /** Reactive counterpart of [getWorkspaceFileByPath]. */
+    fun getWorkspaceFileByPathReactive(relativePath: String): Mono<WorkspaceFileRecord> =
+        Mono.fromCallable { getWorkspaceFileByPath(relativePath) }
+
+    /** Reactive counterpart of [deleteWorkspaceFile]. */
+    fun deleteWorkspaceFileReactive(id: String): Mono<Boolean> = Mono.fromCallable { deleteWorkspaceFile(id) }
 }
 
 /** Stores and retrieves todo domain objects. Use cases: UC-0000013, UC-0000014. */
@@ -396,6 +242,36 @@ interface TodoStore {
 
     /** Deletes every persisted todo. */
     fun clearTodos()
+
+    /** Reactive counterpart of [saveTodo]. */
+    fun saveTodoReactive(todo: Todo): Mono<Void> = Mono.fromRunnable { saveTodo(todo) }
+
+    /** Reactive counterpart of [claimPendingTodo]. */
+    fun claimPendingTodoReactive(
+        todoId: String,
+        agentId: String,
+    ): Mono<Todo> = Mono.fromCallable { claimPendingTodo(todoId, agentId) }
+
+    /** Reactive counterpart of [updateTodoPositions]. */
+    fun updateTodoPositionsReactive(todos: List<Todo>): Mono<Void> = Mono.fromRunnable { updateTodoPositions(todos) }
+
+    /** Reactive counterpart of [createTodoIfAbsent]. */
+    fun createTodoIfAbsentReactive(todo: Todo): Mono<TodoCreation> = Mono.fromCallable { createTodoIfAbsent(todo) }
+
+    /** Reactive counterpart of [listTodos]. */
+    fun listTodosReactive(): Flux<Todo> = Flux.defer { Flux.fromIterable(listTodos()) }
+
+    /** Reactive counterpart of [deleteTodo]. */
+    fun deleteTodoReactive(todoId: String): Mono<Void> = Mono.fromRunnable { deleteTodo(todoId) }
+
+    /** Reactive counterpart of [deleteTodoAndArchive]. */
+    fun deleteTodoAndArchiveReactive(todo: Todo): Mono<Todo> = Mono.fromCallable { deleteTodoAndArchive(todo) }
+
+    /** Reactive counterpart of [listDeletedTodos]. */
+    fun listDeletedTodosReactive(limit: Int = 100): Flux<Todo> = Flux.defer { Flux.fromIterable(listDeletedTodos(limit)) }
+
+    /** Reactive counterpart of [clearTodos]. */
+    fun clearTodosReactive(): Mono<Void> = Mono.fromRunnable { clearTodos() }
 }
 
 /** Result of an atomic todo creation attempt. */
@@ -424,6 +300,25 @@ interface SubAgentStore {
         status: String,
         currentTask: String? = null,
     ): Boolean
+
+    /** Reactive counterpart of [saveAgent]. */
+    fun saveAgentReactive(agent: PersistedSubAgent): Mono<Boolean> = Mono.fromCallable { saveAgent(agent) }
+
+    /** Reactive counterpart of [getAgent]. */
+    fun getAgentReactive(id: String): Mono<PersistedSubAgent> = Mono.fromCallable { getAgent(id) }
+
+    /** Reactive counterpart of [listAgents]. */
+    fun listAgentsReactive(status: String? = null): Flux<PersistedSubAgent> = Flux.defer { Flux.fromIterable(listAgents(status)) }
+
+    /** Reactive counterpart of [deleteAgent]. */
+    fun deleteAgentReactive(id: String): Mono<Boolean> = Mono.fromCallable { deleteAgent(id) }
+
+    /** Reactive counterpart of [updateAgentStatus]. */
+    fun updateAgentStatusReactive(
+        id: String,
+        status: String,
+        currentTask: String? = null,
+    ): Mono<Boolean> = Mono.fromCallable { updateAgentStatus(id, status, currentTask) }
 }
 
 /** Stores and retrieves sub-agent tool configurations. Use cases: UC-0000015, UC-0000019. */
@@ -436,6 +331,15 @@ interface SubAgentConfigStore {
 
     /** Returns all sub-agent tool configurations. */
     fun listSubAgentConfigs(): List<SubAgentToolConfig>
+
+    /** Reactive counterpart of [saveSubAgentConfig]. */
+    fun saveSubAgentConfigReactive(config: SubAgentToolConfig): Mono<Void> = Mono.fromRunnable { saveSubAgentConfig(config) }
+
+    /** Reactive counterpart of [getSubAgentConfig]. */
+    fun getSubAgentConfigReactive(id: String): Mono<SubAgentToolConfig> = Mono.fromCallable { getSubAgentConfig(id) }
+
+    /** Reactive counterpart of [listSubAgentConfigs]. */
+    fun listSubAgentConfigsReactive(): Flux<SubAgentToolConfig> = Flux.defer { Flux.fromIterable(listSubAgentConfigs()) }
 }
 
 /**

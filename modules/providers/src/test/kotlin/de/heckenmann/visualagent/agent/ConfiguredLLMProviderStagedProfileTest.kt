@@ -4,10 +4,12 @@ import de.heckenmann.visualagent.agent.openai.OpenAiClient
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
-import io.mockk.coEvery
-import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
+import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.test.runTest
+import reactor.core.publisher.Mono
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -20,7 +22,8 @@ class ConfiguredLLMProviderStagedProfileTest {
             val ollama = mockk<OllamaClient>(relaxed = true)
             val openAi = mockk<OpenAiClient>()
             val requestSlot = io.mockk.slot<ChatRequestContext>()
-            coEvery { openAi.chat(capture(requestSlot)) } returns ChatResponse("staged-model", Message("assistant", "READY"), true)
+            every { openAi.chatReactive(capture(requestSlot)) } returns
+                Mono.just(ChatResponse("staged-model", Message("assistant", "READY"), true))
             val staged =
                 ProviderProfile(
                     id = "staged-openai",
@@ -31,15 +34,16 @@ class ConfiguredLLMProviderStagedProfileTest {
                     defaultModel = "staged-model",
                 )
 
-            ConfiguredLLMProvider(ollama, openAi, catalog).chat(
-                ChatRequestContext(
-                    messages = listOf(Message("user", "Reply with READY.")),
-                    providerProfile = staged,
-                ),
-            )
+            ConfiguredLLMProvider(ollama, openAi, catalog)
+                .chatReactive(
+                    ChatRequestContext(
+                        messages = listOf(Message("user", "Reply with READY.")),
+                        providerProfile = staged,
+                    ),
+                ).awaitSingle()
 
             assertEquals(staged, requestSlot.captured.providerProfile)
             assertEquals("staged-model", requestSlot.captured.model)
-            coVerify(exactly = 0) { catalog.resolve(any(), any(), any(), any()) }
+            verify(exactly = 0) { catalog.resolve(any(), any(), any(), any()) }
         }
 }

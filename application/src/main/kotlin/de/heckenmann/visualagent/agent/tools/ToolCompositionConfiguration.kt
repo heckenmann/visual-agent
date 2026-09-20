@@ -84,7 +84,7 @@ class SpringAiToolCallbacksAdapter(
                         .build()
 
                 override fun call(functionInput: String): String =
-                    registry.execute(
+                    registry.executeBlocking(
                         tool,
                         functionInput,
                         correlatedContext(tool.definition.name, functionInput, requestContext),
@@ -94,7 +94,7 @@ class SpringAiToolCallbacksAdapter(
                     functionInput: String,
                     toolContext: ToolContext?,
                 ): String =
-                    registry.execute(
+                    registry.executeBlocking(
                         tool,
                         functionInput,
                         correlatedContext(tool.definition.name, functionInput, requestContext + (toolContext?.context ?: emptyMap())),

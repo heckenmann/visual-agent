@@ -5,9 +5,10 @@ import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.todo.TodoEventBus
-import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
+import reactor.core.publisher.Mono
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -111,11 +112,13 @@ class AgentManagerConversationOpsTest {
                     .create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
-            coEvery { provider.chat(any<ChatRequestContext>()) } returns
-                ChatResponse(
-                    model = "test",
-                    message = Message("assistant", "Done."),
-                    done = true,
+            every { provider.chatReactive(any<ChatRequestContext>()) } returns
+                Mono.just(
+                    ChatResponse(
+                        model = "test",
+                        message = Message("assistant", "Done."),
+                        done = true,
+                    ),
                 )
             val agent = manager.createAgent("Worker", "Worker role")
 
@@ -160,8 +163,8 @@ class AgentManagerConversationOpsTest {
                 de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                     .create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
-            coEvery { provider.chat(any<ChatRequestContext>()) } returns
-                ChatResponse(model = "test", message = Message("assistant", "result"), done = true)
+            every { provider.chatReactive(any<ChatRequestContext>()) } returns
+                Mono.just(ChatResponse(model = "test", message = Message("assistant", "result"), done = true))
             val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
             val jobResult = manager.startAgentJob("Worker", "Worker role", "coder", "write code")
@@ -178,8 +181,8 @@ class AgentManagerConversationOpsTest {
                 de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                     .create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
-            coEvery { provider.chat(any<ChatRequestContext>()) } returns
-                ChatResponse(model = "test", message = Message("assistant", "done"), done = true)
+            every { provider.chatReactive(any<ChatRequestContext>()) } returns
+                Mono.just(ChatResponse(model = "test", message = Message("assistant", "done"), done = true))
             val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
             val agent = manager.createAgent("Worker", "Worker role")
 
@@ -196,8 +199,8 @@ class AgentManagerConversationOpsTest {
                 de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                     .create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
-            coEvery { provider.chat(any<ChatRequestContext>()) } returns
-                ChatResponse(model = "test", message = Message("assistant", "completed"), done = true)
+            every { provider.chatReactive(any<ChatRequestContext>()) } returns
+                Mono.just(ChatResponse(model = "test", message = Message("assistant", "completed"), done = true))
             val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
             val agent = manager.createAgent("Worker", "Worker role")
             val finished = kotlinx.coroutines.CompletableDeferred<String>()

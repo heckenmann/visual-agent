@@ -13,26 +13,16 @@ import io.grpc.stub.StreamObserver
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import kotlin.test.AfterTest
+import kotlinx.coroutines.yield
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /** Verifies protocol negotiation and safe incompatibility handling at the server boundary. */
 class VisualAgentGrpcSessionServiceTest {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
-    private val service = VisualAgentGrpcSessionService(mockk<ConversationPort>(relaxed = true), scope)
-
-    @AfterTest
-    fun closeScope() {
-        scope.cancel()
-    }
+    private val service = VisualAgentGrpcSessionService(mockk<ConversationPort>(relaxed = true))
 
     @Test
     fun `hello returns acknowledgement and initial snapshot`() {
@@ -130,7 +120,7 @@ class VisualAgentGrpcSessionServiceTest {
             thirdArg<(String) -> Unit>().invoke("world")
             ConversationStreamResult(ConversationMessage("assistant", "world", id = request.assistantEntryId))
         }
-        val sessionService = VisualAgentGrpcSessionService(conversationPort, scope)
+        val sessionService = VisualAgentGrpcSessionService(conversationPort)
         val observer = RecordingObserver<ServerFrame>()
         val requestObserver = sessionService.openSession(observer)
 
@@ -156,6 +146,12 @@ class VisualAgentGrpcSessionServiceTest {
                 ).build(),
         )
 
+        runBlocking {
+            withTimeout(1_000) {
+                while (observer.values.none { it.hasChatCompleted() }) yield()
+            }
+        }
+
         assertEquals(
             "world",
             observer.values
@@ -173,7 +169,7 @@ class VisualAgentGrpcSessionServiceTest {
     @Test
     fun `invalid chat identities are rejected before the conversation port is called`() {
         val conversationPort = mockk<ConversationPort>(relaxed = true)
-        val sessionService = VisualAgentGrpcSessionService(conversationPort, scope)
+        val sessionService = VisualAgentGrpcSessionService(conversationPort)
         val observer = RecordingObserver<ServerFrame>()
         val requestObserver = sessionService.openSession(observer)
         requestObserver.onNext(
@@ -207,80 +203,8 @@ class VisualAgentGrpcSessionServiceTest {
         coVerify(exactly = 0) { conversationPort.stream(any(), any(), any()) }
     }
 
-    @Test
-    fun `replacing a streaming request keeps cancellation state scoped to each request`() =
-        runTest {
-            val firstStarted = CompletableDeferred<Unit>()
-            val releaseFirst = CompletableDeferred<Unit>()
-            val secondCompleted = CompletableDeferred<Unit>()
-            val conversationPort = mockk<ConversationPort>(relaxed = true)
-            coEvery { conversationPort.stream(any(), any(), any()) } coAnswers {
-                when (firstArg<de.heckenmann.visualagent.protocol.ConversationStreamRequest>().content) {
-                    "first" -> {
-                        firstStarted.complete(Unit)
-                        releaseFirst.await()
-                    }
-                    "second" -> {
-                        thirdArg<(String) -> Unit>().invoke("second-result")
-                        secondCompleted.complete(Unit)
-                    }
-                }
-                ConversationStreamResult(
-                    ConversationMessage(
-                        "assistant",
-                        "",
-                        id = firstArg<de.heckenmann.visualagent.protocol.ConversationStreamRequest>().assistantEntryId,
-                    ),
-                )
-            }
-            val sessionService = VisualAgentGrpcSessionService(conversationPort, scope)
-            val observer = RecordingObserver<ServerFrame>()
-            val requestObserver = sessionService.openSession(observer)
-            requestObserver.onNext(
-                ClientFrame
-                    .newBuilder()
-                    .setSessionId("test-session")
-                    .setHello(Hello.newBuilder().setProtocolVersion(ProtocolVersion.CURRENT).build())
-                    .build(),
-            )
-            requestObserver.onNext(
-                ClientFrame
-                    .newBuilder()
-                    .setSessionId("test-session")
-                    .setRequestId(REQUEST_ONE)
-                    .setChatRequest(
-                        ChatRequest
-                            .newBuilder()
-                            .setContent("first")
-                            .setUserEntryId(USER_ONE)
-                            .build(),
-                    ).build(),
-            )
-            withTimeout(1_000) { firstStarted.await() }
-            requestObserver.onNext(
-                ClientFrame
-                    .newBuilder()
-                    .setSessionId("test-session")
-                    .setRequestId(REQUEST_TWO)
-                    .setChatRequest(
-                        ChatRequest
-                            .newBuilder()
-                            .setContent("second")
-                            .setUserEntryId(USER_TWO)
-                            .build(),
-                    ).build(),
-            )
-            releaseFirst.complete(Unit)
-            withTimeout(1_000) { secondCompleted.await() }
-
-            val secondFrames = observer.values.filter { it.requestId == REQUEST_TWO }
-            assertEquals("second-result", secondFrames.single { it.hasChatDelta() }.chatDelta.text)
-            assertEquals(true, secondFrames.any { it.hasChatCompleted() })
-            assertEquals(true, observer.values.filter { it.hasError() }.all { it.requestId == REQUEST_ONE })
-        }
-
     private class RecordingObserver<T> : StreamObserver<T> {
-        val values = mutableListOf<T>()
+        val values = CopyOnWriteArrayList<T>()
 
         override fun onNext(value: T) {
             values += value

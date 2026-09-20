@@ -12,7 +12,7 @@ class WorkspaceFileActivityNotificationService(
     eventBus: WorkspaceFileActivityEventBus,
     private val agentManager: AgentManager,
 ) : DisposableBean {
-    private val registration = eventBus.addListener(::appendToConversation)
+    private val registration: AutoCloseable = eventBus.addListener(::appendToConversation)
 
     override fun destroy() {
         registration.close()

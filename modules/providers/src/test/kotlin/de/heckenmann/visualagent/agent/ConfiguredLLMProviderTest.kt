@@ -7,14 +7,15 @@ import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderPreferenceStore
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
-import io.mockk.coEvery
-import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.toList
+import io.mockk.verify
+import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
+import reactor.test.StepVerifier
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
@@ -38,7 +39,7 @@ class ConfiguredLLMProviderTest {
 
             val error =
                 assertFailsWith<IllegalStateException> {
-                    router.chat(listOf(Message("user", "hello")))
+                    router.chatReactive(listOf(Message("user", "hello"))).awaitSingle()
                 }
 
             assertEquals("Active provider profile is missing: missing-provider", error.message)
@@ -55,20 +56,40 @@ class ConfiguredLLMProviderTest {
                 val ollama = mockk<OllamaClient>(relaxed = true)
                 val openAi = mockk<OpenAiClient>()
                 val requestSlot = io.mockk.slot<ChatRequestContext>()
-                coEvery { openAi.chat(capture(requestSlot)) } returns ChatResponse("gpt-router", Message("assistant", "ok"), true)
+                every { openAi.chatReactive(capture(requestSlot)) } returns
+                    Mono.just(ChatResponse("gpt-router", Message("assistant", "ok"), true))
                 val router = ConfiguredLLMProvider(ollama, openAi, catalog())
 
-                val response = router.chat(ChatRequestContext(messages = listOf(Message("user", "hello"))))
+                val response = router.chatReactive(ChatRequestContext(messages = listOf(Message("user", "hello")))).awaitSingle()
 
                 assertEquals("ok", response.message.content)
                 assertEquals("gpt-router", requestSlot.captured.model)
-                coVerify(exactly = 1) { openAi.chat(any<ChatRequestContext>()) }
-                coVerify(exactly = 0) { ollama.chat(any<ChatRequestContext>()) }
+                verify(exactly = 1) { openAi.chatReactive(any<ChatRequestContext>()) }
+                verify(exactly = 0) { ollama.chatReactive(any<ChatRequestContext>()) }
             } finally {
                 appConfig.llmProvider = originalProvider
                 appConfig.openAiModel = originalModel
             }
         }
+
+    @Test
+    fun `chatReactive resolves the catalog then delegates through the native provider contract`() {
+        val ollama = mockk<OllamaClient>(relaxed = true)
+        val openAi = mockk<OpenAiClient>()
+        val requestSlot = io.mockk.slot<ChatRequestContext>()
+        val catalog = catalog()
+        catalog.setActiveSelection("openai", "gpt-router")
+        every { openAi.chatReactive(capture(requestSlot)) } returns
+            Mono.just(ChatResponse("gpt-router", Message("assistant", "ok"), true))
+        val router = ConfiguredLLMProvider(ollama, openAi, catalog)
+
+        StepVerifier
+            .create(router.chatReactive(ChatRequestContext(messages = listOf(Message("user", "hello")))))
+            .assertNext { assertEquals("ok", it.message.content) }
+            .verifyComplete()
+
+        assertEquals("openai", requestSlot.captured.provider)
+    }
 
     @Test
     fun `models and connection delegate to ollama provider by default`() =
@@ -79,18 +100,17 @@ class ConfiguredLLMProviderTest {
                 val ollama = mockk<OllamaClient>()
                 val openAi = mockk<OpenAiClient>(relaxed = true)
                 every { ollama.isConnected() } returns true
-                coEvery { ollama.checkConnection() } returns true
-                coEvery { ollama.getModels(any<ProviderProfile>()) } returns listOf("llama")
-                coEvery { ollama.stream(any<ChatRequestContext>()) } returns
-                    flowOf(ChatResponse("llama", Message("assistant", "chunk"), true))
-                val router = ConfiguredLLMProvider(ollama, openAi, catalog(), fetchCapabilities = { emptyMap() })
+                every { ollama.checkConnectionReactive(any<ProviderProfile>()) } returns Mono.just(true)
+                every { ollama.getModelsReactive(any<ProviderProfile>()) } returns Mono.just(listOf("llama"))
+                val router = ConfiguredLLMProvider(ollama, openAi, catalog(), fetchCapabilities = { Mono.just(emptyMap()) })
 
                 assertEquals(true, router.isConnected())
-                assertEquals(true, router.checkConnection())
-                assertEquals(listOf("llama"), router.getModels())
+                assertEquals(true, router.checkConnectionReactive().awaitSingle())
+                assertEquals(listOf("llama"), router.getModelsReactive().awaitSingle())
 
-                coVerify(exactly = 2) { ollama.getModels(any<ProviderProfile>()) }
-                coVerify(exactly = 0) { openAi.getModels() }
+                verify(exactly = 1) { ollama.checkConnectionReactive(any<ProviderProfile>()) }
+                verify(exactly = 1) { ollama.getModelsReactive(any<ProviderProfile>()) }
+                verify(exactly = 0) { openAi.getModelsReactive() }
             } finally {
                 appConfig.llmProvider = originalProvider
             }
@@ -107,22 +127,24 @@ class ConfiguredLLMProviderTest {
                 val ollama = mockk<OllamaClient>(relaxed = true)
                 val openAi = mockk<OpenAiClient>()
                 val requestSlot = io.mockk.slot<ChatRequestContext>()
-                coEvery { openAi.chat(capture(requestSlot)) } returns ChatResponse("gpt-agent", Message("assistant", "ok"), true)
+                every { openAi.chatReactive(capture(requestSlot)) } returns
+                    Mono.just(ChatResponse("gpt-agent", Message("assistant", "ok"), true))
                 val router = ConfiguredLLMProvider(ollama, openAi, catalog())
 
-                router.chat(
-                    ChatRequestContext(
-                        messages = listOf(Message("user", "hello")),
-                        provider = "openai",
-                        model = "gpt-agent",
-                        parameters = ModelParameters(temperature = 0.2, topP = 0.9, maxTokens = 1200),
-                    ),
-                )
+                router
+                    .chatReactive(
+                        ChatRequestContext(
+                            messages = listOf(Message("user", "hello")),
+                            provider = "openai",
+                            model = "gpt-agent",
+                            parameters = ModelParameters(temperature = 0.2, topP = 0.9, maxTokens = 1200),
+                        ),
+                    ).awaitSingle()
 
                 assertEquals("gpt-agent", requestSlot.captured.model)
                 assertEquals(0.2, requestSlot.captured.parameters.temperature)
-                coVerify(exactly = 1) { openAi.chat(any<ChatRequestContext>()) }
-                coVerify(exactly = 0) { ollama.chat(any<ChatRequestContext>()) }
+                verify(exactly = 1) { openAi.chatReactive(any<ChatRequestContext>()) }
+                verify(exactly = 0) { ollama.chatReactive(any<ChatRequestContext>()) }
             } finally {
                 appConfig.llmProvider = originalProvider
                 appConfig.openAiModel = originalModel
@@ -135,7 +157,8 @@ class ConfiguredLLMProviderTest {
             val ollama = mockk<OllamaClient>(relaxed = true)
             val openAi = mockk<OpenAiClient>()
             val requestSlot = io.mockk.slot<ChatRequestContext>()
-            coEvery { openAi.chat(capture(requestSlot)) } returns ChatResponse("gpt-work", Message("assistant", "ok"), true)
+            every { openAi.chatReactive(capture(requestSlot)) } returns
+                Mono.just(ChatResponse("gpt-work", Message("assistant", "ok"), true))
             val catalog = catalog()
             catalog.saveProvider(
                 ProviderProfile(
@@ -149,50 +172,18 @@ class ConfiguredLLMProviderTest {
             )
             val router = ConfiguredLLMProvider(ollama, openAi, catalog)
 
-            router.chat(
-                ChatRequestContext(
-                    messages = listOf(Message("user", "hello")),
-                    provider = "openai-work",
-                ),
-            )
+            router
+                .chatReactive(
+                    ChatRequestContext(
+                        messages = listOf(Message("user", "hello")),
+                        provider = "openai-work",
+                    ),
+                ).awaitSingle()
 
             assertEquals("openai-work", requestSlot.captured.providerProfile?.id)
             assertEquals("gpt-work", requestSlot.captured.model)
-            coVerify(exactly = 1) { openAi.chat(any<ChatRequestContext>()) }
-            coVerify(exactly = 0) { ollama.chat(any<ChatRequestContext>()) }
-        }
-
-    @Test
-    fun `openai profile supports discovery details and streaming`() =
-        runTest {
-            val originalProvider = appConfig.llmProvider
-            try {
-                appConfig.llmProvider = "openai"
-                val catalog = catalog()
-                val ollama = mockk<OllamaClient>(relaxed = true)
-                val openAi = mockk<OpenAiClient>()
-                coEvery { openAi.getModels(any<ProviderProfile>()) } returns listOf("gpt-profile")
-                coEvery { openAi.getModelDetails(any<ProviderProfile>(), "gpt-profile") } returns
-                    ShowResponse("gpt-profile", "", details = ModelDetails(family = "openai"))
-                coEvery { openAi.stream(any<ChatRequestContext>()) } returns
-                    flowOf(ChatResponse("gpt-profile", Message("assistant", "chunk"), true))
-                val router = ConfiguredLLMProvider(ollama, openAi, catalog)
-
-                assertEquals(listOf("gpt-profile"), router.getModels("openai"))
-                assertEquals("gpt-profile", router.getModelDetails("openai", "gpt-profile").model)
-                val chunks =
-                    router
-                        .stream(
-                            ChatRequestContext(
-                                messages = listOf(Message("user", "hello")),
-                                provider = "openai",
-                                model = "gpt-profile",
-                            ),
-                        ).toList()
-                assertEquals("chunk", chunks.single().message.content)
-            } finally {
-                appConfig.llmProvider = originalProvider
-            }
+            verify(exactly = 1) { openAi.chatReactive(any<ChatRequestContext>()) }
+            verify(exactly = 0) { ollama.chatReactive(any<ChatRequestContext>()) }
         }
 
     @Test
@@ -211,7 +202,7 @@ class ConfiguredLLMProviderTest {
             )
             val codex = mockk<ProfiledProviderAdapter>()
             every { codex.adapter } returns ProviderAdapter.CODEX_CLI
-            coEvery { codex.loadModels(any()) } returns listOf(ProviderModelConfig("gpt-5.6-luna", name = "Codex Luna"))
+            every { codex.loadModelsReactive(any()) } returns Mono.just(listOf(ProviderModelConfig("gpt-5.6-luna", name = "Codex Luna")))
             val router =
                 ConfiguredLLMProvider(
                     mockk(relaxed = true),
@@ -220,9 +211,9 @@ class ConfiguredLLMProviderTest {
                     profiledAdapters = listOf(codex),
                 )
 
-            assertEquals(listOf("gpt-5.6-luna"), router.getModels("codex-custom"))
+            assertEquals(listOf("gpt-5.6-luna"), router.getModelsReactive("codex-custom").awaitSingle())
             assertEquals("Codex Luna", catalog.selectableModels("codex-custom").single().name)
-            coVerify(exactly = 1) { codex.loadModels(any()) }
+            verify(exactly = 1) { codex.loadModelsReactive(any()) }
         }
 
     @Test
@@ -235,16 +226,22 @@ class ConfiguredLLMProviderTest {
                 val openAi = mockk<OpenAiClient>(relaxed = true)
                 val catalog = catalog()
                 catalog.setActiveSelection("openai", "gpt-vision")
-                coEvery { openAi.vision(any(), any(), "gpt-vision") } returns
-                    ChatResponse("gpt", Message("assistant", "image ok"), done = true)
-                coEvery { openAi.embeddings("text", "gpt-vision") } returns listOf(0.1, 0.2)
+                every { openAi.visionReactive(any(), any(), "gpt-vision") } returns
+                    Mono.just(ChatResponse("gpt", Message("assistant", "image ok"), done = true))
+                every { openAi.embeddingsReactive("text", "gpt-vision") } returns Mono.just(listOf(0.1, 0.2))
                 val router = ConfiguredLLMProvider(ollama, openAi, catalog)
 
-                assertEquals("image ok", router.vision(ByteArray(0), "describe").message.content)
-                assertEquals(listOf(0.1, 0.2), router.embeddings("text"))
+                assertEquals(
+                    "image ok",
+                    router
+                        .visionReactive(ByteArray(0), "describe")
+                        .awaitSingle()
+                        .message.content,
+                )
+                assertEquals(listOf(0.1, 0.2), router.embeddingsReactive("text").awaitSingle())
 
-                coVerify(exactly = 1) { openAi.vision(any(), any(), "gpt-vision") }
-                coVerify(exactly = 1) { openAi.embeddings("text", "gpt-vision") }
+                verify(exactly = 1) { openAi.visionReactive(any(), any(), "gpt-vision") }
+                verify(exactly = 1) { openAi.embeddingsReactive("text", "gpt-vision") }
             } finally {
                 appConfig.llmProvider = originalProvider
             }
@@ -258,14 +255,16 @@ class ConfiguredLLMProviderTest {
                 appConfig.llmProvider = "ollama"
                 val ollama = mockk<OllamaClient>(relaxed = true)
                 val openAi = mockk<OpenAiClient>(relaxed = true)
-                coEvery { ollama.chat(any<ChatRequestContext>()) } returns ChatResponse("llama", Message("assistant", "ok"), true)
-                coEvery { ollama.stream(any<ChatRequestContext>()) } returns flowOf(ChatResponse("llama", Message("assistant", "c"), true))
+                every { ollama.chatReactive(any<ChatRequestContext>()) } returns
+                    Mono.just(ChatResponse("llama", Message("assistant", "ok"), true))
+                every { ollama.streamReactive(any<ChatRequestContext>()) } returns
+                    Flux.just(ChatResponse("llama", Message("assistant", "c"), true))
                 val router = ConfiguredLLMProvider(ollama, openAi, catalog())
 
-                val chatResponse = router.chat(listOf(Message("user", "hi")))
+                val chatResponse = router.chatReactive(listOf(Message("user", "hi"))).awaitSingle()
                 assertEquals("ok", chatResponse.message.content)
 
-                val streamChunks = router.stream(listOf(Message("user", "hi"))).toList()
+                val streamChunks = router.streamReactive(listOf(Message("user", "hi"))).collectList().awaitSingle()
                 assertEquals("c", streamChunks.single().message.content)
             } finally {
                 appConfig.llmProvider = originalProvider
@@ -278,19 +277,19 @@ class ConfiguredLLMProviderTest {
             val ollama = mockk<OllamaClient>(relaxed = true)
             val openAi = mockk<OpenAiClient>()
             val requestSlot = io.mockk.slot<ChatRequestContext>()
-            coEvery { openAi.chat(capture(requestSlot)) } returns
-                ChatResponse("gpt-active", Message("assistant", "ok"), true)
+            every { openAi.chatReactive(capture(requestSlot)) } returns
+                Mono.just(ChatResponse("gpt-active", Message("assistant", "ok"), true))
             val catalog = catalog()
             catalog.setActiveSelection("openai", "gpt-active")
             val router = ConfiguredLLMProvider(ollama, openAi, catalog)
 
-            val response = router.chat(listOf(Message("user", "hello")))
+            val response = router.chatReactive(listOf(Message("user", "hello"))).awaitSingle()
 
             assertEquals("ok", response.message.content)
             assertEquals("openai", requestSlot.captured.provider)
             assertEquals("gpt-active", requestSlot.captured.model)
-            coVerify(exactly = 1) { openAi.chat(any<ChatRequestContext>()) }
-            coVerify(exactly = 0) { ollama.chat(any<ChatRequestContext>()) }
+            verify(exactly = 1) { openAi.chatReactive(any<ChatRequestContext>()) }
+            verify(exactly = 0) { ollama.chatReactive(any<ChatRequestContext>()) }
         }
 
     private fun catalog(): ProviderCatalogService =

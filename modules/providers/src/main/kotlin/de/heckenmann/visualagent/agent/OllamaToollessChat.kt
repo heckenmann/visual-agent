@@ -1,11 +1,9 @@
 package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.ollama.OllamaPromptFactory
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.reactive.asFlow
 import org.springframework.ai.ollama.api.OllamaApi
 import org.springframework.ai.ollama.api.OllamaChatOptions
+import reactor.core.publisher.Flux
 import org.springframework.ai.ollama.api.OllamaApi.ChatResponse as OllamaChatResponse
 
 /**
@@ -53,21 +51,21 @@ internal object OllamaToollessChat {
     }
 
     /**
-     * Streams a tool-less chat response as a [Flow] of partial [ChatResponse]s.
+     * Streams a tool-less chat response without converting the provider's native Reactor source.
      *
      * @param ollamaApi Ollama API client to use
      * @param promptFactory Factory used to build the prompt
      * @param request Provider-neutral request context
      * @param selectedModel Model name to send to the API
-     * @return Cold flow of incremental chat responses from the provider
+     * @return Cold Reactor stream of incremental chat responses from the provider
      */
-    fun stream(
+    fun streamReactive(
         ollamaApi: OllamaApi,
         promptFactory: OllamaPromptFactory,
         request: ChatRequestContext,
         selectedModel: String,
-    ): Flow<ChatResponse> =
-        flow {
+    ): Flux<ChatResponse> =
+        Flux.defer {
             val prompt = promptFactory.buildPrompt(request, selectedModel)
             val messages = prompt.instructions.map { msg -> msg.toOllamaMessage(selectedModel) }
             val chatRequest =
@@ -77,15 +75,15 @@ internal object OllamaToollessChat {
                     stream = true,
                     options = prompt.options as OllamaChatOptions,
                 )
-            var sequence = 0
-            ollamaApi.streamingChat(chatRequest).asFlow().collect { chunk: OllamaChatResponse ->
+            ollamaApi.streamingChat(chatRequest).index().map { indexed ->
+                val chunk: OllamaChatResponse = indexed.t2
                 val turn =
                     ProviderTurnResponseMapper
-                        .fromOllama(chunk, sequence = sequence++)
+                        .fromOllama(chunk, sequence = indexed.t1.toInt())
                         .let { mapped ->
                             if (mapped.model.isBlank()) mapped.copy(model = selectedModel) else mapped
                         }
-                emit(ProviderTurnResponseMapper.toChatResponse(turn))
+                ProviderTurnResponseMapper.toChatResponse(turn)
             }
         }
 

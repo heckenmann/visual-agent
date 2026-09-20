@@ -5,15 +5,14 @@ import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
-import io.mockk.coEvery
-import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
+import reactor.core.publisher.Mono
 
 /** Verifies that the live Codex catalog is loaded independently from UI visibility. */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -27,13 +26,13 @@ internal class CodexModelCatalogInitializerTest {
             every { catalog.getProvider(PROVIDER_ID) } returns codexProfile()
             every { catalog.updateDiscoveredModelConfigs(PROVIDER_ID, any()) } returns Unit
             every { provider.adapter } returns ProviderAdapter.CODEX_CLI
-            coEvery { provider.loadModels(any()) } returns listOf(ProviderModelConfig(id = "live-model"))
+            every { provider.loadModelsReactive(any()) } returns Mono.just(listOf(ProviderModelConfig(id = "live-model")))
 
-            CodexModelCatalogInitializer(catalog, listOf(provider), this, StandardTestDispatcher(testScheduler))
+            CodexModelCatalogInitializer(catalog, listOf(provider), this)
                 .initializeActiveCodexCatalog()
             advanceUntilIdle()
 
-            coVerify(exactly = 1) { provider.loadModels(any()) }
+            verify(exactly = 1) { provider.loadModelsReactive(any()) }
         }
 
     private fun codexProfile(): ProviderProfile =

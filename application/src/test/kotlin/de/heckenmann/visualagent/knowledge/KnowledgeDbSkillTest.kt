@@ -29,6 +29,22 @@ class KnowledgeDbSkillTest {
     }
 
     @Test
+    fun `cancelled skill read rolls back its access accounting`() {
+        KnowledgeDbTestFactory.create("jdbc:h2:mem:test").use { db ->
+            val created = assertIs<SkillCreateResult.Created>(db.skillStore.createSkill("Transactional read", "Content"))
+            var cancellationChecks = 0
+
+            kotlin.test.assertFailsWith<IllegalStateException> {
+                db.skillStore.readSkill(created.skill.id) {
+                    cancellationChecks++ >= 1
+                }
+            }
+
+            assertEquals(0, db.skillStore.getSkill(created.skill.id)?.readCount)
+        }
+    }
+
+    @Test
     fun `exact duplicate returns the existing skill instead of creating another row`() {
         KnowledgeDbTestFactory.create("jdbc:h2:mem:test").use { db ->
             val first = assertIs<SkillCreateResult.Created>(db.skillStore.createSkill("Title", "# Body"))

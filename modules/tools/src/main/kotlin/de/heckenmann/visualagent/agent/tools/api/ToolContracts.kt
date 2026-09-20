@@ -3,8 +3,10 @@ package de.heckenmann.visualagent.agent.tools.api
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
+import mu.KotlinLogging
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Sinks
 import java.time.Instant
-import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Stable identifier for a model-callable tool.
@@ -130,7 +132,17 @@ enum class ToolCallPhase {
  * The application supplies the Spring bean and connects listeners during composition.
  */
 class ToolEventBus {
-    private val listeners = CopyOnWriteArrayList<(ToolCallEvent) -> Unit>()
+    private val logger = KotlinLogging.logger {}
+    private val emissionLock = Any()
+    private val eventSink = Sinks.many().multicast().onBackpressureBuffer<ToolCallEvent>(EVENT_BUFFER_CAPACITY, false)
+
+    /**
+     * Hot stream of ordered lifecycle events with no replay and a bounded 256-entry buffer.
+     *
+     * The application supplies this compatibility publisher; server consumers should prefer
+     * the Spring-managed tool event bus when available.
+     */
+    val events: Flux<ToolCallEvent> = eventSink.asFlux()
 
     /**
      * Register a listener for future events.
@@ -139,8 +151,15 @@ class ToolEventBus {
      * @return Handle that removes the listener when closed
      */
     fun addListener(listener: (ToolCallEvent) -> Unit): AutoCloseable {
-        listeners += listener
-        return AutoCloseable { listeners.remove(listener) }
+        val subscription =
+            events.subscribe(
+                { event ->
+                    runCatching { listener(event) }
+                        .onFailure { error -> logger.warn(error) { "Tool lifecycle compatibility listener failed." } }
+                },
+                { error -> logger.warn(error) { "Tool lifecycle compatibility stream terminated." } },
+            )
+        return AutoCloseable(subscription::dispose)
     }
 
     /**
@@ -149,8 +168,13 @@ class ToolEventBus {
      * @param event Event to publish
      */
     fun publish(event: ToolCallEvent) {
-        listeners.forEach { listener ->
-            runCatching { listener(event) }
+        synchronized(emissionLock) {
+            val result = eventSink.tryEmitNext(event)
+            check(result == Sinks.EmitResult.OK) { "Unable to emit tool lifecycle event: $result" }
         }
+    }
+
+    private companion object {
+        const val EVENT_BUFFER_CAPACITY = 256
     }
 }

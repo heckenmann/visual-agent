@@ -22,15 +22,27 @@ class SubAgentJobScheduler(
     private val scope: CoroutineScope,
     private val parallelismProvider: ParallelismProvider,
     private val executionControl: SubAgentExecutionControl? = null,
-) {
+) : AutoCloseable {
     private val lock = Any()
     private val waiting = ArrayDeque<WaitingJob>()
     private var activeJobs = 0
     private val jobsById = ConcurrentHashMap<String, Job>()
+    private val subscriptions = mutableListOf<AutoCloseable>()
 
     init {
-        executionControl?.addListener { dispatchWaitingJobs() }
-        parallelismProvider.addChangeListener { dispatchWaitingJobs() }
+        executionControl?.let { control ->
+            subscriptions += control.addListener { dispatchWaitingJobs() }
+        }
+        subscriptions += parallelismProvider.addChangeListener { dispatchWaitingJobs() }
+    }
+
+    /** Releases scheduler subscriptions and cancels queued or running jobs. */
+    override fun close() {
+        synchronized(lock) {
+            subscriptions.forEach(AutoCloseable::close)
+            subscriptions.clear()
+        }
+        cancelAllJobs()
     }
 
     /**

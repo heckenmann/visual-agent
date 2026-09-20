@@ -43,4 +43,18 @@ class TodoEventBusTest {
         assertEquals(listOf("Hello", ""), received.map { it.delta })
         assertTrue(received.last().completed)
     }
+
+    @Test
+    fun `a failing listener does not stop later listeners`() {
+        val bus = TodoEventBus()
+        val received = mutableListOf<TodoChange>()
+        bus.addListener { error("listener failure") }
+        bus.addListener { received += it }
+
+        val change = TodoChange(TodoChangeType.ADDED, todo = Todo(id = "t1", description = "Task"))
+        bus.publish(change)
+        bus.publish(change)
+
+        assertEquals(listOf(change, change), received)
+    }
 }

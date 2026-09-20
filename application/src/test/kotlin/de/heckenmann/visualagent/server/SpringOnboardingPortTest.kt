@@ -14,14 +14,11 @@ import de.heckenmann.visualagent.protocol.OnboardingProviderDraft
 import de.heckenmann.visualagent.protocol.OnboardingStatus
 import de.heckenmann.visualagent.protocol.OnboardingValidationCode
 import de.heckenmann.visualagent.protocol.ProviderModel
-import io.mockk.coEvery
-import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
-import org.springframework.transaction.support.TransactionTemplate
-import java.util.function.Consumer
+import reactor.core.publisher.Mono
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -32,7 +29,7 @@ import de.heckenmann.visualagent.protocol.ProviderAdapter as ProtocolProviderAda
 class SpringOnboardingPortTest {
     private val preferences = mockk<PreferenceStore>()
     private val catalog = mockk<ProviderCatalogService>()
-    private val port = SpringOnboardingPort(preferences, catalog, mockk<LLMProvider>(), mockk<TransactionTemplate>(), mockk())
+    private val port = SpringOnboardingPort(preferences, catalog, mockk<LLMProvider>(), mockk())
 
     @Test
     fun `provider views do not return stored credentials`() {
@@ -75,7 +72,7 @@ class SpringOnboardingPortTest {
     fun `validation probes the exact staged provider and selected model`() =
         runTest {
             val provider = mockk<LLMProvider>()
-            val port = SpringOnboardingPort(preferences, catalog, provider, mockk(), mockk())
+            val port = SpringOnboardingPort(preferences, catalog, provider, mockk())
             val draft =
                 OnboardingProviderDraft(
                     id = "openai",
@@ -85,15 +82,16 @@ class SpringOnboardingPortTest {
                     defaultModel = "verified-model",
                 )
             every { catalog.getProvider("openai") } returns null
-            coEvery { provider.getModelConfigs(any<ProviderProfile>()) } returns listOf(ProviderModelConfig("verified-model"))
-            coEvery { provider.chat(any<ChatRequestContext>()) } returns
-                ChatResponse("verified-model", Message("assistant", "READY"), true)
+            every { provider.getModelConfigsReactive(any<ProviderProfile>()) } returns
+                Mono.just(listOf(ProviderModelConfig("verified-model")))
+            every { provider.chatReactive(any<ChatRequestContext>()) } returns
+                Mono.just(ChatResponse("verified-model", Message("assistant", "READY"), true))
 
             val result = port.validate(draft, "verified-model")
 
             assertTrue(result.success)
-            coVerify {
-                provider.chat(
+            verify {
+                provider.chatReactive(
                     match<ChatRequestContext> { request ->
                         request.model == "verified-model" && request.providerProfile?.id == "openai" && request.parameters.maxTokens == 8
                     },
@@ -105,7 +103,7 @@ class SpringOnboardingPortTest {
     fun `validation reports incomplete http profile as invalid configuration`() =
         runTest {
             val provider = mockk<LLMProvider>()
-            val port = SpringOnboardingPort(preferences, catalog, provider, mockk(), mockk())
+            val port = SpringOnboardingPort(preferences, catalog, provider, mockk())
             val draft =
                 OnboardingProviderDraft(
                     id = "openai",
@@ -118,15 +116,14 @@ class SpringOnboardingPortTest {
             val result = port.validate(draft, "selected-model")
 
             assertEquals(OnboardingValidationCode.INVALID_CONFIGURATION, result.code)
-            coVerify(exactly = 0) { provider.getModelConfigs(any<ProviderProfile>()) }
+            verify(exactly = 0) { provider.getModelConfigsReactive(any<ProviderProfile>()) }
         }
 
     @Test
     fun `finish commits catalog selection after readiness succeeds`() =
         runTest {
             val provider = mockk<LLMProvider>()
-            val transactionTemplate = mockk<TransactionTemplate>()
-            val port = SpringOnboardingPort(preferences, catalog, provider, transactionTemplate, mockk())
+            val port = SpringOnboardingPort(preferences, catalog, provider, mockk())
             val draft =
                 OnboardingProviderDraft(
                     id = "openai",
@@ -136,20 +133,18 @@ class SpringOnboardingPortTest {
                 )
             every { catalog.getProvider("openai") } returns null
             every { catalog.listProviders() } returns emptyList()
-            every { catalog.replaceConfiguration(any()) } returns Unit
+            every { catalog.replaceConfigurationReactive(any()) } returns Mono.empty()
             every { preferences.setPreference(any(), any()) } returns Unit
-            every { transactionTemplate.executeWithoutResult(any()) } answers {
-                firstArg<Consumer<org.springframework.transaction.TransactionStatus>>().accept(mockk())
-            }
-            coEvery { provider.getModelConfigs(any<ProviderProfile>()) } returns listOf(ProviderModelConfig("verified-model"))
-            coEvery { provider.chat(any<ChatRequestContext>()) } returns
-                ChatResponse("verified-model", Message("assistant", "READY"), true)
+            every { provider.getModelConfigsReactive(any<ProviderProfile>()) } returns
+                Mono.just(listOf(ProviderModelConfig("verified-model")))
+            every { provider.chatReactive(any<ChatRequestContext>()) } returns
+                Mono.just(ChatResponse("verified-model", Message("assistant", "READY"), true))
 
             val validation = port.validate(draft, "verified-model")
             port.finish(draft, ProviderModel("verified-model"), checkNotNull(validation.validationFingerprint))
 
             verify {
-                catalog.replaceConfiguration(
+                catalog.replaceConfigurationReactive(
                     match { configuration ->
                         configuration.providerId == "openai" && configuration.modelId == "verified-model"
                     },
@@ -162,8 +157,7 @@ class SpringOnboardingPortTest {
     fun `finish persists server-discovered model metadata instead of client-provided metadata`() =
         runTest {
             val provider = mockk<LLMProvider>()
-            val transactionTemplate = mockk<TransactionTemplate>()
-            val port = SpringOnboardingPort(preferences, catalog, provider, transactionTemplate, mockk())
+            val port = SpringOnboardingPort(preferences, catalog, provider, mockk())
             val draft =
                 OnboardingProviderDraft(
                     id = "openai",
@@ -174,14 +168,11 @@ class SpringOnboardingPortTest {
             val discovered = ProviderModelConfig("verified-model", name = "Verified", contextLimit = 131072)
             every { catalog.getProvider("openai") } returns null
             every { catalog.listProviders() } returns emptyList()
-            every { catalog.replaceConfiguration(any()) } returns Unit
+            every { catalog.replaceConfigurationReactive(any()) } returns Mono.empty()
             every { preferences.setPreference(any(), any()) } returns Unit
-            every { transactionTemplate.executeWithoutResult(any()) } answers {
-                firstArg<Consumer<org.springframework.transaction.TransactionStatus>>().accept(mockk())
-            }
-            coEvery { provider.getModelConfigs(any<ProviderProfile>()) } returns listOf(discovered)
-            coEvery { provider.chat(any<ChatRequestContext>()) } returns
-                ChatResponse("verified-model", Message("assistant", "READY"), true)
+            every { provider.getModelConfigsReactive(any<ProviderProfile>()) } returns Mono.just(listOf(discovered))
+            every { provider.chatReactive(any<ChatRequestContext>()) } returns
+                Mono.just(ChatResponse("verified-model", Message("assistant", "READY"), true))
 
             val validation = port.validate(draft, "verified-model")
             port.finish(
@@ -191,7 +182,7 @@ class SpringOnboardingPortTest {
             )
 
             verify {
-                catalog.replaceConfiguration(
+                catalog.replaceConfigurationReactive(
                     match { configuration ->
                         configuration.providers
                             .single()
@@ -212,8 +203,7 @@ class SpringOnboardingPortTest {
     fun `finish preserves existing provider model configuration`() =
         runTest {
             val provider = mockk<LLMProvider>()
-            val transactionTemplate = mockk<TransactionTemplate>()
-            val port = SpringOnboardingPort(preferences, catalog, provider, transactionTemplate, mockk())
+            val port = SpringOnboardingPort(preferences, catalog, provider, mockk())
             val configured =
                 ProviderProfile(
                     id = "openai",
@@ -240,20 +230,18 @@ class SpringOnboardingPortTest {
                 )
             every { catalog.getProvider("openai") } returns configured
             every { catalog.listProviders() } returns listOf(configured)
-            every { catalog.replaceConfiguration(any()) } returns Unit
+            every { catalog.replaceConfigurationReactive(any()) } returns Mono.empty()
             every { preferences.setPreference(any(), any()) } returns Unit
-            every { transactionTemplate.executeWithoutResult(any()) } answers {
-                firstArg<Consumer<org.springframework.transaction.TransactionStatus>>().accept(mockk())
-            }
-            coEvery { provider.getModelConfigs(any<ProviderProfile>()) } returns listOf(ProviderModelConfig("selected-model"))
-            coEvery { provider.chat(any<ChatRequestContext>()) } returns
-                ChatResponse("selected-model", Message("assistant", "READY"), true)
+            every { provider.getModelConfigsReactive(any<ProviderProfile>()) } returns
+                Mono.just(listOf(ProviderModelConfig("selected-model")))
+            every { provider.chatReactive(any<ChatRequestContext>()) } returns
+                Mono.just(ChatResponse("selected-model", Message("assistant", "READY"), true))
 
             val validation = port.validate(draft, "selected-model")
             port.finish(draft, ProviderModel("selected-model"), checkNotNull(validation.validationFingerprint))
 
             verify {
-                catalog.replaceConfiguration(
+                catalog.replaceConfigurationReactive(
                     match { configuration ->
                         val models =
                             configuration.providers
@@ -274,7 +262,7 @@ class SpringOnboardingPortTest {
     fun `model discovery preserves provider metadata`() =
         runTest {
             val provider = mockk<LLMProvider>()
-            val port = SpringOnboardingPort(preferences, catalog, provider, mockk(), mockk())
+            val port = SpringOnboardingPort(preferences, catalog, provider, mockk())
             val draft =
                 OnboardingProviderDraft(
                     id = "openai",
@@ -283,14 +271,16 @@ class SpringOnboardingPortTest {
                     baseUrl = "https://api.example",
                 )
             every { catalog.getProvider("openai") } returns null
-            coEvery { provider.getModelConfigs(any<ProviderProfile>()) } returns
-                listOf(
-                    ProviderModelConfig(
-                        id = "vision-model",
-                        name = "Vision Model",
-                        contextLimit = 131072,
-                        outputLimit = 8192,
-                        capabilities = setOf("vision"),
+            every { provider.getModelConfigsReactive(any<ProviderProfile>()) } returns
+                Mono.just(
+                    listOf(
+                        ProviderModelConfig(
+                            id = "vision-model",
+                            name = "Vision Model",
+                            contextLimit = 131072,
+                            outputLimit = 8192,
+                            capabilities = setOf("vision"),
+                        ),
                     ),
                 )
 
@@ -306,7 +296,7 @@ class SpringOnboardingPortTest {
     fun `model discovery excludes disabled models`() =
         runTest {
             val provider = mockk<LLMProvider>()
-            val port = SpringOnboardingPort(preferences, catalog, provider, mockk(), mockk())
+            val port = SpringOnboardingPort(preferences, catalog, provider, mockk())
             val draft =
                 OnboardingProviderDraft(
                     id = "openai",
@@ -315,10 +305,12 @@ class SpringOnboardingPortTest {
                     baseUrl = "https://api.example",
                 )
             every { catalog.getProvider("openai") } returns null
-            coEvery { provider.getModelConfigs(any<ProviderProfile>()) } returns
-                listOf(
-                    ProviderModelConfig("available"),
-                    ProviderModelConfig("disabled", status = ModelStatus.DISABLED),
+            every { provider.getModelConfigsReactive(any<ProviderProfile>()) } returns
+                Mono.just(
+                    listOf(
+                        ProviderModelConfig("available"),
+                        ProviderModelConfig("disabled", status = ModelStatus.DISABLED),
+                    ),
                 )
 
             assertEquals(listOf("available"), port.discoverModels(draft).map(ProviderModel::id))

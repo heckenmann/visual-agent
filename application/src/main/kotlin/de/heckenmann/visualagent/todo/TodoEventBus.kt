@@ -1,7 +1,9 @@
 package de.heckenmann.visualagent.todo
 
+import mu.KotlinLogging
 import org.springframework.stereotype.Component
-import java.util.concurrent.CopyOnWriteArrayList
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Sinks
 
 /**
  * In-process pub/sub bus for todo list mutations.
@@ -11,8 +13,26 @@ import java.util.concurrent.CopyOnWriteArrayList
  */
 @Component
 class TodoEventBus {
-    private val listeners = CopyOnWriteArrayList<(TodoChange) -> Unit>()
-    private val progressListeners = CopyOnWriteArrayList<(TodoProgressUpdate) -> Unit>()
+    private val logger = KotlinLogging.logger {}
+    private val emissionLock = Any()
+    private val changeSink = Sinks.many().multicast().onBackpressureBuffer<TodoChange>(EVENT_BUFFER_CAPACITY, false)
+    private val progressSink = Sinks.many().multicast().directBestEffort<TodoProgressUpdate>()
+
+    /**
+     * Hot stream of persisted todo changes.
+     *
+     * Changes are ordered, not replayed, and retained in a bounded buffer for slow consumers.
+     * The authoritative current state remains available through [TodoManager.list].
+     */
+    val changes: Flux<TodoChange> = changeSink.asFlux()
+
+    /**
+     * Hot stream of transient todo progress updates.
+     *
+     * Updates are ordered for active consumers, are not replayed, and may be dropped for slow
+     * consumers because the persisted todo state is authoritative.
+     */
+    val progress: Flux<TodoProgressUpdate> = progressSink.asFlux()
 
     /**
      * Register a listener that receives all todo change events.
@@ -21,8 +41,15 @@ class TodoEventBus {
      * @return Handle that removes the listener when closed
      */
     fun addListener(listener: (TodoChange) -> Unit): AutoCloseable {
-        listeners += listener
-        return AutoCloseable { listeners.remove(listener) }
+        val subscription =
+            changes.subscribe(
+                { change ->
+                    runCatching { listener(change) }
+                        .onFailure { error -> logger.warn(error) { "Todo change listener failed." } }
+                },
+                { error -> logger.warn(error) { "Todo change stream terminated." } },
+            )
+        return AutoCloseable(subscription::dispose)
     }
 
     /**
@@ -32,8 +59,15 @@ class TodoEventBus {
      * @return Handle that removes the listener when closed
      */
     fun addProgressListener(listener: (TodoProgressUpdate) -> Unit): AutoCloseable {
-        progressListeners += listener
-        return AutoCloseable { progressListeners.remove(listener) }
+        val subscription =
+            progress.subscribe(
+                { update ->
+                    runCatching { listener(update) }
+                        .onFailure { error -> logger.warn(error) { "Todo progress listener failed." } }
+                },
+                { error -> logger.warn(error) { "Todo progress stream terminated." } },
+            )
+        return AutoCloseable(subscription::dispose)
     }
 
     /**
@@ -42,8 +76,8 @@ class TodoEventBus {
      * @param change Event payload to broadcast
      */
     fun publish(change: TodoChange) {
-        listeners.forEach { listener ->
-            runCatching { listener(change) }
+        synchronized(emissionLock) {
+            logEmissionFailure("todo change", changeSink.tryEmitNext(change))
         }
     }
 
@@ -53,9 +87,22 @@ class TodoEventBus {
      * @param update Response delta and stream state
      */
     fun publishProgress(update: TodoProgressUpdate) {
-        progressListeners.forEach { listener ->
-            runCatching { listener(update) }
+        synchronized(emissionLock) {
+            logEmissionFailure("todo progress", progressSink.tryEmitNext(update))
         }
+    }
+
+    private fun logEmissionFailure(
+        eventType: String,
+        result: Sinks.EmitResult,
+    ) {
+        if (result != Sinks.EmitResult.OK) {
+            logger.warn { "Unable to emit $eventType event: $result" }
+        }
+    }
+
+    private companion object {
+        const val EVENT_BUFFER_CAPACITY = 256
     }
 }
 

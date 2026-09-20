@@ -9,6 +9,7 @@ import de.heckenmann.visualagent.agent.provider.ProviderErrorMessages
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.knowledge.ConversationRecord
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.time.Instant
@@ -199,7 +200,7 @@ internal class AgentConversationHistoryOps(
     fun resumeInterruptedConversationIfNeeded() {
         if (owner.pendingResumeMessage == null) return
         owner.scope.launch {
-            if (!owner.llmProvider.checkConnection()) {
+            if (!owner.llmProvider.checkConnectionReactive().awaitSingle()) {
                 persist(
                     Message(
                         "assistant",
@@ -220,7 +221,7 @@ internal class AgentConversationHistoryOps(
                         "The previous request was interrupted by an app shutdown or failure. Continue the unfinished work from the last user request now.",
                     ),
                 )
-                val response = owner.llmProvider.chat(request.copy(messages = messages))
+                val response = owner.llmProvider.chatReactive(request.copy(messages = messages)).awaitSingle()
                 val persisted =
                     persist(Message("assistant", owner.responseCoordinator.normalizeAssistantPresentationContent(response.message.content)))
                 owner.conversationOps.publishAssistantCompletion(persisted)

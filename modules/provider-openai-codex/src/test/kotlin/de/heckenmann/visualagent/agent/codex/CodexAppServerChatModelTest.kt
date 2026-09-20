@@ -1,6 +1,5 @@
 package de.heckenmann.visualagent.agent.codex
 
-import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -45,7 +44,7 @@ class CodexAppServerChatModelTest {
                 }
             try {
                 val model = CodexAppServerChatModel(executable, "gpt-test", listOf(callback), directory)
-                val responses = model.streamFlow(Prompt("hello")).toList()
+                val responses = model.streamBlocking(Prompt("hello"))
 
                 assertEquals(
                     listOf("hel", "lo", ""),
@@ -66,8 +65,7 @@ class CodexAppServerChatModelTest {
             try {
                 val responses =
                     CodexAppServerChatModel(executable, "gpt-test", emptyList(), directory)
-                        .streamFlow(Prompt("hello"))
-                        .toList()
+                        .streamBlocking(Prompt("hello"))
 
                 assertEquals(
                     listOf("item-1", "item-2"),
@@ -90,8 +88,7 @@ class CodexAppServerChatModelTest {
             try {
                 val responses =
                     CodexAppServerChatModel(executable, "gpt-test", emptyList(), directory)
-                        .streamFlow(Prompt("hello"))
-                        .toList()
+                        .streamBlocking(Prompt("hello"))
 
                 assertEquals(
                     listOf("hel", "lo", ""),
@@ -111,7 +108,7 @@ class CodexAppServerChatModelTest {
             try {
                 val response =
                     CodexAppServerChatModel(executable, "gpt-test", emptyList(), directory)
-                        .complete(Prompt("hello"))
+                        .completeBlocking(Prompt("hello"))
 
                 assertEquals("hello", responseText(response))
                 assertTrue(response.hasFinishReasons(setOf("stop")))
@@ -128,8 +125,7 @@ class CodexAppServerChatModelTest {
             try {
                 val responses =
                     CodexAppServerChatModel(executable, "gpt-test", emptyList(), directory, showReasoningSummary = true)
-                        .streamFlow(Prompt("hello"))
-                        .toList()
+                        .streamBlocking(Prompt("hello"))
 
                 assertTrue(responses.any { it.metadata.get<String>("codexReasoning") == "planning" })
             } finally {
@@ -145,8 +141,7 @@ class CodexAppServerChatModelTest {
             try {
                 assertFailsWith<IllegalStateException> {
                     CodexAppServerChatModel(executable, "gpt-test", emptyList(), directory)
-                        .streamFlow(Prompt("hello"))
-                        .toList()
+                        .streamBlocking(Prompt("hello"))
                 }
             } finally {
                 deleteRecursively(directory)
@@ -161,7 +156,7 @@ class CodexAppServerChatModelTest {
             try {
                 val response =
                     CodexAppServerChatModel(executable, "gpt-test", emptyList(), directory)
-                        .completeVision(pngBytes(), "describe this image")
+                        .completeVisionBlocking(pngBytes(), "describe this image")
 
                 assertEquals("hello", responseText(response))
                 val turnRequest = Files.readString(directory.resolve("turn-start.json"))
@@ -179,7 +174,7 @@ class CodexAppServerChatModelTest {
             val executable = fakeServer(directory)
             try {
                 CodexAppServerChatModel(executable, "gpt-test", emptyList(), directory)
-                    .complete(Prompt("hello"))
+                    .completeBlocking(Prompt("hello"))
 
                 val threadRequest = Files.readString(directory.resolve("thread-start.json"))
                 val processId = Files.readString(directory.resolve("pid"))
@@ -200,7 +195,7 @@ class CodexAppServerChatModelTest {
             val executable = fakeServer(directory, toolName = "not-enabled")
             try {
                 CodexAppServerChatModel(executable, "gpt-test", emptyList(), directory)
-                    .complete(Prompt("hello"))
+                    .completeBlocking(Prompt("hello"))
 
                 assertTrue(Files.readString(directory.resolve("tool-response.json")).contains("-32602"))
             } finally {
@@ -275,6 +270,17 @@ class CodexAppServerChatModelTest {
             ?.output
             ?.text
             .orEmpty()
+
+    private fun CodexAppServerChatModel.streamBlocking(prompt: Prompt): List<ChatResponse> =
+        streamReactive(prompt).collectList().block().orEmpty()
+
+    private fun CodexAppServerChatModel.completeBlocking(prompt: Prompt): ChatResponse =
+        requireNotNull(completeReactive(prompt).block()) { "Codex returned no response" }
+
+    private fun CodexAppServerChatModel.completeVisionBlocking(
+        image: ByteArray,
+        prompt: String,
+    ): ChatResponse = requireNotNull(completeVisionReactive(image, prompt).block()) { "Codex returned no response" }
 
     private fun deltaEvent(
         text: String,

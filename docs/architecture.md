@@ -8,7 +8,7 @@ own output. Today those surfaces include an editable canvas, managed workspace f
 todo/sub-agent system, and a conversation panel; future work will add more rendering and
 interaction surfaces.
 
-The runtime uses Spring AI for model interaction and tool-calling, and Spring Data JPA on H2 as the transitional persistent state source. An opt-in Spring Data R2DBC H2 foundation supports the ongoing store migration.
+The runtime uses Spring AI for model interaction and tool-calling, and Spring Data R2DBC over embedded H2 for persistent state. Spring Boot Flyway applies ordered, transactional SQL resources through a JDBC-only migration data source before any R2DBC store is created.
 The desktop host is launched from `:desktop` and the server-only `:application` entry point can
 run without Compose. In desktop mode, `:desktop` starts exactly one non-web Spring context from
 the `:application` module in the same JVM; it does not start a second server. The standalone
@@ -26,7 +26,8 @@ The UI receives only protocol ports; it never receives Spring beans.
    ops classes (`AgentManagerConversationOps`, `AgentManagerLifecycleOps`,
    `AgentManagerAutonomyOps`).
 4. Provider: `ConfiguredLLMProvider` is the `@Primary` Spring `LLMProvider` bean.
-   It resolves each request through the H2-backed
+   Its server-facing chat, stream, vision, discovery, connectivity, model-detail,
+   and embedding contracts use Reactor `Mono` / `Flux`. It resolves each request through the H2-backed
    `agent/provider/ProviderCatalogService` (preference key
    `llm.provider.catalog.v1`) and dispatches to `OllamaClient` or
    `OpenAiClient`. Provider adapters: `OLLAMA`, `OPENAI_COMPATIBLE`.
@@ -41,11 +42,10 @@ The UI receives only protocol ports; it never receives Spring beans.
    uses `AutonomousTaskPlanner` (todo expansion + worker selection) and
    `UxSeedTasks.all()` as the default UX backlog. Concurrency is gated by
    `SubAgentJobScheduler` keyed off `AppConfig.maxParallelSubAgents`.
-7. Persistence: JPA-backed stores on H2, with the consolidated Flyway
-   baseline (`db/migration-h2/V1__initial_h2_schema.sql`) and bounded
-   database-neutral search. `KnowledgePersistenceConfig` creates the
-   transitional Hikari `DataSource`; `ReactiveKnowledgePersistenceConfig`
-   provides the opt-in R2DBC connection factory and preference adapter.
+7. Persistence: reactive R2DBC stores on embedded H2, with Flyway managing the
+   versioned baseline (`db/migration-h2/V1__initial_h2_schema.sql`) and bounded
+   database-neutral search. Flyway runs through a JDBC-only migration data source
+   before the R2DBC store beans are created; runtime reads and writes remain R2DBC.
 
 ## Current Implemented Flow
 
@@ -236,14 +236,22 @@ event buses into these contracts. The local connection performs a gRPC in-proces
 exchange without a network hop; the same session contract is the transport seam for a future
 remote deployment.
 
-The dependency direction is enforced by `verifyModuleDependencies` and a source-import scan:
+The dependency direction is enforced by `verifyModuleDependencies`, `verifyReactorBoundaries`, and source-import scans:
 
 ```text
 :desktop ──► :application + :ui ──► :protocol
 ```
 
-`:application` never imports Compose classes, and `:ui` never imports Spring, JPA, providers,
-tools, persistence, or application implementation types.
+`:application` never imports Compose classes, and `:ui` never imports Spring, JDBC, providers,
+tools, persistence, application implementation types, or Project Reactor. `:protocol` is also
+Reactor-free. Server services may expose `Mono` and `Flux` internally; Spring adapters translate
+them to protocol callbacks and gRPC frames before the desktop/UI boundary.
+
+Model-callable tools follow the same boundary: `ToolRegistry.executeReactive` is the server
+execution contract, `VisualAgentTool.executeReactive` permits native non-blocking implementations,
+and `ToolEventBus.events` exposes lifecycle notifications as a hot `Flux`. The synchronous Spring
+AI callback uses the deliberately named `executeBlocking` adapter because Spring AI's callback SPI
+returns `String`.
 
 Every connection outside the presentation process is proxied by the server: provider/network
 requests, persistence, workspace filesystem access, tool execution, and remote services are

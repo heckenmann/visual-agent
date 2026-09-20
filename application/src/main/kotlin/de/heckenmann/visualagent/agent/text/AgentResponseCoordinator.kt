@@ -4,6 +4,7 @@ import de.heckenmann.visualagent.agent.CancellationToken
 import de.heckenmann.visualagent.agent.ConversationOpsProvider
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
+import kotlinx.coroutines.reactor.awaitSingle
 
 /**
  * Coordinates assistant response normalization, repetition-guard retries, and tool-only followup finalization.
@@ -72,7 +73,8 @@ class AgentResponseCoordinator
             token?.throwIfCancelled()
             var raw =
                 llmProvider
-                    .chat(conversationOps.buildMainRequest(conversationOps.loadMainAgentContextFromDb(), requestId, token))
+                    .chatReactive(conversationOps.buildMainRequest(conversationOps.loadMainAgentContextFromDb(), requestId, token))
+                    .awaitSingle()
                     .message
                     .content
                     .trim()
@@ -131,7 +133,8 @@ class AgentResponseCoordinator
             val followup = base.copy(messages = followupMessages, enabledTools = emptySet(), cancellationToken = token)
             token?.throwIfCancelled()
             return llmProvider
-                .chat(followup)
+                .chatReactive(followup)
+                .awaitSingle()
                 .message.content
                 .trim()
         }
@@ -162,7 +165,8 @@ class AgentResponseCoordinator
                 val retryRequest = base.copy(messages = listOf(retryInstruction) + base.messages)
                 retryRaw =
                     llmProvider
-                        .chat(retryRequest)
+                        .chatReactive(retryRequest)
+                        .awaitSingle()
                         .message.content
                         .trim()
             }

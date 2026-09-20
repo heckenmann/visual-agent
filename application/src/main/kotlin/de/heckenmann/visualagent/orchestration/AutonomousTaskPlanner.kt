@@ -7,6 +7,7 @@ import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoManager
 import de.heckenmann.visualagent.todo.TodoStatus
+import kotlinx.coroutines.reactor.awaitSingle
 
 /**
  * Decomposes complex todos, selects suitable workers, and reviews worker output.
@@ -69,7 +70,7 @@ internal class AutonomousTaskPlanner(
                 enabledTools = emptySet(),
                 metadata = mapOf("sessionId" to "review", "todoId" to todoId),
             )
-        val response = llmProvider.chat(request)
+        val response = llmProvider.chatReactive(request).awaitSingle()
         val verdict =
             response
                 .message

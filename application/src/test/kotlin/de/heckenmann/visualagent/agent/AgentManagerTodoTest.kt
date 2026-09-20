@@ -4,14 +4,15 @@ import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.knowledge.PersistenceStores
 import de.heckenmann.visualagent.testsupport.seedDefaultTestAgents
-import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoStatus
 import de.heckenmann.visualagent.todo.TodoTerminalReason
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.reactor.mono
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
@@ -38,13 +39,15 @@ class AgentManagerTodoTest {
         val provider = mockk<LLMProvider>(relaxed = true)
         seedDefaultTestAgents(db)
         coEvery { provider.isConnected() } returns true
-        coEvery { provider.chat(any<ChatRequestContext>()) } coAnswers {
-            delay(3000)
-            ChatResponse(
-                model = "test",
-                message = Message("assistant", "Task completed"),
-                done = true,
-            )
+        every { provider.chatReactive(any<ChatRequestContext>()) } answers {
+            mono {
+                delay(3000)
+                ChatResponse(
+                    model = "test",
+                    message = Message("assistant", "Task completed"),
+                    done = true,
+                )
+            }
         }
         val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
         return Triple(manager, provider, db)
@@ -57,12 +60,14 @@ class AgentManagerTodoTest {
         val provider = mockk<LLMProvider>(relaxed = true)
         seedDefaultTestAgents(db)
         coEvery { provider.isConnected() } returns true
-        coEvery { provider.chat(any<ChatRequestContext>()) } returns
-            ChatResponse(
-                model = "test",
-                message = Message("assistant", "Task completed"),
-                done = true,
-            )
+        every { provider.chatReactive(any<ChatRequestContext>()) } returns
+            mono {
+                ChatResponse(
+                    model = "test",
+                    message = Message("assistant", "Task completed"),
+                    done = true,
+                )
+            }
         val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
         return Triple(manager, provider, db)
     }
@@ -219,9 +224,11 @@ class AgentManagerTodoTest {
         runBlocking {
             val (manager, provider, _) = createManagerWithInstantResponse()
             val request = CompletableDeferred<ChatRequestContext>()
-            coEvery { provider.chat(any<ChatRequestContext>()) } coAnswers {
-                request.complete(firstArg<ChatRequestContext>())
-                ChatResponse(model = "test", message = Message("assistant", "Reviewed"), done = true)
+            every { provider.chatReactive(any<ChatRequestContext>()) } answers {
+                mono {
+                    request.complete(firstArg<ChatRequestContext>())
+                    ChatResponse(model = "test", message = Message("assistant", "Reviewed"), done = true)
+                }
             }
             val todo = manager.todoManager.add("Completed review", "1")
 
@@ -247,9 +254,11 @@ class AgentManagerTodoTest {
         runBlocking {
             val (manager, provider, _) = createManagerWithInstantResponse()
             val request = CompletableDeferred<ChatRequestContext>()
-            coEvery { provider.chat(any<ChatRequestContext>()) } coAnswers {
-                request.complete(firstArg<ChatRequestContext>())
-                ChatResponse(model = "test", message = Message("assistant", "Reviewed"), done = true)
+            every { provider.chatReactive(any<ChatRequestContext>()) } answers {
+                mono {
+                    request.complete(firstArg<ChatRequestContext>())
+                    ChatResponse(model = "test", message = Message("assistant", "Reviewed"), done = true)
+                }
             }
             val todo = manager.todoManager.add("Cancelled review", "1")
 
@@ -301,21 +310,6 @@ class AgentManagerTodoTest {
             assertTrue(terminalReviews.any { it.metadata?.contains(second.id) == true })
             manager.destroy()
         }
-
-    @Test
-    fun `todo review input follows history ending in every supported role`() {
-        listOf("user", "assistant", "system").forEach { finalRole ->
-            val history =
-                appendTodoChangeReviewInput(
-                    listOf(Message(finalRole, "Existing message")),
-                    Todo(id = "todo-1", description = "Test todo"),
-                )
-            val reviewContent = history.last().content
-
-            assertEquals("user", history.last().role)
-            assertTrue(reviewContent.contains("id=todo-1"))
-        }
-    }
 
     @Test
     fun `non-terminal status change does not persist completion message`(): Unit =

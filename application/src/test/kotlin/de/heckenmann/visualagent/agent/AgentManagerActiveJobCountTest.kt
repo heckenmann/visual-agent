@@ -3,10 +3,11 @@ import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.todo.TodoEventBus
-import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.reactor.mono
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
@@ -25,10 +26,12 @@ class AgentManagerActiveJobCountTest {
             val startedCount = AtomicInteger()
             val bothStarted = CompletableDeferred<Unit>()
             val release = CompletableDeferred<Unit>()
-            coEvery { provider.chat(any<ChatRequestContext>()) } coAnswers {
-                if (startedCount.incrementAndGet() == 2) bothStarted.complete(Unit)
-                release.await()
-                ChatResponse("test", Message("assistant", "completed"), done = true)
+            every { provider.chatReactive(any<ChatRequestContext>()) } answers {
+                mono {
+                    if (startedCount.incrementAndGet() == 2) bothStarted.complete(Unit)
+                    release.await()
+                    ChatResponse("test", Message("assistant", "completed"), done = true)
+                }
             }
             val manager =
                 AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus(), TodoEventBus(), config)

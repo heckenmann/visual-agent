@@ -15,7 +15,7 @@ class WorkspaceDownloadNotificationService(
     private val eventBus: WorkspaceDownloadEventBus,
     private val agentManager: AgentManager,
 ) : DisposableBean {
-    private val registration = eventBus.addListener(::notifyConversation)
+    private val registration: AutoCloseable = eventBus.addListener(::notifyConversation)
 
     override fun destroy() {
         registration.close()

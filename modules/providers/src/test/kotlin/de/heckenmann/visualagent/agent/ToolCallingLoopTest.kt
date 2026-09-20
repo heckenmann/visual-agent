@@ -3,7 +3,7 @@ package de.heckenmann.visualagent.agent
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
 import io.mockk.every
 import io.mockk.mockk
-import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.springframework.ai.chat.messages.AssistantMessage
@@ -16,6 +16,7 @@ import org.springframework.ai.chat.prompt.Prompt
 import org.springframework.ai.tool.ToolCallback
 import org.springframework.ai.tool.definition.ToolDefinition
 import org.springframework.ai.tool.metadata.ToolMetadata
+import reactor.test.StepVerifier
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
@@ -31,7 +32,7 @@ class ToolCallingLoopTest {
         val prompt = Prompt(listOf(UserMessage("hello")))
         every { chatModel.call(prompt) } returns springResponse("unit", "direct answer")
 
-        val response = ToolCallingLoop().run(chatModel, prompt, null, emptyList())
+        val response = ToolCallingLoop().runReactive(chatModel, prompt, null, emptyList()).block()!!
 
         assertEquals("direct answer", response.message.content)
         assertEquals("unit", response.model)
@@ -48,7 +49,7 @@ class ToolCallingLoopTest {
                 springResponse("unit", "done after tool"),
             )
 
-        val response = ToolCallingLoop().run(chatModel, prompt, null, listOf(tool))
+        val response = ToolCallingLoop().runReactive(chatModel, prompt, null, listOf(tool)).block()!!
 
         assertEquals("done after tool", response.message.content)
         assertEquals(1, tool.callCount)
@@ -62,7 +63,7 @@ class ToolCallingLoopTest {
         every { chatModel.call(any<Prompt>()) } returns
             springToolResponse("unit", toolName = "direct_tool", arguments = "{}", callId = "call-1")
 
-        val response = ToolCallingLoop().run(chatModel, prompt, null, listOf(tool))
+        val response = ToolCallingLoop().runReactive(chatModel, prompt, null, listOf(tool)).block()!!
 
         assertTrue(response.message.content.contains("direct result"))
     }
@@ -75,7 +76,7 @@ class ToolCallingLoopTest {
         every { chatModel.call(any<Prompt>()) } returns
             springToolResponse("unit", toolName = "count_tool", arguments = "{}", callId = "loop")
 
-        val response = ToolCallingLoop(maxRounds = 3).run(chatModel, prompt, null, listOf(tool))
+        val response = ToolCallingLoop(maxRounds = 3).runReactive(chatModel, prompt, null, listOf(tool)).block()!!
 
         assertEquals("", response.message.content)
         assertEquals(3, tool.callCount)
@@ -90,7 +91,7 @@ class ToolCallingLoopTest {
             springToolResponse("unit", toolName = "unknown_tool", arguments = "{}", callId = "call-1")
 
         assertFailsWith<IllegalStateException> {
-            ToolCallingLoop().run(chatModel, prompt, null, listOf(registeredTool))
+            ToolCallingLoop().runReactive(chatModel, prompt, null, listOf(registeredTool)).block()!!
         }
         assertEquals(0, registeredTool.callCount)
     }
@@ -113,7 +114,7 @@ class ToolCallingLoopTest {
                 springResponse("unit", "done after two calls"),
             )
 
-        val response = ToolCallingLoop().run(chatModel, prompt, null, listOf(tool), correlation)
+        val response = ToolCallingLoop().runReactive(chatModel, prompt, null, listOf(tool), correlation).block()!!
 
         assertEquals("done after two calls", response.message.content)
         assertEquals(2, tool.callCount)
@@ -139,7 +140,7 @@ class ToolCallingLoopTest {
                 )
             every { chatModel.call(any<Prompt>()) } returns springResponse("unit", "final stream answer")
 
-            val chunks = ToolCallingLoop().runStream(chatModel, prompt, null, listOf(tool), correlation).toList()
+            val chunks = ToolCallingLoop().runStreamReactive(chatModel, prompt, null, listOf(tool), correlation).collectList().awaitSingle()
 
             assertEquals(2, chunks.size)
             assertEquals("", chunks[0].message.content)
@@ -158,12 +159,29 @@ class ToolCallingLoopTest {
                     springResponse("unit", "chunk two"),
                 )
 
-            val chunks = ToolCallingLoop().runStream(chatModel, prompt, null, emptyList()).toList()
+            val chunks = ToolCallingLoop().runStreamReactive(chatModel, prompt, null, emptyList()).collectList().awaitSingle()
 
             assertEquals(2, chunks.size)
             assertEquals("chunk one", chunks[0].message.content)
             assertEquals("chunk two", chunks[1].message.content)
         }
+
+    @Test
+    fun `runStreamReactive emits native Flux model chunks without a coroutine adapter`() {
+        val chatModel = mockk<ChatModel>()
+        val prompt = Prompt(listOf(UserMessage("just stream reactively")))
+        every { chatModel.stream(prompt) } returns
+            reactor.core.publisher.Flux.just(
+                springResponse("unit", "chunk one"),
+                springResponse("unit", "chunk two"),
+            )
+
+        StepVerifier
+            .create(ToolCallingLoop().runStreamReactive(chatModel, prompt, null, emptyList()))
+            .assertNext { assertEquals("chunk one", it.message.content) }
+            .assertNext { assertEquals("chunk two", it.message.content) }
+            .verifyComplete()
+    }
 
     @Test
     fun `runStream loops through multiple tool rounds before emitting final answer`() =
@@ -182,7 +200,7 @@ class ToolCallingLoopTest {
                     springResponse("unit", "final after two tools"),
                 )
 
-            val chunks = ToolCallingLoop().runStream(chatModel, prompt, null, listOf(tool), correlation).toList()
+            val chunks = ToolCallingLoop().runStreamReactive(chatModel, prompt, null, listOf(tool), correlation).collectList().awaitSingle()
 
             assertEquals(2, chunks.size)
             assertEquals("", chunks[0].message.content)

@@ -19,7 +19,7 @@ class ToolTimeoutContractTest {
         val registry = ToolRegistry(listOf(SlowManagedTool()), ToolEventBus()) { 1 }
         val tool = registry.resolve(setOf(ToolId("javascript:execute"))).single()
 
-        val result = registry.execute(tool, "{}", emptyMap())
+        val result = registry.executeBlocking(tool, "{}", emptyMap())
         val json = Json.parseToJsonElement(result).jsonObject
 
         assertFalse(json["success"]!!.jsonPrimitive.content.toBoolean())
@@ -32,7 +32,7 @@ class ToolTimeoutContractTest {
         val tool = registry.resolve(setOf(ToolId("context"))).single()
         val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(100)
 
-        val result = registry.execute(tool, """{"timeoutSeconds":600}""", mapOf("toolDeadlineNanos" to deadline))
+        val result = registry.executeBlocking(tool, """{"timeoutSeconds":600}""", mapOf("toolDeadlineNanos" to deadline))
         val json = Json.parseToJsonElement(result).jsonObject
 
         assertFalse(json["success"]!!.jsonPrimitive.content.toBoolean())
@@ -49,7 +49,7 @@ class ToolTimeoutContractTest {
         val thread =
             Thread {
                 result.set(
-                    registry.execute(
+                    registry.executeBlocking(
                         tool,
                         "{}",
                         mapOf("toolCancellationRegistrar" to ToolCancellationRegistrar(parent::onCancelled)),

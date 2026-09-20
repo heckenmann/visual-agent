@@ -10,6 +10,7 @@ import de.heckenmann.visualagent.protocol.ProviderAdapter
 import de.heckenmann.visualagent.protocol.ProviderModel
 import de.heckenmann.visualagent.protocol.ProviderPort
 import de.heckenmann.visualagent.protocol.ProviderProfile
+import kotlinx.coroutines.reactor.awaitSingle
 import org.springframework.stereotype.Component
 import de.heckenmann.visualagent.agent.provider.ModelStatus as ApplicationModelStatus
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter as ApplicationProviderAdapter
@@ -53,21 +54,21 @@ class SpringProviderPort(
 
     override suspend fun refreshModels(providerId: String): List<ProviderModel> =
         protocolBoundary {
-            val discovered = llmProvider.getModels(providerId)
+            val discovered = llmProvider.getModelsReactive(providerId).awaitSingle()
             providerCatalog.updateDiscoveredModels(providerId, discovered)
             selectableModels(providerId)
         }
 
     override suspend fun discoverModels(profile: ProviderProfile): List<ProviderModel> =
         protocolBoundary {
-            val discovered = llmProvider.getModels(profile.toApplication())
+            val discovered = llmProvider.getModelsReactive(profile.toApplication()).awaitSingle()
             profile.withDiscoveredModels(discovered).selectableModels()
         }
 
     override suspend fun modelDetails(
         providerId: String,
         modelId: String,
-    ): ModelDetails = protocolBoundary { llmProvider.getModelDetails(providerId, modelId).toProtocol() }
+    ): ModelDetails = protocolBoundary { llmProvider.getModelDetailsReactive(providerId, modelId).awaitSingle().toProtocol() }
 
     override fun addChangeListener(listener: () -> Unit): AutoCloseable = providerCatalog.addChangeListener(listener)
 }

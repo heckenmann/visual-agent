@@ -1,9 +1,6 @@
 package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.reactive.asFlow
 import mu.KotlinLogging
 import org.springframework.ai.chat.messages.AssistantMessage
 import org.springframework.ai.chat.messages.Message
@@ -15,6 +12,9 @@ import org.springframework.ai.model.tool.ToolCallingChatOptions
 import org.springframework.ai.model.tool.ToolCallingManager
 import org.springframework.ai.model.tool.ToolExecutionResult
 import org.springframework.ai.tool.ToolCallback
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
+import reactor.core.scheduler.Schedulers
 import org.springframework.ai.chat.model.ChatResponse as SpringChatResponse
 
 /**
@@ -35,15 +35,10 @@ internal class ToolCallingLoop(
     private val logger = KotlinLogging.logger {}
 
     /**
-     * Run a chat request with recursive tool calling.
-     *
-     * @param chatModel Model to call (already configured with the correct options)
-     * @param initialPrompt First prompt including history, system instructions, and tools
-     * @param token Optional cancellation token to honour between rounds
-     * @param toolCallbacks Tool callbacks that can fulfil the model's tool calls
-     * @return Final response after all tool rounds completed
+     * Executes Spring AI's synchronous ChatModel tool loop on boundedElastic.
+     * Callers use [runReactive] rather than invoking this compatibility method directly.
      */
-    fun run(
+    private fun runBlocking(
         chatModel: ChatModel,
         initialPrompt: Prompt,
         token: CancellationToken?,
@@ -62,20 +57,14 @@ internal class ToolCallingLoop(
             logger.debug { "Tool calling round ${round + 1}/$maxRounds" }
             val response = chatModel.call(prompt)
             lastResponse = response
-
-            if (!response.hasToolCalls()) {
-                return response.toVisualAgentResponse(round = round)
-            }
+            if (!response.hasToolCalls()) return response.toVisualAgentResponse(round = round)
 
             val turn = ProviderTurnResponseMapper.fromSpring(response, round = round)
             val toolExecutionResult =
                 (callCorrelation?.bindToolCallRound(turn.toolCalls, round) ?: AutoCloseable {}).use {
                     toolCallingManager.executeToolCalls(prompt, response)
                 }
-            if (toolExecutionResult.returnDirect()) {
-                return buildDirectResponse(response, toolExecutionResult)
-            }
-
+            if (toolExecutionResult.returnDirect()) return buildDirectResponse(response, toolExecutionResult)
             prompt = appendToolConversationHistory(prompt, toolExecutionResult)
         }
 
@@ -89,91 +78,107 @@ internal class ToolCallingLoop(
     }
 
     /**
-     * Run a streaming chat request and finalize any tool calls after the stream ends.
+     * Runs the bounded tool-calling state machine through the server's reactive contract.
      *
-     * The stream itself only emits the model's text chunks. If the final aggregated
-     * response contains tool calls, they are executed and a final non-streaming call is
-     * made to obtain the user-facing answer. The returned flow emits the original chunks
-     * followed by the final answer.
-     *
-     * @param chatModel Model to stream from
-     * @param initialPrompt First prompt including history and tools
-     * @param token Optional cancellation token to honour during streaming and follow-up
-     * @param toolCallbacks Tool callbacks that can fulfil the model's tool calls
-     * @return Flow of response chunks, including the final answer after tool execution
+     * Spring AI's non-streaming [ChatModel.call] method is blocking, so its work is isolated on
+     * Reactor's shared bounded-elastic scheduler. Native Spring AI streaming remains a [Flux] in
+     * [runStreamReactive].
      */
-    fun runStream(
+    fun runReactive(
         chatModel: ChatModel,
         initialPrompt: Prompt,
         token: CancellationToken?,
         toolCallbacks: List<ToolCallback>,
         callCorrelation: ProviderToolCallbacks? = null,
-    ): Flow<ChatResponse> =
-        flow {
+    ): Mono<ChatResponse> =
+        Mono
+            .fromCallable { runBlocking(chatModel, initialPrompt, token, toolCallbacks, callCorrelation) }
+            .subscribeOn(Schedulers.boundedElastic())
+
+    /**
+     * Runs Spring AI streaming without converting its native [Flux] to a coroutine [Flow].
+     *
+     * Chunks keep provider order. Once the initial stream completes with tool calls, the bounded
+     * follow-up state machine runs on Reactor's blocking scheduler and contributes at most one
+     * final response.
+     */
+    fun runStreamReactive(
+        chatModel: ChatModel,
+        initialPrompt: Prompt,
+        token: CancellationToken?,
+        toolCallbacks: List<ToolCallback>,
+        callCorrelation: ProviderToolCallbacks? = null,
+    ): Flux<ChatResponse> =
+        Flux.defer {
             token?.throwIfCancelled()
             if (toolCallbacks.isEmpty()) {
-                chatModel.stream(initialPrompt).asFlow().collect { springResponse ->
+                return@defer chatModel.stream(initialPrompt).map { springResponse ->
                     token?.throwIfCancelled()
-                    emit(springResponse.toVisualAgentResponse())
+                    springResponse.toVisualAgentResponse()
                 }
-                return@flow
             }
             val boundPrompt = bindToolCallbacks(initialPrompt, toolCallbacks)
-            val toolCallingManager = buildToolCallingManager()
             val springChunks = mutableListOf<SpringChatResponse>()
 
-            chatModel.stream(boundPrompt).asFlow().collect { springResponse ->
-                token?.throwIfCancelled()
-                springChunks += springResponse
-                emit(springResponse.toVisualAgentResponse(sequence = springChunks.lastIndex))
-            }
-
-            val aggregated = aggregateStreamingResponse(springChunks)
-            if (aggregated?.hasToolCalls() != true) {
-                return@flow
-            }
-
-            val initialTurn = ProviderTurnResponseMapper.fromSpring(aggregated, round = 0)
-            val toolExecutionResult =
-                (callCorrelation?.bindToolCallRound(initialTurn.toolCalls, 0) ?: AutoCloseable {}).use {
-                    toolCallingManager.executeToolCalls(boundPrompt, aggregated)
-                }
-            if (toolExecutionResult.returnDirect()) {
-                val direct = buildDirectResponse(aggregated, toolExecutionResult)
-                emit(direct)
-                return@flow
-            }
-
-            var prompt = appendToolConversationHistory(boundPrompt, toolExecutionResult)
-            var lastFinalResponse: SpringChatResponse? = null
-            repeat(maxRounds) { followUpRoundIndex ->
-                val round = followUpRoundIndex + 1
-                token?.throwIfCancelled()
-                logger.debug { "Stream tool follow-up round $round/$maxRounds" }
-                val finalResponse = chatModel.call(prompt)
-                lastFinalResponse = finalResponse
-
-                if (!finalResponse.hasToolCalls()) {
-                    emit(finalResponse.toVisualAgentResponse(round = round))
-                    return@flow
-                }
-
-                val turn = ProviderTurnResponseMapper.fromSpring(finalResponse, round = round)
-                val nextToolResult =
-                    (callCorrelation?.bindToolCallRound(turn.toolCalls, round) ?: AutoCloseable {}).use {
-                        toolCallingManager.executeToolCalls(prompt, finalResponse)
-                    }
-                if (nextToolResult.returnDirect()) {
-                    val direct = buildDirectResponse(finalResponse, nextToolResult)
-                    emit(direct)
-                    return@flow
-                }
-                prompt = appendToolConversationHistory(prompt, nextToolResult)
-            }
-
-            logger.warn { "Stream tool calling loop reached max rounds ($maxRounds); emitting last response" }
-            lastFinalResponse?.let { emit(it.toVisualAgentResponse(round = maxRounds)) }
+            chatModel
+                .stream(boundPrompt)
+                .doOnNext { springChunks += it }
+                .index()
+                .map { indexed ->
+                    token?.throwIfCancelled()
+                    indexed.t2.toVisualAgentResponse(sequence = indexed.t1.toInt())
+                }.concatWith(
+                    Mono
+                        .fromCallable {
+                            finishStreamingToolCalls(
+                                chatModel,
+                                boundPrompt,
+                                aggregateStreamingResponse(springChunks),
+                                token,
+                                callCorrelation,
+                            )
+                        }.subscribeOn(Schedulers.boundedElastic()),
+                )
         }
+
+    private fun finishStreamingToolCalls(
+        chatModel: ChatModel,
+        initialPrompt: Prompt,
+        aggregated: SpringChatResponse?,
+        token: CancellationToken?,
+        callCorrelation: ProviderToolCallbacks?,
+    ): ChatResponse? {
+        if (aggregated?.hasToolCalls() != true) return null
+        val toolCallingManager = buildToolCallingManager()
+        val initialTurn = ProviderTurnResponseMapper.fromSpring(aggregated, round = 0)
+        val toolExecutionResult =
+            (callCorrelation?.bindToolCallRound(initialTurn.toolCalls, 0) ?: AutoCloseable {}).use {
+                toolCallingManager.executeToolCalls(initialPrompt, aggregated)
+            }
+        if (toolExecutionResult.returnDirect()) return buildDirectResponse(aggregated, toolExecutionResult)
+
+        var prompt = appendToolConversationHistory(initialPrompt, toolExecutionResult)
+        var lastFinalResponse: SpringChatResponse? = null
+        repeat(maxRounds) { followUpRoundIndex ->
+            val round = followUpRoundIndex + 1
+            token?.throwIfCancelled()
+            logger.debug { "Stream tool follow-up round $round/$maxRounds" }
+            val finalResponse = chatModel.call(prompt)
+            lastFinalResponse = finalResponse
+            if (!finalResponse.hasToolCalls()) return finalResponse.toVisualAgentResponse(round = round)
+
+            val turn = ProviderTurnResponseMapper.fromSpring(finalResponse, round = round)
+            val nextToolResult =
+                (callCorrelation?.bindToolCallRound(turn.toolCalls, round) ?: AutoCloseable {}).use {
+                    toolCallingManager.executeToolCalls(prompt, finalResponse)
+                }
+            if (nextToolResult.returnDirect()) return buildDirectResponse(finalResponse, nextToolResult)
+            prompt = appendToolConversationHistory(prompt, nextToolResult)
+        }
+
+        logger.warn { "Stream tool calling loop reached max rounds ($maxRounds); emitting last response" }
+        return lastFinalResponse?.toVisualAgentResponse(round = maxRounds)
+    }
 
     private fun buildToolCallingManager(): ToolCallingManager =
         ToolCallingManager

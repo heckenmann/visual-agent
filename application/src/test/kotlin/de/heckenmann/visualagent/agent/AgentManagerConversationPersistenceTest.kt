@@ -4,10 +4,11 @@ import de.heckenmann.visualagent.agent.conversation.WelcomeResult
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.todo.TodoEventBus
-import io.mockk.coEvery
-import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import io.mockk.verify
+import reactor.core.publisher.Mono
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -22,11 +23,13 @@ class AgentManagerConversationPersistenceTest {
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                 .create(tempDb)
         val provider1 = mockk<LLMProvider>(relaxed = true)
-        coEvery { provider1.chat(any<ChatRequestContext>()) } returns
-            ChatResponse(
-                model = "test",
-                message = Message("assistant", "Saved response"),
-                done = true,
+        every { provider1.chatReactive(any<ChatRequestContext>()) } returns
+            Mono.just(
+                ChatResponse(
+                    model = "test",
+                    message = Message("assistant", "Saved response"),
+                    done = true,
+                ),
             )
         val manager1 = AgentManager(db1, provider1, AgentToolConfigService(db1), ToolEventBus(), TodoEventBus(), AppConfigBean(db1))
 
@@ -82,13 +85,15 @@ class AgentManagerConversationPersistenceTest {
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                 .create(tempDb)
         val provider = mockk<LLMProvider>(relaxed = true)
-        coEvery { provider.checkConnection() } returns true
-        coEvery { provider.getModels() } returns listOf("llava")
-        coEvery { provider.chat(any<ChatRequestContext>()) } returns
-            ChatResponse(
-                model = "test",
-                message = Message("assistant", "Hello, I can help with files, todos, code, terminal, and project context."),
-                done = true,
+        every { provider.checkConnectionReactive() } returns Mono.just(true)
+        every { provider.getModelsReactive() } returns Mono.just(listOf("llava"))
+        every { provider.chatReactive(any<ChatRequestContext>()) } returns
+            Mono.just(
+                ChatResponse(
+                    model = "test",
+                    message = Message("assistant", "Hello, I can help with files, todos, code, terminal, and project context."),
+                    done = true,
+                ),
             )
         val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
@@ -120,10 +125,9 @@ class AgentManagerConversationPersistenceTest {
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                 .create(tempDb)
         val provider = mockk<LLMProvider>(relaxed = true)
-        coEvery { provider.checkConnection() } returns true
-        coEvery { provider.getModels() } returns listOf("llava")
-        coEvery { provider.chat(any<ChatRequestContext>()) } throws
-            IllegalStateException("Provider timeout")
+        every { provider.checkConnectionReactive() } returns Mono.just(true)
+        every { provider.getModelsReactive() } returns Mono.just(listOf("llava"))
+        every { provider.chatReactive(any<ChatRequestContext>()) } returns Mono.error(IllegalStateException("Provider timeout"))
         val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
         manager.clearHistory()
@@ -148,14 +152,16 @@ class AgentManagerConversationPersistenceTest {
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                 .create(tempDb)
         val provider = mockk<LLMProvider>(relaxed = true)
-        coEvery { provider.checkConnection() } returns true
-        coEvery { provider.getModels() } returns listOf("llava")
+        every { provider.checkConnectionReactive() } returns Mono.just(true)
+        every { provider.getModelsReactive() } returns Mono.just(listOf("llava"))
         val requestSlot = slot<ChatRequestContext>()
-        coEvery { provider.chat(capture(requestSlot)) } returns
-            ChatResponse(
-                model = "test",
-                message = Message("assistant", "Guten Tag!"),
-                done = true,
+        every { provider.chatReactive(capture(requestSlot)) } returns
+            Mono.just(
+                ChatResponse(
+                    model = "test",
+                    message = Message("assistant", "Guten Tag!"),
+                    done = true,
+                ),
             )
         val appConfig = AppConfigBean(db)
         val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), appConfig)
@@ -190,17 +196,21 @@ class AgentManagerConversationPersistenceTest {
                 .create(tempDb)
         val provider = mockk<LLMProvider>(relaxed = true)
         val repeated = List(80) { "Meine letzte Nachricht war:" }.joinToString(" ")
-        coEvery { provider.chat(any<ChatRequestContext>()) } returnsMany
+        every { provider.chatReactive(any<ChatRequestContext>()) } returnsMany
             listOf(
-                ChatResponse(
-                    model = "test",
-                    message = Message("assistant", repeated),
-                    done = true,
+                Mono.just(
+                    ChatResponse(
+                        model = "test",
+                        message = Message("assistant", repeated),
+                        done = true,
+                    ),
                 ),
-                ChatResponse(
-                    model = "test",
-                    message = Message("assistant", "Hier ist die korrigierte, kurze Antwort ohne Wiederholung."),
-                    done = true,
+                Mono.just(
+                    ChatResponse(
+                        model = "test",
+                        message = Message("assistant", "Hier ist die korrigierte, kurze Antwort ohne Wiederholung."),
+                        done = true,
+                    ),
                 ),
             )
         val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
@@ -215,7 +225,7 @@ class AgentManagerConversationPersistenceTest {
         val last = rows.last()
         assertEquals("assistant", last.role)
         assertTrue(last.content.contains("korrigierte"))
-        coVerify(exactly = 2) { provider.chat(any<ChatRequestContext>()) }
+        verify(exactly = 2) { provider.chatReactive(any<ChatRequestContext>()) }
         db.close()
     }
 
@@ -226,14 +236,16 @@ class AgentManagerConversationPersistenceTest {
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                 .create(tempDb)
         val provider = mockk<LLMProvider>(relaxed = true)
-        coEvery { provider.checkConnection() } returns true
-        coEvery { provider.getModels() } returns listOf("llava")
+        every { provider.checkConnectionReactive() } returns Mono.just(true)
+        every { provider.getModelsReactive() } returns Mono.just(listOf("llava"))
         val requestSlot = slot<ChatRequestContext>()
-        coEvery { provider.chat(capture(requestSlot)) } returns
-            ChatResponse(
-                model = "test",
-                message = Message("assistant", "Hello!"),
-                done = true,
+        every { provider.chatReactive(capture(requestSlot)) } returns
+            Mono.just(
+                ChatResponse(
+                    model = "test",
+                    message = Message("assistant", "Hello!"),
+                    done = true,
+                ),
             )
         val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 

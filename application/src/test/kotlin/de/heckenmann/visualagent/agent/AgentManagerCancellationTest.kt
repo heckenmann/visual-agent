@@ -6,17 +6,18 @@ import de.heckenmann.visualagent.protocol.LifecycleState
 import de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoStatus
-import io.mockk.coEvery
-import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.reactor.flux
+import kotlinx.coroutines.reactor.mono
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlin.test.Test
@@ -33,10 +34,12 @@ class AgentManagerCancellationTest {
             val provider = mockk<LLMProvider>(relaxed = true)
             val streamEntered = CompletableDeferred<Unit>()
             val cancelled = CompletableDeferred<Unit>()
-            coEvery { provider.stream(any<ChatRequestContext>()) } coAnswers {
-                streamEntered.complete(Unit)
-                cancelled.await()
-                flow { throw CancellationException("Cancelled") }
+            every { provider.streamReactive(any<ChatRequestContext>()) } answers {
+                flux {
+                    streamEntered.complete(Unit)
+                    cancelled.await()
+                    throw CancellationException("Cancelled")
+                }
             }
             val manager =
                 AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus(), TodoEventBus(), AppConfigBean(stores))
@@ -75,10 +78,12 @@ class AgentManagerCancellationTest {
             val provider = mockk<LLMProvider>(relaxed = true)
             val started = CompletableDeferred<Unit>()
             val cancelled = CompletableDeferred<Unit>()
-            coEvery { provider.chat(any<ChatRequestContext>()) } coAnswers {
-                started.complete(Unit)
-                cancelled.await()
-                throw CancellationException("Cancelled")
+            every { provider.chatReactive(any<ChatRequestContext>()) } answers {
+                mono {
+                    started.complete(Unit)
+                    cancelled.await()
+                    throw CancellationException("Cancelled")
+                }
             }
             val manager =
                 AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus(), TodoEventBus(), AppConfigBean(stores))
@@ -102,10 +107,12 @@ class AgentManagerCancellationTest {
             val provider = mockk<LLMProvider>(relaxed = true)
             val started = CompletableDeferred<Unit>()
             val cancelled = CompletableDeferred<Unit>()
-            coEvery { provider.chat(any<ChatRequestContext>()) } coAnswers {
-                started.complete(Unit)
-                cancelled.await()
-                throw CancellationException("Cancelled")
+            every { provider.chatReactive(any<ChatRequestContext>()) } answers {
+                mono {
+                    started.complete(Unit)
+                    cancelled.await()
+                    throw CancellationException("Cancelled")
+                }
             }
             val manager =
                 AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus(), TodoEventBus(), AppConfigBean(stores))
@@ -186,7 +193,7 @@ class AgentManagerCancellationTest {
                 assertFalse(manager.scope.isActive)
                 delay(100)
 
-                coVerify(exactly = 0) { provider.chat(any<ChatRequestContext>()) }
+                verify(exactly = 0) { provider.chatReactive(any<ChatRequestContext>()) }
             } finally {
                 manager.destroy()
                 stores.close()
@@ -219,7 +226,7 @@ class AgentManagerCancellationTest {
 
                 dispatcher.scheduler.runCurrent()
 
-                coVerify(exactly = 0) { provider.chat(any<ChatRequestContext>()) }
+                verify(exactly = 0) { provider.chatReactive(any<ChatRequestContext>()) }
             } finally {
                 manager.destroy()
                 stores.close()
@@ -232,9 +239,11 @@ class AgentManagerCancellationTest {
             val stores = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             val started = CompletableDeferred<Unit>()
-            coEvery { provider.chat(any<ChatRequestContext>()) } coAnswers {
-                started.complete(Unit)
-                kotlinx.coroutines.awaitCancellation()
+            every { provider.chatReactive(any<ChatRequestContext>()) } answers {
+                mono {
+                    started.complete(Unit)
+                    kotlinx.coroutines.awaitCancellation()
+                }
             }
             val lifecycle = LifecycleState()
             val manager =
@@ -258,7 +267,7 @@ class AgentManagerCancellationTest {
 
                 val messages = stores.getConversationMessages("main")
                 assertTrue(messages.none { it.content.contains("main agent could not be triggered") })
-                coVerify(exactly = 1) { provider.chat(any<ChatRequestContext>()) }
+                verify(exactly = 1) { provider.chatReactive(any<ChatRequestContext>()) }
             } finally {
                 manager.destroy()
                 stores.close()

@@ -4,8 +4,10 @@ import de.heckenmann.visualagent.knowledge.PreferenceStore
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import mu.KotlinLogging
 import org.springframework.stereotype.Service
-import java.util.concurrent.CopyOnWriteArrayList
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Sinks
 
 /** Execution state of the autonomous sub-agent workers. */
 enum class SubAgentExecutionState {
@@ -53,11 +55,21 @@ data class SubAgentExecutionStatus(
 class SubAgentExecutionControl(
     private val preferenceStore: PreferenceStore,
 ) {
+    private val logger = KotlinLogging.logger {}
     private val lock = Any()
-    private val listeners = CopyOnWriteArrayList<(SubAgentExecutionSnapshot) -> Unit>()
+    private val emissionLock = Any()
+    private val stateSink = Sinks.many().multicast().directBestEffort<SubAgentExecutionSnapshot>()
     private var stateChanged = CompletableDeferred<Unit>()
     private var globalPaused: Boolean = loadGlobalPaused()
     private val pausedAgentIds: MutableSet<String> = loadPausedAgentIds().toMutableSet()
+
+    /**
+     * Hot stream of execution-gate changes.
+     *
+     * Changes are not replayed and may be dropped for slow consumers because [snapshot] is the
+     * authoritative state query used to recover from a missed refresh signal.
+     */
+    val stateChanges: Flux<SubAgentExecutionSnapshot> = stateSink.asFlux()
 
     /** Returns the current global and per-agent execution state. */
     fun snapshot(): SubAgentExecutionSnapshot =
@@ -165,8 +177,15 @@ class SubAgentExecutionControl(
 
     /** Registers a listener for immediate UI/tool state refreshes. */
     fun addListener(listener: (SubAgentExecutionSnapshot) -> Unit): AutoCloseable {
-        listeners += listener
-        return AutoCloseable { listeners.remove(listener) }
+        val subscription =
+            stateChanges.subscribe(
+                { snapshot ->
+                    runCatching { listener(snapshot) }
+                        .onFailure { error -> logger.warn(error) { "Sub-agent execution listener failed." } }
+                },
+                { error -> logger.warn(error) { "Sub-agent execution stream terminated." } },
+            )
+        return AutoCloseable(subscription::dispose)
     }
 
     private fun mutate(change: () -> Unit): SubAgentExecutionSnapshot {
@@ -189,7 +208,10 @@ class SubAgentExecutionControl(
                 previousSignal.complete(Unit)
                 currentSnapshot()
             }
-        listeners.forEach { listener -> runCatching { listener(next) } }
+        synchronized(emissionLock) {
+            val result = stateSink.tryEmitNext(next)
+            if (result != Sinks.EmitResult.OK) logger.warn { "Unable to emit sub-agent execution state: $result" }
+        }
         return next
     }
 

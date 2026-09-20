@@ -1,66 +1,30 @@
 package de.heckenmann.visualagent.knowledge
 
-import org.flywaydb.core.Flyway
+import de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
 import org.junit.jupiter.api.Test
 import java.nio.file.Files
-import java.sql.DriverManager
 import kotlin.test.assertEquals
 
-/** Verifies onboarding state initialization and persistence in the H2 schema. */
+/** Verifies onboarding state initialization and idempotent H2 R2DBC schema setup. */
 class OnboardingStateMigrationTest {
     @Test
     fun `fresh database starts onboarding`() {
-        val jdbcUrl = newDatabase("visual-agent-onboarding-fresh")
-        migrate(jdbcUrl)
+        val databasePath = Files.createTempDirectory("visual-agent-onboarding-fresh").resolve("database")
+        val db = KnowledgeDbTestFactory.create(databasePath.toString())
 
-        assertEquals("NOT_STARTED", onboardingState(jdbcUrl))
+        assertEquals("NOT_STARTED", db.preferenceStore.getPreference("ui.onboarding.v1"))
+        db.close()
     }
 
     @Test
-    fun `existing onboarding state survives a repeated migration`() {
-        val jdbcUrl = newDatabase("visual-agent-onboarding-existing")
-        migrate(jdbcUrl)
-        DriverManager.getConnection(jdbcUrl, "sa", "").use { connection ->
-            connection
-                .prepareStatement(
-                    "UPDATE user_preferences SET preference_value = ? WHERE preference_key = ?",
-                ).use { statement ->
-                    statement.setString(1, "COMPLETED")
-                    statement.setString(2, "ui.onboarding.v1")
-                    statement.executeUpdate()
-                }
-        }
+    fun `existing onboarding state survives a repeated schema initialization`() {
+        val databasePath = Files.createTempDirectory("visual-agent-onboarding-existing").resolve("database")
+        val db = KnowledgeDbTestFactory.create(databasePath.toString())
+        db.preferenceStore.setPreference("ui.onboarding.v1", "COMPLETED")
+        db.close()
 
-        migrate(jdbcUrl)
-
-        assertEquals("COMPLETED", onboardingState(jdbcUrl))
+        val reopened = KnowledgeDbTestFactory.create(databasePath.toString())
+        assertEquals("COMPLETED", reopened.preferenceStore.getPreference("ui.onboarding.v1"))
+        reopened.close()
     }
-
-    private fun newDatabase(prefix: String): String {
-        val directory = Files.createTempDirectory(prefix)
-        return "jdbc:h2:file:${directory.resolve("database")};DB_CLOSE_ON_EXIT=FALSE"
-    }
-
-    private fun migrate(jdbcUrl: String) {
-        Flyway
-            .configure()
-            .dataSource(jdbcUrl, "sa", "")
-            .locations("classpath:db/migration-h2")
-            .load()
-            .migrate()
-    }
-
-    private fun onboardingState(jdbcUrl: String): String =
-        DriverManager.getConnection(jdbcUrl, "sa", "").use { connection ->
-            connection
-                .prepareStatement(
-                    "SELECT preference_value FROM user_preferences WHERE preference_key = ?",
-                ).use { statement ->
-                    statement.setString(1, "ui.onboarding.v1")
-                    statement.executeQuery().use { result ->
-                        check(result.next())
-                        result.getString("preference_value")
-                    }
-                }
-        }
 }

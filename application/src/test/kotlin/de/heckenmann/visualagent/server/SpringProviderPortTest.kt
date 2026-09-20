@@ -8,12 +8,11 @@ import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.protocol.ModelStatus
 import de.heckenmann.visualagent.protocol.ProviderAdapter
 import de.heckenmann.visualagent.protocol.ProviderProfile
-import io.mockk.coEvery
-import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
+import reactor.core.publisher.Mono
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import de.heckenmann.visualagent.agent.provider.ModelStatus as ApplicationModelStatus
@@ -98,19 +97,21 @@ class SpringProviderPortTest {
     @Test
     fun `refresh and model details delegate to provider and map responses`() =
         runTest {
-            coEvery { provider.getModels("ollama") } returns listOf("llama3")
+            every { provider.getModelsReactive("ollama") } returns Mono.just(listOf("llama3"))
             every { catalog.selectableModels("ollama") } returns applicationProfile.models
-            coEvery { provider.getModelDetails("ollama", "llama3") } returns
-                ShowResponse(
-                    model = "llama3",
-                    modifiedAt = "today",
-                    details =
-                        ModelDetails(
-                            family = "llama",
-                            parameterSize = "8B",
-                            format = "gguf",
-                            quantizationLevel = "Q4_K_M",
-                        ),
+            every { provider.getModelDetailsReactive("ollama", "llama3") } returns
+                Mono.just(
+                    ShowResponse(
+                        model = "llama3",
+                        modifiedAt = "today",
+                        details =
+                            ModelDetails(
+                                family = "llama",
+                                parameterSize = "8B",
+                                format = "gguf",
+                                quantizationLevel = "Q4_K_M",
+                            ),
+                    ),
                 )
 
             assertEquals("llama3", port.refreshModels("ollama").single().id)
@@ -119,8 +120,8 @@ class SpringProviderPortTest {
             assertEquals("llama3", details.model)
             assertEquals("8B", details.parameterSize)
             assertEquals("Q4_K_M", details.quantizationLevel)
-            coVerify { provider.getModels("ollama") }
-            coVerify { provider.getModelDetails("ollama", "llama3") }
+            verify { provider.getModelsReactive("ollama") }
+            verify { provider.getModelDetailsReactive("ollama", "llama3") }
             verify { catalog.updateDiscoveredModels("ollama", listOf("llama3")) }
         }
 
@@ -135,12 +136,12 @@ class SpringProviderPortTest {
                     baseUrl = "https://staged.example.test",
                     apiKey = "not-persisted",
                 )
-            coEvery { provider.getModels(any<ApplicationProviderProfile>()) } returns listOf("gpt-staged")
+            every { provider.getModelsReactive(any<ApplicationProviderProfile>()) } returns Mono.just(listOf("gpt-staged"))
 
             assertEquals("gpt-staged", port.discoverModels(staged).single().id)
 
-            coVerify {
-                provider.getModels(
+            verify {
+                provider.getModelsReactive(
                     match<ApplicationProviderProfile> {
                         it.id == "staged" && it.baseUrl == "https://staged.example.test" && it.apiKey == "not-persisted"
                     },

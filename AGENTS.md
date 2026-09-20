@@ -86,6 +86,34 @@ Never commit API keys, tokens, passwords, private keys, or user PII. Provider AP
 - Ollama running (`ollama serve`) when using local Ollama, or a reachable remote Ollama endpoint.
 - Optional: Ollama API key (bearer) when the endpoint requires authentication; non-blank keys are sent as `Authorization: Bearer <key>` on every request and apply live without restart (Base URL changes still require restart).
 
+## Optional CodeGraph Workflow
+
+CodeGraph is an optional local MCP service for structural code intelligence. It must not replace source review, compilation, tests, or the Gradle quality gates.
+
+- Use the official [`colbymchenry/codegraph`](https://github.com/colbymchenry/codegraph) release bundle. Configure it as a project-scoped STDIO MCP server with an absolute path to its bundled `bin/codegraph` executable. The server must receive this repository as `--path`, not the parent directory.
+- A minimal Codex MCP entry is equivalent to:
+
+  ```toml
+  [mcp_servers.codegraph]
+  command = "/path/to/codegraph-darwin-arm64/bin/codegraph"
+  args = ["serve", "--mcp", "--path", "/path/to/visual-agent"]
+  cwd = "/path/to/visual-agent"
+  ```
+
+- For privacy and predictable process ownership, `DO_NOT_TRACK = "1"`, `CODEGRAPH_NO_UPDATE_CHECK = "1"`, and `CODEGRAPH_NO_DAEMON = "1"` may be set in the MCP entry. Do not run `codegraph install` here: it can install globally and modify agent configuration files.
+- For an initial or forced index, run from the repository:
+
+  ```bash
+  /path/to/codegraph-darwin-arm64/bin/codegraph init --yes /path/to/visual-agent
+  # Later, rebuild from scratch with:
+  /path/to/codegraph-darwin-arm64/bin/codegraph index /path/to/visual-agent
+  ```
+
+- Recommended investigation flow: use `codegraph_explore` for architecture, flow, and symbol questions; use `codegraph_node` for one file or symbol; use `codegraph_callers`, `codegraph_callees`, and `codegraph_impact` when tracing dependencies or change risk. `codegraph_status` reports index health.
+- Treat parser warnings and incomplete indexing as limitations. A successful build or test run remains authoritative; CodeGraph does not validate runtime behavior.
+
+See the [CodeGraph README](https://github.com/colbymchenry/codegraph/blob/main/README.md) for current commands and tool details.
+
 ## Project Layout (essentials)
 
 ```text
@@ -100,7 +128,7 @@ application/src/main/kotlin/de/heckenmann/visualagent/
 ├── canvas/                          # CanvasOperations + InMemoryCanvasService + PNG/document codec
 ├── config/                          # AppConfig singleton, properties mapping, theme stylesheet IDs
 ├── image/                           # In-house RgbaPngEncoder (no AWT)
-├── knowledge/                       # Domain models, JPA entities, stores, repositories, converters
+├── knowledge/                       # Domain models, reactive R2DBC stores, schema migrations
 ├── todo/                            # Todo/TodoPriority/TodoStatus + TodoManager + Spring wiring
 ├── workspace/                       # File service, image header reader, PDF page renderer
 │   └── layout/                      # Toolkit-neutral panel layout service + persistence
@@ -137,7 +165,7 @@ See `README.md` for the full tree and the feature status table.
 - **Tooling**: every tool is a `@Component` implementing `agent/tools/VisualAgentTool`. `ToolRegistry` adapts them to Spring AI `ToolCallback`s with STARTED/FINISHED events on `ToolEventBus`. `VisualAgentTool.managesExecution = true` opts out of the generic async/timeout wrapper (used by sub-agent execution tools).
 - **Tool inventory** (canonical IDs): `ui`, `history`, `todos`, `context`, `pwd`, `manual`, `usecases`, `skills`, `file:read`, `file:list`, `file:glob`, `file:grep`, `file:write`, `file:edit`, `terminal`, `sleep`, `browser` (placeholder, returns "not configured"), `search` (placeholder, returns "not configured"), `workspace:layout`, `workspace:file`, `workspace:mime`, `workspace:download`, `update:check`, `javascript:execute`, `canvas`, `agent:list`, `agent:show`, `agent:create`, `agent:update`, `agent:delete`, `agent:log`. The main agent gets `agent:*` definition tools, `todos`, `update:check`, `skills`, and the server-owned workspace transfer tools; sub-agents get role-based sets from `AgentToolConfigService` (default: `researcher`, `coder`, `analyst`), with `skills` enabled only by explicit configuration. `tools.disabled.global` (preference) is a newline-separated blocklist applied to all agents.
 - **Orchestration**: `orchestration/AutonomousCoordinator.kt` (constructed by `AgentManager`, reachable only through `AgentManagerAutonomyOps`). It uses `AutonomousTaskPlanner` (todo expansion + worker selection) and `UxSeedTasks.all()` (default UX backlog). Per-job retry loop is bounded by `agent.config.maxRetries`; result review calls the main LLM and expects `APPROVED` / `RETRY`. Concurrency is gated by `SubAgentJobScheduler` keyed off `AppConfig.maxParallelSubAgents`.
-- **Persistence**: `knowledge/PersistenceStores.kt` defines domain `data class`es + `*Store` interfaces. `knowledge/PersistenceEntities.kt` holds the `@Entity internal class`es. `knowledge/JpaPersistenceStores.kt` + `JpaWorkspaceFileStore.kt` adapt Spring Data repositories to the domain interfaces. `KnowledgePersistenceConfig` creates the transitional H2 `DataSource`; `ReactiveKnowledgePersistenceConfig` provides the opt-in R2DBC H2 foundation. `ServerDataPathResolver` resolves the packaged server data root through AppDirs before H2 starts; `application/src/main/resources/config/app.properties` is documentation-only. Runtime config is in H2 `user_preferences`. Conversation and skill search use bounded database queries without engine-specific full-text extensions.
+- **Persistence**: `knowledge/PersistenceStores.kt` defines domain `data class`es + `*Store` interfaces. The `R2dbc*Store` adapters use Spring Data R2DBC with embedded H2, while Spring Boot Flyway manages versioned schema migrations through a JDBC-only migration data source. `ServerDataPathResolver` resolves the packaged server data root through AppDirs before H2 starts; `application/src/main/resources/config/app.properties` is documentation-only. Runtime config is in H2 `user_preferences`. Conversation and skill search use bounded database queries without engine-specific full-text extensions.
 - **Stable data root**: Packaged desktop and standalone-server launches use the per-user platform server data root (`Visual Agent/server`), independent of process working directory. `visual-agent.db.path` remains the explicit override. Gradle development tasks opt into the repository-local `data/visual-agent.db`; do not create module-local `application/data` or `modules/desktop/data` stores.
 - **Workspace files**: `workspace/WorkspaceFileService.kt` imports/reads files below the server-owned data root's `workspace/` directory. `workspace/ImageHeaderReader.kt` reads PNG/JPEG/GIF dimensions without AWT. `workspace/PdfPagePreviewRenderer.kt` renders PDF page text to PNG using a built-in 5×7 bitmap font + `image/RgbaPngEncoder.kt` (in-house RGBA encoder).
 - **Workspace layout**: `workspace/layout/WorkspaceLayoutService.kt` + `WorkspaceLayoutPersistence.kt` keep the toolkit-neutral panel layout under preference key `ui.workspace.layout.v1` (JSON, versioned).
@@ -222,7 +250,7 @@ The Compose migration is complete. The current desktop runtime is Compose Multip
 - GitHub CLI comment formatting: when posting issue/PR comments with `gh issue comment` / `gh pr comment`, use `--body-file path/to/file.md` (or pipe from stdin) instead of `--body "$(cat <<'EOF' ... EOF)"`. The latter double-escapes newlines and backticks, producing a single unformatted paragraph on GitHub.
 - Tool error text comes from `agent/provider/ProviderErrorMessages.kt` (matches `429`/`403`/`401`/`timeout`/`connection refused`); do not embed raw SDK exception messages in tool results.
 - `ProviderCatalogService` is the single source of truth for provider/model/variant at runtime; the legacy `AppConfig.ollama*` / `openai*` properties are still loaded but migrated into the catalog on first init.
-- Spring AI's `Flux` is bridged to coroutines via `kotlinx-coroutines-reactor`; any new streaming path must preserve the existing `Flux → Flow` conversion.
+- Spring AI's `Flux` and R2DBC `Mono`/`Flux` remain Reactor-native inside server modules. Convert to Kotlin `Flow` only at a desktop/client or other external boundary; `:protocol` and `:ui` must remain Reactor-free.
 
 ## Documentation Language
 
