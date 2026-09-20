@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.knowledge
 
+import reactor.core.publisher.Mono
 import java.time.Instant
 
 /** Durable, revisioned reference document owned by the main agent. */
@@ -34,6 +35,16 @@ interface MainAgentLongTermMemoryStore {
         expectedRevision: Long,
         maxCodePoints: Int,
     ): MainAgentLongTermMemoryEdit
+
+    /** Reactive counterpart of [snapshot]. */
+    fun snapshotReactive(): Mono<MainAgentLongTermMemory> = Mono.fromCallable { snapshot() }
+
+    /** Reactive counterpart of [replace]. */
+    fun replaceReactive(
+        content: String,
+        expectedRevision: Long,
+        maxCodePoints: Int,
+    ): Mono<MainAgentLongTermMemoryEdit> = Mono.fromCallable { replace(content, expectedRevision, maxCodePoints) }
 }
 
 /** In-memory implementation used only by the legacy test-oriented manager constructor. */
@@ -55,4 +66,12 @@ internal class InMemoryMainAgentLongTermMemoryStore : MainAgentLongTermMemorySto
         current = MainAgentLongTermMemory(content, contentLength, current.revision + 1, Instant.now())
         return MainAgentLongTermMemoryEdit.Saved(current)
     }
+
+    override fun snapshotReactive(): Mono<MainAgentLongTermMemory> = Mono.fromCallable { snapshot() }
+
+    override fun replaceReactive(
+        content: String,
+        expectedRevision: Long,
+        maxCodePoints: Int,
+    ): Mono<MainAgentLongTermMemoryEdit> = Mono.fromCallable { replace(content, expectedRevision, maxCodePoints) }
 }

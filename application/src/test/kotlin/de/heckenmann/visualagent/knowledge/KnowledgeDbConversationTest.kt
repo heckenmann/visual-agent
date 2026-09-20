@@ -2,7 +2,6 @@ package de.heckenmann.visualagent.knowledge
 
 import de.heckenmann.visualagent.agent.ConversationContextPolicy
 import de.heckenmann.visualagent.todo.Todo
-import java.sql.DriverManager
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -194,11 +193,11 @@ class KnowledgeDbConversationTest {
             db.saveConversationMessage("main", "user", "Request $index")
             db.saveConversationMessage("main", "assistant", "Answer $index")
         }
-        DriverManager.getConnection("jdbc:h2:file:$tempDb;DB_CLOSE_ON_EXIT=FALSE").use { connection ->
-            connection.createStatement().use { statement ->
-                statement.executeUpdate("UPDATE conversation_history SET timeline_sequence = 0")
-            }
-        }
+        db.databaseClient
+            .sql("UPDATE conversation_history SET timeline_sequence = 0")
+            .fetch()
+            .rowsUpdated()
+            .block()
 
         val context = db.conversationStore.getConversationMessagesForContext("main", userTurnLimit = 1, recordLimit = 20)
 

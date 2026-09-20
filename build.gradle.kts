@@ -38,6 +38,7 @@ tasks.named("check") {
         ":tools:check",
         "verifyCentralizedVersions",
         "verifyModuleDependencies",
+        "verifyReactorBoundaries",
         "verifyKtlintCompilerCompatibility",
     )
 }
@@ -263,6 +264,48 @@ tasks.register("verifyModuleDependencies") {
                 if (uiSourceViolations.isNotEmpty()) {
                     appendLine("UI source must use protocol-owned types only:")
                     appendLine(uiSourceViolations.joinToString("\n"))
+                }
+            }
+        }
+    }
+}
+
+tasks.register("verifyReactorBoundaries") {
+    group = "verification"
+    description = "Prevents Project Reactor from leaking into UI-facing modules."
+    doLast {
+        val clientModules = listOf(":ui", ":protocol")
+        val sourceViolations =
+            clientModules.flatMap { modulePath ->
+                fileTree(project(modulePath).projectDir.resolve("src/main"))
+                    .matching { include("**/*.kt") }
+                    .files
+                    .flatMap { source ->
+                        source.readLines().mapIndexedNotNull { index, line ->
+                            if (Regex("\\breactor\\.").containsMatchIn(line)) "${source}:${index + 1}: $line" else null
+                        }
+                    }
+            }
+        val dependencyViolations =
+            clientModules.flatMap { modulePath ->
+                val project = project(modulePath)
+                listOf("compileClasspath", "runtimeClasspath").flatMap { configurationName ->
+                    project.configurations.findByName(configurationName)?.incoming?.resolutionResult?.allComponents
+                        ?.mapNotNull { component -> component.moduleVersion }
+                        ?.filter { module -> module.group == "io.projectreactor" }
+                        ?.map { module -> "$modulePath:$configurationName resolves ${module.group}:${module.name}:${module.version}" }
+                        .orEmpty()
+                }
+            }.distinct()
+        check(sourceViolations.isEmpty() && dependencyViolations.isEmpty()) {
+            buildString {
+                if (sourceViolations.isNotEmpty()) {
+                    appendLine("UI-facing source must not import Project Reactor:")
+                    appendLine(sourceViolations.joinToString("\n"))
+                }
+                if (dependencyViolations.isNotEmpty()) {
+                    appendLine("UI-facing modules must not resolve Project Reactor:")
+                    appendLine(dependencyViolations.joinToString("\n"))
                 }
             }
         }

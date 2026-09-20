@@ -6,7 +6,6 @@ import kotlin.io.path.extension
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
-    alias(libs.plugins.kotlin.jpa)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.kotlin.spring)
     alias(libs.plugins.ktlint)
@@ -38,24 +37,21 @@ dependencies {
     implementation(platform(libs.protobuf.bom))
     implementation(platform(libs.coroutines.bom))
     implementation(libs.spring.boot.starter)
+    implementation(libs.spring.boot.starter.flyway)
     implementation(libs.grpc.inprocess)
     implementation(libs.grpc.netty.shaded)
-    implementation(libs.spring.boot.starter.data.jpa)
     implementation(libs.spring.data.r2dbc)
     implementation(libs.spring.r2dbc)
+    implementation(libs.h2)
     implementation(platform(libs.spring.ai.bom))
     implementation(libs.spring.ai.ollama)
     implementation(libs.spring.ai.openai)
-    implementation("org.hibernate.orm:hibernate-community-dialects")
-    implementation("org.springframework.boot:spring-boot-starter-flyway")
-
-    // Temporary relational baseline while the store adapters move to R2DBC.
-    runtimeOnly(libs.h2)
     runtimeOnly(libs.r2dbc.h2)
     implementation(libs.appdirs)
 
     // Kotlinx Coroutines
     implementation(libs.coroutines.core)
+    implementation(libs.coroutines.reactor)
 
     // JSON Serialization
     implementation(libs.serialization.json)
@@ -82,6 +78,7 @@ dependencies {
     testImplementation(libs.spring.boot.starter.test)
     testImplementation(libs.mockk)
     testImplementation(libs.coroutines.test)
+    testImplementation(libs.reactor.test)
 }
 
 val databaseTestTag = "database"

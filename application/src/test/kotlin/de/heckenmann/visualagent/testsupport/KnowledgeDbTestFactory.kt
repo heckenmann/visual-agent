@@ -8,6 +8,7 @@ import de.heckenmann.visualagent.agent.config.SubAgentToolConfig
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.knowledge.ConversationStore
+import de.heckenmann.visualagent.knowledge.DirectoryGrantStore
 import de.heckenmann.visualagent.knowledge.MainAgentLongTermMemoryStore
 import de.heckenmann.visualagent.knowledge.Memory
 import de.heckenmann.visualagent.knowledge.MemoryStore
@@ -25,31 +26,37 @@ import de.heckenmann.visualagent.todo.TodoEventBus
 import org.springframework.boot.SpringBootConfiguration
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration
 import org.springframework.boot.builder.SpringApplicationBuilder
-import org.springframework.boot.persistence.autoconfigure.EntityScan
 import org.springframework.context.ConfigurableApplicationContext
 import org.springframework.context.annotation.ComponentScan
-import org.springframework.data.jpa.repository.config.EnableJpaRepositories
+import org.springframework.r2dbc.core.DatabaseClient
+import org.springframework.transaction.reactive.TransactionalOperator
+import java.util.UUID
 
 /**
- * Builds isolated Spring Data persistence contexts for H2 integration tests.
+ * Builds isolated Spring Data R2DBC persistence contexts for H2 integration tests.
  */
 object KnowledgeDbTestFactory {
     /**
      * Creates a persistence fixture for the given H2 path or JDBC URL.
      *
-     * @param dbPath H2 file path or `jdbc:h2:` URL
+     * @param dbPath H2 file path or `jdbc:h2:` compatibility URL
      * @return Isolated persistence fixture
      */
     fun create(dbPath: String): TestPersistence {
         val context =
             SpringApplicationBuilder(PersistenceTestApplication::class.java)
                 .properties(
-                    "visual-agent.db.path=$dbPath",
+                    "visual-agent.db.path=${isolatedDatabasePath(dbPath)}",
                     "spring.main.web-application-type=none",
                     "spring.main.banner-mode=off",
-                    "spring.jpa.hibernate.ddl-auto=validate",
                 ).run()
         return TestPersistence(context)
+    }
+
+    private fun isolatedDatabasePath(dbPath: String): String {
+        if (!dbPath.startsWith("jdbc:h2:mem:")) return dbPath
+        val name = dbPath.substringAfter("jdbc:h2:mem:").substringBefore(';').ifBlank { "test" }
+        return "jdbc:h2:mem:$name-${UUID.randomUUID()}"
     }
 }
 
@@ -66,9 +73,12 @@ class TestPersistence internal constructor(
     val memoryStore: MemoryStore = context.getBean(MemoryStore::class.java)
     val mainAgentLongTermMemoryStore: MainAgentLongTermMemoryStore = context.getBean(MainAgentLongTermMemoryStore::class.java)
     val preferenceStore: PreferenceStore = context.getBean(PreferenceStore::class.java)
+    val directoryGrantStore: DirectoryGrantStore = context.getBean(DirectoryGrantStore::class.java)
     val subAgentConfigStore: SubAgentConfigStore = context.getBean(SubAgentConfigStore::class.java)
     val workspaceFileStore: WorkspaceFileStore = context.getBean(WorkspaceFileStore::class.java)
     val skillStore: SkillStore = context.getBean(SkillStore::class.java)
+    val databaseClient: DatabaseClient = context.getBean(DatabaseClient::class.java)
+    val transactionalOperator: TransactionalOperator = context.getBean(TransactionalOperator::class.java)
 
     fun createAgentManager(
         provider: LLMProvider,
@@ -228,6 +238,4 @@ class TestPersistence internal constructor(
 @SpringBootConfiguration
 @EnableAutoConfiguration
 @ComponentScan("de.heckenmann.visualagent.knowledge")
-@EntityScan("de.heckenmann.visualagent.knowledge")
-@EnableJpaRepositories("de.heckenmann.visualagent.knowledge")
 internal class PersistenceTestApplication
