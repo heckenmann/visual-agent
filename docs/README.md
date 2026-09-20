@@ -1,6 +1,6 @@
 # Documentation
 
-Visual Agent uses a transitional Spring Data JPA layer on H2 and an opt-in Spring Data R2DBC foundation. Flyway owns the H2 schema baseline. The docs below reflect the current runtime stack.
+Visual Agent uses Spring Data R2DBC over embedded H2. Spring Boot Flyway applies versioned SQL resources through a JDBC-only migration connection before the R2DBC stores are created. The docs below reflect the current runtime stack.
 
 ## Table of Contents
 

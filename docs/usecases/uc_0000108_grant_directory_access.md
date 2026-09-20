@@ -41,4 +41,4 @@ Only the persisted server root or the live client capability is available to gra
 
 ## Design Decision
 
-FileKit supplies the existing native client directory picker. Java NIO supplies server-side canonical path, symlink, containment, and bounded stream primitives, while the existing Spring Data/Flyway stack supplies transactional persistence. Adding a general filesystem library would broaden the dependency and attack surfaces without improving the required owner-side authorization checks.
+FileKit supplies the existing native client directory picker. Java NIO supplies server-side canonical path, symlink, containment, and bounded stream primitives, while the R2DBC store and versioned schema runner supply transactional persistence. Adding a general filesystem library would broaden the dependency and attack surfaces without improving the required owner-side authorization checks.

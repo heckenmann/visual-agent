@@ -5,7 +5,7 @@
 - Java 21+ (the project auto-resolves the JDK 24 toolchain locally; CI uses JDK 21 so the Foojay toolchain resolver can fetch 24).
 - The Gradle wrapper version is defined centrally in `gradle/wrapper/gradle-wrapper.properties`; the release workflow validates release tags against the project version. The Wrapper JAR is intentionally excluded from version control. In a fresh clone, run `gradle wrapper --gradle-version <version from gradle-wrapper.properties>` once before using `./gradlew`.
 - Ollama running locally (`ollama serve`) or a reachable remote Ollama endpoint.
-- H2 is embedded and managed automatically through Spring Data JPA + Flyway. R2DBC support is available for the ongoing store migration.
+- H2 is embedded and accessed through Spring Data R2DBC. Versioned schema migrations run automatically before the stores are created.
 
 ## Build and Run
 
@@ -126,8 +126,7 @@ Leaving the key blank omits the `Authorization` header. Profile URL and key chan
   packages do not depend on the process working directory.
 - Files panel search covers metadata and bounded text/PDF content. The `Sync DB` action reconciles metadata with files found below the managed workspace directory.
 - Editable canvas documents saved from the Canvas or Files panel are stored as regular workspace files under `<server-data-root>/workspace/canvas/`.
-- Schema changes are applied through Flyway migrations at startup
-- Hibernate validates the mapped entities, but does not generate schema in production
+- Schema changes are applied by Flyway at startup and tracked in `flyway_schema_history`; R2DBC remains the runtime persistence API
 - Conversation search uses bounded database queries with a safe `LIKE` path
 
 ## Troubleshooting
@@ -164,7 +163,7 @@ If a lock persists after a crash, verify that no Visual Agent process is still r
 
 ### Migration startup issues
 
-If Flyway or JPA fails during startup, verify the resolved server data root and that the server
+If schema migration fails during startup, verify the resolved server data root and that the server
 process can create and write its per-user directory. For an intentional legacy repository-local
 store, pass its absolute path explicitly with `-Dvisual-agent.db.path=/path/to/data/visual-agent.db`.
 The application never merges a legacy `./data/` directory into an existing target automatically;

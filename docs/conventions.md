@@ -24,6 +24,23 @@ The build packages `docs/usecases/*.md` into runtime resources under `usecases/`
 
 ## Asynchronous Code
 
-Coroutines and `Flow` are Visual Agent's primary asynchronous model. Use `withContext(Dispatchers.IO)` for blocking I/O and `Dispatchers.Default` for CPU-bound work.
+Server-side asynchronous service and event contracts use Reactor `Mono` and `Flux` when an operation is naturally asynchronous. Preserve native Reactor streams from Spring AI, WebClient, and R2DBC instead of converting them to coroutines only to convert them back at another server boundary.
 
-Reactor is restricted to external SDK boundaries that require it, including Spring AI and `WebClient`. `Flux`/`Mono` to `Flow` bridges belong in provider adapters only; application business logic and Compose UI must not expose or consume Reactor types.
+Provider discovery, connectivity checks, model details, embeddings, vision, chat, and
+streaming use Reactor contracts as well. Blocking provider SDK calls are wrapped once
+inside the provider adapter and scheduled on the shared bounded-elastic scheduler.
+
+Pure local transformations remain ordinary Kotlin. Unavoidable blocking server integrations must be isolated in explicit adapters scheduled through Reactor's standard `Schedulers.boundedElastic()` path. The server enables Reactor's Java 21+ virtual-thread bounded-elastic implementation through `reactor.schedulers.defaultBoundedElasticOnVirtualThreads=true` before the Spring context creates reactive services; an explicit JVM property takes precedence. Do not scatter `subscribeOn`, create custom virtual-thread executors, or block a reactive pipeline without a documented boundary reason.
+
+Use `ToolRegistry.executeReactive` for server-side tool execution and `ToolEventBus.events` for tool lifecycle subscriptions. `executeBlocking` is reserved for synchronous host callback APIs such as Spring AI and must not become a general server execution path.
+
+Reactor terminates at the server transport boundary. Generated Java gRPC services still
+use `StreamObserver`; Spring gRPC registers `BindableService` implementations but does
+not automatically adapt `Mono` or `Flux` method returns. The server transport adapter
+must therefore translate Reactor signals explicitly and tie subscription cancellation
+to the gRPC session. `:protocol`, `:desktop`, and `:ui` remain Reactor-free and use
+protocol callbacks, Kotlin `Flow`, `StateFlow`, `SharedFlow`, and Compose state as
+appropriate. A `Flux` to `Flow` bridge is valid only in a desktop/client adapter or
+another genuine external boundary.
+
+Every server event stream must document whether events are mandatory, replayed, coalesced, buffered, or dropped for slow consumers. State queries must remain separate from transient event streams.
