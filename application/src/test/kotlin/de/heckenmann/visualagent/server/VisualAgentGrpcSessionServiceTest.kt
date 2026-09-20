@@ -148,7 +148,7 @@ class VisualAgentGrpcSessionServiceTest {
 
         runBlocking {
             withTimeout(1_000) {
-                while (observer.values.none { it.hasChatDelta() }) yield()
+                while (observer.values.none { it.hasChatCompleted() }) yield()
             }
         }
 
