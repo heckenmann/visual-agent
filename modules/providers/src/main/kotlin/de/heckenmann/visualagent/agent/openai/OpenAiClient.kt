@@ -130,6 +130,12 @@ class OpenAiClient(
             .map(List<String>::isNotEmpty)
             .onErrorReturn(false)
 
+    /** Checks connectivity using the selected OpenAI-compatible provider profile. */
+    fun checkConnectionReactive(profile: ProviderProfile): Mono<Boolean> =
+        getModelsReactive(profile)
+            .map { true }
+            .onErrorReturn(false)
+
     override fun getModelsReactive(): Mono<List<String>> =
         Mono
             .fromCallable {

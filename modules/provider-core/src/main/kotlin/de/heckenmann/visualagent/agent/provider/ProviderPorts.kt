@@ -141,6 +141,12 @@ interface ProfiledProviderAdapter : LLMProvider {
         modelName: String,
     ): Mono<ShowResponse>
 
+    /** Checks connectivity using the supplied provider profile. */
+    fun checkConnectionReactive(profile: ProviderProfile): Mono<Boolean> =
+        loadModelsReactive(profile)
+            .map { true }
+            .onErrorReturn(false)
+
     /** Analyzes an image with an explicitly selected model and provider profile. */
     fun visionReactive(
         image: ByteArray,

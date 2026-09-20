@@ -100,7 +100,7 @@ class ConfiguredLLMProviderTest {
                 val ollama = mockk<OllamaClient>()
                 val openAi = mockk<OpenAiClient>(relaxed = true)
                 every { ollama.isConnected() } returns true
-                every { ollama.checkConnectionReactive() } returns Mono.just(true)
+                every { ollama.checkConnectionReactive(any<ProviderProfile>()) } returns Mono.just(true)
                 every { ollama.getModelsReactive(any<ProviderProfile>()) } returns Mono.just(listOf("llama"))
                 val router = ConfiguredLLMProvider(ollama, openAi, catalog(), fetchCapabilities = { Mono.just(emptyMap()) })
 
@@ -108,7 +108,7 @@ class ConfiguredLLMProviderTest {
                 assertEquals(true, router.checkConnectionReactive().awaitSingle())
                 assertEquals(listOf("llama"), router.getModelsReactive().awaitSingle())
 
-                verify(exactly = 1) { ollama.checkConnectionReactive() }
+                verify(exactly = 1) { ollama.checkConnectionReactive(any<ProviderProfile>()) }
                 verify(exactly = 1) { ollama.getModelsReactive(any<ProviderProfile>()) }
                 verify(exactly = 0) { openAi.getModelsReactive() }
             } finally {

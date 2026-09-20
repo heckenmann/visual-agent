@@ -40,6 +40,19 @@ internal class OllamaClientOps(
                 }
             }.subscribeOn(Schedulers.boundedElastic())
 
+    /** Pings the Ollama endpoint configured by a specific provider profile. */
+    fun checkConnectionReactive(profile: ProviderProfile): Mono<Boolean> =
+        Mono
+            .fromCallable {
+                try {
+                    createOllamaApi(profile, appConfig).listModels()
+                    true
+                } catch (e: Exception) {
+                    logger.warn(e) { "Ollama profile connection check failed" }
+                    false
+                }
+            }.subscribeOn(Schedulers.boundedElastic())
+
     /**
      * Lists models available on the configured Ollama endpoint.
      *

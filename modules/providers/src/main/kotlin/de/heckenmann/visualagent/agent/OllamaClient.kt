@@ -196,6 +196,9 @@ class OllamaClient(
 
     override fun checkConnectionReactive(): Mono<Boolean> = ops.checkConnectionReactive()
 
+    /** Checks connectivity using the selected Ollama provider profile. */
+    fun checkConnectionReactive(profile: ProviderProfile): Mono<Boolean> = ops.checkConnectionReactive(profile)
+
     override fun getModelsReactive(): Mono<List<String>> = ops.getModelsReactive()
 
     override fun getModelsReactive(profile: ProviderProfile): Mono<List<String>> = ops.getModelsReactive(profile)

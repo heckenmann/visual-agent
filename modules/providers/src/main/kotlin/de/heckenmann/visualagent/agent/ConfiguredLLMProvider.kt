@@ -76,7 +76,7 @@ class ConfiguredLLMProvider(
                 providerCatalog.getProvider(providerCatalog.activeProviderId())
                     ?: error("Active provider profile is missing")
             }.subscribeOn(Schedulers.boundedElastic())
-            .flatMap { profile -> providerFor(profile).checkConnectionReactive() }
+            .flatMap { profile -> checkConnectionReactive(profile) }
             .onErrorReturn(false)
 
     override fun getModelsReactive(): Mono<List<String>> = getModelsReactive(providerCatalog.activeProviderId())
@@ -132,6 +132,13 @@ class ConfiguredLLMProvider(
             ProviderAdapter.OPENAI_COMPATIBLE ->
                 openAiClient.getModelsReactive(profile).map { models -> models.map(::ProviderModelConfig) }
             ProviderAdapter.CODEX_CLI -> adapterFor(profile.adapter).loadModelsReactive(profile)
+        }
+
+    private fun checkConnectionReactive(profile: ProviderProfile): Mono<Boolean> =
+        when (profile.adapter) {
+            ProviderAdapter.OLLAMA -> ollamaClient.checkConnectionReactive(profile)
+            ProviderAdapter.OPENAI_COMPATIBLE -> openAiClient.checkConnectionReactive(profile)
+            ProviderAdapter.CODEX_CLI -> adapterFor(profile.adapter).checkConnectionReactive(profile)
         }
 
     private fun activeProviderSelectionReactive(): Mono<Pair<LLMProvider, String>> =
