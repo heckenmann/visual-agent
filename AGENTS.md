@@ -88,27 +88,31 @@ Never commit API keys, tokens, passwords, private keys, or user PII. Provider AP
 
 ## Optional CodeGraph Workflow
 
-CodeGraph is an optional local MCP service for structural and semantic code intelligence. It must not replace source review, compilation, tests, or the Gradle quality gates.
+CodeGraph is an optional local MCP service for structural code intelligence. It must not replace source review, compilation, tests, or the Gradle quality gates.
 
-- Configure CodeGraph as a project-scoped STDIO MCP server with an absolute binary path. The workspace must be `/path/to/visual-agent`, not its parent directory; exclude `.git`, `.gradle`, `build`, and `data`.
-- For an initial or forced reindex, run the one-shot command below from the repository. Do not add `--graph-only` when embeddings are required; that flag intentionally skips embeddings:
+- Use the official [`colbymchenry/codegraph`](https://github.com/colbymchenry/codegraph) release bundle. Configure it as a project-scoped STDIO MCP server with an absolute path to its bundled `bin/codegraph` executable. The server must receive this repository as `--path`, not the parent directory.
+- A minimal Codex MCP entry is equivalent to:
 
-  ```bash
-  /path/to/codegraph-server \
-    --workspace /path/to/visual-agent \
-    --exclude .git \
-    --exclude .gradle \
-    --exclude build \
-    --exclude data \
-    --run-tool codegraph_reindex_workspace \
-    --tool-args '{"force":true}'
+  ```toml
+  [mcp_servers.codegraph]
+  command = "/path/to/codegraph-darwin-arm64/bin/codegraph"
+  args = ["serve", "--mcp", "--path", "/path/to/visual-agent"]
+  cwd = "/path/to/visual-agent"
   ```
 
-- Recommended investigation flow: start with `codegraph_symbol_search`, use `codegraph_get_ai_context` or `codegraph_get_edit_context` for a target file, check `codegraph_analyze_impact` before changing public or shared code, then inspect callers/callees and related tests with `codegraph_get_callers`, `codegraph_get_callees`, and `codegraph_find_related_tests`.
-- Use `codegraph_get_dependency_graph`, `codegraph_find_circular_deps`, and `codegraph_analyze_complexity` when assessing module boundaries or refactoring risk. Use `codegraph_pr_context` for a focused change review when the repository state is indexed.
-- Treat parser warnings, incomplete semantic indexing, and background embedding work as limitations. A successful build or test run remains authoritative; CodeGraph does not validate runtime behavior.
+- For privacy and predictable process ownership, `DO_NOT_TRACK = "1"`, `CODEGRAPH_NO_UPDATE_CHECK = "1"`, and `CODEGRAPH_NO_DAEMON = "1"` may be set in the MCP entry. Do not run `codegraph install` here: it can install globally and modify agent configuration files.
+- For an initial or forced index, run from the repository:
 
-See the [CodeGraph README](https://github.com/codegraph-ai/CodeGraph/blob/main/README.md) and [tool-calling guide](https://github.com/codegraph-ai/CodeGraph/blob/main/docs/tool-calling-guide.md) for the current command and tool details.
+  ```bash
+  /path/to/codegraph-darwin-arm64/bin/codegraph init --yes /path/to/visual-agent
+  # Later, rebuild from scratch with:
+  /path/to/codegraph-darwin-arm64/bin/codegraph index /path/to/visual-agent
+  ```
+
+- Recommended investigation flow: use `codegraph_explore` for architecture, flow, and symbol questions; use `codegraph_node` for one file or symbol; use `codegraph_callers`, `codegraph_callees`, and `codegraph_impact` when tracing dependencies or change risk. `codegraph_status` reports index health.
+- Treat parser warnings and incomplete indexing as limitations. A successful build or test run remains authoritative; CodeGraph does not validate runtime behavior.
+
+See the [CodeGraph README](https://github.com/colbymchenry/codegraph/blob/main/README.md) for current commands and tool details.
 
 ## Project Layout (essentials)
 
