@@ -12,8 +12,6 @@ import de.heckenmann.visualagent.agent.tools.api.ToolDirectoryMimeType
 import de.heckenmann.visualagent.testsupport.TestPng
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
 import io.mockk.mockk
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -25,6 +23,8 @@ import org.apache.pdfbox.pdmodel.font.Standard14Fonts
 import org.junit.jupiter.api.Test
 import org.springframework.beans.BeansException
 import org.springframework.beans.factory.ObjectProvider
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.stream.Stream
@@ -231,25 +231,26 @@ class WorkspaceFileToolTest {
     }
 
     private class FakeVisionProvider : LLMProvider {
-        override suspend fun chat(messages: List<Message>): ChatResponse =
-            ChatResponse(model = "fake", message = Message("assistant", "chat"), done = true)
+        override fun chatReactive(messages: List<Message>): Mono<ChatResponse> =
+            Mono.just(ChatResponse(model = "fake", message = Message("assistant", "chat"), done = true))
 
-        override suspend fun stream(messages: List<Message>): Flow<ChatResponse> = emptyFlow()
+        override fun streamReactive(messages: List<Message>): Flux<ChatResponse> = Flux.empty()
 
-        override suspend fun vision(
+        override fun visionReactive(
             image: ByteArray,
             prompt: String,
-        ): ChatResponse = ChatResponse(model = "vision-model", message = Message("assistant", "vision ok: $prompt"), done = true)
+        ): Mono<ChatResponse> =
+            Mono.just(ChatResponse(model = "vision-model", message = Message("assistant", "vision ok: $prompt"), done = true))
 
-        override suspend fun embeddings(text: String): List<Double> = emptyList()
+        override fun embeddingsReactive(text: String): Mono<List<Double>> = Mono.just(emptyList())
 
         override fun isConnected(): Boolean = true
 
-        override suspend fun checkConnection(): Boolean = true
+        override fun checkConnectionReactive(): Mono<Boolean> = Mono.just(true)
 
-        override suspend fun getModels(): List<String> = listOf("vision-model")
+        override fun getModelsReactive(): Mono<List<String>> = Mono.just(listOf("vision-model"))
 
-        override suspend fun getModelDetails(modelName: String): ShowResponse = ShowResponse(modelName, "")
+        override fun getModelDetailsReactive(modelName: String): Mono<ShowResponse> = Mono.just(ShowResponse(modelName, ""))
     }
 
     private class SingleObjectProvider<T : Any>(

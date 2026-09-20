@@ -1,12 +1,13 @@
 package de.heckenmann.visualagent.agent
 
-import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Test
+import reactor.core.publisher.Mono
 import kotlin.test.assertEquals
 
 class SubAgentModelConfigurationTest {
@@ -15,8 +16,8 @@ class SubAgentModelConfigurationTest {
         runTest {
             val provider = mockk<LLMProvider>()
             val request = slot<ChatRequestContext>()
-            coEvery { provider.chat(capture(request)) } returns
-                ChatResponse("qwen3.5", Message("assistant", "ok"), true)
+            every { provider.chatReactive(capture(request)) } returns
+                Mono.just(ChatResponse("qwen3.5", Message("assistant", "ok"), true))
             val agent =
                 SubAgent(
                     id = "specialist",

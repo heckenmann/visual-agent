@@ -11,14 +11,13 @@ import kotlin.test.assertFalse
 class TerminalToolTest {
     @Test
     fun `registry timeout stops a running terminal process`() {
-        ToolRegistry(listOf(TerminalTool()), ToolEventBus()) { 1 }.use { registry ->
-            val terminal = registry.resolve(setOf(ToolId("terminal"))).single()
+        val registry = ToolRegistry(listOf(TerminalTool()), ToolEventBus()) { 1 }
+        val terminal = registry.resolve(setOf(ToolId("terminal"))).single()
 
-            val result = registry.execute(terminal, """{"command":"sleep 30"}""", emptyMap())
-            val json = Json.parseToJsonElement(result).jsonObject
+        val result = registry.executeBlocking(terminal, """{"command":"sleep 30"}""", emptyMap())
+        val json = Json.parseToJsonElement(result).jsonObject
 
-            assertFalse(json["success"]!!.jsonPrimitive.content.toBoolean())
-            assertContains(json["error"]!!.jsonObject["code"]!!.jsonPrimitive.content, "TIMEOUT")
-        }
+        assertFalse(json["success"]!!.jsonPrimitive.content.toBoolean())
+        assertContains(json["error"]!!.jsonObject["code"]!!.jsonPrimitive.content, "TIMEOUT")
     }
 }

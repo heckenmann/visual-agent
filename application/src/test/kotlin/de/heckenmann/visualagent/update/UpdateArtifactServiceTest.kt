@@ -5,9 +5,11 @@ import org.springframework.core.io.buffer.DataBuffer
 import org.springframework.core.io.buffer.DefaultDataBufferFactory
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import reactor.test.StepVerifier
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
+import java.time.Duration
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -73,6 +75,22 @@ class UpdateArtifactServiceTest {
     }
 
     @Test
+    fun `cancelling a download removes the partial file`() {
+        val bytes = "partial update".toByteArray()
+        withService(HangingReleaseClient(bytes)) { service, root ->
+            StepVerifier
+                .create(service.downloadReactive("1.2.0", asset(bytes)))
+                .thenCancel()
+                .verify(Duration.ofSeconds(2))
+
+            assertTrue(
+                Files.notExists(root.resolve("updates/1.2.0")) ||
+                    Files.list(root.resolve("updates/1.2.0")).use { paths -> !paths.findAny().isPresent },
+            )
+        }
+    }
+
+    @Test
     fun `modified staged bytes cannot be installed`() {
         val bytes = "verified update".toByteArray()
         var launchCount = 0
@@ -125,10 +143,18 @@ class UpdateArtifactServiceTest {
         processLauncher: (List<String>) -> Unit = {},
         block: (UpdateArtifactService, Path) -> Unit,
     ) {
+        withService(FakeReleaseClient(bytes), processLauncher, block)
+    }
+
+    private fun withService(
+        releaseClient: GitHubReleaseClient,
+        processLauncher: (List<String>) -> Unit = {},
+        block: (UpdateArtifactService, Path) -> Unit,
+    ) {
         val root = Files.createTempDirectory("visual-agent-update-test")
         try {
             val config = AppConfigBean().apply { databasePath = root.resolve("visual-agent.db").toString() }
-            val service = UpdateArtifactService(config, FakeReleaseClient(bytes), processLauncher)
+            val service = UpdateArtifactService(config, releaseClient, processLauncher)
             block(service, root)
         } finally {
             root.toFile().deleteRecursively()
@@ -157,5 +183,19 @@ class UpdateArtifactServiceTest {
         override fun releases(): Mono<List<GitHubRelease>> = Mono.just(emptyList())
 
         override fun download(asset: GitHubReleaseAsset): Flux<DataBuffer> = Flux.just(DefaultDataBufferFactory().wrap(bytes))
+    }
+
+    private class HangingReleaseClient(
+        private val bytes: ByteArray,
+    ) : GitHubReleaseClient {
+        override fun latestRelease(): Mono<GitHubRelease> = Mono.empty()
+
+        override fun releases(): Mono<List<GitHubRelease>> = Mono.just(emptyList())
+
+        override fun download(asset: GitHubReleaseAsset): Flux<DataBuffer> =
+            Flux.concat(
+                Flux.just(DefaultDataBufferFactory().wrap(bytes)),
+                Flux.never(),
+            )
     }
 }

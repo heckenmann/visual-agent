@@ -1,7 +1,6 @@
 package de.heckenmann.visualagent.agent.conversation
 
 import de.heckenmann.visualagent.agent.AgentManager
-import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.ChatResponse
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.OllamaClient
@@ -21,6 +20,8 @@ import org.junit.jupiter.api.Test
 import org.springframework.ai.ollama.OllamaChatModel
 import org.springframework.ai.ollama.api.OllamaApi
 import org.springframework.ai.ollama.api.OllamaChatOptions
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import java.time.Instant
 import kotlin.io.path.createTempDirectory
 import kotlin.test.assertTrue
@@ -118,28 +119,24 @@ class WelcomeToollessOllamaRequestTest {
         private val delegate: OllamaClient,
         private val availableModels: List<String>,
     ) : de.heckenmann.visualagent.agent.LLMProvider {
-        override suspend fun chat(messages: List<Message>): ChatResponse = delegate.chat(messages)
+        override fun chatReactive(messages: List<Message>): Mono<ChatResponse> = delegate.chatReactive(messages)
 
-        override suspend fun chat(request: ChatRequestContext): ChatResponse = delegate.chat(request)
+        override fun streamReactive(messages: List<Message>): Flux<ChatResponse> = delegate.streamReactive(messages)
 
-        override suspend fun stream(messages: List<Message>): kotlinx.coroutines.flow.Flow<ChatResponse> = delegate.stream(messages)
-
-        override suspend fun stream(request: ChatRequestContext): kotlinx.coroutines.flow.Flow<ChatResponse> = delegate.stream(request)
-
-        override suspend fun vision(
+        override fun visionReactive(
             image: ByteArray,
             prompt: String,
-        ): ChatResponse = delegate.vision(image, prompt)
+        ): Mono<ChatResponse> = delegate.visionReactive(image, prompt)
 
-        override suspend fun getModels(): List<String> = availableModels
+        override fun getModelsReactive(): Mono<List<String>> = Mono.just(availableModels)
 
-        override suspend fun getModelDetails(modelName: String): de.heckenmann.visualagent.agent.ShowResponse =
-            delegate.getModelDetails(modelName)
+        override fun getModelDetailsReactive(modelName: String): Mono<de.heckenmann.visualagent.agent.ShowResponse> =
+            delegate.getModelDetailsReactive(modelName)
 
-        override suspend fun checkConnection(): Boolean = true
+        override fun checkConnectionReactive(): Mono<Boolean> = Mono.just(true)
 
         override fun isConnected(): Boolean = true
 
-        override suspend fun embeddings(text: String): List<Double> = delegate.embeddings(text)
+        override fun embeddingsReactive(text: String): Mono<List<Double>> = delegate.embeddingsReactive(text)
     }
 }

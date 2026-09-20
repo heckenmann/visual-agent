@@ -32,18 +32,4 @@ class ConversationSuggestionPortTest {
             ConversationSuggestionRequest(assistantId, listOf("x".repeat(MAX_QUESTION_LENGTH + 1)))
         }
     }
-
-    @Test
-    fun `completion bus notifies listeners and removes them`() {
-        val bus = ConversationCompletionEventBus()
-        val received = mutableListOf<ConversationCompletionEvent>()
-        val registration = bus.addListener(received::add)
-        val event = ConversationCompletionEvent(assistantId, 17)
-
-        bus.publish(event)
-        registration.close()
-        bus.publish(ConversationCompletionEvent(assistantId, 18))
-
-        assertEquals(listOf(event), received)
-    }
 }

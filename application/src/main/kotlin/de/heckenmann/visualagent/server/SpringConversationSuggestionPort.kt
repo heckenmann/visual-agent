@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ModelParameters
+import de.heckenmann.visualagent.agent.conversation.ConversationCompletionEventBus
 import de.heckenmann.visualagent.agent.text.ThinkingMarkup
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.knowledge.ConversationRecord
@@ -16,6 +17,7 @@ import de.heckenmann.visualagent.protocol.ConversationSuggestionRequest
 import de.heckenmann.visualagent.protocol.ConversationSuggestionResult
 import de.heckenmann.visualagent.protocol.MAX_QUESTION_LENGTH
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
@@ -30,7 +32,7 @@ class SpringConversationSuggestionPort(
     private val provider: LLMProvider,
     private val conversationStore: ConversationStore,
     private val appConfig: AppConfigBean,
-    private val completionEvents: de.heckenmann.visualagent.protocol.ConversationCompletionEventBus,
+    private val completionEvents: ConversationCompletionEventBus,
 ) : ConversationSuggestionPort {
     private val contextAssembler = SuggestionContextAssembler()
 
@@ -72,7 +74,7 @@ class SpringConversationSuggestionPort(
                 runCatching {
                     withTimeout(SUGGESTION_TIMEOUT_MILLIS) {
                         provider
-                            .chat(
+                            .chatReactive(
                                 ChatRequestContext(
                                     messages = messages,
                                     parameters = ModelParameters(maxTokens = 256),
@@ -85,7 +87,8 @@ class SpringConversationSuggestionPort(
                                         ),
                                     cancellationToken = applicationToken,
                                 ),
-                            ).message.content
+                            ).awaitSingle()
+                            .message.content
                     }
                 }.getOrNull()
             applicationToken.cancel()

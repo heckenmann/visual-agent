@@ -4,9 +4,10 @@ import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.todo.TodoEventBus
-import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
+import reactor.core.publisher.Mono
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -17,13 +18,15 @@ class AgentManagerClearHistoryTest {
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                 .create("jdbc:h2:mem:test")
         val provider = mockk<LLMProvider>(relaxed = true)
-        coEvery { provider.isConnected() } returns true
-        coEvery { provider.getModels() } returns listOf("test-model")
-        coEvery { provider.chat(any<ChatRequestContext>()) } returns
-            ChatResponse(
-                model = "test-model",
-                message = Message("assistant", "Welcome back!"),
-                done = true,
+        every { provider.isConnected() } returns true
+        every { provider.getModelsReactive() } returns Mono.just(listOf("test-model"))
+        every { provider.chatReactive(any<ChatRequestContext>()) } returns
+            Mono.just(
+                ChatResponse(
+                    model = "test-model",
+                    message = Message("assistant", "Welcome back!"),
+                    done = true,
+                ),
             )
         val config = AppConfigBean(db)
         config.ollamaModel = "test-model"

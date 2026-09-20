@@ -2,6 +2,7 @@ package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.conversation.AgentManagerConversationOps
+import de.heckenmann.visualagent.agent.conversation.ConversationCompletionEventBus
 import de.heckenmann.visualagent.agent.conversation.ConversationHistoryPage
 import de.heckenmann.visualagent.agent.conversation.WelcomeMessageComposer
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
@@ -17,7 +18,6 @@ import de.heckenmann.visualagent.knowledge.PersistenceStores
 import de.heckenmann.visualagent.knowledge.SubAgentStore
 import de.heckenmann.visualagent.knowledge.TodoStore
 import de.heckenmann.visualagent.orchestration.AutonomousCoordinator
-import de.heckenmann.visualagent.protocol.ConversationCompletionEventBus
 import de.heckenmann.visualagent.protocol.LifecyclePort
 import de.heckenmann.visualagent.protocol.LifecycleState
 import de.heckenmann.visualagent.todo.Todo
@@ -109,6 +109,8 @@ class AgentManager
         internal var loadedHistoryCount: Int = 0
         internal val finishedToolEventsByRequestId = ConcurrentHashMap<String, MutableList<ToolCallEvent>>()
         private var toolEventListenerHandle: AutoCloseable? = null
+        private var todoPersistenceListenerHandle: AutoCloseable? = null
+        private var todoReviewListenerHandle: AutoCloseable? = null
 
         private val lifecycleOps = AgentManagerLifecycleOps(this)
         internal val conversationOps = AgentManagerConversationOps(this)
@@ -118,7 +120,7 @@ class AgentManager
         init {
             lifecycleOps.loadAgentsFromDb()
             todoManager.loadInitialTodos()
-            todoManager.addListener { change -> lifecycleOps.persistTodoChange(change) }
+            todoPersistenceListenerHandle = todoEventBus.addListener(lifecycleOps::persistTodoChange)
             conversationOpsProvider.setBuildMainRequest(conversationOps::buildMainRequest)
             conversationOpsProvider.setBuildMainSystemContextPrompt(conversationOps::buildMainSystemContextPrompt)
             conversationOpsProvider.setLoadRecentHistoryFromDb(conversationOps::loadRecentHistoryFromDb)
@@ -154,7 +156,7 @@ class AgentManager
                     lifecycle = lifecycle,
                     completionEvents = conversationCompletionEvents,
                 )
-            registerTodoTerminalReviewListener()
+            todoReviewListenerHandle = registerTodoTerminalReviewListener()
             toolEventListenerHandle = conversationOpsProvider.registerToolEventListener()
             conversationOps.loadConversationFromDb()
             conversationOps.resumeInterruptedConversationIfNeeded()
@@ -162,7 +164,12 @@ class AgentManager
 
         override fun destroy() {
             lifecycle.beginShutdown()
-            runCatching { toolEventListenerHandle?.close() }.also { scope.cancel() }
+            runCatching { todoPersistenceListenerHandle?.close() }
+            runCatching { todoReviewListenerHandle?.close() }
+            runCatching { toolEventListenerHandle?.close() }
+            runCatching { autonomousCoordinator.close() }
+            runCatching { subAgentJobScheduler.close() }
+            scope.cancel()
         }
 
         /**

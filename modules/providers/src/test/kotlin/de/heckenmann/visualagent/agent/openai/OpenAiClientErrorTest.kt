@@ -3,6 +3,7 @@ package de.heckenmann.visualagent.agent.openai
 import de.heckenmann.visualagent.agent.ShowResponse
 import de.heckenmann.visualagent.agent.TestProviderRuntimeConfig
 import de.heckenmann.visualagent.agent.TestToolRegistry
+import kotlinx.coroutines.reactor.awaitSingle
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -37,7 +38,7 @@ class OpenAiClientErrorTest {
                     config,
                 )
 
-            val error = assertFailsWith<IllegalStateException> { client.getModels() }
+            val error = assertFailsWith<IllegalStateException> { client.getModelsReactive().awaitSingle() }
 
             assertEquals("OpenAI API key is not configured", error.message)
         }
@@ -61,7 +62,7 @@ class OpenAiClientErrorTest {
                     defaultModel = "m",
                 )
 
-            val details: ShowResponse = client.getModelDetails(profile, "m")
+            val details: ShowResponse = client.getModelDetailsReactive(profile, "m").awaitSingle()
 
             assertEquals("m", details.model)
             assertEquals("Custom", details.details?.family)

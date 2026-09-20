@@ -4,20 +4,20 @@ import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.ChatResponse
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
+import de.heckenmann.visualagent.agent.conversation.ConversationCompletionEventBus
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.knowledge.ConversationRecord
 import de.heckenmann.visualagent.knowledge.ConversationStore
 import de.heckenmann.visualagent.protocol.CancellationTokenImpl
-import de.heckenmann.visualagent.protocol.ConversationCompletionEventBus
 import de.heckenmann.visualagent.protocol.ConversationSuggestionRequest
-import io.mockk.coEvery
-import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.springframework.ai.tokenizer.JTokkitTokenCountEstimator
+import reactor.core.publisher.Mono
 import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -42,16 +42,7 @@ class SpringConversationSuggestionPortTest {
         runTest {
             configureEnabled()
             every { store.getConversationMessages("main", 500) } returns history()
-            coEvery { provider.chat(any<ChatRequestContext>()) } returns
-                ChatResponse(
-                    model = "active-model",
-                    message =
-                        Message(
-                            "assistant",
-                            "[\"What should we explore next?\",\"Which risk deserves attention?\",\"How would you validate this?\"]",
-                        ),
-                    done = true,
-                )
+            every { provider.chatReactive(any<ChatRequestContext>()) } returns Mono.just(validResponse())
 
             val result = port.generate(ConversationSuggestionRequest(assistantId), CancellationTokenImpl())
 
@@ -59,8 +50,8 @@ class SpringConversationSuggestionPortTest {
                 listOf("What should we explore next?", "Which risk deserves attention?", "How would you validate this?"),
                 result.questions,
             )
-            coVerify(exactly = 1) {
-                provider.chat(
+            verify(exactly = 1) {
+                provider.chatReactive(
                     match<ChatRequestContext> {
                         it.enabledTools.isEmpty() &&
                             it.parameters.maxTokens == 256 &&
@@ -81,7 +72,7 @@ class SpringConversationSuggestionPortTest {
             val result = port.generate(ConversationSuggestionRequest(assistantId), CancellationTokenImpl())
 
             assertEquals(emptyList(), result.questions)
-            coVerify(exactly = 0) { provider.chat(any<ChatRequestContext>()) }
+            verify(exactly = 0) { provider.chatReactive(any<ChatRequestContext>()) }
         }
 
     @Test
@@ -93,7 +84,7 @@ class SpringConversationSuggestionPortTest {
                     if (row.id == assistantId) row.copy(content = "Visible answer.<think>private reasoning</think>") else row
                 }
             val request = slot<ChatRequestContext>()
-            coEvery { provider.chat(capture(request)) } returns validResponse()
+            every { provider.chatReactive(capture(request)) } returns Mono.just(validResponse())
 
             port.generate(ConversationSuggestionRequest(assistantId), CancellationTokenImpl())
 
@@ -106,7 +97,7 @@ class SpringConversationSuggestionPortTest {
             configureEnabled(contextLength = 1_024)
             every { store.getConversationMessages("main", 500) } returns longHistory()
             val request = slot<ChatRequestContext>()
-            coEvery { provider.chat(capture(request)) } returns validResponse()
+            every { provider.chatReactive(capture(request)) } returns Mono.just(validResponse())
 
             port.generate(ConversationSuggestionRequest(assistantId), CancellationTokenImpl())
 
@@ -125,7 +116,7 @@ class SpringConversationSuggestionPortTest {
             val result = port.generate(ConversationSuggestionRequest(assistantId), CancellationTokenImpl())
 
             assertEquals(emptyList(), result.questions)
-            coVerify(exactly = 0) { provider.chat(any<ChatRequestContext>()) }
+            verify(exactly = 0) { provider.chatReactive(any<ChatRequestContext>()) }
         }
 
     private fun configureEnabled(contextLength: Int = 4_096) {

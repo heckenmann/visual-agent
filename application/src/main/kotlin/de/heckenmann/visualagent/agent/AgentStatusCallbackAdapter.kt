@@ -1,7 +1,9 @@
 package de.heckenmann.visualagent.agent
 
+import mu.KotlinLogging
 import org.springframework.stereotype.Component
-import java.util.concurrent.CopyOnWriteArrayList
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Sinks
 
 /**
  * Spring-managed adapter that replaces the static [AgentManager.Companion.globalAgentCallback].
@@ -11,8 +13,18 @@ import java.util.concurrent.CopyOnWriteArrayList
  */
 @Component
 class AgentStatusCallbackAdapter {
+    private val logger = KotlinLogging.logger {}
+    private val emissionLock = Any()
     private var callback: ((String, String) -> Unit)? = null
-    private val listeners = CopyOnWriteArrayList<(String, String) -> Unit>()
+    private val eventSink = Sinks.many().multicast().directBestEffort<AgentStatusEvent>()
+
+    /**
+     * Hot stream of sub-agent lifecycle messages.
+     *
+     * Messages are transient, not replayed, and may be dropped for slow consumers. Agent state
+     * and job counts are queried separately and remain authoritative.
+     */
+    val events: Flux<AgentStatusEvent> = eventSink.asFlux()
 
     /**
      * Registers the UI callback that receives sub-agent lifecycle notifications.
@@ -25,8 +37,15 @@ class AgentStatusCallbackAdapter {
 
     /** Registers an additive listener for the transport boundary. */
     fun addListener(listener: (String, String) -> Unit): AutoCloseable {
-        listeners += listener
-        return AutoCloseable { listeners.remove(listener) }
+        val subscription =
+            events.subscribe(
+                { event ->
+                    runCatching { listener(event.agentId, event.message) }
+                        .onFailure { error -> logger.warn(error) { "Agent status listener failed." } }
+                },
+                { error -> logger.warn(error) { "Agent status stream terminated." } },
+            )
+        return AutoCloseable(subscription::dispose)
     }
 
     /**
@@ -39,7 +58,17 @@ class AgentStatusCallbackAdapter {
         agentId: String,
         message: String,
     ) {
-        callback?.invoke(agentId, message)
-        listeners.forEach { listener -> runCatching { listener(agentId, message) } }
+        runCatching { callback?.invoke(agentId, message) }
+            .onFailure { error -> logger.warn(error) { "Agent status callback failed." } }
+        synchronized(emissionLock) {
+            val result = eventSink.tryEmitNext(AgentStatusEvent(agentId, message))
+            if (result != Sinks.EmitResult.OK) logger.warn { "Unable to emit agent status event: $result" }
+        }
     }
 }
+
+/** One user-facing sub-agent lifecycle message. */
+data class AgentStatusEvent(
+    val agentId: String,
+    val message: String,
+)

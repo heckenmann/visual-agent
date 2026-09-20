@@ -1,11 +1,13 @@
 package de.heckenmann.visualagent.config
 
 import de.heckenmann.visualagent.knowledge.PreferenceStore
+import mu.KotlinLogging
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Sinks
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.util.Properties
-import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Represents server-owned runtime configuration after the database is available.
@@ -25,6 +27,7 @@ import java.util.concurrent.CopyOnWriteArrayList
  * @property browserDefault Default browser for web integration (default: firefox)
  */
 class AppConfig private constructor() {
+    private val logger = KotlinLogging.logger {}
     var llmProvider: String = "ollama"
     var ollamaLocalUrl: String = "http://localhost:11434"
     var ollamaModel: String = ""
@@ -49,7 +52,8 @@ class AppConfig private constructor() {
     var followUpSuggestionIdleDelaySeconds: Int = 3
     var followUpSuggestionCount: Int = 3
 
-    private val listeners = CopyOnWriteArrayList<(AppConfigChange) -> Unit>()
+    private val changeSink = Sinks.many().multicast().directBestEffort<AppConfigChange>()
+    private val emissionLock = Any()
     private var lastSnapshot = snapshot()
 
     @Volatile
@@ -91,9 +95,24 @@ class AppConfig private constructor() {
      * @return Closeable registration that removes the listener when closed
      */
     fun addChangeListener(listener: (AppConfigChange) -> Unit): AutoCloseable {
-        listeners.add(listener)
-        return AutoCloseable { listeners.remove(listener) }
+        val subscription =
+            changes.subscribe(
+                { change ->
+                    runCatching { listener(change) }
+                        .onFailure { error -> logger.warn(error) { "Application config listener failed." } }
+                },
+                { error -> logger.warn(error) { "Application config stream terminated." } },
+            )
+        return AutoCloseable(subscription::dispose)
     }
+
+    /**
+     * Hot stream of configuration changes.
+     *
+     * Changes are not replayed and may be dropped for slow consumers; the current configuration
+     * values are authoritative and can be read after any refresh signal.
+     */
+    val changes: Flux<AppConfigChange> = changeSink.asFlux()
 
     /**
      * Binds the Spring-managed persistence facade used for settings storage.
@@ -196,7 +215,10 @@ class AppConfig private constructor() {
             val oldValue = previous.values[key]
             if (oldValue != value) {
                 val change = AppConfigChange(key = key, oldValue = oldValue, newValue = value)
-                listeners.forEach { listener -> listener(change) }
+                synchronized(emissionLock) {
+                    val result = changeSink.tryEmitNext(change)
+                    if (result != Sinks.EmitResult.OK) logger.warn { "Unable to emit application config change: $result" }
+                }
             }
         }
     }

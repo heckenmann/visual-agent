@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.agent.TestToolRegistry
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import io.mockk.mockk
+import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
@@ -32,7 +33,7 @@ class OpenAiClientCredentialTest {
                     defaultModel = "gpt-4.1-mini",
                 )
 
-            val error = assertFailsWith<IllegalStateException> { client.getModels(profile) }
+            val error = assertFailsWith<IllegalStateException> { client.getModelsReactive(profile).awaitSingle() }
 
             assertEquals("OpenAI API key is not configured", error.message)
         }

@@ -17,12 +17,14 @@ repositories {
 dependencies {
     implementation(libs.kotlin.stdlib)
     implementation(libs.kotlin.logging)
-    compileOnly(platform(libs.spring.boot.bom))
+    implementation(platform(libs.spring.boot.bom))
     compileOnly(libs.spring.context)
     implementation(libs.serialization.json)
+    implementation(libs.reactor.core)
 
     testImplementation(libs.kotlin.test)
     testImplementation(libs.junit.jupiter)
+    testImplementation(libs.reactor.test)
 }
 
 tasks.test {

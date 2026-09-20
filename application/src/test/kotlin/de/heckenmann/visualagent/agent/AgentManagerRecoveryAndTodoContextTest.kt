@@ -3,12 +3,14 @@ import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.todo.TodoEventBus
-import io.mockk.coEvery
-import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import io.mockk.verify
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import reactor.core.publisher.Mono
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -23,11 +25,13 @@ class AgentManagerRecoveryAndTodoContextTest {
                     .create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             val requestSlot = slot<ChatRequestContext>()
-            coEvery { provider.chat(capture(requestSlot)) } returns
-                ChatResponse(
-                    model = "test",
-                    message = Message("assistant", "ok"),
-                    done = true,
+            every { provider.chatReactive(capture(requestSlot)) } returns
+                Mono.just(
+                    ChatResponse(
+                        model = "test",
+                        message = Message("assistant", "ok"),
+                        done = true,
+                    ),
                 )
             val appConfig = AppConfigBean(db)
             val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), appConfig)
@@ -62,19 +66,29 @@ class AgentManagerRecoveryAndTodoContextTest {
             db.saveConversationMessage("main", "user", "Please continue after restart")
 
             val provider = mockk<LLMProvider>(relaxed = true)
-            coEvery { provider.checkConnection() } returns true
-            coEvery { provider.chat(any<ChatRequestContext>()) } returns
-                ChatResponse(
-                    model = "test",
-                    message = Message("assistant", "Recovered and continued."),
-                    done = true,
+            every { provider.checkConnectionReactive() } returns Mono.just(true)
+            every { provider.chatReactive(any<ChatRequestContext>()) } returns
+                Mono.just(
+                    ChatResponse(
+                        model = "test",
+                        message = Message("assistant", "Recovered and continued."),
+                        done = true,
+                    ),
                 )
             AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
-            delay(600)
+            withTimeout(5_000) {
+                while (db
+                        .getConversationMessages(
+                            "main",
+                        ).none { it.role == "assistant" && it.content.contains("Recovered and continued.") }
+                ) {
+                    delay(50)
+                }
+            }
             val messages = db.getConversationMessages("main")
             assertTrue(messages.any { it.role == "assistant" && it.content.contains("Recovered and continued.") })
-            coVerify(atLeast = 1) { provider.chat(any<ChatRequestContext>()) }
+            verify(atLeast = 1) { provider.chatReactive(any<ChatRequestContext>()) }
         }
 
     @Test
@@ -87,11 +101,20 @@ class AgentManagerRecoveryAndTodoContextTest {
             db.saveConversationMessage("main", "user", "Please continue after restart")
 
             val provider = mockk<LLMProvider>(relaxed = true)
-            coEvery { provider.checkConnection() } returns true
-            coEvery { provider.chat(any<ChatRequestContext>()) } throws IllegalStateException("401 invalid api key")
+            every { provider.checkConnectionReactive() } returns Mono.just(true)
+            every { provider.chatReactive(any<ChatRequestContext>()) } returns
+                Mono.error(IllegalStateException("401 invalid api key"))
             AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
-            delay(600)
+            withTimeout(5_000) {
+                while (db.getConversationMessages("main").none {
+                        it.role == "assistant" &&
+                            it.content.contains("I could not resume the previous request automatically.")
+                    }
+                ) {
+                    delay(50)
+                }
+            }
             val messages = db.getConversationMessages("main")
             assertTrue(
                 messages.any {

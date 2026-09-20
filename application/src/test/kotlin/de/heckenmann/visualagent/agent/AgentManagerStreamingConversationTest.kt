@@ -1,20 +1,20 @@
 package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
+import de.heckenmann.visualagent.agent.conversation.ConversationCompletionEventBus
 import de.heckenmann.visualagent.agent.provider.ProviderUserFacingError
 import de.heckenmann.visualagent.agent.provider.ProviderUserFacingException
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.protocol.ConversationCompletionEvent
-import de.heckenmann.visualagent.protocol.ConversationCompletionEventBus
 import de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
 import de.heckenmann.visualagent.todo.TodoEventBus
-import io.mockk.coEvery
-import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOf
+import io.mockk.verify
+import kotlinx.coroutines.reactor.flux
 import kotlinx.coroutines.runBlocking
+import reactor.core.publisher.Flux
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -26,8 +26,8 @@ class AgentManagerStreamingConversationTest {
         runBlocking {
             val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
-            coEvery { provider.stream(any<ChatRequestContext>()) } returns
-                flowOf(
+            every { provider.streamReactive(any<ChatRequestContext>()) } returns
+                Flux.just(
                     ChatResponse(model = "test", message = Message("assistant", "Hello"), done = false),
                     ChatResponse(model = "test", message = Message("assistant", " world"), done = true),
                 )
@@ -62,8 +62,8 @@ class AgentManagerStreamingConversationTest {
         runBlocking {
             val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
-            coEvery { provider.stream(any<ChatRequestContext>()) } returns
-                flowOf(ChatResponse(model = "test", message = Message("assistant", "Answer"), done = true))
+            every { provider.streamReactive(any<ChatRequestContext>()) } returns
+                Flux.just(ChatResponse(model = "test", message = Message("assistant", "Answer"), done = true))
             val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
             manager.streamMessage("Request", onChunk = {}, userEntryId = USER_ID, assistantEntryId = ASSISTANT_ID)
@@ -72,7 +72,7 @@ class AgentManagerStreamingConversationTest {
 
             assertEquals(listOf("Answer"), retryChunks)
             assertEquals(listOf(USER_ID, ASSISTANT_ID), manager.getHistory().mapNotNull(Message::id))
-            coVerify(exactly = 1) { provider.stream(any<ChatRequestContext>()) }
+            verify(exactly = 1) { provider.streamReactive(any<ChatRequestContext>()) }
         }
 
     @Test
@@ -80,8 +80,8 @@ class AgentManagerStreamingConversationTest {
         runBlocking {
             val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
-            coEvery { provider.stream(any<ChatRequestContext>()) } returns
-                flowOf(ChatResponse(model = "test", message = Message("assistant", "Answer"), done = true))
+            every { provider.streamReactive(any<ChatRequestContext>()) } returns
+                Flux.just(ChatResponse(model = "test", message = Message("assistant", "Answer"), done = true))
             val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
             manager.streamMessage("Request", onChunk = {}, userEntryId = USER_ID, assistantEntryId = ASSISTANT_ID)
@@ -93,7 +93,7 @@ class AgentManagerStreamingConversationTest {
                 manager.streamMessage("Request", onChunk = {}, userEntryId = SECOND_USER_ID, assistantEntryId = USER_ID)
             }
 
-            coVerify(exactly = 1) { provider.stream(any<ChatRequestContext>()) }
+            verify(exactly = 1) { provider.streamReactive(any<ChatRequestContext>()) }
         }
 
     @Test
@@ -101,8 +101,8 @@ class AgentManagerStreamingConversationTest {
         runBlocking {
             val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
-            coEvery { provider.stream(any<ChatRequestContext>()) } returns
-                flow {
+            every { provider.streamReactive(any<ChatRequestContext>()) } returns
+                flux {
                     throw ProviderUserFacingException(
                         ProviderUserFacingError(
                             "Provider executable unavailable",
@@ -130,11 +130,11 @@ class AgentManagerStreamingConversationTest {
             val events = mutableListOf<ConversationCompletionEvent>()
             val completionEvents = ConversationCompletionEventBus()
             completionEvents.addListener(events::add)
-            coEvery { provider.stream(any<ChatRequestContext>()) } returns
-                flow {
-                    emit(ChatResponse(model = "test", message = Message("assistant", "partial"), done = false))
+            every { provider.streamReactive(any<ChatRequestContext>()) } returns
+                flux {
+                    send(ChatResponse(model = "test", message = Message("assistant", "partial"), done = false))
                     token.cancel()
-                    emit(ChatResponse(model = "test", message = Message("assistant", "ignored"), done = true))
+                    send(ChatResponse(model = "test", message = Message("assistant", "ignored"), done = true))
                 }
             val manager =
                 AgentManager(
@@ -157,8 +157,8 @@ class AgentManagerStreamingConversationTest {
         runBlocking {
             val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
-            coEvery { provider.stream(any<ChatRequestContext>()) } returns
-                flowOf(
+            every { provider.streamReactive(any<ChatRequestContext>()) } returns
+                Flux.just(
                     ChatResponse(model = "test", message = Message("assistant", "First."), done = false),
                     ChatResponse(model = "test", message = Message("assistant", "Second."), done = true),
                 )
@@ -177,8 +177,8 @@ class AgentManagerStreamingConversationTest {
         runBlocking {
             val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
-            coEvery { provider.stream(any<ChatRequestContext>()) } returns
-                flowOf(
+            every { provider.streamReactive(any<ChatRequestContext>()) } returns
+                Flux.just(
                     ChatResponse(model = "test", message = Message("assistant", "<think>first</think>"), done = false),
                     ChatResponse(model = "test", message = Message("assistant", "<think>second</think>answer"), done = true),
                 )

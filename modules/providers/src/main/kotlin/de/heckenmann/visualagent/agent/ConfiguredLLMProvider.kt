@@ -1,6 +1,6 @@
 package de.heckenmann.visualagent.agent
 
-import de.heckenmann.visualagent.agent.ollama.fetchModelCapabilities
+import de.heckenmann.visualagent.agent.ollama.fetchModelCapabilitiesReactive
 import de.heckenmann.visualagent.agent.openai.OpenAiClient
 import de.heckenmann.visualagent.agent.provider.ProfiledProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
@@ -8,9 +8,11 @@ import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderEnvironmentCredentials
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
-import kotlinx.coroutines.flow.Flow
 import org.springframework.context.annotation.Primary
 import org.springframework.stereotype.Component
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
+import reactor.core.scheduler.Schedulers
 
 /**
  * Primary provider facade that delegates model operations to the configured backend.
@@ -21,44 +23,43 @@ class ConfiguredLLMProvider(
     private val ollamaClient: OllamaClient,
     private val openAiClient: OpenAiClient,
     private val providerCatalog: ProviderCatalogService,
-    private val fetchCapabilities: suspend (ProviderProfile) -> Map<String, Set<String>> = ::fetchModelCapabilities,
+    private val fetchCapabilities: (ProviderProfile) -> Mono<Map<String, Set<String>>> = ::fetchModelCapabilitiesReactive,
     private val profiledAdapters: List<ProfiledProviderAdapter> = emptyList(),
 ) : LLMProvider {
-    override suspend fun chat(messages: List<Message>): ChatResponse = chat(ChatRequestContext(messages = messages))
+    override fun chatReactive(messages: List<Message>): Mono<ChatResponse> = chatReactive(ChatRequestContext(messages = messages))
 
-    override suspend fun chat(request: ChatRequestContext): ChatResponse {
-        val resolved = request.resolve()
-        return providerFor(resolved.providerProfile).chat(resolved)
-    }
+    override fun chatReactive(request: ChatRequestContext): Mono<ChatResponse> =
+        resolveRequest(request).flatMap { resolved -> providerFor(resolved.providerProfile).chatReactive(resolved) }
 
-    override suspend fun stream(messages: List<Message>): Flow<ChatResponse> = stream(ChatRequestContext(messages = messages))
+    override fun streamReactive(messages: List<Message>): Flux<ChatResponse> = streamReactive(ChatRequestContext(messages = messages))
 
-    override suspend fun stream(request: ChatRequestContext): Flow<ChatResponse> {
-        val resolved = request.resolve()
-        return providerFor(resolved.providerProfile).stream(resolved)
-    }
+    override fun streamReactive(request: ChatRequestContext): Flux<ChatResponse> =
+        resolveRequest(request).flatMapMany { resolved -> providerFor(resolved.providerProfile).streamReactive(resolved) }
 
-    override suspend fun vision(
+    override fun visionReactive(
         image: ByteArray,
         prompt: String,
-    ): ChatResponse {
-        val providerId = providerCatalog.activeProviderId()
-        val profile =
-            providerCatalog.getProvider(providerId)
-                ?: error("Active provider profile is missing: $providerId")
-        val modelId = providerCatalog.activeModelId().ifBlank { profile.defaultModel }
-        requireVisionCapability(profile, modelId)
-        return if (profile.adapter == ProviderAdapter.CODEX_CLI) {
-            adapterFor(profile.adapter).vision(image, prompt, modelId, profile)
-        } else {
-            providerFor(profile).vision(image, prompt, modelId)
-        }
-    }
+    ): Mono<ChatResponse> =
+        Mono
+            .fromCallable {
+                val providerId = providerCatalog.activeProviderId()
+                val profile =
+                    providerCatalog.getProvider(providerId)
+                        ?: error("Active provider profile is missing: $providerId")
+                val modelId = providerCatalog.activeModelId().ifBlank { profile.defaultModel }
+                requireVisionCapability(profile, modelId)
+                profile to modelId
+            }.subscribeOn(Schedulers.boundedElastic())
+            .flatMap { (profile, modelId) ->
+                if (profile.adapter == ProviderAdapter.CODEX_CLI) {
+                    adapterFor(profile.adapter).visionReactive(image, prompt, modelId, profile)
+                } else {
+                    providerFor(profile).visionReactive(image, prompt, modelId)
+                }
+            }
 
-    override suspend fun embeddings(text: String): List<Double> {
-        val (provider, modelId) = activeProviderSelection()
-        return provider.embeddings(text, modelId)
-    }
+    override fun embeddingsReactive(text: String): Mono<List<Double>> =
+        activeProviderSelectionReactive().flatMap { (provider, modelId) -> provider.embeddingsReactive(text, modelId) }
 
     override fun isConnected(): Boolean {
         val profile = providerCatalog.getProvider(providerCatalog.activeProviderId()) ?: return false
@@ -69,60 +70,80 @@ class ConfiguredLLMProvider(
         }
     }
 
-    override suspend fun checkConnection(): Boolean =
-        runCatching { getModels(providerCatalog.activeProviderId()).isNotEmpty() }.getOrDefault(false)
+    override fun checkConnectionReactive(): Mono<Boolean> =
+        Mono
+            .fromCallable {
+                providerCatalog.getProvider(providerCatalog.activeProviderId())
+                    ?: error("Active provider profile is missing")
+            }.subscribeOn(Schedulers.boundedElastic())
+            .flatMap { profile -> providerFor(profile).checkConnectionReactive() }
+            .onErrorReturn(false)
 
-    override suspend fun getModels(): List<String> = getModels(providerCatalog.activeProviderId())
+    override fun getModelsReactive(): Mono<List<String>> = getModelsReactive(providerCatalog.activeProviderId())
 
-    override suspend fun getModels(providerId: String): List<String> {
-        val profile = providerCatalog.getProvider(providerId) ?: error("Provider not found: $providerId")
-        val discovered = discoverModelConfigs(profile)
-        if (profile.adapter == ProviderAdapter.CODEX_CLI) {
-            providerCatalog.updateDiscoveredModelConfigs(providerId, discovered)
-        } else {
-            providerCatalog.updateDiscoveredModels(providerId, discovered.map { it.id })
-        }
-        if (profile.adapter == ProviderAdapter.OLLAMA) {
-            val capabilities = fetchCapabilities(profile)
-            providerCatalog.updateModelCapabilities(providerId, capabilities)
-        }
-        return providerCatalog.selectableModels(providerId).map { it.id }
-    }
+    override fun getModelsReactive(providerId: String): Mono<List<String>> =
+        Mono
+            .fromCallable { providerCatalog.getProvider(providerId) ?: error("Provider not found: $providerId") }
+            .subscribeOn(Schedulers.boundedElastic())
+            .flatMap { profile ->
+                discoverModelConfigsReactive(profile).flatMap { discovered ->
+                    if (profile.adapter == ProviderAdapter.CODEX_CLI) {
+                        providerCatalog.updateDiscoveredModelConfigs(providerId, discovered)
+                    } else {
+                        providerCatalog.updateDiscoveredModels(providerId, discovered.map { it.id })
+                    }
+                    if (profile.adapter == ProviderAdapter.OLLAMA) {
+                        fetchCapabilities(profile)
+                            .doOnNext { capabilities ->
+                                providerCatalog.updateModelCapabilities(providerId, capabilities)
+                            }.then()
+                    } else {
+                        Mono.empty()
+                    }.thenReturn(providerCatalog.selectableModels(providerId).map { it.id })
+                }
+            }
 
-    override suspend fun getModels(profile: ProviderProfile): List<String> = discoverModelConfigs(profile).map { it.id }
+    override fun getModelsReactive(profile: ProviderProfile): Mono<List<String>> =
+        discoverModelConfigsReactive(profile).map { configs -> configs.map(ProviderModelConfig::id) }
 
-    override suspend fun getModelConfigs(profile: ProviderProfile): List<ProviderModelConfig> = discoverModelConfigs(profile)
+    override fun getModelConfigsReactive(profile: ProviderProfile): Mono<List<ProviderModelConfig>> = discoverModelConfigsReactive(profile)
 
-    override suspend fun getModelDetails(modelName: String): ShowResponse = getModelDetails(providerCatalog.activeProviderId(), modelName)
+    override fun getModelDetailsReactive(modelName: String): Mono<ShowResponse> =
+        getModelDetailsReactive(providerCatalog.activeProviderId(), modelName)
 
-    override suspend fun getModelDetails(
+    override fun getModelDetailsReactive(
         providerId: String,
         modelName: String,
-    ): ShowResponse {
-        val profile = providerCatalog.getProvider(providerId) ?: error("Provider not found: $providerId")
-        return when (profile.adapter) {
-            ProviderAdapter.OLLAMA -> ollamaClient.getModelDetails(profile, modelName)
-            ProviderAdapter.OPENAI_COMPATIBLE -> openAiClient.getModelDetails(profile, modelName)
-            ProviderAdapter.CODEX_CLI -> adapterFor(profile.adapter).getModelDetails(profile, modelName)
-        }
-    }
+    ): Mono<ShowResponse> =
+        Mono
+            .fromCallable { providerCatalog.getProvider(providerId) ?: error("Provider not found: $providerId") }
+            .subscribeOn(Schedulers.boundedElastic())
+            .flatMap { profile ->
+                when (profile.adapter) {
+                    ProviderAdapter.OLLAMA -> ollamaClient.getModelDetailsReactive(profile, modelName)
+                    ProviderAdapter.OPENAI_COMPATIBLE -> openAiClient.getModelDetailsReactive(profile, modelName)
+                    ProviderAdapter.CODEX_CLI -> adapterFor(profile.adapter).getModelDetailsReactive(profile, modelName)
+                }
+            }
 
-    private suspend fun discoverModelConfigs(profile: ProviderProfile): List<ProviderModelConfig> =
+    private fun discoverModelConfigsReactive(profile: ProviderProfile): Mono<List<ProviderModelConfig>> =
         when (profile.adapter) {
-            ProviderAdapter.OLLAMA -> ollamaClient.getModels(profile).map(::ProviderModelConfig)
+            ProviderAdapter.OLLAMA -> ollamaClient.getModelsReactive(profile).map { models -> models.map(::ProviderModelConfig) }
             ProviderAdapter.OPENAI_COMPATIBLE ->
-                openAiClient.getModels(profile).map(::ProviderModelConfig)
-            ProviderAdapter.CODEX_CLI -> adapterFor(profile.adapter).loadModels(profile)
+                openAiClient.getModelsReactive(profile).map { models -> models.map(::ProviderModelConfig) }
+            ProviderAdapter.CODEX_CLI -> adapterFor(profile.adapter).loadModelsReactive(profile)
         }
 
-    private fun activeProviderSelection(): Pair<LLMProvider, String> {
-        val providerId = providerCatalog.activeProviderId()
-        val profile =
-            providerCatalog.getProvider(providerId)
-                ?: error("Active provider profile is missing: $providerId")
-        val modelId = providerCatalog.activeModelId().ifBlank { profile.defaultModel }
-        return providerFor(profile) to modelId
-    }
+    private fun activeProviderSelectionReactive(): Mono<Pair<LLMProvider, String>> =
+        Mono
+            .fromCallable {
+                val providerId = providerCatalog.activeProviderId()
+                val profile =
+                    providerCatalog.getProvider(providerId)
+                        ?: error("Active provider profile is missing: $providerId")
+                val modelId = providerCatalog.activeModelId().ifBlank { profile.defaultModel }
+                providerFor(profile) to modelId
+            }.subscribeOn(Schedulers.boundedElastic())
 
     private fun providerFor(profile: de.heckenmann.visualagent.agent.provider.ProviderProfile?): LLMProvider =
         when (profile?.adapter) {
@@ -135,6 +156,11 @@ class ConfiguredLLMProvider(
     private fun adapterFor(adapter: ProviderAdapter): ProfiledProviderAdapter =
         profiledAdapters.singleOrNull { it.adapter == adapter }
             ?: error("Provider adapter is unavailable: $adapter")
+
+    private fun resolveRequest(request: ChatRequestContext): Mono<ChatRequestContext> =
+        Mono
+            .fromCallable { request.resolve() }
+            .subscribeOn(Schedulers.boundedElastic())
 
     private fun requireVisionCapability(
         profile: ProviderProfile,

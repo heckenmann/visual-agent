@@ -7,6 +7,8 @@ import de.heckenmann.visualagent.protocol.UpdateDownloadResult
 import de.heckenmann.visualagent.protocol.UpdateInstallResult
 import org.springframework.core.io.buffer.DataBufferUtils
 import org.springframework.stereotype.Component
+import reactor.core.publisher.Mono
+import reactor.core.scheduler.Schedulers
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.Path
@@ -25,48 +27,81 @@ internal class UpdateArtifactService(
 ) {
     private val stagedFiles = ConcurrentHashMap<String, StagedArtifact>()
 
-    /** Downloads one asset, verifies its GitHub SHA-256 digest, and returns a staging handle. */
+    /**
+     * Downloads one asset, verifies its GitHub SHA-256 digest, and returns a staging handle.
+     *
+     * This synchronous method is retained for the toolkit-neutral update port. The actual
+     * download and verification pipeline is [downloadReactive].
+     */
     fun download(
         version: String,
         asset: GitHubReleaseAsset,
-    ): UpdateDownloadResult {
+    ): UpdateDownloadResult =
+        runCatching {
+            downloadReactive(version, asset).block(DOWNLOAD_TIMEOUT) ?: UpdateDownloadResult(error = "Update download failed")
+        }.getOrElse { error ->
+            UpdateDownloadResult(error = error.message ?: "Update download failed")
+        }
+
+    /** Downloads and verifies one asset without blocking the Reactor pipeline. */
+    fun downloadReactive(
+        version: String,
+        asset: GitHubReleaseAsset,
+    ): Mono<UpdateDownloadResult> {
         val expectedDigest =
             asset.digest
                 ?.removePrefix("sha256:")
                 ?.lowercase()
                 ?.takeIf { it.matches(SHA256_PATTERN) }
-                ?: return UpdateDownloadResult(error = "The selected release asset has no valid SHA-256 digest")
+                ?: return Mono.just(UpdateDownloadResult(error = "The selected release asset has no valid SHA-256 digest"))
         if (asset.sizeBytes !in 1..MAX_ASSET_SIZE) {
-            return UpdateDownloadResult(error = "The selected release asset exceeds the supported size limit")
+            return Mono.just(UpdateDownloadResult(error = "The selected release asset exceeds the supported size limit"))
         }
         val id = UUID.randomUUID().toString()
         val directory = stagingRoot().resolve(version).normalize()
         val partial = directory.resolve("$id.part")
         val verified = directory.resolve("$id.${asset.name.substringAfterLast('.', "bin")}")
-        return runCatching {
-            Files.createDirectories(directory)
-            val downloadedBytes = AtomicLong()
-            val stream =
-                releases
-                    .download(asset)
-                    .doOnNext { buffer ->
-                        if (downloadedBytes.addAndGet(buffer.readableByteCount().toLong()) > MAX_ASSET_SIZE) {
-                            throw IllegalStateException("The downloaded release asset exceeds the supported size limit")
-                        }
+        val downloadedBytes = AtomicLong()
+        val stream =
+            releases
+                .download(asset)
+                .doOnNext { buffer ->
+                    if (downloadedBytes.addAndGet(buffer.readableByteCount().toLong()) > MAX_ASSET_SIZE) {
+                        throw IllegalStateException("The downloaded release asset exceeds the supported size limit")
                     }
-            DataBufferUtils.write(stream, partial).block(DOWNLOAD_TIMEOUT)
-            require(Files.size(partial) == asset.sizeBytes) { "The downloaded release asset size does not match GitHub metadata" }
-            require(sha256(partial) == expectedDigest) { "The downloaded release asset failed SHA-256 verification" }
-            Files.move(partial, verified)
-            stagedFiles[id] = StagedArtifact(verified, UpdateAsset(asset.name, asset.sizeBytes, expectedDigest))
-            UpdateDownloadResult(
-                staged = StagedUpdate(id, version, UpdateAsset(asset.name, asset.sizeBytes, expectedDigest)),
-            )
-        }.getOrElse { error ->
-            Files.deleteIfExists(partial)
-            Files.deleteIfExists(verified)
-            UpdateDownloadResult(error = error.message ?: "Update download failed")
-        }
+                }
+        return Mono
+            .fromCallable { Files.createDirectories(directory) }
+            .then(DataBufferUtils.write(stream, partial))
+            .then(
+                Mono.fromCallable {
+                    require(Files.size(partial) == asset.sizeBytes) { "The downloaded release asset size does not match GitHub metadata" }
+                    require(sha256(partial) == expectedDigest) { "The downloaded release asset failed SHA-256 verification" }
+                    Files.move(partial, verified)
+                    stagedFiles[id] = StagedArtifact(verified, UpdateAsset(asset.name, asset.sizeBytes, expectedDigest))
+                    UpdateDownloadResult(
+                        staged = StagedUpdate(id, version, UpdateAsset(asset.name, asset.sizeBytes, expectedDigest)),
+                    )
+                },
+            ).subscribeOn(Schedulers.boundedElastic())
+            .doOnCancel { cleanupStagingFiles(id, partial, verified) }
+            .onErrorResume { error ->
+                Mono
+                    .fromCallable {
+                        cleanupStagingFiles(id, partial, verified)
+                        UpdateDownloadResult(error = error.message ?: "Update download failed")
+                    }.subscribeOn(Schedulers.boundedElastic())
+            }
+    }
+
+    private fun cleanupStagingFiles(
+        id: String,
+        partial: Path,
+        verified: Path,
+    ) {
+        stagedFiles.remove(id)
+        runCatching { Files.deleteIfExists(partial) }
+        runCatching { Files.deleteIfExists(verified) }
     }
 
     /** Starts the platform helper for a verified package after explicit user confirmation. */

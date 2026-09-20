@@ -4,9 +4,10 @@ import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.todo.TodoEventBus
-import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
+import reactor.core.publisher.Mono
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -20,11 +21,13 @@ class AgentManagerToolPayloadNormalizationTest {
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                 .create(tempDb)
         val provider = mockk<LLMProvider>(relaxed = true)
-        coEvery { provider.chat(any<ChatRequestContext>()) } returns
-            ChatResponse(
-                model = "test",
-                message = Message("assistant", """{"tool_calls": []}"""),
-                done = true,
+        every { provider.chatReactive(any<ChatRequestContext>()) } returns
+            Mono.just(
+                ChatResponse(
+                    model = "test",
+                    message = Message("assistant", """{"tool_calls": []}"""),
+                    done = true,
+                ),
             )
         val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 

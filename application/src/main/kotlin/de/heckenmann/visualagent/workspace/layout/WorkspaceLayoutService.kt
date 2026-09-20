@@ -1,8 +1,10 @@
 package de.heckenmann.visualagent.workspace.layout
 
 import kotlinx.serialization.Serializable
+import mu.KotlinLogging
 import org.springframework.stereotype.Service
-import java.util.concurrent.CopyOnWriteArrayList
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Sinks
 
 /**
  * Provides live or persisted workspace window state to UI code and model tools.
@@ -11,6 +13,8 @@ import java.util.concurrent.CopyOnWriteArrayList
 class WorkspaceLayoutService(
     private val persistence: WorkspaceLayoutPersistence,
 ) {
+    private val logger = KotlinLogging.logger {}
+
     @Volatile
     private var stage: StageState? = null
 
@@ -23,7 +27,16 @@ class WorkspaceLayoutService(
     @Volatile
     private var liveWindows: List<WorkspaceWindowState>? = null
 
-    private val listeners = CopyOnWriteArrayList<(List<WorkspaceWindowState>) -> Unit>()
+    private val stateSink = Sinks.many().multicast().directBestEffort<List<WorkspaceWindowState>>()
+    private val emissionLock = Any()
+
+    /**
+     * Hot stream of live workspace window state changes.
+     *
+     * Updates are not replayed and may be dropped for slow consumers because [report] provides
+     * the authoritative persisted or live snapshot.
+     */
+    val stateChanges: Flux<List<WorkspaceWindowState>> = stateSink.asFlux()
 
     /** Registers the live Compose workspace geometry for runtime layout reads. */
     fun bind(
@@ -64,7 +77,10 @@ class WorkspaceLayoutService(
         liveWindows = states
         persistence.save(layout)
         if (notifyListeners) {
-            listeners.forEach { listener -> listener(states) }
+            synchronized(emissionLock) {
+                val result = stateSink.tryEmitNext(states)
+                if (result != Sinks.EmitResult.OK) logger.warn { "Unable to emit workspace layout change: $result" }
+            }
         }
         return layout
     }
@@ -89,8 +105,15 @@ class WorkspaceLayoutService(
      * @return Handle that unregisters the listener when closed
      */
     fun addWindowStateListener(listener: (List<WorkspaceWindowState>) -> Unit): AutoCloseable {
-        listeners += listener
-        return AutoCloseable { listeners -= listener }
+        val subscription =
+            stateChanges.subscribe(
+                { states ->
+                    runCatching { listener(states) }
+                        .onFailure { error -> logger.warn(error) { "Workspace layout listener failed." } }
+                },
+                { error -> logger.warn(error) { "Workspace layout stream terminated." } },
+            )
+        return AutoCloseable(subscription::dispose)
     }
 }
 

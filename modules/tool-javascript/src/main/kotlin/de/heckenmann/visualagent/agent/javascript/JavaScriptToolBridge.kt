@@ -146,7 +146,7 @@ internal class JavaScriptToolBridge(
             val tool =
                 registry.resolve(setOf(ToolId(name))).singleOrNull()
                     ?: throw failure(JavaScriptErrorCategory.TOOL_ACCESS, "Tool '$name' is not registered")
-            val resultJson = registry.execute(tool, input.toString(), requestContext + mapOf("javascript" to true))
+            val resultJson = registry.executeBlocking(tool, input.toString(), requestContext + mapOf("javascript" to true))
             cancellationToken.throwIfCancelled()
             val result = Json.decodeFromString<ToolResultEnvelope>(resultJson)
             envelopeToGuest(result)

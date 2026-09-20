@@ -15,17 +15,16 @@ import de.heckenmann.visualagent.protocol.v1.Snapshot
 import de.heckenmann.visualagent.protocol.v1.VisualAgentSessionServiceGrpc
 import io.grpc.stub.StreamObserver
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.reactor.mono
 import org.springframework.stereotype.Component
+import reactor.core.Disposable
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** Bridges one bidirectional protocol session to the application services. */
 @Component
 class VisualAgentGrpcSessionService(
     private val conversationPort: ConversationPort,
-    private val scope: CoroutineScope,
 ) : VisualAgentSessionServiceGrpc.VisualAgentSessionServiceImplBase() {
     override fun openSession(responseObserver: StreamObserver<ServerFrame>): StreamObserver<ClientFrame> {
         val session = Session(responseObserver)
@@ -110,37 +109,45 @@ class VisualAgentGrpcSessionService(
                         )
                         return
                     }
-            cancelActiveRequest()
+            cancelActiveRequest(notifyClient = true)
             val state = RequestState(requestId = requestId, token = CancellationTokenImpl())
-            val job =
-                scope.launch(start = CoroutineStart.LAZY) {
-                    try {
-                        conversationPort.stream(request, state.token) { chunk -> sendDelta(state.requestId, chunk) }
-                        send(
-                            ServerFrame
-                                .newBuilder()
-                                .setSessionId(sessionId)
-                                .setRequestId(state.requestId)
-                                .setServerRevision(++revision)
-                                .setChatCompleted(ChatCompleted.newBuilder().setSuccessful(true).build())
-                                .build(),
-                        )
-                    } catch (_: CancellationException) {
-                        error("CANCELLED", "Request cancelled", retryable = true, requestId = state.requestId)
-                    } catch (_: Exception) {
-                        error(
-                            "OPERATION_FAILED",
-                            "The server could not complete the request",
-                            retryable = true,
-                            requestId = state.requestId,
-                        )
-                    } finally {
-                        if (activeRequest === state) activeRequest = null
-                    }
-                }
-            state.job = job
             activeRequest = state
-            job.start()
+            state.subscription =
+                mono(Dispatchers.IO) {
+                    conversationPort.stream(request, state.token) { chunk -> sendDelta(state.requestId, chunk) }
+                }.doOnCancel(state.token::cancel)
+                    .subscribe(
+                        {
+                            if (state.token.isCancelled) {
+                                sendCancellation(state)
+                            } else if (state.terminal.compareAndSet(false, true)) {
+                                send(
+                                    ServerFrame
+                                        .newBuilder()
+                                        .setSessionId(sessionId)
+                                        .setRequestId(state.requestId)
+                                        .setServerRevision(++revision)
+                                        .setChatCompleted(ChatCompleted.newBuilder().setSuccessful(true).build())
+                                        .build(),
+                                )
+                            }
+                            clearActiveRequest(state)
+                        },
+                        { throwable ->
+                            if (throwable is CancellationException || state.token.isCancelled) {
+                                sendCancellation(state)
+                            } else if (state.terminal.compareAndSet(false, true)) {
+                                error(
+                                    "OPERATION_FAILED",
+                                    "The server could not complete the request",
+                                    retryable = true,
+                                    requestId = state.requestId,
+                                )
+                            }
+                            clearActiveRequest(state)
+                        },
+                    )
+            if (activeRequest !== state || state.token.isCancelled) state.subscription?.dispose()
         }
 
         private fun cancel(
@@ -151,8 +158,8 @@ class VisualAgentGrpcSessionService(
                 error("SESSION_NOT_READY", "The session must complete the handshake first", retryable = false)
                 return
             }
-            cancelActiveRequest(requestId)
-            if (request.reason.isNotBlank()) {
+            val cancelled = cancelActiveRequest(requestId, notifyClient = request.reason.isNotBlank())
+            if (!cancelled && request.reason.isNotBlank()) {
                 error("CANCELLED", "Request cancelled", retryable = true, requestId = requestId)
             }
         }
@@ -195,6 +202,11 @@ class VisualAgentGrpcSessionService(
             )
         }
 
+        private fun sendCancellation(state: RequestState) {
+            if (!state.terminal.compareAndSet(false, true)) return
+            error("CANCELLED", "Request cancelled", retryable = true, requestId = state.requestId)
+        }
+
         private fun send(frame: ServerFrame) {
             synchronized(responseObserver) {
                 runCatching { responseObserver.onNext(frame) }
@@ -203,24 +215,24 @@ class VisualAgentGrpcSessionService(
 
         private fun cancelActiveRequest(
             requestId: String? = null,
-            cause: Throwable? = null,
-        ) {
-            val current = activeRequest ?: return
-            if (requestId != null && requestId.isNotBlank() && current.requestId != requestId) return
+            notifyClient: Boolean = false,
+        ): Boolean {
+            val current = activeRequest ?: return false
+            if (requestId != null && requestId.isNotBlank() && current.requestId != requestId) return false
             if (activeRequest === current) activeRequest = null
+            if (notifyClient) sendCancellation(current)
             current.token.cancel()
-            current.job?.cancel(
-                cause?.let { failure ->
-                    java.util.concurrent.CancellationException("gRPC session transport failed").also { cancellation ->
-                        cancellation.initCause(failure)
-                    }
-                },
-            )
+            current.subscription?.dispose()
+            return true
+        }
+
+        private fun clearActiveRequest(state: RequestState) {
+            if (activeRequest === state) activeRequest = null
         }
 
         /** Cancels work when the transport reports a connection failure. */
-        fun close(cause: Throwable) {
-            cancelActiveRequest(cause = cause)
+        fun close(_cause: Throwable) {
+            cancelActiveRequest()
         }
 
         /** Cancels work and closes the response stream when the client completes it. */
@@ -235,6 +247,7 @@ class VisualAgentGrpcSessionService(
     private class RequestState(
         val requestId: String,
         val token: CancellationTokenImpl,
-        var job: Job? = null,
+        val terminal: AtomicBoolean = AtomicBoolean(false),
+        var subscription: Disposable? = null,
     )
 }

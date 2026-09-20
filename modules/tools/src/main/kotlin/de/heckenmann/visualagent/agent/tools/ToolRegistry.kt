@@ -6,11 +6,9 @@ import de.heckenmann.visualagent.agent.tools.api.ToolResult
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import mu.KotlinLogging
+import reactor.core.publisher.Mono
 import java.time.Instant
-import java.util.concurrent.CancellationException
-import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.TimeoutException
 
 /**
  * Provider-neutral registry and execution boundary for model-callable tools.
@@ -21,10 +19,10 @@ class ToolRegistry(
     tools: List<VisualAgentTool>,
     private val toolEventBus: ToolEventBus,
     private val defaultTimeoutSeconds: () -> Int = { DEFAULT_TOOL_TIMEOUT_SECONDS },
-) : AutoCloseable {
+) {
     private val logger = KotlinLogging.logger {}
     private val toolsById = tools.associateBy { it.definition.id }
-    private val executor = Executors.newCachedThreadPool()
+    private val reactiveExecution = ReactiveToolExecution(toolEventBus)
 
     /**
      * Return all registered application tool IDs.
@@ -61,182 +59,91 @@ class ToolRegistry(
     fun resolve(enabledTools: Set<ToolId>): List<VisualAgentTool> = enabledTools.mapNotNull(toolsById::get).sortedBy { it.definition.name }
 
     /**
-     * Executes one registered tool with lifecycle events and timeout handling.
+     * Executes one registered tool with lifecycle events, timeout handling, and cancellation.
      *
      * @param tool resolved tool
      * @param functionInput JSON arguments from the provider
      * @param context request-scoped metadata
-     * @return serialized structured result
+     * @return Deferred serialized structured result
      * @see docs/usecases/uc_0000020_execute_tool_call.md
      */
-    fun execute(
+    fun executeReactive(
         tool: VisualAgentTool,
         functionInput: String,
         context: Map<String, Any>,
-    ): String {
+    ): Mono<String> {
         val definition = tool.definition
         val inputObject = parseObject(functionInput)
-        val startedAt = Instant.now()
-        val options =
-            runCatching { runtimeOptions(inputObject, defaultTimeoutSeconds()) }
-                .getOrElse { error ->
-                    return completeImmediately(
+        return Mono.defer {
+            val startedAt = Instant.now()
+            val options =
+                runCatching { runtimeOptions(inputObject, defaultTimeoutSeconds()) }
+                    .getOrElse { error ->
+                        return@defer Mono.just(
+                            completeImmediately(
+                                definition,
+                                functionInput,
+                                context + mapOf("toolTimeoutSeconds" to defaultTimeoutSeconds()),
+                                startedAt,
+                                failure(
+                                    definition.id.value,
+                                    "TOOL_ARGUMENTS: ${error.message ?: "Invalid tool runtime arguments."}",
+                                ),
+                            ),
+                        )
+                    }
+            val deadlineNanos = deadlineNanos(context, options.timeoutSeconds)
+            if (remainingNanos(deadlineNanos) <= 0L) {
+                return@defer Mono.just(
+                    completeImmediately(
                         definition,
                         functionInput,
-                        context + mapOf("toolTimeoutSeconds" to defaultTimeoutSeconds()),
+                        context + mapOf("toolTimeoutSeconds" to options.timeoutSeconds),
                         startedAt,
-                        failure(
-                            definition.id.value,
-                            "TOOL_ARGUMENTS: ${error.message ?: "Invalid tool runtime arguments."}",
-                        ),
-                    )
-                }
-        val deadlineNanos = deadlineNanos(context, options.timeoutSeconds)
-        if (remainingNanos(deadlineNanos) <= 0L) {
-            return completeImmediately(
-                definition,
-                functionInput,
-                context + mapOf("toolTimeoutSeconds" to options.timeoutSeconds),
-                startedAt,
-                timeoutFailure(definition.id.value, 0L),
-            )
-        }
-        val cancellationToken = ToolCancellationToken()
-        val cancellationRegistration =
-            (context["toolCancellationRegistrar"] as? ToolCancellationRegistrar)?.register(cancellationToken::cancel)
-        val effectiveContext =
-            context +
-                mapOf(
-                    "toolTimeoutSeconds" to options.timeoutSeconds,
-                    "toolDeadlineNanos" to deadlineNanos,
-                    "toolCancellationToken" to cancellationToken,
-                )
-        publishEvent(
-            definition,
-            ToolCallPhase.STARTED,
-            functionInput,
-            effectiveContext,
-            ToolResult(definition.id.value, true, ""),
-            startedAt,
-            startedAt,
-        )
-        if (options.async) {
-            scheduleAsyncExecution(
-                tool = tool,
-                definition = definition,
-                functionInput = functionInput,
-                effectiveContext = effectiveContext,
-                deadlineNanos = deadlineNanos,
-                cancellationToken = cancellationToken,
-                cancellationRegistration = cancellationRegistration,
-                startedAt = startedAt,
-            )
-            val accepted =
-                success(
-                    definition.id.value,
-                    "scheduled async tool call (timeout=${options.timeoutSeconds}s)",
-                )
-            return serialize(accepted)
-        }
-        val result =
-            try {
-                executeWithTimeout(tool, definition.id.value, functionInput, effectiveContext, deadlineNanos, cancellationToken)
-            } finally {
-                cancellationRegistration?.close()
-            }
-        val finishedAt = Instant.now()
-        publishEvent(definition, ToolCallPhase.FINISHED, functionInput, effectiveContext, result, startedAt, finishedAt)
-        return serialize(result)
-    }
-
-    override fun close() {
-        executor.shutdownNow()
-    }
-
-    private fun scheduleAsyncExecution(
-        tool: VisualAgentTool,
-        definition: ToolDefinition,
-        functionInput: String,
-        effectiveContext: Map<String, Any>,
-        deadlineNanos: Long,
-        cancellationToken: ToolCancellationToken,
-        cancellationRegistration: AutoCloseable?,
-        startedAt: Instant,
-    ) {
-        executor.submit {
-            try {
-                val result =
-                    executeWithTimeout(
-                        tool,
-                        definition.id.value,
-                        functionInput,
-                        effectiveContext,
-                        deadlineNanos,
-                        cancellationToken,
-                    )
-                val finishedAt = Instant.now()
-                toolEventBus.publish(
-                    ToolCallEvent(
-                        toolId = definition.id.value,
-                        functionName = definition.name,
-                        providerToolCallId = effectiveContext["providerToolCallId"] as? String,
-                        requestId = effectiveContext["requestId"] as? String,
-                        round = effectiveContext["toolCallRound"] as? Int,
-                        sequence = effectiveContext["toolCallSequence"] as? Int,
-                        phase = ToolCallPhase.FINISHED,
-                        inputJson = functionInput,
-                        context = effectiveContext + mapOf("async" to true),
-                        result = result,
-                        startedAtUtc = startedAt,
-                        finishedAtUtc = finishedAt,
-                        durationMillis =
-                            java.time.Duration
-                                .between(startedAt, finishedAt)
-                                .toMillis(),
+                        timeoutFailure(definition.id.value, 0L),
                     ),
                 )
-            } finally {
-                cancellationRegistration?.close()
+            }
+            val execution =
+                reactiveExecution.execute(
+                    tool = tool,
+                    definition = definition,
+                    functionInput = functionInput,
+                    context = context,
+                    options = options,
+                    deadlineNanos = deadlineNanos,
+                    startedAt = startedAt,
+                )
+            if (options.async) {
+                execution.subscribe(
+                    {},
+                    { error -> logger.warn(error) { "Asynchronous tool execution failed for toolId=${definition.id.value}." } },
+                )
+                Mono.just(
+                    serialize(
+                        success(
+                            definition.id.value,
+                            "scheduled async tool call (timeout=${options.timeoutSeconds}s)",
+                        ),
+                    ),
+                )
+            } else {
+                execution.map(::serialize)
             }
         }
     }
 
-    private fun executeWithTimeout(
+    /**
+     * Executes a tool for a synchronous host callback such as Spring AI's [org.springframework.ai.tool.ToolCallback].
+     *
+     * This is a deliberate adapter boundary. Server-side tool execution itself remains [Mono]-based;
+     * new server code must use [executeReactive] instead.
+     */
+    fun executeBlocking(
         tool: VisualAgentTool,
-        toolId: String,
         functionInput: String,
-        effectiveContext: Map<String, Any>,
-        deadlineNanos: Long,
-        cancellationToken: ToolCancellationToken,
-    ): ToolResult {
-        val effectiveTimeoutNanos = remainingNanos(deadlineNanos)
-        val future = executor.submit<ToolResult> { tool.execute(functionInput, effectiveContext) }
-        val cancellationRegistration = cancellationToken.onCancelled { future.cancel(true) }
-        return try {
-            future.get(effectiveTimeoutNanos, TimeUnit.NANOSECONDS)
-        } catch (_: TimeoutException) {
-            cancellationToken.cancel()
-            future.cancel(true)
-            timeoutFailure(toolId, effectiveTimeoutNanos)
-        } catch (_: InterruptedException) {
-            cancellationToken.cancel()
-            future.cancel(true)
-            Thread.currentThread().interrupt()
-            failure(toolId, "TOOL_CANCELLED: Tool call was cancelled.")
-        } catch (_: CancellationException) {
-            failure(toolId, "TOOL_CANCELLED: Tool call was cancelled.")
-        } catch (error: Exception) {
-            if (cancellationToken.isCancelled) {
-                failure(toolId, "TOOL_CANCELLED: Tool call was cancelled.")
-            } else {
-                val safeError = ToolResultNormalization.executionError(error)
-                logger.warn { "Tool execution failed for toolId=$toolId code=${safeError.code}" }
-                failure(toolId, ToolResultNormalization.legacyError(safeError))
-            }
-        } finally {
-            cancellationRegistration.close()
-        }
-    }
+        context: Map<String, Any>,
+    ): String = checkNotNull(executeReactive(tool, functionInput, context).block()) { "Tool execution completed without a result." }
 
     private fun deadlineNanos(
         context: Map<String, Any>,

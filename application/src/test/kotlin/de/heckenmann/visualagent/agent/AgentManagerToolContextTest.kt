@@ -7,10 +7,11 @@ import de.heckenmann.visualagent.knowledge.MainAgentLongTermMemoryEdit
 import de.heckenmann.visualagent.knowledge.MainAgentLongTermMemoryStore
 import de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
 import de.heckenmann.visualagent.todo.TodoEventBus
-import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import kotlinx.coroutines.test.runTest
+import reactor.core.publisher.Mono
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -25,11 +26,13 @@ class AgentManagerToolContextTest {
             val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             val requestSlot = slot<ChatRequestContext>()
-            coEvery { provider.chat(capture(requestSlot)) } returns
-                ChatResponse(
-                    model = "test",
-                    message = Message("assistant", "ok"),
-                    done = true,
+            every { provider.chatReactive(capture(requestSlot)) } returns
+                Mono.just(
+                    ChatResponse(
+                        model = "test",
+                        message = Message("assistant", "ok"),
+                        done = true,
+                    ),
                 )
             val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
@@ -61,7 +64,8 @@ class AgentManagerToolContextTest {
                     .create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             val requestSlot = slot<ChatRequestContext>()
-            coEvery { provider.chat(capture(requestSlot)) } returns ChatResponse("test", Message("assistant", "ok"), true)
+            every { provider.chatReactive(capture(requestSlot)) } returns
+                Mono.just(ChatResponse("test", Message("assistant", "ok"), true))
             val memory = RecordingMemoryStore("Remember durable project constraints.")
             val manager =
                 AgentManager(
@@ -102,7 +106,8 @@ class AgentManagerToolContextTest {
             tools.setToolGloballyEnabled("memory", enabled = false)
             val provider = mockk<LLMProvider>(relaxed = true)
             val requestSlot = slot<ChatRequestContext>()
-            coEvery { provider.chat(capture(requestSlot)) } returns ChatResponse("test", Message("assistant", "ok"), true)
+            every { provider.chatReactive(capture(requestSlot)) } returns
+                Mono.just(ChatResponse("test", Message("assistant", "ok"), true))
             val manager =
                 AgentManager(
                     db,
@@ -126,7 +131,8 @@ class AgentManagerToolContextTest {
             val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             val requests = mutableListOf<ChatRequestContext>()
-            coEvery { provider.chat(capture(requests)) } returns ChatResponse("test", Message("assistant", "ok"), true)
+            every { provider.chatReactive(capture(requests)) } returns
+                Mono.just(ChatResponse("test", Message("assistant", "ok"), true))
             val manager =
                 AgentManager(
                     db,

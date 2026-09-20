@@ -7,6 +7,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import reactor.test.StepVerifier
 import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -43,7 +44,7 @@ class ToolRegistryTest {
         val registry = ToolRegistry(listOf(FakeTool("context")), bus) { timeoutSeconds }
 
         val result =
-            registry.execute(
+            registry.executeBlocking(
                 registry.resolve(setOf(ToolId("context"))).single(),
                 """{"x":1}""",
                 mapOf(
@@ -72,13 +73,33 @@ class ToolRegistryTest {
     }
 
     @Test
+    fun `reactive execution defers work until subscription and publishes lifecycle events`() {
+        val bus = ToolEventBus()
+        val events = mutableListOf<ToolCallEvent>()
+        bus.addListener(events::add)
+        val tool = FakeTool("context")
+        val registry = ToolRegistry(listOf(tool), bus) { timeoutSeconds }
+
+        val execution = registry.executeReactive(tool, "{}", emptyMap())
+
+        assertTrue(events.isEmpty())
+        StepVerifier
+            .create(execution)
+            .assertNext { result ->
+                val json = Json.parseToJsonElement(result).jsonObject
+                assertTrue(json["success"]!!.jsonPrimitive.content.toBoolean())
+            }.verifyComplete()
+        assertEquals(listOf(ToolCallPhase.STARTED, ToolCallPhase.FINISHED), events.map(ToolCallEvent::phase))
+    }
+
+    @Test
     fun `tool event is fired for tool execution errors`() {
         val events = mutableListOf<ToolCallEvent>()
         val bus = ToolEventBus()
         bus.addListener { events += it }
         val registry = ToolRegistry(listOf(FailingTool("context")), bus) { timeoutSeconds }
 
-        val result = registry.execute(registry.resolve(setOf(ToolId("context"))).single(), """{"x":1}""", emptyMap())
+        val result = registry.executeBlocking(registry.resolve(setOf(ToolId("context"))).single(), """{"x":1}""", emptyMap())
         val json = Json.parseToJsonElement(result).jsonObject
 
         assertFalse(json["success"]!!.jsonPrimitive.content.toBoolean())
@@ -133,7 +154,7 @@ class ToolRegistryTest {
         val input =
             """{"source":"sftp://alice:super-secret@example.org/file.txt","password":"super-secret","token":"abc"}"""
 
-        registry.execute(tool, input, emptyMap())
+        registry.executeBlocking(tool, input, emptyMap())
 
         assertEquals(input, receivedInput)
         assertEquals(2, events.size)
@@ -150,7 +171,7 @@ class ToolRegistryTest {
         timeoutSeconds = 1
         try {
             val registry = registry(SlowTool("context", 1500))
-            val result = registry.execute(registry.resolve(setOf(ToolId("context"))).single(), """{}""", emptyMap())
+            val result = registry.executeBlocking(registry.resolve(setOf(ToolId("context"))).single(), """{}""", emptyMap())
             val json = Json.parseToJsonElement(result).jsonObject
             assertFalse(json["success"]!!.jsonPrimitive.content.toBoolean())
             assertEquals("TIMEOUT", json["error"]!!.jsonObject["code"]!!.jsonPrimitive.content)
@@ -165,7 +186,12 @@ class ToolRegistryTest {
         timeoutSeconds = 1
         try {
             val registry = registry(SlowTool("context", 1200))
-            val result = registry.execute(registry.resolve(setOf(ToolId("context"))).single(), """{"timeoutSeconds":2}""", emptyMap())
+            val result =
+                registry.executeBlocking(
+                    registry.resolve(setOf(ToolId("context"))).single(),
+                    """{"timeoutSeconds":2}""",
+                    emptyMap(),
+                )
             val json = Json.parseToJsonElement(result).jsonObject
             assertTrue(json["success"]!!.jsonPrimitive.content.toBoolean())
             assertEquals("ok", json["data"]!!.jsonPrimitive.content)
@@ -181,7 +207,7 @@ class ToolRegistryTest {
         bus.addListener { events += it }
         val registry = ToolRegistry(listOf(FakeTool("context")), bus) { timeoutSeconds }
 
-        val result = registry.execute(registry.resolve(setOf(ToolId("context"))).single(), """{"timeoutSeconds":601}""", emptyMap())
+        val result = registry.executeBlocking(registry.resolve(setOf(ToolId("context"))).single(), """{"timeoutSeconds":601}""", emptyMap())
         val json = Json.parseToJsonElement(result).jsonObject
 
         assertFalse(json["success"]!!.jsonPrimitive.content.toBoolean())
@@ -209,7 +235,7 @@ class ToolRegistryTest {
         bus.addListener { events += it }
         val registry = ToolRegistry(listOf(SlowTool("context", 200)), bus) { timeoutSeconds }
 
-        val result = registry.execute(registry.resolve(setOf(ToolId("context"))).single(), """{"async":true}""", emptyMap())
+        val result = registry.executeBlocking(registry.resolve(setOf(ToolId("context"))).single(), """{"async":true}""", emptyMap())
         val json = Json.parseToJsonElement(result).jsonObject
         assertTrue(json["success"]!!.jsonPrimitive.content.toBoolean())
         assertTrue(json["data"]!!.jsonPrimitive.content.contains("scheduled async"))
@@ -231,7 +257,7 @@ class ToolRegistryTest {
         bus.addListener { events += it }
         val registry = ToolRegistry(listOf(ManagedTool("agent:start")), bus)
 
-        val result = registry.execute(registry.resolve(setOf(ToolId("agent:start"))).single(), """{"async":true}""", emptyMap())
+        val result = registry.executeBlocking(registry.resolve(setOf(ToolId("agent:start"))).single(), """{"async":true}""", emptyMap())
         val json = Json.parseToJsonElement(result).jsonObject
 
         assertTrue(json["data"]!!.jsonPrimitive.content.contains("scheduled async"))

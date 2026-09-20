@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.ShowResponse
 import de.heckenmann.visualagent.agent.ToolId
 import org.springframework.ai.tool.ToolCallback
+import reactor.core.publisher.Mono
 import java.nio.file.Path
 
 /** String value whose contents must never be exposed by provider infrastructure. */
@@ -69,6 +70,15 @@ interface ProviderPreferenceStore {
         key: String,
         value: String,
     )
+
+    /** Reactive counterpart of [getPreference]. */
+    fun getPreferenceReactive(key: String): Mono<String> = Mono.fromCallable { getPreference(key) }
+
+    /** Reactive counterpart of [setPreference]. */
+    fun setPreferenceReactive(
+        key: String,
+        value: String,
+    ): Mono<Void> = Mono.fromRunnable { setPreference(key, value) }
 }
 
 /** Resolves application tools into provider-facing Spring AI callbacks. */
@@ -123,19 +133,19 @@ interface ProfiledProviderAdapter : LLMProvider {
     val adapter: ProviderAdapter
 
     /** Loads selectable model definitions for one provider profile. */
-    suspend fun loadModels(profile: ProviderProfile): List<ProviderModelConfig>
+    fun loadModelsReactive(profile: ProviderProfile): Mono<List<ProviderModelConfig>>
 
     /** Gets model details using the supplied provider profile. */
-    suspend fun getModelDetails(
+    fun getModelDetailsReactive(
         profile: ProviderProfile,
         modelName: String,
-    ): ShowResponse
+    ): Mono<ShowResponse>
 
     /** Analyzes an image with an explicitly selected model and provider profile. */
-    suspend fun vision(
+    fun visionReactive(
         image: ByteArray,
         prompt: String,
         modelId: String,
         profile: ProviderProfile,
-    ): ChatResponse
+    ): Mono<ChatResponse>
 }

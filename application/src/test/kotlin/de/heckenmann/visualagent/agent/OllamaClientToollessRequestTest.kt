@@ -7,6 +7,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
+import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.springframework.ai.chat.model.ChatModel
@@ -44,14 +45,15 @@ class OllamaClientToollessRequestTest {
             val registry = toolRegistry(emptyList(), ToolEventBus(), AppConfigBean(mockk(relaxed = true)))
             val client = createClient(chatModel, ollamaApi, registry)
 
-            client.chat(
-                ChatRequestContext(
-                    messages = listOf(Message("user", "hello")),
-                    model = "m",
-                    enabledTools = emptySet(),
-                    modelCapabilities = setOf("tools"),
-                ),
-            )
+            client
+                .chatReactive(
+                    ChatRequestContext(
+                        messages = listOf(Message("user", "hello")),
+                        model = "m",
+                        enabledTools = emptySet(),
+                        modelCapabilities = setOf("tools"),
+                    ),
+                ).awaitSingle()
 
             assertNull(
                 requestSlot.captured.tools(),

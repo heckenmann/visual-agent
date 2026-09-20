@@ -27,6 +27,7 @@ internal class GitHubReleaseUpdateService(
     private val artifacts: UpdateArtifactService? = null,
 ) : UpdateCheckPort,
     UpdatePort {
+    /** Synchronous model-tool compatibility boundary; the lookup itself is [checkReactive]. */
     override fun check(request: UpdateCheckRequest): UpdateCheckResult =
         checkReactive(request).block(CHECK_TIMEOUT)
             ?: error("GitHub did not return an update result")
@@ -39,35 +40,56 @@ internal class GitHubReleaseUpdateService(
             ),
         ).toProtocol()
 
-    override fun download(request: UpdateRequest): UpdateDownloadResult {
+    /** Synchronous protocol compatibility boundary; the pipeline is [downloadReactive]. */
+    override fun download(request: UpdateRequest): UpdateDownloadResult =
+        runCatching {
+            downloadReactive(request).block(DOWNLOAD_TIMEOUT)
+                ?: UpdateDownloadResult(error = "Update download failed")
+        }.getOrElse { error ->
+            UpdateDownloadResult(error = error.message ?: "Update download failed")
+        }
+
+    /** Downloads a selected release asset without blocking the reactive update pipeline. */
+    internal fun downloadReactive(request: UpdateRequest): Mono<UpdateDownloadResult> {
         val packageType = request.packageType ?: InstallationPlatform.defaultPackageType()
         val current = currentVersion()
-        val release =
-            releaseForDownload(request).block(CHECK_TIMEOUT)
-                ?: return UpdateDownloadResult(error = "No release is available for the selected channel")
-        if (release.draft || release.prerelease != request.includePrerelease) {
-            return UpdateDownloadResult(error = "The selected release is no longer available for this channel")
-        }
-        val version =
-            requireNotNull(SemanticVersion.parse(release.tagName)) { "GitHub returned an invalid release version" }
-        if (version <= current) return UpdateDownloadResult(error = "No newer update is available")
-        val selection =
-            ReleaseAssetSelector.select(
-                System.getProperty("os.name"),
-                System.getProperty("os.arch"),
-                packageType,
-                release.assets,
-            )
-        val asset =
-            if (request.assetName != null) {
-                selection.matchingAssets.firstOrNull { it.name == request.assetName }
-                    ?: return UpdateDownloadResult(error = "The selected release asset is no longer available")
-            } else {
-                selection.selected
-                    ?: return UpdateDownloadResult(error = "No unambiguous package asset is available for $packageType")
-            }
-        return requireNotNull(artifacts) { "Update download service is not configured" }
-            .download(version.toString(), asset)
+        return releaseForDownload(request)
+            .switchIfEmpty(Mono.error(IllegalStateException("No release is available for the selected channel")))
+            .flatMap { release ->
+                if (release.draft || release.prerelease != request.includePrerelease) {
+                    return@flatMap Mono.just(UpdateDownloadResult(error = "The selected release is no longer available for this channel"))
+                }
+                val version =
+                    requireNotNull(SemanticVersion.parse(release.tagName)) { "GitHub returned an invalid release version" }
+                if (version <= current) return@flatMap Mono.just(UpdateDownloadResult(error = "No newer update is available"))
+                val selection =
+                    ReleaseAssetSelector.select(
+                        System.getProperty("os.name"),
+                        System.getProperty("os.arch"),
+                        packageType,
+                        release.assets,
+                    )
+                val asset =
+                    if (request.assetName != null) {
+                        selection.matchingAssets.firstOrNull { it.name == request.assetName }
+                    } else {
+                        selection.selected
+                    }
+                if (asset == null) {
+                    return@flatMap Mono.just(
+                        UpdateDownloadResult(
+                            error =
+                                if (request.assetName != null) {
+                                    "The selected release asset is no longer available"
+                                } else {
+                                    "No unambiguous package asset is available for $packageType"
+                                },
+                        ),
+                    )
+                }
+                requireNotNull(artifacts) { "Update download service is not configured" }
+                    .downloadReactive(version.toString(), asset)
+            }.onErrorResume { error -> Mono.just(UpdateDownloadResult(error = error.message ?: "Update download failed")) }
     }
 
     override fun install(stagedId: String): UpdateInstallResult =
@@ -164,6 +186,7 @@ internal class GitHubReleaseUpdateService(
 
     private companion object {
         val CHECK_TIMEOUT = Duration.ofSeconds(20)
+        val DOWNLOAD_TIMEOUT = Duration.ofMinutes(10)
         const val MAX_RELEASE_NOTES_LENGTH = 4_000
     }
 }

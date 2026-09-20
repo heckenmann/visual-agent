@@ -6,8 +6,11 @@ import de.heckenmann.visualagent.protocol.DownloadActivity
 import de.heckenmann.visualagent.protocol.DownloadActivityStatus
 import de.heckenmann.visualagent.protocol.WorkspaceDownload
 import de.heckenmann.visualagent.protocol.WorkspaceDownloadState
+import mu.KotlinLogging
 import org.apache.tika.Tika
 import org.springframework.stereotype.Service
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Sinks
 import java.io.IOException
 import java.net.URI
 import java.nio.file.FileAlreadyExistsException
@@ -16,7 +19,6 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.io.path.createDirectories
 import kotlin.io.path.deleteIfExists
@@ -31,9 +33,19 @@ class WorkspaceDownloadService(
     private val mimeDetector: Tika = Tika(),
     private val eventBus: WorkspaceDownloadEventBus = WorkspaceDownloadEventBus(),
 ) {
+    private val logger = KotlinLogging.logger {}
     private val jobs = ConcurrentHashMap<String, WorkspaceDownloadJob>()
-    private val listeners = CopyOnWriteArrayList<() -> Unit>()
+    private val changeSink = Sinks.many().multicast().directBestEffort<Unit>()
+    private val emissionLock = Any()
     private val lastProgressNotificationNanos = AtomicLong(0)
+
+    /**
+     * Hot stream of active-download refresh hints.
+     *
+     * Hints are not replayed and may be dropped for slow consumers. Callers must query
+     * [activeDownloads] for the authoritative current state.
+     */
+    val changes: Flux<Unit> = changeSink.asFlux()
 
     /** Downloads, validates, atomically publishes, and registers one remote file. */
     fun download(request: WorkspaceDownloadRequest): WorkspaceFileRecord {
@@ -151,8 +163,15 @@ class WorkspaceDownloadService(
 
     /** Registers a listener for download progress changes. */
     fun addListener(listener: () -> Unit): AutoCloseable {
-        listeners += listener
-        return AutoCloseable { listeners.remove(listener) }
+        val subscription =
+            changes.subscribe(
+                {
+                    runCatching { listener() }
+                        .onFailure { error -> logger.warn(error) { "Workspace download refresh listener failed." } }
+                },
+                { error -> logger.warn(error) { "Workspace download refresh stream terminated." } },
+            )
+        return AutoCloseable(subscription::dispose)
     }
 
     private fun normalizeTarget(request: WorkspaceDownloadRequest): WorkspaceDownloadTarget {
@@ -173,7 +192,10 @@ class WorkspaceDownloadService(
             .replace('\\', '/')
 
     private fun notifyListeners() {
-        listeners.forEach { listener -> runCatching(listener) }
+        synchronized(emissionLock) {
+            val result = changeSink.tryEmitNext(Unit)
+            if (result != Sinks.EmitResult.OK) logger.warn { "Unable to emit workspace download refresh: $result" }
+        }
     }
 
     private fun notifyProgressListeners() {

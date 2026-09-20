@@ -7,10 +7,6 @@ import de.heckenmann.visualagent.server.VisualAgentGrpcServer
 import de.heckenmann.visualagent.server.VisualAgentGrpcSessionService
 import io.grpc.stub.StreamObserver
 import io.mockk.mockk
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -21,10 +17,9 @@ import kotlin.test.assertTrue
 
 /** Verifies the desktop-to-server in-process transport without a network socket. */
 class DesktopServerConnectionTest {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
     private val server =
         VisualAgentGrpcServer(
-            VisualAgentGrpcSessionService(mockk<ConversationPort>(relaxed = true), scope),
+            VisualAgentGrpcSessionService(mockk<ConversationPort>(relaxed = true)),
             "desktop-connection-test",
             0,
             "",
@@ -34,7 +29,6 @@ class DesktopServerConnectionTest {
     @AfterTest
     fun closeResources() {
         server.close()
-        scope.cancel()
     }
 
     @Test

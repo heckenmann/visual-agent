@@ -2,8 +2,9 @@ package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
-import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.Serializable
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 
 /**
  * LLM provider interface for chat, streaming, vision, and embedding capabilities.
@@ -26,37 +27,25 @@ interface LLMProvider {
      * @throws Exception if the request fails or model is unavailable
      * @see docs/usecases/uc_0000002_send_main_agent_message.md
      */
-    suspend fun chat(messages: List<Message>): ChatResponse
+    fun chatReactive(messages: List<Message>): Mono<ChatResponse>
 
     /**
-     * Send a chat request with model, tool, and metadata context.
+     * Sends a complete request through the server's native reactive contract.
      *
      * @param request Complete request context for the provider
-     * @return Complete chat response from the LLM
-     * @throws Exception if the request fails or model is unavailable
-     * @see docs/usecases/uc_0000002_send_main_agent_message.md
-     * @see docs/usecases/uc_0000020_execute_tool_call.md
+     * @return Deferred complete chat response from the LLM
      */
-    suspend fun chat(request: ChatRequestContext): ChatResponse = chat(request.messages)
+    fun chatReactive(request: ChatRequestContext): Mono<ChatResponse> = chatReactive(request.messages)
+
+    fun streamReactive(messages: List<Message>): Flux<ChatResponse>
 
     /**
-     * Stream a chat response in real-time chunks.
-     *
-     * @param messages List of conversation messages
-     * @return Flow of response chunks for real-time display
-     * @see docs/usecases/uc_0000003_stream_main_agent_response.md
-     */
-    suspend fun stream(messages: List<Message>): Flow<ChatResponse>
-
-    /**
-     * Stream a chat request with model, tool, and metadata context.
+     * Streams a complete request through the server's native reactive contract.
      *
      * @param request Complete request context for the provider
-     * @return Flow of response chunks for real-time display
-     * @see docs/usecases/uc_0000003_stream_main_agent_response.md
-     * @see docs/usecases/uc_0000020_execute_tool_call.md
+     * @return Cold stream of response chunks
      */
-    suspend fun stream(request: ChatRequestContext): Flow<ChatResponse> = stream(request.messages)
+    fun streamReactive(request: ChatRequestContext): Flux<ChatResponse> = streamReactive(request.messages)
 
     /**
      * Process an image with a vision-capable model.
@@ -66,10 +55,10 @@ interface LLMProvider {
      * @return Response describing the image content
      * @see docs/usecases/uc_0000027_analyze_workspace_file_via_tool.md
      */
-    suspend fun vision(
+    fun visionReactive(
         image: ByteArray,
         prompt: String,
-    ): ChatResponse
+    ): Mono<ChatResponse>
 
     /**
      * Process an image with an explicitly selected model.
@@ -82,11 +71,11 @@ interface LLMProvider {
      * @param modelId Catalog model identifier selected for this operation
      * @return Response describing the image content
      */
-    suspend fun vision(
+    fun visionReactive(
         image: ByteArray,
         prompt: String,
         modelId: String,
-    ): ChatResponse = vision(image, prompt)
+    ): Mono<ChatResponse> = visionReactive(image, prompt)
 
     /**
      * Generate embeddings for text.
@@ -95,7 +84,7 @@ interface LLMProvider {
      * @return List of embedding values
      * @see docs/usecases/uc_0000010_chat_with_ollama_provider.md
      */
-    suspend fun embeddings(text: String): List<Double>
+    fun embeddingsReactive(text: String): Mono<List<Double>>
 
     /**
      * Generate embeddings with an explicitly selected model.
@@ -107,10 +96,10 @@ interface LLMProvider {
      * @param modelId Catalog model identifier selected for this operation
      * @return List of embedding values
      */
-    suspend fun embeddings(
+    fun embeddingsReactive(
         text: String,
         modelId: String,
-    ): List<Double> = embeddings(text)
+    ): Mono<List<Double>> = embeddingsReactive(text)
 
     /**
      * Check if the provider is currently connected and available.
@@ -126,7 +115,7 @@ interface LLMProvider {
      * @return true if the provider endpoint is reachable and responsive
      * @see docs/usecases/uc_0000012_check_provider_connectivity.md
      */
-    suspend fun checkConnection(): Boolean
+    fun checkConnectionReactive(): Mono<Boolean>
 
     /**
      * Get the list of available model names.
@@ -134,7 +123,7 @@ interface LLMProvider {
      * @return List of model names
      * @see docs/usecases/uc_0000009_discover_available_models.md
      */
-    suspend fun getModels(): List<String>
+    fun getModelsReactive(): Mono<List<String>>
 
     /**
      * Gets model names for a specific configured provider.
@@ -143,7 +132,7 @@ interface LLMProvider {
      * @return Selectable model names
      * @see docs/usecases/uc_0000009_discover_available_models.md
      */
-    suspend fun getModels(providerId: String): List<String> = getModels()
+    fun getModelsReactive(providerId: String): Mono<List<String>> = getModelsReactive()
 
     /**
      * Discovers model names using a caller-supplied provider profile without changing persisted configuration.
@@ -152,7 +141,7 @@ interface LLMProvider {
      * @return Discovered model names
      * @see docs/usecases/uc_0000009_discover_available_models.md
      */
-    suspend fun getModels(profile: ProviderProfile): List<String> = getModels()
+    fun getModelsReactive(profile: ProviderProfile): Mono<List<String>> = getModelsReactive()
 
     /**
      * Discovers structured model metadata using a caller-supplied provider profile without changing
@@ -166,7 +155,8 @@ interface LLMProvider {
      * @return Discovered model configurations with any available provider metadata
      * @see docs/usecases/uc_0000009_discover_available_models.md
      */
-    suspend fun getModelConfigs(profile: ProviderProfile): List<ProviderModelConfig> = getModels(profile).map(::ProviderModelConfig)
+    fun getModelConfigsReactive(profile: ProviderProfile): Mono<List<ProviderModelConfig>> =
+        getModelsReactive(profile).map { models -> models.map(::ProviderModelConfig) }
 
     /**
      * Get detailed information about a specific model.
@@ -175,7 +165,7 @@ interface LLMProvider {
      * @return ShowResponse containing model details
      * @see docs/usecases/uc_0000009_discover_available_models.md
      */
-    suspend fun getModelDetails(modelName: String): ShowResponse
+    fun getModelDetailsReactive(modelName: String): Mono<ShowResponse>
 
     /**
      * Gets model details for a specific configured provider.
@@ -185,10 +175,10 @@ interface LLMProvider {
      * @return Model details
      * @see docs/usecases/uc_0000009_discover_available_models.md
      */
-    suspend fun getModelDetails(
+    fun getModelDetailsReactive(
         providerId: String,
         modelName: String,
-    ): ShowResponse = getModelDetails(modelName)
+    ): Mono<ShowResponse> = getModelDetailsReactive(modelName)
 }
 
 /**

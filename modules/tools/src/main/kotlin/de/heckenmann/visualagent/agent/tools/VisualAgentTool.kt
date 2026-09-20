@@ -3,6 +3,7 @@ package de.heckenmann.visualagent.agent.tools
 import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
+import reactor.core.publisher.Mono
 
 /**
  * Application-level tool that can be exposed to an LLM through Spring AI.
@@ -16,8 +17,8 @@ interface VisualAgentTool {
     /**
      * Whether this tool manages asynchronous execution and waiting internally.
      *
-     * Managed tools are invoked directly by the registry instead of being wrapped in
-     * the generic timeout and background executor.
+     * Managed tools retain ownership of their internal scheduling while the registry still
+     * applies its reactive timeout and cancellation boundary.
      */
     val managesExecution: Boolean
         get() = false
@@ -33,6 +34,22 @@ interface VisualAgentTool {
         inputJson: String,
         context: Map<String, Any> = emptyMap(),
     ): ToolResult
+
+    /**
+     * Execute this tool through its reactive server-side contract.
+     *
+     * Synchronous tools inherit a deferred [Mono] wrapper. Implementations that already own a
+     * non-blocking source can override this method to preserve it. The registry selects the
+     * scheduler for synchronous work, timeout handling, and cancellation.
+     *
+     * @param inputJson JSON argument object passed by Spring AI
+     * @param context Request-scoped execution metadata
+     * @return Deferred tool result
+     */
+    fun executeReactive(
+        inputJson: String,
+        context: Map<String, Any> = emptyMap(),
+    ): Mono<ToolResult> = Mono.fromCallable { execute(inputJson, context) }
 }
 
 /**

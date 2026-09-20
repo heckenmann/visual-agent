@@ -4,11 +4,14 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import mu.KotlinLogging
 import org.springframework.context.annotation.DependsOn
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
-import java.util.concurrent.CopyOnWriteArrayList
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
+import reactor.core.publisher.Sinks
 
 /**
  * Stores provider profiles, model catalogs, and active selection in the database.
@@ -23,8 +26,18 @@ class ProviderCatalogService(
     private val preferenceStore: ProviderPreferenceStore,
     private val appConfig: ProviderRuntimeConfig = DefaultProviderRuntimeConfig(),
 ) {
+    private val logger = KotlinLogging.logger {}
     private val json = Json { ignoreUnknownKeys = true }
-    private val changeListeners = CopyOnWriteArrayList<() -> Unit>()
+    private val changeSink = Sinks.many().multicast().directBestEffort<Unit>()
+    private val emissionLock = Any()
+
+    /**
+     * Hot stream of provider catalog refresh hints.
+     *
+     * Hints are not replayed and may be dropped for slow consumers. Provider queries remain the
+     * authoritative source of the current catalog and active selection.
+     */
+    val changes: Flux<Unit> = changeSink.asFlux()
 
     init {
         migrateLegacyConfiguration()
@@ -86,6 +99,18 @@ class ProviderCatalogService(
      * @param configuration Complete catalog and active main-agent selection to persist
      */
     fun replaceConfiguration(configuration: ProviderConfiguration) {
+        save(validatedCatalogState(configuration))
+    }
+
+    /** Reactively replaces the complete provider catalog and active selection. */
+    fun replaceConfigurationReactive(configuration: ProviderConfiguration): Mono<Void> {
+        val state = validatedCatalogState(configuration)
+        return preferenceStore
+            .setPreferenceReactive(KEY_CATALOG, json.encodeToString(state))
+            .doOnSuccess { publishProviderChange(state.activeProviderId) }
+    }
+
+    private fun validatedCatalogState(configuration: ProviderConfiguration): CatalogState {
         val providers = configuration.providers.map { profile -> profile.withSelectableCodexDefault() }
         require(providers.map(ProviderProfile::id).all { it.isNotBlank() }) { "Provider identifiers must not be blank" }
         require(providers.map(ProviderProfile::id).distinct().size == providers.size) { "Provider identifiers must be unique" }
@@ -97,12 +122,10 @@ class ProviderCatalogService(
         require(selectedProvider.selectableModels().any { it.id == configuration.modelId }) {
             "Model is missing, disabled, or filtered: ${configuration.providerId}/${configuration.modelId}"
         }
-        save(
-            CatalogState(
-                activeProviderId = configuration.providerId,
-                activeModelId = configuration.modelId,
-                providers = providers,
-            ),
+        return CatalogState(
+            activeProviderId = configuration.providerId,
+            activeModelId = configuration.modelId,
+            providers = providers,
         )
     }
 
@@ -130,8 +153,15 @@ class ProviderCatalogService(
 
     /** Registers a listener invoked after the persisted provider catalog changes. */
     fun addChangeListener(listener: () -> Unit): AutoCloseable {
-        changeListeners += listener
-        return AutoCloseable { changeListeners.remove(listener) }
+        val subscription =
+            changes.subscribe(
+                {
+                    runCatching { listener() }
+                        .onFailure { error -> logger.warn(error) { "Provider catalog listener failed." } }
+                },
+                { error -> logger.warn(error) { "Provider catalog stream terminated." } },
+            )
+        return AutoCloseable(subscription::dispose)
     }
 
     /**
@@ -409,12 +439,17 @@ class ProviderCatalogService(
     private fun publishProviderChange(providerId: String) {
         val publish = {
             appConfig.llmProvider = providerId
-            changeListeners.forEach { listener -> runCatching(listener) }
+            synchronized(emissionLock) {
+                val result = changeSink.tryEmitNext(Unit)
+                if (result != Sinks.EmitResult.OK) logger.warn { "Unable to emit provider catalog change: $result" }
+            }
         }
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(
                 object : TransactionSynchronization {
-                    override fun afterCommit() = publish()
+                    override fun afterCommit() {
+                        publish()
+                    }
                 },
             )
         } else {

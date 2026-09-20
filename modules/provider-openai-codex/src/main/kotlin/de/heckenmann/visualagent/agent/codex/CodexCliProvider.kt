@@ -17,10 +17,8 @@ import de.heckenmann.visualagent.agent.provider.ProviderUserFacingError
 import de.heckenmann.visualagent.agent.provider.ProviderUserFacingException
 import de.heckenmann.visualagent.agent.provider.ProviderWorkingDirectory
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.reactor.awaitSingle
+import kotlinx.coroutines.reactor.mono
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -29,6 +27,8 @@ import org.springframework.ai.chat.messages.SystemMessage
 import org.springframework.ai.chat.messages.UserMessage
 import org.springframework.ai.chat.prompt.Prompt
 import org.springframework.stereotype.Component
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import java.nio.file.Path
 
 /** Codex CLI subscription provider backed by the native Codex app-server protocol. */
@@ -41,20 +41,26 @@ class CodexCliProvider internal constructor(
 ) : ProfiledProviderAdapter {
     override val adapter: ProviderAdapter = ProviderAdapter.CODEX_CLI
 
-    override suspend fun chat(messages: List<Message>): ChatResponse = error("Codex CLI chat requires a configured provider profile")
+    override fun chatReactive(messages: List<Message>): Mono<ChatResponse> =
+        Mono.error(IllegalStateException("Codex CLI chat requires a configured provider profile"))
 
-    override suspend fun chat(request: ChatRequestContext): ChatResponse =
-        withContext(Dispatchers.IO) {
+    override fun chatReactive(request: ChatRequestContext): Mono<ChatResponse> =
+        mono {
             val profile = requireNotNull(request.providerProfile) { "Codex CLI provider profile is missing" }
             val model = effectiveModel(request.model ?: profile.defaultModel)
-            val response =
+            val executable = withContext(Dispatchers.IO) { resolveExecutable(profile) }
+            val chatModel =
                 CodexAppServerChatModel(
-                    resolveExecutable(profile),
+                    executable,
                     model,
                     callbacks(request, model),
                     request.workingDirectory(),
                     request.showReasoningSummary(),
-                ).complete(request.toPrompt(toolCallbacks.toolRuntimeGuidance()), request.cancellationToken)
+                )
+            val response =
+                chatModel
+                    .completeReactive(request.toPrompt(toolCallbacks.toolRuntimeGuidance()), request.cancellationToken)
+                    .awaitSingle()
             ChatResponse(
                 model = response.metadata.model.takeIf(String::isNotBlank) ?: model,
                 message = response.toCodexProviderMessage(),
@@ -63,53 +69,55 @@ class CodexCliProvider internal constructor(
             )
         }
 
-    override suspend fun stream(messages: List<Message>): Flow<ChatResponse> =
-        error("Codex CLI streaming requires a configured provider profile")
+    override fun streamReactive(messages: List<Message>): Flux<ChatResponse> =
+        Flux.error(IllegalStateException("Codex CLI streaming requires a configured provider profile"))
 
-    override suspend fun stream(request: ChatRequestContext): Flow<ChatResponse> {
-        val profile = requireNotNull(request.providerProfile) { "Codex CLI provider profile is missing" }
-        val model = effectiveModel(request.model ?: profile.defaultModel)
-        return flow {
+    override fun streamReactive(request: ChatRequestContext): Flux<ChatResponse> =
+        mono {
+            val profile = requireNotNull(request.providerProfile) { "Codex CLI provider profile is missing" }
+            val model = effectiveModel(request.model ?: profile.defaultModel)
+            val executable = withContext(Dispatchers.IO) { resolveExecutable(profile) }
+            ResolvedCodexRequest(executable, model)
+        }.flatMapMany { resolved ->
             CodexAppServerChatModel(
-                resolveExecutable(profile),
-                model,
-                callbacks(request, model),
+                resolved.executable,
+                resolved.model,
+                callbacks(request, resolved.model),
                 request.workingDirectory(),
                 request.showReasoningSummary(),
-            ).streamFlow(request.toPrompt(toolCallbacks.toolRuntimeGuidance()), request.cancellationToken).collect { chunk ->
-                emit(
+            ).streamReactive(request.toPrompt(toolCallbacks.toolRuntimeGuidance()), request.cancellationToken)
+                .map { chunk ->
                     ChatResponse(
-                        model = chunk.metadata.model.takeIf(String::isNotBlank) ?: model,
+                        model = chunk.metadata.model.takeIf(String::isNotBlank) ?: resolved.model,
                         message = chunk.toCodexProviderMessage(),
                         done = chunk.hasFinishReasons(setOf("stop")),
-                        providerTurn = chunk.toCodexProviderTurn(model),
-                    ),
-                )
-            }
-        }.flowOn(Dispatchers.IO)
-    }
+                        providerTurn = chunk.toCodexProviderTurn(resolved.model),
+                    )
+                }
+        }
 
-    override suspend fun vision(
+    override fun visionReactive(
         image: ByteArray,
         prompt: String,
-    ): ChatResponse = error("Codex CLI vision requires a configured provider profile")
+    ): Mono<ChatResponse> = Mono.error(IllegalStateException("Codex CLI vision requires a configured provider profile"))
 
     /** Sends an image through the configured Codex app-server profile. */
-    override suspend fun vision(
+    override fun visionReactive(
         image: ByteArray,
         prompt: String,
         modelId: String,
         profile: ProviderProfile,
-    ): ChatResponse =
-        withContext(Dispatchers.IO) {
+    ): Mono<ChatResponse> =
+        mono {
             val model = effectiveModel(modelId.ifBlank { profile.defaultModel })
+            val executable = withContext(Dispatchers.IO) { resolveExecutable(profile) }
             val response =
                 CodexAppServerChatModel(
-                    resolveExecutable(profile),
+                    executable,
                     model,
                     emptyList(),
                     workingDirectory.get(),
-                ).completeVision(image, prompt)
+                ).completeVisionReactive(image, prompt).awaitSingle()
             ChatResponse(
                 model = response.metadata.model.takeIf(String::isNotBlank) ?: model,
                 message = response.toCodexProviderMessage(),
@@ -118,23 +126,24 @@ class CodexCliProvider internal constructor(
             )
         }
 
-    override suspend fun embeddings(text: String): List<Double> = emptyList()
+    override fun embeddingsReactive(text: String): Mono<List<Double>> = Mono.just(emptyList())
 
     override fun isConnected(): Boolean = true
 
-    override suspend fun checkConnection(): Boolean = false
+    override fun checkConnectionReactive(): Mono<Boolean> = Mono.just(false)
 
-    override suspend fun getModels(): List<String> = error("Codex CLI model discovery is provided by the Codex model catalog")
+    override fun getModelsReactive(): Mono<List<String>> =
+        Mono.error(IllegalStateException("Codex CLI model discovery is provided by the Codex model catalog"))
 
-    override suspend fun getModelDetails(modelName: String): ShowResponse =
-        ShowResponse(model = modelName, modifiedAt = "", details = ModelDetails(family = "Codex CLI"))
+    override fun getModelDetailsReactive(modelName: String): Mono<ShowResponse> =
+        Mono.just(ShowResponse(model = modelName, modifiedAt = "", details = ModelDetails(family = "Codex CLI")))
 
-    override suspend fun getModelDetails(
+    override fun getModelDetailsReactive(
         profile: ProviderProfile,
         modelName: String,
-    ): ShowResponse = getModelDetails(modelName)
+    ): Mono<ShowResponse> = getModelDetailsReactive(modelName)
 
-    override suspend fun loadModels(profile: ProviderProfile): List<ProviderModelConfig> = modelCatalog.load(profile)
+    override fun loadModelsReactive(profile: ProviderProfile): Mono<List<ProviderModelConfig>> = modelCatalog.loadReactive(profile)
 
     private suspend fun resolveExecutable(profile: ProviderProfile): Path =
         when (val result = locator.locate(profile.options[OPTION_EXECUTABLE_PATH])) {
@@ -191,6 +200,11 @@ class CodexCliProvider internal constructor(
         request.enabledTools,
         request.metadata + mapOf("model" to model, "provider" to "codex") +
             (request.cancellationToken?.let { mapOf("cancellationToken" to it) } ?: emptyMap()),
+    )
+
+    private data class ResolvedCodexRequest(
+        val executable: Path,
+        val model: String,
     )
 }
 

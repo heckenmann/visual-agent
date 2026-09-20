@@ -4,10 +4,9 @@ import de.heckenmann.visualagent.agent.provider.ProfiledProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderErrorMessages
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.reactor.awaitSingle
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Component
@@ -19,7 +18,6 @@ internal class CodexModelCatalogInitializer(
     private val providerCatalog: ProviderCatalogService,
     private val profiledAdapters: List<ProfiledProviderAdapter>,
     private val applicationScope: CoroutineScope,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     /** Loads the active Codex catalog after Spring has initialized all provider services. */
     @EventListener(ApplicationReadyEvent::class)
@@ -27,9 +25,9 @@ internal class CodexModelCatalogInitializer(
         val providerId = providerCatalog.activeProviderId()
         val profile = providerCatalog.getProvider(providerId)?.takeIf { it.adapter == ProviderAdapter.CODEX_CLI } ?: return
         val adapter = profiledAdapters.singleOrNull { it.adapter == ProviderAdapter.CODEX_CLI } ?: return
-        applicationScope.launch(ioDispatcher) {
+        applicationScope.launch {
             runCatching {
-                adapter.loadModels(profile).also { providerCatalog.updateDiscoveredModelConfigs(providerId, it) }
+                adapter.loadModelsReactive(profile).awaitSingle().also { providerCatalog.updateDiscoveredModelConfigs(providerId, it) }
             }.onFailure { error -> logger.warning(ProviderErrorMessages.userFacing(error)) }
         }
     }

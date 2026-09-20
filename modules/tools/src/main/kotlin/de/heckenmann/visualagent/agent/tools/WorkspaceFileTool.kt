@@ -10,6 +10,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import reactor.core.publisher.Mono
 
 /**
  * Tool that lets sub-agents inspect, analyze, and manage files imported into the managed workspace.
@@ -24,6 +25,7 @@ class WorkspaceFileTool(
     private val grantedDirectories = WorkspaceGrantedDirectoryActions(directories)
     private val mediaActions = WorkspaceFileToolMediaActions(workspaceFiles)
     private val mutations = WorkspaceFileToolMutationActions(workspaceFiles, grantedDirectories)
+    private val reactiveActions = WorkspaceFileToolReactiveActions(workspaceFiles, mediaActions)
     override val definition =
         ToolDefinition(
             id = ToolId(TOOL_ID),
@@ -31,6 +33,11 @@ class WorkspaceFileTool(
             description = workspaceFileToolDescription(),
             inputSchema = STRING_SCHEMA,
         )
+
+    override fun executeReactive(
+        inputJson: String,
+        context: Map<String, Any>,
+    ): Mono<ToolResult> = reactiveActions.execute(inputJson, context) ?: Mono.fromCallable { execute(inputJson, context) }
 
     override fun execute(
         inputJson: String,
@@ -66,8 +73,8 @@ class WorkspaceFileTool(
                 "extractPdfText" -> extractPdfText(file(input))
                 "renderPdfPage" -> renderPdfPage(file(input), input.int("page") ?: 1)
                 "imageInfo" -> imageInfo(file(input))
-                "imageBytes" -> imageBytes(file(input))
-                "analyzeImage" -> analyzeImage(file(input), input.requiredString("prompt"))
+                "imageBytes" -> success(TOOL_ID, mediaActions.imageBytes(file(input)).toString())
+                "analyzeImage" -> success(TOOL_ID, mediaActions.analyzeImage(file(input), input.requiredString("prompt")).toString())
                 else -> failure(TOOL_ID, "Unsupported workspace file action")
             }
         }.getOrElse { error ->
@@ -307,13 +314,6 @@ class WorkspaceFileTool(
     ): ToolResult = success(TOOL_ID, workspaceFileJson(workspaceFiles.renderPdfPage(record, page)).toString())
 
     private fun imageInfo(record: ToolWorkspaceFile): ToolResult = success(TOOL_ID, mediaActions.imageInfo(record).toString())
-
-    private fun imageBytes(record: ToolWorkspaceFile): ToolResult = success(TOOL_ID, mediaActions.imageBytes(record).toString())
-
-    private fun analyzeImage(
-        record: ToolWorkspaceFile,
-        prompt: String,
-    ): ToolResult = success(TOOL_ID, mediaActions.analyzeImage(record, prompt).toString())
 
     private fun file(input: kotlinx.serialization.json.JsonObject): ToolWorkspaceFile =
         workspaceFiles.requireFile(input.string("id"), input.string("path"))

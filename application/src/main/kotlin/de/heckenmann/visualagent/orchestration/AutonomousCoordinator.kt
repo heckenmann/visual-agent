@@ -49,7 +49,7 @@ class AutonomousCoordinator
         private val conversationOps: ConversationOpsProvider,
         private val subAgentOps: SubAgentOpsProvider,
         private val executionControl: SubAgentExecutionControl? = null,
-    ) {
+    ) : AutoCloseable {
         private val logger = KotlinLogging.logger {}
         private val subAgents: Map<String, SubAgent>
             get() = subAgentOps.allSubAgents
@@ -61,6 +61,7 @@ class AutonomousCoordinator
         private val requestedTodoIdSet = ConcurrentHashMap.newKeySet<String>()
         private val workSignal = AutonomousWorkSignal()
         private val autonomousProcessingEnabled = AtomicBoolean(false)
+        private val subscriptions = mutableListOf<AutoCloseable>()
         private val taskPlanner =
             AutonomousTaskPlanner(
                 todoManager = todoManager,
@@ -102,18 +103,29 @@ class AutonomousCoordinator
                     }
                 }
             }
-            todoEventBus.addListener { change ->
-                change.todo?.id?.let { pendingTodoChanges[it] = change }
-                change.todoId?.let { pendingTodoChanges[it] = change }
-                val todo = change.todo
-                decompositionScheduler.onTodoChanged(change)
-                if (todo?.status == TodoStatus.PENDING) {
-                    activeCancellationTokens[todo.id]?.cancel()
+            subscriptions +=
+                todoEventBus.addListener { change ->
+                    change.todo?.id?.let { pendingTodoChanges[it] = change }
+                    change.todoId?.let { pendingTodoChanges[it] = change }
+                    val todo = change.todo
+                    decompositionScheduler.onTodoChanged(change)
+                    if (todo?.status == TodoStatus.PENDING) {
+                        activeCancellationTokens[todo.id]?.cancel()
+                    }
+                    if (autonomousProcessingEnabled.get() || requestedTodoIds.isNotEmpty()) workSignal.signal()
                 }
-                if (autonomousProcessingEnabled.get() || requestedTodoIds.isNotEmpty()) workSignal.signal()
+            executionControl?.let { control ->
+                subscriptions += control.addListener { workSignal.signal() }
             }
-            executionControl?.addListener { workSignal.signal() }
-            parallelismProvider.addChangeListener { workSignal.signal() }
+            subscriptions += parallelismProvider.addChangeListener { workSignal.signal() }
+        }
+
+        /** Releases event subscriptions and cancels active autonomous work. */
+        override fun close() {
+            subscriptions.forEach(AutoCloseable::close)
+            subscriptions.clear()
+            activeCancellationTokens.values.forEach(CancellationToken::cancel)
+            activeTodoJobs.values.forEach(Job::cancel)
         }
 
         /**

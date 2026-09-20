@@ -53,7 +53,7 @@ class MainAgentMemoryToolTest {
         val tool = MainAgentMemoryTool(RecordingMemoryPort())
         val registry = ToolRegistry(listOf(tool), ToolEventBus()) { 120 }
 
-        val response = registry.execute(registry.resolve(setOf(tool.definition.id)).single(), "{\"action\":\"show\"}", emptyMap())
+        val response = registry.executeBlocking(registry.resolve(setOf(tool.definition.id)).single(), "{\"action\":\"show\"}", emptyMap())
         val envelope = Json.parseToJsonElement(response).jsonObject
 
         assertEquals("durable note", envelope["data"]!!.jsonObject["content"]!!.jsonPrimitive.content)

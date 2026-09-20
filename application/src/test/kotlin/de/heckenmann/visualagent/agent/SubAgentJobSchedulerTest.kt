@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
@@ -115,6 +116,34 @@ class SubAgentJobSchedulerTest {
             control.resumeAll()
             withTimeout(50) { started.await() }
             job.join()
+            assertEquals(SubAgentJobQueueSnapshot(active = 0, queued = 0), scheduler.snapshot())
+            scope.coroutineContext[Job]?.cancel()
+        }
+
+    @Test
+    fun `close cancels active jobs and releases scheduler subscriptions`() =
+        runBlocking {
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+            val scheduler =
+                SubAgentJobScheduler(
+                    scope,
+                    object : ParallelismProvider() {
+                        override fun get(): Int = 1
+                    },
+                )
+            val started = CompletableDeferred<Unit>()
+            val job =
+                async {
+                    scheduler.run {
+                        started.complete(Unit)
+                        awaitCancellation()
+                    }
+                }
+
+            started.await()
+            scheduler.close()
+
+            withTimeout(500) { job.join() }
             assertEquals(SubAgentJobQueueSnapshot(active = 0, queued = 0), scheduler.snapshot())
             scope.coroutineContext[Job]?.cancel()
         }

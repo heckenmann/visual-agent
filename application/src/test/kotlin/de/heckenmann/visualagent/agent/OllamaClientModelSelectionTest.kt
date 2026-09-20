@@ -7,7 +7,8 @@ import de.heckenmann.visualagent.config.AppConfigBean
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.reactor.awaitSingle
+import kotlinx.coroutines.reactor.awaitSingleOrNull
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.springframework.ai.chat.messages.UserMessage
@@ -50,7 +51,7 @@ class OllamaClientModelSelectionTest {
                     )
                 val client = createClient(chatModel, ollamaApi, toolRegistry(emptyList(), ToolEventBus(), AppConfigBean()), appConfig)
 
-                client.stream(listOf(Message("user", "hello"))).collect {}
+                client.streamReactive(listOf(Message("user", "hello"))).then().awaitSingleOrNull()
 
                 verify(exactly = 1) { ollamaApi.streamingChat(any()) }
             } finally {
@@ -83,7 +84,7 @@ class OllamaClientModelSelectionTest {
                     )
                 val client = createClient(chatModel, ollamaApi, toolRegistry(emptyList(), ToolEventBus(), AppConfigBean()), appConfig)
 
-                val response = client.chat(listOf(Message("user", "hello")))
+                val response = client.chatReactive(listOf(Message("user", "hello"))).awaitSingle()
 
                 assertEquals("unit-test-model", response.model)
                 assertEquals("ok", response.message.content)
@@ -118,14 +119,15 @@ class OllamaClientModelSelectionTest {
             val client = createClient(chatModel, ollamaApi, registry, appConfig)
 
             val response =
-                client.chat(
-                    ChatRequestContext(
-                        messages = listOf(Message("user", "use context")),
-                        model = "tool-model",
-                        enabledTools = setOf(ToolId("context")),
-                        modelCapabilities = setOf("tools"),
-                    ),
-                )
+                client
+                    .chatReactive(
+                        ChatRequestContext(
+                            messages = listOf(Message("user", "use context")),
+                            model = "tool-model",
+                            enabledTools = setOf(ToolId("context")),
+                            modelCapabilities = setOf("tools"),
+                        ),
+                    ).awaitSingle()
 
             assertEquals("tool-ready", response.message.content)
         }
@@ -150,14 +152,15 @@ class OllamaClientModelSelectionTest {
             val client = createClient(chatModel, ollamaApi, registry, appConfig)
 
             val response =
-                client.chat(
-                    ChatRequestContext(
-                        messages = listOf(Message("user", "list todos")),
-                        model = "tool-model",
-                        enabledTools = setOf(ToolId("todos")),
-                        modelCapabilities = setOf("tools"),
-                    ),
-                )
+                client
+                    .chatReactive(
+                        ChatRequestContext(
+                            messages = listOf(Message("user", "list todos")),
+                            model = "tool-model",
+                            enabledTools = setOf(ToolId("todos")),
+                            modelCapabilities = setOf("tools"),
+                        ),
+                    ).awaitSingle()
 
             assertEquals("Recovered after unknown tool error", response.message.content)
             verify(exactly = 2) { chatModel.call(any<Prompt>()) }
@@ -176,14 +179,15 @@ class OllamaClientModelSelectionTest {
 
             val chunks =
                 client
-                    .stream(
+                    .streamReactive(
                         ChatRequestContext(
                             messages = listOf(Message("user", "list todos")),
                             model = "tool-model",
                             enabledTools = setOf(ToolId("todos")),
                             modelCapabilities = setOf("tools"),
                         ),
-                    ).toList()
+                    ).collectList()
+                    .awaitSingle()
 
             assertEquals(1, chunks.size)
             assertEquals("Recovered stream fallback", chunks.single().message.content)
@@ -202,14 +206,15 @@ class OllamaClientModelSelectionTest {
             val client = createClient(chatModel, ollamaApi, registry, appConfig)
 
             val response =
-                client.chat(
-                    ChatRequestContext(
-                        messages = listOf(Message("user", "list todos")),
-                        model = "tool-model",
-                        enabledTools = setOf(ToolId("todos")),
-                        modelCapabilities = setOf("tools"),
-                    ),
-                )
+                client
+                    .chatReactive(
+                        ChatRequestContext(
+                            messages = listOf(Message("user", "list todos")),
+                            model = "tool-model",
+                            enabledTools = setOf(ToolId("todos")),
+                            modelCapabilities = setOf("tools"),
+                        ),
+                    ).awaitSingle()
 
             assertTrue(response.message.content.contains("Requested tool function does not exist"))
             assertTrue(response.message.content.contains("todos"))
@@ -228,7 +233,7 @@ class OllamaClientModelSelectionTest {
                 every { chatModel.call(capture(promptSlot)) } returns springResponse("vision-model", "image description")
                 val client = createClient(chatModel, ollamaApi, toolRegistry(emptyList(), ToolEventBus(), AppConfigBean()), appConfig)
 
-                val response = client.vision(byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47), "describe")
+                val response = client.visionReactive(byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47), "describe").awaitSingle()
 
                 val message = promptSlot.captured.instructions.single() as UserMessage
                 assertEquals("image description", response.message.content)
@@ -248,7 +253,9 @@ class OllamaClientModelSelectionTest {
             every { chatModel.call(capture(promptSlot)) } returns springResponse("catalog-vision-model", "image description")
             val client = createClient(chatModel, ollamaApi, toolRegistry(emptyList(), ToolEventBus(), AppConfigBean()), appConfig)
 
-            client.vision(byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47), "describe", "catalog-vision-model")
+            client
+                .visionReactive(byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47), "describe", "catalog-vision-model")
+                .awaitSingle()
 
             val options = promptSlot.captured.options as OllamaChatOptions
             assertEquals("catalog-vision-model", options.model)
@@ -283,10 +290,10 @@ class OllamaClientModelSelectionTest {
                 )
             val client = createClient(chatModel, ollamaApi, toolRegistry(emptyList(), ToolEventBus(), AppConfigBean()), appConfig)
 
-            assertEquals(listOf(1.0, 2.0), client.embeddings("hello", "catalog-embedding-model"))
+            assertEquals(listOf(1.0, 2.0), client.embeddingsReactive("hello", "catalog-embedding-model").awaitSingle())
             assertEquals("catalog-embedding-model", embeddingsSlot.captured.model())
-            assertEquals(listOf("llama"), client.getModels())
-            val modelDetails = client.getModelDetails("llama")
+            assertEquals(listOf("llama"), client.getModelsReactive().awaitSingle())
+            val modelDetails = client.getModelDetailsReactive("llama").awaitSingle()
             assertEquals("llama", modelDetails.details?.family)
             assertEquals("7B", modelDetails.details?.parameterSize)
         }

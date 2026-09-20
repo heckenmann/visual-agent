@@ -18,14 +18,14 @@ import de.heckenmann.visualagent.knowledge.TodoStore
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoManager
-import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.reactor.flux
+import kotlinx.coroutines.reactor.mono
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -54,6 +54,8 @@ internal class CoordinatorFixture(
     private val scope: CoroutineScope,
 ) {
     fun cancel() {
+        coordinator.close()
+        scheduler.close()
         scope.cancel()
     }
 }
@@ -95,45 +97,49 @@ internal fun buildFixture(
     val toolConfig = mockk<AgentToolConfigService>()
     every { toolConfig.mainAgentTools() } returns emptySet()
     every { toolConfig.toolsFor(any<SubAgent>()) } returns emptySet()
-    coEvery { provider.chat(any<ChatRequestContext>()) } coAnswers {
+    every { provider.chatReactive(any<ChatRequestContext>()) } answers {
         val ctx = it.invocation.args[0] as ChatRequestContext
         val token = ctx.cancellationToken
         val isReview = ctx.metadata["sessionId"] == "review"
         val content = if (isReview) reviewContent else responseContent
-        if (chatDelayMs > 0 && !isReview) {
-            val start = System.currentTimeMillis()
-            while (System.currentTimeMillis() - start < chatDelayMs) {
-                if (token?.isCancelled == true) throw kotlinx.coroutines.CancellationException("cancelled")
-                kotlinx.coroutines.delay(50)
+        mono {
+            if (chatDelayMs > 0 && !isReview) {
+                val start = System.currentTimeMillis()
+                while (System.currentTimeMillis() - start < chatDelayMs) {
+                    if (token?.isCancelled == true) throw kotlinx.coroutines.CancellationException("cancelled")
+                    kotlinx.coroutines.delay(50)
+                }
             }
-        }
-        ChatResponse(
-            model = "test",
-            message = Message("assistant", content),
-            done = true,
-        )
-    }
-    coEvery { provider.stream(any<ChatRequestContext>()) } coAnswers {
-        val ctx = it.invocation.args[0] as ChatRequestContext
-        val isReview = ctx.metadata["sessionId"] == "review"
-        if (!isReview && workerAttempts.incrementAndGet() <= failingWorkerAttempts) {
-            throw IllegalStateException("transient worker failure")
-        }
-        if (!isReview) onWorkerStreamStarted?.invoke()
-        if (chatDelayMs > 0 && !isReview) {
-            val start = System.currentTimeMillis()
-            while (System.currentTimeMillis() - start < chatDelayMs) {
-                if (ctx.cancellationToken?.isCancelled == true) throw kotlinx.coroutines.CancellationException("cancelled")
-                kotlinx.coroutines.delay(50)
-            }
-        }
-        flowOf(
             ChatResponse(
                 model = "test",
-                message = Message("assistant", if (isReview) reviewContent else responseContent),
+                message = Message("assistant", content),
                 done = true,
-            ),
-        )
+            )
+        }
+    }
+    every { provider.streamReactive(any<ChatRequestContext>()) } answers {
+        val ctx = it.invocation.args[0] as ChatRequestContext
+        val isReview = ctx.metadata["sessionId"] == "review"
+        flux {
+            if (!isReview && workerAttempts.incrementAndGet() <= failingWorkerAttempts) {
+                throw IllegalStateException("transient worker failure")
+            }
+            if (!isReview) onWorkerStreamStarted?.invoke()
+            if (chatDelayMs > 0 && !isReview) {
+                val start = System.currentTimeMillis()
+                while (System.currentTimeMillis() - start < chatDelayMs) {
+                    if (ctx.cancellationToken?.isCancelled == true) throw kotlinx.coroutines.CancellationException("cancelled")
+                    kotlinx.coroutines.delay(50)
+                }
+            }
+            send(
+                ChatResponse(
+                    model = "test",
+                    message = Message("assistant", if (isReview) reviewContent else responseContent),
+                    done = true,
+                ),
+            )
+        }
     }
     val notifications = CopyOnWriteArrayList<String>()
     val savedAgents = CopyOnWriteArrayList<SubAgent>()

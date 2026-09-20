@@ -6,12 +6,12 @@ import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.config.AppConfigBean
-import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
+import reactor.core.publisher.Mono
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
@@ -25,10 +25,10 @@ class WelcomeMessageComposerTest {
             val config = AppConfigBean().apply { ollamaModel = "minimax-m2.7:cloud" }
             val requestSlot = slot<ChatRequestContext>()
             every { catalog.activeModelId() } returns "gpt-5.6-luna"
-            coEvery { provider.checkConnection() } returns true
-            coEvery { provider.getModels() } returns listOf("gpt-5.6-luna")
-            coEvery { provider.chat(capture(requestSlot)) } returns
-                ChatResponse("gpt-5.6-luna", Message("assistant", "Hallo"), true)
+            every { provider.checkConnectionReactive() } returns Mono.just(true)
+            every { provider.getModelsReactive() } returns Mono.just(listOf("gpt-5.6-luna"))
+            every { provider.chatReactive(capture(requestSlot)) } returns
+                Mono.just(ChatResponse("gpt-5.6-luna", Message("assistant", "Hallo"), true))
             val persisted = mutableListOf<Message>()
 
             val result =

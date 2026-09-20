@@ -1,12 +1,12 @@
 package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.conversation.AgentManagerConversationOps
+import de.heckenmann.visualagent.agent.conversation.ConversationCompletionEventBus
 import de.heckenmann.visualagent.agent.text.AgentResponseCoordinator
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.protocol.ConversationCompletionEvent
-import de.heckenmann.visualagent.protocol.ConversationCompletionEventBus
 import de.heckenmann.visualagent.protocol.LifecyclePort
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoStatus
@@ -16,6 +16,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.buildJsonObject
@@ -111,7 +112,7 @@ internal class AgentTodoTrigger(
                     )
                 try {
                     currentCoroutineContext().ensureActive()
-                    val response = llmProvider.chat(request)
+                    val response = llmProvider.chatReactive(request).awaitSingle()
                     val content = responseCoordinator.normalizeAssistantPresentationContent(response.message.content)
                     if (lifecycle.closing) return@withLock
                     val persistedAssistant = conversationOps.persist(Message(role = "assistant", content = content))

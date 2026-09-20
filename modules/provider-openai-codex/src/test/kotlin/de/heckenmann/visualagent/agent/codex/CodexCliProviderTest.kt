@@ -3,6 +3,7 @@ package de.heckenmann.visualagent.agent.codex
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ProviderFinishReason
 import io.mockk.mockk
+import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import org.springframework.ai.chat.messages.AssistantMessage
@@ -67,13 +68,15 @@ class CodexCliProviderTest {
         runBlocking {
             val provider = CodexCliProvider(mockk(), mockk(), mockk())
 
-            assertFailsWith<IllegalStateException> { provider.chat(listOf(Message("user", "hello"))) }
-            assertFailsWith<IllegalStateException> { provider.stream(listOf(Message("user", "hello"))) }
-            assertFailsWith<IllegalStateException> { provider.vision(byteArrayOf(), "describe") }
-            assertFailsWith<IllegalStateException> { provider.getModels() }
-            assertEquals(emptyList(), provider.embeddings("text"))
+            assertFailsWith<IllegalStateException> { provider.chatReactive(listOf(Message("user", "hello"))).awaitSingle() }
+            assertFailsWith<IllegalStateException> {
+                provider.streamReactive(listOf(Message("user", "hello"))).collectList().awaitSingle()
+            }
+            assertFailsWith<IllegalStateException> { provider.visionReactive(byteArrayOf(), "describe").awaitSingle() }
+            assertFailsWith<IllegalStateException> { provider.getModelsReactive().awaitSingle() }
+            assertEquals(emptyList(), provider.embeddingsReactive("text").awaitSingle())
             assertEquals(true, provider.isConnected())
-            assertEquals(false, provider.checkConnection())
-            assertEquals("model", provider.getModelDetails("model").model)
+            assertEquals(false, provider.checkConnectionReactive().awaitSingle())
+            assertEquals("model", provider.getModelDetailsReactive("model").awaitSingle().model)
         }
 }

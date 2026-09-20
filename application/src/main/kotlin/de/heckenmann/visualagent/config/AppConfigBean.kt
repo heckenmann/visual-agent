@@ -2,8 +2,10 @@ package de.heckenmann.visualagent.config
 
 import de.heckenmann.visualagent.agent.provider.ProviderRuntimeConfig
 import de.heckenmann.visualagent.knowledge.PreferenceStore
+import mu.KotlinLogging
 import org.springframework.stereotype.Component
-import java.util.concurrent.CopyOnWriteArrayList
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Sinks
 
 /**
  * Spring-managed settings bean that holds the resolved application configuration.
@@ -19,6 +21,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 class AppConfigBean(
     private val preferenceStore: PreferenceStore = NoOpPreferenceStore(),
 ) : ProviderRuntimeConfig {
+    private val logger = KotlinLogging.logger {}
     override var llmProvider: String = "ollama"
     override var ollamaLocalUrl: String = "http://localhost:11434"
     override var ollamaModel: String = ""
@@ -75,14 +78,30 @@ class AppConfigBean(
             else -> "ollama"
         }
 
-    private val listeners = CopyOnWriteArrayList<(AppConfigChange) -> Unit>()
+    private val changeSink = Sinks.many().multicast().directBestEffort<AppConfigChange>()
+    private val emissionLock = Any()
+
+    /**
+     * Hot stream of configuration changes.
+     *
+     * Changes are not replayed and may be dropped for slow consumers; the bean's current values
+     * are authoritative and can be read after any refresh signal.
+     */
+    val changes: Flux<AppConfigChange> = changeSink.asFlux()
 
     /**
      * Registers an observer that receives configuration changes after [save].
      */
     fun addChangeListener(listener: (AppConfigChange) -> Unit): AutoCloseable {
-        listeners.add(listener)
-        return AutoCloseable { listeners.remove(listener) }
+        val subscription =
+            changes.subscribe(
+                { change ->
+                    runCatching { listener(change) }
+                        .onFailure { error -> logger.warn(error) { "Application config bean listener failed." } }
+                },
+                { error -> logger.warn(error) { "Application config bean stream terminated." } },
+            )
+        return AutoCloseable(subscription::dispose)
     }
 
     /**
@@ -131,7 +150,10 @@ class AppConfigBean(
     private fun publishChanges() {
         val snapshot = snapshot()
         snapshot.forEach { (key, value) ->
-            listeners.forEach { listener -> listener(AppConfigChange(key = key, oldValue = null, newValue = value)) }
+            synchronized(emissionLock) {
+                val result = changeSink.tryEmitNext(AppConfigChange(key = key, oldValue = null, newValue = value))
+                if (result != Sinks.EmitResult.OK) logger.warn { "Unable to emit application config bean change: $result" }
+            }
         }
     }
 

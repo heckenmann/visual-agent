@@ -20,11 +20,11 @@ dependencies {
     api(project(":agent-core"))
     api(project(":provider-core"))
     implementation(libs.kotlin.stdlib)
+    implementation(platform(libs.spring.boot.bom))
     implementation(platform(libs.spring.ai.bom))
     implementation(libs.spring.ai.ollama)
     implementation(libs.spring.ai.openai)
     implementation(libs.coroutines.core)
-    implementation(libs.coroutines.reactor)
     implementation(libs.serialization.json)
     implementation(libs.kotlin.logging)
 
@@ -32,6 +32,8 @@ dependencies {
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.mockk)
     testImplementation(libs.coroutines.test)
+    testImplementation(libs.coroutines.reactor)
+    testImplementation(libs.reactor.test)
 }
 
 tasks.test {

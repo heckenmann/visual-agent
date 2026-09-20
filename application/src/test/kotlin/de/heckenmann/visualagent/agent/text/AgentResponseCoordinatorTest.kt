@@ -8,10 +8,11 @@ import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ToolResult
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
-import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
+import reactor.core.publisher.Mono
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.test.assertEquals
@@ -68,8 +69,8 @@ class AgentResponseCoordinatorTest {
     fun `blank response is finalized from captured tool results`() =
         runTest {
             conversationOps.finishedToolEventsByRequestId["request-1"] = mutableListOf(toolEvent(success = true))
-            coEvery { provider.chat(any<ChatRequestContext>()) } returnsMany
-                listOf(response(""), response("Final answer from tool output"))
+            every { provider.chatReactive(any<ChatRequestContext>()) } returnsMany
+                listOf(Mono.just(response("")), Mono.just(response("Final answer from tool output")))
 
             val result = coordinator.generateAssistantContentWithRepetitionGuard("request-1")
 
@@ -83,8 +84,8 @@ class AgentResponseCoordinatorTest {
     @Test
     fun `repeated response is retried with anti-repetition instruction`() =
         runTest {
-            coEvery { provider.chat(any<ChatRequestContext>()) } returnsMany
-                listOf(response("repeat pattern ".repeat(60)), response("clean retry"))
+            every { provider.chatReactive(any<ChatRequestContext>()) } returnsMany
+                listOf(Mono.just(response("repeat pattern ".repeat(60))), Mono.just(response("clean retry")))
 
             val result = coordinator.generateAssistantContentWithRepetitionGuard("request-2")
 

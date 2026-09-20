@@ -6,6 +6,7 @@ import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.config.AppConfigBean
+import kotlinx.coroutines.reactor.awaitSingle
 import mu.KotlinLogging
 
 /**
@@ -35,14 +36,14 @@ class WelcomeMessageComposer(
                 .userModelInstruction
                 .trim()
 
-        if (!llmProvider.checkConnection()) {
+        if (!llmProvider.checkConnectionReactive().awaitSingle()) {
             logger.warn { "Welcome generation skipped: provider is not reachable" }
             val fallback = persistFallback(persist, userInstruction)
             return WelcomeResult.Fallback(fallback, IllegalStateException("Provider not reachable"))
         }
 
         val configuredModel = providerCatalog.activeModelId()
-        val availableModels = runCatching { llmProvider.getModels() }.getOrDefault(emptyList())
+        val availableModels = runCatching { llmProvider.getModelsReactive().awaitSingle() }.getOrDefault(emptyList())
         if (configuredModel.isNotBlank() && configuredModel !in availableModels) {
             logger.warn { "Welcome generation skipped: model '$configuredModel' is not available" }
             val fallback = persistFallback(persist, userInstruction)
@@ -72,7 +73,8 @@ class WelcomeMessageComposer(
         val generated =
             runCatching {
                 llmProvider
-                    .chat(request)
+                    .chatReactive(request)
+                    .awaitSingle()
                     .message
                     .content
                     .trim()

@@ -70,26 +70,24 @@ internal fun startTodoChangeWatcher(
     token: CancellationToken,
     todoEventBus: TodoEventBus,
 ): AutoCloseable {
-    val handle =
-        todoEventBus.addListener { change ->
-            if (change.todo?.id != todoId && change.todoId != todoId) return@addListener
-            when (change.type) {
-                TodoChangeType.UPDATED -> {
-                    val todo = change.todo ?: return@addListener
-                    val reassigned = todo.assignedAgentId != assignedAgentId
-                    val cancelled = todo.status == TodoStatus.CANCELLED
-                    val descriptionChanged = todo.description != taskDescription
-                    if (reassigned || cancelled || descriptionChanged) {
-                        token.cancel()
-                    }
+    return todoEventBus.addListener { change ->
+        if (change.todo?.id != todoId && change.todoId != todoId) return@addListener
+        when (change.type) {
+            TodoChangeType.UPDATED -> {
+                val todo = change.todo ?: return@addListener
+                val reassigned = todo.assignedAgentId != assignedAgentId
+                val cancelled = todo.status == TodoStatus.CANCELLED
+                val descriptionChanged = todo.description != taskDescription
+                if (reassigned || cancelled || descriptionChanged) {
+                    token.cancel()
                 }
-                TodoChangeType.REMOVED,
-                TodoChangeType.CLEARED,
-                -> token.cancel()
-                else -> Unit
             }
+            TodoChangeType.REMOVED,
+            TodoChangeType.CLEARED,
+            -> token.cancel()
+            else -> Unit
         }
-    return handle
+    }
 }
 
 /**

@@ -1,12 +1,12 @@
 package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.knowledge.MemoryStore
-import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -20,8 +20,8 @@ class SubAgentTest {
     fun `performTodo streams response deltas when a callback is provided`() =
         runBlocking {
             val provider = mockk<LLMProvider>()
-            coEvery { provider.stream(any<ChatRequestContext>()) } returns
-                flowOf(
+            every { provider.streamReactive(any<ChatRequestContext>()) } returns
+                Flux.just(
                     ChatResponse("test", Message("assistant", "new "), false),
                     ChatResponse("test", Message("assistant", "text"), true),
                 )
@@ -45,8 +45,8 @@ class SubAgentTest {
     fun `performTodo preserves adjacent sentence chunks`() =
         runBlocking {
             val provider = mockk<LLMProvider>()
-            coEvery { provider.stream(any<ChatRequestContext>()) } returns
-                flowOf(
+            every { provider.streamReactive(any<ChatRequestContext>()) } returns
+                Flux.just(
                     ChatResponse("test", Message("assistant", "First."), false),
                     ChatResponse("test", Message("assistant", "Second."), true),
                 )
@@ -70,8 +70,8 @@ class SubAgentTest {
     fun `performTodo does not split a filename extension across chunks`() =
         runBlocking {
             val provider = mockk<LLMProvider>()
-            coEvery { provider.stream(any<ChatRequestContext>()) } returns
-                flowOf(
+            every { provider.streamReactive(any<ChatRequestContext>()) } returns
+                Flux.just(
                     ChatResponse("test", Message("assistant", "archive."), false),
                     ChatResponse("test", Message("assistant", "iso"), true),
                 )
@@ -93,9 +93,10 @@ class SubAgentTest {
     fun `performTodo falls back to complete response when streaming is unavailable`() =
         runBlocking {
             val provider = mockk<LLMProvider>()
-            coEvery { provider.stream(any<ChatRequestContext>()) } throws UnsupportedOperationException("stream unsupported")
-            coEvery { provider.chat(any<ChatRequestContext>()) } returns
-                ChatResponse("test", Message("assistant", "complete response"), true)
+            every { provider.streamReactive(any<ChatRequestContext>()) } returns
+                Flux.error(UnsupportedOperationException("stream unsupported"))
+            every { provider.chatReactive(any<ChatRequestContext>()) } returns
+                Mono.just(ChatResponse("test", Message("assistant", "complete response"), true))
             val memoryStore = mockk<MemoryStore>(relaxed = true)
             val chunks = mutableListOf<String>()
 
@@ -116,10 +117,10 @@ class SubAgentTest {
     fun `performTodo falls back when stream ends without a terminal response`() =
         runBlocking {
             val provider = mockk<LLMProvider>()
-            coEvery { provider.stream(any<ChatRequestContext>()) } returns
-                flowOf(ChatResponse("test", Message("assistant", "partial"), false))
-            coEvery { provider.chat(any<ChatRequestContext>()) } returns
-                ChatResponse("test", Message("assistant", "complete response"), true)
+            every { provider.streamReactive(any<ChatRequestContext>()) } returns
+                Flux.just(ChatResponse("test", Message("assistant", "partial"), false))
+            every { provider.chatReactive(any<ChatRequestContext>()) } returns
+                Mono.just(ChatResponse("test", Message("assistant", "complete response"), true))
             val memoryStore = mockk<MemoryStore>(relaxed = true)
             val chunks = mutableListOf<String>()
 
@@ -141,11 +142,13 @@ class SubAgentTest {
         runBlocking {
             val provider = mockk<LLMProvider>()
             val request = slot<ChatRequestContext>()
-            coEvery { provider.chat(capture(request)) } returns
-                ChatResponse(
-                    model = "test",
-                    message = Message("assistant", "result"),
-                    done = true,
+            every { provider.chatReactive(capture(request)) } returns
+                Mono.just(
+                    ChatResponse(
+                        model = "test",
+                        message = Message("assistant", "result"),
+                        done = true,
+                    ),
                 )
             val memoryStore = mockk<MemoryStore>(relaxed = true)
 
@@ -169,11 +172,13 @@ class SubAgentTest {
     fun `performTodo fails when the todo result cannot be persisted`() =
         runBlocking {
             val provider = mockk<LLMProvider>()
-            coEvery { provider.chat(any<ChatRequestContext>()) } returns
-                ChatResponse(
-                    model = "test",
-                    message = Message("assistant", "result"),
-                    done = true,
+            every { provider.chatReactive(any<ChatRequestContext>()) } returns
+                Mono.just(
+                    ChatResponse(
+                        model = "test",
+                        message = Message("assistant", "result"),
+                        done = true,
+                    ),
                 )
             val memoryStore = mockk<MemoryStore>(relaxed = true)
             every { memoryStore.saveStructuredKnowledge(any(), any(), any()) } throws IllegalStateException("database unavailable")

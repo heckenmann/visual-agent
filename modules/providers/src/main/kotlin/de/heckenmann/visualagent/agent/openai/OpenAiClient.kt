@@ -16,13 +16,6 @@ import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.agent.provider.ProviderRuntimeConfig
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
 import io.micrometer.observation.ObservationRegistry
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.reactive.asFlow
-import kotlinx.coroutines.withContext
 import org.springframework.ai.chat.messages.UserMessage
 import org.springframework.ai.chat.model.ChatModel
 import org.springframework.ai.chat.prompt.Prompt
@@ -30,6 +23,9 @@ import org.springframework.ai.openai.OpenAiChatModel
 import org.springframework.ai.openai.OpenAiChatOptions
 import org.springframework.ai.openai.setup.OpenAiSetup
 import org.springframework.stereotype.Component
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
+import reactor.core.scheduler.Schedulers
 import java.lang.reflect.Method
 import java.net.URI
 import java.time.Duration
@@ -43,146 +39,131 @@ class OpenAiClient(
     private val toolRegistry: ProviderToolCallbacks,
     private val appConfig: ProviderRuntimeConfig = DefaultProviderRuntimeConfig(),
 ) : LLMProvider {
-    override suspend fun chat(messages: List<Message>): ChatResponse = chat(ChatRequestContext(messages = messages))
+    override fun chatReactive(messages: List<Message>): Mono<ChatResponse> = chatReactive(ChatRequestContext(messages = messages))
 
-    override suspend fun chat(request: ChatRequestContext): ChatResponse =
-        withContext(Dispatchers.IO) {
-            val selectedModel = request.model ?: appConfig.openAiModel
-            val prompt = promptFactory.buildPrompt(request, selectedModel)
-            val model = chatModel(request.providerProfile, selectedModel)
-            request.cancellationToken?.throwIfCancelled()
-            val responseResult =
-                runCatching {
-                    ToolCallingLoop()
-                        .run(
-                            model,
-                            prompt,
-                            request.cancellationToken,
-                            toolRegistry.functionCallbacks(
-                                request.enabledTools,
-                                request.metadata + mapOf("model" to selectedModel, "provider" to "openai") +
-                                    (request.cancellationToken?.let { mapOf("cancellationToken" to it) } ?: emptyMap()),
-                            ),
-                            toolRegistry,
-                        )
-                }
-            if (responseResult.isFailure) throw buildDetailedProviderError(responseResult.exceptionOrNull())
-            responseResult.getOrThrow()
-        }
-
-    override suspend fun stream(messages: List<Message>): Flow<ChatResponse> = stream(ChatRequestContext(messages = messages))
-
-    override suspend fun stream(request: ChatRequestContext): Flow<ChatResponse> {
+    override fun chatReactive(request: ChatRequestContext): Mono<ChatResponse> {
         val selectedModel = request.model ?: appConfig.openAiModel
         val prompt = promptFactory.buildPrompt(request, selectedModel)
         val model = chatModel(request.providerProfile, selectedModel)
-        val toolCallbacks =
-            if (request.enabledTools.isEmpty()) {
-                emptyList()
-            } else {
-                toolRegistry.functionCallbacks(
-                    request.enabledTools,
-                    request.metadata + mapOf("model" to selectedModel, "provider" to "openai") +
-                        (request.cancellationToken?.let { mapOf("cancellationToken" to it) } ?: emptyMap()),
-                )
-            }
-        return flow {
-            try {
-                request.cancellationToken?.throwIfCancelled()
-                if (toolCallbacks.isEmpty()) {
-                    model
-                        .stream(prompt)
-                        .asFlow()
-                        .map { chunk ->
-                            ProviderTurnResponseMapper
-                                .fromSpring(chunk)
-                                .let { turn ->
-                                    if (turn.model.isBlank()) turn.copy(model = selectedModel) else turn
-                                }.let(ProviderTurnResponseMapper::toChatResponse)
-                        }.collect { emit(it) }
-                } else {
-                    ToolCallingLoop()
-                        .runStream(model, prompt, request.cancellationToken, toolCallbacks, toolRegistry)
-                        .collect { emit(it) }
-                }
-            } catch (error: Throwable) {
-                throw buildDetailedProviderError(error)
-            }
-        }.flowOn(Dispatchers.IO)
+        return ToolCallingLoop()
+            .runReactive(model, prompt, request.cancellationToken, toolCallbacks(request, selectedModel), toolRegistry)
+            .onErrorMap(::buildDetailedProviderError)
     }
 
-    override suspend fun vision(
+    override fun streamReactive(messages: List<Message>): Flux<ChatResponse> = streamReactive(ChatRequestContext(messages = messages))
+
+    override fun streamReactive(request: ChatRequestContext): Flux<ChatResponse> {
+        val selectedModel = request.model ?: appConfig.openAiModel
+        val prompt = promptFactory.buildPrompt(request, selectedModel)
+        val model = chatModel(request.providerProfile, selectedModel)
+        val toolCallbacks = toolCallbacks(request, selectedModel)
+        return Flux
+            .defer {
+                request.cancellationToken?.throwIfCancelled()
+                if (toolCallbacks.isEmpty()) {
+                    model.stream(prompt).map { chunk ->
+                        ProviderTurnResponseMapper
+                            .fromSpring(chunk)
+                            .let { turn -> if (turn.model.isBlank()) turn.copy(model = selectedModel) else turn }
+                            .let(ProviderTurnResponseMapper::toChatResponse)
+                    }
+                } else {
+                    ToolCallingLoop()
+                        .runStreamReactive(model, prompt, request.cancellationToken, toolCallbacks, toolRegistry)
+                }
+            }.onErrorMap(::buildDetailedProviderError)
+    }
+
+    private fun toolCallbacks(
+        request: ChatRequestContext,
+        selectedModel: String,
+    ) = if (request.enabledTools.isEmpty()) {
+        emptyList()
+    } else {
+        toolRegistry.functionCallbacks(
+            request.enabledTools,
+            request.metadata + mapOf("model" to selectedModel, "provider" to "openai") +
+                (request.cancellationToken?.let { mapOf("cancellationToken" to it) } ?: emptyMap()),
+        )
+    }
+
+    override fun visionReactive(
         image: ByteArray,
         prompt: String,
-    ): ChatResponse = vision(image, prompt, appConfig.openAiModel)
+    ): Mono<ChatResponse> = visionReactive(image, prompt, appConfig.openAiModel)
 
-    override suspend fun vision(
+    override fun visionReactive(
         image: ByteArray,
         prompt: String,
         modelId: String,
-    ): ChatResponse =
-        withContext(Dispatchers.IO) {
-            val response =
-                chatModel(modelId = modelId)
-                    .call(
-                        Prompt(
-                            listOf(
-                                UserMessage
-                                    .builder()
-                                    .text(prompt)
-                                    .media(VisionSupport.media(image))
-                                    .build(),
+    ): Mono<ChatResponse> =
+        Mono
+            .fromCallable {
+                val response =
+                    chatModel(modelId = modelId)
+                        .call(
+                            Prompt(
+                                listOf(
+                                    UserMessage
+                                        .builder()
+                                        .text(prompt)
+                                        .media(VisionSupport.media(image))
+                                        .build(),
+                                ),
+                                OpenAiChatOptions.builder().model(modelId).build(),
                             ),
-                            OpenAiChatOptions.builder().model(modelId).build(),
-                        ),
-                    )
-            ProviderTurnResponseMapper.toChatResponse(ProviderTurnResponseMapper.fromSpring(response))
-        }
+                        )
+                ProviderTurnResponseMapper.toChatResponse(ProviderTurnResponseMapper.fromSpring(response))
+            }.subscribeOn(Schedulers.boundedElastic())
 
-    override suspend fun embeddings(text: String): List<Double> = emptyList()
+    override fun embeddingsReactive(text: String): Mono<List<Double>> = Mono.just(emptyList())
 
-    override suspend fun embeddings(
+    override fun embeddingsReactive(
         text: String,
         modelId: String,
-    ): List<Double> = embeddings(text)
+    ): Mono<List<Double>> = embeddingsReactive(text)
 
     override fun isConnected(): Boolean = appConfig.openAiApiKey.isNotBlank()
 
-    override suspend fun checkConnection(): Boolean =
-        withContext(Dispatchers.IO) {
-            runCatching { getModels().isNotEmpty() }.getOrDefault(false)
-        }
+    override fun checkConnectionReactive(): Mono<Boolean> =
+        getModelsReactive()
+            .map(List<String>::isNotEmpty)
+            .onErrorReturn(false)
 
-    override suspend fun getModels(): List<String> =
-        withContext(Dispatchers.IO) {
-            if (appConfig.openAiApiKey.isBlank()) {
-                throw IllegalStateException("OpenAI API key is not configured")
-            }
-            try {
-                OpenAiModelCatalog(::openAiClient).load(modelsUri())
-            } catch (error: Throwable) {
-                throw buildDetailedProviderError(error)
-            }
-        }
+    override fun getModelsReactive(): Mono<List<String>> =
+        Mono
+            .fromCallable {
+                if (appConfig.openAiApiKey.isBlank()) {
+                    throw IllegalStateException("OpenAI API key is not configured")
+                }
+                try {
+                    OpenAiModelCatalog(::openAiClient).load(modelsUri())
+                } catch (error: Throwable) {
+                    throw buildDetailedProviderError(error)
+                }
+            }.subscribeOn(Schedulers.boundedElastic())
 
-    override suspend fun getModels(profile: ProviderProfile): List<String> =
-        withContext(Dispatchers.IO) {
-            requireUsableApiKey(profile.baseUrl, ProviderEnvironmentCredentials.openAiApiKey(profile))
-            OpenAiModelCatalog { openAiClient(profile) }.load(modelsUri(profile))
-        }
+    override fun getModelsReactive(profile: ProviderProfile): Mono<List<String>> =
+        Mono
+            .fromCallable {
+                requireUsableApiKey(profile.baseUrl, ProviderEnvironmentCredentials.openAiApiKey(profile))
+                OpenAiModelCatalog { openAiClient(profile) }.load(modelsUri(profile))
+            }.subscribeOn(Schedulers.boundedElastic())
 
-    internal suspend fun getModelDetails(
+    internal fun getModelDetailsReactive(
         profile: ProviderProfile,
         modelName: String,
-    ): ShowResponse =
-        ShowResponse(
-            model = modelName,
-            modifiedAt = "",
-            details = ModelDetails(family = profile.name),
+    ): Mono<ShowResponse> =
+        Mono.just(
+            ShowResponse(
+                model = modelName,
+                modifiedAt = "",
+                details = ModelDetails(family = profile.name),
+            ),
         )
 
-    override suspend fun getModelDetails(modelName: String): ShowResponse =
-        withContext(Dispatchers.IO) {
+    override fun getModelDetailsReactive(modelName: String): Mono<ShowResponse> =
+        Mono.fromCallable {
             ShowResponse(
                 model = modelName,
                 modifiedAt = "",

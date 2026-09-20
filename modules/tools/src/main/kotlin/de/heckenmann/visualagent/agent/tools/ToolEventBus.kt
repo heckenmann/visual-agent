@@ -1,9 +1,11 @@
 package de.heckenmann.visualagent.agent.tools
 
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
+import mu.KotlinLogging
 import org.springframework.stereotype.Component
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Sinks
 import java.time.Instant
-import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Event emitted for every tool call execution.
@@ -50,7 +52,19 @@ enum class ToolCallPhase {
  */
 @Component
 class ToolEventBus {
-    private val listeners = CopyOnWriteArrayList<(ToolCallEvent) -> Unit>()
+    private val logger = KotlinLogging.logger {}
+    private val emissionLock = Any()
+    private val eventSink = Sinks.many().multicast().onBackpressureBuffer<ToolCallEvent>(EVENT_BUFFER_CAPACITY, false)
+
+    /**
+     * Hot stream of sanitized lifecycle events for active tool executions.
+     *
+     * Events are ordered, not replayed, and retained in a bounded buffer of 256 entries. STARTED
+     * and FINISHED events are therefore preserved for temporarily slow consumers; an overflow is
+     * logged by [publish]. Consumers should keep their work non-blocking and apply their own
+     * scheduling when needed.
+     */
+    val events: Flux<ToolCallEvent> = eventSink.asFlux()
 
     /**
      * Register a listener for tool call events.
@@ -59,8 +73,12 @@ class ToolEventBus {
      * @return Handle that removes the listener when closed
      */
     fun addListener(listener: (ToolCallEvent) -> Unit): AutoCloseable {
-        listeners += listener
-        return AutoCloseable { listeners.remove(listener) }
+        val subscription =
+            events.subscribe { event ->
+                runCatching { listener(event) }
+                    .onFailure { error -> logger.warn(error) { "Tool lifecycle listener failed." } }
+            }
+        return AutoCloseable(subscription::dispose)
     }
 
     /**
@@ -70,8 +88,15 @@ class ToolEventBus {
      */
     fun publish(event: ToolCallEvent) {
         val safeEvent = event.copy(inputJson = sanitizeToolInputForEvent(event.inputJson, event.toolId))
-        listeners.forEach { listener ->
-            runCatching { listener(safeEvent) }
+        synchronized(emissionLock) {
+            val emission = eventSink.tryEmitNext(safeEvent)
+            if (emission != Sinks.EmitResult.OK) {
+                logger.warn { "Tool lifecycle event was not delivered: $emission" }
+            }
         }
+    }
+
+    private companion object {
+        const val EVENT_BUFFER_CAPACITY = 256
     }
 }
