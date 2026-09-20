@@ -273,8 +273,32 @@ tasks.register("verifyModuleDependencies") {
 tasks.register("verifyReactorBoundaries") {
     group = "verification"
     description = "Prevents Project Reactor from leaking into UI-facing modules."
+    val clientModules = listOf(":ui", ":protocol")
+    dependsOn(
+        clientModules.map { modulePath ->
+            project(modulePath).tasks.register("verifyReactorBoundary") {
+                group = "verification"
+                description = "Prevents Project Reactor from leaking into this UI-facing module."
+                doLast {
+                    val dependencyViolations =
+                        listOf("compileClasspath", "runtimeClasspath").flatMap { configurationName ->
+                            configurations.findByName(configurationName)?.incoming?.resolutionResult?.allComponents
+                                ?.mapNotNull { component -> component.moduleVersion }
+                                ?.filter { module -> module.group == "io.projectreactor" }
+                                ?.map { module -> "$path:$configurationName resolves ${module.group}:${module.name}:${module.version}" }
+                                .orEmpty()
+                        }.distinct()
+                    check(dependencyViolations.isEmpty()) {
+                        buildString {
+                            appendLine("UI-facing modules must not resolve Project Reactor:")
+                            appendLine(dependencyViolations.joinToString("\n"))
+                        }
+                    }
+                }
+            }
+        },
+    )
     doLast {
-        val clientModules = listOf(":ui", ":protocol")
         val sourceViolations =
             clientModules.flatMap { modulePath ->
                 fileTree(project(modulePath).projectDir.resolve("src/main"))
@@ -286,26 +310,11 @@ tasks.register("verifyReactorBoundaries") {
                         }
                     }
             }
-        val dependencyViolations =
-            clientModules.flatMap { modulePath ->
-                val project = project(modulePath)
-                listOf("compileClasspath", "runtimeClasspath").flatMap { configurationName ->
-                    project.configurations.findByName(configurationName)?.incoming?.resolutionResult?.allComponents
-                        ?.mapNotNull { component -> component.moduleVersion }
-                        ?.filter { module -> module.group == "io.projectreactor" }
-                        ?.map { module -> "$modulePath:$configurationName resolves ${module.group}:${module.name}:${module.version}" }
-                        .orEmpty()
-                }
-            }.distinct()
-        check(sourceViolations.isEmpty() && dependencyViolations.isEmpty()) {
+        check(sourceViolations.isEmpty()) {
             buildString {
                 if (sourceViolations.isNotEmpty()) {
                     appendLine("UI-facing source must not import Project Reactor:")
                     appendLine(sourceViolations.joinToString("\n"))
-                }
-                if (dependencyViolations.isNotEmpty()) {
-                    appendLine("UI-facing modules must not resolve Project Reactor:")
-                    appendLine(dependencyViolations.joinToString("\n"))
                 }
             }
         }
