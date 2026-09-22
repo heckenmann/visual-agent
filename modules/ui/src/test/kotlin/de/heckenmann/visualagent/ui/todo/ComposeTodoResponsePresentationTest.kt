@@ -17,8 +17,13 @@ class ComposeTodoResponsePresentationTest {
         state.apply("attempt-1", "agent-a", "first", completed = false)
         state.apply("attempt-1", "agent-a", " second", completed = false)
         assertEquals("first second", state.text)
+        assertEquals(true, state.isStreaming)
 
         state.apply("attempt-2", "agent-a", "retry", completed = false)
         assertEquals("retry", state.text)
+        assertEquals(true, state.isStreaming)
+
+        state.apply("attempt-2", "agent-a", "", completed = true)
+        assertEquals(false, state.isStreaming)
     }
 }

@@ -200,9 +200,9 @@ class ComposeMarkdownRenderTest {
 
     @Test
     fun `renders complete code block when conversation changes from streaming to completed`() {
-        val content = mutableStateOf("streaming response")
+        val content = mutableStateOf("# Status\n\n- first item\n")
         val streaming = mutableStateOf(true)
-        val completed = "```kotlin\nval first = 1\nval middle = 2\nval last = 3\n```"
+        val completed = "# Status\n\n- first item\n\n```kotlin\nval first = 1\nval middle = 2\nval last = 3\n```"
         composeTestRule.setContent {
             MaterialTheme {
                 ConversationMessageContent(
@@ -212,6 +212,9 @@ class ComposeMarkdownRenderTest {
                 )
             }
         }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNode(hasText("Status", substring = true), useUnmergedTree = true).assertExists()
+        composeTestRule.onNode(hasText("first item", substring = true), useUnmergedTree = true).assertExists()
         composeTestRule.runOnIdle {
             content.value = completed
             streaming.value = false
