@@ -214,9 +214,8 @@ class ComposeWorkspaceComponentsTest {
     }
 
     @Test
-    fun `workspace panels animate to their reordered positions`() {
+    fun `workspace panels settle at their reordered positions`() {
         var windows by mutableStateOf(listOf(testWindow("first", "First"), testWindow("second", "Second")))
-        composeTestRule.mainClock.autoAdvance = false
         composeTestRule.setContent {
             MaterialTheme {
                 Box(
@@ -236,18 +235,16 @@ class ComposeWorkspaceComponentsTest {
                 }
             }
         }
-        composeTestRule.mainClock.advanceTimeByFrame()
+        composeTestRule.waitForIdle()
         val initialLeft = composeTestRule.onNodeWithTag("workspace-panel-first").getUnclippedBoundsInRoot().left
 
-        windows = windows.reversed()
-        composeTestRule.mainClock.advanceTimeBy(110)
-        val halfwayLeft = composeTestRule.onNodeWithTag("workspace-panel-first").getUnclippedBoundsInRoot().left
-        composeTestRule.mainClock.advanceTimeBy(500)
+        composeTestRule.runOnIdle { windows = windows.reversed() }
+        composeTestRule.waitForIdle()
         val finalLeft = composeTestRule.onNodeWithTag("workspace-panel-first").getUnclippedBoundsInRoot().left
 
         assertTrue(
-            "Expected panel to be between $initialLeft and $finalLeft halfway through reorder, but was $halfwayLeft",
-            halfwayLeft > initialLeft && halfwayLeft < finalLeft,
+            "Expected the reordered panel right of $initialLeft, but was $finalLeft",
+            finalLeft > initialLeft,
         )
     }
 

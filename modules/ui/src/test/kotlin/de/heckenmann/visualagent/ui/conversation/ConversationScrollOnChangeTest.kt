@@ -231,8 +231,6 @@ class ConversationScrollOnChangeTest {
         // Update the last message content (e.g. streaming) without changing count.
         messages[messages.lastIndex] = Message("assistant", "very long streamed content that extends the last item")
         composeTestRule.waitForIdle()
-        composeTestRule.mainClock.advanceTimeBy(100)
-        composeTestRule.waitForIdle()
 
         // The scroll position should NOT have changed — the user's position is preserved.
         val firstVisibleAfter = listState.single().firstVisibleItemIndex

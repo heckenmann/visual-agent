@@ -3,7 +3,6 @@ package de.heckenmann.visualagent.ui.todo
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -77,16 +76,13 @@ class ComposeTodoPanelProtocolTest {
 
         composeTestRule.waitForIdle()
         progressListener!!.invoke(TodoProgress("todo", "New response"))
-        composeTestRule.mainClock.advanceTimeBy(250)
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("New response").assertExists()
         composeTestRule.onNodeWithContentDescription("Todo working").assertExists()
         progressListener!!.invoke(TodoProgress("todo", completed = true))
         currentTodo = currentTodo.copy(status = TodoState.COMPLETED)
         todoListener!!.invoke(TodoChange(todo = currentTodo))
-        composeTestRule.waitUntil {
-            composeTestRule.onAllNodesWithText("New response").fetchSemanticsNodes().isEmpty()
-        }
+        composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("New response").assertDoesNotExist()
         assertEquals(0, composeTestRule.onAllNodesWithContentDescription("Todo working").fetchSemanticsNodes().size)
     }
