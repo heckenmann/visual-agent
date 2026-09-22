@@ -3,7 +3,7 @@
 package de.heckenmann.visualagent.ui.components
 
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.onNodeWithText
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
@@ -24,17 +24,12 @@ import org.junit.Test
  */
 class ComposeMarkdownTest {
     @get:Rule
-    val composeTestRule = createComposeRule()
+    val composeTestRule: ComposeContentTestRule = ImmediateMarkdownComposeRule()
 
     /**
-     * The `multiplatform-markdown-renderer` library parses Markdown asynchronously.
-     * Tests must wait for the text nodes to appear rather than using fixed time delays.
+     * The test rule configures synchronous Markdown parsing, so Compose idling is sufficient.
      */
     private fun waitForMarkdownParsing() {
-        composeTestRule.waitForIdle()
-        Thread.sleep(200)
-        composeTestRule.waitForIdle()
-        Thread.sleep(200)
         composeTestRule.waitForIdle()
     }
 

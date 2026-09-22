@@ -1,9 +1,11 @@
 package de.heckenmann.visualagent.ui.components
 
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import com.mikepenz.markdown.m3.Markdown
+import com.mikepenz.markdown.model.rememberMarkdownState
 import de.heckenmann.visualagent.protocol.ClientImagePort
 import de.heckenmann.visualagent.protocol.ConversationPort
 import de.heckenmann.visualagent.ui.agents.*
@@ -33,13 +35,20 @@ import de.heckenmann.visualagent.ui.workspace.*
 @Composable
 internal fun ComposeMarkdown(
     markdown: String,
-    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier.fillMaxWidth(),
     conversationPort: ConversationPort? = LocalConversationPort.current,
     clientImagePort: ClientImagePort? = LocalClientImagePort.current,
 ) {
     val imageTransformer = rememberImageTransformer(conversationPort, clientImagePort)
+    val immediateParsing = LocalMarkdownImmediateParsing.current
+    val markdownState =
+        rememberMarkdownState(
+            markdown,
+            retainState = !immediateParsing,
+            immediate = immediateParsing,
+        )
     Markdown(
-        content = markdown,
+        markdownState = markdownState,
         modifier = modifier,
         imageTransformer = imageTransformer,
     )
@@ -50,3 +59,6 @@ internal val LocalConversationPort = staticCompositionLocalOf<ConversationPort?>
 
 /** Client-local image boundary made available to nested Markdown message rows. */
 internal val LocalClientImagePort = staticCompositionLocalOf<ClientImagePort?> { null }
+
+/** Allows tests to use the renderer's completed parse state without real-time waiting. */
+internal val LocalMarkdownImmediateParsing = staticCompositionLocalOf { false }
