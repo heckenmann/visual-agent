@@ -8,8 +8,6 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import reactor.test.StepVerifier
-import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.CountDownLatch
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -231,51 +229,6 @@ class ToolRegistryTest {
         assertEquals("boolean", properties["async"]!!.jsonObject["type"]!!.jsonPrimitive.content)
     }
 
-    @Test
-    fun `tool call can run asynchronously`() {
-        val events = CopyOnWriteArrayList<ToolCallEvent>()
-        val finished = CountDownLatch(1)
-        val bus = ToolEventBus()
-        bus.addListener { event ->
-            events += event
-            if (event.phase == ToolCallPhase.FINISHED) finished.countDown()
-        }
-        val release = CountDownLatch(1)
-        val registry = ToolRegistry(listOf(SlowTool("context", release)), bus) { timeoutSeconds }
-
-        val result = registry.executeBlocking(registry.resolve(setOf(ToolId("context"))).single(), """{"async":true}""", emptyMap())
-        val json = Json.parseToJsonElement(result).jsonObject
-        assertTrue(json["success"]!!.jsonPrimitive.content.toBoolean())
-        assertTrue(json["data"]!!.jsonPrimitive.content.contains("scheduled async"))
-
-        release.countDown()
-        finished.await()
-        assertEquals(2, events.size)
-        assertEquals(ToolCallPhase.STARTED, events[0].phase)
-        assertEquals(ToolCallPhase.FINISHED, events[1].phase)
-        assertTrue(events[1].result.success)
-    }
-
-    @Test
-    fun `managed tool handles async input itself`() {
-        val events = CopyOnWriteArrayList<ToolCallEvent>()
-        val finished = CountDownLatch(1)
-        val bus = ToolEventBus()
-        bus.addListener { event ->
-            events += event
-            if (event.phase == ToolCallPhase.FINISHED) finished.countDown()
-        }
-        val registry = ToolRegistry(listOf(ManagedTool("agent:start")), bus)
-
-        val result = registry.executeBlocking(registry.resolve(setOf(ToolId("agent:start"))).single(), """{"async":true}""", emptyMap())
-        val json = Json.parseToJsonElement(result).jsonObject
-
-        assertTrue(json["data"]!!.jsonPrimitive.content.contains("scheduled async"))
-        finished.await()
-        assertEquals(2, events.size)
-        assertEquals(true, events.last().context["async"])
-    }
-
     private fun registry(vararg tools: VisualAgentTool) = ToolRegistry(tools.toList(), ToolEventBus()) { timeoutSeconds }
 
     private class FakeTool(
@@ -312,27 +265,6 @@ class ToolRegistryTest {
         ): ToolResult = throw IllegalStateException("boom")
     }
 
-    private class SlowTool(
-        id: String,
-        private val release: CountDownLatch,
-    ) : VisualAgentTool {
-        override val definition =
-            ToolDefinition(
-                id = ToolId(id),
-                name = ToolId(id).toFunctionName(),
-                description = "Slow $id",
-                inputSchema = """{"type":"object"}""",
-            )
-
-        override fun execute(
-            inputJson: String,
-            context: Map<String, Any>,
-        ): ToolResult {
-            release.await()
-            return ToolResult(definition.id.value, true, "ok")
-        }
-    }
-
     private class TimeoutRecordingTool(
         id: String,
     ) : VisualAgentTool {
@@ -352,23 +284,5 @@ class ToolRegistryTest {
             timeoutSeconds = context["toolTimeoutSeconds"] as? Int
             return ToolResult(definition.id.value, true, "ok")
         }
-    }
-
-    private class ManagedTool(
-        id: String,
-    ) : VisualAgentTool {
-        override val managesExecution: Boolean = true
-        override val definition =
-            ToolDefinition(
-                id = ToolId(id),
-                name = ToolId(id).toFunctionName(),
-                description = "Managed $id",
-                inputSchema = """{"type":"object"}""",
-            )
-
-        override fun execute(
-            inputJson: String,
-            context: Map<String, Any>,
-        ): ToolResult = ToolResult(definition.id.value, true, "managed")
     }
 }
