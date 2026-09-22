@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.springframework.ai.chat.messages.SystemMessage
 import org.springframework.ai.chat.prompt.Prompt
 import org.springframework.ai.ollama.api.OllamaApi
 import org.springframework.ai.ollama.api.OllamaChatOptions
@@ -89,4 +90,46 @@ class OllamaToollessChatOptionsFilteringTest {
             assertTrue(optionsMap.containsKey("temperature"), "options must still contain 'temperature'")
             assertEquals(0.5, optionsMap["temperature"])
         }
+
+    @Test
+    fun `execute preserves protocol system role for every model identifier`() =
+        runTest {
+            val ollamaApi = mockk<OllamaApi>()
+            val requestSlot = slot<OllamaApi.ChatRequest>()
+            every { ollamaApi.chat(capture(requestSlot)) } returns response()
+            val promptFactory = mockk<OllamaPromptFactory>()
+            every { promptFactory.buildPrompt(any(), any()) } returns
+                Prompt(
+                    listOf(
+                        SystemMessage("system instruction"),
+                    ),
+                    OllamaChatOptions.builder().model("qwen3:cloud").build(),
+                )
+
+            OllamaToollessChat.execute(
+                ollamaApi = ollamaApi,
+                promptFactory = promptFactory,
+                request = ChatRequestContext(messages = emptyList()),
+                selectedModel = "qwen3:cloud",
+            )
+
+            val messages = requestSlot.captured.messages()
+            val role = messages.single().role()
+            assertEquals(OllamaApi.Message.Role.SYSTEM, role)
+        }
+
+    private fun response() =
+        OllamaApi.ChatResponse(
+            "m",
+            java.time.Instant.now(),
+            OllamaApi.Message(OllamaApi.Message.Role.ASSISTANT, "hi", null, null, null, null),
+            null,
+            true,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+        )
 }

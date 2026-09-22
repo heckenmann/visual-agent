@@ -38,7 +38,7 @@ internal object OllamaToollessChat {
         selectedModel: String,
     ): ChatResponse {
         val prompt = promptFactory.buildPrompt(request, selectedModel)
-        val messages = prompt.instructions.map { msg -> msg.toOllamaMessage(selectedModel) }
+        val messages = prompt.instructions.map { msg -> msg.toOllamaMessage() }
         val chatRequest =
             buildChatRequest(
                 selectedModel = selectedModel,
@@ -67,7 +67,7 @@ internal object OllamaToollessChat {
     ): Flux<ChatResponse> =
         Flux.defer {
             val prompt = promptFactory.buildPrompt(request, selectedModel)
-            val messages = prompt.instructions.map { msg -> msg.toOllamaMessage(selectedModel) }
+            val messages = prompt.instructions.map { msg -> msg.toOllamaMessage() }
             val chatRequest =
                 buildChatRequest(
                     selectedModel = selectedModel,
@@ -126,15 +126,10 @@ internal object OllamaToollessChat {
 
     private val TOP_LEVEL_OPTION_KEYS = setOf("model", "format", "keep_alive", "truncate")
 
-    private fun org.springframework.ai.chat.messages.Message.toOllamaMessage(selectedModel: String): OllamaApi.Message {
+    private fun org.springframework.ai.chat.messages.Message.toOllamaMessage(): OllamaApi.Message {
         val role =
             when (this) {
-                is org.springframework.ai.chat.messages.SystemMessage ->
-                    if (selectedModel.endsWith(":cloud")) {
-                        OllamaApi.Message.Role.USER
-                    } else {
-                        OllamaApi.Message.Role.SYSTEM
-                    }
+                is org.springframework.ai.chat.messages.SystemMessage -> OllamaApi.Message.Role.SYSTEM
                 is org.springframework.ai.chat.messages.AssistantMessage -> OllamaApi.Message.Role.ASSISTANT
                 else -> OllamaApi.Message.Role.USER
             }

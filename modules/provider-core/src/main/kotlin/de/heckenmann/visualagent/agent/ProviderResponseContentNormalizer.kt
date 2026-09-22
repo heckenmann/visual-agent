@@ -16,6 +16,7 @@ object ProviderResponseContentNormalizer {
      */
     fun normalize(content: String): String = assistantRolePrefix.replaceFirst(content, "")
 
-    // A bare "assistant" is valid response text. Only remove unambiguous role framing.
-    private val assistantRolePrefix = Regex("^\\s*(?:(?i:<\\|assistant\\|>)|(?i:assistant:))\\s*")
+    // A bare "assistant" is valid response text. Remove only protocol markers at message start.
+    private val assistantRolePrefix =
+        Regex("^\\s*(?:(?i:<\\|assistant\\|>)\\s*|(?i:assistant)(?::\\s*|(?=\\p{Lu})))")
 }

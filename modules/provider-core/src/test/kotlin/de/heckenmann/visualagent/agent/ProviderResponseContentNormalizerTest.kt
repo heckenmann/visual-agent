@@ -9,6 +9,8 @@ class ProviderResponseContentNormalizerTest {
     fun `removes standard leading assistant role markers`() {
         assertEquals("Answer", ProviderResponseContentNormalizer.normalize("assistant: Answer"))
         assertEquals("Answer", ProviderResponseContentNormalizer.normalize("<|assistant|> Answer"))
+        assertEquals("Answer", ProviderResponseContentNormalizer.normalize("assistantAnswer"))
+        assertEquals("Hallo", ProviderResponseContentNormalizer.normalize("assistantHallo"))
     }
 
     @Test
@@ -18,6 +20,6 @@ class ProviderResponseContentNormalizerTest {
             "Assistant managers coordinate work",
             ProviderResponseContentNormalizer.normalize("Assistant managers coordinate work"),
         )
-        assertEquals("assistantAnswer", ProviderResponseContentNormalizer.normalize("assistantAnswer"))
+        assertEquals("assistantanswer", ProviderResponseContentNormalizer.normalize("assistantanswer"))
     }
 }
