@@ -59,6 +59,39 @@ class MainSystemPromptComposerTest {
     }
 
     @Test
+    fun `prompt does not mention globally disabled tools or their instructions`() {
+        val disabledStore =
+            MapSubAgentConfigStore().also {
+                it.setPreference(
+                    "tools.disabled.global",
+                    "agent:list\nagent:create\ntodos\nhistory\nworkspace:file\njavascript:execute\nskills",
+                )
+            }
+
+        val prompt = MainSystemPromptComposer.compose(null, AgentToolConfigService(disabledStore))
+
+        assertFalse("agent:list" in prompt)
+        assertFalse("agent:create" in prompt)
+        assertFalse("`todos`" in prompt)
+        assertFalse("history" in prompt)
+        assertFalse("workspace:file" in prompt)
+        assertFalse("inspect agents" in prompt)
+        assertFalse("listRoots" in prompt)
+    }
+
+    @Test
+    fun `prompt omits tool policy when tooling is explicitly unavailable`() {
+        val prompt = MainSystemPromptComposer.compose(null, toolConfigService, toolingAvailable = false)
+
+        assertFalse("## Tool Policy" in prompt)
+        assertFalse("tool list" in prompt)
+        assertFalse("agent:list" in prompt)
+        assertFalse("workspace:file" in prompt)
+        assertFalse("Use `javascript:execute`" in prompt)
+        assertFalse("Use `skills` directly" in prompt)
+    }
+
+    @Test
     fun `runtime state exposes every current execution item`() {
         val todos =
             listOf(
@@ -92,7 +125,6 @@ class MainSystemPromptComposerTest {
         val prompt = MainSystemPromptComposer.compose(null, toolConfigService)
 
         assertTrue("Before changing todo state, call `todos` with" in prompt)
-        assertTrue("Use `history` when earlier conversation information is missing" in prompt)
         assertTrue("On a tool failure, inspect the error" in prompt)
         assertTrue("call `listRoots` first" in prompt)
         assertTrue("do not create skill files in the workspace" in prompt)

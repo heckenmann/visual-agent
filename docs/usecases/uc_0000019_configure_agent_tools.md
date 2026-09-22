@@ -42,6 +42,6 @@ Agents receive only the tools allowed by persisted configuration.
 - The main agent receives only its explicit orchestration and server-owned tools, including the request-safe `context` tool; it does not receive direct file-system or terminal access.
 - Sub-agent tool sets can include task-specific tools like canvas or workspace files.
 - The main agent can inspect any agent's tool set via `agent:list` or `agent:show` before assigning a todo.
-- Disabled tools are not exposed in provider callbacks.
+- Disabled tools are not exposed in provider callbacks, tool schemas, or system prompt instructions.
 - Per-agent tool overrides are resolved before template defaults and are still filtered by globally disabled tools.
 - Tool toggles remain separate from provider/model dropdowns so capability changes are explicit.

@@ -7,6 +7,7 @@ import de.heckenmann.visualagent.agent.provider.ProviderErrorMessages
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.agent.provider.ProviderRuntimeConfig
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
+import de.heckenmann.visualagent.agent.supportsToolCalling
 import mu.KotlinLogging
 import org.springframework.ai.chat.model.ChatModel
 import org.springframework.ai.ollama.OllamaChatModel
@@ -45,7 +46,7 @@ class OllamaClient(
         return Mono
             .defer {
                 request.cancellationToken?.throwIfCancelled()
-                val supportsTools = request.modelCapabilities.contains("tools")
+                val supportsTools = request.supportsToolCalling()
                 val toolsEnabled = request.enabledTools.isNotEmpty()
                 logger.debug {
                     "Ollama chat: model=$selectedModel, supportsTools=$supportsTools, toolsEnabled=$toolsEnabled"
@@ -93,7 +94,7 @@ class OllamaClient(
         val selectedModel = request.model ?: appConfig.ollamaModel
         val allowedFunctionNames = promptFactory.allowedFunctionNames(request, selectedModel)
         val prompt = promptFactory.buildPrompt(request, selectedModel)
-        val supportsTools = request.modelCapabilities.contains("tools")
+        val supportsTools = request.supportsToolCalling()
         val toolsEnabled = request.enabledTools.isNotEmpty()
         val toolCallbacks = if (!supportsTools || !toolsEnabled) emptyList() else toolCallbacks(request, selectedModel)
         return Flux

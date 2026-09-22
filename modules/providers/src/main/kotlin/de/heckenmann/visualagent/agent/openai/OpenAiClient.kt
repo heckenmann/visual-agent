@@ -15,6 +15,7 @@ import de.heckenmann.visualagent.agent.provider.ProviderEnvironmentCredentials
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.agent.provider.ProviderRuntimeConfig
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
+import de.heckenmann.visualagent.agent.supportsToolCalling
 import io.micrometer.observation.ObservationRegistry
 import org.springframework.ai.chat.messages.UserMessage
 import org.springframework.ai.chat.model.ChatModel
@@ -90,7 +91,7 @@ class OpenAiClient(
     private fun toolCallbacks(
         request: ChatRequestContext,
         selectedModel: String,
-    ) = if (request.enabledTools.isEmpty()) {
+    ) = if (request.enabledTools.isEmpty() || !request.supportsToolCalling()) {
         emptyList()
     } else {
         toolRegistry.functionCallbacks(

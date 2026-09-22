@@ -26,7 +26,8 @@ class OllamaPromptFactoryTest {
                 messages = listOf(Message("user", "hello")),
                 model = "no-tools-model",
                 enabledTools = setOf(ToolId("todos")),
-                modelCapabilities = emptySet(),
+                modelCapabilities = setOf("completion"),
+                modelCapabilitiesComplete = true,
             )
 
         val prompt = factory.buildPrompt(request, "no-tools-model")
@@ -34,6 +35,7 @@ class OllamaPromptFactoryTest {
 
         assertTrue(options.toolCallbacks.orEmpty().isEmpty(), "toolCallbacks must be empty")
         assertTrue(options.toolContext.orEmpty().isEmpty(), "toolContext must be empty")
+        assertTrue(prompt.instructions.none { it.text.orEmpty().contains("Tool calling strict mode") })
     }
 
     @Test
@@ -46,6 +48,7 @@ class OllamaPromptFactoryTest {
                 model = "tools-model",
                 enabledTools = setOf(ToolId("todos")),
                 modelCapabilities = setOf("tools"),
+                modelCapabilitiesComplete = true,
             )
 
         val prompt = factory.buildPrompt(request, "tools-model")
@@ -65,6 +68,7 @@ class OllamaPromptFactoryTest {
                 model = "tools-model",
                 enabledTools = emptySet(),
                 modelCapabilities = setOf("tools"),
+                modelCapabilitiesComplete = true,
             )
 
         val prompt = factory.buildPrompt(request, "tools-model")

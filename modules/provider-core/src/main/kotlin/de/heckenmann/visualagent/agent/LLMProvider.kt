@@ -187,6 +187,8 @@ interface LLMProvider {
  * @property messages Ordered conversation messages
  * @property model Optional model override; defaults to the configured model when null
  * @property enabledTools Tool IDs that may be exposed to the model for this request
+ * @property modelCapabilities Provider-reported capabilities of the selected model
+ * @property modelCapabilitiesComplete Whether the capability set is authoritative
  * @property metadata Additional provider-neutral execution context
  * @property cancellationToken Optional token the provider can consult to honour user cancellation
  * @see docs/usecases/uc_0000002_send_main_agent_message.md
@@ -206,8 +208,18 @@ data class ChatRequestContext(
     val providerProfile: ProviderProfile? = null,
     val cancellationToken: CancellationToken? = null,
     val modelCapabilities: Set<String> = emptySet(),
+    val modelCapabilitiesComplete: Boolean = false,
     val contextWindow: ContextWindow = ContextWindow(),
 )
+
+/**
+ * Returns whether the selected model may receive tool definitions.
+ *
+ * An incomplete capability set is treated as unknown so providers that do not publish
+ * capability metadata remain usable. An authoritative set must explicitly contain `tools`.
+ */
+fun ChatRequestContext.supportsToolCalling(): Boolean =
+    !modelCapabilitiesComplete || modelCapabilities.any { it.equals("tools", ignoreCase = true) }
 
 /**
  * Context limits known for one provider request.

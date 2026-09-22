@@ -6,6 +6,7 @@ import de.heckenmann.visualagent.agent.RequestContextBudgeter
 import de.heckenmann.visualagent.agent.ToolDefinition
 import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
+import de.heckenmann.visualagent.agent.supportsToolCalling
 import org.springframework.ai.chat.messages.AssistantMessage
 import org.springframework.ai.chat.messages.SystemMessage
 import org.springframework.ai.chat.messages.UserMessage
@@ -33,13 +34,17 @@ class OllamaPromptFactory(
         request: ChatRequestContext,
         selectedModel: String,
     ): List<String> =
-        toolRegistry
-            .functionCallbacks(
-                enabledTools = request.enabledTools,
-                context = request.metadata + mapOf("model" to selectedModel),
-            ).map { it.toolDefinition.name() }
-            .distinct()
-            .sorted()
+        if (!request.supportsToolCalling()) {
+            emptyList()
+        } else {
+            toolRegistry
+                .functionCallbacks(
+                    enabledTools = request.enabledTools,
+                    context = request.metadata + mapOf("model" to selectedModel),
+                ).map { it.toolDefinition.name() }
+                .distinct()
+                .sorted()
+        }
 
     /**
      * Builds a Spring AI prompt including tool options and strict tool-name guidance.
@@ -52,7 +57,7 @@ class OllamaPromptFactory(
         request: ChatRequestContext,
         selectedModel: String,
     ): Prompt {
-        val supportsTools = request.modelCapabilities.contains("tools")
+        val supportsTools = request.supportsToolCalling()
         val toolContext =
             request.metadata +
                 mapOf("model" to selectedModel) +

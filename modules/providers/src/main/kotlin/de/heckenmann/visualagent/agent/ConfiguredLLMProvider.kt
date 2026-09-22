@@ -227,6 +227,12 @@ class ConfiguredLLMProvider(
                 model = stagedModel,
                 providerProfile = stagedProfile,
                 contextWindow = stagedProfile.contextWindow(stagedModel, contextWindow),
+                modelCapabilities =
+                    stagedProfile.models
+                        .firstOrNull { it.id == stagedModel }
+                        ?.capabilities
+                        .orEmpty(),
+                modelCapabilitiesComplete = stagedProfile.models.firstOrNull { it.id == stagedModel }?.capabilitiesComplete == true,
             )
         }
         val explicitOptions =
@@ -250,6 +256,7 @@ class ConfiguredLLMProvider(
             options = resolved.options,
             providerProfile = resolved.provider,
             modelCapabilities = resolved.model.capabilities,
+            modelCapabilitiesComplete = resolved.model.capabilitiesComplete,
             contextWindow =
                 contextWindow.copy(
                     modelLimit = resolved.model.contextLimit,

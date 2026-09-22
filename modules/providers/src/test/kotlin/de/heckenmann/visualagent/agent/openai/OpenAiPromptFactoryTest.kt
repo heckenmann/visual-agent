@@ -24,6 +24,8 @@ class OpenAiPromptFactoryTest {
                 ChatRequestContext(
                     messages = listOf(Message("user", "show context")),
                     enabledTools = setOf(ToolId("context")),
+                    modelCapabilities = setOf("tools"),
+                    modelCapabilitiesComplete = true,
                 ),
                 "gpt-test",
             )
@@ -54,6 +56,29 @@ class OpenAiPromptFactoryTest {
     }
 
     @Test
+    fun `prompt omits tools and guard when model explicitly lacks tooling`() {
+        val registry = TestToolRegistry(listOf(FakeTool("context")))
+        val factory = OpenAiPromptFactory(registry)
+
+        val prompt =
+            factory.buildPrompt(
+                ChatRequestContext(
+                    messages = listOf(Message("user", "show context")),
+                    enabledTools = setOf(ToolId("context")),
+                    modelCapabilities = setOf("completion"),
+                    modelCapabilitiesComplete = true,
+                ),
+                "no-tools-model",
+            )
+
+        assertTrue(prompt.instructions.none { it.text.orEmpty().contains("Tool calling strict mode") })
+        val options = prompt.options as org.springframework.ai.openai.OpenAiChatOptions
+        assertTrue(options.toolCallbacks.orEmpty().isEmpty())
+        assertTrue(options.toolContext.orEmpty().isEmpty())
+        assertEquals(emptyList(), factory.allowedFunctionNames(promptRequest(), "no-tools-model"))
+    }
+
+    @Test
     fun `allowedFunctionNames returns sorted enabled names`() {
         val registry = TestToolRegistry(listOf(FakeTool("terminal"), FakeTool("context")))
         val factory = OpenAiPromptFactory(registry)
@@ -63,12 +88,22 @@ class OpenAiPromptFactoryTest {
                 ChatRequestContext(
                     messages = emptyList(),
                     enabledTools = setOf(ToolId("terminal"), ToolId("context")),
+                    modelCapabilities = setOf("tools"),
+                    modelCapabilitiesComplete = true,
                 ),
                 "gpt-test",
             )
 
         assertEquals(listOf("context", "terminal"), names)
     }
+
+    private fun promptRequest() =
+        ChatRequestContext(
+            messages = emptyList(),
+            enabledTools = setOf(ToolId("context")),
+            modelCapabilities = setOf("completion"),
+            modelCapabilitiesComplete = true,
+        )
 
     @Test
     fun `prompt applies sampling options`() {

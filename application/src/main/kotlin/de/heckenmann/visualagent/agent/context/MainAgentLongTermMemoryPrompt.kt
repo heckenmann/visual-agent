@@ -8,6 +8,7 @@ internal object MainAgentLongTermMemoryPrompt {
         memory: MainAgentLongTermMemory,
         limit: Int,
         memoryToolAvailable: Boolean,
+        toolingAvailable: Boolean = true,
     ): String =
         buildString {
             appendLine("## Durable Main-Agent Memory")
@@ -20,8 +21,10 @@ internal object MainAgentLongTermMemoryPrompt {
                         "do not create, update, or delegate a todo merely to use memory.",
                 )
                 appendLine("Use edit with the expected revision when durable facts change.")
-            } else {
+            } else if (toolingAvailable) {
                 appendLine("The memory tool is currently unavailable, so this document is read-only for this request.")
+            } else {
+                appendLine("This document is read-only for this request.")
             }
             appendLine("<memory>")
             append(memory.content)

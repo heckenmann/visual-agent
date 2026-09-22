@@ -245,6 +245,18 @@ class ProviderCatalogService(
     }
 
     /**
+     * Returns whether the active model may receive tool definitions.
+     *
+     * Incomplete capability metadata is treated as unknown and therefore remains enabled for
+     * compatibility with providers that do not publish capability declarations.
+     */
+    fun activeModelSupportsToolCalling(): Boolean {
+        val profile = getProvider(activeProviderId()) ?: return true
+        val model = profile.models.firstOrNull { it.id == activeModelId() } ?: return true
+        return !model.capabilitiesComplete || model.capabilities.any { it.equals("tools", ignoreCase = true) }
+    }
+
+    /**
      * Persists the active provider identifier.
      *
      * Use cases: UC-0000007.

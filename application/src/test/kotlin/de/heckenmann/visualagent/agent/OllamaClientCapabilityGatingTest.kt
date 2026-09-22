@@ -54,7 +54,8 @@ class OllamaClientCapabilityGatingTest {
                             messages = listOf(Message("user", "hello")),
                             model = "no-tools-model",
                             enabledTools = setOf(ToolId("context")),
-                            modelCapabilities = emptySet(),
+                            modelCapabilities = setOf("completion"),
+                            modelCapabilitiesComplete = true,
                         ),
                     ).awaitSingle()
 
@@ -94,7 +95,8 @@ class OllamaClientCapabilityGatingTest {
                             messages = listOf(Message("user", "hello")),
                             model = "no-tools-model",
                             enabledTools = setOf(ToolId("context")),
-                            modelCapabilities = emptySet(),
+                            modelCapabilities = setOf("completion"),
+                            modelCapabilitiesComplete = true,
                         ),
                     ).collectList()
                     .awaitSingle()
@@ -126,6 +128,7 @@ class OllamaClientCapabilityGatingTest {
                             model = "tools-model",
                             enabledTools = setOf(ToolId("context")),
                             modelCapabilities = setOf("completion", "tools"),
+                            modelCapabilitiesComplete = true,
                         ),
                     ).awaitSingle()
 

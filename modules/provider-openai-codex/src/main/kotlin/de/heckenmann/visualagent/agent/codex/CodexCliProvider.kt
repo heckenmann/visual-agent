@@ -20,6 +20,7 @@ import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
 import de.heckenmann.visualagent.agent.provider.ProviderUserFacingError
 import de.heckenmann.visualagent.agent.provider.ProviderUserFacingException
 import de.heckenmann.visualagent.agent.provider.ProviderWorkingDirectory
+import de.heckenmann.visualagent.agent.supportsToolCalling
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.reactor.mono
@@ -205,11 +206,15 @@ class CodexCliProvider internal constructor(
     private fun callbacks(
         request: ChatRequestContext,
         model: String,
-    ) = toolCallbacks.functionCallbacks(
-        request.enabledTools,
-        request.metadata + mapOf("model" to model, "provider" to "codex") +
-            (request.cancellationToken?.let { mapOf("cancellationToken" to it) } ?: emptyMap()),
-    )
+    ) = if (!request.supportsToolCalling()) {
+        emptyList()
+    } else {
+        toolCallbacks.functionCallbacks(
+            request.enabledTools,
+            request.metadata + mapOf("model" to model, "provider" to "codex") +
+                (request.cancellationToken?.let { mapOf("cancellationToken" to it) } ?: emptyMap()),
+        )
+    }
 
     private fun budgetRequest(
         request: ChatRequestContext,
@@ -218,7 +223,11 @@ class CodexCliProvider internal constructor(
     ): ChatRequestContext =
         contextBudgeter.fit(
             request,
-            listOf(Message("system", "Tool timeout contract: $toolRuntimeGuidance")) + request.messages,
+            if (callbacks.isEmpty()) {
+                request.messages
+            } else {
+                listOf(Message("system", "Tool timeout contract: $toolRuntimeGuidance")) + request.messages
+            },
             callbacks.map { callback -> callback.toProviderDefinition() },
         )
 

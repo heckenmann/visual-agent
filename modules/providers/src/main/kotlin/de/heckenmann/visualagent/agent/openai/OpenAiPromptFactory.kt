@@ -6,6 +6,7 @@ import de.heckenmann.visualagent.agent.RequestContextBudgeter
 import de.heckenmann.visualagent.agent.ToolDefinition
 import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
+import de.heckenmann.visualagent.agent.supportsToolCalling
 import org.springframework.ai.chat.messages.AssistantMessage
 import org.springframework.ai.chat.messages.SystemMessage
 import org.springframework.ai.chat.messages.UserMessage
@@ -33,13 +34,17 @@ class OpenAiPromptFactory(
         request: ChatRequestContext,
         selectedModel: String,
     ): List<String> =
-        toolRegistry
-            .functionCallbacks(
-                enabledTools = request.enabledTools,
-                context = request.metadata + mapOf("model" to selectedModel, "provider" to "openai"),
-            ).map { it.toolDefinition.name() }
-            .distinct()
-            .sorted()
+        if (!request.supportsToolCalling()) {
+            emptyList()
+        } else {
+            toolRegistry
+                .functionCallbacks(
+                    enabledTools = request.enabledTools,
+                    context = request.metadata + mapOf("model" to selectedModel, "provider" to "openai"),
+                ).map { it.toolDefinition.name() }
+                .distinct()
+                .sorted()
+        }
 
     /**
      * Builds an OpenAI prompt with native Spring AI tool-calling options.
@@ -57,10 +62,14 @@ class OpenAiPromptFactory(
                 mapOf("model" to selectedModel, "provider" to "openai") +
                 (request.cancellationToken?.let { mapOf("cancellationToken" to it) } ?: emptyMap())
         val callbacks =
-            toolRegistry.functionCallbacks(
-                enabledTools = request.enabledTools,
-                context = toolContext,
-            )
+            if (request.supportsToolCalling()) {
+                toolRegistry.functionCallbacks(
+                    enabledTools = request.enabledTools,
+                    context = toolContext,
+                )
+            } else {
+                emptyList()
+            }
         val exactFunctionNames = callbacks.map { it.toolDefinition.name() }.distinct().sorted()
         val budgetedRequest =
             contextBudgeter.fit(
@@ -68,12 +77,12 @@ class OpenAiPromptFactory(
                 toolNameGuardMessage(exactFunctionNames) + request.messages,
                 callbacks.map { callback -> callback.toProviderDefinition() },
             )
-        val optionsBuilder =
-            OpenAiChatOptions
-                .builder()
-                .model(selectedModel)
+        val optionsBuilder = OpenAiChatOptions.builder().model(selectedModel)
+        if (callbacks.isNotEmpty()) {
+            optionsBuilder
                 .toolCallbacks(callbacks)
                 .toolContext(toolContext)
+        }
         budgetedRequest.parameters.temperature?.let(optionsBuilder::temperature)
         budgetedRequest.parameters.topP?.let(optionsBuilder::topP)
         budgetedRequest.parameters.maxTokens?.let(optionsBuilder::maxCompletionTokens)

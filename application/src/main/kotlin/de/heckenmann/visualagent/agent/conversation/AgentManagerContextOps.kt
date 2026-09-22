@@ -22,8 +22,14 @@ internal class AgentManagerContextOps(
         requestId: String? = null,
         token: CancellationToken? = null,
     ): ChatRequestContext {
-        val contextPrompt = buildMainSystemContextPrompt()
-        val enabledTools = owner.agentToolConfigService.mainAgentTools()
+        val toolingAvailable = owner.providerCatalog.activeModelSupportsToolCalling()
+        val contextPrompt = buildMainSystemContextPrompt(toolingAvailable)
+        val enabledTools =
+            owner.agentToolConfigService
+                .mainAgentTools()
+                .takeIf { toolingAvailable }
+                ?.toSet()
+                .orEmpty()
         val runtimeStatePrompt =
             MainAgentRuntimeStatePrompt.compose(
                 todos = owner.todoStore.listTodos(),
@@ -34,6 +40,7 @@ internal class AgentManagerContextOps(
                 owner.mainAgentLongTermMemoryStore.snapshot(),
                 owner.appConfig.maxMainAgentMemoryChars,
                 ToolId("memory") in enabledTools,
+                toolingAvailable,
             )
         val preparedMessages = mutableListOf<Message>()
         preparedMessages += Message("system", contextPrompt)
@@ -68,11 +75,12 @@ internal class AgentManagerContextOps(
             else -> message
         }
 
-    internal fun buildMainSystemContextPrompt(): String =
+    internal fun buildMainSystemContextPrompt(toolingAvailable: Boolean = owner.providerCatalog.activeModelSupportsToolCalling()): String =
         de.heckenmann.visualagent.agent.context.MainSystemPromptComposer
             .compose(
                 pendingResumeMessage = owner.pendingResumeMessage,
                 toolConfigService = owner.agentToolConfigService,
                 userModelInstruction = owner.appConfig.userModelInstruction,
+                toolingAvailable = toolingAvailable,
             )
 }
