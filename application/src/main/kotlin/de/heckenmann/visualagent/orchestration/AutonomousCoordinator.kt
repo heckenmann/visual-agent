@@ -293,7 +293,12 @@ class AutonomousCoordinator
                     scope.launch(start = CoroutineStart.LAZY) {
                         if (todoManager.getById(todo.id)?.status != TodoStatus.IN_PROGRESS) {
                             activeCancellationTokens.remove(todo.id, token)
-                            releaseClaimedAgent(agent, todo.id)
+                            releaseAutonomousTodoAgent(
+                                agent = agent,
+                                todoId = todo.id,
+                                agentBusySince = agentBusySince,
+                                subAgentOps = subAgentOps,
+                            )
                             return@launch
                         }
                         processTodoWithLLM(
@@ -322,7 +327,12 @@ class AutonomousCoordinator
                 processingJob.invokeOnCompletion {
                     activeTodoJobs.remove(todo.id, processingJob)
                     if (scope.isActive && todoManager.getById(todo.id)?.status != TodoStatus.IN_PROGRESS) {
-                        releaseClaimedAgent(agent, todo.id)
+                        releaseAutonomousTodoAgent(
+                            agent = agent,
+                            todoId = todo.id,
+                            agentBusySince = agentBusySince,
+                            subAgentOps = subAgentOps,
+                        )
                     }
                     workSignal.signal()
                 }
@@ -336,20 +346,6 @@ class AutonomousCoordinator
                 subAgentOps.saveSubAgent(agent)
                 todoManager.updateStatus(todo.id, TodoStatus.PENDING)
                 throw error
-            }
-        }
-
-        private fun releaseClaimedAgent(
-            agent: SubAgent,
-            todoId: String,
-        ) {
-            if (agent.currentTodoId == todoId) {
-                agentBusySince.remove(agent.id)
-                agent.status = AgentStatus.IDLE
-                agent.currentTask = null
-                agent.currentTodoId = null
-                subAgentOps.saveSubAgent(agent)
-                subAgentOps.notifyAgent(agent.id, "STATUS:${agent.status.name}")
             }
         }
     }
