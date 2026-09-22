@@ -183,11 +183,15 @@ class ComposeMarkdownRenderTest {
 
     @Test
     fun `renders every code line after content changes from streaming text`() {
-        val markdown = mutableStateOf("streaming response")
+        val markdown = mutableStateOf("```kotlin\nval first = 1\n")
         val completed = "```kotlin\nval first = 1\nval middle = 2\nval last = 3\n```"
         composeTestRule.setContent {
             MaterialTheme {
-                ComposeMarkdown(markdown.value, modifier = Modifier.fillMaxSize())
+                ComposeStreamingMarkdown(
+                    markdown = markdown.value,
+                    streamKey = "streaming-code-block",
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
         }
         waitForMarkdownParsing()
