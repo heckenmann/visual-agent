@@ -14,7 +14,7 @@ internal class ImmediateMarkdownComposeRule(
         delegate.setContent {
             CompositionLocalProvider(
                 LocalMarkdownImmediateParsing provides true,
-                LocalMarkdownImageIoContext provides EmptyCoroutineContext,
+                LocalMarkdownImageLoadContext provides EmptyCoroutineContext,
                 LocalMarkdownImageDecodeContext provides EmptyCoroutineContext,
             ) {
                 composable()

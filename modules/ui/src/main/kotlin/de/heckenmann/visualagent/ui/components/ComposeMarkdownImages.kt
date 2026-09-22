@@ -50,7 +50,7 @@ internal fun rememberImageTransformer(
     }
 
 /** Dispatcher for image source resolution. */
-internal val LocalMarkdownImageIoContext = staticCompositionLocalOf<CoroutineContext> { Dispatchers.IO }
+internal val LocalMarkdownImageLoadContext = staticCompositionLocalOf<CoroutineContext> { Dispatchers.IO }
 
 /** Dispatcher for image decoding. */
 internal val LocalMarkdownImageDecodeContext = staticCompositionLocalOf<CoroutineContext> { Dispatchers.Default }
@@ -69,7 +69,7 @@ private class BoundaryImageTransformer(
     @Composable
     override fun transform(link: String): ImageData {
         val source = link.removePrefix(INLINE_IMAGE_SOURCE_PREFIX)
-        val ioContext = LocalMarkdownImageIoContext.current
+        val loadContext = LocalMarkdownImageLoadContext.current
         val decodeContext = LocalMarkdownImageDecodeContext.current
         var state by remember(source) { mutableStateOf<ResolvedImageState>(ResolvedImageState.Loading) }
         var reservation by remember(source) { mutableStateOf<MarkdownImageLoadBudget.Reservation?>(null) }
@@ -87,7 +87,7 @@ private class BoundaryImageTransformer(
             try {
                 val resolution =
                     runCatching {
-                        withContext(ioContext) {
+                        withContext(loadContext) {
                             resolveImage(source)
                         }
                     }.getOrElse { ConversationImageResolution.Rejected("Image could not be loaded") }
