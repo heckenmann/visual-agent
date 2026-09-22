@@ -162,9 +162,9 @@ internal class R2dbcConversationStore(
                     SELECT id, session_id, role, content, metadata, created_at, timeline_sequence, context_policy
                     FROM conversation_history
                     WHERE session_id = :sessionId AND context_policy = 'DIALOGUE'
-                      AND EXISTS (SELECT 1 FROM boundary)
                       AND (
-                          timeline_sequence > (SELECT timeline_sequence FROM boundary)
+                          NOT EXISTS (SELECT 1 FROM boundary)
+                          OR timeline_sequence > (SELECT timeline_sequence FROM boundary)
                           OR (
                               timeline_sequence = (SELECT timeline_sequence FROM boundary)
                               AND (

@@ -11,6 +11,7 @@ import de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
 import de.heckenmann.visualagent.todo.TodoEventBus
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.verify
 import kotlinx.coroutines.reactor.flux
 import kotlinx.coroutines.runBlocking
@@ -21,6 +22,26 @@ import kotlin.test.assertFailsWith
 
 @de.heckenmann.visualagent.testsupport.DatabaseTest
 class AgentManagerStreamingConversationTest {
+    @Test
+    fun `stream message sends the latest user request before the context turn limit is reached`() =
+        runBlocking {
+            val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
+            val provider = mockk<LLMProvider>(relaxed = true)
+            val request = slot<ChatRequestContext>()
+            every { provider.streamReactive(capture(request)) } returns
+                Flux.just(ChatResponse(model = "test", message = Message("assistant", "Answer"), done = true))
+            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
+
+            manager.streamMessage("Create a Markdown table", onChunk = {}, userEntryId = USER_ID, assistantEntryId = ASSISTANT_ID)
+
+            assertEquals(
+                "Create a Markdown table",
+                request.captured.messages
+                    .last { it.role == "user" }
+                    .content,
+            )
+        }
+
     @Test
     fun `stream message emits chunks and persists assistant response`() =
         runBlocking {
