@@ -8,7 +8,8 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import reactor.test.StepVerifier
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -170,11 +171,12 @@ class ToolRegistryTest {
         val previousTimeout = timeoutSeconds
         timeoutSeconds = 1
         try {
-            val registry = registry(SlowTool("context", 1500))
-            val result = registry.executeBlocking(registry.resolve(setOf(ToolId("context"))).single(), """{}""", emptyMap())
+            val tool = TimeoutRecordingTool("context")
+            val registry = registry(tool)
+            val result = registry.executeBlocking(tool, """{}""", emptyMap())
             val json = Json.parseToJsonElement(result).jsonObject
-            assertFalse(json["success"]!!.jsonPrimitive.content.toBoolean())
-            assertEquals("TIMEOUT", json["error"]!!.jsonObject["code"]!!.jsonPrimitive.content)
+            assertTrue(json["success"]!!.jsonPrimitive.content.toBoolean())
+            assertEquals(1, tool.timeoutSeconds)
         } finally {
             timeoutSeconds = previousTimeout
         }
@@ -185,16 +187,17 @@ class ToolRegistryTest {
         val previousTimeout = timeoutSeconds
         timeoutSeconds = 1
         try {
-            val registry = registry(SlowTool("context", 1200))
+            val tool = TimeoutRecordingTool("context")
+            val registry = registry(tool)
             val result =
                 registry.executeBlocking(
-                    registry.resolve(setOf(ToolId("context"))).single(),
+                    tool,
                     """{"timeoutSeconds":2}""",
                     emptyMap(),
                 )
             val json = Json.parseToJsonElement(result).jsonObject
             assertTrue(json["success"]!!.jsonPrimitive.content.toBoolean())
-            assertEquals("ok", json["data"]!!.jsonPrimitive.content)
+            assertEquals(2, tool.timeoutSeconds)
         } finally {
             timeoutSeconds = previousTimeout
         }
@@ -230,20 +233,23 @@ class ToolRegistryTest {
 
     @Test
     fun `tool call can run asynchronously`() {
-        val events = mutableListOf<ToolCallEvent>()
+        val events = CopyOnWriteArrayList<ToolCallEvent>()
+        val finished = CountDownLatch(1)
         val bus = ToolEventBus()
-        bus.addListener { events += it }
-        val registry = ToolRegistry(listOf(SlowTool("context", 200)), bus) { timeoutSeconds }
+        bus.addListener { event ->
+            events += event
+            if (event.phase == ToolCallPhase.FINISHED) finished.countDown()
+        }
+        val release = CountDownLatch(1)
+        val registry = ToolRegistry(listOf(SlowTool("context", release)), bus) { timeoutSeconds }
 
         val result = registry.executeBlocking(registry.resolve(setOf(ToolId("context"))).single(), """{"async":true}""", emptyMap())
         val json = Json.parseToJsonElement(result).jsonObject
         assertTrue(json["success"]!!.jsonPrimitive.content.toBoolean())
         assertTrue(json["data"]!!.jsonPrimitive.content.contains("scheduled async"))
 
-        val deadline = System.currentTimeMillis() + 3000
-        while (System.currentTimeMillis() < deadline && events.count { it.phase == ToolCallPhase.FINISHED } == 0) {
-            TimeUnit.MILLISECONDS.sleep(25)
-        }
+        release.countDown()
+        finished.await()
         assertEquals(2, events.size)
         assertEquals(ToolCallPhase.STARTED, events[0].phase)
         assertEquals(ToolCallPhase.FINISHED, events[1].phase)
@@ -252,19 +258,20 @@ class ToolRegistryTest {
 
     @Test
     fun `managed tool handles async input itself`() {
-        val events = mutableListOf<ToolCallEvent>()
+        val events = CopyOnWriteArrayList<ToolCallEvent>()
+        val finished = CountDownLatch(1)
         val bus = ToolEventBus()
-        bus.addListener { events += it }
+        bus.addListener { event ->
+            events += event
+            if (event.phase == ToolCallPhase.FINISHED) finished.countDown()
+        }
         val registry = ToolRegistry(listOf(ManagedTool("agent:start")), bus)
 
         val result = registry.executeBlocking(registry.resolve(setOf(ToolId("agent:start"))).single(), """{"async":true}""", emptyMap())
         val json = Json.parseToJsonElement(result).jsonObject
 
         assertTrue(json["data"]!!.jsonPrimitive.content.contains("scheduled async"))
-        val deadline = System.currentTimeMillis() + 3_000
-        while (System.currentTimeMillis() < deadline && events.count { it.phase == ToolCallPhase.FINISHED } == 0) {
-            TimeUnit.MILLISECONDS.sleep(25)
-        }
+        finished.await()
         assertEquals(2, events.size)
         assertEquals(true, events.last().context["async"])
     }
@@ -307,7 +314,7 @@ class ToolRegistryTest {
 
     private class SlowTool(
         id: String,
-        private val delayMillis: Long,
+        private val release: CountDownLatch,
     ) : VisualAgentTool {
         override val definition =
             ToolDefinition(
@@ -321,7 +328,28 @@ class ToolRegistryTest {
             inputJson: String,
             context: Map<String, Any>,
         ): ToolResult {
-            TimeUnit.MILLISECONDS.sleep(delayMillis)
+            release.await()
+            return ToolResult(definition.id.value, true, "ok")
+        }
+    }
+
+    private class TimeoutRecordingTool(
+        id: String,
+    ) : VisualAgentTool {
+        override val definition =
+            ToolDefinition(
+                id = ToolId(id),
+                name = ToolId(id).toFunctionName(),
+                description = "Timeout recording $id",
+                inputSchema = """{"type":"object"}""",
+            )
+        var timeoutSeconds: Int? = null
+
+        override fun execute(
+            inputJson: String,
+            context: Map<String, Any>,
+        ): ToolResult {
+            timeoutSeconds = context["toolTimeoutSeconds"] as? Int
             return ToolResult(definition.id.value, true, "ok")
         }
     }

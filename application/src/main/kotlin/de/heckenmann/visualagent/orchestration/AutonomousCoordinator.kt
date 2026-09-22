@@ -22,6 +22,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import mu.KotlinLogging
@@ -49,6 +50,7 @@ class AutonomousCoordinator
         private val conversationOps: ConversationOpsProvider,
         private val subAgentOps: SubAgentOpsProvider,
         private val executionControl: SubAgentExecutionControl? = null,
+        private val retryDelay: suspend (Long) -> Unit = { delay(it) },
     ) : AutoCloseable {
         private val logger = KotlinLogging.logger {}
         private val subAgents: Map<String, SubAgent>
@@ -313,6 +315,7 @@ class AutonomousCoordinator
                             jobScheduler = jobScheduler,
                             executionControl = executionControl,
                             cancellationToken = token,
+                            retryDelay = retryDelay,
                         )
                     }
                 activeTodoJobs[todo.id] = processingJob

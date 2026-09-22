@@ -78,6 +78,7 @@ internal fun scrollArrowHandler(
  * @param scrollState Horizontal scroll state to mutate
  * @param scope Coroutine scope used to run the repeating scroll job
  * @param isClosing Returns true when the application is shutting down
+ * @param nextStep Suspension between scroll steps
  * @return The continuous scroll job, which the caller must cancel on pointer release
  */
 internal fun startContinuousScroll(
@@ -85,6 +86,7 @@ internal fun startContinuousScroll(
     scrollState: LazyListState,
     scope: CoroutineScope,
     isClosing: () -> Boolean,
+    nextStep: suspend () -> Unit = { delay(SCROLL_ARROW_REPEAT_DELAY_MS) },
 ): Job {
     return scope.launch {
         while (isActive && !isClosing()) {
@@ -92,7 +94,7 @@ internal fun startContinuousScroll(
             if (consumed == 0f) {
                 return@launch
             }
-            delay(SCROLL_ARROW_REPEAT_DELAY_MS)
+            nextStep()
         }
     }
 }

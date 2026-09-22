@@ -19,7 +19,6 @@ import de.heckenmann.visualagent.todo.TodoTerminalReason
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import mu.KotlinLogging
@@ -50,6 +49,7 @@ internal suspend fun processTodoWithLLM(
     jobScheduler: SubAgentJobScheduler,
     executionControl: SubAgentExecutionControl? = null,
     cancellationToken: CancellationToken? = null,
+    retryDelay: suspend (Long) -> Unit,
 ) {
     val logger = KotlinLogging.logger {}
     val token = cancellationToken ?: CancellationToken()
@@ -203,7 +203,7 @@ internal suspend fun processTodoWithLLM(
                     executionId = executionId,
                     todoId = todoId,
                 )
-                delay(backoff)
+                retryDelay(backoff)
             }
         }
     } catch (_: kotlinx.coroutines.CancellationException) {
@@ -267,6 +267,7 @@ internal suspend fun processTodoWithLLM(
                             scope,
                             jobScheduler,
                             executionControl,
+                            retryDelay = retryDelay,
                         )
                     }
                 },

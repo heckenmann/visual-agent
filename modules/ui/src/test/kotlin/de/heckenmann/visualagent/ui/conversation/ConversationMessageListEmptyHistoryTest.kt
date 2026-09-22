@@ -9,7 +9,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.ui.agents.*
@@ -27,11 +26,12 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import de.heckenmann.visualagent.protocol.ConversationMessage as Message
 
 /**
- * Verifies that [conversationMessageList] renders pending user messages and
- * streaming content even when the history list is empty.
+ * Verifies that [conversationMessageList] keeps transient conversation rows in its list when the
+ * history list is empty.
  *
  * Bug: [conversationMessageList] returns early when history is empty,
  * showing only "No conversation yet". The pendingUserMessage and
@@ -73,90 +73,50 @@ class ConversationMessageListEmptyHistoryTest {
                     }
                 }
             }
-            composeTestRule.mainClock.advanceTimeBy(100)
             composeTestRule.waitForIdle()
 
             val listInfo = listStateHolder.single().layoutInfo
             assertEquals(2, listInfo.totalItemsCount)
             assertEquals(0, listInfo.visibleItemsInfo.first().index)
             composeTestRule.onNodeWithText("Thinking").assertExists()
-            composeTestRule.onNodeWithText("Hello, agent!").assertExists()
         }
 
     @Test
-    fun `shows streaming content when history is empty`(): Unit =
-        runTest {
-            composeTestRule.setContent {
-                MaterialTheme {
-                    Box(modifier = Modifier.height(300.dp)) {
-                        LazyColumn(
-                            state = rememberLazyListState(),
-                            reverseLayout = true,
-                        ) {
-                            conversationMessageList(
-                                history = emptyList(),
-                                sending = true,
-                                inFlight = InFlightStateHolder(),
-                                pendingUserMessage = null,
-                                streamingContent = "I'm thinking...",
-                                deletingMessageIds = emptySet(),
-                                onDeleteMessage = {},
-                                onStatusChange = {},
-                                onEditMessage = {},
-                                sendContent = {},
-                                streamingEntryId = STREAMING_ENTRY_ID,
-                            )
-                        }
-                    }
-                }
-            }
-            composeTestRule.waitUntil(1_000) {
-                composeTestRule.onAllNodesWithText("I'm thinking...").fetchSemanticsNodes().isNotEmpty()
-            }
+    fun `timeline creates streaming content when history is empty`() {
+        val items =
+            buildConversationTimeline(
+                history = emptyList(),
+                pendingUserMessage = null,
+                streamingContent = "I'm thinking...",
+                showWaitingIndicator = false,
+                showOlderHistoryLoading = false,
+                includeInlineComposer = false,
+                streamingEntryId = STREAMING_ENTRY_ID,
+            )
 
-            composeTestRule.onNodeWithText("I'm thinking...").assertExists()
-        }
+        val streaming = assertIs<ConversationTimelineItem.MessageEntry>(items.single())
+        assertEquals("assistant", streaming.message.role)
+        assertEquals("I'm thinking...", streaming.message.content)
+        assertEquals(STREAMING_ENTRY_ID, streaming.stableKey)
+    }
 
     @Test
-    fun `shows both pending user message and streaming content when history is empty`(): Unit =
-        runTest {
-            composeTestRule.setContent {
-                MaterialTheme {
-                    Box(modifier = Modifier.height(300.dp)) {
-                        LazyColumn(
-                            state = rememberLazyListState(),
-                            reverseLayout = true,
-                        ) {
-                            conversationMessageList(
-                                history = emptyList(),
-                                sending = true,
-                                inFlight = InFlightStateHolder(),
-                                pendingUserMessage = "Hello!",
-                                streamingContent = "Streaming response...",
-                                deletingMessageIds = emptySet(),
-                                onDeleteMessage = {},
-                                onStatusChange = {},
-                                onEditMessage = {},
-                                sendContent = {},
-                                pendingUserEntryId = PENDING_ENTRY_ID,
-                                streamingEntryId = STREAMING_ENTRY_ID,
-                            )
-                        }
-                    }
-                }
-            }
-            composeTestRule.waitUntil(1_000) {
-                composeTestRule.onAllNodesWithText("Hello!").fetchSemanticsNodes().isNotEmpty() &&
-                    composeTestRule
-                        .onAllNodesWithText("Streaming response...")
-                        .fetchSemanticsNodes()
-                        .isNotEmpty()
-            }
+    fun `timeline keeps pending user and streaming content when history is empty`() {
+        val items =
+            buildConversationTimeline(
+                history = emptyList(),
+                pendingUserMessage = "Hello!",
+                streamingContent = "Streaming response...",
+                showWaitingIndicator = false,
+                showOlderHistoryLoading = false,
+                includeInlineComposer = false,
+                pendingUserEntryId = PENDING_ENTRY_ID,
+                streamingEntryId = STREAMING_ENTRY_ID,
+            ).filterIsInstance<ConversationTimelineItem.MessageEntry>()
 
-            composeTestRule.onNodeWithText("Hello!").assertExists()
-            composeTestRule.onNodeWithText("Streaming response...").assertExists()
-            composeTestRule.onNodeWithText("Thinking").assertDoesNotExist()
-        }
+        assertEquals(listOf("Streaming response...", "Hello!"), items.map { it.message.content })
+        assertEquals(listOf(STREAMING_ENTRY_ID, PENDING_ENTRY_ID), items.map { it.stableKey })
+    }
 
     @Test
     fun `shows waiting indicator at newest end with existing history`(): Unit =

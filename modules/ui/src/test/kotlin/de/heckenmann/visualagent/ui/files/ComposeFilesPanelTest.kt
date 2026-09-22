@@ -2,7 +2,6 @@ package de.heckenmann.visualagent.ui.files
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import de.heckenmann.visualagent.protocol.ActivityPort
@@ -12,6 +11,8 @@ import de.heckenmann.visualagent.protocol.WorkspaceDownload
 import de.heckenmann.visualagent.protocol.WorkspaceDownloadState
 import de.heckenmann.visualagent.protocol.WorkspaceFile
 import de.heckenmann.visualagent.protocol.WorkspaceFilePort
+import de.heckenmann.visualagent.ui.CompletionIdlingResource
+import de.heckenmann.visualagent.ui.awaitCompletion
 import de.heckenmann.visualagent.ui.modal.ComposeModalRequester
 import io.mockk.every
 import io.mockk.mockk
@@ -82,7 +83,11 @@ class ComposeFilesPanelTest {
     @Test
     fun `panel renders protocol workspace values`() {
         val workspace = mockk<WorkspaceFilePort>()
-        every { workspace.listFiles() } returns sampleFiles()
+        val filesLoaded = CompletionIdlingResource("workspace files")
+        every { workspace.listFiles() } answers {
+            filesLoaded.complete()
+            sampleFiles()
+        }
         every { workspace.listDirectories() } returns listOf("empty-folder")
         every { workspace.workspaceRoot() } returns "/tmp/workspace"
         every { workspace.activeDownloads() } returns emptyList()
@@ -90,13 +95,12 @@ class ComposeFilesPanelTest {
         every { workspace.addListener(any()) } returns AutoCloseable { }
         val canvas = mockk<CanvasPort>(relaxed = true)
         val activity = mockk<ActivityPort>(relaxed = true)
-        composeTestRule.setContent {
-            MaterialTheme {
-                FilesPanel(workspace, canvas, ComposeModalRequester { }, activity)
+        composeTestRule.awaitCompletion(filesLoaded) {
+            composeTestRule.setContent {
+                MaterialTheme {
+                    FilesPanel(workspace, canvas, ComposeModalRequester { }, activity)
+                }
             }
-        }
-        composeTestRule.waitUntil(5_000) {
-            composeTestRule.onAllNodesWithText("empty-folder").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText("Folder / · 2 total · 0 visible").assertExists()
         composeTestRule.onNodeWithText("data").assertExists()

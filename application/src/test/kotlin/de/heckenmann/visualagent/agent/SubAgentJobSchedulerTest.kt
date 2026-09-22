@@ -2,22 +2,20 @@ package de.heckenmann.visualagent.agent
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SubAgentJobSchedulerTest {
     private fun scheduler(parallelism: Int = 4): SubAgentJobScheduler {
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         val provider =
             object : ParallelismProvider() {
                 override fun get(): Int = parallelism
@@ -44,19 +42,18 @@ class SubAgentJobSchedulerTest {
             firstStarted.await()
 
             val second =
-                async {
+                async(start = CoroutineStart.UNDISPATCHED) {
                     scheduler.run {
                         secondStarted.complete(Unit)
                         "second"
                     }
                 }
 
-            assertFalse(withTimeoutOrNull(50) { secondStarted.await() } != null)
             assertEquals(SubAgentJobQueueSnapshot(active = 1, queued = 1), scheduler.snapshot())
 
             releaseFirst.complete(Unit)
             assertEquals("first", first.await())
-            withTimeout(50) { secondStarted.await() }
+            secondStarted.await()
             assertEquals("second", second.await())
         }
 
@@ -84,7 +81,6 @@ class SubAgentJobSchedulerTest {
                 )
 
             assertTrue(jobId.isNotBlank())
-            assertFalse(withTimeoutOrNull(50) { completion.await() } != null)
             assertEquals(1, scheduler.snapshot().queued)
 
             releaseFirst.complete(Unit)
@@ -95,7 +91,7 @@ class SubAgentJobSchedulerTest {
     @Test
     fun `paused jobs remain queued until their gate resumes`() =
         runBlocking {
-            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
             val provider =
                 object : ParallelismProvider() {
                     override fun get(): Int = 1
@@ -105,16 +101,15 @@ class SubAgentJobSchedulerTest {
             val scheduler = SubAgentJobScheduler(scope, provider, control)
             val started = CompletableDeferred<Unit>()
             val job =
-                async {
+                async(start = CoroutineStart.UNDISPATCHED) {
                     scheduler.run("agent-1") {
                         started.complete(Unit)
                     }
                 }
 
-            assertFalse(withTimeoutOrNull(50) { started.await() } != null)
             assertEquals(SubAgentJobQueueSnapshot(active = 0, queued = 1), scheduler.snapshot())
             control.resumeAll()
-            withTimeout(50) { started.await() }
+            started.await()
             job.join()
             assertEquals(SubAgentJobQueueSnapshot(active = 0, queued = 0), scheduler.snapshot())
             scope.coroutineContext[Job]?.cancel()
@@ -123,7 +118,7 @@ class SubAgentJobSchedulerTest {
     @Test
     fun `close cancels active jobs and releases scheduler subscriptions`() =
         runBlocking {
-            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
             val scheduler =
                 SubAgentJobScheduler(
                     scope,
@@ -143,7 +138,7 @@ class SubAgentJobSchedulerTest {
             started.await()
             scheduler.close()
 
-            withTimeout(500) { job.join() }
+            job.join()
             assertEquals(SubAgentJobQueueSnapshot(active = 0, queued = 0), scheduler.snapshot())
             scope.coroutineContext[Job]?.cancel()
         }

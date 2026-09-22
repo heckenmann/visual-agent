@@ -13,7 +13,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.reactor.flux
@@ -77,24 +76,27 @@ class AgentManagerCancellationTest {
             val stores = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             val started = CompletableDeferred<Unit>()
-            val cancelled = CompletableDeferred<Unit>()
+            val returnedToIdle = CompletableDeferred<Unit>()
             every { provider.chatReactive(any<ChatRequestContext>()) } answers {
                 mono {
                     started.complete(Unit)
-                    cancelled.await()
-                    throw CancellationException("Cancelled")
+                    kotlinx.coroutines.awaitCancellation()
                 }
             }
             val manager =
                 AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus(), TodoEventBus(), AppConfigBean(stores))
+            val listener =
+                manager.agentStatusCallbackAdapter.addListener { _, message ->
+                    if (message == "STATUS:IDLE") returnedToIdle.complete(Unit)
+                }
             try {
                 val jobId = manager.enqueueAgentJob("test agent", "coder", "researcher", "do work")
                 started.await()
                 assertTrue(manager.cancelSubAgentJob(jobId))
-                cancelled.complete(Unit)
-                delay(200)
+                returnedToIdle.await()
                 assertEquals(0, manager.getActiveJobCount("test agent"))
             } finally {
+                listener.close()
                 manager.destroy()
                 stores.close()
             }
@@ -106,25 +108,28 @@ class AgentManagerCancellationTest {
             val stores = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             val started = CompletableDeferred<Unit>()
-            val cancelled = CompletableDeferred<Unit>()
+            val returnedToIdle = CompletableDeferred<Unit>()
             every { provider.chatReactive(any<ChatRequestContext>()) } answers {
                 mono {
                     started.complete(Unit)
-                    cancelled.await()
-                    throw CancellationException("Cancelled")
+                    kotlinx.coroutines.awaitCancellation()
                 }
             }
             val manager =
                 AgentManager(stores, provider, AgentToolConfigService(stores), ToolEventBus(), TodoEventBus(), AppConfigBean(stores))
+            val listener =
+                manager.agentStatusCallbackAdapter.addListener { _, message ->
+                    if (message == "STATUS:IDLE") returnedToIdle.complete(Unit)
+                }
             try {
                 val jobId = manager.enqueueAgentJob("test agent", "coder", "researcher", "do work")
                 started.await()
                 val cancelledIds = manager.cancelAllRunningActions()
                 assertTrue(cancelledIds.contains(jobId))
-                cancelled.complete(Unit)
-                delay(200)
+                returnedToIdle.await()
                 assertEquals(0, manager.getActiveJobCount("test agent"))
             } finally {
+                listener.close()
                 manager.destroy()
                 stores.close()
             }
@@ -175,6 +180,7 @@ class AgentManagerCancellationTest {
             val stores = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
             val lifecycle = LifecycleState()
+            val dispatcher = StandardTestDispatcher()
             val manager =
                 AgentManager(
                     stores,
@@ -183,6 +189,7 @@ class AgentManagerCancellationTest {
                     ToolEventBus(),
                     TodoEventBus(),
                     AppConfigBean(stores),
+                    scope = CoroutineScope(SupervisorJob() + dispatcher),
                     lifecycle = lifecycle,
                 )
             try {
@@ -191,7 +198,7 @@ class AgentManagerCancellationTest {
 
                 manager.cancelActiveWork()
                 assertFalse(manager.scope.isActive)
-                delay(100)
+                dispatcher.scheduler.runCurrent()
 
                 verify(exactly = 0) { provider.chatReactive(any<ChatRequestContext>()) }
             } finally {
@@ -246,6 +253,7 @@ class AgentManagerCancellationTest {
                 }
             }
             val lifecycle = LifecycleState()
+            val dispatcher = StandardTestDispatcher()
             val manager =
                 AgentManager(
                     stores,
@@ -254,16 +262,17 @@ class AgentManagerCancellationTest {
                     ToolEventBus(),
                     TodoEventBus(),
                     AppConfigBean(stores),
+                    scope = CoroutineScope(SupervisorJob() + dispatcher),
                     lifecycle = lifecycle,
                 )
             try {
                 val todo = manager.todoManager.add("finished work")
                 manager.todoManager.updateStatus(todo.id, TodoStatus.COMPLETED)
+                dispatcher.scheduler.runCurrent()
                 started.await()
                 lifecycle.beginShutdown()
                 manager.cancelActiveWork()
-
-                delay(100)
+                dispatcher.scheduler.runCurrent()
 
                 val messages = stores.getConversationMessages("main")
                 assertTrue(messages.none { it.content.contains("main agent could not be triggered") })

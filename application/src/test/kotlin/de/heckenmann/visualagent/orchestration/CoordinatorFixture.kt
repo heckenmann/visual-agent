@@ -20,10 +20,12 @@ import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoManager
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.reactor.flux
 import kotlinx.coroutines.reactor.mono
 import java.util.concurrent.CopyOnWriteArrayList
@@ -51,12 +53,31 @@ internal class CoordinatorFixture(
     val messages: MutableList<Message>,
     val executionControl: SubAgentExecutionControl,
     val scheduler: SubAgentJobScheduler,
+    private val workerStarts: Channel<Unit>,
+    private val workerCompletions: Channel<Unit>,
+    private val messageEvents: Channel<Message>,
     private val scope: CoroutineScope,
 ) {
     fun cancel() {
         coordinator.close()
         scheduler.close()
         scope.cancel()
+    }
+
+    suspend fun awaitWorkerStart() {
+        workerStarts.receive()
+    }
+
+    suspend fun awaitWorkerCompletion() {
+        workerCompletions.receive()
+    }
+
+    suspend fun awaitMessageContaining(text: String): Message {
+        messages.firstOrNull { it.content.contains(text) }?.let { return it }
+        while (true) {
+            val message = messageEvents.receive()
+            if (message.content.contains(text)) return message
+        }
     }
 }
 
@@ -65,7 +86,7 @@ internal class CoordinatorFixture(
  */
 internal fun buildFixture(
     parallelism: Int = 4,
-    chatDelayMs: Int = 0,
+    workerResponseGate: CompletableDeferred<Unit>? = null,
     responseContent: String = "APPROVED\nLooks good.",
     reviewContent: String = "APPROVED",
     failingWorkerAttempts: Int = 0,
@@ -76,6 +97,9 @@ internal fun buildFixture(
     val todoManager = TodoManager(todoStore, todoEventBus)
     val provider = mockk<LLMProvider>()
     val workerAttempts = AtomicInteger()
+    val workerStarts = Channel<Unit>(Channel.UNLIMITED)
+    val workerCompletions = Channel<Unit>(Channel.UNLIMITED)
+    val messageEvents = Channel<Message>(Channel.UNLIMITED)
     val memoryStore =
         object : MemoryStore {
             override fun saveMemory(
@@ -103,13 +127,7 @@ internal fun buildFixture(
         val isReview = ctx.metadata["sessionId"] == "review"
         val content = if (isReview) reviewContent else responseContent
         mono {
-            if (chatDelayMs > 0 && !isReview) {
-                val start = System.currentTimeMillis()
-                while (System.currentTimeMillis() - start < chatDelayMs) {
-                    if (token?.isCancelled == true) throw kotlinx.coroutines.CancellationException("cancelled")
-                    kotlinx.coroutines.delay(50)
-                }
-            }
+            if (!isReview) workerResponseGate?.await()
             ChatResponse(
                 model = "test",
                 message = Message("assistant", content),
@@ -124,13 +142,10 @@ internal fun buildFixture(
             if (!isReview && workerAttempts.incrementAndGet() <= failingWorkerAttempts) {
                 throw IllegalStateException("transient worker failure")
             }
-            if (!isReview) onWorkerStreamStarted?.invoke()
-            if (chatDelayMs > 0 && !isReview) {
-                val start = System.currentTimeMillis()
-                while (System.currentTimeMillis() - start < chatDelayMs) {
-                    if (ctx.cancellationToken?.isCancelled == true) throw kotlinx.coroutines.CancellationException("cancelled")
-                    kotlinx.coroutines.delay(50)
-                }
+            if (!isReview) {
+                workerStarts.trySend(Unit)
+                onWorkerStreamStarted?.invoke()
+                workerResponseGate?.await()
             }
             send(
                 ChatResponse(
@@ -139,6 +154,7 @@ internal fun buildFixture(
                     done = true,
                 ),
             )
+            if (!isReview) workerCompletions.trySend(Unit)
         }
     }
     val notifications = CopyOnWriteArrayList<String>()
@@ -155,6 +171,7 @@ internal fun buildFixture(
         ConversationOpsProvider(mockk<ToolEventBus>(relaxed = true)).apply {
             setPersistMessage {
                 messages.add(it)
+                messageEvents.trySend(it)
                 it
             }
             setBuildMainSystemContextPrompt { "You are the main orchestrator agent." }
@@ -182,6 +199,7 @@ internal fun buildFixture(
             conversationOps = conversationOps,
             subAgentOps = subAgentOps,
             executionControl = executionControl,
+            retryDelay = {},
         )
     return CoordinatorFixture(
         coordinator,
@@ -193,6 +211,9 @@ internal fun buildFixture(
         messages,
         executionControl,
         scheduler,
+        workerStarts,
+        workerCompletions,
+        messageEvents,
         scope,
     )
 }

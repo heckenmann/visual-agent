@@ -7,9 +7,10 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.test.StandardTestDispatcher
 import reactor.core.publisher.Mono
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
@@ -42,15 +43,16 @@ class AgentManagerRecoveryAndTodoContextTest {
 
                 manager.sendMessage("Start")
 
-                val firstMessage = requestSlot.captured.messages.first()
-                assertTrue(firstMessage.role == "system")
-                assertTrue(firstMessage.content.contains("Current TODO list"))
-                assertTrue(firstMessage.content.contains("Implement worker orchestration"))
-                assertTrue(firstMessage.content.contains("Your Available Tools"))
-                assertTrue(firstMessage.content.contains("do NOT have access to"))
-                assertTrue(firstMessage.content.contains("agent:list"))
-                assertTrue(firstMessage.content.contains("todos"))
-                assertTrue(firstMessage.content.contains("Always answer in German."))
+                val systemMessages = requestSlot.captured.messages.filter { it.role == "system" }
+                val policy = systemMessages.first()
+                val runtimeState = requestSlot.captured.messages.first { it.content.contains("## Runtime State") }
+                assertTrue(policy.content.contains("Main-agent tools"))
+                assertTrue(policy.content.contains("Sub-agent-only tools"))
+                assertTrue(policy.content.contains("agent:list"))
+                assertTrue(policy.content.contains("todos"))
+                assertTrue(policy.content.contains("Always answer in German."))
+                assertTrue(runtimeState.content.contains("Implement worker orchestration"))
+                assertTrue(runtimeState.role == "assistant")
             } finally {
                 appConfig.userModelInstruction = previousInstruction
             }
@@ -75,20 +77,26 @@ class AgentManagerRecoveryAndTodoContextTest {
                         done = true,
                     ),
                 )
-            AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
-
-            withTimeout(5_000) {
-                while (db
-                        .getConversationMessages(
-                            "main",
-                        ).none { it.role == "assistant" && it.content.contains("Recovered and continued.") }
-                ) {
-                    delay(50)
-                }
+            val dispatcher = StandardTestDispatcher()
+            val manager =
+                AgentManager(
+                    db,
+                    provider,
+                    AgentToolConfigService(db),
+                    ToolEventBus(),
+                    TodoEventBus(),
+                    AppConfigBean(db),
+                    scope = CoroutineScope(SupervisorJob() + dispatcher),
+                )
+            try {
+                dispatcher.scheduler.advanceUntilIdle()
+                val messages = db.getConversationMessages("main")
+                assertTrue(messages.any { it.role == "assistant" && it.content.contains("Recovered and continued.") })
+                verify(atLeast = 1) { provider.chatReactive(any<ChatRequestContext>()) }
+            } finally {
+                manager.destroy()
+                db.close()
             }
-            val messages = db.getConversationMessages("main")
-            assertTrue(messages.any { it.role == "assistant" && it.content.contains("Recovered and continued.") })
-            verify(atLeast = 1) { provider.chatReactive(any<ChatRequestContext>()) }
         }
 
     @Test
@@ -104,24 +112,30 @@ class AgentManagerRecoveryAndTodoContextTest {
             every { provider.checkConnectionReactive() } returns Mono.just(true)
             every { provider.chatReactive(any<ChatRequestContext>()) } returns
                 Mono.error(IllegalStateException("401 invalid api key"))
-            AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
-
-            withTimeout(5_000) {
-                while (db.getConversationMessages("main").none {
+            val dispatcher = StandardTestDispatcher()
+            val manager =
+                AgentManager(
+                    db,
+                    provider,
+                    AgentToolConfigService(db),
+                    ToolEventBus(),
+                    TodoEventBus(),
+                    AppConfigBean(db),
+                    scope = CoroutineScope(SupervisorJob() + dispatcher),
+                )
+            try {
+                dispatcher.scheduler.advanceUntilIdle()
+                val messages = db.getConversationMessages("main")
+                assertTrue(
+                    messages.any {
                         it.role == "assistant" &&
-                            it.content.contains("I could not resume the previous request automatically.")
-                    }
-                ) {
-                    delay(50)
-                }
+                            it.content.contains("I could not resume the previous request automatically.") &&
+                            it.content.contains("Authentication failed")
+                    },
+                )
+            } finally {
+                manager.destroy()
+                db.close()
             }
-            val messages = db.getConversationMessages("main")
-            assertTrue(
-                messages.any {
-                    it.role == "assistant" &&
-                        it.content.contains("I could not resume the previous request automatically.") &&
-                        it.content.contains("Authentication failed")
-                },
-            )
         }
 }

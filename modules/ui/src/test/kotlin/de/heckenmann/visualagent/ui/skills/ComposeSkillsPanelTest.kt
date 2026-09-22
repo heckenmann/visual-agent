@@ -3,6 +3,7 @@
 package de.heckenmann.visualagent.ui.skills
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -15,6 +16,8 @@ import de.heckenmann.visualagent.protocol.SkillPort
 import de.heckenmann.visualagent.protocol.SkillSearchResult
 import de.heckenmann.visualagent.protocol.SkillUpdateResult
 import de.heckenmann.visualagent.protocol.ToolActivity
+import de.heckenmann.visualagent.ui.CompletionIdlingResource
+import de.heckenmann.visualagent.ui.awaitCompletion
 import de.heckenmann.visualagent.ui.modal.ComposeContentModal
 import de.heckenmann.visualagent.ui.modal.ComposeModal
 import de.heckenmann.visualagent.ui.modal.ComposeModalRequester
@@ -44,25 +47,26 @@ class ComposeSkillsPanelTest {
         val document = SkillDocument(skill, "# Reusable build fix\n\nUse a pinned toolchain.")
         val port = FakeSkillPort(skill, document)
         var requested: ComposeModal? = null
+        val initialLoad = CompletionIdlingResource("the initial skill catalog")
+        port.onSearch = { initialLoad.complete() }
 
-        composeTestRule.setContent {
-            MaterialTheme {
-                SkillsPanel(
-                    skillPort = port,
-                    activityPort = NoOpActivityPort,
-                    modalRequester = ComposeModalRequester { requested = it },
-                )
+        composeTestRule.awaitCompletion(initialLoad) {
+            composeTestRule.setContent {
+                MaterialTheme {
+                    SkillsPanel(
+                        skillPort = port,
+                        activityPort = NoOpActivityPort,
+                        modalRequester = ComposeModalRequester { requested = it },
+                    )
+                }
             }
         }
-
-        composeTestRule.waitUntil(5_000) {
-            runCatching {
-                composeTestRule.onNodeWithText(skill.title).assertExists()
-                true
-            }.getOrDefault(false)
+        composeTestRule.onNodeWithText(skill.title).assertExists()
+        val detailLoad = CompletionIdlingResource("the selected skill")
+        port.onGet = { detailLoad.complete() }
+        composeTestRule.awaitCompletion(detailLoad) {
+            composeTestRule.onNodeWithText(skill.title).performClick()
         }
-        composeTestRule.onNodeWithText(skill.title).performClick()
-        composeTestRule.waitUntil(5_000) { requested != null }
 
         val modal = assertIs<ComposeContentModal>(assertNotNull(requested))
         assertEquals(skill.title, modal.title)
@@ -99,18 +103,19 @@ class ComposeSkillsPanelTest {
     fun `skills panel reports overlong search queries`() {
         val skill = SkillSearchResult("skill-1", "Reusable", "excerpt", "2026-01-01", 1, 0, null)
         val port = FakeSkillPort(skill, SkillDocument(skill, "Body"))
-        composeTestRule.setContent {
-            MaterialTheme {
-                SkillsPanel(port, NoOpActivityPort, ComposeModalRequester {})
+        val initialLoad = CompletionIdlingResource("the initial skill catalog")
+        port.onSearch = { initialLoad.complete() }
+        composeTestRule.awaitCompletion(initialLoad) {
+            composeTestRule.setContent {
+                CompositionLocalProvider(LocalSkillsSearchDebounce provides {}) {
+                    MaterialTheme {
+                        SkillsPanel(port, NoOpActivityPort, ComposeModalRequester {})
+                    }
+                }
             }
         }
         composeTestRule.onNodeWithText("Search skills").performTextInput("x".repeat(MAX_QUERY_CODE_POINTS + 1))
-        composeTestRule.waitUntil(5_000) {
-            runCatching {
-                composeTestRule.onNodeWithText("Search query is limited to $MAX_QUERY_CODE_POINTS Unicode code points.").assertExists()
-                true
-            }.getOrDefault(false)
-        }
+        composeTestRule.onNodeWithText("Search query is limited to $MAX_QUERY_CODE_POINTS Unicode code points.").assertExists()
     }
 
     @Test
@@ -119,24 +124,27 @@ class ComposeSkillsPanelTest {
         val port = FakeSkillPort(skill, SkillDocument(skill, "Existing body"))
         port.createResult = SkillCreateResult.Duplicate(skill)
         val requested = mutableStateOf<ComposeModal?>(null)
-        composeTestRule.setContent {
-            MaterialTheme {
-                SkillsPanel(port, NoOpActivityPort, ComposeModalRequester { requested.value = it })
-                (requested.value as? ComposeContentModal)?.content {}
+        val initialLoad = CompletionIdlingResource("the initial skill catalog")
+        port.onSearch = { initialLoad.complete() }
+        composeTestRule.awaitCompletion(initialLoad) {
+            composeTestRule.setContent {
+                MaterialTheme {
+                    SkillsPanel(port, NoOpActivityPort, ComposeModalRequester { requested.value = it })
+                    (requested.value as? ComposeContentModal)?.content {}
+                }
             }
         }
 
-        composeTestRule.waitUntil(5_000) { composeTestRule.onNodeWithText(skill.title).isDisplayed() }
+        composeTestRule.onNodeWithText(skill.title).assertExists()
         composeTestRule.onNodeWithContentDescription("Create skill").performClick()
         composeTestRule.onNodeWithText("Title").performTextInput("Duplicate")
         composeTestRule.onNodeWithText("Markdown").performTextInput("Duplicate body")
-        composeTestRule.onNodeWithText("Create skill").performClick()
-        composeTestRule.waitUntil(5_000) {
-            runCatching {
-                composeTestRule.onNodeWithText("An equivalent skill already exists: Existing.").assertExists()
-                true
-            }.getOrDefault(false)
+        val create = CompletionIdlingResource("the duplicate skill check")
+        port.onCreate = create::complete
+        composeTestRule.awaitCompletion(create) {
+            composeTestRule.onNodeWithText("Create skill").performClick()
         }
+        composeTestRule.onNodeWithText("An equivalent skill already exists: Existing.").assertExists()
     }
 
     @Test
@@ -147,24 +155,27 @@ class ComposeSkillsPanelTest {
         port.createResult = SkillCreateResult.Created(created)
         port.document = SkillDocument(created, "Created body")
         val requested = mutableStateOf<ComposeModal?>(null)
-        composeTestRule.setContent {
-            MaterialTheme {
-                SkillsPanel(port, NoOpActivityPort, ComposeModalRequester { requested.value = it })
-                (requested.value as? ComposeContentModal)?.content {}
+        val initialLoad = CompletionIdlingResource("the initial skill catalog")
+        port.onSearch = { initialLoad.complete() }
+        composeTestRule.awaitCompletion(initialLoad) {
+            composeTestRule.setContent {
+                MaterialTheme {
+                    SkillsPanel(port, NoOpActivityPort, ComposeModalRequester { requested.value = it })
+                    (requested.value as? ComposeContentModal)?.content {}
+                }
             }
         }
 
-        composeTestRule.waitUntil(5_000) { composeTestRule.onNodeWithText(original.title).isDisplayed() }
+        composeTestRule.onNodeWithText(original.title).assertExists()
         composeTestRule.onNodeWithContentDescription("Create skill").performClick()
         composeTestRule.onNodeWithText("Title").performTextInput("Created")
         composeTestRule.onNodeWithText("Markdown").performTextInput("Created body")
-        composeTestRule.onNodeWithText("Create skill").performClick()
-        composeTestRule.waitUntil(5_000) {
-            runCatching {
-                composeTestRule.onNodeWithText("Revision 1 · 0 model reads").assertExists()
-                true
-            }.getOrDefault(false)
+        val createdDetail = CompletionIdlingResource("the created skill detail")
+        port.onGet = { id -> if (id == created.id) createdDetail.complete() }
+        composeTestRule.awaitCompletion(createdDetail) {
+            composeTestRule.onNodeWithText("Create skill").performClick()
         }
+        composeTestRule.onNodeWithText("Revision 1 · 0 model reads").assertExists()
         kotlin.test.assertEquals("skill-2", port.lastRequestedId)
     }
 
@@ -173,23 +184,29 @@ class ComposeSkillsPanelTest {
         val skill = SkillSearchResult("skill-1", "Missing", "excerpt", "2026-01-01", 1, 0, null)
         val port = FakeSkillPort(skill, SkillDocument(skill, "Body"))
         val requested = mutableStateOf<ComposeModal?>(null)
-        composeTestRule.setContent {
-            MaterialTheme {
-                SkillsPanel(port, NoOpActivityPort, ComposeModalRequester { requested.value = it })
+        val initialLoad = CompletionIdlingResource("the initial skill catalog")
+        port.onSearch = { initialLoad.complete() }
+        composeTestRule.awaitCompletion(initialLoad) {
+            composeTestRule.setContent {
+                MaterialTheme {
+                    SkillsPanel(port, NoOpActivityPort, ComposeModalRequester { requested.value = it })
+                }
             }
         }
-        composeTestRule.waitUntil(5_000) { composeTestRule.onNodeWithText(skill.title).isDisplayed() }
+        composeTestRule.onNodeWithText(skill.title).assertExists()
         port.document = null
-        composeTestRule.onNodeWithText(skill.title).performClick()
-        composeTestRule.waitForIdle()
-        port.failSearch = true
-        composeTestRule.onNodeWithContentDescription("Refresh skills").performClick()
-        composeTestRule.waitUntil(5_000) {
-            runCatching {
-                composeTestRule.onNodeWithText("Unable to load skills: search failed").assertExists()
-                true
-            }.getOrDefault(false)
+        val missingDetail = CompletionIdlingResource("the missing skill result")
+        port.onGet = { missingDetail.complete() }
+        composeTestRule.awaitCompletion(missingDetail) {
+            composeTestRule.onNodeWithText(skill.title).performClick()
         }
+        port.failSearch = true
+        val refreshFailure = CompletionIdlingResource("the failed skill refresh")
+        port.onSearch = { refreshFailure.complete() }
+        composeTestRule.awaitCompletion(refreshFailure) {
+            composeTestRule.onNodeWithContentDescription("Refresh skills").performClick()
+        }
+        composeTestRule.onNodeWithText("Unable to load skills: search failed").assertExists()
     }
 
     private class FakeSkillPort(
@@ -201,16 +218,21 @@ class ComposeSkillsPanelTest {
         var updateResult: SkillUpdateResult? = null
         var deleteResult: SkillDeleteResult? = null
         var failSearch = false
+        var onSearch: ((String) -> Unit)? = null
+        var onGet: ((String) -> Unit)? = null
+        var onCreate: (() -> Unit)? = null
 
         override fun search(
             query: String,
             limit: Int,
         ): List<SkillSearchResult> {
+            onSearch?.invoke(query)
             check(!failSearch) { "search failed" }
             return listOf(skill)
         }
 
         override fun get(id: String): SkillDocument? {
+            onGet?.invoke(id)
             lastRequestedId = id
             return document?.takeIf { it.summary.id == id }
         }
@@ -218,7 +240,10 @@ class ComposeSkillsPanelTest {
         override fun create(
             title: String,
             content: String,
-        ): SkillCreateResult = createResult ?: error("unused")
+        ): SkillCreateResult {
+            onCreate?.invoke()
+            return createResult ?: error("unused")
+        }
 
         override fun update(
             id: String,

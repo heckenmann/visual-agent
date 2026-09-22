@@ -1,7 +1,6 @@
 package de.heckenmann.visualagent.agent.codex
 
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Files
@@ -39,11 +38,9 @@ internal class CodexCliAccountServiceTest {
             val updates = mutableListOf<String>()
 
             val result =
-                withTimeout(5_000) {
-                    service.deviceLogin(executable.toString()) { output ->
-                        updates += output
-                        if ("ABCD-EFGH" in output) Files.writeString(marker, "received")
-                    }
+                service.deviceLogin(executable.toString()) { output ->
+                    updates += output
+                    if ("ABCD-EFGH" in output) Files.writeString(marker, "received")
                 }
 
             assertTrue(result.successful)

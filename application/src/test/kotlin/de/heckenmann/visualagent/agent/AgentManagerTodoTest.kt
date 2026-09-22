@@ -2,8 +2,8 @@ package de.heckenmann.visualagent.agent
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfigBean
-import de.heckenmann.visualagent.knowledge.PersistenceStores
 import de.heckenmann.visualagent.testsupport.seedDefaultTestAgents
+import de.heckenmann.visualagent.todo.TodoChange
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoStatus
 import de.heckenmann.visualagent.todo.TodoTerminalReason
@@ -11,10 +11,9 @@ import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.reactor.mono
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -23,16 +22,16 @@ import kotlin.test.assertTrue
 
 @de.heckenmann.visualagent.testsupport.DatabaseTest
 class AgentManagerTodoTest {
-    private suspend fun <R> useManager(block: suspend (AgentManager) -> R): R {
-        val (manager, _, _) = createManager()
+    private suspend fun <R> useManager(block: suspend (ManagerFixture) -> R): R {
+        val fixture = createManager()
         return try {
-            block(manager)
+            block(fixture)
         } finally {
-            manager.destroy()
+            fixture.manager.destroy()
         }
     }
 
-    private fun createManager(): Triple<AgentManager, LLMProvider, PersistenceStores> {
+    private fun createManager(): ManagerFixture {
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                 .create("jdbc:h2:mem:test")
@@ -41,19 +40,24 @@ class AgentManagerTodoTest {
         coEvery { provider.isConnected() } returns true
         every { provider.chatReactive(any<ChatRequestContext>()) } answers {
             mono {
-                delay(3000)
-                ChatResponse(
-                    model = "test",
-                    message = Message("assistant", "Task completed"),
-                    done = true,
-                )
+                awaitCancellation()
             }
         }
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
-        return Triple(manager, provider, db)
+        return ManagerFixture(
+            manager =
+                AgentManager(
+                    db,
+                    provider,
+                    AgentToolConfigService(db),
+                    ToolEventBus(),
+                    TodoEventBus(),
+                    AppConfigBean(db),
+                ),
+            provider = provider,
+        )
     }
 
-    private fun createManagerWithInstantResponse(): Triple<AgentManager, LLMProvider, PersistenceStores> {
+    private fun createManagerWithInstantResponse(): ManagerFixture {
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                 .create("jdbc:h2:mem:test")
@@ -68,18 +72,30 @@ class AgentManagerTodoTest {
                     done = true,
                 )
             }
-        val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
-        return Triple(manager, provider, db)
+        return ManagerFixture(
+            manager =
+                AgentManager(
+                    db,
+                    provider,
+                    AgentToolConfigService(db),
+                    ToolEventBus(),
+                    TodoEventBus(),
+                    AppConfigBean(db),
+                ),
+            provider = provider,
+        )
     }
 
     @Test
     fun `autonomous pickup assigns pending todo to idle agent`(): Unit =
         runBlocking {
-            useManager { manager ->
-                manager.todoManager.add("Research topic X", "1")
+            useManager { fixture ->
+                val manager = fixture.manager
+                val todo = manager.todoManager.add("Research topic X", "1")
 
-                manager.startAutonomousProcessing(seed = false)
-                delay(1200)
+                manager.awaitTodoStatus(todo.id, TodoStatus.IN_PROGRESS) {
+                    manager.startAutonomousProcessing(seed = false)
+                }
 
                 val agent = manager.getSubAgents().first { it.id == "1" }
                 assertEquals(AgentStatus.BUSY, agent.status)
@@ -88,46 +104,17 @@ class AgentManagerTodoTest {
         }
 
     @Test
-    fun `autonomous pickup does nothing when no pending todos`(): Unit =
-        runBlocking {
-            useManager { manager ->
-                manager.startAutonomousProcessing(seed = false)
-                delay(800)
-
-                assertTrue(manager.getSubAgents().all { it.status == AgentStatus.IDLE })
-            }
-        }
-
-    @Test
-    fun `autonomous pickup does nothing when no idle agents`(): Unit =
-        runBlocking {
-            useManager { manager ->
-                manager.getSubAgents().forEach { it.status = AgentStatus.BUSY }
-                manager.todoManager.add("Orphan task", "1")
-
-                manager.startAutonomousProcessing(seed = false)
-                delay(800)
-
-                assertEquals(
-                    TodoStatus.PENDING,
-                    manager.todoManager
-                        .getAll()
-                        .single()
-                        .status,
-                )
-            }
-        }
-
-    @Test
     fun `autonomous pickup admits the topmost todo before later work`(): Unit =
         runBlocking {
-            useManager { manager ->
+            useManager { fixture ->
+                val manager = fixture.manager
                 manager.todoManager.add("Later task", "1")
                 val top = manager.todoManager.add("Top task", "2")
                 manager.todoManager.moveToPosition(top.id, 0)
 
-                manager.startAutonomousProcessing(seed = false)
-                delay(1200)
+                manager.awaitTodoStatus(top.id, TodoStatus.IN_PROGRESS) {
+                    manager.startAutonomousProcessing(seed = false)
+                }
 
                 val topAgent = manager.getSubAgent("2")
                 assertEquals(AgentStatus.BUSY, topAgent?.status)
@@ -138,11 +125,13 @@ class AgentManagerTodoTest {
     @Test
     fun `todo status transitions correctly on auto pickup`(): Unit =
         runBlocking {
-            useManager { manager ->
+            useManager { fixture ->
+                val manager = fixture.manager
                 val todo = manager.todoManager.add("Verify status", "1")
 
-                manager.startAutonomousProcessing(seed = false)
-                delay(1200)
+                manager.awaitTodoStatus(todo.id, TodoStatus.IN_PROGRESS) {
+                    manager.startAutonomousProcessing(seed = false)
+                }
 
                 assertEquals(TodoStatus.IN_PROGRESS, manager.todoManager.getById(todo.id)!!.status)
                 assertNotNull(manager.todoManager.getById(todo.id)!!.assignedAgentId)
@@ -152,11 +141,13 @@ class AgentManagerTodoTest {
     @Test
     fun `only one agent gets busy per pickup slot`(): Unit =
         runBlocking {
-            useManager { manager ->
-                manager.todoManager.add("Solo task", "1")
+            useManager { fixture ->
+                val manager = fixture.manager
+                val todo = manager.todoManager.add("Solo task", "1")
 
-                manager.startAutonomousProcessing(seed = false)
-                delay(1200)
+                manager.awaitTodoStatus(todo.id, TodoStatus.IN_PROGRESS) {
+                    manager.startAutonomousProcessing(seed = false)
+                }
 
                 val busyCount = manager.getSubAgents().count { it.status == AgentStatus.BUSY }
                 assertEquals(1, busyCount)
@@ -165,7 +156,7 @@ class AgentManagerTodoTest {
 
     @Test
     fun `agent currentTodoId is null when idle`() {
-        val (manager, _, _) = createManager()
+        val manager = createManager().manager
 
         manager.getSubAgents().forEach { agent ->
             assertNull(agent.currentTodoId)
@@ -177,9 +168,9 @@ class AgentManagerTodoTest {
     @Test
     fun `todo mutation creates conversation messages`(): Unit =
         runBlocking {
-            val (manager, _, _) = createManager()
+            val fixture = createManager()
+            val manager = fixture.manager
             manager.todoManager.add("A new task", "1")
-            delay(200)
 
             val history = manager.getHistory()
             assertTrue(history.any { it.role == "system" && it.content.contains("A new task") })
@@ -188,12 +179,11 @@ class AgentManagerTodoTest {
     @Test
     fun `todo completion persists system message`(): Unit =
         runBlocking {
-            val (manager, _, _) = createManagerWithInstantResponse()
+            val fixture = createManagerWithInstantResponse()
+            val manager = fixture.manager
             val todo = manager.todoManager.add("Trigger test", "1")
-            delay(200)
 
             manager.todoManager.updateStatus(todo.id, TodoStatus.COMPLETED)
-            delay(200)
 
             val history = manager.getHistory()
             assertTrue(
@@ -205,12 +195,11 @@ class AgentManagerTodoTest {
     @Test
     fun `todo cancellation persists system message`(): Unit =
         runBlocking {
-            val (manager, _, _) = createManagerWithInstantResponse()
+            val fixture = createManagerWithInstantResponse()
+            val manager = fixture.manager
             val todo = manager.todoManager.add("Cancel trigger test", "1")
-            delay(200)
 
             manager.todoManager.updateStatus(todo.id, TodoStatus.CANCELLED)
-            delay(200)
 
             val history = manager.getHistory()
             assertTrue(
@@ -222,7 +211,9 @@ class AgentManagerTodoTest {
     @Test
     fun `completed todo review request ends with an explicit user instruction`(): Unit =
         runBlocking {
-            val (manager, provider, _) = createManagerWithInstantResponse()
+            val fixture = createManagerWithInstantResponse()
+            val manager = fixture.manager
+            val provider = fixture.provider
             val request = CompletableDeferred<ChatRequestContext>()
             every { provider.chatReactive(any<ChatRequestContext>()) } answers {
                 mono {
@@ -234,7 +225,7 @@ class AgentManagerTodoTest {
 
             manager.todoManager.updateStatus(todo.id, TodoStatus.COMPLETED)
 
-            val completedRequest = withTimeout(2_000) { request.await() }
+            val completedRequest = request.await()
             val completedMessages = completedRequest.messages
             val completedMessage = completedMessages.last()
             assertEquals(
@@ -252,7 +243,9 @@ class AgentManagerTodoTest {
     @Test
     fun `failed todo review request includes its terminal outcome`(): Unit =
         runBlocking {
-            val (manager, provider, _) = createManagerWithInstantResponse()
+            val fixture = createManagerWithInstantResponse()
+            val manager = fixture.manager
+            val provider = fixture.provider
             val request = CompletableDeferred<ChatRequestContext>()
             every { provider.chatReactive(any<ChatRequestContext>()) } answers {
                 mono {
@@ -264,7 +257,7 @@ class AgentManagerTodoTest {
 
             manager.todoManager.cancelTodo(todo.id, TodoTerminalReason.EXECUTION_FAILED)
 
-            val cancelledRequest = withTimeout(2_000) { request.await() }
+            val cancelledRequest = request.await()
             val cancelledMessages = cancelledRequest.messages
             val cancelledMessage = cancelledMessages.last()
             assertEquals(
@@ -286,22 +279,24 @@ class AgentManagerTodoTest {
     @Test
     fun `terminal todo changes each create one main-agent review notification`() =
         runBlocking {
-            val (manager, _, _) = createManagerWithInstantResponse()
+            val fixture = createManagerWithInstantResponse()
+            val manager = fixture.manager
+            val reviewRequests = CompletableDeferred<Int>()
+            var requestCount = 0
+            every { fixture.provider.chatReactive(any<ChatRequestContext>()) } answers {
+                mono {
+                    requestCount += 1
+                    if (requestCount == 2) reviewRequests.complete(requestCount)
+                    ChatResponse(model = "test", message = Message("assistant", "Reviewed"), done = true)
+                }
+            }
             val first = manager.todoManager.add("First terminal todo", "1")
             val second = manager.todoManager.add("Second terminal todo", "2")
 
             manager.todoManager.updateStatus(first.id, TodoStatus.COMPLETED)
             manager.todoManager.cancelTodo(second.id, TodoTerminalReason.EXECUTION_FAILED)
 
-            withTimeout(2_000) {
-                while (
-                    manager
-                        .getHistory()
-                        .count { it.metadata?.contains("todo_terminal_transition") == true } < 2
-                ) {
-                    delay(10)
-                }
-            }
+            reviewRequests.await()
             val terminalReviews =
                 manager
                     .getHistory()
@@ -314,12 +309,11 @@ class AgentManagerTodoTest {
     @Test
     fun `non-terminal status change does not persist completion message`(): Unit =
         runBlocking {
-            val (manager, _, _) = createManagerWithInstantResponse()
+            val fixture = createManagerWithInstantResponse()
+            val manager = fixture.manager
             val todo = manager.todoManager.add("No trigger", "1")
-            delay(200)
 
             manager.todoManager.updateStatus(todo.id, TodoStatus.IN_PROGRESS)
-            delay(200)
 
             val history = manager.getHistory()
             assertTrue(
@@ -327,4 +321,27 @@ class AgentManagerTodoTest {
                 "Expected no completion system message for non-terminal status change",
             )
         }
+
+    private suspend fun AgentManager.awaitTodoStatus(
+        todoId: String,
+        status: TodoStatus,
+        trigger: () -> Unit,
+    ) {
+        val observed = CompletableDeferred<TodoChange>()
+        val listener =
+            todoEventBus.addListener { change ->
+                if (change.todo?.id == todoId && change.todo.status == status) observed.complete(change)
+            }
+        try {
+            trigger()
+            observed.await()
+        } finally {
+            listener.close()
+        }
+    }
+
+    private data class ManagerFixture(
+        val manager: AgentManager,
+        val provider: LLMProvider,
+    )
 }

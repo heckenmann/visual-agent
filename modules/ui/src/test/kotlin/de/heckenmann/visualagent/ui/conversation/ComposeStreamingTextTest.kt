@@ -8,7 +8,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
@@ -36,6 +35,7 @@ class ComposeStreamingTextTest {
 
     @Test
     fun `displays full text immediately when animate is false`() {
+        composeTestRule.mainClock.autoAdvance = false
         composeTestRule.setContent {
             MaterialTheme {
                 StreamingText(text = "Hello world", animate = false) { displayed ->
@@ -56,14 +56,13 @@ class ComposeStreamingTextTest {
                 }
             }
         }
-        composeTestRule.waitUntil(1_000) {
-            composeTestRule.onAllNodesWithText("Hello world").fetchSemanticsNodes().isNotEmpty()
-        }
+        composeTestRule.mainClock.advanceTimeBy(1_000)
         composeTestRule.onNodeWithText("Hello world").assertExists()
     }
 
     @Test
     fun `handles empty text`() {
+        composeTestRule.mainClock.autoAdvance = false
         composeTestRule.setContent {
             MaterialTheme {
                 StreamingText(text = "", animate = true) { displayed ->
@@ -105,12 +104,7 @@ class ComposeStreamingTextTest {
         text = "Hello world, how"
         text = "Hello world, how are"
         text = "Hello world, how are you?"
-        composeTestRule.waitUntil(1_000) {
-            composeTestRule
-                .onAllNodesWithText("Hello world, how are you?")
-                .fetchSemanticsNodes()
-                .isNotEmpty()
-        }
+        composeTestRule.mainClock.advanceTimeBy(1_000)
 
         // With the fix, the full text is eventually displayed.
         // With the bug, nothing is displayed (visibleLength stays at 0).

@@ -13,9 +13,8 @@ import io.grpc.stub.StreamObserver
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.yield
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -146,11 +145,7 @@ class VisualAgentGrpcSessionServiceTest {
                 ).build(),
         )
 
-        runBlocking {
-            withTimeout(1_000) {
-                while (observer.values.none { it.hasChatCompleted() }) yield()
-            }
-        }
+        runBlocking { observer.awaitFrame(ServerFrame::hasChatCompleted) }
 
         assertEquals(
             "world",
@@ -205,14 +200,23 @@ class VisualAgentGrpcSessionServiceTest {
 
     private class RecordingObserver<T> : StreamObserver<T> {
         val values = CopyOnWriteArrayList<T>()
+        private val frames = Channel<T>(Channel.UNLIMITED)
 
         override fun onNext(value: T) {
             values += value
+            frames.trySend(value)
         }
 
         override fun onError(throwable: Throwable) = Unit
 
         override fun onCompleted() = Unit
+
+        suspend fun awaitFrame(predicate: (T) -> Boolean): T {
+            values.firstOrNull(predicate)?.let { return it }
+            while (true) {
+                frames.receive().takeIf(predicate)?.let { return it }
+            }
+        }
     }
 
     private companion object {

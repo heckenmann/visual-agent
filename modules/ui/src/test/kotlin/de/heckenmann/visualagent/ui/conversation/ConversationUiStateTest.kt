@@ -149,6 +149,26 @@ class ConversationUiStateTest {
     }
 
     @Test
+    fun `timeline retains a pending user message when persisted history is empty`() {
+        val items =
+            buildConversationTimeline(
+                history = emptyList(),
+                pendingUserMessage = "Hello, agent!",
+                streamingContent = "",
+                showWaitingIndicator = true,
+                showOlderHistoryLoading = false,
+                includeInlineComposer = false,
+                pendingUserEntryId = "pending-user",
+            )
+
+        assertIs<ConversationTimelineItem.Waiting>(items.first())
+        val pending = assertIs<ConversationTimelineItem.MessageEntry>(items.last())
+        assertEquals("user", pending.message.role)
+        assertEquals("Hello, agent!", pending.message.content)
+        assertEquals("pending-user", pending.stableKey)
+    }
+
+    @Test
     fun `streaming and persisted answer retain one timeline identity and type`() {
         val id = "assistant-id"
         val streaming =

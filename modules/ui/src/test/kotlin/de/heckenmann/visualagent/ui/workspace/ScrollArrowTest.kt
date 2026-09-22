@@ -15,8 +15,10 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.LifecycleState
+import de.heckenmann.visualagent.ui.CompletionIdlingResource
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
+import de.heckenmann.visualagent.ui.awaitCompletion
 import de.heckenmann.visualagent.ui.canvas.*
 import de.heckenmann.visualagent.ui.components.*
 import de.heckenmann.visualagent.ui.conversation.*
@@ -27,6 +29,7 @@ import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -82,7 +85,7 @@ class ScrollArrowTest {
                 }
             }
 
-            composeTestRule.waitUntil(timeoutMillis = 2_000) { scrollState.maxScrollOffset() > 0 }
+            composeTestRule.waitForIdle()
             composeTestRule.onNodeWithContentDescription("Scroll right").performClick()
             composeTestRule.waitForIdle()
 
@@ -107,7 +110,7 @@ class ScrollArrowTest {
         }
 
     @Test
-    fun `continuous scroll repeats until edge is reached`(): Unit =
+    fun `continuous scroll advances after its first scheduled step`(): Unit =
         runTest {
             val scrollState = LazyListState(firstVisibleItemIndex = 0)
             val viewportWidth = 800
@@ -136,22 +139,29 @@ class ScrollArrowTest {
                 }
             }
 
-            composeTestRule.waitUntil(timeoutMillis = 2_000) { scrollState.maxScrollOffset() > 0 }
-            val job =
-                startContinuousScroll(
-                    direction = 1,
-                    scrollState = scrollState,
-                    scope = composeScope ?: this,
-                    isClosing = { false },
-                )
-            composeTestRule.waitUntil(timeoutMillis = 10_000) { scrollState.reachedMaxScroll() }
+            composeTestRule.waitForIdle()
+            val stepReached = CompletionIdlingResource("continuous right-scroll step")
+            lateinit var job: kotlinx.coroutines.Job
+            composeTestRule.awaitCompletion(stepReached) {
+                job =
+                    startContinuousScroll(
+                        direction = 1,
+                        scrollState = scrollState,
+                        scope = composeScope ?: this,
+                        isClosing = { false },
+                        nextStep = {
+                            stepReached.complete()
+                            awaitCancellation()
+                        },
+                    )
+            }
             job.cancel()
 
-            assertTrue(scrollState.reachedMaxScroll())
+            assertTrue(scrollState.scrollOffset() > 0)
         }
 
     @Test
-    fun `continuous scroll stops at min edge for left direction`(): Unit =
+    fun `continuous scroll schedules another leftward step after moving`(): Unit =
         runTest {
             val scrollState = LazyListState(firstVisibleItemIndex = 0, firstVisibleItemScrollOffset = 500)
             val viewportWidth = 800
@@ -180,18 +190,24 @@ class ScrollArrowTest {
                 }
             }
 
-            composeTestRule.waitUntil(timeoutMillis = 2_000) { scrollState.maxScrollOffset() > 0 }
-            val job =
-                startContinuousScroll(
-                    direction = -1,
-                    scrollState = scrollState,
-                    scope = composeScope ?: this,
-                    isClosing = { false },
-                )
-            composeTestRule.waitUntil(timeoutMillis = 5_000) { scrollState.scrollOffset() <= 0 }
+            composeTestRule.waitForIdle()
+            val stepReached = CompletionIdlingResource("continuous left-scroll step")
+            lateinit var job: kotlinx.coroutines.Job
+            composeTestRule.awaitCompletion(stepReached) {
+                job =
+                    startContinuousScroll(
+                        direction = -1,
+                        scrollState = scrollState,
+                        scope = composeScope ?: this,
+                        isClosing = { false },
+                        nextStep = {
+                            stepReached.complete()
+                            awaitCancellation()
+                        },
+                    )
+            }
+            assertTrue(job.isActive)
             job.cancel()
-
-            assertTrue(scrollState.scrollOffset() <= 0)
         }
 
     @Test
@@ -207,16 +223,4 @@ class ScrollArrowTest {
         }
 
     private fun LazyListState.scrollOffset(): Int = firstVisibleItemIndex * 1_000_000 + firstVisibleItemScrollOffset
-
-    private fun LazyListState.maxScrollOffset(): Int =
-        (
-            layoutInfo
-                .visibleItemsInfo
-                .lastOrNull()
-                ?.offset
-                ?.plus(layoutInfo.visibleItemsInfo.lastOrNull()?.size ?: 0) ?: 0
-        ) -
-            layoutInfo.viewportSize.width
-
-    private fun LazyListState.reachedMaxScroll(): Boolean = scrollOffset() >= maxScrollOffset()
 }

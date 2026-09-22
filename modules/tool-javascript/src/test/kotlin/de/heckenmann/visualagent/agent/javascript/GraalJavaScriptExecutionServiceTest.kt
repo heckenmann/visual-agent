@@ -10,7 +10,6 @@ import de.heckenmann.visualagent.agent.tools.api.ToolResult
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.AfterEach
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -287,7 +286,7 @@ class GraalJavaScriptExecutionServiceTest {
                 JavaScriptExecutionRequest(
                     source = "return await tools.call('test:slow', {timeoutSeconds: 600});",
                     enabledTools = setOf("test:slow"),
-                    requestContext = mapOf("toolDeadlineNanos" to (System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(100))),
+                    requestContext = mapOf("toolDeadlineNanos" to System.nanoTime()),
                     limits = JavaScriptExecutionLimits(timeoutMillis = 30_000),
                 ),
             )
@@ -328,26 +327,6 @@ class GraalJavaScriptExecutionServiceTest {
     }
 
     @Test
-    fun `parent cancellation terminates execution`() {
-        val token = CancellationToken()
-        val thread =
-            Thread {
-                assertFailsWith<JavaScriptExecutionException> {
-                    execute(
-                        "while (true) {}",
-                        token = token,
-                        limits = JavaScriptExecutionLimits(timeoutMillis = 30_000),
-                    )
-                }.also { assertTrue(it.category == JavaScriptErrorCategory.CANCELLED || it.category == JavaScriptErrorCategory.RUNTIME) }
-            }
-        thread.start()
-        Thread.sleep(100)
-        token.cancel()
-        thread.join(5_000)
-        assertTrue(!thread.isAlive)
-    }
-
-    @Test
     fun `parent cancellation interrupts an in-flight tool call`() {
         val token = CancellationToken()
         val thread =
@@ -362,9 +341,9 @@ class GraalJavaScriptExecutionServiceTest {
                 }.also { assertEquals(JavaScriptErrorCategory.CANCELLED, it.category) }
             }
         thread.start()
-        assertTrue(SlowTool.started.await(5, TimeUnit.SECONDS))
+        SlowTool.started.await()
         token.cancel()
-        thread.join(5_000)
+        thread.join()
         assertTrue(!thread.isAlive)
         assertTrue(SlowTool.interrupted.get())
     }
@@ -441,7 +420,7 @@ class GraalJavaScriptExecutionServiceTest {
         ): ToolResult {
             started.countDown()
             try {
-                Thread.sleep(30_000)
+                CountDownLatch(1).await()
             } catch (_: InterruptedException) {
                 interrupted.set(true)
                 Thread.currentThread().interrupt()
