@@ -143,6 +143,7 @@ private fun ProviderModelConfig.toProtocol(): ProviderModel =
         contextLimit = contextLimit,
         outputLimit = outputLimit,
         capabilities = capabilities,
+        capabilitiesComplete = capabilitiesComplete,
     )
 
 private fun ProviderModel.toApplication(): ProviderModelConfig =
@@ -155,6 +156,7 @@ private fun ProviderModel.toApplication(): ProviderModelConfig =
         contextLimit = contextLimit,
         outputLimit = outputLimit,
         capabilities = capabilities,
+        capabilitiesComplete = capabilitiesComplete,
     )
 
 private fun ApplicationModelStatus.toProtocol(): ModelStatus = ModelStatus.valueOf(name)
@@ -169,4 +171,5 @@ private fun ShowResponse.toProtocol(): ModelDetails =
         parameterSize = details?.parameterSize,
         format = details?.format,
         quantizationLevel = details?.quantizationLevel,
+        contextLimit = details?.contextLimit,
     )

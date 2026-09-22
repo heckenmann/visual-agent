@@ -76,7 +76,7 @@ internal object ProviderTurnResponseMapper {
     fun toChatResponse(turn: ProviderTurnResponse): ChatResponse =
         ChatResponse(
             model = turn.model,
-            message = Message(role = "assistant", content = turn.content),
+            message = Message(role = "assistant", content = ProviderResponseContentNormalizer.normalize(turn.content)),
             done = turn.finishReason != null,
             totalDuration = turn.timing?.totalMillis?.times(NANOS_PER_MILLI),
             promptEvalCount = turn.usage?.promptTokens,

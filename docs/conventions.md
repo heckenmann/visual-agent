@@ -44,3 +44,12 @@ appropriate. A `Flux` to `Flow` bridge is valid only in a desktop/client adapter
 another genuine external boundary.
 
 Every server event stream must document whether events are mandatory, replayed, coalesced, buffered, or dropped for slow consumers. State queries must remain separate from transient event streams.
+
+## Provider Neutrality
+
+Do not add production branches for individual model names, model families, or observed output
+quirks. Provider behavior must be selected through the provider adapter, declared capabilities,
+structured response metadata, or documented protocol differences. Normalize protocol-level framing
+artifacts once at the shared provider-neutral boundary before rendering, persistence, or history
+reuse. If structured information is unavailable, return a clear failure or improve the common
+contract; do not introduce a model-specific workaround.

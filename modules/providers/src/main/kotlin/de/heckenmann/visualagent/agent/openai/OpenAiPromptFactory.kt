@@ -2,6 +2,9 @@ package de.heckenmann.visualagent.agent.openai
 
 import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.Message
+import de.heckenmann.visualagent.agent.RequestContextBudgeter
+import de.heckenmann.visualagent.agent.ToolDefinition
+import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
 import org.springframework.ai.chat.messages.AssistantMessage
 import org.springframework.ai.chat.messages.SystemMessage
@@ -17,6 +20,7 @@ import org.springframework.ai.chat.messages.Message as SpringMessage
 @Component
 class OpenAiPromptFactory(
     private val toolRegistry: ProviderToolCallbacks,
+    private val contextBudgeter: RequestContextBudgeter = RequestContextBudgeter(),
 ) {
     /**
      * Returns provider-safe function names enabled for the request.
@@ -58,20 +62,26 @@ class OpenAiPromptFactory(
                 context = toolContext,
             )
         val exactFunctionNames = callbacks.map { it.toolDefinition.name() }.distinct().sorted()
+        val budgetedRequest =
+            contextBudgeter.fit(
+                request,
+                toolNameGuardMessage(exactFunctionNames) + request.messages,
+                callbacks.map { callback -> callback.toProviderDefinition() },
+            )
         val optionsBuilder =
             OpenAiChatOptions
                 .builder()
                 .model(selectedModel)
                 .toolCallbacks(callbacks)
                 .toolContext(toolContext)
-        request.parameters.temperature?.let(optionsBuilder::temperature)
-        request.parameters.topP?.let(optionsBuilder::topP)
-        request.parameters.maxTokens?.let(optionsBuilder::maxCompletionTokens)
-        request.options["seed"]?.toIntOrNull()?.let(optionsBuilder::seed)
-        request.options["reasoningEffort"]?.let(optionsBuilder::reasoningEffort)
-        request.options["verbosity"]?.let(optionsBuilder::verbosity)
+        budgetedRequest.parameters.temperature?.let(optionsBuilder::temperature)
+        budgetedRequest.parameters.topP?.let(optionsBuilder::topP)
+        budgetedRequest.parameters.maxTokens?.let(optionsBuilder::maxCompletionTokens)
+        budgetedRequest.options["seed"]?.toIntOrNull()?.let(optionsBuilder::seed)
+        budgetedRequest.options["reasoningEffort"]?.let(optionsBuilder::reasoningEffort)
+        budgetedRequest.options["verbosity"]?.let(optionsBuilder::verbosity)
         val options = optionsBuilder.build()
-        return Prompt(toSpringMessages(toolNameGuardMessage(exactFunctionNames) + request.messages), options)
+        return Prompt(toSpringMessages(budgetedRequest.messages), options)
     }
 
     private fun toolNameGuardMessage(exactFunctionNames: List<String>): List<Message> =
@@ -102,4 +112,12 @@ class OpenAiPromptFactory(
                 else -> UserMessage(msg.content)
             }
         }
+
+    private fun org.springframework.ai.tool.ToolCallback.toProviderDefinition(): ToolDefinition =
+        ToolDefinition(
+            id = ToolId(toolDefinition.name()),
+            name = toolDefinition.name(),
+            description = toolDefinition.description(),
+            inputSchema = toolDefinition.inputSchema(),
+        )
 }

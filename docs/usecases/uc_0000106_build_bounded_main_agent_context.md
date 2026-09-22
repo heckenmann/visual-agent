@@ -20,8 +20,8 @@ Main agent orchestration.
 1. The application loads the latest user-turn boundary from the conversation store.
 2. It selects dialogue records and eligible summary-source records, excluding
    audit-only lifecycle noise.
-3. It groups each user turn into the user request, deduplicated execution summary,
-   and final visible assistant outcome.
+3. It groups each user turn into the user request, a deduplicated low-priority
+   execution reference, and final visible assistant outcome.
 4. It retains recent turns newest-first under the provider token budget and never
    removes the current user request.
 5. The resulting projection is sent to the provider for normal, streaming, retry,
@@ -52,4 +52,6 @@ user's current intent, while all events remain auditable.
 - Todo, tool, sub-agent, and workspace events are deduplicated deterministically;
   actionable failures remain visible.
 - Context size is bounded using the configured token budget and explicit reserves.
+- Historical execution, memory, and runtime state are reference data rather than
+  system instructions; they cannot override the newest user request.
 - Initial history and full audit history remain unchanged for the UI.

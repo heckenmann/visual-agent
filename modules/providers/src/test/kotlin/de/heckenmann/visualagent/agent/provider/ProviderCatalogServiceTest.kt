@@ -283,7 +283,7 @@ class ProviderCatalogServiceTest {
         assertFalse(catalog.deleteProvider("missing"))
     }
 
-    private class MapPreferenceStore : ProviderPreferenceStore {
+    internal class MapPreferenceStore : ProviderPreferenceStore {
         private val values = mutableMapOf<String, String>()
 
         override fun getPreference(key: String): String? = values[key]

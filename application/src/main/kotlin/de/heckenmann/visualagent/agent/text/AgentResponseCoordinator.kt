@@ -4,6 +4,7 @@ import de.heckenmann.visualagent.agent.CancellationToken
 import de.heckenmann.visualagent.agent.ConversationOpsProvider
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
+import de.heckenmann.visualagent.agent.ProviderResponseContentNormalizer
 import kotlinx.coroutines.reactor.awaitSingle
 
 /**
@@ -21,7 +22,7 @@ class AgentResponseCoordinator
          * payloads with a placeholder, and detects runaway repetition.
          */
         fun normalizeAssistantContent(content: String): String {
-            val trimmed = removeThinkingMarkup(content).trim()
+            val trimmed = stripLeadingAssistantRoleToken(removeThinkingMarkup(content)).trim()
             if (trimmed.isBlank() || isToolCallsOnlyPayload(trimmed)) {
                 return "(No text response. See tool results above.)"
             }
@@ -40,7 +41,7 @@ class AgentResponseCoordinator
          * @return Trimmed presentation content with reasoning markup retained
          */
         fun normalizeAssistantPresentationContent(content: String): String {
-            val trimmed = content.trim()
+            val trimmed = stripLeadingAssistantRoleToken(content).trim()
             if (trimmed.isBlank()) return "(No text response. See tool results above.)"
             val withoutThinking = removeThinkingMarkup(trimmed).trim()
             if (withoutThinking.isBlank() || isToolCallsOnlyPayload(withoutThinking)) {
@@ -61,6 +62,8 @@ class AgentResponseCoordinator
         fun removeThinkingMarkup(content: String): String = ThinkingMarkup.remove(content)
 
         private fun hasThinkingMarkup(content: String): Boolean = ThinkingMarkup.isPresent(content)
+
+        private fun stripLeadingAssistantRoleToken(content: String): String = ProviderResponseContentNormalizer.normalize(content)
 
         /**
          * Generates assistant content with repetition-guard retry logic. If the initial response

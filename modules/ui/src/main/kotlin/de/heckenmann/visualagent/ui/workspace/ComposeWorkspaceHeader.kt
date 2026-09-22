@@ -35,6 +35,7 @@ internal fun ComposeWorkspaceHeader(
     modelName: String,
     beanDefinitionCount: Int,
     inFlight: InFlightState,
+    capabilityWarnings: ModelCapabilityWarnings = ModelCapabilityWarnings(),
     onStopAll: () -> Unit = {},
 ) {
     Row(
@@ -61,6 +62,7 @@ internal fun ComposeWorkspaceHeader(
         HeaderChip("Provider", providerName)
         HeaderChip("Model", modelName)
         HeaderChip("Beans", beanDefinitionCount.toString())
+        ModelCapabilityWarningBadges(warnings = capabilityWarnings)
         InFlightIndicator(state = inFlight, onStopAll = onStopAll)
     }
 }

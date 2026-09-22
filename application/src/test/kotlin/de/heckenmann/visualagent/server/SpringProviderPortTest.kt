@@ -42,6 +42,7 @@ class SpringProviderPortTest {
                         contextLimit = 8192,
                         outputLimit = 2048,
                         capabilities = setOf("tools"),
+                        capabilitiesComplete = true,
                     ),
                 ),
         )
@@ -61,6 +62,7 @@ class SpringProviderPortTest {
         assertEquals(ProviderAdapter.OLLAMA, port.getProvider("ollama")?.adapter)
         assertEquals(ModelStatus.ACTIVE, port.selectableModels("ollama").single().status)
         assertEquals(8192, port.selectableModels("ollama").single().contextLimit)
+        assertEquals(true, port.selectableModels("ollama").single().capabilitiesComplete)
         assertEquals("ollama", port.activeProviderId())
         assertEquals("llama3", port.activeModelId())
         assertEquals(true, port.deleteProvider("ollama"))
@@ -110,6 +112,7 @@ class SpringProviderPortTest {
                                 parameterSize = "8B",
                                 format = "gguf",
                                 quantizationLevel = "Q4_K_M",
+                                contextLimit = 4096,
                             ),
                     ),
                 )
@@ -120,6 +123,7 @@ class SpringProviderPortTest {
             assertEquals("llama3", details.model)
             assertEquals("8B", details.parameterSize)
             assertEquals("Q4_K_M", details.quantizationLevel)
+            assertEquals(4096, details.contextLimit)
             verify { provider.getModelsReactive("ollama") }
             verify { provider.getModelDetailsReactive("ollama", "llama3") }
             verify { catalog.updateDiscoveredModels("ollama", listOf("llama3")) }

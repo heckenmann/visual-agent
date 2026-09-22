@@ -206,7 +206,31 @@ data class ChatRequestContext(
     val providerProfile: ProviderProfile? = null,
     val cancellationToken: CancellationToken? = null,
     val modelCapabilities: Set<String> = emptySet(),
+    val contextWindow: ContextWindow = ContextWindow(),
 )
+
+/**
+ * Context limits known for one provider request.
+ *
+ * The effective input window is the smallest known limit. A missing model limit means that the
+ * configured application limit remains authoritative. Output is reserved only when the request
+ * or the selected model explicitly specifies an output limit.
+ *
+ * @property configuredLimit Application-configured context window in tokens
+ * @property modelLimit Provider-reported model context window in tokens
+ * @property outputLimit Requested or model-specific output limit in tokens
+ */
+data class ContextWindow(
+    val configuredLimit: Int? = null,
+    val modelLimit: Int? = null,
+    val outputLimit: Int? = null,
+) {
+    /** Returns the smallest available positive context limit, or null when no limit is known. */
+    fun effectiveLimit(): Int? = listOfNotNull(configuredLimit, modelLimit).filter { it > 0 }.minOrNull()
+
+    /** Returns this window with the request's explicit output limit taking precedence. */
+    fun withRequestedOutput(requestedOutput: Int?): ContextWindow = copy(outputLimit = requestedOutput ?: outputLimit)
+}
 
 /**
  * Provider-neutral model selection used by agents and request routing.

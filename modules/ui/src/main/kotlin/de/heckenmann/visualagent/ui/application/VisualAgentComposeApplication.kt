@@ -62,6 +62,7 @@ fun VisualAgentComposeApp(
     var settingsLoaded by remember { mutableStateOf(false) }
     val updateState = remember { mutableStateOf(UpdatePresentationState()) }
     var settingsRevision by remember { mutableStateOf(0) }
+    var providerRevision by remember { mutableStateOf(0) }
     val workspaceFocusRequester = remember { FocusRequester() }
     val composeScope = rememberCoroutineScope()
     val inFlight = rememberInFlightState(deps.applicationPort.activity)
@@ -105,6 +106,13 @@ fun VisualAgentComposeApp(
                     settings = next
                     settingsLoaded = true
                 }
+            }
+        onDispose { registration.close() }
+    }
+    DisposableEffect(deps.applicationPort.providers) {
+        val registration =
+            deps.applicationPort.providers.addChangeListener {
+                composeScope.launch { providerRevision += 1 }
             }
         onDispose { registration.close() }
     }
@@ -240,16 +248,21 @@ fun VisualAgentComposeApp(
                                     LaunchedEffect(workspaceStates) {
                                         deps.applicationPort.layout.applyWindowStates(workspaceStates, notifyListeners = false)
                                     }
-                                    val activeProvider =
-                                        remember(settingsRevision) {
-                                            panelServices.providers.getProvider(panelServices.providers.activeProviderId())
-                                        }
+                                    val capabilityWarnings =
+                                        rememberModelCapabilityWarnings(
+                                            providers = panelServices.providers,
+                                            configuredContextLength = settings.contextLength,
+                                            providerRevision = providerRevision,
+                                            selectionProviderId = settings.providerId,
+                                            selectionModelId = settings.modelId,
+                                        )
                                     Column(modifier = Modifier.fillMaxSize()) {
                                         ComposeWorkspaceHeader(
-                                            providerName = activeProvider?.id ?: panelServices.providers.activeProviderId(),
+                                            providerName = panelServices.providers.activeProviderId(),
                                             modelName = panelServices.providers.activeModelId(),
                                             beanDefinitionCount = deps.beanDefinitionCount,
                                             inFlight = inFlight.state.value,
+                                            capabilityWarnings = capabilityWarnings,
                                             onStopAll = {
                                                 composeScope.launch {
                                                     deps.applicationPort.cancelActiveWork()
@@ -286,11 +299,3 @@ fun VisualAgentComposeApp(
         }
     }
 }
-
-private fun ComposeWorkspaceWindow.toLayoutWindowState(orderIndex: Int): LayoutWindowState =
-    LayoutWindowState(
-        id = id,
-        order = orderIndex,
-        visible = visible,
-        preferredWidth = preferredWidth.toDouble(),
-    )

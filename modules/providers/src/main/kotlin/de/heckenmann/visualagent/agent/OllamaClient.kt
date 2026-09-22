@@ -60,6 +60,7 @@ class OllamaClient(
                             request.cancellationToken,
                             toolCallbacks(request, selectedModel),
                             toolRegistry,
+                            request.contextWindow.withRequestedOutput(request.parameters.maxTokens),
                         )
                 } else {
                     Mono
@@ -109,7 +110,14 @@ class OllamaClient(
                 } else {
                     val model = chatModelFor(request)
                     ToolCallingLoop()
-                        .runStreamReactive(model, prompt, request.cancellationToken, toolCallbacks, toolRegistry)
+                        .runStreamReactive(
+                            model,
+                            prompt,
+                            request.cancellationToken,
+                            toolCallbacks,
+                            toolRegistry,
+                            request.contextWindow.withRequestedOutput(request.parameters.maxTokens),
+                        )
                 }
             }.onErrorResume { error ->
                 when {

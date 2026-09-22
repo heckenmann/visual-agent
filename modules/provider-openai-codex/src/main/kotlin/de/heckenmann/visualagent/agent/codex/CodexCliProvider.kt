@@ -5,9 +5,13 @@ import de.heckenmann.visualagent.agent.ChatResponse
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ModelDetails
 import de.heckenmann.visualagent.agent.ProviderFinishReason
+import de.heckenmann.visualagent.agent.ProviderResponseContentNormalizer
 import de.heckenmann.visualagent.agent.ProviderResponseMetadata
 import de.heckenmann.visualagent.agent.ProviderTurnResponse
+import de.heckenmann.visualagent.agent.RequestContextBudgeter
 import de.heckenmann.visualagent.agent.ShowResponse
+import de.heckenmann.visualagent.agent.ToolDefinition
+import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.agent.provider.ProfiledProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
@@ -37,6 +41,7 @@ class CodexCliProvider internal constructor(
     private val locator: CodexCliLocator,
     private val toolCallbacks: ProviderToolCallbacks,
     private val modelCatalog: CodexModelCatalog,
+    private val contextBudgeter: RequestContextBudgeter = RequestContextBudgeter(),
     private val workingDirectory: ProviderWorkingDirectory = ProviderWorkingDirectory { Path.of(System.getProperty("user.dir")) },
 ) : ProfiledProviderAdapter {
     override val adapter: ProviderAdapter = ProviderAdapter.CODEX_CLI
@@ -49,17 +54,19 @@ class CodexCliProvider internal constructor(
             val profile = requireNotNull(request.providerProfile) { "Codex CLI provider profile is missing" }
             val model = effectiveModel(request.model ?: profile.defaultModel)
             val executable = withContext(Dispatchers.IO) { resolveExecutable(profile) }
+            val callbacks = callbacks(request, model)
+            val budgetedRequest = budgetRequest(request, callbacks, toolCallbacks.toolRuntimeGuidance())
             val chatModel =
                 CodexAppServerChatModel(
                     executable,
                     model,
-                    callbacks(request, model),
+                    callbacks,
                     request.workingDirectory(),
                     request.showReasoningSummary(),
                 )
             val response =
                 chatModel
-                    .completeReactive(request.toPrompt(toolCallbacks.toolRuntimeGuidance()), request.cancellationToken)
+                    .completeReactive(budgetedRequest.toPrompt(), request.cancellationToken)
                     .awaitSingle()
             ChatResponse(
                 model = response.metadata.model.takeIf(String::isNotBlank) ?: model,
@@ -79,13 +86,15 @@ class CodexCliProvider internal constructor(
             val executable = withContext(Dispatchers.IO) { resolveExecutable(profile) }
             ResolvedCodexRequest(executable, model)
         }.flatMapMany { resolved ->
+            val callbacks = callbacks(request, resolved.model)
+            val budgetedRequest = budgetRequest(request, callbacks, toolCallbacks.toolRuntimeGuidance())
             CodexAppServerChatModel(
                 resolved.executable,
                 resolved.model,
-                callbacks(request, resolved.model),
+                callbacks,
                 request.workingDirectory(),
                 request.showReasoningSummary(),
-            ).streamReactive(request.toPrompt(toolCallbacks.toolRuntimeGuidance()), request.cancellationToken)
+            ).streamReactive(budgetedRequest.toPrompt(), request.cancellationToken)
                 .map { chunk ->
                     ChatResponse(
                         model = chunk.metadata.model.takeIf(String::isNotBlank) ?: resolved.model,
@@ -163,9 +172,9 @@ class CodexCliProvider internal constructor(
             ),
         )
 
-    private fun ChatRequestContext.toPrompt(toolRuntimeGuidance: String): Prompt =
+    private fun ChatRequestContext.toPrompt(): Prompt =
         Prompt(
-            (listOf(Message("system", "Tool timeout contract: $toolRuntimeGuidance")) + messages).map { message ->
+            messages.map { message ->
                 when (message.role) {
                     "system" -> SystemMessage(message.content)
                     "assistant" -> AssistantMessage(message.content)
@@ -202,10 +211,29 @@ class CodexCliProvider internal constructor(
             (request.cancellationToken?.let { mapOf("cancellationToken" to it) } ?: emptyMap()),
     )
 
+    private fun budgetRequest(
+        request: ChatRequestContext,
+        callbacks: List<org.springframework.ai.tool.ToolCallback>,
+        toolRuntimeGuidance: String,
+    ): ChatRequestContext =
+        contextBudgeter.fit(
+            request,
+            listOf(Message("system", "Tool timeout contract: $toolRuntimeGuidance")) + request.messages,
+            callbacks.map { callback -> callback.toProviderDefinition() },
+        )
+
     private data class ResolvedCodexRequest(
         val executable: Path,
         val model: String,
     )
+
+    private fun org.springframework.ai.tool.ToolCallback.toProviderDefinition(): ToolDefinition =
+        ToolDefinition(
+            id = ToolId(toolDefinition.name()),
+            name = toolDefinition.name(),
+            description = toolDefinition.description(),
+            inputSchema = toolDefinition.inputSchema(),
+        )
 }
 
 /**
@@ -223,7 +251,7 @@ internal fun org.springframework.ai.chat.model.ChatResponse.toCodexProviderMessa
         }
     return Message(
         role = "assistant",
-        content = result?.output?.text.orEmpty(),
+        content = ProviderResponseContentNormalizer.normalize(result?.output?.text.orEmpty()),
         metadata = messageMetadata,
     )
 }
@@ -233,7 +261,7 @@ internal fun org.springframework.ai.chat.model.ChatResponse.toCodexProviderTurn(
     val rawFinishReason = result?.metadata?.finishReason
     return ProviderTurnResponse(
         model = metadata.model.takeIf(String::isNotBlank) ?: fallbackModel,
-        content = result?.output?.text.orEmpty(),
+        content = ProviderResponseContentNormalizer.normalize(result?.output?.text.orEmpty()),
         reasoning = metadata.get<String>("codexReasoning"),
         reasoningIsSummary = true,
         finishReason = rawFinishReason?.let { ProviderFinishReason.STOP },

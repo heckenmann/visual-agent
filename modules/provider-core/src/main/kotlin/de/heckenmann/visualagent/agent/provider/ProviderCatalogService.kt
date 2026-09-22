@@ -206,8 +206,13 @@ class ProviderCatalogService(
         val profile = getProvider(providerId) ?: return
         val models =
             profile.models.map { model ->
-                val caps = capabilities[model.id] ?: model.capabilities
-                if (caps != model.capabilities) model.copy(capabilities = caps) else model
+                capabilities[model.id]?.let { caps ->
+                    if (caps != model.capabilities || !model.capabilitiesComplete) {
+                        model.copy(capabilities = caps, capabilitiesComplete = true)
+                    } else {
+                        model
+                    }
+                } ?: model
             }
         saveProvider(profile.copy(models = models))
     }

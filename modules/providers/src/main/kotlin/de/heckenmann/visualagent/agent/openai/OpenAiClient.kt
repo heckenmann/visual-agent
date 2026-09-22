@@ -46,8 +46,14 @@ class OpenAiClient(
         val prompt = promptFactory.buildPrompt(request, selectedModel)
         val model = chatModel(request.providerProfile, selectedModel)
         return ToolCallingLoop()
-            .runReactive(model, prompt, request.cancellationToken, toolCallbacks(request, selectedModel), toolRegistry)
-            .onErrorMap(::buildDetailedProviderError)
+            .runReactive(
+                model,
+                prompt,
+                request.cancellationToken,
+                toolCallbacks(request, selectedModel),
+                toolRegistry,
+                request.contextWindow.withRequestedOutput(request.parameters.maxTokens),
+            ).onErrorMap(::buildDetailedProviderError)
     }
 
     override fun streamReactive(messages: List<Message>): Flux<ChatResponse> = streamReactive(ChatRequestContext(messages = messages))
@@ -69,7 +75,14 @@ class OpenAiClient(
                     }
                 } else {
                     ToolCallingLoop()
-                        .runStreamReactive(model, prompt, request.cancellationToken, toolCallbacks, toolRegistry)
+                        .runStreamReactive(
+                            model,
+                            prompt,
+                            request.cancellationToken,
+                            toolCallbacks,
+                            toolRegistry,
+                            request.contextWindow.withRequestedOutput(request.parameters.maxTokens),
+                        )
                 }
             }.onErrorMap(::buildDetailedProviderError)
     }

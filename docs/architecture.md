@@ -61,10 +61,10 @@ The UI receives only protocol ports; it never receives Spring beans.
    in-flight activity indicator in the header pulses for the duration
    of the request.
 5. `AgentManager` builds a `ChatRequestContext` with:
-   - system context prompt from `MainSystemPromptComposer` (resume hint,
-     authoritative todo counters, current todo list, active provider and
-     model, execution policy);
-   - optional `userModelInstruction` system message from `AppConfig`;
+   - static system context prompt from `MainSystemPromptComposer` (policy,
+     execution rules, active provider and model, and a conditional resume hint);
+   - optional low-priority reference sections for durable memory and current
+     runtime state;
    - a bounded context projection assembled from the latest persisted user turns;
      routine audit events are classified and compacted, while the complete history
      remains available through the `history` tool;
@@ -86,6 +86,12 @@ and `AUDIT_ONLY` records remain visible to the UI without being copied to the mo
 tool, sub-agent, and workspace events, and applies a token budget while never evicting
 the current user request. It is used for normal requests, streaming, retries, resume,
 and autonomous terminal reviews.
+
+Only static application policy is sent with the `system` role. Runtime state, durable
+memory, historical execution summaries, and omitted-history notices use low-priority
+reference messages. Historical content cannot become a higher-priority instruction by
+being reloaded from the database, and the newest user message remains the authoritative
+request for the current turn.
 
 Todo edits use one combined command for description, assignment, and status. The
 manager persists the candidate once and emits one change event only after the store
@@ -114,6 +120,16 @@ Options are merged in provider, model, agent, then variant order.
 Shared generation parameters are translated to Spring AI options,
 while supported provider-specific values remain available through an
 open options map.
+
+### Provider-neutral response handling
+
+Provider adapters convert transport payloads into provider-neutral response types. The shared
+response boundary removes only standard chat-protocol framing artifacts, such as a leading
+assistant role marker accidentally serialized as response text, before a response is rendered,
+persisted, or reused as provider context. It does not contain branches for concrete model names,
+model families, or prompt templates. Capability metadata, declared provider options, and structured
+response fields are the only supported inputs for provider or model behavior; unsupported behavior
+must fail explicitly rather than being hidden by a model-specific workaround.
 
 7. Spring AI executes tool calls through registered `ToolCallback`s.
    Each STARTED/FINISHED event is published on the `ToolEventBus`; the

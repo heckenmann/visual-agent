@@ -35,6 +35,7 @@ data class ShowResponse(
  * @property families Additional model families
  * @property parameterSize Human-readable parameter count
  * @property quantizationLevel Quantization description
+ * @property contextLimit Provider-reported context window in tokens
  */
 @Serializable
 data class ModelDetails(
@@ -44,6 +45,7 @@ data class ModelDetails(
     val families: List<String>? = null,
     val parameterSize: String? = null,
     val quantizationLevel: String? = null,
+    val contextLimit: Int? = null,
 )
 
 /**

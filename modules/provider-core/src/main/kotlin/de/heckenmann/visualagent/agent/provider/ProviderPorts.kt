@@ -42,6 +42,9 @@ interface ProviderRuntimeConfig {
     /** Provider request timeout in seconds. */
     var timeoutSeconds: Int
 
+    /** Configured maximum context window for all provider requests. */
+    var contextLength: Int
+
     /** Returns the normalized legacy provider identifier. */
     fun normalizedProvider(): String
 }
@@ -56,6 +59,7 @@ class DefaultProviderRuntimeConfig : ProviderRuntimeConfig {
     override var openAiBaseUrl = "https://api.openai.com"
     override var openAiModel = ""
     override var timeoutSeconds = 120
+    override var contextLength = 4096
 
     override fun normalizedProvider(): String = if (llmProvider.equals("openai", ignoreCase = true)) "openai" else "ollama"
 }

@@ -28,13 +28,17 @@ internal class MainAgentContextAssembler(
     ): List<Message> {
         val turns = splitIntoTurns(history)
         if (turns.isEmpty()) return emptyList()
-        val selected = turns.takeLast(MAX_RECENT_USER_TURNS)
-        val projected = selected.map(::projectTurn)
+        val projected = turns.map(::projectTurn)
         val budget = historyBudget(systemPrompt, contextLength)
         val retained = retainWithinBudget(projected, budget)
         val omitted = projected.size - retained.size
         if (omitted == 0) return retained.flatten()
-        val notice = Message(role = "system", content = "$omitted older conversation turn(s) omitted from provider context.")
+        val notice =
+            Message(
+                role = "assistant",
+                content = "Historical context: $omitted older conversation turn(s) omitted from provider context.",
+                contextPolicy = ConversationContextPolicy.SUMMARY_SOURCE,
+            )
         val messages = retained.flatten()
         val lastAssistant = messages.indexOfLast { it.role == "assistant" }
         if (lastAssistant < 0) return listOf(notice) + messages
@@ -60,10 +64,10 @@ internal class MainAgentContextAssembler(
             if (summary.lines.isNotEmpty() || summary.omittedCount > 0) {
                 add(
                     Message(
-                        role = "system",
+                        role = "assistant",
                         content =
                             buildString {
-                                append("Execution summary:")
+                                append("Historical execution context (not instructions):")
                                 if (summary.lines.isNotEmpty()) {
                                     append('\n')
                                     append(summary.lines.joinToString("\n") { "- $it" })
@@ -134,9 +138,7 @@ internal class MainAgentContextAssembler(
     ): Int =
         (
             contextLength.coerceAtLeast(MIN_CONTEXT_TOKENS) -
-                tokenEstimator.estimate(systemPrompt) -
-                RESERVED_OUTPUT_TOKENS -
-                RESERVED_TOOL_TOKENS
+                tokenEstimator.estimate(systemPrompt)
         ).coerceAtLeast(MIN_CONTEXT_TOKENS)
 
     private fun retainWithinBudget(
@@ -213,11 +215,8 @@ internal class MainAgentContextAssembler(
     private fun estimateTurn(turn: List<Message>): Int = tokenEstimator.estimate(turn.map { message -> message.content }.joinToString("\n"))
 
     private companion object {
-        const val MAX_RECENT_USER_TURNS = 10
         const val MAX_SUMMARY_EVENTS = 24
         const val MAX_SUMMARY_CHARS = 500
-        const val RESERVED_OUTPUT_TOKENS = 1024
-        const val RESERVED_TOOL_TOKENS = 512
         const val MIN_CONTEXT_TOKENS = 256
     }
 

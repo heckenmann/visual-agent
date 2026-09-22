@@ -2,7 +2,7 @@ package de.heckenmann.visualagent.agent.context
 
 import de.heckenmann.visualagent.knowledge.MainAgentLongTermMemory
 
-/** Produces the stable system section that exposes durable main-agent memory. */
+/** Produces the low-priority reference section that exposes durable main-agent memory. */
 internal object MainAgentLongTermMemoryPrompt {
     fun compose(
         memory: MainAgentLongTermMemory,

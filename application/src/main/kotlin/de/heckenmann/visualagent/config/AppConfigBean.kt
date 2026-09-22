@@ -36,7 +36,7 @@ class AppConfigBean(
     var showPanelLabels: Boolean = true
     var conversationInputPlacement: ConversationInputPlacement = ConversationInputPlacement.CONVERSATION_MESSAGE
     var browserDefault: String = "firefox"
-    var contextLength: Int = 4096
+    override var contextLength: Int = 4096
     var loadLimit: Int = 50
     var maxParallelSubAgents: Int = 4
     override var timeoutSeconds: Int = 120
