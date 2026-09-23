@@ -96,6 +96,13 @@ internal class CodexAppServerChatModel(
                             CodexAppServerRequestParams.thread(prompt, model, workingDirectory, toolCallbacks),
                         )
                     val threadId = thread.codexThreadId()
+                    val historyItems = CodexAppServerRequestParams.historyItems(prompt)
+                    if (historyItems.isNotEmpty()) {
+                        transport.request(
+                            "thread/inject_items",
+                            CodexAppServerRequestParams.injectHistory(threadId, historyItems),
+                        )
+                    }
                     transport.request(
                         "turn/start",
                         CodexAppServerRequestParams.turn(prompt, threadId, model, showReasoningSummary, image),

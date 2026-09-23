@@ -14,7 +14,7 @@ Allow a desktop user to use an authenticated, user-local OpenAI Codex CLI instal
 
 1. The provider locator validates the configured executable with `codex --version`.
 2. The provider creates a short-lived app-server process with `codex app-server --listen stdio://`.
-3. The adapter negotiates `initialize`, starts an ephemeral thread, and starts one turn with the request's messages and enabled dynamic tools.
+3. The adapter negotiates `initialize`, starts an ephemeral thread, injects completed conversation turns as role-preserving Responses API messages, and starts the current turn with enabled dynamic tools.
 4. Native `item/agentMessage/delta` notifications are mapped to incremental Spring AI responses while the turn is running.
 5. `item/tool/call` requests are validated against the request-scoped tool allowlist and delegated to the existing `ToolRegistry` callback.
 6. The tool result is returned to the same Codex turn through `DynamicToolCallResponse`; the trusted workspace image action becomes an `inputImage` content item. Audio content remains textual until the negotiated app-server schema and selected model support it.
@@ -23,7 +23,15 @@ Allow a desktop user to use an authenticated, user-local OpenAI Codex CLI instal
 
 ## Prompt and input mapping
 
-System messages are sent as Codex `baseInstructions`. User and assistant messages, including conversation history, are sent only as turn text inputs; each is explicitly role-marked because the app-server turn input contract accepts user input items rather than arbitrary Spring message roles. No API key or provider credential is inserted into the prompt.
+System messages are sent as Codex `baseInstructions`. Completed user and assistant messages are converted to native Responses API message items and appended to the ephemeral thread with `thread/inject_items`, preserving their roles and order. The latest user turn is sent as a native user text input through `turn/start`, whose input contract accepts user input items rather than arbitrary Spring message roles; any additional assistant/context messages in that active turn retain an explicit role marker. No API key or provider credential is inserted into the prompt. An injection failure fails the provider request instead of silently degrading to flattened history.
+
+### Context transfer research
+
+- Spring AI models a `Prompt` as an ordered collection of role-bearing messages. A previous assistant response is a distinct assistant-role message, not user text with an `[assistant]` prefix.
+- Spring AI's `MessageChatMemoryAdvisor` adds retrieved conversation history to a prompt as a collection of messages. Its `VectorStoreChatMemoryAdvisor` instead appends retrieved memory to system text, which is not the appropriate representation for turn-by-turn dialogue.
+- Visual Agent already persists the complete conversation in its database and applies context policies and token-window budgeting in `MainAgentContextAssembler` and `RequestContextBudgeter`. A second Spring `ChatMemory` store would duplicate ownership and bypass that request-specific selection, so the provider adapter preserves the prepared prompt instead.
+- Codex app-server `turn/start` accepts `UserInput` items, not arbitrary Spring message roles. Its `thread/inject_items` RPC accepts raw Responses API items and appends them to model-visible thread history without starting a user turn. The adapter uses that operation for completed turns and sends only the current user turn through `turn/start`.
+- The protocol was smoke-tested against the installed Codex CLI 0.150.1 using an ephemeral thread; injection succeeded without making a model-generation request.
 
 ## Configuration
 
@@ -42,7 +50,7 @@ The former `org.springaicommunity.agents:agent-codex` dependency was removed. It
 
 Visual Agent now contains a clean-room adapter implemented only against public Spring AI APIs and the public Codex app-server schema. It does not copy, translate, or derive code from the removed connector. The adapter implements the required Spring AI chat and streaming model contracts and owns a minimal JSON-RPC process transport.
 
-The app-server protocol supports request-scoped `dynamicTools`, server-initiated `item/tool/call` requests, textual and inline image tool results, and native `item/agentMessage/delta` streaming. Audio content-item mapping is retained as a disabled forward-compatibility path because current Codex schemas and models do not support audio. Unknown notifications are ignored for forward compatibility; unsupported server requests receive a protocol error.
+The app-server protocol supports request-scoped `dynamicTools`, `thread/inject_items` for adding raw Responses API history items without starting a user turn, server-initiated `item/tool/call` requests, textual and inline image tool results, and native `item/agentMessage/delta` streaming. Audio content-item mapping is retained as a disabled forward-compatibility path because current Codex schemas and models do not support audio. Unknown notifications are ignored for forward compatibility; unsupported server requests receive a protocol error.
 
 ## Tool Calls
 
@@ -84,12 +92,15 @@ The app-server protocol supports request-scoped `dynamicTools`, server-initiated
 ## Verification
 
 - Protocol tests use a controlled fake app-server process and cover initialization, native delta streaming, assistant item boundaries, textual and inline image tool callbacks, structured tool failures, audio fallback, terminal completion, and cleanup.
-- Request-boundary tests verify that every thread is ephemeral, read-only, uses the `never` approval policy, and rejects a server tool request outside the request-scoped allowlist. The CLI process-factory test verifies API-key removal with controlled sentinel values.
+- Request-boundary tests verify that every thread is ephemeral, read-only, uses the `never` approval policy, that completed assistant/user messages are injected with native roles before the current user turn, and that a server tool request outside the request-scoped allowlist is rejected. The CLI process-factory test verifies API-key removal with controlled sentinel values.
 - Lifecycle tests verify successful completion process termination and failed-turn/rejected-tool error propagation. The transport cleanup path also waits for normal or forced child termination, and cancellation is wired to that same close path.
 - Provider wiring tests cover the new dependency-free adapter.
 - The optional real-CLI smoke test remains outside the default suite because it requires a locally authenticated Codex account; enable it with `-Dvisualagent.codex.smoke=true` and `-Dvisualagent.codex.smoke.model=...`. An executable path can be supplied with `-Dvisualagent.codex.smoke.executable=...`. The authenticated smoke test was run successfully against the locally installed CLI.
 
 ## References
 
-- [Codex app-server protocol schema](https://developers.openai.com/)
+- [Spring AI Prompt and message roles](https://docs.spring.io/spring-ai/reference/api/prompt.html)
+- [Spring AI chat memory and message-history guidance](https://docs.spring.io/spring-ai/reference/api/chat-memory.html)
+- [Codex app-server thread protocol](https://github.com/openai/codex/blob/main/codex-rs/app-server-protocol/src/protocol/v2/thread.rs)
+- [Codex app-server RPC definitions](https://github.com/openai/codex/blob/main/codex-rs/app-server-protocol/src/protocol/common.rs)
 - [OpenAI tool and streaming reference](https://developers.openai.com/api/reference/cli/resources/responses/methods/create)

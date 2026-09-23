@@ -102,6 +102,14 @@ reference messages. Historical content cannot become a higher-priority instructi
 being reloaded from the database, and the newest user message remains the authoritative
 request for the current turn.
 
+Provider adapters must preserve the role and order of messages in the bounded
+`ChatRequestContext`; historical assistant messages must not be flattened into user text
+with role-like prefixes. The Codex app-server adapter sends completed turns as native
+Responses API message items through `thread/inject_items`, then submits the current turn
+through `turn/start`. System instructions remain `baseInstructions`, and the latest user
+turn remains separate from imported history. This follows Spring AI's role-bearing
+`Prompt` model while adapting to the app-server's user-input-only `turn/start` contract.
+
 Todo edits use one combined command for description, assignment, and status. The
 manager persists the candidate once and emits one change event only after the store
 operation succeeds; no-op updates allocate no new activity sequence. The event

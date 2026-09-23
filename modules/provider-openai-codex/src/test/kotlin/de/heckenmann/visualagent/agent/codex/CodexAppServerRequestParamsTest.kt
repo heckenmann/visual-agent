@@ -18,7 +18,7 @@ import kotlin.test.assertTrue
 /** Verifies role-preserving request mapping for the Codex app-server protocol. */
 class CodexAppServerRequestParamsTest {
     @Test
-    fun `conversation history remains turn-level input`() {
+    fun `completed conversation turns retain native message roles`() {
         val prompt =
             Prompt(
                 listOf(
@@ -32,6 +32,7 @@ class CodexAppServerRequestParamsTest {
         val thread = CodexAppServerRequestParams.thread(prompt, "model", Path.of("."), emptyList())
         val baseInstructions = thread.getValue("baseInstructions").jsonPrimitive.content
         val providerConfig = thread.getValue("config").jsonObject
+        val history = CodexAppServerRequestParams.historyItems(prompt)
         val turn = CodexAppServerRequestParams.turn(prompt, "thread", "model", false, null)
         val inputs = turn.getValue("input").jsonArray
 
@@ -59,16 +60,56 @@ class CodexAppServerRequestParamsTest {
                 .toBoolean(),
         )
         assertFalse("developerInstructions" in thread)
-        assertEquals(3, inputs.size)
+        assertEquals(2, history.size)
         assertEquals(
-            listOf("[user]\nold request", "[assistant]\nold response", "[user]\nsay hello to me"),
+            listOf("user", "assistant"),
+            history.map {
+                it.jsonObject
+                    .getValue("role")
+                    .jsonPrimitive.content
+            },
+        )
+        assertEquals(
+            listOf("input_text", "output_text"),
+            history.map {
+                it.jsonObject
+                    .getValue("content")
+                    .jsonArray
+                    .single()
+                    .jsonObject
+                    .getValue("type")
+                    .jsonPrimitive.content
+            },
+        )
+        assertEquals(
+            listOf("old request", "old response"),
+            history.map {
+                it.jsonObject
+                    .getValue("content")
+                    .jsonArray
+                    .single()
+                    .jsonObject
+                    .getValue("text")
+                    .jsonPrimitive.content
+            },
+        )
+        assertEquals(
+            listOf("say hello to me"),
             inputs.map {
                 it.jsonObject
                     .getValue("text")
-                    .jsonPrimitive
-                    .content
+                    .jsonPrimitive.content
             },
         )
+    }
+
+    @Test
+    fun `history injection is scoped to the started thread`() {
+        val items = CodexAppServerRequestParams.historyItems(Prompt(UserMessage("earlier")))
+        val params = CodexAppServerRequestParams.injectHistory("thread-1", items)
+
+        assertEquals("thread-1", params.getValue("threadId").jsonPrimitive.content)
+        assertEquals(items, params.getValue("items"))
     }
 
     @Test
@@ -91,7 +132,7 @@ class CodexAppServerRequestParamsTest {
                     .content
             }
 
-        assertEquals(listOf("[user]\ncomplete the result", "[assistant]\ntool results"), texts)
+        assertEquals(listOf("complete the result", "[assistant]\ntool results"), texts)
     }
 
     @Test
