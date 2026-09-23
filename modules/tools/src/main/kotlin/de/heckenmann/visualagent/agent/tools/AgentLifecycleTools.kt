@@ -6,11 +6,13 @@ import de.heckenmann.visualagent.agent.tools.api.ToolAgentConfig
 import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.springframework.beans.factory.ObjectProvider
 
 /**
  * Creates a new sub-agent from a template.
@@ -40,7 +42,7 @@ class AgentCreateTool(
         val role = input.requiredString("role")
         val templateName = input.string("templateName")?.takeIf(String::isNotBlank) ?: "researcher"
         val created = agents.create(name, role, templateName)
-        val tools = agents.tools(created.id).sorted()
+        val tools = agents.providerToolNames(created.id)
         val toolHint =
             buildString {
                 appendLine("Created agent ${created.id} ($name, template=$templateName)")
@@ -59,6 +61,7 @@ class AgentCreateTool(
 @AgentTool
 class AgentUpdateTool(
     private val agents: AgentToolPort,
+    private val registry: ObjectProvider<ToolRegistry>,
 ) : VisualAgentTool {
     override val definition =
         ToolDefinition(
@@ -66,11 +69,10 @@ class AgentUpdateTool(
             name = ToolId("agent:update").toFunctionName(),
             description =
                 "Update an existing sub-agent's configuration. " +
-                    "Input: {\"id\":\"123\",\"name\":\"Coder\",\"role\":\"Implementation\"," +
-                    "\"timeout\":120,\"maxRetries\":3,\"memoryLimitMb\":1024,\"provider\":\"ollama\",\"model\":\"llama3\"," +
-                    "\"temperature\":0.7,\"topP\":0.9,\"maxTokens\":4096,\"variant\":\"chat\"," +
-                    "\"options\":{\"seed\":\"42\"},\"tools\":[\"workspace:file\",\"javascript:execute\"],\"templateName\":\"coder\"}. " +
-                    "All fields except id are optional. Only provided fields are updated.",
+                    "Input fields: id (required), name, role, timeout, maxRetries, memoryLimitMb, provider, " +
+                    "model, temperature, topP, maxTokens, variant, options, tools, and templateName (optional). " +
+                    "For tools, use provider function names from an available agent inventory. " +
+                    "Unknown function names are rejected. Only provided fields are updated.",
             inputSchema = STRING_SCHEMA,
         )
 
@@ -83,11 +85,32 @@ class AgentUpdateTool(
         val agent = agents.get(id) ?: return failure("agent:update", "Agent not found")
         val templateName = input.string("templateName")?.takeIf(String::isNotBlank)
         val baseConfig = templateName?.let(agents::template) ?: agent.config
-        val config = mergeConfigFromInput(baseConfig, input)
+        val requestedTools =
+            input.jsonObject["tools"]?.let { value ->
+                value as? JsonArray ?: return failure("agent:update", "TOOL_ARGUMENTS: Tools must be an array of function names")
+            }
+        val toolIdsByFunctionName =
+            if (requestedTools != null) {
+                registry.getObject().toolDefinitions().associate { it.name to it.id.value }
+            } else {
+                emptyMap()
+            }
+        val tools =
+            requestedTools?.map { entry ->
+                val name =
+                    (entry as? JsonPrimitive)?.takeIf { it.isString }?.content
+                        ?: return failure("agent:update", "TOOL_ARGUMENTS: Tool function names must be strings")
+                toolIdsByFunctionName[name]
+                    ?: return failure(
+                        "agent:update",
+                        "TOOL_ARGUMENTS: Unknown tool function '$name'. Use a name from the agent's available tool inventory.",
+                    )
+            }
+        val config = mergeConfigFromInput(baseConfig, input, tools)
         val updated = agents.update(id, input.string("name"), input.string("role"), config)
         return if (updated) {
             agents.get(id) ?: return failure("agent:update", "Agent not found")
-            val tools = agents.tools(id).sorted()
+            val tools = agents.providerToolNames(id)
             val toolHint =
                 buildString {
                     appendLine("Updated agent $id")
@@ -103,11 +126,9 @@ class AgentUpdateTool(
     private fun mergeConfigFromInput(
         base: ToolAgentConfig,
         input: JsonObject,
+        tools: List<String>?,
     ): ToolAgentConfig {
         val options = input.jsonObject["options"]?.jsonObject?.mapValues { it.value.jsonPrimitive.content } ?: base.options
-        val tools =
-            input.jsonObject["tools"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }
-                ?: base.tools
         return base.copy(
             timeout = input.int("timeout") ?: base.timeout,
             maxRetries = input.int("maxRetries") ?: base.maxRetries,
@@ -119,7 +140,7 @@ class AgentUpdateTool(
             maxTokens = input.int("maxTokens") ?: base.maxTokens,
             variant = input.primitiveString("variant") ?: base.variant,
             options = options,
-            tools = tools,
+            tools = tools ?: base.tools,
             templateName = input.primitiveString("templateName") ?: base.templateName,
         )
     }
@@ -220,7 +241,7 @@ class AgentShowTool(
     }
 
     private fun formatAgentDetails(agent: ToolAgent): String {
-        val tools = agents.tools(agent.id).sorted()
+        val tools = agents.providerToolNames(agent.id)
         val configId = agents.configId(agent.id)
         val description = configId?.let(agents::configDescription).orEmpty()
         val model = agent.config.model?.ifBlank { null } ?: "inherited"
@@ -249,3 +270,5 @@ class AgentShowTool(
         }
     }
 }
+
+private fun AgentToolPort.providerToolNames(id: String): List<String> = tools(id).map { ToolId(it).toFunctionName() }.sorted()

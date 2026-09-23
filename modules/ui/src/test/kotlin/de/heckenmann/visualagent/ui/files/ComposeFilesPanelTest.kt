@@ -2,9 +2,9 @@ package de.heckenmann.visualagent.ui.files
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import de.heckenmann.visualagent.protocol.ActivityPort
 import de.heckenmann.visualagent.protocol.CANVAS_MIME_TYPE
 import de.heckenmann.visualagent.protocol.CanvasPort
@@ -12,9 +12,15 @@ import de.heckenmann.visualagent.protocol.WorkspaceDownload
 import de.heckenmann.visualagent.protocol.WorkspaceDownloadState
 import de.heckenmann.visualagent.protocol.WorkspaceFile
 import de.heckenmann.visualagent.protocol.WorkspaceFilePort
+import de.heckenmann.visualagent.protocol.WorkspaceSyncResult
+import de.heckenmann.visualagent.ui.CompletionIdlingResource
+import de.heckenmann.visualagent.ui.awaitCompletion
+import de.heckenmann.visualagent.ui.modal.ComposeConfirmationModal
+import de.heckenmann.visualagent.ui.modal.ComposeContentModal
 import de.heckenmann.visualagent.ui.modal.ComposeModalRequester
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import org.junit.Rule
 import org.junit.Test
 import kotlin.test.assertEquals
@@ -65,24 +71,120 @@ class ComposeFilesPanelTest {
 
     @Test
     fun `download row exposes pause and cancel controls`() {
+        var paused = false
+        var cancelled = false
         composeTestRule.setContent {
             MaterialTheme {
                 WorkspaceDownloadRow(
                     download = WorkspaceDownload("download", "downloads/report.bin", WorkspaceDownloadState.DOWNLOADING, 50, 100),
-                    onPause = {},
+                    onPause = { paused = true },
                     onResume = {},
+                    onCancel = { cancelled = true },
+                )
+            }
+        }
+        composeTestRule.onNodeWithContentDescription("Pause download").performClick()
+        composeTestRule.onNodeWithContentDescription("Cancel download").performClick()
+        assertEquals(true, paused)
+        assertEquals(true, cancelled)
+    }
+
+    @Test
+    fun `paused download resumes when its action is clicked`() {
+        var resumed = false
+        composeTestRule.setContent {
+            MaterialTheme {
+                WorkspaceDownloadRow(
+                    download = WorkspaceDownload("download", "downloads/report.bin", WorkspaceDownloadState.PAUSED, 50, 100),
+                    onPause = {},
+                    onResume = { resumed = true },
                     onCancel = {},
                 )
             }
         }
-        composeTestRule.onNodeWithContentDescription("Pause download").assertExists()
-        composeTestRule.onNodeWithContentDescription("Cancel download").assertExists()
+
+        composeTestRule.onNodeWithContentDescription("Resume download").performClick()
+
+        assertEquals(true, resumed)
+    }
+
+    @Test
+    fun `canvas file actions open rename and confirm deletion`() {
+        val file = sampleFiles().first { it.mimeType == CANVAS_MIME_TYPE }
+        val workspace = mockk<WorkspaceFilePort>(relaxed = true)
+        val canvas = mockk<CanvasPort>(relaxed = true)
+        var modal: Any? = null
+        var refreshed = false
+
+        composeTestRule.setContent {
+            MaterialTheme {
+                WorkspaceFileRow(
+                    file,
+                    workspace,
+                    canvas,
+                    ComposeModalRequester { modal = it },
+                    refresh = { refreshed = true },
+                    setStatus = {},
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithContentDescription("Open canvas document").performClick()
+        verify(exactly = 1) { canvas.openDocument(file.id, null) }
+
+        composeTestRule.onNodeWithContentDescription("Rename workspace file").performClick()
+        assertEquals("Rename file", (modal as ComposeContentModal).title)
+
+        composeTestRule.onNodeWithContentDescription("Delete workspace file").performClick()
+        val confirmation = modal as ComposeConfirmationModal
+        assertEquals("Delete workspace file?", confirmation.title)
+        confirmation.onConfirm()
+        verify(exactly = 1) { workspace.deleteFile(file.id) }
+        assertEquals(true, refreshed)
+    }
+
+    @Test
+    fun `copy file metadata button reports the copied file`() {
+        val file = sampleFiles().first { it.mimeType != CANVAS_MIME_TYPE }
+        var status = ""
+        composeTestRule.setContent {
+            MaterialTheme {
+                WorkspaceFileRow(
+                    file,
+                    mockk(relaxed = true),
+                    mockk(relaxed = true),
+                    ComposeModalRequester { },
+                    refresh = {},
+                    setStatus = { status = it },
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithContentDescription("Copy file metadata").performClick()
+
+        assertEquals("Copied metadata for ${file.relativePath}", status)
+    }
+
+    @Test
+    fun `workspace import button invokes platform picker callback`() {
+        var pickerOpened = false
+        composeTestRule.setContent {
+            MaterialTheme { WorkspaceFileImportButton { pickerOpened = true } }
+        }
+
+        composeTestRule.onNodeWithContentDescription("Import file into current folder").performClick()
+
+        assertEquals(true, pickerOpened)
     }
 
     @Test
     fun `panel renders protocol workspace values`() {
         val workspace = mockk<WorkspaceFilePort>()
-        every { workspace.listFiles() } returns sampleFiles()
+        val filesLoaded = CompletionIdlingResource("workspace files")
+        every { workspace.listFiles() } answers {
+            filesLoaded.complete()
+            sampleFiles()
+        }
         every { workspace.listDirectories() } returns listOf("empty-folder")
         every { workspace.workspaceRoot() } returns "/tmp/workspace"
         every { workspace.activeDownloads() } returns emptyList()
@@ -90,18 +192,60 @@ class ComposeFilesPanelTest {
         every { workspace.addListener(any()) } returns AutoCloseable { }
         val canvas = mockk<CanvasPort>(relaxed = true)
         val activity = mockk<ActivityPort>(relaxed = true)
-        composeTestRule.setContent {
-            MaterialTheme {
-                FilesPanel(workspace, canvas, ComposeModalRequester { }, activity)
+        composeTestRule.awaitCompletion(filesLoaded) {
+            composeTestRule.setContent {
+                MaterialTheme {
+                    FilesPanel(workspace, canvas, ComposeModalRequester { }, activity)
+                }
             }
-        }
-        composeTestRule.waitUntil(5_000) {
-            composeTestRule.onAllNodesWithText("empty-folder").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText("Folder / · 2 total · 0 visible").assertExists()
         composeTestRule.onNodeWithText("data").assertExists()
         composeTestRule.onNodeWithText("empty-folder").assertExists()
         composeTestRule.onNodeWithContentDescription("Create folder in current folder").assertExists()
+    }
+
+    @Test
+    fun `folder navigation create and sync actions reach workspace service`() {
+        val workspace = mockk<WorkspaceFilePort>()
+        val filesLoaded = CompletionIdlingResource("workspace files")
+        val syncCompleted = CompletionIdlingResource("workspace sync")
+        every { workspace.listFiles() } answers {
+            filesLoaded.complete()
+            sampleFiles()
+        }
+        every { workspace.listDirectories() } returns listOf("data", "empty-folder")
+        every { workspace.workspaceRoot() } returns "/tmp/workspace"
+        every { workspace.activeDownloads() } returns emptyList()
+        every { workspace.addDownloadListener(any()) } returns AutoCloseable { }
+        every { workspace.addListener(any()) } returns AutoCloseable { }
+        every { workspace.syncMetadataWithFilesystem() } answers {
+            syncCompleted.complete()
+            WorkspaceSyncResult(1, 2, 3, 4)
+        }
+        val canvas = mockk<CanvasPort>(relaxed = true)
+        val activity = mockk<ActivityPort>(relaxed = true)
+        var requestedModal: Any? = null
+
+        composeTestRule.awaitCompletion(filesLoaded) {
+            composeTestRule.setContent {
+                MaterialTheme {
+                    FilesPanel(workspace, canvas, ComposeModalRequester { requestedModal = it }, activity)
+                }
+            }
+        }
+
+        composeTestRule.onNodeWithContentDescription("Open folder data").performClick()
+        composeTestRule.onNodeWithText("Folder data · 2 total · 2 visible").assertExists()
+        composeTestRule.onNodeWithContentDescription("Create folder in current folder").performClick()
+        assertEquals("Create folder", (requestedModal as ComposeContentModal).title)
+        composeTestRule.onNodeWithContentDescription("Open parent folder").performClick()
+        composeTestRule.onNodeWithText("Folder / · 2 total · 0 visible").assertExists()
+
+        composeTestRule.awaitCompletion(syncCompleted) {
+            composeTestRule.onNodeWithContentDescription("Sync workspace files").performClick()
+        }
+        verify(exactly = 1) { workspace.syncMetadataWithFilesystem() }
     }
 
     private fun sampleFiles() =

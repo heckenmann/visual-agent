@@ -53,8 +53,21 @@ interface VisualAgentTool {
 }
 
 /**
- * Convert an application tool ID into a provider-safe function name.
+ * Converts an internal tool ID into the sole model-callable provider function name.
  *
- * @return Name that can be used as a Spring AI function callback name
+ * Internal IDs remain stable for configuration, persistence, and UI display. Provider function
+ * names use lower snake case so every provider receives the same portable function contract.
+ *
+ * @return Lower snake-case name that can be used as a Spring AI function callback name
+ * @throws IllegalArgumentException when this ID cannot produce a portable provider function name
  */
-fun ToolId.toFunctionName(): String = value.replace(Regex("[^A-Za-z0-9_]"), "_")
+fun ToolId.toFunctionName(): String {
+    val functionName = value.lowercase().replace(UNSAFE_FUNCTION_NAME_CHARACTERS, "_").trim('_')
+    require(PROVIDER_FUNCTION_NAME.matches(functionName)) {
+        "Tool ID '$value' cannot produce a valid provider function name."
+    }
+    return functionName
+}
+
+private val UNSAFE_FUNCTION_NAME_CHARACTERS = Regex("[^a-z0-9]+")
+private val PROVIDER_FUNCTION_NAME = Regex("[a-z][a-z0-9_]{0,63}")

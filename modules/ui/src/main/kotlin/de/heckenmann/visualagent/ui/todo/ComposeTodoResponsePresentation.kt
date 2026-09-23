@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.TodoItem
 import de.heckenmann.visualagent.ui.components.ComposeMarkdown
+import de.heckenmann.visualagent.ui.components.ComposeStreamingMarkdown
 import de.heckenmann.visualagent.ui.components.labelizeEnumName
 import de.heckenmann.visualagent.ui.modal.ComposeContentModal
 import de.heckenmann.visualagent.ui.modal.ComposeModalRequester
@@ -55,6 +56,8 @@ internal class TodoResponseState {
         private set
     var text: String by mutableStateOf("")
         private set
+    var isStreaming: Boolean by mutableStateOf(false)
+        private set
 
     /** Applies one server progress event, replacing stale output from an older execution. */
     fun apply(
@@ -69,6 +72,7 @@ internal class TodoResponseState {
         }
         if (agentId != null) this.agentId = agentId
         if (delta.isNotEmpty()) text += delta
+        isStreaming = !completed && this.executionId != null
         if (completed) this.executionId = executionId ?: this.executionId
     }
 
@@ -77,6 +81,7 @@ internal class TodoResponseState {
         executionId = null
         agentId = null
         text = ""
+        isStreaming = false
     }
 
     /** Restores persisted output when a conversation panel is opened. */
@@ -87,6 +92,7 @@ internal class TodoResponseState {
         executionId = null
         agentId = restoredAgentId
         text = response
+        isStreaming = false
     }
 }
 
@@ -185,7 +191,14 @@ internal fun TodoResponseOverlay(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             SelectionContainer {
-                ComposeMarkdown(responseState.text.ifBlank { "No response output yet." })
+                if (responseState.isStreaming) {
+                    ComposeStreamingMarkdown(
+                        markdown = responseState.text.ifBlank { "No response output yet." },
+                        streamKey = responseState.executionId ?: "todo-response-stream",
+                    )
+                } else {
+                    ComposeMarkdown(responseState.text.ifBlank { "No response output yet." })
+                }
             }
         },
         footer = {

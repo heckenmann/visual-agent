@@ -15,6 +15,8 @@ import de.heckenmann.visualagent.protocol.DirectoryGrantOrigin
 import de.heckenmann.visualagent.protocol.DirectoryGrantView
 import de.heckenmann.visualagent.protocol.ServerDirectoryPickerEntry
 import de.heckenmann.visualagent.protocol.ServerDirectoryPickerPage
+import de.heckenmann.visualagent.ui.CompletionIdlingResource
+import de.heckenmann.visualagent.ui.awaitCompletion
 import de.heckenmann.visualagent.ui.modal.ComposeModalRequester
 import io.mockk.every
 import io.mockk.mockk
@@ -31,7 +33,9 @@ class DirectoryAccessPanelTest {
     @Test
     fun `panel renders origin and access descriptions`() {
         val directoryAccess = mockk<DirectoryGrantAdministrationPort>(relaxed = true)
-        every { directoryAccess.listGrants() } returns
+        val grantsLoaded = CompletionIdlingResource("directory grants")
+        every { directoryAccess.listGrants() } answers {
+            grantsLoaded.complete()
             listOf(
                 DirectoryGrantView(
                     "grant",
@@ -44,20 +48,20 @@ class DirectoryAccessPanelTest {
                     null,
                 ),
             )
-        composeTestRule.setContent {
-            MaterialTheme {
-                DirectoryAccessPanel(
-                    directoryAccess,
-                    mockk<ClientDirectoryGrantAdministrationPort>(relaxed = true),
-                    ComposeModalRequester { },
-                )
+        }
+        composeTestRule.awaitCompletion(grantsLoaded) {
+            composeTestRule.setContent {
+                MaterialTheme {
+                    DirectoryAccessPanel(
+                        directoryAccess,
+                        mockk<ClientDirectoryGrantAdministrationPort>(relaxed = true),
+                        ComposeModalRequester { },
+                    )
+                }
             }
         }
         composeTestRule.onNodeWithText("This device").assertExists()
         assertEquals(2, composeTestRule.onAllNodesWithText("Application server").fetchSemanticsNodes().size)
-        composeTestRule.waitUntil(5_000) {
-            composeTestRule.onAllNodesWithText("Documents").fetchSemanticsNodes().isNotEmpty()
-        }
         assertTrue(composeTestRule.onAllNodesWithText("Documents").fetchSemanticsNodes().isNotEmpty())
     }
 
@@ -92,20 +96,23 @@ class DirectoryAccessPanelTest {
                 true,
                 null,
             )
-        every { directoryAccess.listGrants() } returns listOf(grant)
+        val grantsLoaded = CompletionIdlingResource("directory grants")
+        every { directoryAccess.listGrants() } answers {
+            grantsLoaded.complete()
+            listOf(grant)
+        }
         every { directoryAccess.updateGrant("grant", "Documents", DirectoryAccessMode.READ_ONLY) } returns grant
 
-        composeTestRule.setContent {
-            MaterialTheme {
-                DirectoryAccessPanel(
-                    directoryAccess,
-                    mockk<ClientDirectoryGrantAdministrationPort>(relaxed = true),
-                    ComposeModalRequester { },
-                )
+        composeTestRule.awaitCompletion(grantsLoaded) {
+            composeTestRule.setContent {
+                MaterialTheme {
+                    DirectoryAccessPanel(
+                        directoryAccess,
+                        mockk<ClientDirectoryGrantAdministrationPort>(relaxed = true),
+                        ComposeModalRequester { },
+                    )
+                }
             }
-        }
-        composeTestRule.waitUntil(5_000) {
-            composeTestRule.onAllNodesWithText("Save changes").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText("This device").performClick()
         composeTestRule.onNodeWithText("This device directory").assertExists()
@@ -118,30 +125,37 @@ class DirectoryAccessPanelTest {
         val root = ServerDirectoryPickerEntry("root", "Root folder", "/srv/root", null)
         val child = ServerDirectoryPickerEntry("child", "Child folder", "/srv/root/child", "root")
         val nextChild = ServerDirectoryPickerEntry("next-child", "Another folder", "/srv/root/another", "root")
-        every { directoryAccess.listServerDirectoryRoots(null) } returns ServerDirectoryPickerPage(listOf(root), "")
-        every { directoryAccess.listServerDirectoryChildren("root", null) } returns
+        val rootsLoaded = CompletionIdlingResource("directory roots")
+        val firstPageLoaded = CompletionIdlingResource("directory child page")
+        val secondPageLoaded = CompletionIdlingResource("next directory child page")
+        every { directoryAccess.listServerDirectoryRoots(null) } answers {
+            rootsLoaded.complete()
+            ServerDirectoryPickerPage(listOf(root), "")
+        }
+        every { directoryAccess.listServerDirectoryChildren("root", null) } answers {
+            firstPageLoaded.complete()
             ServerDirectoryPickerPage(listOf(child), "next")
-        every { directoryAccess.listServerDirectoryChildren("root", "next") } returns
+        }
+        every { directoryAccess.listServerDirectoryChildren("root", "next") } answers {
+            secondPageLoaded.complete()
             ServerDirectoryPickerPage(listOf(nextChild), null)
+        }
         var selected: ServerDirectoryPickerEntry? = null
         var dismissed = false
 
-        composeTestRule.setContent {
-            MaterialTheme {
-                ServerDirectoryPicker(directoryAccess, { selected = it }, { dismissed = true })
+        composeTestRule.awaitCompletion(rootsLoaded) {
+            composeTestRule.setContent {
+                MaterialTheme {
+                    ServerDirectoryPicker(directoryAccess, { selected = it }, { dismissed = true })
+                }
             }
         }
-        composeTestRule.waitUntil(5_000) {
-            composeTestRule.onAllNodesWithText("Root folder").fetchSemanticsNodes().isNotEmpty()
-        }
-        composeTestRule.onNodeWithContentDescription("Open Root folder").performClick()
-        composeTestRule.waitUntil(5_000) {
-            composeTestRule.onAllNodesWithText("Child folder").fetchSemanticsNodes().isNotEmpty()
+        composeTestRule.awaitCompletion(firstPageLoaded) {
+            composeTestRule.onNodeWithContentDescription("Open Root folder").performClick()
         }
         composeTestRule.onNodeWithText("Filter folders").performTextInput("folder")
-        composeTestRule.onNodeWithText("Load more folders").performClick()
-        composeTestRule.waitUntil(5_000) {
-            composeTestRule.onAllNodesWithText("Another folder").fetchSemanticsNodes().isNotEmpty()
+        composeTestRule.awaitCompletion(secondPageLoaded) {
+            composeTestRule.onNodeWithText("Load more folders").performClick()
         }
         composeTestRule.onNodeWithText("Choose this folder").performClick()
         assertEquals(root, selected)
@@ -152,15 +166,19 @@ class DirectoryAccessPanelTest {
     @Test
     fun `server picker exposes load failures`() {
         val directoryAccess = mockk<DirectoryGrantAdministrationPort>()
-        every { directoryAccess.listServerDirectoryRoots(null) } throws IllegalStateException("server unavailable")
+        val rootsRequested = CompletionIdlingResource("failed directory roots request")
+        every { directoryAccess.listServerDirectoryRoots(null) } answers {
+            rootsRequested.complete()
+            throw IllegalStateException("server unavailable")
+        }
 
-        composeTestRule.setContent {
-            MaterialTheme {
-                ServerDirectoryPicker(directoryAccess, {}, {})
+        composeTestRule.awaitCompletion(rootsRequested) {
+            composeTestRule.setContent {
+                MaterialTheme {
+                    ServerDirectoryPicker(directoryAccess, {}, {})
+                }
             }
         }
-        composeTestRule.waitUntil(5_000) {
-            composeTestRule.onAllNodesWithText("server unavailable").fetchSemanticsNodes().isNotEmpty()
-        }
+        composeTestRule.onNodeWithText("server unavailable").assertExists()
     }
 }

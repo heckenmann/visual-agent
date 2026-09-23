@@ -255,6 +255,8 @@ class ConfiguredLLMProviderTest {
                 appConfig.llmProvider = "ollama"
                 val ollama = mockk<OllamaClient>(relaxed = true)
                 val openAi = mockk<OpenAiClient>(relaxed = true)
+                every { ollama.getModelDetailsReactive(any<ProviderProfile>(), any()) } returns
+                    Mono.just(ShowResponse("llama", ""))
                 every { ollama.chatReactive(any<ChatRequestContext>()) } returns
                     Mono.just(ChatResponse("llama", Message("assistant", "ok"), true))
                 every { ollama.streamReactive(any<ChatRequestContext>()) } returns

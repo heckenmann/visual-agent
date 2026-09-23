@@ -43,7 +43,9 @@ switching to other panels.
     conversation timeline with its latest response tail and terminal status;
     only the animated working indicator disappears.
 11. The main agent streams a response. The last assistant row shows a subtle,
-    animated left-edge accent bar in the primary color.
+    animated left-edge accent bar in the primary color and renders received
+    Markdown incrementally. Completed blocks remain stable while an unfinished
+    Markdown tail continues to update as new chunks arrive.
 12. Before the first streamed token arrives, a "Thinking" indicator is shown
     only while `InFlightState.totalActive > 0`; a stale local send flag cannot
     keep it visible after activity ends.
@@ -75,6 +77,9 @@ switching to other panels.
   fixed composer outside the message viewport.
 - `ComposeConversationMessageList.kt` — passes `InFlightState` into tool and
   sub-agent rows and renders the inline waiting indicator.
+- `ComposeStreamingMarkdown.kt` — uses the Markdown renderer's append-only
+  streaming state for live assistant and todo-response content without
+  rewriting the raw Markdown.
 - `ComposeToolMessageRow.kt` — renders the in-flight spinner on tool chips.
 - `ComposeSubAgentMessageRow.kt` — renders the running chip on sub-agent rows.
 - `ComposeConversationIndicators.kt` — shared indicator composables
@@ -98,6 +103,12 @@ switching to other panels.
 - A tool-call chip shows a spinner and "running…" while the tool is executing
   and the final duration when it finishes.
 - The actively streamed assistant row has an animated left-edge accent bar.
+- Streamed assistant Markdown is rendered before the response completes;
+  headings, lists, links, inline formatting, and code content appear as their
+  syntax becomes complete. Incomplete Markdown remains visible and no raw
+  response content is dropped or normalized.
+- Replacing a transient streamed row with its persisted assistant message does
+  not duplicate or lose Markdown content.
 - The pre-stream "Thinking" indicator derives exclusively from
   `InFlightState.totalActive` and disappears after successful, failed, timed
   out, or cancelled requests complete their shared terminal path.

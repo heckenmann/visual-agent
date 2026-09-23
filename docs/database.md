@@ -12,6 +12,15 @@ Runtime defaults:
 - H2 file locking and transaction handling
 - versioned schema migration through Flyway and `flyway_schema_history`
 
+Runtime transactions use Spring's reactive R2DBC transaction manager. Do not put
+`@Transactional` on synchronous service or protocol-port methods: Spring rejects
+non-reactive return types before entering the method. Compose reactive database
+operations with `TransactionalOperator` when multiple statements must be atomic.
+Spring-proxied integration tests are required to catch this wiring error; direct
+unit tests bypass transaction interception. See Spring's [declarative transaction
+documentation](https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-decl-explained.html)
+and [programmatic transaction documentation](https://docs.spring.io/spring-framework/reference/data-access/transaction/programmatic.html).
+
 The application uses DB-first reads for conversation, todos, and related runtime context.
 Managed workspace files are stored on disk below the resolved server data root at
 `<server-data-root>/workspace/`.

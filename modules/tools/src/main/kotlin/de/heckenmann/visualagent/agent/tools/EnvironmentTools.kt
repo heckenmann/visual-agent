@@ -86,7 +86,7 @@ class ContextTool(
         success(
             "context",
             buildString {
-                appendLine("Workspace: use workspace:file action listRoots for authorized roots.")
+                appendLine("For workspace access, consult the available function schema for its authorized-root operation.")
                 val current = settings.read()
                 appendLine("Provider: ${current.provider}")
                 appendLine("Model: ${current.model}")

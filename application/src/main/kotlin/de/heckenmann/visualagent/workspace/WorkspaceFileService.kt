@@ -5,7 +5,6 @@ import de.heckenmann.visualagent.knowledge.WorkspaceFileStore
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.LinkOption
@@ -219,7 +218,6 @@ class WorkspaceFileService
          * @return true when a file was deleted
          * @see docs/usecases/uc_0000024_manage_workspace_files.md
          */
-        @Transactional
         fun deleteFile(id: String): Boolean {
             val record = store.getWorkspaceFile(id) ?: return false
             val path = WorkspaceFilePaths.resolveWorkspacePath(record.relativePath, workspaceRoot())
@@ -233,7 +231,6 @@ class WorkspaceFileService
         }
 
         /** Deletes a workspace directory, optionally including all nested files and directories. */
-        @Transactional
         fun deleteDirectory(
             relativePath: String,
             recursive: Boolean = false,

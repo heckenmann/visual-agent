@@ -31,9 +31,9 @@ The available sub-agent pool can be shaped for the current workspace needs.
 
 ## Tool Calls
 
-- `agent:create`: create a sub-agent.
-- `agent:update`: update sub-agent metadata/configuration.
-- `agent:delete`: delete a sub-agent.
+- `agent_create`: create a sub-agent.
+- `agent_update`: update sub-agent metadata/configuration. Its optional `tools` array accepts the provider function names shown in agent inventories; the server validates them against registered tools and persists their internal IDs. Invalid names return a tool argument error without changing the agent.
+- `agent_delete`: delete a sub-agent.
 
 ## Code Entry Points
 

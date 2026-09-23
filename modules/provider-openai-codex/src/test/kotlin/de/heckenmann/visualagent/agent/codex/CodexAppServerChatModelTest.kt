@@ -239,11 +239,18 @@ class CodexAppServerChatModelTest {
                   ;;
                 *'"method":"thread/start"'*)
                   printf '%s' "${'$'}line" > '${directory.resolve("thread-start.json")}'
-                  printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{"thread":{"id":"thread-1"}}}'
+                  request_id=${'$'}(printf '%s' "${'$'}line" | sed -n 's/.*"id":\([0-9][0-9]*\).*/\1/p')
+                  printf '{"jsonrpc":"2.0","id":%s,"result":{"thread":{"id":"thread-1"}}}\n' "${'$'}request_id"
+                  ;;
+                *'"method":"thread/inject_items"'*)
+                  printf '%s' "${'$'}line" > '${directory.resolve("history-inject.json")}'
+                  request_id=${'$'}(printf '%s' "${'$'}line" | sed -n 's/.*"id":\([0-9][0-9]*\).*/\1/p')
+                  printf '{"jsonrpc":"2.0","id":%s,"result":{}}\n' "${'$'}request_id"
                   ;;
                 *'"method":"turn/start"'*)
                   printf '%s' "${'$'}line" > '${directory.resolve("turn-start.json")}'
-                  printf '%s\n' '{"jsonrpc":"2.0","id":3,"result":{"threadId":"thread-1","turn":{"id":"turn-1"}}}'
+                  request_id=${'$'}(printf '%s' "${'$'}line" | sed -n 's/.*"id":\([0-9][0-9]*\).*/\1/p')
+                  printf '{"jsonrpc":"2.0","id":%s,"result":{"threadId":"thread-1","turn":{"id":"turn-1"}}}\n' "${'$'}request_id"
                   ${if (reasoningSummary) "printf '%s\\n' '{\"jsonrpc\":\"2.0\",\"method\":\"item/reasoning/summaryTextDelta\",\"params\":{\"delta\":\"planning\",\"itemId\":\"item-1\",\"summaryIndex\":0,\"threadId\":\"thread-1\",\"turnId\":\"turn-1\"}}'" else ""}
                   printf '%s\n' '{"jsonrpc":"2.0","id":99,"method":"item/tool/call","params":{"arguments":{},"callId":"call-1","threadId":"thread-1","tool":"$toolName","turnId":"turn-1"}}'
                   IFS= read -r tool_response

@@ -81,7 +81,7 @@ class ConversationMessageListLoadingIndicatorTest {
         composeTestRule.onNodeWithText("Thinking").assertExists()
 
         composeTestRule.runOnIdle { inFlight.markStreamEnd("request-1") }
-        composeTestRule.mainClock.advanceTimeBy(250L)
+        composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("Thinking").assertDoesNotExist()
     }
 

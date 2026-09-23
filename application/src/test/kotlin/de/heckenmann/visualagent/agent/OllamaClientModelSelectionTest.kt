@@ -283,7 +283,7 @@ class OllamaClientModelSelectionTest {
                     "system",
                     details,
                     emptyList(),
-                    emptyMap(),
+                    mapOf("llama.context_length" to 8192),
                     emptyMap(),
                     listOf("vision"),
                     Instant.EPOCH,
@@ -296,5 +296,6 @@ class OllamaClientModelSelectionTest {
             val modelDetails = client.getModelDetailsReactive("llama").awaitSingle()
             assertEquals("llama", modelDetails.details?.family)
             assertEquals("7B", modelDetails.details?.parameterSize)
+            assertEquals(8192, modelDetails.details?.contextLimit)
         }
 }

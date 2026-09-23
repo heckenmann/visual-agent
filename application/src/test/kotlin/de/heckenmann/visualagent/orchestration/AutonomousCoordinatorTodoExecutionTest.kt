@@ -5,9 +5,7 @@ import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.todo.TodoStatus
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -35,7 +33,7 @@ class AutonomousCoordinatorTodoExecutionTest {
     @Test
     fun `start all ignores completed todos`() =
         runBlocking {
-            val fixture = buildFixture(chatDelayMs = 5000)
+            val fixture = buildFixture(workerResponseGate = CompletableDeferred())
             fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
             val completed = fixture.todoManager.add("Already completed")
             fixture.todoManager.updateStatus(completed.id, TodoStatus.COMPLETED)
@@ -43,7 +41,7 @@ class AutonomousCoordinatorTodoExecutionTest {
 
             try {
                 assertEquals(1, fixture.coordinator.startAllTodos())
-                delay(1500)
+                fixture.awaitWorkerStart()
 
                 assertEquals(TodoStatus.COMPLETED, fixture.todoManager.getById(completed.id)?.status)
                 assertEquals(TodoStatus.IN_PROGRESS, fixture.todoManager.getById(pending.id)?.status)
@@ -55,7 +53,7 @@ class AutonomousCoordinatorTodoExecutionTest {
     @Test
     fun `starting one todo does not pick an earlier pending todo`() =
         runBlocking {
-            val fixture = buildFixture(chatDelayMs = 5000)
+            val fixture = buildFixture(workerResponseGate = CompletableDeferred())
             fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
             fixture.putSubAgent(SubAgent(id = "agent-2", name = "Tester", role = "Testing", status = AgentStatus.IDLE))
             val first = fixture.todoManager.add("First task", "agent-1")
@@ -63,7 +61,7 @@ class AutonomousCoordinatorTodoExecutionTest {
 
             try {
                 assertTrue(fixture.coordinator.startTodo(second.id))
-                delay(1500)
+                fixture.awaitWorkerStart()
 
                 assertEquals(TodoStatus.PENDING, fixture.todoManager.getById(first.id)?.status)
                 assertEquals(TodoStatus.IN_PROGRESS, fixture.todoManager.getById(second.id)?.status)
@@ -77,7 +75,7 @@ class AutonomousCoordinatorTodoExecutionTest {
     @Test
     fun `blocked requested todo does not prevent another requested todo from starting`() =
         runBlocking {
-            val fixture = buildFixture(chatDelayMs = 5000)
+            val fixture = buildFixture(workerResponseGate = CompletableDeferred())
             fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
             fixture.putSubAgent(SubAgent(id = "agent-2", name = "Tester", role = "Testing", status = AgentStatus.IDLE))
             val blocked = fixture.todoManager.add("Blocked task", "agent-1")
@@ -88,9 +86,7 @@ class AutonomousCoordinatorTodoExecutionTest {
                 assertTrue(fixture.coordinator.startTodo(blocked.id))
                 assertTrue(fixture.coordinator.startTodo(runnable.id))
 
-                withTimeout(50) {
-                    while (fixture.todoManager.getById(runnable.id)?.status != TodoStatus.IN_PROGRESS) delay(10)
-                }
+                fixture.awaitWorkerStart()
                 assertEquals(TodoStatus.PENDING, fixture.todoManager.getById(blocked.id)?.status)
             } finally {
                 fixture.cancel()
@@ -100,7 +96,7 @@ class AutonomousCoordinatorTodoExecutionTest {
     @Test
     fun `concurrent starts atomically claim one todo per idle agent`() =
         runBlocking {
-            val fixture = buildFixture(chatDelayMs = 5000)
+            val fixture = buildFixture(workerResponseGate = CompletableDeferred())
             fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
             val first = fixture.todoManager.add("First task", "agent-1")
             val second = fixture.todoManager.add("Second task", "agent-1")
@@ -109,14 +105,7 @@ class AutonomousCoordinatorTodoExecutionTest {
                 assertTrue(fixture.coordinator.startTodo(first.id))
                 assertTrue(fixture.coordinator.startTodo(second.id))
 
-                withTimeout(3_000) {
-                    while (fixture.todoManager.getById(first.id)?.status != TodoStatus.IN_PROGRESS &&
-                        fixture.todoManager.getById(second.id)?.status != TodoStatus.IN_PROGRESS
-                    ) {
-                        delay(50)
-                    }
-                }
-                delay(300)
+                fixture.awaitWorkerStart()
 
                 val inProgress =
                     listOf(first, second).filter {
@@ -140,7 +129,6 @@ class AutonomousCoordinatorTodoExecutionTest {
 
             try {
                 fixture.coordinator.startAutonomousProcessing(seed = false)
-                delay(800)
 
                 assertEquals(TodoStatus.PENDING, fixture.todoManager.getById(todo.id)?.status)
                 assertFalse(fixture.subAgents.values.any { it.name.contains("analyst", ignoreCase = true) })
@@ -161,10 +149,7 @@ class AutonomousCoordinatorTodoExecutionTest {
 
             try {
                 fixture.coordinator.startAutonomousProcessing(seed = false)
-
-                withTimeout(2_000) {
-                    while (fixture.todoManager.getById(todo.id)?.status != TodoStatus.COMPLETED) delay(10)
-                }
+                fixture.awaitWorkerCompletion()
                 assertEquals(1, fixture.todoManager.getAll().size)
                 assertTrue(fixture.messages.any { it.content.contains("Started todo ${todo.id}") })
             } finally {
@@ -184,10 +169,7 @@ class AutonomousCoordinatorTodoExecutionTest {
 
             try {
                 fixture.coordinator.startAutonomousProcessing(seed = false)
-
-                withTimeout(2_000) {
-                    while (fixture.todoManager.getById(todo.id)?.status != TodoStatus.COMPLETED) delay(10)
-                }
+                fixture.awaitWorkerCompletion()
                 assertFalse(fixture.subAgents.values.any { it.name.contains("analyst", ignoreCase = true) })
                 assertTrue(fixture.messages.any { it.content.contains("Started todo ${todo.id}") })
             } finally {
@@ -198,7 +180,8 @@ class AutonomousCoordinatorTodoExecutionTest {
     @Test
     fun `paused worker does not hold the scheduler slot at the next execution boundary`() =
         runBlocking {
-            val fixture = buildFixture(parallelism = 1, chatDelayMs = 5000)
+            val workerResponseGate = CompletableDeferred<Unit>()
+            val fixture = buildFixture(parallelism = 1, workerResponseGate = workerResponseGate)
             fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
             fixture.putSubAgent(SubAgent(id = "agent-2", name = "Tester", role = "Testing", status = AgentStatus.IDLE))
             fixture.todoManager.add("First task", "agent-1")
@@ -206,12 +189,11 @@ class AutonomousCoordinatorTodoExecutionTest {
 
             try {
                 fixture.coordinator.startAllTodos()
-                delay(500)
+                fixture.awaitWorkerStart()
                 fixture.executionControl.pauseAgent("agent-1")
 
-                withTimeout(8_000) {
-                    while (fixture.subAgents["agent-2"]?.status != AgentStatus.BUSY) delay(100)
-                }
+                workerResponseGate.complete(Unit)
+                fixture.awaitWorkerStart()
                 assertEquals(AgentStatus.BUSY, fixture.subAgents["agent-1"]?.status)
             } finally {
                 fixture.cancel()
@@ -221,7 +203,7 @@ class AutonomousCoordinatorTodoExecutionTest {
     @Test
     fun `stopping a queued todo cancels its processor before the scheduler slot opens`() =
         runBlocking {
-            val fixture = buildFixture(parallelism = 1, chatDelayMs = 5000)
+            val fixture = buildFixture(parallelism = 1, workerResponseGate = CompletableDeferred())
             fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
             val todo = fixture.todoManager.add("Queued stop task", "agent-1")
             val blockerStarted = CompletableDeferred<Unit>()
@@ -237,14 +219,8 @@ class AutonomousCoordinatorTodoExecutionTest {
             try {
                 blockerStarted.await()
                 assertTrue(fixture.coordinator.startTodo(todo.id))
-                withTimeout(3_000) {
-                    while (fixture.todoManager.getById(todo.id)?.status != TodoStatus.IN_PROGRESS) delay(50)
-                }
                 assertTrue(fixture.coordinator.stopTodo(todo.id))
 
-                withTimeout(3_000) {
-                    while (fixture.subAgents["agent-1"]?.status != AgentStatus.IDLE) delay(50)
-                }
                 assertEquals(0, fixture.scheduler.snapshot().queued)
                 assertEquals(null, fixture.subAgents["agent-1"]?.currentTodoId)
             } finally {
@@ -257,21 +233,16 @@ class AutonomousCoordinatorTodoExecutionTest {
     @Test
     fun `stopping a paused pre-run todo does not record a crash`() =
         runBlocking {
-            val fixture = buildFixture(chatDelayMs = 5000)
+            val fixture = buildFixture(workerResponseGate = CompletableDeferred())
             fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
             val todo = fixture.todoManager.add("Paused pre-run stop task", "agent-1")
 
             try {
                 assertTrue(fixture.coordinator.startTodo(todo.id))
-                withTimeout(3_000) {
-                    while (fixture.todoManager.getById(todo.id)?.status != TodoStatus.IN_PROGRESS) delay(50)
-                }
+                fixture.awaitWorkerStart()
                 fixture.executionControl.pauseAgent("agent-1")
                 assertTrue(fixture.coordinator.stopTodo(todo.id))
 
-                withTimeout(3_000) {
-                    while (fixture.subAgents["agent-1"]?.status != AgentStatus.IDLE) delay(50)
-                }
                 assertTrue(fixture.messages.none { it.content.contains("Crashed unexpectedly") })
             } finally {
                 fixture.cancel()

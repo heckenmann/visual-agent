@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.LinearProgressIndicator
@@ -53,6 +54,16 @@ internal fun WorkspaceDirectoryRow(
             Text(directory.name + if (activeDownloads > 0) " · $activeDownloads active" else "")
         }
     }
+}
+
+/** Renders the action that opens the platform file picker for workspace imports. */
+@Composable
+internal fun WorkspaceFileImportButton(onImport: () -> Unit) {
+    ActionIconButton(
+        icon = Icons.Filled.FolderOpen,
+        description = "Import file into current folder",
+        onClick = onImport,
+    )
 }
 
 /** Renders a running or paused download with controls and bounded progress. */

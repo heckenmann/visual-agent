@@ -83,6 +83,7 @@ class AgentManagerToolContextTest {
             val memoryMessages = requestSlot.captured.messages.filter { it.content.contains("Durable Main-Agent Memory") }
             assertEquals(1, memoryMessages.size)
             assertTrue(memoryMessages.single().content.contains("Remember durable project constraints."))
+            assertEquals("assistant", memoryMessages.single().role)
             assertTrue(
                 memoryMessages
                     .single()
@@ -126,7 +127,7 @@ class AgentManagerToolContextTest {
         }
 
     @Test
-    fun `durable memory consumes the history context budget`() =
+    fun `durable memory does not preempt an older fitting turn`() =
         runTest {
             val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
@@ -149,8 +150,8 @@ class AgentManagerToolContextTest {
 
             val latestContent = requests.last().messages.joinToString("\n") { it.content }
             assertTrue(latestContent.contains("current-marker"))
-            assertFalse(latestContent.contains("old-marker"))
-            assertTrue(latestContent.contains("older conversation turn(s) omitted"))
+            assertTrue(latestContent.contains("old-marker"))
+            assertFalse(latestContent.contains("older conversation turn(s) omitted"))
         }
 
     private class RecordingMemoryStore(

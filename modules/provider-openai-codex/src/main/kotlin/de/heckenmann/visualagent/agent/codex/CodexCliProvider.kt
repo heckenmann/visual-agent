@@ -5,9 +5,13 @@ import de.heckenmann.visualagent.agent.ChatResponse
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ModelDetails
 import de.heckenmann.visualagent.agent.ProviderFinishReason
+import de.heckenmann.visualagent.agent.ProviderResponseContentNormalizer
 import de.heckenmann.visualagent.agent.ProviderResponseMetadata
 import de.heckenmann.visualagent.agent.ProviderTurnResponse
+import de.heckenmann.visualagent.agent.RequestContextBudgeter
 import de.heckenmann.visualagent.agent.ShowResponse
+import de.heckenmann.visualagent.agent.ToolDefinition
+import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.agent.provider.ProfiledProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
@@ -16,6 +20,7 @@ import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
 import de.heckenmann.visualagent.agent.provider.ProviderUserFacingError
 import de.heckenmann.visualagent.agent.provider.ProviderUserFacingException
 import de.heckenmann.visualagent.agent.provider.ProviderWorkingDirectory
+import de.heckenmann.visualagent.agent.supportsToolCalling
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.reactor.mono
@@ -37,6 +42,7 @@ class CodexCliProvider internal constructor(
     private val locator: CodexCliLocator,
     private val toolCallbacks: ProviderToolCallbacks,
     private val modelCatalog: CodexModelCatalog,
+    private val contextBudgeter: RequestContextBudgeter = RequestContextBudgeter(),
     private val workingDirectory: ProviderWorkingDirectory = ProviderWorkingDirectory { Path.of(System.getProperty("user.dir")) },
 ) : ProfiledProviderAdapter {
     override val adapter: ProviderAdapter = ProviderAdapter.CODEX_CLI
@@ -49,17 +55,19 @@ class CodexCliProvider internal constructor(
             val profile = requireNotNull(request.providerProfile) { "Codex CLI provider profile is missing" }
             val model = effectiveModel(request.model ?: profile.defaultModel)
             val executable = withContext(Dispatchers.IO) { resolveExecutable(profile) }
+            val callbacks = callbacks(request, model)
+            val budgetedRequest = budgetRequest(request, callbacks, toolCallbacks.toolRuntimeGuidance())
             val chatModel =
                 CodexAppServerChatModel(
                     executable,
                     model,
-                    callbacks(request, model),
+                    callbacks,
                     request.workingDirectory(),
                     request.showReasoningSummary(),
                 )
             val response =
                 chatModel
-                    .completeReactive(request.toPrompt(toolCallbacks.toolRuntimeGuidance()), request.cancellationToken)
+                    .completeReactive(budgetedRequest.toPrompt(), request.cancellationToken)
                     .awaitSingle()
             ChatResponse(
                 model = response.metadata.model.takeIf(String::isNotBlank) ?: model,
@@ -79,17 +87,19 @@ class CodexCliProvider internal constructor(
             val executable = withContext(Dispatchers.IO) { resolveExecutable(profile) }
             ResolvedCodexRequest(executable, model)
         }.flatMapMany { resolved ->
+            val callbacks = callbacks(request, resolved.model)
+            val budgetedRequest = budgetRequest(request, callbacks, toolCallbacks.toolRuntimeGuidance())
             CodexAppServerChatModel(
                 resolved.executable,
                 resolved.model,
-                callbacks(request, resolved.model),
+                callbacks,
                 request.workingDirectory(),
                 request.showReasoningSummary(),
-            ).streamReactive(request.toPrompt(toolCallbacks.toolRuntimeGuidance()), request.cancellationToken)
+            ).streamReactive(budgetedRequest.toPrompt(), request.cancellationToken)
                 .map { chunk ->
                     ChatResponse(
                         model = chunk.metadata.model.takeIf(String::isNotBlank) ?: resolved.model,
-                        message = chunk.toCodexProviderMessage(),
+                        message = chunk.toCodexProviderMessage(normalizeContent = false),
                         done = chunk.hasFinishReasons(setOf("stop")),
                         providerTurn = chunk.toCodexProviderTurn(resolved.model),
                     )
@@ -163,9 +173,9 @@ class CodexCliProvider internal constructor(
             ),
         )
 
-    private fun ChatRequestContext.toPrompt(toolRuntimeGuidance: String): Prompt =
+    private fun ChatRequestContext.toPrompt(): Prompt =
         Prompt(
-            (listOf(Message("system", "Tool timeout contract: $toolRuntimeGuidance")) + messages).map { message ->
+            messages.map { message ->
                 when (message.role) {
                     "system" -> SystemMessage(message.content)
                     "assistant" -> AssistantMessage(message.content)
@@ -196,16 +206,43 @@ class CodexCliProvider internal constructor(
     private fun callbacks(
         request: ChatRequestContext,
         model: String,
-    ) = toolCallbacks.functionCallbacks(
-        request.enabledTools,
-        request.metadata + mapOf("model" to model, "provider" to "codex") +
-            (request.cancellationToken?.let { mapOf("cancellationToken" to it) } ?: emptyMap()),
-    )
+    ) = if (!request.supportsToolCalling()) {
+        emptyList()
+    } else {
+        toolCallbacks.functionCallbacks(
+            request.enabledTools,
+            request.metadata + mapOf("model" to model, "provider" to "codex") +
+                (request.cancellationToken?.let { mapOf("cancellationToken" to it) } ?: emptyMap()),
+        )
+    }
+
+    private fun budgetRequest(
+        request: ChatRequestContext,
+        callbacks: List<org.springframework.ai.tool.ToolCallback>,
+        toolRuntimeGuidance: String,
+    ): ChatRequestContext =
+        contextBudgeter.fit(
+            request,
+            if (callbacks.isEmpty()) {
+                request.messages
+            } else {
+                listOf(Message("system", "Tool timeout contract: $toolRuntimeGuidance")) + request.messages
+            },
+            callbacks.map { callback -> callback.toProviderDefinition() },
+        )
 
     private data class ResolvedCodexRequest(
         val executable: Path,
         val model: String,
     )
+
+    private fun org.springframework.ai.tool.ToolCallback.toProviderDefinition(): ToolDefinition =
+        ToolDefinition(
+            id = ToolId(toolDefinition.name()),
+            name = toolDefinition.name(),
+            description = toolDefinition.description(),
+            inputSchema = toolDefinition.inputSchema(),
+        )
 }
 
 /**
@@ -213,7 +250,7 @@ class CodexCliProvider internal constructor(
  *
  * @return Provider-neutral assistant message with optional Codex metadata
  */
-internal fun org.springframework.ai.chat.model.ChatResponse.toCodexProviderMessage(): Message {
+internal fun org.springframework.ai.chat.model.ChatResponse.toCodexProviderMessage(normalizeContent: Boolean = true): Message {
     val itemId = metadata.get<String>("codexItemId")
     val messageMetadata =
         itemId?.let {
@@ -223,7 +260,10 @@ internal fun org.springframework.ai.chat.model.ChatResponse.toCodexProviderMessa
         }
     return Message(
         role = "assistant",
-        content = result?.output?.text.orEmpty(),
+        content =
+            result?.output?.text.orEmpty().let { content ->
+                if (normalizeContent) ProviderResponseContentNormalizer.normalize(content) else content
+            },
         metadata = messageMetadata,
     )
 }

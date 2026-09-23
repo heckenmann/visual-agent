@@ -2,22 +2,11 @@ package de.heckenmann.visualagent.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -25,10 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.MainAgentMemoryPort
 import de.heckenmann.visualagent.protocol.MainAgentMemoryUpdate
@@ -36,11 +22,7 @@ import de.heckenmann.visualagent.protocol.ProviderConfiguration
 import de.heckenmann.visualagent.protocol.ProviderPort
 import de.heckenmann.visualagent.protocol.ProviderProfile
 import de.heckenmann.visualagent.protocol.SettingsPort
-import de.heckenmann.visualagent.ui.components.PanelDropdownField
-import de.heckenmann.visualagent.ui.components.PanelInfoBox
 import de.heckenmann.visualagent.ui.components.PanelScrollbarHost
-import de.heckenmann.visualagent.ui.components.PanelSection
-import de.heckenmann.visualagent.ui.components.PanelSelectOption
 import de.heckenmann.visualagent.ui.components.RegisterPanelVerticalScrollbar
 import de.heckenmann.visualagent.ui.components.settingsDraftActionRow
 import de.heckenmann.visualagent.ui.components.toUiErrorMessage
@@ -66,6 +48,7 @@ internal fun providerSettingsOverlay(
     var loaded by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var refreshing by remember { mutableStateOf(false) }
+    var refreshGeneration by remember { mutableStateOf(0) }
     var status by remember { mutableStateOf("Loading provider settings...") }
     var editingProfile by remember { mutableStateOf<ProviderProfile?>(null) }
     var creatingProfile by remember { mutableStateOf(false) }
@@ -73,12 +56,20 @@ internal fun providerSettingsOverlay(
     val enabledProviders = draft.providers.filter(ProviderProfile::enabled)
     val selectedProvider = draft.providers.firstOrNull { it.id == draft.providerId }
     val models = selectedProvider?.selectableModels().orEmpty()
-    val canSave = draft.providerId.isNotBlank() && draft.modelId.isNotBlank()
+    val providerConfigurationChanged =
+        draft.providers != persisted.providers || draft.providerId != persisted.providerId || draft.modelId != persisted.modelId
+    val canSave =
+        !refreshing &&
+            draft.providerId.isNotBlank() &&
+            draft.modelId.isNotBlank() &&
+            (!providerConfigurationChanged || models.any { it.id == draft.modelId })
     val memoryFitsLimit = draftMemory.codePointCount(0, draftMemory.length) <= draft.conversationSettings.maxMainAgentMemoryChars
 
     /** Loads the persisted catalog, optionally reporting that local edits were discarded. */
     fun loadPersistedDraft(discardingLocalEdits: Boolean) {
-        if (saving || refreshing) return
+        if (saving) return
+        refreshGeneration++
+        refreshing = false
         scope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
@@ -126,7 +117,11 @@ internal fun providerSettingsOverlay(
                         )
                     settingsPort.save(
                         nextSettings,
-                        ProviderConfiguration(draft.providers, draft.providerId, draft.modelId),
+                        if (providerConfigurationChanged) {
+                            ProviderConfiguration(draft.providers, draft.providerId, draft.modelId)
+                        } else {
+                            null
+                        },
                     )
                     if (draftMemory != persistedMemory.content) {
                         mainAgentMemoryPort.replace(draftMemory, persistedMemory.revision)
@@ -156,17 +151,25 @@ internal fun providerSettingsOverlay(
     }
 
     /** Refreshes only the remote model catalog; the active selection remains a local draft. */
-    fun refreshModels() {
-        val provider = selectedProvider ?: return
-        if (refreshing || saving) return
+    fun refreshModels(
+        provider: ProviderProfile? = selectedProvider,
+        preferredModelId: String? = null,
+    ) {
+        if (provider == null) return
+        if (saving) return
+        val generation = ++refreshGeneration
         refreshing = true
         scope.launch {
             runCatching { withContext(Dispatchers.IO) { providerPort.discoverModels(provider) } }
                 .onSuccess { discovered ->
-                    draft = draft.withModels(provider.id, discovered)
-                    status = "Loaded ${discovered.size} selectable models"
-                }.onFailure { error -> status = error.toUiErrorMessage() }
-            refreshing = false
+                    if (generation == refreshGeneration) {
+                        draft = draft.withModels(provider.id, discovered, preferredModelId)
+                        status = "Loaded ${discovered.size} selectable models"
+                    }
+                }.onFailure { error ->
+                    if (generation == refreshGeneration) status = error.toUiErrorMessage()
+                }
+            if (generation == refreshGeneration) refreshing = false
         }
     }
 
@@ -181,6 +184,8 @@ internal fun providerSettingsOverlay(
                 editingProfile = null
             },
             onSave = { profile ->
+                refreshGeneration++
+                refreshing = false
                 draft = draft.upsert(profile)
                 creatingProfile = false
                 editingProfile = null
@@ -210,85 +215,51 @@ internal fun providerSettingsOverlay(
                     limit = draft.conversationSettings.maxMainAgentMemoryChars,
                     onContentChange = { draftMemory = it },
                 )
-                PanelSection(title = "Main agent connection") {
-                    OutlinedButton(
-                        onClick = onRunOnboarding,
-                        modifier = Modifier.semantics { contentDescription = "Run onboarding again" },
-                    ) {
-                        Icon(Icons.Filled.Edit, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Run onboarding again")
-                    }
-                    PanelInfoBox(
-                        "Reopens the guided provider and model readiness check without changing saved settings until you finish it.",
-                    )
-                    PanelDropdownField(
-                        label = "Provider",
-                        selectedValue = draft.providerId,
-                        options = enabledProviders.map { profile -> PanelSelectOption(profile.id, profile.name) },
-                        enabled = enabledProviders.isNotEmpty(),
-                        onSelected = { providerId ->
-                            val nextModels =
-                                draft.providers
-                                    .firstOrNull { it.id == providerId }
-                                    ?.selectableModels()
-                                    .orEmpty()
-                            draft = draft.copy(providerId = providerId, modelId = nextModels.firstOrNull()?.id.orEmpty())
-                        },
-                        information =
-                            "Selects the connection and credentials used by the main agent. " +
-                                "It also changes the available model catalog.",
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Button(onClick = { creatingProfile = true }) {
-                            Icon(Icons.Filled.Add, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Add provider")
+                providerConnectionSection(
+                    draft = draft,
+                    enabledProviders = enabledProviders,
+                    selectedProvider = selectedProvider,
+                    models = models,
+                    refreshing = refreshing,
+                    onRunOnboarding = onRunOnboarding,
+                    onProviderSelected = { providerId ->
+                        val nextModels =
+                            draft.providers
+                                .firstOrNull { it.id == providerId }
+                                ?.selectableModels()
+                                .orEmpty()
+                        val previous =
+                            if (providerId == persisted.providerId) {
+                                persisted.modelId
+                            } else {
+                                draft.providers.firstOrNull { it.id == providerId }?.defaultModel
+                            }
+                        val modelId = previous?.takeIf(String::isNotBlank) ?: nextModels.firstOrNull()?.id.orEmpty()
+                        draft = draft.copy(providerId = providerId, modelId = modelId)
+                        refreshModels(draft.providers.firstOrNull { it.id == providerId }, previous)
+                    },
+                    onAddProvider = { creatingProfile = true },
+                    onEditProvider = { editingProfile = selectedProvider },
+                    onRemoveProvider = {
+                        selectedProvider?.let { profile ->
+                            refreshGeneration++
+                            refreshing = false
+                            draft = draft.remove(profile.id)
+                            status = "Staged removal of ${profile.name}"
                         }
-                        OutlinedButton(
-                            enabled = selectedProvider != null,
-                            onClick = { editingProfile = selectedProvider },
-                        ) {
-                            Icon(Icons.Filled.Edit, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Edit provider")
-                        }
-                        OutlinedButton(
-                            enabled = draft.providers.size > 1 && selectedProvider != null,
-                            onClick = {
-                                selectedProvider?.let { profile ->
-                                    draft = draft.remove(profile.id)
-                                    status = "Staged removal of ${profile.name}"
-                                }
-                            },
-                        ) {
-                            Icon(Icons.Filled.Delete, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Remove provider")
-                        }
-                    }
-                    PanelInfoBox("Provider and credential changes remain local until you save this dialog.")
-                    androidx.compose.material3.HorizontalDivider()
-                    modelSettingsContent(
-                        providerId = draft.providerId,
-                        modelId = draft.modelId,
-                        models = models,
-                        loadingModels = refreshing,
-                        modelDetails = "Select a model and save to use it for new agent requests.",
-                        favoriteModels = draft.favoriteModels.toList(),
-                        onModelSelected = { modelId -> draft = draft.copy(modelId = modelId) },
-                        onRefreshModels = ::refreshModels,
-                        onFavoriteChanged = { favorite ->
-                            draft =
-                                draft.copy(
-                                    favoriteModels =
-                                        draft.favoriteModels.toMutableSet().apply {
-                                            if (favorite) add(draft.modelId) else remove(draft.modelId)
-                                        },
-                                )
-                        },
-                    )
-                }
+                    },
+                    onModelSelected = { modelId -> draft = draft.copy(modelId = modelId) },
+                    onRefreshModels = { refreshModels() },
+                    onFavoriteChanged = { favorite ->
+                        draft =
+                            draft.copy(
+                                favoriteModels =
+                                    draft.favoriteModels.toMutableSet().apply {
+                                        if (favorite) add(draft.modelId) else remove(draft.modelId)
+                                    },
+                            )
+                    },
+                )
             }
         }
         androidx.compose.material3.HorizontalDivider()
@@ -296,6 +267,7 @@ internal fun providerSettingsOverlay(
             settingsDraftActionRow(
                 hasUnsavedChanges = hasUnsavedChanges,
                 saving = saving,
+                canSave = canSave,
                 onReset = { loadPersistedDraft(discardingLocalEdits = true) },
                 onSave = ::saveDraft,
             )

@@ -56,7 +56,7 @@ internal fun ConversationImageAttachments(images: List<String>) {
     }
 }
 
-private fun decodeEmbeddedImage(source: String): ImageBitmap? {
+internal fun decodeEmbeddedImage(source: String): ImageBitmap? {
     val match = EMBEDDED_IMAGE_PATTERN.matchEntire(source.trim()) ?: return null
     val bytes = runCatching { Base64.getDecoder().decode(match.groupValues[1]) }.getOrNull() ?: return null
     if (bytes.isEmpty() || bytes.size.toLong() > MAX_MARKDOWN_IMAGE_BYTES) return null

@@ -17,9 +17,8 @@ import io.mockk.mockk
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.yield
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -50,13 +49,11 @@ class VisualAgentGrpcSessionCancellationTest {
             val requestObserver = VisualAgentGrpcSessionService(conversationPort).openSession(observer)
             requestObserver.onNext(helloFrame())
             requestObserver.onNext(chatFrame(REQUEST_ONE, USER_ONE, "first"))
-            withTimeout(1_000) { firstStarted.await() }
+            firstStarted.await()
             requestObserver.onNext(chatFrame(REQUEST_TWO, USER_TWO, "second"))
             releaseFirst.complete(Unit)
-            withTimeout(1_000) { secondCompleted.await() }
-            withTimeout(1_000) {
-                while (observer.values.none { it.requestId == REQUEST_TWO && it.hasChatCompleted() }) yield()
-            }
+            secondCompleted.await()
+            observer.awaitFrame { it.requestId == REQUEST_TWO && it.hasChatCompleted() }
 
             val secondFrames = observer.values.filter { it.requestId == REQUEST_TWO }
             assertEquals("second-result", secondFrames.single { it.hasChatDelta() }.chatDelta.text)
@@ -86,12 +83,12 @@ class VisualAgentGrpcSessionCancellationTest {
             val requestObserver = VisualAgentGrpcSessionService(conversationPort).openSession(observer)
             requestObserver.onNext(helloFrame())
             requestObserver.onNext(chatFrame(REQUEST_ONE, USER_ONE, "hello"))
-            withTimeout(1_000) { streamStarted.await() }
+            streamStarted.await()
 
             requestObserver.onError(IllegalStateException("client disconnected"))
 
-            withTimeout(1_000) { tokenCancelled.await() }
-            withTimeout(1_000) { coroutineCancelled.await() }
+            tokenCancelled.await()
+            coroutineCancelled.await()
         }
 
     @Test
@@ -116,7 +113,7 @@ class VisualAgentGrpcSessionCancellationTest {
                     .build(),
             )
 
-            withTimeout(1_000) { tokenCancelled.await() }
+            tokenCancelled.await()
             assertEquals(1, observer.values.count { it.hasError() && it.requestId == REQUEST_ONE })
             assertEquals(
                 "CANCELLED",
@@ -152,14 +149,23 @@ class VisualAgentGrpcSessionCancellationTest {
 
     private class RecordingObserver<T> : StreamObserver<T> {
         val values = CopyOnWriteArrayList<T>()
+        private val frames = Channel<T>(Channel.UNLIMITED)
 
         override fun onNext(value: T) {
             values += value
+            frames.trySend(value)
         }
 
         override fun onError(throwable: Throwable) = Unit
 
         override fun onCompleted() = Unit
+
+        suspend fun awaitFrame(predicate: (T) -> Boolean): T {
+            values.firstOrNull(predicate)?.let { return it }
+            while (true) {
+                frames.receive().takeIf(predicate)?.let { return it }
+            }
+        }
     }
 
     private companion object {

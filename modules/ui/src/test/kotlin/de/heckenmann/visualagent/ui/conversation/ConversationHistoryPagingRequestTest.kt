@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.runBlocking
 import org.junit.Rule
 import org.junit.Test
 import kotlin.test.assertTrue
@@ -68,11 +69,12 @@ class ConversationHistoryPagingRequestTest {
                 ConversationHistoryPagingEffect(state, listState, gateway)
             }
         }
-        composeTestRule.waitUntil(timeoutMillis = 5_000) { olderLoadStarted.isCompleted }
+        runBlocking { olderLoadStarted.await() }
         composeTestRule.waitForIdle()
 
         assertTrue(observedState.isLoadingOlder, "a loader-driven viewport update must not cancel the older-history request")
         releaseOlderLoad.complete(Unit)
-        composeTestRule.waitUntil(timeoutMillis = 5_000) { observedState.history.size == 20 }
+        composeTestRule.waitForIdle()
+        assertTrue(observedState.history.size == 20)
     }
 }

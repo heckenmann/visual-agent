@@ -27,7 +27,7 @@ class ManualTool(
                     "- list: {\"action\":\"list\"}. Lists all available topics.\n" +
                     "- show: {\"action\":\"show\",\"topic\":\"todos\"}. Shows a manual page for a tool or topic. " +
                     "Use topic=markdown for markdown formatting reference. " +
-                    "Use topic=<tool_id> (e.g. workspace:file, todos, canvas) for tool-specific documentation.",
+                    "Use a provider function name from the available tool schemas as topic for tool-specific documentation.",
             inputSchema = STRING_SCHEMA,
         )
 
@@ -96,12 +96,7 @@ class ManualTool(
             toolDefinitions.forEach { tool ->
                 val manual = toolReference(tool)
                 val aliases =
-                    setOf(
-                        tool.id.value,
-                        tool.id.value.replace(":", "_"),
-                        tool.name,
-                        tool.name.replace(":", "_"),
-                    ).map(::normalizeTopic)
+                    setOf(tool.name).map(::normalizeTopic)
                 aliases.forEach { alias ->
                     put(alias, manual)
                 }
@@ -112,7 +107,6 @@ class ManualTool(
         """
         # ${tool.name}
         
-        - **Tool ID:** `${tool.id.value}`
         - **Function name:** `${tool.name}`
         
         ## Description

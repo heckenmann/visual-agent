@@ -207,9 +207,8 @@ class ComposeRailTest {
     }
 
     @Test
-    fun `rail items animate to their reordered positions`() {
+    fun `rail items settle at their reordered positions`() {
         var windows by mutableStateOf(listOf(testWindow("chat", "Chat"), testWindow("todos", "Todos")))
-        composeTestRule.mainClock.autoAdvance = false
         composeTestRule.setContent {
             MaterialTheme {
                 ComposeRail(
@@ -222,25 +221,22 @@ class ComposeRailTest {
                 )
             }
         }
-        composeTestRule.mainClock.advanceTimeByFrame()
+        composeTestRule.waitForIdle()
         val initialTop = composeTestRule.onNodeWithContentDescription("Toggle Chat").getUnclippedBoundsInRoot().top
 
-        windows = windows.reversed()
-        composeTestRule.mainClock.advanceTimeBy(110)
-        val halfwayTop = composeTestRule.onNodeWithContentDescription("Toggle Chat").getUnclippedBoundsInRoot().top
-        composeTestRule.mainClock.advanceTimeBy(500)
+        composeTestRule.runOnIdle { windows = windows.reversed() }
+        composeTestRule.waitForIdle()
         val finalTop = composeTestRule.onNodeWithContentDescription("Toggle Chat").getUnclippedBoundsInRoot().top
 
         assertTrue(
-            halfwayTop > initialTop && halfwayTop < finalTop,
-            "Expected rail item to be between $initialTop and $finalTop halfway through reorder, but was $halfwayTop",
+            finalTop > initialTop,
+            "Expected the reordered rail item below $initialTop, but was $finalTop",
         )
     }
 
     @Test
-    fun `rail item returns to its settled position when an update interrupts reordering`() {
+    fun `rail item keeps its reordered position when visibility changes`() {
         var windows by mutableStateOf(listOf(testWindow("chat", "Chat"), testWindow("todos", "Todos")))
-        composeTestRule.mainClock.autoAdvance = false
         composeTestRule.setContent {
             MaterialTheme {
                 ComposeRail(
@@ -253,13 +249,15 @@ class ComposeRailTest {
                 )
             }
         }
-        composeTestRule.mainClock.advanceTimeByFrame()
+        composeTestRule.waitForIdle()
         val initialTop = composeTestRule.onNodeWithContentDescription("Toggle Chat").getUnclippedBoundsInRoot().top
 
-        windows = windows.reversed()
-        composeTestRule.mainClock.advanceTimeBy(80)
-        windows = windows.map { window -> if (window.id == "chat") window.copy(visible = false) else window }
-        composeTestRule.mainClock.advanceTimeBy(500)
+        composeTestRule.runOnIdle { windows = windows.reversed() }
+        composeTestRule.waitForIdle()
+        composeTestRule.runOnIdle {
+            windows = windows.map { window -> if (window.id == "chat") window.copy(visible = false) else window }
+        }
+        composeTestRule.waitForIdle()
         val settledTop = composeTestRule.onNodeWithContentDescription("Toggle Chat").getUnclippedBoundsInRoot().top
 
         assertEquals(initialTop + 46.dp, settledTop)

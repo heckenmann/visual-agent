@@ -49,6 +49,9 @@ class AgentResponseCoordinatorTest {
         assertTrue(coordinator.normalizeAssistantContent("repeat pattern ".repeat(60)).contains("malformed"))
         assertEquals("answer", coordinator.normalizeAssistantContent("  answer  "))
         assertEquals("answer", coordinator.normalizeAssistantContent("<think>planning</think>answer"))
+        assertEquals("Deutsch", coordinator.normalizeAssistantContent("assistantDeutsch"))
+        assertEquals("answer", coordinator.normalizeAssistantContent("assistant: answer"))
+        assertEquals("answer", coordinator.normalizeAssistantContent("<|assistant|> answer"))
     }
 
     @Test
@@ -56,6 +59,7 @@ class AgentResponseCoordinatorTest {
         val content = "<think>first</think><think>second</think>answer"
 
         assertEquals(content, coordinator.normalizeAssistantPresentationContent(content))
+        assertEquals("Deutsch", coordinator.normalizeAssistantPresentationContent("assistantDeutsch"))
         assertEquals("answer", coordinator.removeThinkingMarkup(content))
     }
 

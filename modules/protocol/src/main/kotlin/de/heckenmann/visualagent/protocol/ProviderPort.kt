@@ -92,6 +92,7 @@ data class ProviderModel(
     val contextLimit: Int? = null,
     val outputLimit: Int? = null,
     val capabilities: Set<String> = emptySet(),
+    val capabilitiesComplete: Boolean = false,
 )
 
 /** User-safe model detail response. */
@@ -102,4 +103,5 @@ data class ModelDetails(
     val parameterSize: String? = null,
     val format: String? = null,
     val quantizationLevel: String? = null,
+    val contextLimit: Int? = null,
 )

@@ -3,10 +3,12 @@ package de.heckenmann.visualagent.agent
 import de.heckenmann.visualagent.agent.ollama.OllamaPromptFactory
 import de.heckenmann.visualagent.agent.ollama.OllamaToolRecovery
 import de.heckenmann.visualagent.agent.ollama.createOllamaApi
+import de.heckenmann.visualagent.agent.ollama.fetchModelCapabilitiesReactive
 import de.heckenmann.visualagent.agent.provider.ProviderErrorMessages
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.agent.provider.ProviderRuntimeConfig
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
+import de.heckenmann.visualagent.agent.supportsToolCalling
 import mu.KotlinLogging
 import org.springframework.ai.chat.model.ChatModel
 import org.springframework.ai.ollama.OllamaChatModel
@@ -37,6 +39,13 @@ class OllamaClient(
     private val auxiliary = OllamaClientAuxiliary(chatModel, ollamaApi, appConfig)
     private val ops = OllamaClientOps(ollamaApi, appConfig)
 
+    internal fun getModelCapabilitiesReactive(profile: ProviderProfile): Mono<Map<String, Set<String>>> =
+        fetchModelCapabilitiesReactive(
+            profile,
+            de.heckenmann.visualagent.agent.ollama
+                .createOllamaApi(profile, appConfig),
+        )
+
     override fun chatReactive(messages: List<Message>): Mono<ChatResponse> = chatReactive(ChatRequestContext(messages = messages))
 
     override fun chatReactive(request: ChatRequestContext): Mono<ChatResponse> {
@@ -45,7 +54,7 @@ class OllamaClient(
         return Mono
             .defer {
                 request.cancellationToken?.throwIfCancelled()
-                val supportsTools = request.modelCapabilities.contains("tools")
+                val supportsTools = request.supportsToolCalling()
                 val toolsEnabled = request.enabledTools.isNotEmpty()
                 logger.debug {
                     "Ollama chat: model=$selectedModel, supportsTools=$supportsTools, toolsEnabled=$toolsEnabled"
@@ -53,13 +62,14 @@ class OllamaClient(
                 if (supportsTools && toolsEnabled) {
                     val prompt = promptFactory.buildPrompt(request, selectedModel)
                     val model = chatModelFor(request)
-                    ToolCallingLoop()
+                    ToolCallingLoop(outputLimitUpdater = promptFactory::updateOutputLimit)
                         .runReactive(
                             model,
                             prompt,
                             request.cancellationToken,
                             toolCallbacks(request, selectedModel),
                             toolRegistry,
+                            request.contextWindow.withRequestedOutput(request.parameters.maxTokens),
                         )
                 } else {
                     Mono
@@ -92,7 +102,7 @@ class OllamaClient(
         val selectedModel = request.model ?: appConfig.ollamaModel
         val allowedFunctionNames = promptFactory.allowedFunctionNames(request, selectedModel)
         val prompt = promptFactory.buildPrompt(request, selectedModel)
-        val supportsTools = request.modelCapabilities.contains("tools")
+        val supportsTools = request.supportsToolCalling()
         val toolsEnabled = request.enabledTools.isNotEmpty()
         val toolCallbacks = if (!supportsTools || !toolsEnabled) emptyList() else toolCallbacks(request, selectedModel)
         return Flux
@@ -108,8 +118,15 @@ class OllamaClient(
                         )
                 } else {
                     val model = chatModelFor(request)
-                    ToolCallingLoop()
-                        .runStreamReactive(model, prompt, request.cancellationToken, toolCallbacks, toolRegistry)
+                    ToolCallingLoop(outputLimitUpdater = promptFactory::updateOutputLimit)
+                        .runStreamReactive(
+                            model,
+                            prompt,
+                            request.cancellationToken,
+                            toolCallbacks,
+                            toolRegistry,
+                            request.contextWindow.withRequestedOutput(request.parameters.maxTokens),
+                        )
                 }
             }.onErrorResume { error ->
                 when {

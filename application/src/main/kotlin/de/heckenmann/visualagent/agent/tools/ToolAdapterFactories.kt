@@ -57,10 +57,6 @@ fun agentCreateTool(manager: AgentManager) =
     AgentCreateTool(AgentToolPortAdapter(manager, manager.agentToolConfigService, manager.memoryStore))
 
 /** Compatibility factory routing application agent collaborators through the tool-owned port. */
-fun agentUpdateTool(manager: AgentManager) =
-    AgentUpdateTool(AgentToolPortAdapter(manager, manager.agentToolConfigService, manager.memoryStore))
-
-/** Compatibility factory routing application agent collaborators through the tool-owned port. */
 fun agentDeleteTool(manager: AgentManager) =
     AgentDeleteTool(AgentToolPortAdapter(manager, manager.agentToolConfigService, manager.memoryStore))
 

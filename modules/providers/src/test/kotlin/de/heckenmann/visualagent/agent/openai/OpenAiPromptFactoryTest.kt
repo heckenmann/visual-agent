@@ -15,29 +15,32 @@ import kotlin.test.assertTrue
 
 class OpenAiPromptFactoryTest {
     @Test
-    fun `prompt attaches enabled tool callbacks`() {
-        val registry = TestToolRegistry(listOf(FakeTool("context"), FakeTool("terminal")))
+    fun `prompt exposes only provider function names in callbacks and strict guard`() {
+        val registry = TestToolRegistry(listOf(FakeTool("agent:list"), FakeTool("terminal")))
         val factory = OpenAiPromptFactory(registry)
 
         val prompt =
             factory.buildPrompt(
                 ChatRequestContext(
-                    messages = listOf(Message("user", "show context")),
-                    enabledTools = setOf(ToolId("context")),
+                    messages = listOf(Message("user", "list agents")),
+                    enabledTools = setOf(ToolId("agent:list")),
+                    modelCapabilities = setOf("tools"),
+                    modelCapabilitiesComplete = true,
                 ),
                 "gpt-test",
             )
         val options = prompt.options as ToolCallingChatOptions
 
         assertEquals("gpt-test", prompt.options?.model)
-        assertEquals(listOf("context"), options.toolCallbacks.orEmpty().map { it.toolDefinition.name() })
-        assertTrue(
+        assertEquals(listOf("agent_list"), options.toolCallbacks.orEmpty().map { it.toolDefinition.name() })
+        val guard =
             prompt.instructions
                 .first()
                 .text
                 .orEmpty()
-                .contains("Tool calling strict mode"),
-        )
+        assertTrue(guard.contains("Tool calling strict mode"))
+        assertTrue(guard.contains("agent_list"))
+        assertTrue(!guard.contains("agent:list"))
         assertEquals(
             "openai",
             options.toolContext.orEmpty()["provider"].toString(),
@@ -54,6 +57,29 @@ class OpenAiPromptFactoryTest {
     }
 
     @Test
+    fun `prompt omits tools and guard when model explicitly lacks tooling`() {
+        val registry = TestToolRegistry(listOf(FakeTool("context")))
+        val factory = OpenAiPromptFactory(registry)
+
+        val prompt =
+            factory.buildPrompt(
+                ChatRequestContext(
+                    messages = listOf(Message("user", "show context")),
+                    enabledTools = setOf(ToolId("context")),
+                    modelCapabilities = setOf("completion"),
+                    modelCapabilitiesComplete = true,
+                ),
+                "no-tools-model",
+            )
+
+        assertTrue(prompt.instructions.none { it.text.orEmpty().contains("Tool calling strict mode") })
+        val options = prompt.options as org.springframework.ai.openai.OpenAiChatOptions
+        assertTrue(options.toolCallbacks.orEmpty().isEmpty())
+        assertTrue(options.toolContext.orEmpty().isEmpty())
+        assertEquals(emptyList(), factory.allowedFunctionNames(promptRequest(), "no-tools-model"))
+    }
+
+    @Test
     fun `allowedFunctionNames returns sorted enabled names`() {
         val registry = TestToolRegistry(listOf(FakeTool("terminal"), FakeTool("context")))
         val factory = OpenAiPromptFactory(registry)
@@ -63,12 +89,22 @@ class OpenAiPromptFactoryTest {
                 ChatRequestContext(
                     messages = emptyList(),
                     enabledTools = setOf(ToolId("terminal"), ToolId("context")),
+                    modelCapabilities = setOf("tools"),
+                    modelCapabilitiesComplete = true,
                 ),
                 "gpt-test",
             )
 
         assertEquals(listOf("context", "terminal"), names)
     }
+
+    private fun promptRequest() =
+        ChatRequestContext(
+            messages = emptyList(),
+            enabledTools = setOf(ToolId("context")),
+            modelCapabilities = setOf("completion"),
+            modelCapabilitiesComplete = true,
+        )
 
     @Test
     fun `prompt applies sampling options`() {

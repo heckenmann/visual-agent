@@ -25,9 +25,11 @@ Desktop user.
    protocol-owned conversation port.
 6. The server adapter delegates the request to the agent manager.
 7. The agent manager loads the complete audit history from H2, then builds a bounded request context from the latest user turns. Dialogue is retained verbatim; todo, tool, workspace and sub-agent activity is reduced to deterministic execution summaries, while audit-only records remain available to the history UI but are excluded from the provider context.
-8. The configured provider sends the request to the selected backend.
-9. The assistant response is rendered in the conversation. If the provider cannot complete the request, a safe, actionable failure message is rendered instead.
-10. User and assistant messages are persisted.
+8. Immediately before each provider round, the provider resolves the effective context window as the smaller of the configured session limit and the selected model's reported limit. It counts the exact enabled tool schemas and reserves either the configured output limit or a dynamic response capacity derived from the available context. The latest user message always has highest priority and is retained; optional memory, runtime state, and then whole older conversation turns are removed first.
+9. If the selected model has an authoritative capability declaration without `tools`, the provider removes all tool callbacks, tool schemas, and tool-specific prompt instructions before sending the request. Unknown or incomplete capability metadata remains enabled for compatibility.
+10. The configured provider sends the request to the selected backend.
+11. The assistant response passes through provider-neutral response normalization, is rendered in the conversation, and is then persisted. A leading standard assistant transport marker, including a marker joined directly to an uppercase response start, is not shown or reused as dialogue content. If the provider cannot complete the request, a safe, actionable failure message is rendered instead.
+12. User and assistant messages are persisted.
 
 ## Result
 
@@ -51,9 +53,13 @@ The user receives a complete response and the conversation survives application 
 - Pressing Enter in the conversation input sends the current message.
 - Pressing Shift+Enter keeps editing and inserts a newline.
 - The main-agent request includes only request-scoped context.
-- The main-agent request is bounded by the configured context length and reserves capacity for the response and tool calls.
+- The main-agent request is bounded dynamically by the configured session limit, the selected model limit, exact tool-schema tokens, and either the explicit output limit or a dynamic response reserve; no fixed history allowance is used.
+- Models with authoritative capability metadata that omits `tools` receive neither tool definitions nor tool-specific system instructions.
+- Models with incomplete capability metadata do not lose tooling solely because capability discovery is unavailable.
+- The latest user message is never discarded in favor of older conversation context.
 - Audit-only records are never sent to the provider, while relevant execution failures remain visible in the compact summary.
 - Conversation turns are stored in H2 with their caller-provided opaque
   UUIDs; IDs never encode a role or message type.
 - Provider failures are persisted as an assistant message without exposing provider payloads or credentials.
+- Provider-neutral framing markers are removed before an assistant response is rendered, persisted, or reused as model context.
 - The composer remains usable for multiline editing, cancellation, and keyboard submission in both input placement modes.

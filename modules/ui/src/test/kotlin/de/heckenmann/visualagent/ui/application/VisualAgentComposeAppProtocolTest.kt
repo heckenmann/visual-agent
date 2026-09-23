@@ -16,7 +16,11 @@ import de.heckenmann.visualagent.protocol.ConversationSuggestionPort
 import de.heckenmann.visualagent.protocol.LayoutWindowState
 import de.heckenmann.visualagent.protocol.MainAgentMemoryPort
 import de.heckenmann.visualagent.protocol.MainAgentMemorySnapshot
+import de.heckenmann.visualagent.protocol.ModelDetails
+import de.heckenmann.visualagent.protocol.ProviderAdapter
+import de.heckenmann.visualagent.protocol.ProviderModel
 import de.heckenmann.visualagent.protocol.ProviderPort
+import de.heckenmann.visualagent.protocol.ProviderProfile
 import de.heckenmann.visualagent.protocol.SettingsPort
 import de.heckenmann.visualagent.protocol.SettingsSnapshot
 import de.heckenmann.visualagent.protocol.SkillPort
@@ -25,6 +29,8 @@ import de.heckenmann.visualagent.protocol.UpdatePort
 import de.heckenmann.visualagent.protocol.WorkspaceFilePort
 import de.heckenmann.visualagent.protocol.WorkspaceLayoutPort
 import de.heckenmann.visualagent.protocol.WorkspaceLayoutSnapshot
+import de.heckenmann.visualagent.ui.CompletionIdlingResource
+import de.heckenmann.visualagent.ui.awaitCompletion
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -70,7 +76,42 @@ class VisualAgentComposeAppProtocolTest {
         assertEquals(shellBounds.right, contentBounds.right)
     }
 
-    private fun protocolPort(): ApplicationPort {
+    @Test
+    fun `workspace loads the active model context limit for capability warnings`() {
+        val modelDetailsLoaded = CompletionIdlingResource("active model details")
+        val port =
+            protocolPort(
+                activeProvider =
+                    ProviderProfile(
+                        id = "ollama",
+                        name = "Ollama",
+                        adapter = ProviderAdapter.OLLAMA,
+                        baseUrl = "http://localhost:11434",
+                        models = listOf(ProviderModel("llama")),
+                    ),
+                modelDetails = ModelDetails(model = "llama", modifiedAt = "now", contextLimit = 2048),
+                onModelDetails = modelDetailsLoaded::complete,
+            )
+
+        composeTestRule.awaitCompletion(modelDetailsLoaded) {
+            composeTestRule.setContent {
+                MaterialTheme {
+                    VisualAgentComposeApp(
+                        deps = ComposeApplicationDependencies(port),
+                        onCloseApplication = {},
+                        persistedWindows = emptyList(),
+                    )
+                }
+            }
+        }
+        assertTrue(composeTestRule.onAllNodesWithText("Context 2048").fetchSemanticsNodes().isNotEmpty())
+    }
+
+    private fun protocolPort(
+        activeProvider: ProviderProfile? = null,
+        modelDetails: ModelDetails = ModelDetails(model = "llama", modifiedAt = ""),
+        onModelDetails: () -> Unit = {},
+    ): ApplicationPort {
         val conversation = mockk<ConversationPort>(relaxed = true)
         coEvery { conversation.currentHistory() } returns emptyList()
         every { conversation.preferences() } returns ConversationPreferences()
@@ -94,6 +135,11 @@ class VisualAgentComposeAppProtocolTest {
         val providers = mockk<ProviderPort>(relaxed = true)
         every { providers.activeProviderId() } returns "ollama"
         every { providers.activeModelId() } returns "llama"
+        every { providers.getProvider("ollama") } returns activeProvider
+        coEvery { providers.modelDetails("ollama", "llama") } answers {
+            onModelDetails()
+            modelDetails
+        }
         every { providers.enabledProviders() } returns emptyList()
         every { providers.addChangeListener(any()) } returns AutoCloseable { }
 

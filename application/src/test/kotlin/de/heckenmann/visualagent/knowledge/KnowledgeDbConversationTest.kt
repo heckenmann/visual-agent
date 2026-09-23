@@ -118,6 +118,56 @@ class KnowledgeDbConversationTest {
     }
 
     @Test
+    fun `main context query returns available dialogue when fewer turns exist than requested`() {
+        val tempDb = createTempDirectory("visual-agent-conversation-short-context-test").resolve("history.db").toString()
+        val db =
+            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                .create(tempDb)
+
+        db.conversationStore.saveConversationMessage(
+            "55555555-5555-4555-8555-555555555555",
+            "main",
+            "user",
+            "First request",
+            null,
+            ConversationContextPolicy.DIALOGUE,
+        )
+        db.conversationStore.saveConversationMessage(
+            "66666666-6666-4666-8666-666666666666",
+            "main",
+            "assistant",
+            "First response",
+            null,
+            ConversationContextPolicy.DIALOGUE,
+        )
+        db.conversationStore.saveConversationMessage(
+            "77777777-7777-4777-8777-777777777777",
+            "main",
+            "user",
+            "Latest request",
+            null,
+            ConversationContextPolicy.DIALOGUE,
+        )
+        db.conversationStore.saveConversationMessage(
+            "88888888-8888-4888-8888-888888888888",
+            "main",
+            "system",
+            "Internal trace",
+            null,
+            ConversationContextPolicy.AUDIT_ONLY,
+        )
+
+        val context = db.conversationStore.getConversationMessagesForContext("main", userTurnLimit = 10, recordLimit = 20)
+
+        assertEquals(
+            listOf("First request", "First response", "Latest request"),
+            context.map { it.content },
+        )
+        assertTrue(context.none { it.content == "Internal trace" })
+        db.close()
+    }
+
+    @Test
     fun `main context query retains the current dialogue when execution events exceed the record budget`() {
         val tempDb = createTempDirectory("visual-agent-conversation-context-budget-test").resolve("history.db").toString()
         val db =

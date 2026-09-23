@@ -78,7 +78,6 @@ class ComposeConversationPanelTest {
                 backgroundScope.launch {
                     listState.scrollToBottom()
                 }
-            composeTestRule.mainClock.advanceTimeBy(16)
             composeTestRule.waitForIdle()
             job.join()
 

@@ -2,10 +2,15 @@ package de.heckenmann.visualagent.agent.ollama
 
 import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.Message
+import de.heckenmann.visualagent.agent.RequestContextBudgeter
+import de.heckenmann.visualagent.agent.ToolDefinition
+import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
+import de.heckenmann.visualagent.agent.supportsToolCalling
 import org.springframework.ai.chat.messages.AssistantMessage
 import org.springframework.ai.chat.messages.SystemMessage
 import org.springframework.ai.chat.messages.UserMessage
+import org.springframework.ai.chat.prompt.ChatOptions
 import org.springframework.ai.chat.prompt.Prompt
 import org.springframework.ai.ollama.api.OllamaChatOptions
 import org.springframework.stereotype.Component
@@ -17,6 +22,7 @@ import org.springframework.ai.chat.messages.Message as SpringMessage
 @Component
 class OllamaPromptFactory(
     private val toolRegistry: ProviderToolCallbacks,
+    private val contextBudgeter: RequestContextBudgeter = RequestContextBudgeter(),
 ) {
     /**
      * Returns provider-safe function names enabled for the request.
@@ -29,13 +35,17 @@ class OllamaPromptFactory(
         request: ChatRequestContext,
         selectedModel: String,
     ): List<String> =
-        toolRegistry
-            .functionCallbacks(
-                enabledTools = request.enabledTools,
-                context = request.metadata + mapOf("model" to selectedModel),
-            ).map { it.toolDefinition.name() }
-            .distinct()
-            .sorted()
+        if (!request.supportsToolCalling()) {
+            emptyList()
+        } else {
+            toolRegistry
+                .functionCallbacks(
+                    enabledTools = request.enabledTools,
+                    context = request.metadata + mapOf("model" to selectedModel),
+                ).map { it.toolDefinition.name() }
+                .distinct()
+                .sorted()
+        }
 
     /**
      * Builds a Spring AI prompt including tool options and strict tool-name guidance.
@@ -48,7 +58,7 @@ class OllamaPromptFactory(
         request: ChatRequestContext,
         selectedModel: String,
     ): Prompt {
-        val supportsTools = request.modelCapabilities.contains("tools")
+        val supportsTools = request.supportsToolCalling()
         val toolContext =
             request.metadata +
                 mapOf("model" to selectedModel) +
@@ -63,6 +73,12 @@ class OllamaPromptFactory(
                 emptyList()
             }
         val exactFunctionNames = callbacks.map { it.toolDefinition.name() }.distinct().sorted()
+        val budgetedRequest =
+            contextBudgeter.fit(
+                request,
+                toolNameGuardMessage(exactFunctionNames) + request.messages,
+                callbacks.map { callback -> callback.toProviderDefinition() },
+            )
         val optionsBuilder =
             OllamaChatOptions
                 .builder()
@@ -72,14 +88,14 @@ class OllamaPromptFactory(
                 .toolCallbacks(callbacks)
                 .toolContext(toolContext)
         }
-        request.parameters.temperature?.let(optionsBuilder::temperature)
-        request.parameters.topP?.let(optionsBuilder::topP)
-        request.parameters.maxTokens?.let(optionsBuilder::numPredict)
-        request.options["topK"]?.toIntOrNull()?.let(optionsBuilder::topK)
-        request.options["seed"]?.toIntOrNull()?.let(optionsBuilder::seed)
-        request.options["repeatPenalty"]?.toDoubleOrNull()?.let(optionsBuilder::repeatPenalty)
+        budgetedRequest.parameters.temperature?.let(optionsBuilder::temperature)
+        budgetedRequest.parameters.topP?.let(optionsBuilder::topP)
+        budgetedRequest.parameters.maxTokens?.let(optionsBuilder::numPredict)
+        budgetedRequest.options["topK"]?.toIntOrNull()?.let(optionsBuilder::topK)
+        budgetedRequest.options["seed"]?.toIntOrNull()?.let(optionsBuilder::seed)
+        budgetedRequest.options["repeatPenalty"]?.toDoubleOrNull()?.let(optionsBuilder::repeatPenalty)
         val options = optionsBuilder.build()
-        return Prompt(toSpringMessages(toolNameGuardMessage(exactFunctionNames) + request.messages), options)
+        return Prompt(toSpringMessages(budgetedRequest.messages), options)
     }
 
     private fun toolNameGuardMessage(exactFunctionNames: List<String>): List<Message> =
@@ -110,4 +126,19 @@ class OllamaPromptFactory(
                 else -> UserMessage(msg.content)
             }
         }
+
+    private fun org.springframework.ai.tool.ToolCallback.toProviderDefinition(): ToolDefinition =
+        ToolDefinition(
+            id = ToolId(toolDefinition.name()),
+            name = toolDefinition.name(),
+            description = toolDefinition.description(),
+            inputSchema = toolDefinition.inputSchema(),
+        )
+
+    internal fun updateOutputLimit(
+        options: ChatOptions,
+        limit: Int,
+    ): ChatOptions =
+        (options as? OllamaChatOptions)?.mutate()?.numPredict(limit)?.build()
+            ?: options.mutate().maxTokens(limit).build()
 }

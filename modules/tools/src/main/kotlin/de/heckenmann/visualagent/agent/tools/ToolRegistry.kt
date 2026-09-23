@@ -21,8 +21,13 @@ class ToolRegistry(
     private val defaultTimeoutSeconds: () -> Int = { DEFAULT_TOOL_TIMEOUT_SECONDS },
 ) {
     private val logger = KotlinLogging.logger {}
-    private val toolsById = tools.associateBy { it.definition.id }
+    private val registeredTools = tools.toList()
+    private val toolsById = registeredTools.associateBy { it.definition.id }
     private val reactiveExecution = ReactiveToolExecution(toolEventBus)
+
+    init {
+        validateDefinitions()
+    }
 
     /**
      * Return all registered application tool IDs.
@@ -185,6 +190,22 @@ class ToolRegistry(
     }
 
     private fun serialize(result: ToolResult): String = envelopeJson.encodeToString(ToolResultNormalization.envelope(result))
+
+    private fun validateDefinitions() {
+        val definitions = registeredTools.map(::definition)
+        require(definitions.map { it.id }.distinct().size == definitions.size) {
+            "Tool registry contains duplicate internal tool IDs."
+        }
+        definitions.forEach { definition ->
+            val expectedFunctionName = definition.id.toFunctionName()
+            require(definition.name == expectedFunctionName) {
+                "Tool '${definition.id.value}' must use provider function name '$expectedFunctionName'."
+            }
+        }
+        require(definitions.map { it.name }.distinct().size == definitions.size) {
+            "Tool registry contains provider function name collisions."
+        }
+    }
 
     private fun publishEvent(
         definition: ToolDefinition,

@@ -15,6 +15,7 @@ internal class TestProviderRuntimeConfig(
     override var openAiBaseUrl: String = "https://api.openai.com",
     override var openAiModel: String = "gpt-4o-mini",
     override var timeoutSeconds: Int = 120,
+    override var contextLength: Int = 4096,
 ) : ProviderRuntimeConfig {
     override fun normalizedProvider(): String = if (llmProvider.equals("openai", ignoreCase = true)) "openai" else "ollama"
 }
@@ -67,4 +68,4 @@ internal class TestToolRegistry(
             }
 }
 
-internal fun ToolId.toTestFunctionName(): String = value.replace(Regex("[^A-Za-z0-9_]"), "_")
+internal fun ToolId.toTestFunctionName(): String = value.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')

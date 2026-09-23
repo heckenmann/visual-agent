@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import com.mobilebytelabs.kmptoolkit.clipboard.copyToClipboard
 import de.heckenmann.visualagent.protocol.ActivityPort
 import de.heckenmann.visualagent.protocol.SkillCreateResult
@@ -25,6 +26,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+internal val LocalSkillsSearchDebounce =
+    staticCompositionLocalOf<suspend () -> Unit> {
+        { delay(250) }
+    }
+
 /** Presents the searchable, user-editable catalog of reusable model skills. */
 @Composable
 internal fun SkillsPanel(
@@ -42,6 +48,7 @@ internal fun SkillsPanel(
     var saveError by remember { mutableStateOf<String?>(null) }
     var status by remember { mutableStateOf("Loading skills…") }
     val scope = rememberCoroutineScope()
+    val awaitSearchDebounce = LocalSkillsSearchDebounce.current
     lateinit var selectSkill: (String) -> Unit
 
     /** Reloads catalog metadata without blocking Compose's main dispatcher. */
@@ -271,7 +278,7 @@ internal fun SkillsPanel(
 
     LaunchedEffect(skillPort) { refresh() }
     LaunchedEffect(query, skillPort) {
-        delay(250)
+        awaitSearchDebounce()
         refresh()
     }
     ToolEventRefreshEffect(activityPort, setOf("skills"), onRefresh = ::refresh)

@@ -1,6 +1,9 @@
 package de.heckenmann.visualagent.ui.settings
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -74,6 +77,29 @@ class ComposeUpdateSettingsSectionTest {
         composeTestRule.waitForIdle()
 
         composeTestRule.onNodeWithText("Visual Agent is up to date").assertExists()
+    }
+
+    @Test
+    fun `open release page button opens the release url`() {
+        val updates = FakeUpdatePort()
+        var openedUrl: String? = null
+        val uriHandler =
+            object : UriHandler {
+                override fun openUri(uri: String) {
+                    openedUrl = uri
+                }
+            }
+
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalUriHandler provides uriHandler) {
+                MaterialTheme { UpdateSettingsSection(SettingsSnapshot(), updates, onChange = {}) }
+            }
+        }
+        composeTestRule.onNodeWithContentDescription("Check for updates").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithContentDescription("Open release page").performClick()
+
+        assertEquals("https://example.test/release", openedUrl)
     }
 
     private class FakeUpdatePort : UpdatePort {

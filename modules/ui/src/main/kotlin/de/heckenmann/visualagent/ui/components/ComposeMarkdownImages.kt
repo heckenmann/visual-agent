@@ -12,6 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.BitmapPainter
@@ -31,6 +32,7 @@ import de.heckenmann.visualagent.protocol.ConversationPort
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.CoroutineContext
 import org.jetbrains.skia.Image as SkiaImage
 
 /** Creates a Markdown image transformer with explicit server and client source boundaries. */
@@ -47,6 +49,12 @@ internal fun rememberImageTransformer(
         }
     }
 
+/** Dispatcher for image source resolution. */
+internal val LocalMarkdownImageLoadContext = staticCompositionLocalOf<CoroutineContext> { Dispatchers.IO }
+
+/** Dispatcher for image decoding. */
+internal val LocalMarkdownImageDecodeContext = staticCompositionLocalOf<CoroutineContext> { Dispatchers.Default }
+
 private object NoOpImageTransformer : ImageTransformer {
     @Composable
     override fun transform(link: String): ImageData? = null
@@ -61,6 +69,8 @@ private class BoundaryImageTransformer(
     @Composable
     override fun transform(link: String): ImageData {
         val source = link.removePrefix(INLINE_IMAGE_SOURCE_PREFIX)
+        val loadContext = LocalMarkdownImageLoadContext.current
+        val decodeContext = LocalMarkdownImageDecodeContext.current
         var state by remember(source) { mutableStateOf<ResolvedImageState>(ResolvedImageState.Loading) }
         var reservation by remember(source) { mutableStateOf<MarkdownImageLoadBudget.Reservation?>(null) }
         DisposableEffect(source) {
@@ -77,7 +87,7 @@ private class BoundaryImageTransformer(
             try {
                 val resolution =
                     runCatching {
-                        withContext(Dispatchers.IO) {
+                        withContext(loadContext) {
                             resolveImage(source)
                         }
                     }.getOrElse { ConversationImageResolution.Rejected("Image could not be loaded") }
@@ -89,7 +99,7 @@ private class BoundaryImageTransformer(
                         return@LaunchedEffect
                     }
                 }
-                val nextState = withContext(Dispatchers.Default) { resolution.toImageState() }
+                val nextState = withContext(decodeContext) { resolution.toImageState() }
                 val candidateReservation = nextReservation
                 if (nextState is ResolvedImageState.Loaded && candidateReservation != null) {
                     if (!candidateReservation.ensurePixels(nextState.decodedPixels)) {

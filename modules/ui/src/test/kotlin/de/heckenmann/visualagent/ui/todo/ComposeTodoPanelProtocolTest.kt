@@ -3,7 +3,6 @@ package de.heckenmann.visualagent.ui.todo
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -13,6 +12,8 @@ import de.heckenmann.visualagent.protocol.TodoItem
 import de.heckenmann.visualagent.protocol.TodoPort
 import de.heckenmann.visualagent.protocol.TodoProgress
 import de.heckenmann.visualagent.protocol.TodoState
+import de.heckenmann.visualagent.ui.modal.ComposeConfirmationModal
+import de.heckenmann.visualagent.ui.modal.ComposeContentModal
 import de.heckenmann.visualagent.ui.modal.ComposeModalRequester
 import io.mockk.every
 import io.mockk.mockk
@@ -59,6 +60,34 @@ class ComposeTodoPanelProtocolTest {
     }
 
     @Test
+    fun `todo add edit start stop complete and delete controls invoke their actions`() {
+        val todo = TodoItem("todo", "Task")
+        val port = protocolPort(listOf(todo))
+        var requested: Any? = null
+        composeTestRule.setContent {
+            MaterialTheme { TodoPanel(port, ComposeModalRequester { requested = it }, LifecycleState()) }
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithContentDescription("Add todo").performClick()
+        assertEquals("Add todo", (requested as ComposeContentModal).title)
+        composeTestRule.onNodeWithContentDescription("Edit todo").performClick()
+        assertEquals("Edit todo", (requested as ComposeContentModal).title)
+        composeTestRule.onNodeWithContentDescription("Start todo").performClick()
+        composeTestRule.onNodeWithContentDescription("Stop todo").performClick()
+        composeTestRule.onNodeWithContentDescription("Complete todo").performClick()
+        composeTestRule.onNodeWithContentDescription("Delete todo").performClick()
+        val confirmation = requested as ComposeConfirmationModal
+        assertEquals("Delete todo?", confirmation.title)
+        confirmation.onConfirm()
+
+        io.mockk.verify(exactly = 1) { port.start("todo") }
+        io.mockk.verify(exactly = 1) { port.stop("todo") }
+        io.mockk.verify(exactly = 1) { port.updateStatus("todo", TodoState.COMPLETED) }
+        io.mockk.verify(exactly = 1) { port.remove("todo") }
+    }
+
+    @Test
     fun `progress listener hides the streaming response after completion`() {
         var progressListener: ((TodoProgress) -> Unit)? = null
         var todoListener: ((TodoChange) -> Unit)? = null
@@ -77,16 +106,13 @@ class ComposeTodoPanelProtocolTest {
 
         composeTestRule.waitForIdle()
         progressListener!!.invoke(TodoProgress("todo", "New response"))
-        composeTestRule.mainClock.advanceTimeBy(250)
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("New response").assertExists()
         composeTestRule.onNodeWithContentDescription("Todo working").assertExists()
         progressListener!!.invoke(TodoProgress("todo", completed = true))
         currentTodo = currentTodo.copy(status = TodoState.COMPLETED)
         todoListener!!.invoke(TodoChange(todo = currentTodo))
-        composeTestRule.waitUntil {
-            composeTestRule.onAllNodesWithText("New response").fetchSemanticsNodes().isEmpty()
-        }
+        composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("New response").assertDoesNotExist()
         assertEquals(0, composeTestRule.onAllNodesWithContentDescription("Todo working").fetchSemanticsNodes().size)
     }

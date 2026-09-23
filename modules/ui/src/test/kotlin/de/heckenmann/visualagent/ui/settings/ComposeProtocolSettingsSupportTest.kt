@@ -61,4 +61,45 @@ class ComposeProtocolSettingsSupportTest {
         assertEquals("fallback", normalized.providerId)
         assertEquals("new", normalized.modelId)
     }
+
+    @Test
+    fun `model refresh restores preferred model only for the selected provider`() {
+        val draft =
+            ProviderSettingsDraft(
+                providers =
+                    listOf(
+                        ProviderProfile(
+                            "openai",
+                            "OpenAI",
+                            ProviderAdapter.OPENAI_COMPATIBLE,
+                            "",
+                            defaultModel = "gpt",
+                            models = listOf(ProviderModel("gpt")),
+                        ),
+                        ProviderProfile(
+                            "codex",
+                            "Codex",
+                            ProviderAdapter.CODEX_CLI,
+                            "",
+                            defaultModel = "codex-2",
+                            models = listOf(ProviderModel("codex-1")),
+                        ),
+                    ),
+                providerId = "codex",
+                modelId = "codex-1",
+            )
+
+        val refreshed = draft.withModels("codex", listOf(ProviderModel("codex-1"), ProviderModel("codex-2")), "codex-2")
+        val staleOtherProvider = refreshed.withModels("openai", listOf(ProviderModel("gpt-new")), "gpt-new")
+
+        assertEquals("codex-2", refreshed.modelId)
+        assertEquals("codex-2", staleOtherProvider.modelId)
+        assertEquals(
+            listOf("gpt-new"),
+            staleOtherProvider.providers
+                .first()
+                .models
+                .map(ProviderModel::id),
+        )
+    }
 }

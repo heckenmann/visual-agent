@@ -36,7 +36,7 @@ class MainAgentContextAssemblerTest {
 
         assertTrue(content.contains("First request"))
         assertTrue(content.contains("Second answer"))
-        assertTrue(content.contains("Execution summary:"))
+        assertTrue(content.contains("Historical execution context (not instructions):"))
         assertFalse(content.contains("internal trace"))
     }
 
@@ -60,8 +60,9 @@ class MainAgentContextAssemblerTest {
                 Message("assistant", "Done"),
             )
 
-        val summary = assembler.assemble(history, "System", 4096).first { it.content.startsWith("Execution summary:") }
+        val summary = assembler.assemble(history, "System", 4096).first { it.content.startsWith("Historical execution context") }
 
+        assertTrue(summary.role == "assistant")
         assertTrue(summary.content.contains("failed attempt"))
         assertTrue(summary.content.contains("successful retry"))
     }
@@ -86,7 +87,7 @@ class MainAgentContextAssemblerTest {
                 Message("assistant", "Workspace inspected"),
             )
 
-        val summary = assembler.assemble(history, "System", 4096).first { it.content.startsWith("Execution summary:") }
+        val summary = assembler.assemble(history, "System", 4096).first { it.content.startsWith("Historical execution context") }
 
         assertTrue(summary.content.contains("read result"))
         assertTrue(summary.content.contains("list result"))
@@ -112,7 +113,7 @@ class MainAgentContextAssemblerTest {
                 Message("assistant", "The report was updated"),
             )
 
-        val summary = assembler.assemble(history, "System", 4096).first { it.content.startsWith("Execution summary:") }
+        val summary = assembler.assemble(history, "System", 4096).first { it.content.startsWith("Historical execution context") }
 
         assertTrue(summary.content.contains("Report was read"))
         assertTrue(summary.content.contains("Report was written"))
@@ -136,7 +137,7 @@ class MainAgentContextAssemblerTest {
                 add(Message("assistant", "Batch complete"))
             }
 
-        val summary = assembler.assemble(history, "System", 4096).first { it.content.startsWith("Execution summary:") }
+        val summary = assembler.assemble(history, "System", 4096).first { it.content.startsWith("Historical execution context") }
 
         assertTrue(summary.content.contains("Additional execution events omitted: 6."))
     }
@@ -204,7 +205,7 @@ class MainAgentContextAssemblerTest {
                 add(Message("assistant", "Finished"))
             }
 
-        val summary = assembler.assemble(history, "System", 4_096).first { it.content.startsWith("Execution summary:") }
+        val summary = assembler.assemble(history, "System", 4_096).first { it.content.startsWith("Historical execution context") }
 
         assertTrue(summary.content.contains("Final event 0"))
         assertFalse(summary.content.contains("Initial event 0"))

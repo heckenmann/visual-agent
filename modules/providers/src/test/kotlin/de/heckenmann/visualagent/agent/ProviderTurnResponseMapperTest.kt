@@ -94,4 +94,17 @@ class ProviderTurnResponseMapperTest {
         assertNull(turn.finishReason)
         assertFalse(ProviderTurnResponseMapper.toChatResponse(turn).done)
     }
+
+    @Test
+    fun `preserves ordinary assistant-prefixed response content`() {
+        val response =
+            SpringChatResponse(
+                listOf(Generation(AssistantMessage("Assistant managers coordinate work"), ChatGenerationMetadata.builder().build())),
+                ChatResponseMetadata.builder().model("model-a").build(),
+            )
+
+        val turn = ProviderTurnResponseMapper.fromSpring(response)
+
+        assertEquals("Assistant managers coordinate work", ProviderTurnResponseMapper.toChatResponse(turn).message.content)
+    }
 }

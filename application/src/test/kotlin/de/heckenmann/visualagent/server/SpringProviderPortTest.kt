@@ -42,6 +42,7 @@ class SpringProviderPortTest {
                         contextLimit = 8192,
                         outputLimit = 2048,
                         capabilities = setOf("tools"),
+                        capabilitiesComplete = true,
                     ),
                 ),
         )
@@ -61,6 +62,7 @@ class SpringProviderPortTest {
         assertEquals(ProviderAdapter.OLLAMA, port.getProvider("ollama")?.adapter)
         assertEquals(ModelStatus.ACTIVE, port.selectableModels("ollama").single().status)
         assertEquals(8192, port.selectableModels("ollama").single().contextLimit)
+        assertEquals(true, port.selectableModels("ollama").single().capabilitiesComplete)
         assertEquals("ollama", port.activeProviderId())
         assertEquals("llama3", port.activeModelId())
         assertEquals(true, port.deleteProvider("ollama"))
@@ -110,6 +112,7 @@ class SpringProviderPortTest {
                                 parameterSize = "8B",
                                 format = "gguf",
                                 quantizationLevel = "Q4_K_M",
+                                contextLimit = 4096,
                             ),
                     ),
                 )
@@ -120,6 +123,7 @@ class SpringProviderPortTest {
             assertEquals("llama3", details.model)
             assertEquals("8B", details.parameterSize)
             assertEquals("Q4_K_M", details.quantizationLevel)
+            assertEquals(4096, details.contextLimit)
             verify { provider.getModelsReactive("ollama") }
             verify { provider.getModelDetailsReactive("ollama", "llama3") }
             verify { catalog.updateDiscoveredModels("ollama", listOf("llama3")) }
@@ -136,12 +140,16 @@ class SpringProviderPortTest {
                     baseUrl = "https://staged.example.test",
                     apiKey = "not-persisted",
                 )
-            every { provider.getModelsReactive(any<ApplicationProviderProfile>()) } returns Mono.just(listOf("gpt-staged"))
+            every { provider.getModelConfigsReactive(any<ApplicationProviderProfile>()) } returns
+                Mono.just(listOf(ProviderModelConfig("gpt-staged", capabilities = setOf("tools", "vision"), capabilitiesComplete = true)))
 
-            assertEquals("gpt-staged", port.discoverModels(staged).single().id)
+            val discovered = port.discoverModels(staged).single()
+            assertEquals("gpt-staged", discovered.id)
+            assertEquals(setOf("tools", "vision"), discovered.capabilities)
+            assertEquals(true, discovered.capabilitiesComplete)
 
             verify {
-                provider.getModelsReactive(
+                provider.getModelConfigsReactive(
                     match<ApplicationProviderProfile> {
                         it.id == "staged" && it.baseUrl == "https://staged.example.test" && it.apiKey == "not-persisted"
                     },
@@ -149,6 +157,30 @@ class SpringProviderPortTest {
             }
             verify(exactly = 0) { catalog.updateDiscoveredModels(any(), any()) }
             verify(exactly = 0) { catalog.updateDiscoveredModelConfigs(any(), any()) }
+        }
+
+    @Test
+    fun `incomplete discovery preserves existing capability knowledge`() =
+        runTest {
+            val staged =
+                ProviderProfile(
+                    id = "codex",
+                    name = "Codex",
+                    adapter = ProviderAdapter.CODEX_CLI,
+                    baseUrl = "",
+                    models =
+                        listOf(
+                            de.heckenmann.visualagent.protocol
+                                .ProviderModel("model", capabilities = setOf("tools")),
+                        ),
+                )
+            every { provider.getModelConfigsReactive(any<ApplicationProviderProfile>()) } returns
+                Mono.just(listOf(ProviderModelConfig("model", capabilities = setOf("vision"))))
+
+            val discovered = port.discoverModels(staged).single()
+
+            assertEquals(setOf("tools", "vision"), discovered.capabilities)
+            assertEquals(false, discovered.capabilitiesComplete)
         }
 
     @Test

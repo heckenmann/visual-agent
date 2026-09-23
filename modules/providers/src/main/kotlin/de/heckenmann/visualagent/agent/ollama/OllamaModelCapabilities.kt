@@ -1,41 +1,45 @@
 package de.heckenmann.visualagent.agent.ollama
 
-import de.heckenmann.visualagent.agent.ListTagsResponse
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
-import kotlinx.serialization.json.Json
 import mu.KotlinLogging
+import org.springframework.ai.ollama.api.OllamaApi
+import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
 
 private val logger = KotlinLogging.logger {}
 
-/**
- * Fetches model capabilities from Ollama's `/api/tags` endpoint.
- *
- * Spring AI's `OllamaApi.Model` does not expose the `capabilities` field, so this
- * function makes a direct HTTP call to read the raw JSON response.
- *
- * @param profile Provider profile with base URL and optional API key
- * @return Map of model name to set of capability strings (e.g. "tools", "thinking")
- */
-internal fun fetchModelCapabilitiesReactive(profile: ProviderProfile): Mono<Map<String, Set<String>>> =
+/** Reads each model's capability declaration from Ollama's `/api/show` endpoint. */
+internal fun fetchModelCapabilitiesReactive(
+    profile: ProviderProfile,
+    api: OllamaApi,
+): Mono<Map<String, Set<String>>> =
     Mono
         .fromCallable {
-            try {
-                val url = java.net.URI("${profile.baseUrl.trimEnd('/')}/api/tags").toURL()
-                val connection = url.openConnection() as java.net.HttpURLConnection
-                connection.requestMethod = "GET"
-                connection.connectTimeout = 10_000
-                connection.readTimeout = 10_000
-                profile.apiKey.trim().takeIf { it.isNotEmpty() }?.let {
-                    connection.setRequestProperty("Authorization", "Bearer $it")
-                }
-                val body = connection.inputStream.bufferedReader().readText()
-                val json = Json { ignoreUnknownKeys = true }
-                val response = json.decodeFromString<ListTagsResponse>(body)
-                response.models.associate { it.name to it.capabilities }
-            } catch (e: Exception) {
-                logger.warn(e) { "Failed to fetch model capabilities from ${profile.baseUrl}" }
-                emptyMap()
-            }
+            api
+                .listModels()
+                .models()
+                .mapNotNull { it.name() }
+                .distinct()
         }.subscribeOn(Schedulers.boundedElastic())
+        .flatMapMany(Flux<String>::fromIterable)
+        .flatMapSequential({ model ->
+            Mono
+                .fromCallable {
+                    api
+                        .showModel(OllamaApi.ShowModelRequest(model))
+                        .capabilities()
+                        .takeIf(List<String>::isNotEmpty)
+                        ?.let { model to it.toSet() }
+                }.subscribeOn(Schedulers.boundedElastic())
+                .onErrorResume { error ->
+                    logger.warn(error) { "Failed to read Ollama capabilities for model=$model provider=${profile.id}" }
+                    Mono.empty()
+                }
+        }, 4)
+        .collectMap({ it.first }, { it.second })
+        .map { it.toMap() }
+        .onErrorResume { error ->
+            logger.warn(error) { "Failed to list Ollama models for capability discovery provider=${profile.id}" }
+            Mono.just(emptyMap())
+        }

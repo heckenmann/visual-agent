@@ -5,6 +5,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import de.heckenmann.visualagent.protocol.ActivityPort
 import de.heckenmann.visualagent.protocol.Agent
 import de.heckenmann.visualagent.protocol.AgentExecutionSnapshot
@@ -13,6 +14,9 @@ import de.heckenmann.visualagent.protocol.AgentStatus
 import de.heckenmann.visualagent.protocol.ProviderPort
 import de.heckenmann.visualagent.protocol.TodoPort
 import de.heckenmann.visualagent.ui.application.SubAgentsPanel
+import de.heckenmann.visualagent.ui.modal.ComposeConfirmationModal
+import de.heckenmann.visualagent.ui.modal.ComposeContentModal
+import de.heckenmann.visualagent.ui.modal.ComposeInfoModal
 import de.heckenmann.visualagent.ui.modal.ComposeModalRequester
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -20,6 +24,7 @@ import io.mockk.every
 import io.mockk.mockk
 import org.junit.Rule
 import org.junit.Test
+import kotlin.test.assertEquals
 
 /** Verifies sub-agent controls using only protocol-owned agent data. */
 class ComposeSubAgentsPanelProtocolTest {
@@ -60,6 +65,110 @@ class ComposeSubAgentsPanelProtocolTest {
         composeTestRule.onNodeWithContentDescription("Pause sub-agent").performClick()
         composeTestRule.waitForIdle()
         coVerify { agents.pause(agent.id) }
+    }
+
+    @Test
+    fun `create logs configure and delete controls invoke their actions`() {
+        val agent = Agent("agent-1", "Researcher", "Find relevant sources", AgentStatus.IDLE)
+        val agents = mockk<AgentPort>(relaxed = true)
+        every { agents.list() } returns listOf(agent)
+        every { agents.executionSnapshot() } returns AgentExecutionSnapshot(false)
+        every { agents.activeJobCount(agent.id) } returns 0
+        every { agents.addExecutionListener(any()) } returns AutoCloseable { }
+        every { agents.addChangeListener(any()) } returns AutoCloseable { }
+        val todos = mockk<TodoPort>(relaxed = true)
+        every { todos.addListener(any()) } returns AutoCloseable { }
+        val activity = mockk<ActivityPort>(relaxed = true)
+        every { activity.addToolListener(any()) } returns AutoCloseable { }
+        every { activity.addAgentListener(any()) } returns AutoCloseable { }
+        var modal: Any? = null
+
+        composeTestRule.setContent {
+            MaterialTheme {
+                SubAgentsPanel(
+                    agentPort = agents,
+                    providerPort = mockk<ProviderPort>(relaxed = true),
+                    modalRequester = ComposeModalRequester { modal = it },
+                    activityPort = activity,
+                    todoPort = todos,
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithContentDescription("Create sub-agent").performClick()
+        assertEquals("Create sub-agent", (modal as ComposeContentModal).title)
+        composeTestRule.onNodeWithContentDescription("View sub-agent logs").performClick()
+        assertEquals("Researcher logs", (modal as ComposeInfoModal).title)
+        composeTestRule.onNodeWithContentDescription("Configure sub-agent details").performClick()
+        assertEquals("Configure Researcher", (modal as ComposeContentModal).title)
+        composeTestRule.onNodeWithContentDescription("Delete sub-agent").performClick()
+        val confirmation = modal as ComposeConfirmationModal
+        assertEquals("Delete sub-agent?", confirmation.title)
+        confirmation.onConfirm()
+
+        io.mockk.verify(exactly = 1) { agents.delete(agent.id) }
+    }
+
+    @Test
+    fun `create sub-agent form persists entered identity and role`() {
+        val agents = mockk<AgentPort>(relaxed = true)
+        val created = Agent("agent-new", "Writer", "Write tests", AgentStatus.IDLE)
+        every { agents.create("Writer", "Write tests", any()) } returns created
+        var modal: Any? = null
+        val todos = mockk<TodoPort>(relaxed = true)
+        every { todos.addListener(any()) } returns AutoCloseable { }
+        val activity = mockk<ActivityPort>(relaxed = true)
+        every { activity.addToolListener(any()) } returns AutoCloseable { }
+        every { activity.addAgentListener(any()) } returns AutoCloseable { }
+
+        composeTestRule.setContent {
+            MaterialTheme {
+                SubAgentsPanel(
+                    agents,
+                    mockk<ProviderPort>(relaxed = true),
+                    ComposeModalRequester { modal = it },
+                    activity,
+                    todos,
+                )
+            }
+        }
+        composeTestRule.onNodeWithContentDescription("Create sub-agent").performClick()
+        val content = modal as ComposeContentModal
+        composeTestRule.setContent { MaterialTheme { content.content {} } }
+        composeTestRule.onNodeWithText("Name").performTextInput("Writer")
+        composeTestRule.onNodeWithText("Role").performTextInput("Write tests")
+        composeTestRule.onNodeWithText("Create sub-agent").performClick()
+
+        io.mockk.verify(exactly = 1) { agents.create("Writer", "Write tests", any()) }
+    }
+
+    @Test
+    fun `global pause and resume buttons update execution state`() {
+        val agents = mockk<AgentPort>(relaxed = true)
+        every { agents.list() } returns emptyList()
+        every { agents.executionSnapshot() } returnsMany
+            listOf(AgentExecutionSnapshot(false), AgentExecutionSnapshot(true), AgentExecutionSnapshot(false))
+        coEvery { agents.pauseAll() } returns AgentExecutionSnapshot(true)
+        coEvery { agents.resumeAll() } returns AgentExecutionSnapshot(false)
+        val todos = mockk<TodoPort>(relaxed = true)
+        every { todos.addListener(any()) } returns AutoCloseable { }
+        val activity = mockk<ActivityPort>(relaxed = true)
+        every { activity.addToolListener(any()) } returns AutoCloseable { }
+        every { activity.addAgentListener(any()) } returns AutoCloseable { }
+
+        composeTestRule.setContent {
+            MaterialTheme {
+                SubAgentsPanel(agents, mockk(relaxed = true), ComposeModalRequester { }, activity, todos)
+            }
+        }
+
+        composeTestRule.onNodeWithContentDescription("Pause all sub-agents").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithContentDescription("Resume all sub-agents").performClick()
+        composeTestRule.waitForIdle()
+
+        coVerify(exactly = 1) { agents.pauseAll() }
+        coVerify(exactly = 1) { agents.resumeAll() }
     }
 
     @Test

@@ -49,7 +49,6 @@ class ActivityIndicatorComposeTest {
                 )
             }
         }
-        composeTestRule.mainClock.advanceTimeBy(500L)
         composeTestRule
             .onNodeWithContentDescription("Agent busy: 1 chat stream, 1 sub-agent")
             .assertExists()

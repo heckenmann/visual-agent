@@ -4,9 +4,7 @@ import de.heckenmann.visualagent.knowledge.PreferenceStore
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -39,20 +37,21 @@ class SubAgentExecutionControlTest {
             val control = SubAgentExecutionControl(MemoryPreferenceStore())
             control.pauseAll()
             control.pauseAgent("agent-1")
+            val entered = CompletableDeferred<Unit>()
             val released = CompletableDeferred<Unit>()
             val waiting =
                 async(Dispatchers.Default) {
+                    entered.complete(Unit)
                     control.awaitExecutionAllowed("agent-1")
                     released.complete(Unit)
                 }
 
-            delay(50)
+            entered.await()
             assertFalse(released.isCompleted)
             control.resumeAgent("agent-1")
-            delay(50)
             assertFalse(released.isCompleted)
             control.resumeAll()
-            withTimeout(1_000) { released.await() }
+            released.await()
             waiting.await()
         }
 
@@ -90,14 +89,16 @@ class SubAgentExecutionControlTest {
             var notifications = 0
             control.addListener { notifications++ }
             control.pauseAll()
+            val entered = CompletableDeferred<Unit>()
             val released = CompletableDeferred<Unit>()
             val waiting =
                 async(Dispatchers.Default) {
+                    entered.complete(Unit)
                     control.awaitExecutionAllowed()
                     released.complete(Unit)
                 }
 
-            delay(50)
+            entered.await()
             preferences.failOnNextSecondWrite()
             assertFailsWith<IllegalStateException> { control.resumeAll() }
 
@@ -107,7 +108,7 @@ class SubAgentExecutionControlTest {
             assertTrue(SubAgentExecutionControl(preferences).isGloballyPaused())
 
             control.resumeAll()
-            withTimeout(1_000) { released.await() }
+            released.await()
             waiting.await()
             assertEquals(2, notifications)
         }

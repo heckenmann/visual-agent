@@ -102,7 +102,7 @@ class ConversationScrollToLatestInteractionTest {
         composeTestRule.waitForIdle()
 
         composeTestRule.onNodeWithContentDescription("Scroll to latest message").performClick()
-        composeTestRule.waitUntil(timeoutMillis = 5_000) { !listStates.last().canScrollBackward }
+        composeTestRule.waitForIdle()
 
         assertFalse(listStates.last().canScrollBackward, "the button must land at the newest timeline item")
         composeTestRule.onNodeWithText("message 80").assertExists()

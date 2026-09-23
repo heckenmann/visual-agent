@@ -9,7 +9,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CreateNewFolder
-import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -149,11 +148,7 @@ internal fun FilesPanel(
         }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            ActionIconButton(
-                icon = Icons.Filled.FolderOpen,
-                description = "Import file into current folder",
-                onClick = { picker.launch() },
-            )
+            WorkspaceFileImportButton { picker.launch() }
             ActionIconButton(
                 icon = Icons.Filled.CreateNewFolder,
                 description = "Create folder in current folder",

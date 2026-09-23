@@ -2,6 +2,7 @@ package de.heckenmann.visualagent.agent.codex
 
 import de.heckenmann.visualagent.agent.VisionSupport
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -73,7 +74,7 @@ internal object CodexAppServerRequestParams {
                 "input",
                 buildJsonArray {
                     prompt
-                        .conversationMessages()
+                        .currentTurnMessages()
                         .forEach { message ->
                             add(
                                 buildJsonObject {
@@ -96,6 +97,32 @@ internal object CodexAppServerRequestParams {
             put("summary", JsonPrimitive(if (showReasoningSummary) "detailed" else "none"))
         }
 
+    /** Converts completed conversation turns to role-preserving Responses API history items. */
+    fun historyItems(prompt: Prompt): JsonArray {
+        val messages = prompt.conversationMessages()
+        val latestUserIndex = messages.indexOfLast { it is UserMessage }
+        val previousTurns = if (latestUserIndex < 0) emptyList() else messages.take(latestUserIndex)
+        return buildJsonArray {
+            previousTurns.forEach { message ->
+                when (message) {
+                    is AssistantMessage -> add(responsesMessage("assistant", "output_text", message.text.orEmpty()))
+                    is UserMessage -> add(responsesMessage("user", "input_text", message.text.orEmpty()))
+                    else -> add(responsesMessage("user", "input_text", message.text.orEmpty()))
+                }
+            }
+        }
+    }
+
+    /** Builds the app-server request that adds completed turns to a thread without starting a turn. */
+    fun injectHistory(
+        threadId: String,
+        historyItems: JsonArray,
+    ): JsonObject =
+        buildJsonObject {
+            put("threadId", JsonPrimitive(threadId))
+            put("items", historyItems)
+        }
+
     private fun Prompt.systemInstructions(): String? =
         instructions
             .filterIsInstance<SystemMessage>()
@@ -104,10 +131,36 @@ internal object CodexAppServerRequestParams {
 
     private fun Prompt.conversationMessages(): List<Message> = instructions.filter { it !is SystemMessage }
 
+    private fun Prompt.currentTurnMessages(): List<Message> {
+        val messages = conversationMessages()
+        val latestUserIndex = messages.indexOfLast { it is UserMessage }
+        return if (latestUserIndex < 0) messages else messages.drop(latestUserIndex)
+    }
+
+    private fun responsesMessage(
+        role: String,
+        contentType: String,
+        text: String,
+    ) = buildJsonObject {
+        put("type", JsonPrimitive("message"))
+        put("role", JsonPrimitive(role))
+        put(
+            "content",
+            buildJsonArray {
+                add(
+                    buildJsonObject {
+                        put("type", JsonPrimitive(contentType))
+                        put("text", JsonPrimitive(text))
+                    },
+                )
+            },
+        )
+    }
+
     private fun messageText(message: org.springframework.ai.chat.messages.Message): String =
         when (message) {
             is AssistantMessage -> "[assistant]\n${message.text.orEmpty()}"
-            is UserMessage -> "[user]\n${message.text.orEmpty()}"
+            is UserMessage -> message.text.orEmpty()
             else -> "[context]\n${message.text.orEmpty()}"
         }
 }

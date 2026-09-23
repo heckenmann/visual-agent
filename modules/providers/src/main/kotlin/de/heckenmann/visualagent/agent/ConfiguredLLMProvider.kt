@@ -1,13 +1,14 @@
 package de.heckenmann.visualagent.agent
 
-import de.heckenmann.visualagent.agent.ollama.fetchModelCapabilitiesReactive
 import de.heckenmann.visualagent.agent.openai.OpenAiClient
+import de.heckenmann.visualagent.agent.provider.DefaultProviderRuntimeConfig
 import de.heckenmann.visualagent.agent.provider.ProfiledProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderEnvironmentCredentials
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
+import de.heckenmann.visualagent.agent.provider.ProviderRuntimeConfig
 import org.springframework.context.annotation.Primary
 import org.springframework.stereotype.Component
 import reactor.core.publisher.Flux
@@ -23,8 +24,9 @@ class ConfiguredLLMProvider(
     private val ollamaClient: OllamaClient,
     private val openAiClient: OpenAiClient,
     private val providerCatalog: ProviderCatalogService,
-    private val fetchCapabilities: (ProviderProfile) -> Mono<Map<String, Set<String>>> = ::fetchModelCapabilitiesReactive,
+    private val fetchCapabilities: (ProviderProfile) -> Mono<Map<String, Set<String>>> = ollamaClient::getModelCapabilitiesReactive,
     private val profiledAdapters: List<ProfiledProviderAdapter> = emptyList(),
+    private val runtimeConfig: ProviderRuntimeConfig = DefaultProviderRuntimeConfig(),
 ) : LLMProvider {
     override fun chatReactive(messages: List<Message>): Mono<ChatResponse> = chatReactive(ChatRequestContext(messages = messages))
 
@@ -93,13 +95,14 @@ class ConfiguredLLMProvider(
                         providerCatalog.updateDiscoveredModels(providerId, discovered.map { it.id })
                     }
                     if (profile.adapter == ProviderAdapter.OLLAMA) {
-                        fetchCapabilities(profile)
-                            .doOnNext { capabilities ->
-                                providerCatalog.updateModelCapabilities(providerId, capabilities)
-                            }.then()
-                    } else {
-                        Mono.empty()
-                    }.thenReturn(providerCatalog.selectableModels(providerId).map { it.id })
+                        providerCatalog.updateModelCapabilities(
+                            providerId,
+                            discovered
+                                .filter(ProviderModelConfig::capabilitiesComplete)
+                                .associate { it.id to it.capabilities },
+                        )
+                    }
+                    Mono.just(providerCatalog.selectableModels(providerId).map { it.id })
                 }
             }
 
@@ -128,7 +131,19 @@ class ConfiguredLLMProvider(
 
     private fun discoverModelConfigsReactive(profile: ProviderProfile): Mono<List<ProviderModelConfig>> =
         when (profile.adapter) {
-            ProviderAdapter.OLLAMA -> ollamaClient.getModelsReactive(profile).map { models -> models.map(::ProviderModelConfig) }
+            ProviderAdapter.OLLAMA ->
+                ollamaClient.getModelsReactive(profile).flatMap { names ->
+                    fetchCapabilities(profile).map { capabilities ->
+                        names.map { name ->
+                            val reported = capabilities[name]
+                            ProviderModelConfig(
+                                id = name,
+                                capabilities = reported.orEmpty(),
+                                capabilitiesComplete = reported != null,
+                            )
+                        }
+                    }
+                }
             ProviderAdapter.OPENAI_COMPATIBLE ->
                 openAiClient.getModelsReactive(profile).map { models -> models.map(::ProviderModelConfig) }
             ProviderAdapter.CODEX_CLI -> adapterFor(profile.adapter).loadModelsReactive(profile)
@@ -166,8 +181,44 @@ class ConfiguredLLMProvider(
 
     private fun resolveRequest(request: ChatRequestContext): Mono<ChatRequestContext> =
         Mono
-            .fromCallable { request.resolve() }
+            .fromCallable { request.withConfiguredContextLimit().resolve() }
             .subscribeOn(Schedulers.boundedElastic())
+            .flatMap(::refreshModelContextLimit)
+
+    private fun refreshModelContextLimit(request: ChatRequestContext): Mono<ChatRequestContext> {
+        val profile = request.providerProfile ?: return Mono.just(request)
+        val model = request.model ?: return Mono.just(request)
+        val modelDetails =
+            runCatching { modelDetailsReactive(profile, model) }
+                .getOrElse { return Mono.just(request) }
+        return modelDetails
+            .map { details ->
+                request.copy(
+                    contextWindow =
+                        request.contextWindow.copy(
+                            modelLimit = details.details?.contextLimit ?: request.contextWindow.modelLimit,
+                        ),
+                )
+            }.onErrorReturn(request)
+    }
+
+    private fun ChatRequestContext.withConfiguredContextLimit(): ChatRequestContext =
+        copy(
+            contextWindow =
+                contextWindow.copy(
+                    configuredLimit = contextWindow.configuredLimit ?: runtimeConfig.contextLength,
+                ),
+        )
+
+    private fun modelDetailsReactive(
+        profile: ProviderProfile,
+        model: String,
+    ): Mono<ShowResponse> =
+        when (profile.adapter) {
+            ProviderAdapter.OLLAMA -> ollamaClient.getModelDetailsReactive(profile, model)
+            ProviderAdapter.OPENAI_COMPATIBLE -> openAiClient.getModelDetailsReactive(profile, model)
+            ProviderAdapter.CODEX_CLI -> adapterFor(profile.adapter).getModelDetailsReactive(profile, model)
+        }
 
     private fun requireVisionCapability(
         profile: ProviderProfile,
@@ -187,6 +238,13 @@ class ConfiguredLLMProvider(
                 provider = stagedProfile.id,
                 model = stagedModel,
                 providerProfile = stagedProfile,
+                contextWindow = stagedProfile.contextWindow(stagedModel, contextWindow),
+                modelCapabilities =
+                    stagedProfile.models
+                        .firstOrNull { it.id == stagedModel }
+                        ?.capabilities
+                        .orEmpty(),
+                modelCapabilitiesComplete = stagedProfile.models.firstOrNull { it.id == stagedModel }?.capabilitiesComplete == true,
             )
         }
         val explicitOptions =
@@ -210,6 +268,23 @@ class ConfiguredLLMProvider(
             options = resolved.options,
             providerProfile = resolved.provider,
             modelCapabilities = resolved.model.capabilities,
+            modelCapabilitiesComplete = resolved.model.capabilitiesComplete,
+            contextWindow =
+                contextWindow.copy(
+                    modelLimit = resolved.model.contextLimit,
+                    outputLimit = resolved.model.outputLimit,
+                ),
+        )
+    }
+
+    private fun ProviderProfile.contextWindow(
+        modelId: String,
+        current: ContextWindow,
+    ): ContextWindow {
+        val modelConfig = models.firstOrNull { it.id == modelId }
+        return current.copy(
+            modelLimit = modelConfig?.contextLimit,
+            outputLimit = modelConfig?.outputLimit,
         )
     }
 }

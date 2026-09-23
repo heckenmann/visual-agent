@@ -187,6 +187,8 @@ interface LLMProvider {
  * @property messages Ordered conversation messages
  * @property model Optional model override; defaults to the configured model when null
  * @property enabledTools Tool IDs that may be exposed to the model for this request
+ * @property modelCapabilities Provider-reported capabilities of the selected model
+ * @property modelCapabilitiesComplete Whether the capability set is authoritative
  * @property metadata Additional provider-neutral execution context
  * @property cancellationToken Optional token the provider can consult to honour user cancellation
  * @see docs/usecases/uc_0000002_send_main_agent_message.md
@@ -206,7 +208,41 @@ data class ChatRequestContext(
     val providerProfile: ProviderProfile? = null,
     val cancellationToken: CancellationToken? = null,
     val modelCapabilities: Set<String> = emptySet(),
+    val modelCapabilitiesComplete: Boolean = false,
+    val contextWindow: ContextWindow = ContextWindow(),
 )
+
+/**
+ * Returns whether the selected model may receive tool definitions.
+ *
+ * An incomplete capability set is treated as unknown so providers that do not publish
+ * capability metadata remain usable. An authoritative set must explicitly contain `tools`.
+ */
+fun ChatRequestContext.supportsToolCalling(): Boolean =
+    !modelCapabilitiesComplete || modelCapabilities.any { it.equals("tools", ignoreCase = true) }
+
+/**
+ * Context limits known for one provider request.
+ *
+ * The effective input window is the smallest known limit. A missing model limit means that the
+ * configured application limit remains authoritative. Output is reserved only when the request
+ * or the selected model explicitly specifies an output limit.
+ *
+ * @property configuredLimit Application-configured context window in tokens
+ * @property modelLimit Provider-reported model context window in tokens
+ * @property outputLimit Requested or model-specific output limit in tokens
+ */
+data class ContextWindow(
+    val configuredLimit: Int? = null,
+    val modelLimit: Int? = null,
+    val outputLimit: Int? = null,
+) {
+    /** Returns the smallest available positive context limit, or null when no limit is known. */
+    fun effectiveLimit(): Int? = listOfNotNull(configuredLimit, modelLimit).filter { it > 0 }.minOrNull()
+
+    /** Returns this window with the request's explicit output limit taking precedence. */
+    fun withRequestedOutput(requestedOutput: Int?): ContextWindow = copy(outputLimit = requestedOutput ?: outputLimit)
+}
 
 /**
  * Provider-neutral model selection used by agents and request routing.

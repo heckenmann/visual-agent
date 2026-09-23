@@ -146,13 +146,10 @@ internal fun ConversationMessageContent(
             )
         } else if (isStreaming) {
             SelectionContainer {
-                StreamingText(text = parsed.answer, animate = false) { displayedText ->
-                    Text(
-                        text = displayedText,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
+                ComposeStreamingMarkdown(
+                    markdown = parsed.answer,
+                    streamKey = message.id ?: "streaming-assistant-response",
+                )
             }
         } else {
             SelectionContainer { ComposeMarkdown(parsed.answer) }

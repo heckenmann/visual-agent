@@ -4,9 +4,12 @@ import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.AgentManagerConstants
 import de.heckenmann.visualagent.agent.CancellationToken
 import de.heckenmann.visualagent.agent.ChatRequestContext
+import de.heckenmann.visualagent.agent.ContextWindow
+import de.heckenmann.visualagent.agent.ConversationContextPolicy
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.agent.context.MainAgentLongTermMemoryPrompt
+import de.heckenmann.visualagent.agent.context.MainAgentRuntimeStatePrompt
 
 /** Builds bounded, provider-safe request context for the main agent. */
 internal class AgentManagerContextOps(
@@ -19,20 +22,33 @@ internal class AgentManagerContextOps(
         requestId: String? = null,
         token: CancellationToken? = null,
     ): ChatRequestContext {
-        val contextPrompt = buildMainSystemContextPrompt()
-        val enabledTools = owner.agentToolConfigService.mainAgentTools()
+        val toolingAvailable = owner.providerCatalog.activeModelSupportsToolCalling()
+        val contextPrompt = buildMainSystemContextPrompt(toolingAvailable)
+        val enabledTools =
+            owner.agentToolConfigService
+                .mainAgentTools()
+                .takeIf { toolingAvailable }
+                ?.toSet()
+                .orEmpty()
+        val runtimeStatePrompt =
+            MainAgentRuntimeStatePrompt.compose(
+                todos = owner.todoStore.listTodos(),
+                subAgents = owner.getSubAgents(),
+            )
         val memoryPrompt =
             MainAgentLongTermMemoryPrompt.compose(
                 owner.mainAgentLongTermMemoryStore.snapshot(),
                 owner.appConfig.maxMainAgentMemoryChars,
                 ToolId("memory") in enabledTools,
+                toolingAvailable,
             )
         val preparedMessages = mutableListOf<Message>()
         preparedMessages += Message("system", contextPrompt)
-        preparedMessages += Message("system", memoryPrompt)
+        preparedMessages += Message("assistant", memoryPrompt, contextPolicy = ConversationContextPolicy.SUMMARY_SOURCE)
+        preparedMessages += Message("assistant", runtimeStatePrompt, contextPolicy = ConversationContextPolicy.SUMMARY_SOURCE)
         preparedMessages +=
             contextAssembler
-                .assemble(history, "$contextPrompt\n\n$memoryPrompt", owner.appConfig.contextLength)
+                .assemble(history, contextPrompt, owner.appConfig.contextLength)
                 .map(::normalizeHistoryRoleForProvider)
         val metadata =
             mutableMapOf<String, Any>(
@@ -47,26 +63,24 @@ internal class AgentManagerContextOps(
             enabledTools = enabledTools,
             metadata = metadata,
             cancellationToken = token,
+            contextWindow = ContextWindow(configuredLimit = owner.appConfig.contextLength),
         )
     }
 
     private fun normalizeHistoryRoleForProvider(message: Message): Message =
         when (message.role) {
             "tool" -> message.copy(role = "assistant")
-            "sub_agent" -> message.copy(role = "system")
-            "assistant" -> message.copy(content = owner.responseCoordinator.removeThinkingMarkup(message.content).trim())
+            "sub_agent" -> message.copy(role = "assistant")
+            "assistant" -> message.copy(content = owner.responseCoordinator.normalizeAssistantContent(message.content))
             else -> message
         }
 
-    internal fun buildMainSystemContextPrompt(): String {
-        val todos = owner.todoStore.listTodos()
-        return de.heckenmann.visualagent.agent.context.MainSystemPromptComposer
+    internal fun buildMainSystemContextPrompt(toolingAvailable: Boolean = owner.providerCatalog.activeModelSupportsToolCalling()): String =
+        de.heckenmann.visualagent.agent.context.MainSystemPromptComposer
             .compose(
-                todos = todos,
                 pendingResumeMessage = owner.pendingResumeMessage,
                 toolConfigService = owner.agentToolConfigService,
-                subAgents = owner.getSubAgents(),
                 userModelInstruction = owner.appConfig.userModelInstruction,
+                toolingAvailable = toolingAvailable,
             )
-    }
 }

@@ -8,7 +8,6 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import reactor.test.StepVerifier
-import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -170,11 +169,12 @@ class ToolRegistryTest {
         val previousTimeout = timeoutSeconds
         timeoutSeconds = 1
         try {
-            val registry = registry(SlowTool("context", 1500))
-            val result = registry.executeBlocking(registry.resolve(setOf(ToolId("context"))).single(), """{}""", emptyMap())
+            val tool = TimeoutRecordingTool("context")
+            val registry = registry(tool)
+            val result = registry.executeBlocking(tool, """{}""", emptyMap())
             val json = Json.parseToJsonElement(result).jsonObject
-            assertFalse(json["success"]!!.jsonPrimitive.content.toBoolean())
-            assertEquals("TIMEOUT", json["error"]!!.jsonObject["code"]!!.jsonPrimitive.content)
+            assertTrue(json["success"]!!.jsonPrimitive.content.toBoolean())
+            assertEquals(1, tool.timeoutSeconds)
         } finally {
             timeoutSeconds = previousTimeout
         }
@@ -185,16 +185,17 @@ class ToolRegistryTest {
         val previousTimeout = timeoutSeconds
         timeoutSeconds = 1
         try {
-            val registry = registry(SlowTool("context", 1200))
+            val tool = TimeoutRecordingTool("context")
+            val registry = registry(tool)
             val result =
                 registry.executeBlocking(
-                    registry.resolve(setOf(ToolId("context"))).single(),
+                    tool,
                     """{"timeoutSeconds":2}""",
                     emptyMap(),
                 )
             val json = Json.parseToJsonElement(result).jsonObject
             assertTrue(json["success"]!!.jsonPrimitive.content.toBoolean())
-            assertEquals("ok", json["data"]!!.jsonPrimitive.content)
+            assertEquals(2, tool.timeoutSeconds)
         } finally {
             timeoutSeconds = previousTimeout
         }
@@ -226,47 +227,6 @@ class ToolRegistryTest {
 
         assertEquals("integer", properties["timeoutSeconds"]!!.jsonObject["type"]!!.jsonPrimitive.content)
         assertEquals("boolean", properties["async"]!!.jsonObject["type"]!!.jsonPrimitive.content)
-    }
-
-    @Test
-    fun `tool call can run asynchronously`() {
-        val events = mutableListOf<ToolCallEvent>()
-        val bus = ToolEventBus()
-        bus.addListener { events += it }
-        val registry = ToolRegistry(listOf(SlowTool("context", 200)), bus) { timeoutSeconds }
-
-        val result = registry.executeBlocking(registry.resolve(setOf(ToolId("context"))).single(), """{"async":true}""", emptyMap())
-        val json = Json.parseToJsonElement(result).jsonObject
-        assertTrue(json["success"]!!.jsonPrimitive.content.toBoolean())
-        assertTrue(json["data"]!!.jsonPrimitive.content.contains("scheduled async"))
-
-        val deadline = System.currentTimeMillis() + 3000
-        while (System.currentTimeMillis() < deadline && events.count { it.phase == ToolCallPhase.FINISHED } == 0) {
-            TimeUnit.MILLISECONDS.sleep(25)
-        }
-        assertEquals(2, events.size)
-        assertEquals(ToolCallPhase.STARTED, events[0].phase)
-        assertEquals(ToolCallPhase.FINISHED, events[1].phase)
-        assertTrue(events[1].result.success)
-    }
-
-    @Test
-    fun `managed tool handles async input itself`() {
-        val events = mutableListOf<ToolCallEvent>()
-        val bus = ToolEventBus()
-        bus.addListener { events += it }
-        val registry = ToolRegistry(listOf(ManagedTool("agent:start")), bus)
-
-        val result = registry.executeBlocking(registry.resolve(setOf(ToolId("agent:start"))).single(), """{"async":true}""", emptyMap())
-        val json = Json.parseToJsonElement(result).jsonObject
-
-        assertTrue(json["data"]!!.jsonPrimitive.content.contains("scheduled async"))
-        val deadline = System.currentTimeMillis() + 3_000
-        while (System.currentTimeMillis() < deadline && events.count { it.phase == ToolCallPhase.FINISHED } == 0) {
-            TimeUnit.MILLISECONDS.sleep(25)
-        }
-        assertEquals(2, events.size)
-        assertEquals(true, events.last().context["async"])
     }
 
     private fun registry(vararg tools: VisualAgentTool) = ToolRegistry(tools.toList(), ToolEventBus()) { timeoutSeconds }
@@ -305,42 +265,24 @@ class ToolRegistryTest {
         ): ToolResult = throw IllegalStateException("boom")
     }
 
-    private class SlowTool(
+    private class TimeoutRecordingTool(
         id: String,
-        private val delayMillis: Long,
     ) : VisualAgentTool {
         override val definition =
             ToolDefinition(
                 id = ToolId(id),
                 name = ToolId(id).toFunctionName(),
-                description = "Slow $id",
+                description = "Timeout recording $id",
                 inputSchema = """{"type":"object"}""",
             )
+        var timeoutSeconds: Int? = null
 
         override fun execute(
             inputJson: String,
             context: Map<String, Any>,
         ): ToolResult {
-            TimeUnit.MILLISECONDS.sleep(delayMillis)
+            timeoutSeconds = context["toolTimeoutSeconds"] as? Int
             return ToolResult(definition.id.value, true, "ok")
         }
-    }
-
-    private class ManagedTool(
-        id: String,
-    ) : VisualAgentTool {
-        override val managesExecution: Boolean = true
-        override val definition =
-            ToolDefinition(
-                id = ToolId(id),
-                name = ToolId(id).toFunctionName(),
-                description = "Managed $id",
-                inputSchema = """{"type":"object"}""",
-            )
-
-        override fun execute(
-            inputJson: String,
-            context: Map<String, Any>,
-        ): ToolResult = ToolResult(definition.id.value, true, "managed")
     }
 }

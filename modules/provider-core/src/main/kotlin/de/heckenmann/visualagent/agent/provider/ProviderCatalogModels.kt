@@ -33,6 +33,7 @@ enum class ModelStatus {
  * @property options Model-level request options inherited by agents
  * @property contextLimit Optional context-window limit
  * @property outputLimit Optional output-token limit
+ * @property capabilitiesComplete Whether capabilities is a complete provider declaration rather than positive observations
  */
 @Serializable
 data class ProviderModelConfig(
@@ -44,6 +45,7 @@ data class ProviderModelConfig(
     val contextLimit: Int? = null,
     val outputLimit: Int? = null,
     val capabilities: Set<String> = emptySet(),
+    val capabilitiesComplete: Boolean = false,
 )
 
 /**

@@ -194,21 +194,34 @@ private fun ReorderableCollectionItemScope.SplitPanelHeader(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        onOpenSettings?.let { openSettings ->
-            ActionIconButton(
-                icon = Icons.Filled.Settings,
-                description = "Configure providers and models",
-                onClick = openSettings,
-                modifier = Modifier.size(if (primary) 28.dp else 26.dp),
-                iconSize = if (primary) 18.dp else 16.dp,
-            )
-        }
+        workspacePanelHeaderActions(window.title, primary, onOpenSettings, onClose)
+    }
+}
+
+/** Renders the settings and close actions for one workspace panel header. */
+@Composable
+internal fun workspacePanelHeaderActions(
+    panelTitle: String,
+    primary: Boolean,
+    onOpenSettings: (() -> Unit)?,
+    onClose: () -> Unit,
+) {
+    val buttonSize = if (primary) 28.dp else 26.dp
+    val iconSize = if (primary) 18.dp else 16.dp
+    onOpenSettings?.let { openSettings ->
         ActionIconButton(
-            icon = Icons.Filled.Close,
-            description = "Close ${window.title} panel",
-            onClick = onClose,
-            modifier = Modifier.size(if (primary) 28.dp else 26.dp),
-            iconSize = if (primary) 18.dp else 16.dp,
+            icon = Icons.Filled.Settings,
+            description = "Configure providers and models",
+            onClick = openSettings,
+            modifier = Modifier.size(buttonSize),
+            iconSize = iconSize,
         )
     }
+    ActionIconButton(
+        icon = Icons.Filled.Close,
+        description = "Close $panelTitle panel",
+        onClick = onClose,
+        modifier = Modifier.size(buttonSize),
+        iconSize = iconSize,
+    )
 }

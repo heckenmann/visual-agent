@@ -2,7 +2,6 @@ package de.heckenmann.visualagent.ui.onboarding
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import de.heckenmann.visualagent.protocol.OnboardingAgent
@@ -15,6 +14,8 @@ import de.heckenmann.visualagent.protocol.OnboardingStatus
 import de.heckenmann.visualagent.protocol.OnboardingValidationCode
 import de.heckenmann.visualagent.protocol.OnboardingValidationResult
 import de.heckenmann.visualagent.protocol.ProviderModel
+import de.heckenmann.visualagent.ui.CompletionIdlingResource
+import de.heckenmann.visualagent.ui.awaitCompletion
 import org.junit.Rule
 import org.junit.Test
 import kotlin.test.assertTrue
@@ -47,25 +48,24 @@ class ComposeOnboardingWizardTest {
         composeTestRule.onNodeWithText("LLM provider").assertExists()
         composeTestRule.onNodeWithText("Add provider").performClick()
         composeTestRule.onNodeWithText("New provider").assertExists()
-        composeTestRule.onNodeWithText("Continue").performClick()
-        composeTestRule.waitUntil(5_000) { onboarding.discoveryCalled }
-        composeTestRule.waitUntil(5_000) {
-            composeTestRule.onAllNodesWithText("Discovered model", substring = true).fetchSemanticsNodes().isNotEmpty()
+        composeTestRule.awaitCompletion(onboarding.modelDiscovery) {
+            composeTestRule.onNodeWithText("Continue").performClick()
         }
         composeTestRule.onNodeWithText("✓ Discovered model").assertExists()
         composeTestRule.onNodeWithText("Continue").performClick()
         composeTestRule.onNodeWithText("Review").assertExists()
-        composeTestRule.onNodeWithText("Save and continue").performClick()
-        composeTestRule.waitUntil(5_000) {
-            composeTestRule.onAllNodesWithText("Create your first sub-agent").fetchSemanticsNodes().isNotEmpty()
+        composeTestRule.awaitCompletion(onboarding.providerSaved) {
+            composeTestRule.onNodeWithText("Save and continue").performClick()
         }
         composeTestRule.onNodeWithText("Existing agent").assertExists()
         composeTestRule.onNodeWithText(DEFAULT_RESEARCHER_REQUEST).assertExists()
-        composeTestRule.onNodeWithText("Ask model to create sub-agent").performClick()
-        composeTestRule.waitUntil(5_000) { onboarding.creationCalled }
+        composeTestRule.awaitCompletion(onboarding.agentCreation) {
+            composeTestRule.onNodeWithText("Ask model to create sub-agent").performClick()
+        }
         composeTestRule.onNodeWithText("Created Researcher").assertExists()
-        composeTestRule.onNodeWithText("Finish").performClick()
-        composeTestRule.waitUntil(5_000) { finished }
+        composeTestRule.awaitCompletion(onboarding.completion) {
+            composeTestRule.onNodeWithText("Finish").performClick()
+        }
 
         assertTrue(onboarding.finished)
         assertTrue(onboarding.completed)
@@ -76,6 +76,10 @@ class ComposeOnboardingWizardTest {
         var discoveryCalled = false
         var creationCalled = false
         var completed = false
+        val modelDiscovery = CompletionIdlingResource("model discovery")
+        val providerSaved = CompletionIdlingResource("provider save")
+        val agentCreation = CompletionIdlingResource("agent creation")
+        val completion = CompletionIdlingResource("onboarding completion")
 
         override fun state() = OnboardingState(OnboardingStatus.NOT_STARTED, version = 1)
 
@@ -87,6 +91,7 @@ class ComposeOnboardingWizardTest {
 
         override suspend fun discoverModels(draft: OnboardingProviderDraft): List<ProviderModel> {
             discoveryCalled = true
+            modelDiscovery.complete()
             return listOf(ProviderModel(id = "discovered", name = "Discovered model"))
         }
 
@@ -101,10 +106,12 @@ class ComposeOnboardingWizardTest {
             validationFingerprint: String,
         ) {
             finished = true
+            providerSaved.complete()
         }
 
         override suspend fun createAgent(description: String): OnboardingAgentCreationResult {
             creationCalled = true
+            agentCreation.complete()
             return OnboardingAgentCreationResult(
                 "Created Researcher",
                 agents() + OnboardingAgent("researcher", "Researcher", "Research topics"),
@@ -113,6 +120,7 @@ class ComposeOnboardingWizardTest {
 
         override fun complete() {
             completed = true
+            completion.complete()
         }
     }
 }

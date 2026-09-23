@@ -15,6 +15,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import de.heckenmann.visualagent.protocol.ProviderModel
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -73,6 +74,59 @@ class ComposeWorkspaceNavigationTest {
         composeTestRule.onNodeWithText("Provider ollama").assertExists()
         composeTestRule.onNodeWithText("Model llava").assertExists()
         composeTestRule.onNodeWithText("Beans 123").assertExists()
+    }
+
+    @Test
+    fun `workspace header renders model capability warnings`() {
+        val warnings =
+            modelCapabilityWarnings(
+                configuredContextLength = 4096,
+                activeModel =
+                    ProviderModel(
+                        id = "small",
+                        contextLimit = 2048,
+                        capabilities = setOf("completion"),
+                        capabilitiesComplete = true,
+                    ),
+            )
+
+        composeTestRule.setContent {
+            MaterialTheme {
+                ComposeWorkspaceHeader(
+                    providerName = "provider",
+                    modelName = "small",
+                    beanDefinitionCount = 1,
+                    inFlight = InFlightState(),
+                    capabilityWarnings = warnings,
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Context 2048").assertExists()
+        composeTestRule.onNodeWithText("Tools unavailable").assertExists()
+    }
+
+    @Test
+    fun `capability warnings leave undeclared tooling support unknown`() {
+        val warnings =
+            modelCapabilityWarnings(
+                configuredContextLength = 8192,
+                activeModel = ProviderModel(id = "unknown"),
+            )
+
+        assertEquals(null, warnings.context)
+        assertEquals(null, warnings.tooling)
+    }
+
+    @Test
+    fun `capability warnings leave partial capability declarations unknown`() {
+        val warnings =
+            modelCapabilityWarnings(
+                configuredContextLength = 8192,
+                activeModel = ProviderModel(id = "vision-model", capabilities = setOf("vision")),
+            )
+
+        assertEquals(null, warnings.tooling)
     }
 
     @Test

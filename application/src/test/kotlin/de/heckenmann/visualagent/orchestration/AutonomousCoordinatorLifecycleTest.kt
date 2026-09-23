@@ -3,9 +3,8 @@ package de.heckenmann.visualagent.orchestration
 import de.heckenmann.visualagent.agent.AgentStatus
 import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.todo.TodoStatus
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -51,14 +50,14 @@ class AutonomousCoordinatorLifecycleTest {
     @Test
     fun `start all todos resets cancelled work and schedules it`() =
         runBlocking {
-            val fixture = buildFixture(chatDelayMs = 5000)
+            val fixture = buildFixture(workerResponseGate = CompletableDeferred())
             fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
             val todo = fixture.todoManager.add("Retry task", "agent-1")
             fixture.todoManager.cancelTodo(todo.id)
 
             try {
                 assertEquals(1, fixture.coordinator.startAllTodos())
-                delay(1500)
+                fixture.awaitWorkerStart()
 
                 assertEquals(TodoStatus.IN_PROGRESS, fixture.todoManager.getById(todo.id)?.status)
                 assertEquals(AgentStatus.BUSY, fixture.subAgents["agent-1"]?.status)
@@ -70,13 +69,13 @@ class AutonomousCoordinatorLifecycleTest {
     @Test
     fun `stop todo cancels an in progress worker`() =
         runBlocking {
-            val fixture = buildFixture(chatDelayMs = 5000)
+            val fixture = buildFixture(workerResponseGate = CompletableDeferred())
             fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
             val todo = fixture.todoManager.add("Stop task", "agent-1")
 
             try {
                 assertTrue(fixture.coordinator.startTodo(todo.id))
-                delay(1500)
+                fixture.awaitWorkerStart()
                 assertEquals(TodoStatus.IN_PROGRESS, fixture.todoManager.getById(todo.id)?.status)
 
                 assertTrue(fixture.coordinator.stopTodo(todo.id))
@@ -110,10 +109,9 @@ class AutonomousCoordinatorLifecycleTest {
 
             try {
                 fixture.coordinator.startAutonomousProcessing(seed = false)
-                delay(1000)
+                fixture.awaitWorkerCompletion()
 
-                val completion = fixture.messages.firstOrNull { it.content.contains("completed todo") }
-                requireNotNull(completion)
+                val completion = fixture.awaitMessageContaining("completed todo")
                 assertTrue(completion.content.contains("Use `todos` with `get-result`"))
                 assertTrue(completion.content.contains("completed todo"))
             } finally {
@@ -130,10 +128,10 @@ class AutonomousCoordinatorLifecycleTest {
 
             try {
                 fixture.coordinator.startAutonomousProcessing(seed = false)
-                delay(1000)
+                fixture.awaitWorkerCompletion()
 
                 assertEquals(TodoStatus.COMPLETED, fixture.todoManager.getById(todo.id)!!.status)
-                assertNotNull(fixture.messages.firstOrNull { it.content.contains("completed todo") })
+                assertNotNull(fixture.awaitMessageContaining("completed todo"))
             } finally {
                 fixture.cancel()
             }
@@ -148,11 +146,11 @@ class AutonomousCoordinatorLifecycleTest {
 
             try {
                 fixture.coordinator.startAutonomousProcessing(seed = false)
-                delay(2_000)
+                fixture.awaitWorkerCompletion()
 
+                assertTrue(fixture.awaitMessageContaining("failed attempt 1").content.contains("failed attempt 1"))
+                assertTrue(fixture.awaitMessageContaining("completed todo ${todo.id}").content.contains("completed todo ${todo.id}"))
                 assertEquals(TodoStatus.COMPLETED, fixture.todoManager.getById(todo.id)?.status)
-                assertTrue(fixture.messages.any { it.content.contains("failed attempt 1") })
-                assertTrue(fixture.messages.any { it.content.contains("completed todo ${todo.id}") })
             } finally {
                 fixture.cancel()
             }
@@ -161,25 +159,25 @@ class AutonomousCoordinatorLifecycleTest {
     @Test
     fun `sub-agent restarts when todo description is edited while running`() =
         runBlocking {
-            val fixture = buildFixture(chatDelayMs = 1000)
+            val workerResponseGate = CompletableDeferred<Unit>()
+            val fixture = buildFixture(workerResponseGate = workerResponseGate)
             fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
             val todo = fixture.todoManager.add("Old description", "agent-1")
 
             try {
                 fixture.coordinator.startAutonomousProcessing(seed = false)
-                delay(400)
+                fixture.awaitWorkerStart()
                 fixture.todoManager.update(todo.id, "New description")
 
-                withTimeout(2_000) {
-                    while (fixture.messages.none { it.content.contains("Todo ${todo.id} was updated") }) delay(10)
-                }
-                delay(100)
+                fixture.awaitMessageContaining("Todo ${todo.id} was updated")
+                fixture.awaitWorkerStart()
                 assertEquals(AgentStatus.BUSY, fixture.subAgents["agent-1"]?.status)
 
-                delay(4000)
+                workerResponseGate.complete(Unit)
+                fixture.awaitWorkerCompletion()
 
                 assertTrue(fixture.messages.any { it.content.contains("Todo ${todo.id} was updated") })
-                assertTrue(fixture.messages.any { it.content.contains("completed todo ${todo.id}") })
+                assertTrue(fixture.awaitMessageContaining("completed todo ${todo.id}").content.contains("completed todo ${todo.id}"))
             } finally {
                 fixture.cancel()
             }
@@ -188,18 +186,17 @@ class AutonomousCoordinatorLifecycleTest {
     @Test
     fun `coordinator resumes loop when existing todo is reset to PENDING`() =
         runBlocking {
-            val fixture = buildFixture(chatDelayMs = 5000)
+            val fixture = buildFixture(workerResponseGate = CompletableDeferred())
             fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
             val todo = fixture.todoManager.add("Implement feature", "agent-1")
             fixture.todoManager.cancelTodo(todo.id)
 
             try {
                 fixture.coordinator.startAutonomousProcessing(seed = false)
-                delay(400)
                 assertEquals(AgentStatus.IDLE, fixture.subAgents["agent-1"]?.status)
 
                 fixture.todoManager.updateStatus(todo.id, TodoStatus.PENDING)
-                delay(2000)
+                fixture.awaitWorkerStart()
 
                 assertEquals(AgentStatus.BUSY, fixture.subAgents["agent-1"]?.status)
                 assertTrue(fixture.messages.any { it.content.contains("Started todo") })
@@ -211,17 +208,17 @@ class AutonomousCoordinatorLifecycleTest {
     @Test
     fun `sub-agent stops when assigned agent changes while running`() =
         runBlocking {
-            val fixture = buildFixture(chatDelayMs = 1000)
+            val fixture = buildFixture(workerResponseGate = CompletableDeferred())
             fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
             fixture.putSubAgent(SubAgent(id = "agent-2", name = "Tester", role = "Testing", status = AgentStatus.IDLE))
             val todo = fixture.todoManager.add("Task", "agent-1")
 
             try {
                 fixture.coordinator.startAutonomousProcessing(seed = false)
-                delay(400)
+                fixture.awaitWorkerStart()
                 fixture.todoManager.updateAssignedAgent(todo.id, "agent-2")
 
-                delay(2500)
+                fixture.awaitMessageContaining("Stopped because the todo was cancelled, deleted, or reassigned")
 
                 assertTrue(fixture.messages.any { it.content.contains("Stopped because the todo was cancelled, deleted, or reassigned") })
             } finally {

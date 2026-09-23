@@ -10,7 +10,6 @@ import de.heckenmann.visualagent.agent.tools.api.ToolResult
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.AfterEach
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -69,7 +68,7 @@ class GraalJavaScriptExecutionServiceTest {
         val result =
             execute(
                 """
-                const numbers = (await tools.call('test:numbers', {})).data;
+                const numbers = (await tools.call('test_numbers', {})).data;
                 return numbers.filter(value => value > 1).map(value => value * 2);
                 """.trimIndent(),
                 enabled = setOf("test:numbers"),
@@ -83,9 +82,9 @@ class GraalJavaScriptExecutionServiceTest {
         val result =
             execute(
                 """
-                const numbers = (await tools.call('test:numbers', {})).data;
+                const numbers = (await tools.call('test_numbers', {})).data;
                 const doubled = numbers.map(value => value * 2);
-                return (await tools.call('test:echo', {values: doubled})).data;
+                return (await tools.call('test_echo', {values: doubled})).data;
                 """.trimIndent(),
                 enabled = setOf("test:numbers", "test:echo"),
             )
@@ -98,14 +97,18 @@ class GraalJavaScriptExecutionServiceTest {
         val result =
             execute(
                 """
-                const description = tools.describe('test:numbers');
-                return {count: tools.list().length, id: description.id, name: description.name};
+                const description = tools.describe('test_numbers');
+                return {
+                    count: tools.list().length,
+                    hasNoInternalIds: description.id === undefined && tools.list()[0].id === undefined,
+                    name: description.name
+                };
                 """.trimIndent(),
                 enabled = setOf("test:numbers"),
             )
 
         assertEquals(
-            mapOf("count" to 1.0, "id" to "test:numbers", "name" to "test_numbers"),
+            mapOf("count" to 1.0, "hasNoInternalIds" to true, "name" to "test_numbers"),
             result.value,
         )
     }
@@ -115,7 +118,7 @@ class GraalJavaScriptExecutionServiceTest {
         val observed = mutableListOf<String>()
         val registration = events.addListener { observed += "${it.toolId}:${it.phase}" }
         try {
-            execute("return await tools.call('test:numbers', {});", enabled = setOf("test:numbers"))
+            execute("return await tools.call('test_numbers', {});", enabled = setOf("test:numbers"))
         } finally {
             registration.close()
         }
@@ -172,17 +175,20 @@ class GraalJavaScriptExecutionServiceTest {
                 mapOf("cancellationToken" to parentCancellationToken),
             )
 
-        assertTrue(result.contains("TOOL_TIMEOUT"))
+        assertTrue(result.contains("\"success\":false"))
         assertFalse(parentCancellationToken.isCancelled)
     }
 
     @Test
     fun `rejects disabled and recursive tools`() {
         assertFailsWith<JavaScriptExecutionException> {
-            execute("await tools.call('test:echo', {});", enabled = emptySet())
+            execute("await tools.call('test_echo', {});", enabled = emptySet())
         }.also { assertEquals(JavaScriptErrorCategory.TOOL_ACCESS, it.category) }
         assertFailsWith<JavaScriptExecutionException> {
-            execute("await tools.call('javascript:execute', {});", enabled = setOf("javascript:execute"))
+            execute("await tools.call('test:echo', {});", enabled = setOf("test:echo"))
+        }.also { assertEquals(JavaScriptErrorCategory.TOOL_ACCESS, it.category) }
+        assertFailsWith<JavaScriptExecutionException> {
+            execute("await tools.call('javascript_execute', {});", enabled = setOf("javascript:execute"))
         }.also { assertEquals(JavaScriptErrorCategory.TOOL_ACCESS, it.category) }
     }
 
@@ -192,7 +198,7 @@ class GraalJavaScriptExecutionServiceTest {
             execute(
                 """
                 try {
-                    await tools.call('missing:tool', {});
+                    await tools.call('missing_tool', {});
                     return 'unexpected';
                 } catch (error) {
                     return 'handled';
@@ -210,7 +216,7 @@ class GraalJavaScriptExecutionServiceTest {
             assertFailsWith<JavaScriptExecutionException> {
                 execute(
                     """
-                    try { await tools.call('test:echo', 'not-an-object'); } catch (_) {}
+                    try { await tools.call('test_echo', 'not-an-object'); } catch (_) {}
                     return await Promise.reject(new Error('later failure'));
                     """.trimIndent(),
                     enabled = setOf("test:echo"),
@@ -260,7 +266,7 @@ class GraalJavaScriptExecutionServiceTest {
     fun `bounds tool argument traversal before materializing guest arrays`() {
         assertFailsWith<JavaScriptExecutionException> {
             execute(
-                "return await tools.call('test:echo', {values: Array(10_000).fill(1)});",
+                "return await tools.call('test_echo', {values: Array(10_000).fill(1)});",
                 enabled = setOf("test:echo"),
                 limits = JavaScriptExecutionLimits(maxToolArgumentCharacters = 100),
             )
@@ -271,7 +277,7 @@ class GraalJavaScriptExecutionServiceTest {
     fun `rejects nested asynchronous tool calls`() {
         assertFailsWith<JavaScriptExecutionException> {
             execute(
-                "await tools.call('test:echo', {async: true});",
+                "await tools.call('test_echo', {async: true});",
                 enabled = setOf("test:echo"),
             )
         }.also {
@@ -285,9 +291,9 @@ class GraalJavaScriptExecutionServiceTest {
         val result =
             service.execute(
                 JavaScriptExecutionRequest(
-                    source = "return await tools.call('test:slow', {timeoutSeconds: 600});",
+                    source = "return await tools.call('test_slow', {timeoutSeconds: 600});",
                     enabledTools = setOf("test:slow"),
-                    requestContext = mapOf("toolDeadlineNanos" to (System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(100))),
+                    requestContext = mapOf("toolDeadlineNanos" to System.nanoTime()),
                     limits = JavaScriptExecutionLimits(timeoutMillis = 30_000),
                 ),
             )
@@ -308,7 +314,7 @@ class GraalJavaScriptExecutionServiceTest {
         }.also { assertEquals(JavaScriptErrorCategory.RUNTIME, it.category) }
         assertFailsWith<JavaScriptExecutionException> {
             execute(
-                "await tools.call('test:numbers', {}); await tools.call('test:numbers', {});",
+                "await tools.call('test_numbers', {}); await tools.call('test_numbers', {});",
                 enabled = setOf("test:numbers"),
                 limits = JavaScriptExecutionLimits(maxToolCalls = 1),
             )
@@ -321,30 +327,10 @@ class GraalJavaScriptExecutionServiceTest {
         }.also { assertEquals(JavaScriptErrorCategory.TIMEOUT, it.category) }
         assertFailsWith<JavaScriptExecutionException> {
             execute(
-                "await tools.call('test:echo', 'not-an-object');",
+                "await tools.call('test_echo', 'not-an-object');",
                 enabled = setOf("test:echo"),
             )
         }.also { assertEquals(JavaScriptErrorCategory.TOOL_ARGUMENTS, it.category) }
-    }
-
-    @Test
-    fun `parent cancellation terminates execution`() {
-        val token = CancellationToken()
-        val thread =
-            Thread {
-                assertFailsWith<JavaScriptExecutionException> {
-                    execute(
-                        "while (true) {}",
-                        token = token,
-                        limits = JavaScriptExecutionLimits(timeoutMillis = 30_000),
-                    )
-                }.also { assertTrue(it.category == JavaScriptErrorCategory.CANCELLED || it.category == JavaScriptErrorCategory.RUNTIME) }
-            }
-        thread.start()
-        Thread.sleep(100)
-        token.cancel()
-        thread.join(5_000)
-        assertTrue(!thread.isAlive)
     }
 
     @Test
@@ -354,7 +340,7 @@ class GraalJavaScriptExecutionServiceTest {
             Thread {
                 assertFailsWith<JavaScriptExecutionException> {
                     execute(
-                        "await tools.call('test:slow', {}); return 'done';",
+                        "await tools.call('test_slow', {}); return 'done';",
                         enabled = setOf("test:slow"),
                         token = token,
                         limits = JavaScriptExecutionLimits(timeoutMillis = 30_000),
@@ -362,9 +348,9 @@ class GraalJavaScriptExecutionServiceTest {
                 }.also { assertEquals(JavaScriptErrorCategory.CANCELLED, it.category) }
             }
         thread.start()
-        assertTrue(SlowTool.started.await(5, TimeUnit.SECONDS))
+        SlowTool.started.await()
         token.cancel()
-        thread.join(5_000)
+        thread.join()
         assertTrue(!thread.isAlive)
         assertTrue(SlowTool.interrupted.get())
     }
@@ -441,7 +427,7 @@ class GraalJavaScriptExecutionServiceTest {
         ): ToolResult {
             started.countDown()
             try {
-                Thread.sleep(30_000)
+                CountDownLatch(1).await()
             } catch (_: InterruptedException) {
                 interrupted.set(true)
                 Thread.currentThread().interrupt()

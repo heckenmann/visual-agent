@@ -9,12 +9,18 @@ import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.api.AgentToolPort
 import de.heckenmann.visualagent.agent.tools.api.ToolAgentExecutionStatus
+import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 import de.heckenmann.visualagent.knowledge.Memory
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import org.springframework.beans.factory.ObjectProvider
 import java.time.Instant
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -44,6 +50,8 @@ class AgentControlToolsTest {
         assertTrue(result.content.contains("active=1, queued=2"))
         assertTrue(result.content.contains("todo=todo-1"))
         assertTrue(result.content.contains("task=Implement queue"))
+        assertTrue(result.content.contains("file_write"))
+        assertFalse(result.content.contains("file:write"))
     }
 
     @Test
@@ -67,10 +75,10 @@ class AgentControlToolsTest {
         assertTrue(createResult.success)
         assertTrue(createResult.content.contains("To assign work, create a todo"))
 
-        val updateResult = agentUpdateTool(manager).execute("""{"id":"created","name":"Senior Coder","templateName":"coder"}""")
+        val updateResult = updateTool().execute("""{"id":"created","name":"Senior Coder","templateName":"coder"}""")
         assertTrue(updateResult.success)
         assertTrue(updateResult.content.contains("Assigned tools:"))
-        assertFalse(agentUpdateTool(manager).execute("""{"id":"missing"}""").success)
+        assertFalse(updateTool().execute("""{"id":"missing"}""").success)
         assertTrue(agentDeleteTool(manager).execute("""{"id":"created"}""").success)
         assertFalse(agentDeleteTool(manager).execute("""{"id":"missing"}""").success)
     }
@@ -103,9 +111,27 @@ class AgentControlToolsTest {
         every { agentToolConfigService.toolsFor(updated) } returns setOf(ToolId("file:read"), ToolId("terminal"))
         every { manager.updateAgent("agent-1", null, null, any()) } returns true
         every { manager.getSubAgent("agent-1") } returns updated
+        val registry = mockk<ToolRegistry>()
+        every { registry.toolDefinitions() } returns
+            listOf(
+                ToolDefinition(
+                    de.heckenmann.visualagent.agent.tools.api
+                        .ToolId("file:read"),
+                    "file_read",
+                    "Read files",
+                    "{}",
+                ),
+                ToolDefinition(
+                    de.heckenmann.visualagent.agent.tools.api
+                        .ToolId("terminal"),
+                    "terminal",
+                    "Terminal",
+                    "{}",
+                ),
+            )
 
         val result =
-            agentUpdateTool(manager).execute(
+            updateTool(registry).execute(
                 """
                 {
                     "id":"agent-1",
@@ -119,7 +145,7 @@ class AgentControlToolsTest {
                     "maxTokens":4096,
                     "variant":"chat",
                     "options":{"seed":"42"},
-                    "tools":["file:read","terminal"]
+                    "tools":["file_read","terminal"]
                 }
                 """.trimIndent(),
             )
@@ -146,6 +172,31 @@ class AgentControlToolsTest {
                 },
             )
         }
+
+        val updateTool = updateTool(registry)
+        val invalid =
+            ToolRegistry(listOf(updateTool), ToolEventBus())
+                .executeBlocking(updateTool, """{"id":"agent-1","tools":["unknown_tool"]}""", emptyMap())
+        val error =
+            Json
+                .parseToJsonElement(invalid)
+                .jsonObject
+                .getValue("error")
+                .jsonObject
+        assertEquals("INVALID_ARGUMENT", error.getValue("code").jsonPrimitive.content)
+        assertTrue(
+            error
+                .getValue("message")
+                .jsonPrimitive.content
+                .contains("Unknown tool function 'unknown_tool'"),
+        )
+        assertTrue(
+            error
+                .getValue("message")
+                .jsonPrimitive.content
+                .contains("available tool inventory"),
+        )
+        verify(exactly = 1) { manager.updateAgent("agent-1", null, null, any()) }
     }
 
     @Test
@@ -235,5 +286,14 @@ class AgentControlToolsTest {
         assertTrue(result.success)
         assertTrue(result.content.contains("Agent agent-1 state: PAUSED"))
         assertTrue(result.content.contains("Pause reason: INDIVIDUAL"))
+    }
+
+    private fun updateTool(registry: ToolRegistry = mockk()): AgentUpdateTool {
+        val provider = mockk<ObjectProvider<ToolRegistry>>()
+        every { provider.getObject() } returns registry
+        return AgentUpdateTool(
+            AgentToolPortAdapter(manager, manager.agentToolConfigService, manager.memoryStore),
+            provider,
+        )
     }
 }

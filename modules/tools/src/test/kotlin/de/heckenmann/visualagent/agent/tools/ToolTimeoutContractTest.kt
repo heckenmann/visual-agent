@@ -7,7 +7,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -30,7 +29,7 @@ class ToolTimeoutContractTest {
     fun `nested call cannot exceed its inherited deadline`() {
         val registry = ToolRegistry(listOf(SlowManagedTool("context")), ToolEventBus()) { 600 }
         val tool = registry.resolve(setOf(ToolId("context"))).single()
-        val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(100)
+        val deadline = System.nanoTime()
 
         val result = registry.executeBlocking(tool, """{"timeoutSeconds":600}""", mapOf("toolDeadlineNanos" to deadline))
         val json = Json.parseToJsonElement(result).jsonObject
@@ -58,9 +57,9 @@ class ToolTimeoutContractTest {
             }
 
         thread.start()
-        assertFalse(started.await(5, TimeUnit.SECONDS).not())
+        started.await()
         parent.cancel()
-        thread.join(5_000)
+        thread.join()
 
         assertFalse(thread.isAlive)
         assertContains(result.get(), "TOOL_CANCELLED")
@@ -69,6 +68,7 @@ class ToolTimeoutContractTest {
     private class SlowManagedTool(
         id: String = "javascript:execute",
     ) : VisualAgentTool {
+        private val release = CountDownLatch(1)
         override val managesExecution: Boolean = true
         override val definition =
             ToolDefinition(
@@ -82,7 +82,7 @@ class ToolTimeoutContractTest {
             inputJson: String,
             context: Map<String, Any>,
         ): ToolResult {
-            TimeUnit.MILLISECONDS.sleep(1_500)
+            awaitUntilInterrupted(release)
             return ToolResult(definition.id.value, true, "late")
         }
     }
@@ -103,8 +103,16 @@ class ToolTimeoutContractTest {
             context: Map<String, Any>,
         ): ToolResult {
             started.countDown()
-            Thread.sleep(30_000)
+            awaitUntilInterrupted(CountDownLatch(1))
             return ToolResult(definition.id.value, true, "late")
         }
+    }
+}
+
+private fun awaitUntilInterrupted(release: CountDownLatch) {
+    try {
+        release.await()
+    } catch (_: InterruptedException) {
+        Thread.currentThread().interrupt()
     }
 }

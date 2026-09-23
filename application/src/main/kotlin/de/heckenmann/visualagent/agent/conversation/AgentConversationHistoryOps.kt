@@ -271,7 +271,12 @@ internal class AgentConversationHistoryOps(
             ?.let {
                 Message(
                     role = it.role,
-                    content = it.content,
+                    content =
+                        if (it.role == "assistant") {
+                            owner.responseCoordinator.normalizeAssistantPresentationContent(it.content)
+                        } else {
+                            it.content
+                        },
                     metadata = it.metadata?.ifBlank { null },
                     id = it.id,
                     createdAtEpochMillis = it.createdAt.toEpochMilli(),

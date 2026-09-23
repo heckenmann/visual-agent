@@ -4,6 +4,7 @@ package de.heckenmann.visualagent.ui.status
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import de.heckenmann.visualagent.protocol.ProtocolErrorCategory
@@ -133,5 +134,29 @@ class ComposeErrorUiTest {
 
         composeTestRule.onNodeWithText("Tool input invalid").assertExists()
         composeTestRule.onNodeWithText("Missing path.").assertExists()
+    }
+
+    @Test
+    fun `error banner copy and retry buttons invoke callbacks`() {
+        val userError =
+            UserFacingError(
+                category = ProtocolErrorCategory.PROVIDER,
+                summary = "Provider unreachable",
+                detail = "Check the connection.",
+                retryable = true,
+            )
+        var copied = false
+        var retried = false
+        composeTestRule.setContent {
+            MaterialTheme {
+                ErrorBanner(userError, onRetry = { retried = true }, onCopyDetails = { copied = true })
+            }
+        }
+
+        composeTestRule.onNodeWithContentDescription("Copy error details").performClick()
+        composeTestRule.onNodeWithContentDescription("Retry").performClick()
+
+        assertTrue(copied)
+        assertTrue(retried)
     }
 }

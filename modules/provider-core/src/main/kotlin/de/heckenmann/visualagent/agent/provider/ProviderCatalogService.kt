@@ -206,8 +206,13 @@ class ProviderCatalogService(
         val profile = getProvider(providerId) ?: return
         val models =
             profile.models.map { model ->
-                val caps = capabilities[model.id] ?: model.capabilities
-                if (caps != model.capabilities) model.copy(capabilities = caps) else model
+                capabilities[model.id]?.let { caps ->
+                    if (caps != model.capabilities || !model.capabilitiesComplete) {
+                        model.copy(capabilities = caps, capabilitiesComplete = true)
+                    } else {
+                        model
+                    }
+                } ?: model
             }
         saveProvider(profile.copy(models = models))
     }
@@ -237,6 +242,18 @@ class ProviderCatalogService(
     fun activeModelId(): String {
         val state = load()
         return state.activeModelId.ifBlank { getProvider(state.activeProviderId)?.defaultModel.orEmpty() }
+    }
+
+    /**
+     * Returns whether the active model may receive tool definitions.
+     *
+     * Incomplete capability metadata is treated as unknown and therefore remains enabled for
+     * compatibility with providers that do not publish capability declarations.
+     */
+    fun activeModelSupportsToolCalling(): Boolean {
+        val profile = getProvider(activeProviderId()) ?: return true
+        val model = profile.models.firstOrNull { it.id == activeModelId() } ?: return true
+        return !model.capabilitiesComplete || model.capabilities.any { it.equals("tools", ignoreCase = true) }
     }
 
     /**

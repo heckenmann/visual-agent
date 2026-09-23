@@ -117,6 +117,7 @@ internal class OllamaClientOps(
                             format = response.details().format(),
                             parameterSize = response.details().parameterSize(),
                             quantizationLevel = response.details().quantizationLevel(),
+                            contextLimit = contextLimit(response.modelInfo()),
                         ),
                 )
             }.subscribeOn(Schedulers.boundedElastic())
@@ -148,6 +149,7 @@ internal class OllamaClientOps(
                                 families = details.families(),
                                 parameterSize = details.parameterSize(),
                                 quantizationLevel = details.quantizationLevel(),
+                                contextLimit = contextLimit(response.modelInfo()),
                             ),
                     )
                 } catch (e: Exception) {
@@ -156,3 +158,11 @@ internal class OllamaClientOps(
                 }
             }.subscribeOn(Schedulers.boundedElastic())
 }
+
+private fun contextLimit(modelInfo: Map<String, Any>): Int? =
+    modelInfo.entries
+        .firstOrNull { (key, value) ->
+            key.endsWith("context_length", ignoreCase = true) && value.toString().toIntOrNull() != null
+        }?.value
+        ?.toString()
+        ?.toIntOrNull()

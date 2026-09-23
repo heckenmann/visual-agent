@@ -47,6 +47,15 @@ The UI receives only protocol ports; it never receives Spring beans.
    database-neutral search. Flyway runs through a JDBC-only migration data source
    before the R2DBC store beans are created; runtime reads and writes remain R2DBC.
 
+   The runtime transaction manager is reactive (`R2dbcTransactionManager`). A
+   synchronous method returning `void`, a value, or a collection must not use
+   Spring's `@Transactional`: Spring rejects the call before the method body with
+   `Cannot apply reactive transaction to non-reactive return type`. Use reactive
+   `Mono`/`Flux` operations composed with `TransactionalOperator` for work that
+   needs a transaction, and cover Spring-proxied service methods with an
+   integration test; direct unit tests do not exercise transaction interception.
+   See Spring's [transaction interceptor documentation](https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-decl-explained.html).
+
 ## Current Implemented Flow
 
 1. The desktop shell opens immediately and renders a safe, centered, frameless splash window. The main window is not created until startup is ready.
@@ -61,10 +70,10 @@ The UI receives only protocol ports; it never receives Spring beans.
    in-flight activity indicator in the header pulses for the duration
    of the request.
 5. `AgentManager` builds a `ChatRequestContext` with:
-   - system context prompt from `MainSystemPromptComposer` (resume hint,
-     authoritative todo counters, current todo list, active provider and
-     model, execution policy);
-   - optional `userModelInstruction` system message from `AppConfig`;
+   - static system context prompt from `MainSystemPromptComposer` (policy,
+     execution rules, active provider and model, and a conditional resume hint);
+   - optional low-priority reference sections for durable memory and current
+     runtime state;
    - a bounded context projection assembled from the latest persisted user turns;
      routine audit events are classified and compacted, while the complete history
      remains available through the `history` tool;
@@ -86,6 +95,20 @@ and `AUDIT_ONLY` records remain visible to the UI without being copied to the mo
 tool, sub-agent, and workspace events, and applies a token budget while never evicting
 the current user request. It is used for normal requests, streaming, retries, resume,
 and autonomous terminal reviews.
+
+Only static application policy is sent with the `system` role. Runtime state, durable
+memory, historical execution summaries, and omitted-history notices use low-priority
+reference messages. Historical content cannot become a higher-priority instruction by
+being reloaded from the database, and the newest user message remains the authoritative
+request for the current turn.
+
+Provider adapters must preserve the role and order of messages in the bounded
+`ChatRequestContext`; historical assistant messages must not be flattened into user text
+with role-like prefixes. The Codex app-server adapter sends completed turns as native
+Responses API message items through `thread/inject_items`, then submits the current turn
+through `turn/start`. System instructions remain `baseInstructions`, and the latest user
+turn remains separate from imported history. This follows Spring AI's role-bearing
+`Prompt` model while adapting to the app-server's user-input-only `turn/start` contract.
 
 Todo edits use one combined command for description, assignment, and status. The
 manager persists the candidate once and emits one change event only after the store
@@ -114,6 +137,16 @@ Options are merged in provider, model, agent, then variant order.
 Shared generation parameters are translated to Spring AI options,
 while supported provider-specific values remain available through an
 open options map.
+
+### Provider-neutral response handling
+
+Provider adapters convert transport payloads into provider-neutral response types. The shared
+response boundary removes only standard chat-protocol framing artifacts, such as a leading
+assistant role marker accidentally serialized as response text, before a response is rendered,
+persisted, or reused as provider context. It does not contain branches for concrete model names,
+model families, or prompt templates. Capability metadata, declared provider options, and structured
+response fields are the only supported inputs for provider or model behavior; unsupported behavior
+must fail explicitly rather than being hidden by a model-specific workaround.
 
 7. Spring AI executes tool calls through registered `ToolCallback`s.
    Each STARTED/FINISHED event is published on the `ToolEventBus`; the
@@ -175,9 +208,16 @@ the authoritative source.
 
 ## Tooling Architecture
 
-Tools are exposed via canonical IDs and mapped to provider-safe function
-names inside `ToolRegistry`. The full inventory lives in `AGENTS.md`;
-the runtime split is:
+Tools retain canonical Internal Tool IDs for configuration, UI, persistence,
+and audit events, while `ToolRegistry` maps each ID deterministically to one
+lowercase snake-case Provider Function Name. Model-facing prompts, provider
+schemas, strict guards, and callback dispatch use Provider Function Names
+exclusively; internal IDs and internal action names never appear in model
+instructions. The full inventory lives in `AGENTS.md`; the runtime split is:
+
+Agent inventory tools return Provider Function Names. `agent_update` validates
+those names against the registry and stores the corresponding Internal Tool IDs;
+unknown names fail without modifying the agent.
 
 Main-agent tool set (`agentToolConfigService.mainAgentTools()`):
 `agent:list`, `agent:show`, `agent:create`, `agent:update`, `agent:delete`,
@@ -209,7 +249,8 @@ actionable categories so it can correct the script or arguments.
 `javascript:execute` is implemented in the application server with a fresh
 GraalJS context for every request. The context exposes only request-scoped
 `tools.call`, `tools.list`, `tools.describe`, a hardened `workspace.write/read/delete`
-file API, and bounded simulated console methods. Calls are delegated through the existing `ToolRegistry`, preserving
+file API, and bounded simulated console methods. The nested API exposes and accepts
+only provider function names, not internal tool IDs. Calls are delegated through the existing `ToolRegistry`, preserving
 the normal allowlist, lifecycle events, cancellation, and tool safeguards.
 The context denies host classes, arbitrary host objects, IO, native access, process
 creation, networking, and polyglot access. Result, timeout, tool-call,

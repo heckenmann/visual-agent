@@ -15,6 +15,7 @@ import de.heckenmann.visualagent.agent.provider.ProviderEnvironmentCredentials
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.agent.provider.ProviderRuntimeConfig
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
+import de.heckenmann.visualagent.agent.supportsToolCalling
 import io.micrometer.observation.ObservationRegistry
 import org.springframework.ai.chat.messages.UserMessage
 import org.springframework.ai.chat.model.ChatModel
@@ -45,9 +46,15 @@ class OpenAiClient(
         val selectedModel = request.model ?: appConfig.openAiModel
         val prompt = promptFactory.buildPrompt(request, selectedModel)
         val model = chatModel(request.providerProfile, selectedModel)
-        return ToolCallingLoop()
-            .runReactive(model, prompt, request.cancellationToken, toolCallbacks(request, selectedModel), toolRegistry)
-            .onErrorMap(::buildDetailedProviderError)
+        return ToolCallingLoop(outputLimitUpdater = promptFactory::updateOutputLimit)
+            .runReactive(
+                model,
+                prompt,
+                request.cancellationToken,
+                toolCallbacks(request, selectedModel),
+                toolRegistry,
+                request.contextWindow.withRequestedOutput(request.parameters.maxTokens),
+            ).onErrorMap(::buildDetailedProviderError)
     }
 
     override fun streamReactive(messages: List<Message>): Flux<ChatResponse> = streamReactive(ChatRequestContext(messages = messages))
@@ -68,8 +75,15 @@ class OpenAiClient(
                             .let(ProviderTurnResponseMapper::toChatResponse)
                     }
                 } else {
-                    ToolCallingLoop()
-                        .runStreamReactive(model, prompt, request.cancellationToken, toolCallbacks, toolRegistry)
+                    ToolCallingLoop(outputLimitUpdater = promptFactory::updateOutputLimit)
+                        .runStreamReactive(
+                            model,
+                            prompt,
+                            request.cancellationToken,
+                            toolCallbacks,
+                            toolRegistry,
+                            request.contextWindow.withRequestedOutput(request.parameters.maxTokens),
+                        )
                 }
             }.onErrorMap(::buildDetailedProviderError)
     }
@@ -77,7 +91,7 @@ class OpenAiClient(
     private fun toolCallbacks(
         request: ChatRequestContext,
         selectedModel: String,
-    ) = if (request.enabledTools.isEmpty()) {
+    ) = if (request.enabledTools.isEmpty() || !request.supportsToolCalling()) {
         emptyList()
     } else {
         toolRegistry.functionCallbacks(

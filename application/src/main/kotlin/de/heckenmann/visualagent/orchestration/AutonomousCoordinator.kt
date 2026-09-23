@@ -22,6 +22,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import mu.KotlinLogging
@@ -49,6 +50,7 @@ class AutonomousCoordinator
         private val conversationOps: ConversationOpsProvider,
         private val subAgentOps: SubAgentOpsProvider,
         private val executionControl: SubAgentExecutionControl? = null,
+        private val retryDelay: suspend (Long) -> Unit = { delay(it) },
     ) : AutoCloseable {
         private val logger = KotlinLogging.logger {}
         private val subAgents: Map<String, SubAgent>
@@ -291,7 +293,12 @@ class AutonomousCoordinator
                     scope.launch(start = CoroutineStart.LAZY) {
                         if (todoManager.getById(todo.id)?.status != TodoStatus.IN_PROGRESS) {
                             activeCancellationTokens.remove(todo.id, token)
-                            releaseClaimedAgent(agent, todo.id)
+                            releaseAutonomousTodoAgent(
+                                agent = agent,
+                                todoId = todo.id,
+                                agentBusySince = agentBusySince,
+                                subAgentOps = subAgentOps,
+                            )
                             return@launch
                         }
                         processTodoWithLLM(
@@ -313,13 +320,19 @@ class AutonomousCoordinator
                             jobScheduler = jobScheduler,
                             executionControl = executionControl,
                             cancellationToken = token,
+                            retryDelay = retryDelay,
                         )
                     }
                 activeTodoJobs[todo.id] = processingJob
                 processingJob.invokeOnCompletion {
                     activeTodoJobs.remove(todo.id, processingJob)
                     if (scope.isActive && todoManager.getById(todo.id)?.status != TodoStatus.IN_PROGRESS) {
-                        releaseClaimedAgent(agent, todo.id)
+                        releaseAutonomousTodoAgent(
+                            agent = agent,
+                            todoId = todo.id,
+                            agentBusySince = agentBusySince,
+                            subAgentOps = subAgentOps,
+                        )
                     }
                     workSignal.signal()
                 }
@@ -333,20 +346,6 @@ class AutonomousCoordinator
                 subAgentOps.saveSubAgent(agent)
                 todoManager.updateStatus(todo.id, TodoStatus.PENDING)
                 throw error
-            }
-        }
-
-        private fun releaseClaimedAgent(
-            agent: SubAgent,
-            todoId: String,
-        ) {
-            if (agent.currentTodoId == todoId) {
-                agentBusySince.remove(agent.id)
-                agent.status = AgentStatus.IDLE
-                agent.currentTask = null
-                agent.currentTodoId = null
-                subAgentOps.saveSubAgent(agent)
-                subAgentOps.notifyAgent(agent.id, "STATUS:${agent.status.name}")
             }
         }
     }
