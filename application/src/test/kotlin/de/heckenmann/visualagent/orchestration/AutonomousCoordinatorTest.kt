@@ -58,20 +58,15 @@ class AutonomousCoordinatorTest {
         runBlocking {
             val fixture = buildFixture(workerResponseGate = CompletableDeferred())
             fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
-            val claimed = CompletableDeferred<Unit>()
-            val registration =
-                fixture.todoManager.addListener { change ->
-                    if (change.todo?.status == TodoStatus.IN_PROGRESS) claimed.complete(Unit)
-                }
 
             try {
                 fixture.coordinator.startAutonomousProcessing(seed = false)
-                fixture.todoManager.add("Implement feature", "agent-1")
+                val todo = fixture.todoManager.add("Implement feature", "agent-1")
 
-                claimed.await()
+                fixture.awaitWorkerStart()
+                assertEquals(TodoStatus.IN_PROGRESS, fixture.todoManager.getById(todo.id)?.status)
                 assertEquals(AgentStatus.BUSY, fixture.subAgents["agent-1"]?.status)
             } finally {
-                registration.close()
                 fixture.cancel()
             }
         }
