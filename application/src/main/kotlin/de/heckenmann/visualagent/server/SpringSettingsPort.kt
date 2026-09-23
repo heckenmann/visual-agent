@@ -8,7 +8,6 @@ import de.heckenmann.visualagent.protocol.SettingsPort
 import de.heckenmann.visualagent.protocol.SettingsSnapshot
 import de.heckenmann.visualagent.protocol.ThemeMode
 import org.springframework.stereotype.Component
-import org.springframework.transaction.annotation.Transactional
 import de.heckenmann.visualagent.config.ThemeMode as ApplicationThemeMode
 
 /** Maps the persisted application settings to the neutral [SettingsPort]. */
@@ -20,7 +19,6 @@ class SpringSettingsPort(
 ) : SettingsPort {
     override fun snapshot(): SettingsSnapshot = config.toProtocol(providerCatalog)
 
-    @Transactional
     override fun save(
         settings: SettingsSnapshot,
         providerConfiguration: de.heckenmann.visualagent.protocol.ProviderConfiguration?,

@@ -47,6 +47,15 @@ The UI receives only protocol ports; it never receives Spring beans.
    database-neutral search. Flyway runs through a JDBC-only migration data source
    before the R2DBC store beans are created; runtime reads and writes remain R2DBC.
 
+   The runtime transaction manager is reactive (`R2dbcTransactionManager`). A
+   synchronous method returning `void`, a value, or a collection must not use
+   Spring's `@Transactional`: Spring rejects the call before the method body with
+   `Cannot apply reactive transaction to non-reactive return type`. Use reactive
+   `Mono`/`Flux` operations composed with `TransactionalOperator` for work that
+   needs a transaction, and cover Spring-proxied service methods with an
+   integration test; direct unit tests do not exercise transaction interception.
+   See Spring's [transaction interceptor documentation](https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-decl-explained.html).
+
 ## Current Implemented Flow
 
 1. The desktop shell opens immediately and renders a safe, centered, frameless splash window. The main window is not created until startup is ready.
