@@ -191,9 +191,16 @@ the authoritative source.
 
 ## Tooling Architecture
 
-Tools are exposed via canonical IDs and mapped to provider-safe function
-names inside `ToolRegistry`. The full inventory lives in `AGENTS.md`;
-the runtime split is:
+Tools retain canonical Internal Tool IDs for configuration, UI, persistence,
+and audit events, while `ToolRegistry` maps each ID deterministically to one
+lowercase snake-case Provider Function Name. Model-facing prompts, provider
+schemas, strict guards, and callback dispatch use Provider Function Names
+exclusively; internal IDs and internal action names never appear in model
+instructions. The full inventory lives in `AGENTS.md`; the runtime split is:
+
+Agent inventory tools return Provider Function Names. `agent_update` validates
+those names against the registry and stores the corresponding Internal Tool IDs;
+unknown names fail without modifying the agent.
 
 Main-agent tool set (`agentToolConfigService.mainAgentTools()`):
 `agent:list`, `agent:show`, `agent:create`, `agent:update`, `agent:delete`,
@@ -225,7 +232,8 @@ actionable categories so it can correct the script or arguments.
 `javascript:execute` is implemented in the application server with a fresh
 GraalJS context for every request. The context exposes only request-scoped
 `tools.call`, `tools.list`, `tools.describe`, a hardened `workspace.write/read/delete`
-file API, and bounded simulated console methods. Calls are delegated through the existing `ToolRegistry`, preserving
+file API, and bounded simulated console methods. The nested API exposes and accepts
+only provider function names, not internal tool IDs. Calls are delegated through the existing `ToolRegistry`, preserving
 the normal allowlist, lifecycle events, cancellation, and tool safeguards.
 The context denies host classes, arbitrary host objects, IO, native access, process
 creation, networking, and polyglot access. Result, timeout, tool-call,

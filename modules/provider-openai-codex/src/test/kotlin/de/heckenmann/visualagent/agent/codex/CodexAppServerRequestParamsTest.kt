@@ -8,6 +8,8 @@ import org.springframework.ai.chat.messages.AssistantMessage
 import org.springframework.ai.chat.messages.SystemMessage
 import org.springframework.ai.chat.messages.UserMessage
 import org.springframework.ai.chat.prompt.Prompt
+import org.springframework.ai.tool.ToolCallback
+import org.springframework.ai.tool.definition.ToolDefinition
 import java.nio.file.Path
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -123,5 +125,34 @@ class CodexAppServerRequestParamsTest {
                 .toBoolean(),
         )
         assertTrue("dynamicTools" in thread)
+    }
+
+    @Test
+    fun `dynamic tool schema preserves the provider function name`() {
+        val callback =
+            object : ToolCallback {
+                override fun getToolDefinition(): ToolDefinition =
+                    ToolDefinition
+                        .builder()
+                        .name("agent_list")
+                        .description("Lists agents")
+                        .inputSchema("{}")
+                        .build()
+
+                override fun call(toolInput: String): String = "{}"
+            }
+
+        val thread = CodexAppServerRequestParams.thread(Prompt(UserMessage("request")), "model", Path.of("workspace"), listOf(callback))
+        val functionName =
+            thread
+                .getValue("dynamicTools")
+                .jsonArray
+                .single()
+                .jsonObject
+                .getValue("name")
+                .jsonPrimitive.content
+
+        assertEquals("agent_list", functionName)
+        assertFalse(functionName.contains(':'))
     }
 }

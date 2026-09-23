@@ -36,6 +36,10 @@ internal class JavaScriptToolBridge(
     private val workspaceBytes = AtomicLong()
     private val permits = Semaphore(limits.maxConcurrentToolCalls)
     private val valueConverter = JavaScriptGuestValueConverter(limits)
+    private val toolsByFunctionName =
+        registry
+            .resolve(enabledTools.map(::ToolId).toSet())
+            .associateBy { registry.definition(it).name }
 
     /** Returns the only host object made available to the guest context. */
     fun toolsObject(): ProxyObject =
@@ -131,8 +135,10 @@ internal class JavaScriptToolBridge(
                 ?.trim()
                 .orEmpty()
         if (name.isBlank()) throw failure(JavaScriptErrorCategory.TOOL_ARGUMENTS, "Tool name is required")
-        if (name !in enabledTools) throw failure(JavaScriptErrorCategory.TOOL_ACCESS, "Tool '$name' is not enabled")
-        if (name == JAVASCRIPT_TOOL_ID) throw failure(JavaScriptErrorCategory.TOOL_ACCESS, "Recursive JavaScript execution is disabled")
+        if (name == JAVASCRIPT_TOOL_FUNCTION_NAME) {
+            throw failure(JavaScriptErrorCategory.TOOL_ACCESS, "Recursive JavaScript execution is disabled")
+        }
+        val tool = toolsByFunctionName[name] ?: throw failure(JavaScriptErrorCategory.TOOL_ACCESS, "Tool '$name' is not enabled")
         val input =
             arguments.getOrNull(1)?.let(valueConverter::toJsonObject)
                 ?: throw failure(JavaScriptErrorCategory.TOOL_ARGUMENTS, "Tool arguments must be an object")
@@ -143,9 +149,6 @@ internal class JavaScriptToolBridge(
         if (!permits.tryAcquire()) throw failure(JavaScriptErrorCategory.LIMIT_EXCEEDED, "Concurrent JavaScript tool-call limit exceeded")
         return try {
             cancellationToken.throwIfCancelled()
-            val tool =
-                registry.resolve(setOf(ToolId(name))).singleOrNull()
-                    ?: throw failure(JavaScriptErrorCategory.TOOL_ACCESS, "Tool '$name' is not registered")
             val resultJson = registry.executeBlocking(tool, input.toString(), requestContext + mapOf("javascript" to true))
             cancellationToken.throwIfCancelled()
             val result = Json.decodeFromString<ToolResultEnvelope>(resultJson)
@@ -161,13 +164,8 @@ internal class JavaScriptToolBridge(
 
     private fun listTools(): Any =
         ProxyArray.fromList(
-            enabledTools.sorted().mapNotNull { name ->
-                registry
-                    .resolve(setOf(ToolId(name)))
-                    .singleOrNull()
-                    ?.let(registry::definition)
-                    ?.toJavaScriptDescription()
-                    ?.let(::descriptionObject)
+            toolsByFunctionName.toSortedMap().values.map { tool ->
+                descriptionObject(registry.definition(tool).toJavaScriptDescription())
             },
         )
 
@@ -178,10 +176,9 @@ internal class JavaScriptToolBridge(
                 ?.asString()
                 ?.trim()
                 .orEmpty()
-        if (name !in enabledTools) throw failure(JavaScriptErrorCategory.TOOL_ACCESS, "Tool '$name' is not enabled")
         val definition =
-            registry.resolve(setOf(ToolId(name))).singleOrNull()?.let(registry::definition)
-                ?: throw failure(JavaScriptErrorCategory.TOOL_ACCESS, "Tool '$name' is not registered")
+            toolsByFunctionName[name]?.let(registry::definition)
+                ?: throw failure(JavaScriptErrorCategory.TOOL_ACCESS, "Tool '$name' is not enabled")
         return descriptionObject(definition.toJavaScriptDescription())
     }
 
@@ -235,7 +232,6 @@ internal class JavaScriptToolBridge(
     private fun descriptionObject(description: JavaScriptToolDescription): ProxyObject =
         ProxyObject.fromMap(
             mapOf(
-                "id" to description.id,
                 "name" to description.name,
                 "description" to description.description,
                 "inputSchema" to description.inputSchema,
@@ -342,7 +338,7 @@ internal class JavaScriptToolBridge(
         }
 
     private companion object {
-        const val JAVASCRIPT_TOOL_ID = "javascript:execute"
+        const val JAVASCRIPT_TOOL_FUNCTION_NAME = "javascript_execute"
         const val MAX_ERROR_CHARACTERS = 500
     }
 }

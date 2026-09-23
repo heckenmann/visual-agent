@@ -33,29 +33,24 @@ class MainSystemPromptComposerTest {
     }
 
     @Test
-    fun `prompt contains exact tool boundary and direct execution rules`() {
+    fun `prompt contains provider neutral tool policy and direct execution rules`() {
         val prompt = MainSystemPromptComposer.compose(null, toolConfigService)
 
-        assertTrue("Main-agent tools (use these exact IDs when needed)" in prompt)
-        assertTrue("agent:list" in prompt)
-        assertTrue("agent:create" in prompt)
-        assertTrue("todos" in prompt)
-        assertTrue("workspace:file" in prompt)
-        assertTrue("Sub-agent-only tools (never call these directly)" in prompt)
         assertTrue("Answer simple requests directly" in prompt)
         assertTrue("a todo is not required" in prompt)
+        assertTrue("Use only the functions supplied in the native tool schemas" in prompt)
+        assertTrue("Never serialize, imitate, or describe a function call as response text" in prompt)
     }
 
     @Test
-    fun `prompt includes only guidance for enabled optional tools`() {
+    fun `prompt never exposes internal tool identifiers or action names`() {
         val prompt = MainSystemPromptComposer.compose(null, toolConfigService)
-        assertTrue("Use `javascript:execute` only for complex deterministic transformations" in prompt)
-        assertTrue("Use `skills` directly for database-owned reusable knowledge" in prompt)
 
-        val disabledStore = MapSubAgentConfigStore().also { it.setPreference("tools.disabled.global", "javascript:execute\nskills") }
-        val reducedPrompt = MainSystemPromptComposer.compose(null, AgentToolConfigService(disabledStore))
-        assertFalse("Use `javascript:execute` only for complex deterministic transformations" in reducedPrompt)
-        assertFalse("Use `skills` directly for database-owned reusable knowledge" in reducedPrompt)
+        assertFalse("agent:list" in prompt)
+        assertFalse("agent:create" in prompt)
+        assertFalse("workspace:file" in prompt)
+        assertFalse("javascript:execute" in prompt)
+        assertFalse("listRoots" in prompt)
     }
 
     @Test
@@ -72,10 +67,7 @@ class MainSystemPromptComposerTest {
 
         assertFalse("agent:list" in prompt)
         assertFalse("agent:create" in prompt)
-        assertFalse("`todos`" in prompt)
-        assertFalse("history" in prompt)
         assertFalse("workspace:file" in prompt)
-        assertFalse("inspect agents" in prompt)
         assertFalse("listRoots" in prompt)
     }
 
@@ -87,8 +79,6 @@ class MainSystemPromptComposerTest {
         assertFalse("tool list" in prompt)
         assertFalse("agent:list" in prompt)
         assertFalse("workspace:file" in prompt)
-        assertFalse("Use `javascript:execute`" in prompt)
-        assertFalse("Use `skills` directly" in prompt)
     }
 
     @Test
@@ -124,10 +114,7 @@ class MainSystemPromptComposerTest {
     fun `prompt keeps concise safety and recovery rules`() {
         val prompt = MainSystemPromptComposer.compose(null, toolConfigService)
 
-        assertTrue("Before changing todo state, call `todos` with" in prompt)
         assertTrue("On a tool failure, inspect the error" in prompt)
-        assertTrue("call `listRoots` first" in prompt)
-        assertTrue("do not create skill files in the workspace" in prompt)
         assertTrue("Respond in the user's language" in prompt)
     }
 

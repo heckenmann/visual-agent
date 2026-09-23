@@ -117,7 +117,6 @@ class JavaScriptExecutionException(
 
 /** Read-only metadata exposed by the request-scoped JavaScript tool API. */
 data class JavaScriptToolDescription(
-    val id: String,
     val name: String,
     val description: String,
     val inputSchema: String,
@@ -126,7 +125,6 @@ data class JavaScriptToolDescription(
 /** Converts a tool definition into metadata safe for a guest runtime. */
 fun ToolDefinition.toJavaScriptDescription(): JavaScriptToolDescription =
     JavaScriptToolDescription(
-        id = id.value,
         name = name,
         description = description,
         inputSchema = inputSchema,

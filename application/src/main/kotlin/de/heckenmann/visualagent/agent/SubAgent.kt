@@ -167,13 +167,14 @@ data class SubAgent(
                         )
                         if (enabledTools.any { it.value == "javascript:execute" }) {
                             append(
-                                " Use javascript:execute for complex deterministic logic, bulk processing of many elements " +
+                                " Use the available JavaScript function for complex deterministic logic and bulk processing " +
+                                    "of many elements " +
                                     "(mapping, filtering, transforming, deduplicating, sorting, or aggregating records), " +
                                     "or large CSV/Markdown assembly; call only enabled tools through " +
                                     "await tools.call(name, arguments), use workspace.write({path, content}) " +
                                     "for generated text that must be persisted, workspace.read({path}) to read " +
                                     "text, and workspace.delete({path}) to remove a file. Existing JavaScript files " +
-                                    "can be executed by passing their relative path to javascript:execute; " +
+                                    "can be executed by passing their relative path to that function; " +
                                     "return the complete final value. " +
                                     "If execution returns an error, inspect it, correct the source or arguments, " +
                                     "and retry without repeating the unchanged failure. The sandbox has no direct " +
@@ -186,8 +187,8 @@ data class SubAgent(
                                     "read a matching skill before relying on it, and save only stable reusable Markdown " +
                                     "results with skills create or update. Never store secrets, PII, transient progress, " +
                                     "or raw provider responses. Skills are database records, never workspace files: " +
-                                    "do not create SKILL.md or another skill document with workspace:file, JavaScript, " +
-                                    "or terminal.",
+                                    "do not create SKILL.md or another skill document with file-editing, JavaScript, " +
+                                    "or terminal functions. Use only the supplied function schemas for nested calls.",
                             )
                         } else {
                             append(

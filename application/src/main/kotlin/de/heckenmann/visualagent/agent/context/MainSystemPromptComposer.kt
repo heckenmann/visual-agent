@@ -23,21 +23,7 @@ internal object MainSystemPromptComposer {
         userModelInstruction: String = "",
         toolingAvailable: Boolean = true,
     ): String {
-        val mainTools =
-            if (toolingAvailable) {
-                toolConfigService.mainAgentTools().map { it.value }.sorted()
-            } else {
-                emptyList()
-            }
-        val subAgentTools =
-            toolConfigService
-                .defaultConfigs()
-                .flatMap { it.tools }
-                .filter(toolConfigService::isToolGloballyEnabled)
-                .distinct()
-                .sorted()
-        val forbiddenTools = (subAgentTools - mainTools.toSet()).sorted()
-        val toolsExposed = toolingAvailable && mainTools.isNotEmpty()
+        val toolsExposed = toolingAvailable && toolConfigService.mainAgentTools().isNotEmpty()
         val preference = userModelInstruction.trim().ifBlank { "Reply in the language of the latest user message." }
         val resumeHint =
             if (pendingResumeMessage == null) {
@@ -45,60 +31,23 @@ internal object MainSystemPromptComposer {
             } else {
                 "A previous request is pending. Resume it only when there is no newer user request."
             }
-        val forbiddenText = forbiddenTools.joinToString(", ") { "`$it`" }.ifBlank { "none" }
-        val javascriptGuidance =
-            if ("javascript:execute" in mainTools) {
-                "- Use `javascript:execute` only for complex deterministic transformations; return its result and inspect success or failure."
-            } else {
-                ""
-            }
-        val skillsGuidance =
-            if ("skills" in mainTools) {
-                "- Use `skills` directly for database-owned reusable knowledge; do not create skill files in the workspace."
-            } else {
-                ""
-            }
         val toolPolicy =
             if (toolsExposed) {
-                buildList {
-                    add("## Tool Policy")
-                    add("Main-agent tools (use these exact IDs when needed):")
-                    add(mainTools.joinToString(", ") { "`$it`" })
-                    add("Sub-agent-only tools (never call these directly): $forbiddenText")
-                    add("- Answer simple requests directly; a todo is not required for a direct answer or tool call.")
-                    if ("agent:list" in mainTools) {
-                        add(
-                            "- For large, parallel, or delegated work, inspect agents with `agent:list` before assigning work.",
-                        )
-                    }
-                    if ("todos" in mainTools) {
-                        add("- Before changing todo state, call `todos` with `{" + "\"action\":\"list\"}" + ".")
-                    }
-                    if ("history" in mainTools) {
-                        add("- Use `history` when earlier conversation information is missing.")
-                    }
-                    add("- Never claim a result that a tool did not return.")
-                    add("- On a tool failure, inspect the error, correct the request, and retry once when useful.")
-                    if ("workspace:file" in mainTools) {
-                        add(
-                            "- For managed files, use `workspace:file`; call `listRoots` first and use only " +
-                                "the returned root ID and relative paths.",
-                        )
-                    }
-                }.joinToString("\n")
+                """
+                ## Tool Policy
+                - Answer simple requests directly; a todo is not required for a direct answer or tool call.
+                - Use only the functions supplied in the native tool schemas. Their names and input schemas are authoritative.
+                - Never serialize, imitate, or describe a function call as response text; use a native structured tool call instead.
+                - For large, parallel, or delegated work, use the relevant available functions before assigning work.
+                - Never claim a result that a function did not return.
+                - On a tool failure, inspect the error, correct the request, and retry once when useful.
+                """.trimIndent()
             } else {
                 ""
             }
         val runtimeStateGuidance =
             if (toolsExposed) {
-                val inventoryTools = listOf("todos", "agent:list").filter { it in mainTools }
-                if (inventoryTools.isEmpty()) {
-                    "Runtime todos and sub-agents are supplied separately when they fit."
-                } else {
-                    "Runtime todos and sub-agents are supplied separately when they fit. Use " +
-                        inventoryTools.joinToString(" and ") { "`$it`" } +
-                        " for the authoritative current inventory."
-                }
+                "Runtime todos and sub-agents are supplied separately when they fit. Use the relevant available functions for authoritative current state."
             } else {
                 "Runtime todos and sub-agents are supplied separately when they fit."
             }
@@ -123,8 +72,6 @@ internal object MainSystemPromptComposer {
                 appendLine()
                 appendLine(toolPolicy)
             }
-            if (javascriptGuidance.isNotBlank()) appendLine(javascriptGuidance)
-            if (skillsGuidance.isNotBlank()) appendLine(skillsGuidance)
             appendLine()
             appendLine("## Response Style")
             append("Respond in the user's language, answer the latest request first, and use concise valid Markdown.")

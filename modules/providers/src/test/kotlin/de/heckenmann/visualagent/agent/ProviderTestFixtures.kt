@@ -68,4 +68,4 @@ internal class TestToolRegistry(
             }
 }
 
-internal fun ToolId.toTestFunctionName(): String = value.replace(Regex("[^A-Za-z0-9_]"), "_")
+internal fun ToolId.toTestFunctionName(): String = value.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')

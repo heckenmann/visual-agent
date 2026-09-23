@@ -26,7 +26,7 @@ class TodosTool(
                 "Manage the task plan (work items / to-do list). " +
                     "This tool is ONLY for tracking work items — NEVER use it to store code, data, file contents, or results. " +
                     "Sub-agents have read-only access; todo lifecycle changes are controlled by the main agent and orchestrator. " +
-                    "Use workspace:file to save code and data to files, and use todos only to describe what work needs to be done.\n" +
+                    "Use an available file function to save code and data when one is enabled; use todos only to describe work.\n" +
                     "Actions and their required input parameters:\n" +
                     "- list: no parameters. Returns all todos with status, description, id, position, assigned agent.\n" +
                     "- count: no parameters. Returns counts per status.\n" +

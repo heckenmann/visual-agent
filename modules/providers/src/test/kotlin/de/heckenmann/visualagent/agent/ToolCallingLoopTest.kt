@@ -27,15 +27,17 @@ import org.springframework.ai.chat.model.ChatResponse as SpringChatResponse
  */
 class ToolCallingLoopTest {
     @Test
-    fun `run returns direct text response when model does not request tools`() {
+    fun `run preserves JSON-looking pseudo tool calls as response text`() {
         val chatModel = mockk<ChatModel>()
+        val tool = CountingTool()
         val prompt = Prompt(listOf(UserMessage("hello")))
-        every { chatModel.call(prompt) } returns springResponse("unit", "direct answer")
+        every { chatModel.call(any<Prompt>()) } returns springResponse("unit", "{\"name\":\"agent:list\",\"parameters\":{}}")
 
-        val response = ToolCallingLoop().runReactive(chatModel, prompt, null, emptyList()).block()!!
+        val response = ToolCallingLoop().runReactive(chatModel, prompt, null, listOf(tool)).block()!!
 
-        assertEquals("direct answer", response.message.content)
+        assertEquals("{\"name\":\"agent:list\",\"parameters\":{}}", response.message.content)
         assertEquals("unit", response.model)
+        assertEquals(0, tool.callCount)
     }
 
     @Test

@@ -39,14 +39,14 @@ class OllamaPromptFactoryTest {
     }
 
     @Test
-    fun `buildPrompt includes tool options when model supports tools and tools are enabled`() {
-        val registry = TestToolRegistry(listOf(FakeTool("todos")))
+    fun `buildPrompt exposes only provider function names in callbacks and strict guard`() {
+        val registry = TestToolRegistry(listOf(FakeTool("workspace:file")))
         val factory = OllamaPromptFactory(registry)
         val request =
             ChatRequestContext(
                 messages = listOf(Message("user", "hello")),
                 model = "tools-model",
-                enabledTools = setOf(ToolId("todos")),
+                enabledTools = setOf(ToolId("workspace:file")),
                 modelCapabilities = setOf("tools"),
                 modelCapabilitiesComplete = true,
             )
@@ -54,8 +54,15 @@ class OllamaPromptFactoryTest {
         val prompt = factory.buildPrompt(request, "tools-model")
         val options = prompt.options as OllamaChatOptions
 
-        assertEquals(listOf("todos"), options.toolCallbacks.orEmpty().map { it.toolDefinition.name() })
+        assertEquals(listOf("workspace_file"), options.toolCallbacks.orEmpty().map { it.toolDefinition.name() })
         assertEquals("tools-model", options.toolContext?.get("model"))
+        val guard =
+            prompt.instructions
+                .first()
+                .text
+                .orEmpty()
+        assertTrue(guard.contains("workspace_file"))
+        assertTrue(!guard.contains("workspace:file"))
     }
 
     @Test

@@ -29,7 +29,7 @@ class SkillsTool(
             description =
                 "Manage durable reusable Markdown skills. " +
                     "Skills are database records, not workspace files: never create SKILL.md or another skill document " +
-                    "with workspace:file, javascript:execute, or terminal. Handle skill requests with this tool directly; " +
+                    "with file-editing, JavaScript, or terminal functions. Handle skill requests with this tool directly; " +
                     "Search before expensive work when a prior solution may exist. " +
                     "After substantial completed work, save a self-contained stable result with a specific title, " +
                     "rationale, commands, and reusable code patterns. " +

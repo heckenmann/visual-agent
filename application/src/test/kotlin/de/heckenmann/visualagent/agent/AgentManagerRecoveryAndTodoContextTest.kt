@@ -14,6 +14,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import reactor.core.publisher.Mono
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @de.heckenmann.visualagent.testsupport.DatabaseTest
@@ -46,10 +47,9 @@ class AgentManagerRecoveryAndTodoContextTest {
                 val systemMessages = requestSlot.captured.messages.filter { it.role == "system" }
                 val policy = systemMessages.first()
                 val runtimeState = requestSlot.captured.messages.first { it.content.contains("## Runtime State") }
-                assertTrue(policy.content.contains("Main-agent tools"))
-                assertTrue(policy.content.contains("Sub-agent-only tools"))
-                assertTrue(policy.content.contains("agent:list"))
-                assertTrue(policy.content.contains("todos"))
+                assertTrue(policy.content.contains("Use only the functions supplied in the native tool schemas"))
+                assertTrue(policy.content.contains("Never serialize, imitate, or describe a function call as response text"))
+                assertFalse(policy.content.contains("agent:list"))
                 assertTrue(policy.content.contains("Always answer in German."))
                 assertTrue(runtimeState.content.contains("Implement worker orchestration"))
                 assertTrue(runtimeState.role == "assistant")

@@ -50,7 +50,7 @@ class AgentListTool(
     }
 
     private fun formatAgentLine(agent: ToolAgent): String {
-        val tools = agents.tools(agent.id).sorted()
+        val tools = agents.tools(agent.id).map { ToolId(it).toFunctionName() }.sorted()
         val model = agent.config.model?.ifBlank { null } ?: "inherited"
         val template = resolveTemplateName(agent)
         return buildString {
