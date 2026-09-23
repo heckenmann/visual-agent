@@ -66,6 +66,7 @@ class AgentManagerTodoTest {
                 manager.awaitTodoStatus(todo.id, TodoStatus.IN_PROGRESS) {
                     manager.startAutonomousProcessing(seed = false)
                 }
+                manager.awaitAgentStatus("1", AgentStatus.BUSY)
 
                 val agent = manager.getSubAgents().first { it.id == "1" }
                 assertEquals(AgentStatus.BUSY, agent.status)
@@ -85,6 +86,7 @@ class AgentManagerTodoTest {
                 manager.awaitTodoStatus(top.id, TodoStatus.IN_PROGRESS) {
                     manager.startAutonomousProcessing(seed = false)
                 }
+                manager.awaitAgentStatus("2", AgentStatus.BUSY)
 
                 val topAgent = manager.getSubAgent("2")
                 assertEquals(AgentStatus.BUSY, topAgent?.status)
@@ -159,6 +161,22 @@ class AgentManagerTodoTest {
         try {
             trigger()
             observed.await()
+        } finally {
+            listener.close()
+        }
+    }
+
+    private suspend fun AgentManager.awaitAgentStatus(
+        agentId: String,
+        status: AgentStatus,
+    ) {
+        val observed = CompletableDeferred<Unit>()
+        val listener =
+            agentStatusCallbackAdapter.addListener { changedAgentId, message ->
+                if (changedAgentId == agentId && message == "STATUS:${status.name}") observed.complete(Unit)
+            }
+        try {
+            if (getSubAgent(agentId)?.status != status) observed.await()
         } finally {
             listener.close()
         }
