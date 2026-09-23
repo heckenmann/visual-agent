@@ -10,6 +10,7 @@ import de.heckenmann.visualagent.agent.supportsToolCalling
 import org.springframework.ai.chat.messages.AssistantMessage
 import org.springframework.ai.chat.messages.SystemMessage
 import org.springframework.ai.chat.messages.UserMessage
+import org.springframework.ai.chat.prompt.ChatOptions
 import org.springframework.ai.chat.prompt.Prompt
 import org.springframework.ai.openai.OpenAiChatOptions
 import org.springframework.stereotype.Component
@@ -129,4 +130,11 @@ class OpenAiPromptFactory(
             description = toolDefinition.description(),
             inputSchema = toolDefinition.inputSchema(),
         )
+
+    internal fun updateOutputLimit(
+        options: ChatOptions,
+        limit: Int,
+    ): ChatOptions =
+        (options as? OpenAiChatOptions)?.mutate()?.maxCompletionTokens(limit)?.build()
+            ?: options.mutate().maxTokens(limit).build()
 }

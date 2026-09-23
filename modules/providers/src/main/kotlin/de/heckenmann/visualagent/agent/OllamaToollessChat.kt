@@ -83,7 +83,7 @@ internal object OllamaToollessChat {
                         .let { mapped ->
                             if (mapped.model.isBlank()) mapped.copy(model = selectedModel) else mapped
                         }
-                ProviderTurnResponseMapper.toChatResponse(turn)
+                ProviderTurnResponseMapper.toChatResponse(turn, normalizeContent = false)
             }
         }
 

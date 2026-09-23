@@ -73,10 +73,17 @@ internal object ProviderTurnResponseMapper {
      * @param turn Structured provider turn
      * @return Conversation-facing response with the original structured turn attached
      */
-    fun toChatResponse(turn: ProviderTurnResponse): ChatResponse =
+    fun toChatResponse(
+        turn: ProviderTurnResponse,
+        normalizeContent: Boolean = true,
+    ): ChatResponse =
         ChatResponse(
             model = turn.model,
-            message = Message(role = "assistant", content = ProviderResponseContentNormalizer.normalize(turn.content)),
+            message =
+                Message(
+                    role = "assistant",
+                    content = if (normalizeContent) ProviderResponseContentNormalizer.normalize(turn.content) else turn.content,
+                ),
             done = turn.finishReason != null,
             totalDuration = turn.timing?.totalMillis?.times(NANOS_PER_MILLI),
             promptEvalCount = turn.usage?.promptTokens,

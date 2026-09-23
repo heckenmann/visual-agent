@@ -46,7 +46,7 @@ class OpenAiClient(
         val selectedModel = request.model ?: appConfig.openAiModel
         val prompt = promptFactory.buildPrompt(request, selectedModel)
         val model = chatModel(request.providerProfile, selectedModel)
-        return ToolCallingLoop()
+        return ToolCallingLoop(outputLimitUpdater = promptFactory::updateOutputLimit)
             .runReactive(
                 model,
                 prompt,
@@ -75,7 +75,7 @@ class OpenAiClient(
                             .let(ProviderTurnResponseMapper::toChatResponse)
                     }
                 } else {
-                    ToolCallingLoop()
+                    ToolCallingLoop(outputLimitUpdater = promptFactory::updateOutputLimit)
                         .runStreamReactive(
                             model,
                             prompt,

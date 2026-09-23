@@ -7,6 +7,7 @@ import org.springframework.ai.chat.messages.Message
 import org.springframework.ai.chat.metadata.ChatGenerationMetadata
 import org.springframework.ai.chat.model.ChatModel
 import org.springframework.ai.chat.model.Generation
+import org.springframework.ai.chat.prompt.ChatOptions
 import org.springframework.ai.chat.prompt.Prompt
 import org.springframework.ai.model.tool.ToolCallingChatOptions
 import org.springframework.ai.model.tool.ToolCallingManager
@@ -32,6 +33,9 @@ import org.springframework.ai.chat.model.ChatResponse as SpringChatResponse
 internal class ToolCallingLoop(
     private val maxRounds: Int = DEFAULT_MAX_ROUNDS,
     private val contextBudgeter: RequestContextBudgeter = RequestContextBudgeter(),
+    private val outputLimitUpdater: (ChatOptions, Int) -> ChatOptions = { options, limit ->
+        options.mutate().maxTokens(limit).build()
+    },
 ) {
     private val logger = KotlinLogging.logger {}
 
@@ -50,7 +54,7 @@ internal class ToolCallingLoop(
         token?.throwIfCancelled()
         val budgetRequest = ChatRequestContext(messages = emptyList(), contextWindow = contextWindow)
         if (toolCallbacks.isEmpty()) {
-            return contextBudgeter.fitPrompt(budgetRequest, initialPrompt).let(chatModel::call).toVisualAgentResponse()
+            return fitPrompt(budgetRequest, initialPrompt).let(chatModel::call).toVisualAgentResponse()
         }
         val boundPrompt = bindToolCallbacks(initialPrompt, toolCallbacks)
         val toolCallingManager = buildToolCallingManager()
@@ -60,7 +64,7 @@ internal class ToolCallingLoop(
         repeat(maxRounds) { round ->
             token?.throwIfCancelled()
             logger.debug { "Tool calling round ${round + 1}/$maxRounds" }
-            val boundedPrompt = contextBudgeter.fitPrompt(budgetRequest, prompt, toolCallbacks)
+            val boundedPrompt = fitPrompt(budgetRequest, prompt, toolCallbacks)
             val response = chatModel.call(boundedPrompt)
             lastResponse = response
             if (!response.hasToolCalls()) return response.toVisualAgentResponse(round = round)
@@ -120,7 +124,7 @@ internal class ToolCallingLoop(
         Flux.defer {
             token?.throwIfCancelled()
             val budgetRequest = ChatRequestContext(messages = emptyList(), contextWindow = contextWindow)
-            val boundedPrompt = contextBudgeter.fitPrompt(budgetRequest, initialPrompt, toolCallbacks)
+            val boundedPrompt = fitPrompt(budgetRequest, initialPrompt, toolCallbacks)
             if (toolCallbacks.isEmpty()) {
                 return@defer chatModel.stream(boundedPrompt).map { springResponse ->
                     token?.throwIfCancelled()
@@ -136,7 +140,7 @@ internal class ToolCallingLoop(
                 .index()
                 .map { indexed ->
                     token?.throwIfCancelled()
-                    indexed.t2.toVisualAgentResponse(sequence = indexed.t1.toInt())
+                    indexed.t2.toVisualAgentResponse(sequence = indexed.t1.toInt(), normalizeContent = false)
                 }.concatWith(
                     Mono
                         .fromCallable {
@@ -178,7 +182,7 @@ internal class ToolCallingLoop(
             val round = followUpRoundIndex + 1
             token?.throwIfCancelled()
             logger.debug { "Stream tool follow-up round $round/$maxRounds" }
-            val boundedPrompt = contextBudgeter.fitPrompt(budgetRequest, prompt, toolCallbacks)
+            val boundedPrompt = fitPrompt(budgetRequest, prompt, toolCallbacks)
             val finalResponse = chatModel.call(boundedPrompt)
             lastFinalResponse = finalResponse
             if (!finalResponse.hasToolCalls()) return finalResponse.toVisualAgentResponse(round = round)
@@ -200,6 +204,12 @@ internal class ToolCallingLoop(
         ToolCallingManager
             .builder()
             .build()
+
+    private fun fitPrompt(
+        request: ChatRequestContext,
+        prompt: Prompt,
+        toolCallbacks: List<ToolCallback> = emptyList(),
+    ): Prompt = contextBudgeter.fitPrompt(request, prompt, toolCallbacks, outputLimitUpdater)
 
     private fun bindToolCallbacks(
         prompt: Prompt,
@@ -270,6 +280,7 @@ internal class ToolCallingLoop(
     private fun SpringChatResponse.toVisualAgentResponse(
         round: Int? = null,
         sequence: Int? = null,
+        normalizeContent: Boolean = true,
     ): ChatResponse =
         ProviderTurnResponseMapper.toChatResponse(
             ProviderTurnResponseMapper.fromSpring(
@@ -277,6 +288,7 @@ internal class ToolCallingLoop(
                 round = round,
                 sequence = sequence,
             ),
+            normalizeContent = normalizeContent,
         )
 
     companion object {

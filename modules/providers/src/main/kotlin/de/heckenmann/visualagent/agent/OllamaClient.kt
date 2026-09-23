@@ -39,6 +39,13 @@ class OllamaClient(
     private val auxiliary = OllamaClientAuxiliary(chatModel, ollamaApi, appConfig)
     private val ops = OllamaClientOps(ollamaApi, appConfig)
 
+    internal fun getModelCapabilitiesReactive(profile: ProviderProfile): Mono<Map<String, Set<String>>> =
+        fetchModelCapabilitiesReactive(
+            profile,
+            de.heckenmann.visualagent.agent.ollama
+                .createOllamaApi(profile, appConfig),
+        )
+
     override fun chatReactive(messages: List<Message>): Mono<ChatResponse> = chatReactive(ChatRequestContext(messages = messages))
 
     override fun chatReactive(request: ChatRequestContext): Mono<ChatResponse> {
@@ -55,7 +62,7 @@ class OllamaClient(
                 if (supportsTools && toolsEnabled) {
                     val prompt = promptFactory.buildPrompt(request, selectedModel)
                     val model = chatModelFor(request)
-                    ToolCallingLoop()
+                    ToolCallingLoop(outputLimitUpdater = promptFactory::updateOutputLimit)
                         .runReactive(
                             model,
                             prompt,
@@ -111,7 +118,7 @@ class OllamaClient(
                         )
                 } else {
                     val model = chatModelFor(request)
-                    ToolCallingLoop()
+                    ToolCallingLoop(outputLimitUpdater = promptFactory::updateOutputLimit)
                         .runStreamReactive(
                             model,
                             prompt,

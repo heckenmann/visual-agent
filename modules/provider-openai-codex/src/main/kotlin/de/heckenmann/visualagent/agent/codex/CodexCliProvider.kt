@@ -99,7 +99,7 @@ class CodexCliProvider internal constructor(
                 .map { chunk ->
                     ChatResponse(
                         model = chunk.metadata.model.takeIf(String::isNotBlank) ?: resolved.model,
-                        message = chunk.toCodexProviderMessage(),
+                        message = chunk.toCodexProviderMessage(normalizeContent = false),
                         done = chunk.hasFinishReasons(setOf("stop")),
                         providerTurn = chunk.toCodexProviderTurn(resolved.model),
                     )
@@ -250,7 +250,7 @@ class CodexCliProvider internal constructor(
  *
  * @return Provider-neutral assistant message with optional Codex metadata
  */
-internal fun org.springframework.ai.chat.model.ChatResponse.toCodexProviderMessage(): Message {
+internal fun org.springframework.ai.chat.model.ChatResponse.toCodexProviderMessage(normalizeContent: Boolean = true): Message {
     val itemId = metadata.get<String>("codexItemId")
     val messageMetadata =
         itemId?.let {
@@ -260,7 +260,10 @@ internal fun org.springframework.ai.chat.model.ChatResponse.toCodexProviderMessa
         }
     return Message(
         role = "assistant",
-        content = ProviderResponseContentNormalizer.normalize(result?.output?.text.orEmpty()),
+        content =
+            result?.output?.text.orEmpty().let { content ->
+                if (normalizeContent) ProviderResponseContentNormalizer.normalize(content) else content
+            },
         metadata = messageMetadata,
     )
 }
@@ -270,7 +273,7 @@ internal fun org.springframework.ai.chat.model.ChatResponse.toCodexProviderTurn(
     val rawFinishReason = result?.metadata?.finishReason
     return ProviderTurnResponse(
         model = metadata.model.takeIf(String::isNotBlank) ?: fallbackModel,
-        content = ProviderResponseContentNormalizer.normalize(result?.output?.text.orEmpty()),
+        content = result?.output?.text.orEmpty(),
         reasoning = metadata.get<String>("codexReasoning"),
         reasoningIsSummary = true,
         finishReason = rawFinishReason?.let { ProviderFinishReason.STOP },

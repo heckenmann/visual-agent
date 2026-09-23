@@ -3,6 +3,7 @@ package de.heckenmann.visualagent.agent
 import org.springframework.ai.chat.messages.AssistantMessage
 import org.springframework.ai.chat.messages.SystemMessage
 import org.springframework.ai.chat.messages.UserMessage
+import org.springframework.ai.chat.prompt.ChatOptions
 import org.springframework.ai.chat.prompt.Prompt
 import org.springframework.ai.tokenizer.JTokkitTokenCountEstimator
 import org.springframework.ai.tokenizer.TokenCountEstimator
@@ -61,13 +62,18 @@ class RequestContextBudgeter(
      * @param request Request limits for the provider round
      * @param prompt Prompt that is about to be sent
      * @param toolCallbacks Exact callbacks attached to the prompt
+     * @param outputLimitUpdater Provider-specific option update for the computed response limit
      * @return Prompt with older optional messages removed when required
      */
     fun fitPrompt(
         request: ChatRequestContext,
         prompt: Prompt,
         toolCallbacks: List<ToolCallback> = emptyList(),
+        outputLimitUpdater: (ChatOptions, Int) -> ChatOptions = { options, limit ->
+            options.mutate().maxTokens(limit).build()
+        },
     ): Prompt {
+        val firstUserIndex = prompt.instructions.indexOfFirst { it is UserMessage }
         val messages =
             prompt.instructions.mapIndexed { index, message ->
                 Message(
@@ -80,11 +86,21 @@ class RequestContextBudgeter(
                         },
                     content = message.text.orEmpty(),
                     id = index.toString(),
+                    contextPolicy =
+                        if (index < firstUserIndex && message is AssistantMessage) {
+                            ConversationContextPolicy.SUMMARY_SOURCE
+                        } else {
+                            null
+                        },
                 )
             }
         val fitted = fit(request, messages, toolCallbacks.map { it.toProviderDefinition() })
         val retainedIds = fitted.messages.mapNotNull { it.id?.toIntOrNull() }.toSet()
-        return Prompt(prompt.instructions.filterIndexed { index, _ -> index in retainedIds }, prompt.options)
+        val options =
+            prompt.options?.let { currentOptions ->
+                fitted.parameters.maxTokens?.let { limit -> outputLimitUpdater(currentOptions, limit) } ?: currentOptions
+            }
+        return Prompt(prompt.instructions.filterIndexed { index, _ -> index in retainedIds }, options)
     }
 
     private fun mandatoryIndices(
