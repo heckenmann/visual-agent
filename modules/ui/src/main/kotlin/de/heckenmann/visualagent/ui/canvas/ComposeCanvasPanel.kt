@@ -166,11 +166,7 @@ private fun CanvasDrawingToolbar(
         description = "Add text",
         onClick = { update(canvasOperations.drawText("Visual Agent", 70.0, 220.0, "#F8F8F2")) },
     )
-    ActionIconButton(
-        icon = Icons.Filled.Image,
-        description = "Import image",
-        onClick = onImportImage,
-    )
+    CanvasImportImageButton(onImportImage)
     ActionIconButton(
         icon = Icons.Filled.ClearAll,
         description = "Clear canvas",
@@ -196,6 +192,16 @@ private fun CanvasDrawingToolbar(
                 update(canvasOperations.deleteSelectedFigures())
             }
         },
+    )
+}
+
+/** Renders the action that opens the platform file picker for canvas image imports. */
+@Composable
+internal fun CanvasImportImageButton(onImport: () -> Unit) {
+    ActionIconButton(
+        icon = Icons.Filled.Image,
+        description = "Import image",
+        onClick = onImport,
     )
 }
 

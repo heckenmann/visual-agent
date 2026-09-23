@@ -12,6 +12,8 @@ import de.heckenmann.visualagent.protocol.TodoItem
 import de.heckenmann.visualagent.protocol.TodoPort
 import de.heckenmann.visualagent.protocol.TodoProgress
 import de.heckenmann.visualagent.protocol.TodoState
+import de.heckenmann.visualagent.ui.modal.ComposeConfirmationModal
+import de.heckenmann.visualagent.ui.modal.ComposeContentModal
 import de.heckenmann.visualagent.ui.modal.ComposeModalRequester
 import io.mockk.every
 import io.mockk.mockk
@@ -55,6 +57,34 @@ class ComposeTodoPanelProtocolTest {
 
         io.mockk.verify(exactly = 1) { port.startAll() }
         io.mockk.verify(exactly = 1) { port.stopAll() }
+    }
+
+    @Test
+    fun `todo add edit start stop complete and delete controls invoke their actions`() {
+        val todo = TodoItem("todo", "Task")
+        val port = protocolPort(listOf(todo))
+        var requested: Any? = null
+        composeTestRule.setContent {
+            MaterialTheme { TodoPanel(port, ComposeModalRequester { requested = it }, LifecycleState()) }
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithContentDescription("Add todo").performClick()
+        assertEquals("Add todo", (requested as ComposeContentModal).title)
+        composeTestRule.onNodeWithContentDescription("Edit todo").performClick()
+        assertEquals("Edit todo", (requested as ComposeContentModal).title)
+        composeTestRule.onNodeWithContentDescription("Start todo").performClick()
+        composeTestRule.onNodeWithContentDescription("Stop todo").performClick()
+        composeTestRule.onNodeWithContentDescription("Complete todo").performClick()
+        composeTestRule.onNodeWithContentDescription("Delete todo").performClick()
+        val confirmation = requested as ComposeConfirmationModal
+        assertEquals("Delete todo?", confirmation.title)
+        confirmation.onConfirm()
+
+        io.mockk.verify(exactly = 1) { port.start("todo") }
+        io.mockk.verify(exactly = 1) { port.stop("todo") }
+        io.mockk.verify(exactly = 1) { port.updateStatus("todo", TodoState.COMPLETED) }
+        io.mockk.verify(exactly = 1) { port.remove("todo") }
     }
 
     @Test

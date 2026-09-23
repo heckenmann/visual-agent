@@ -4,7 +4,9 @@ package de.heckenmann.visualagent.ui.application
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
@@ -59,6 +61,20 @@ class ComposeCommandPaletteHostTest {
 
         composeTestRule.onNodeWithText("Search commands").performTextInput("xyz")
         composeTestRule.onNodeWithText("No matching commands").assertExists()
+    }
+
+    @Test
+    fun `close button dismisses command palette`() {
+        var dismissed = false
+        composeTestRule.setContent {
+            MaterialTheme {
+                ComposeCommandPaletteHost(visible = true, commands = emptyList(), onDismiss = { dismissed = true })
+            }
+        }
+
+        composeTestRule.onNodeWithContentDescription("Close command palette").performClick()
+
+        kotlin.test.assertTrue(dismissed)
     }
 }
 

@@ -3,6 +3,7 @@ package de.heckenmann.visualagent.ui.agents
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import de.heckenmann.visualagent.protocol.Agent
 import de.heckenmann.visualagent.protocol.AgentConfig
 import de.heckenmann.visualagent.protocol.AgentPort
@@ -14,6 +15,7 @@ import de.heckenmann.visualagent.protocol.ProviderProfile
 import de.heckenmann.visualagent.protocol.ToolDefinition
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import org.junit.Rule
 import org.junit.Test
 
@@ -46,6 +48,8 @@ class ComposeSubAgentDetailsEditorProtocolTest {
         composeTestRule.onNodeWithText("Timeout").assertExists()
         composeTestRule.onNodeWithText("terminal").assertExists()
         composeTestRule.onNodeWithText("files").assertExists()
-        composeTestRule.onNodeWithText("Save changes").assertExists()
+        composeTestRule.onNodeWithText("Save changes").performClick()
+
+        verify(exactly = 1) { agents.update(agent.id, any(), any(), any()) }
     }
 }

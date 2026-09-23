@@ -25,6 +25,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.ui.agents.*
@@ -100,7 +102,8 @@ internal fun ActionIconButton(
                     .pointerHoverIcon(
                         if (enabled) PointerIcon.Hand else PointerIcon.Default,
                         overrideDescendants = true,
-                    ).combinedClickable(
+                    ).semantics { this.selected = selected }
+                    .combinedClickable(
                         enabled = enabled,
                         role = Role.Button,
                         onClick = onClick,
