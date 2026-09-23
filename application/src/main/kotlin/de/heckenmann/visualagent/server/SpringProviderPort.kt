@@ -61,7 +61,7 @@ class SpringProviderPort(
 
     override suspend fun discoverModels(profile: ProviderProfile): List<ProviderModel> =
         protocolBoundary {
-            val discovered = llmProvider.getModelsReactive(profile.toApplication()).awaitSingle()
+            val discovered = llmProvider.getModelConfigsReactive(profile.toApplication()).awaitSingle()
             profile.withDiscoveredModels(discovered).selectableModels()
         }
 
@@ -103,11 +103,22 @@ private fun ProviderProfile.toApplication(): ApplicationProviderProfile =
         modelBlacklist = modelBlacklist,
     )
 
-private fun ProviderProfile.withDiscoveredModels(modelIds: List<String>): ProviderProfile =
+private fun ProviderProfile.withDiscoveredModels(modelConfigs: List<ProviderModelConfig>): ProviderProfile =
     copy(
         models =
-            modelIds.distinct().map { modelId ->
-                models.firstOrNull { it.id == modelId } ?: ProviderModel(id = modelId)
+            modelConfigs.distinctBy(ProviderModelConfig::id).map { config ->
+                val discovered = config.toProtocol()
+                val existing = models.firstOrNull { it.id == config.id }
+                existing?.copy(
+                    name = discovered.name,
+                    capabilities =
+                        when {
+                            discovered.capabilitiesComplete || existing.capabilitiesComplete ->
+                                if (discovered.capabilitiesComplete) discovered.capabilities else existing.capabilities
+                            else -> existing.capabilities + discovered.capabilities
+                        },
+                    capabilitiesComplete = discovered.capabilitiesComplete || existing.capabilitiesComplete,
+                ) ?: discovered
             },
     )
 

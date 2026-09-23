@@ -17,8 +17,8 @@ Desktop user.
 
 1. The user opens the global **Providers and models** overlay with the settings icon in the Conversation panel title bar.
 2. The UI shows enabled provider connections and models selectable for the selected connection.
-3. The user stages a provider, model, favorite, or profile change without affecting active agent requests.
-4. The user may refresh the remote model catalog to update the local selection choices.
+3. Selecting a provider immediately refreshes its model list from that provider's endpoint. The stored active model is restored for the active provider; another provider uses its stored default model when it remains selectable.
+4. The user stages a provider, model, favorite, or profile change without affecting active agent requests. A manual refresh preserves the current draft model when it remains selectable.
 5. The user configures model instruction, context, startup history, parallel agents, tool timeout, queue behavior, and optional idle follow-up suggestions in the same local draft.
 6. The user selects **Save changes** to persist the staged catalog, conversation settings, and active provider/model together, or **Reset changes** to reload the persisted state from H2.
 7. The user may press **Esc** or select the title-bar close action to discard the local draft without saving.
@@ -47,6 +47,8 @@ Main-agent requests use the user-selected provider and model unless an agent-spe
 
 - Provider selection uses enabled provider profiles rather than free-form text.
 - Provider/model edits stay local until the user explicitly saves the global overlay.
+- Each provider switch requests a fresh model list, including OpenAI-compatible and Codex CLI providers; stale responses cannot replace a later selection.
+- Discovery failures retain the staged model list and selection.
 - Conversation settings stay local until the user explicitly saves the same global overlay.
 - Reset discards the local draft and rereads the persisted configuration; it does not restore factory defaults.
 - The overlay occupies 80% of the application window height, keeps its title bar visible, and shows a vertical scrollbar when content exceeds the available space.

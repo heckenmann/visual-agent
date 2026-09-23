@@ -3,6 +3,7 @@ package de.heckenmann.visualagent.agent
 import de.heckenmann.visualagent.agent.ollama.OllamaPromptFactory
 import de.heckenmann.visualagent.agent.ollama.OllamaToolRecovery
 import de.heckenmann.visualagent.agent.ollama.createOllamaApi
+import de.heckenmann.visualagent.agent.ollama.fetchModelCapabilitiesReactive
 import de.heckenmann.visualagent.agent.provider.ProviderErrorMessages
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.agent.provider.ProviderRuntimeConfig

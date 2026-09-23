@@ -140,12 +140,16 @@ class SpringProviderPortTest {
                     baseUrl = "https://staged.example.test",
                     apiKey = "not-persisted",
                 )
-            every { provider.getModelsReactive(any<ApplicationProviderProfile>()) } returns Mono.just(listOf("gpt-staged"))
+            every { provider.getModelConfigsReactive(any<ApplicationProviderProfile>()) } returns
+                Mono.just(listOf(ProviderModelConfig("gpt-staged", capabilities = setOf("tools", "vision"), capabilitiesComplete = true)))
 
-            assertEquals("gpt-staged", port.discoverModels(staged).single().id)
+            val discovered = port.discoverModels(staged).single()
+            assertEquals("gpt-staged", discovered.id)
+            assertEquals(setOf("tools", "vision"), discovered.capabilities)
+            assertEquals(true, discovered.capabilitiesComplete)
 
             verify {
-                provider.getModelsReactive(
+                provider.getModelConfigsReactive(
                     match<ApplicationProviderProfile> {
                         it.id == "staged" && it.baseUrl == "https://staged.example.test" && it.apiKey == "not-persisted"
                     },
@@ -153,6 +157,30 @@ class SpringProviderPortTest {
             }
             verify(exactly = 0) { catalog.updateDiscoveredModels(any(), any()) }
             verify(exactly = 0) { catalog.updateDiscoveredModelConfigs(any(), any()) }
+        }
+
+    @Test
+    fun `incomplete discovery preserves existing capability knowledge`() =
+        runTest {
+            val staged =
+                ProviderProfile(
+                    id = "codex",
+                    name = "Codex",
+                    adapter = ProviderAdapter.CODEX_CLI,
+                    baseUrl = "",
+                    models =
+                        listOf(
+                            de.heckenmann.visualagent.protocol
+                                .ProviderModel("model", capabilities = setOf("tools")),
+                        ),
+                )
+            every { provider.getModelConfigsReactive(any<ApplicationProviderProfile>()) } returns
+                Mono.just(listOf(ProviderModelConfig("model", capabilities = setOf("vision"))))
+
+            val discovered = port.discoverModels(staged).single()
+
+            assertEquals(setOf("tools", "vision"), discovered.capabilities)
+            assertEquals(false, discovered.capabilitiesComplete)
         }
 
     @Test

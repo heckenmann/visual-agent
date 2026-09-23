@@ -84,9 +84,15 @@ internal fun ProviderSettingsDraft.normalizeSelection(): ProviderSettingsDraft {
 internal fun ProviderSettingsDraft.withModels(
     providerId: String,
     models: List<ProviderModel>,
+    preferredModelId: String? = null,
 ): ProviderSettingsDraft {
     val updated = providers.map { profile -> if (profile.id == providerId) profile.copy(models = models) else profile }
-    val selectedModel = modelId.takeIf { id -> models.any { it.id == id } } ?: models.firstOrNull()?.id.orEmpty()
+    if (this.providerId != providerId) return copy(providers = updated)
+    val selectable = updated.firstOrNull { it.id == providerId }?.selectableModels().orEmpty()
+    val selectedModel =
+        listOfNotNull(preferredModelId, modelId)
+            .firstOrNull { id -> selectable.any { it.id == id } }
+            ?: selectable.firstOrNull()?.id.orEmpty()
     return copy(providers = updated, modelId = selectedModel)
 }
 

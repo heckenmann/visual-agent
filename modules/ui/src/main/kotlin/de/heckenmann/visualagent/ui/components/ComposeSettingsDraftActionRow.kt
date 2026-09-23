@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 internal fun settingsDraftActionRow(
     hasUnsavedChanges: Boolean,
     saving: Boolean,
+    canSave: Boolean = true,
     onReset: () -> Unit,
     onSave: () -> Unit,
 ) {
@@ -21,6 +22,11 @@ internal fun settingsDraftActionRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
     ) {
         resetActionButton(onClick = onReset, enabled = hasUnsavedChanges && !saving)
-        saveActionButton(label = if (saving) "Saving..." else "Save changes", onClick = onSave, enabled = hasUnsavedChanges && !saving)
+        saveActionButton(
+            label = if (saving) "Saving..." else "Save changes",
+            onClick = onSave,
+            enabled =
+                hasUnsavedChanges && !saving && canSave,
+        )
     }
 }

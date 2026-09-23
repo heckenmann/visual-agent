@@ -1,6 +1,5 @@
 package de.heckenmann.visualagent.agent
 
-import de.heckenmann.visualagent.agent.ollama.fetchModelCapabilitiesReactive
 import de.heckenmann.visualagent.agent.openai.OpenAiClient
 import de.heckenmann.visualagent.agent.provider.DefaultProviderRuntimeConfig
 import de.heckenmann.visualagent.agent.provider.ProfiledProviderAdapter
@@ -25,7 +24,7 @@ class ConfiguredLLMProvider(
     private val ollamaClient: OllamaClient,
     private val openAiClient: OpenAiClient,
     private val providerCatalog: ProviderCatalogService,
-    private val fetchCapabilities: (ProviderProfile) -> Mono<Map<String, Set<String>>> = ::fetchModelCapabilitiesReactive,
+    private val fetchCapabilities: (ProviderProfile) -> Mono<Map<String, Set<String>>> = ollamaClient::getModelCapabilitiesReactive,
     private val profiledAdapters: List<ProfiledProviderAdapter> = emptyList(),
     private val runtimeConfig: ProviderRuntimeConfig = DefaultProviderRuntimeConfig(),
 ) : LLMProvider {
@@ -96,13 +95,14 @@ class ConfiguredLLMProvider(
                         providerCatalog.updateDiscoveredModels(providerId, discovered.map { it.id })
                     }
                     if (profile.adapter == ProviderAdapter.OLLAMA) {
-                        fetchCapabilities(profile)
-                            .doOnNext { capabilities ->
-                                providerCatalog.updateModelCapabilities(providerId, capabilities)
-                            }.then()
-                    } else {
-                        Mono.empty()
-                    }.thenReturn(providerCatalog.selectableModels(providerId).map { it.id })
+                        providerCatalog.updateModelCapabilities(
+                            providerId,
+                            discovered
+                                .filter(ProviderModelConfig::capabilitiesComplete)
+                                .associate { it.id to it.capabilities },
+                        )
+                    }
+                    Mono.just(providerCatalog.selectableModels(providerId).map { it.id })
                 }
             }
 
@@ -131,7 +131,19 @@ class ConfiguredLLMProvider(
 
     private fun discoverModelConfigsReactive(profile: ProviderProfile): Mono<List<ProviderModelConfig>> =
         when (profile.adapter) {
-            ProviderAdapter.OLLAMA -> ollamaClient.getModelsReactive(profile).map { models -> models.map(::ProviderModelConfig) }
+            ProviderAdapter.OLLAMA ->
+                ollamaClient.getModelsReactive(profile).flatMap { names ->
+                    fetchCapabilities(profile).map { capabilities ->
+                        names.map { name ->
+                            val reported = capabilities[name]
+                            ProviderModelConfig(
+                                id = name,
+                                capabilities = reported.orEmpty(),
+                                capabilitiesComplete = reported != null,
+                            )
+                        }
+                    }
+                }
             ProviderAdapter.OPENAI_COMPATIBLE ->
                 openAiClient.getModelsReactive(profile).map { models -> models.map(::ProviderModelConfig) }
             ProviderAdapter.CODEX_CLI -> adapterFor(profile.adapter).loadModelsReactive(profile)
