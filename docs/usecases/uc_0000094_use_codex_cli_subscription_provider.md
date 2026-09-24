@@ -18,7 +18,7 @@ Allow a desktop user to use an authenticated, user-local OpenAI Codex CLI instal
 4. Native `item/agentMessage/delta` notifications are mapped to incremental Spring AI responses while the turn is running.
 5. `item/tool/call` requests are validated against the request-scoped tool allowlist and delegated to the existing `ToolRegistry` callback.
 6. The tool result is returned to the same Codex turn through `DynamicToolCallResponse`; the trusted workspace image action becomes an `inputImage` content item. Audio content remains textual until the negotiated app-server schema and selected model support it.
-7. Assistant deltas retain their Codex `itemId` in Spring AI response metadata so separate assistant items remain distinguishable.
+7. Assistant deltas retain their Codex `itemId` in Spring AI response metadata so separate assistant items remain distinguishable. When two different items contain visible assistant text, the stream adds a Markdown blank-line boundary unless existing whitespace already separates them.
 8. `turn/completed` emits the terminal Spring AI response and the process is closed.
 
 ## Prompt and input mapping
@@ -92,6 +92,7 @@ The app-server protocol supports request-scoped `dynamicTools`, `thread/inject_i
 ## Verification
 
 - Protocol tests use a controlled fake app-server process and cover initialization, native delta streaming, assistant item boundaries, textual and inline image tool callbacks, structured tool failures, audio fallback, terminal completion, and cleanup.
+- Streaming tests verify separate Codex items receive a Markdown boundary, same-item token chunks remain unchanged, and existing leading whitespace or blank lines are preserved without duplication.
 - Request-boundary tests verify that every thread is ephemeral, read-only, uses the `never` approval policy, that completed assistant/user messages are injected with native roles before the current user turn, and that a server tool request outside the request-scoped allowlist is rejected. The CLI process-factory test verifies API-key removal with controlled sentinel values.
 - Lifecycle tests verify successful completion process termination and failed-turn/rejected-tool error propagation. The transport cleanup path also waits for normal or forced child termination, and cancellation is wired to that same close path.
 - Provider wiring tests cover the new dependency-free adapter.

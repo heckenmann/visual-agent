@@ -107,9 +107,7 @@ internal class CodexAppServerChatModel(
                         "turn/start",
                         CodexAppServerRequestParams.turn(prompt, threadId, model, showReasoningSummary, image),
                     )
-                    var pendingDelta: String? = null
-                    var pendingItemId: String? = null
-                    var receivedMultipleDeltas = false
+                    val deltaBuffer = CodexAssistantDeltaBuffer()
                     var toolCallSequence = 0
                     withTimeout(TURN_TIMEOUT_MILLIS) {
                         while (true) {
@@ -126,18 +124,8 @@ internal class CodexAppServerChatModel(
                                                     ?.jsonPrimitive
                                                     ?.contentOrNull
                                                     .orEmpty()
-                                            if (delta.isNotEmpty()) {
-                                                val previousDelta = pendingDelta
-                                                if (previousDelta != null && pendingItemId != itemId) {
-                                                    send(response(previousDelta, done = false, itemId = pendingItemId))
-                                                    pendingDelta = null
-                                                    pendingItemId = null
-                                                    receivedMultipleDeltas = true
-                                                }
-                                                pendingDelta?.let { send(response(it, done = false, itemId = pendingItemId)) }
-                                                receivedMultipleDeltas = receivedMultipleDeltas || pendingDelta != null
-                                                pendingDelta = delta
-                                                pendingItemId = itemId
+                                            deltaBuffer.accept(delta, itemId)?.let { previous ->
+                                                send(response(previous.text, done = false, itemId = previous.itemId))
                                             }
                                         }
                                         "item/reasoning/summaryTextDelta" -> {
@@ -173,15 +161,10 @@ internal class CodexAppServerChatModel(
                                                         ?: "Codex turn $status"
                                                 error(message)
                                             }
-                                            pendingDelta?.let { lastDelta ->
-                                                if (receivedMultipleDeltas) {
-                                                    send(response(lastDelta, done = false, itemId = pendingItemId))
-                                                } else {
-                                                    val chunks = lastDelta.simulatedChunks()
-                                                    chunks.forEachIndexed { index, chunk ->
-                                                        send(response(chunk, done = false, itemId = pendingItemId))
-                                                        if (index < chunks.lastIndex) delay(SIMULATED_CHUNK_DELAY_MS)
-                                                    }
+                                            deltaBuffer.complete()?.let { batch ->
+                                                batch.chunks.forEachIndexed { index, chunk ->
+                                                    send(response(chunk, done = false, itemId = batch.itemId))
+                                                    if (batch.animate && index < batch.chunks.lastIndex) delay(SIMULATED_CHUNK_DELAY_MS)
                                                 }
                                             }
                                             return@withTimeout

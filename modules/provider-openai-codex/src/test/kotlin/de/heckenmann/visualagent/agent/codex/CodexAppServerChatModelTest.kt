@@ -58,29 +58,6 @@ class CodexAppServerChatModelTest {
         }
 
     @Test
-    fun `assistant item boundaries are preserved in response metadata`() =
-        runBlocking {
-            val directory = createTempDirectory("codex-app-server-item-boundary-test-")
-            val executable = fakeServer(directory, secondItem = true)
-            try {
-                val responses =
-                    CodexAppServerChatModel(executable, "gpt-test", emptyList(), directory)
-                        .streamBlocking(Prompt("hello"))
-
-                assertEquals(
-                    listOf("item-1", "item-2"),
-                    responses.dropLast(1).map {
-                        it.metadata
-                            .get<String>("codexItemId")
-                            ?: error("item ID missing")
-                    },
-                )
-            } finally {
-                deleteRecursively(directory)
-            }
-        }
-
-    @Test
     fun `a single native delta is animated in small chunks`() =
         runBlocking {
             val directory = createTempDirectory("codex-app-server-single-delta-test-")
@@ -203,10 +180,12 @@ class CodexAppServerChatModelTest {
             }
         }
 
-    private fun fakeServer(
+    internal fun fakeServer(
         directory: Path,
         singleDelta: Boolean = false,
         secondItem: Boolean = false,
+        firstDelta: String = "hel",
+        secondDelta: String = "lo",
         reasoningSummary: Boolean = false,
         turnStatus: String = "completed",
         toolName: String = "context",
@@ -216,7 +195,7 @@ class CodexAppServerChatModelTest {
             if (singleDelta) {
                 """printf '%s\n' '{"jsonrpc":"2.0","method":"item/agentMessage/delta","params":{"delta":"hello","itemId":"item-1","threadId":"thread-1","turnId":"turn-1"}}'"""
             } else if (secondItem) {
-                deltaEvent("hel", "item-1") + "\n                  " + deltaEvent("lo", "item-2")
+                deltaEvent(firstDelta, "item-1") + "\n                  " + deltaEvent(secondDelta, "item-2")
             } else {
                 deltaEvent("hel") + "\n                  " + deltaEvent("lo")
             }
@@ -266,7 +245,7 @@ class CodexAppServerChatModelTest {
         return executable
     }
 
-    private fun deleteRecursively(directory: Path) {
+    internal fun deleteRecursively(directory: Path) {
         Files.walk(directory).use { paths ->
             paths.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
         }
