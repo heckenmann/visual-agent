@@ -17,6 +17,7 @@ import de.heckenmann.visualagent.protocol.ConversationPreferences
 import de.heckenmann.visualagent.protocol.ConversationResponseTelemetry
 import de.heckenmann.visualagent.protocol.ConversationStreamRequest
 import de.heckenmann.visualagent.protocol.ConversationStreamResult
+import de.heckenmann.visualagent.protocol.ConversationStreamUpdate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -43,17 +44,17 @@ class SpringConversationPort(
     override suspend fun stream(
         request: ConversationStreamRequest,
         token: CancellationToken,
-        onChunk: (String) -> Unit,
+        onChunk: (ConversationStreamUpdate) -> Unit,
     ): ConversationStreamResult =
         withContext(Dispatchers.IO) {
             protocolBoundary {
                 val applicationToken = ApplicationCancellationToken()
                 token.onCancelled(applicationToken::cancel)
                 agentManager.streamMessage(request.content, applicationToken, onChunk, request.userEntryId, request.assistantEntryId)
+                val history = agentManager.getHistory()
                 val message =
-                    agentManager
-                        .getHistory()
-                        .lastOrNull { it.id == request.assistantEntryId }
+                    history.lastOrNull { it.role == "assistant" && it.conversationRequestId == request.assistantEntryId }
+                        ?: history.lastOrNull { it.id == request.assistantEntryId }
                         ?: error("Conversation stream completed without its assistant entry")
                 ConversationStreamResult(message.toConversationMessage(mediaResolver))
             }
@@ -136,6 +137,7 @@ private fun de.heckenmann.visualagent.agent.conversation.ConversationHistoryPage
         messages.map { it.toConversationMessage(mediaResolver) },
         offset,
         hasMore,
+        nextOffset,
     )
 
 private fun Message.toConversationMessage(mediaResolver: ConversationMediaResolver): ConversationMessage {
@@ -151,6 +153,9 @@ private fun Message.toConversationMessage(mediaResolver: ConversationMediaResolv
         id = id,
         createdAtEpochMillis = createdAtEpochMillis,
         timelineSequence = timelineSequence,
+        parentAssistantTurnId = parentAssistantTurnId,
+        turnOrder = turnOrder,
+        assistantToolTurn = assistantToolTurn,
         reasoning = responseMetadata?.reasoning,
         telemetry =
             responseMetadata?.let { telemetry ->

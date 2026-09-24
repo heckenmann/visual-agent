@@ -4,6 +4,7 @@ import de.heckenmann.visualagent.protocol.ConversationMessage
 import de.heckenmann.visualagent.protocol.ConversationPort
 import de.heckenmann.visualagent.protocol.ConversationStreamRequest
 import de.heckenmann.visualagent.protocol.ConversationStreamResult
+import de.heckenmann.visualagent.protocol.ConversationStreamUpdate
 import de.heckenmann.visualagent.protocol.ProtocolVersion
 import de.heckenmann.visualagent.protocol.v1.ChatRequest
 import de.heckenmann.visualagent.protocol.v1.ClientFrame
@@ -116,7 +117,7 @@ class VisualAgentGrpcSessionServiceTest {
             val request = firstArg<ConversationStreamRequest>()
             assertEquals(USER_ONE, request.userEntryId)
             assertEquals(REQUEST_ONE, request.assistantEntryId)
-            thirdArg<(String) -> Unit>().invoke("world")
+            thirdArg<(ConversationStreamUpdate) -> Unit>().invoke(ConversationStreamUpdate(REQUEST_ONE, "world"))
             ConversationStreamResult(ConversationMessage("assistant", "world", id = request.assistantEntryId))
         }
         val sessionService = VisualAgentGrpcSessionService(conversationPort)
@@ -152,6 +153,12 @@ class VisualAgentGrpcSessionServiceTest {
             observer.values
                 .first { it.hasChatDelta() }
                 .chatDelta.text,
+        )
+        assertEquals(
+            REQUEST_ONE,
+            observer.values
+                .first { it.hasChatDelta() }
+                .chatDelta.assistantTurnId,
         )
         assertEquals(
             true,

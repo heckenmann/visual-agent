@@ -18,6 +18,7 @@ import de.heckenmann.visualagent.knowledge.PersistenceStores
 import de.heckenmann.visualagent.knowledge.SubAgentStore
 import de.heckenmann.visualagent.knowledge.TodoStore
 import de.heckenmann.visualagent.orchestration.AutonomousCoordinator
+import de.heckenmann.visualagent.protocol.ConversationStreamUpdate
 import de.heckenmann.visualagent.protocol.LifecyclePort
 import de.heckenmann.visualagent.protocol.LifecycleState
 import de.heckenmann.visualagent.todo.Todo
@@ -244,7 +245,7 @@ class AgentManager
         suspend fun streamMessage(
             content: String,
             token: CancellationToken? = null,
-            onChunk: (String) -> Unit,
+            onChunk: (ConversationStreamUpdate) -> Unit,
             userEntryId: String,
             assistantEntryId: String,
         ): String = conversationOps.streamMessage(content, token, onChunk, userEntryId, assistantEntryId)
@@ -297,6 +298,13 @@ class AgentManager
          * Records a tool call event in the conversation history.
          */
         fun recordToolCall(event: ToolCallEvent) = conversationOps.recordToolCall(event)
+
+        /** Persists a tool-calling assistant turn before the provider executes its declared calls. */
+        internal fun recordProviderAssistantTurn(
+            turn: ProviderTurnResponse,
+            turnId: String,
+            requestId: String,
+        ): Message = conversationOps.recordProviderAssistantTurn(turn, turnId, requestId)
 
         /**
          * Deletes a message from the conversation history by its ID.

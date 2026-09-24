@@ -117,7 +117,14 @@ interface ProviderToolCallbacks {
     fun bindToolCallRound(
         toolCalls: List<de.heckenmann.visualagent.agent.ProviderToolCall>,
         round: Int,
+        parentAssistantTurnId: String? = null,
     ): AutoCloseable = AutoCloseable {}
+
+    /** Persists visible assistant prose for a tool-calling turn before its tools execute. */
+    fun recordAssistantToolTurn(
+        turn: de.heckenmann.visualagent.agent.ProviderTurnResponse,
+        context: Map<String, Any>,
+    ): String? = null
 }
 
 /** Supplies the default filesystem location used by local provider processes. */

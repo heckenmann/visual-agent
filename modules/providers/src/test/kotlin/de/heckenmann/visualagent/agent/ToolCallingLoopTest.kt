@@ -58,6 +58,35 @@ class ToolCallingLoopTest {
     }
 
     @Test
+    fun `run records assistant prose and binds tool calls to the same turn before execution`() {
+        val chatModel = mockk<ChatModel>()
+        val tool = CountingTool()
+        val correlation = CorrelatingCallbacks()
+        val prompt = Prompt(listOf(UserMessage("inspect the file")))
+        every { chatModel.call(any<Prompt>()) }
+            .returnsMany(
+                springToolResponse("unit", "I'll inspect the file first.", "count_tool", "{}", "call-1"),
+                springResponse("unit", "The file is valid."),
+            )
+
+        val response =
+            ToolCallingLoop()
+                .runReactive(
+                    chatModel,
+                    prompt,
+                    null,
+                    listOf(tool),
+                    correlation,
+                    requestMetadata = mapOf("requestId" to "request-1", "agent" to "main"),
+                ).block()!!
+
+        assertEquals("The file is valid.", response.message.content)
+        assertEquals("I'll inspect the file first.", correlation.recordedTurns.single().content)
+        assertEquals("assistant-turn-0", correlation.parentTurnIds.single())
+        assertEquals(1, tool.callCount)
+    }
+
+    @Test
     fun `run returns tool result directly when callback requests returnDirect`() {
         val chatModel = mockk<ChatModel>()
         val tool = DirectReturnTool()
@@ -221,6 +250,7 @@ class ToolCallingLoopTest {
 
     private fun springToolResponse(
         model: String,
+        content: String = "",
         toolName: String,
         arguments: String,
         callId: String,
@@ -230,7 +260,7 @@ class ToolCallingLoopTest {
         val assistantMessage =
             AssistantMessage
                 .builder()
-                .content("")
+                .content(content)
                 .toolCalls(listOf(toolCall) + additionalCalls)
                 .build()
         val generation = Generation(assistantMessage, ChatGenerationMetadata.builder().finishReason("tool_calls").build())
@@ -270,6 +300,8 @@ class ToolCallingLoopTest {
 
     private class CorrelatingCallbacks : ProviderToolCallbacks {
         val rounds = mutableListOf<Pair<Int, List<ProviderToolCall>>>()
+        val recordedTurns = mutableListOf<ProviderTurnResponse>()
+        val parentTurnIds = mutableListOf<String?>()
 
         override fun functionCallbacks(
             enabledTools: Set<ToolId>,
@@ -279,9 +311,19 @@ class ToolCallingLoopTest {
         override fun bindToolCallRound(
             toolCalls: List<ProviderToolCall>,
             round: Int,
+            parentAssistantTurnId: String?,
         ): AutoCloseable {
             rounds += round to toolCalls
+            parentTurnIds += parentAssistantTurnId
             return AutoCloseable {}
+        }
+
+        override fun recordAssistantToolTurn(
+            turn: ProviderTurnResponse,
+            context: Map<String, Any>,
+        ): String {
+            recordedTurns += turn
+            return "assistant-turn-${turn.metadata.round ?: 0}"
         }
     }
 }

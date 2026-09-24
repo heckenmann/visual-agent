@@ -50,6 +50,7 @@ internal class ToolCallingLoop(
         toolCallbacks: List<ToolCallback>,
         callCorrelation: ProviderToolCallbacks? = null,
         contextWindow: ContextWindow = ContextWindow(),
+        requestMetadata: Map<String, Any> = emptyMap(),
     ): ChatResponse {
         token?.throwIfCancelled()
         val budgetRequest = ChatRequestContext(messages = emptyList(), contextWindow = contextWindow)
@@ -70,8 +71,9 @@ internal class ToolCallingLoop(
             if (!response.hasToolCalls()) return response.toVisualAgentResponse(round = round)
 
             val turn = ProviderTurnResponseMapper.fromSpring(response, round = round)
+            val parentTurnId = callCorrelation?.recordAssistantToolTurn(turn, requestMetadata)
             val toolExecutionResult =
-                (callCorrelation?.bindToolCallRound(turn.toolCalls, round) ?: AutoCloseable {}).use {
+                (callCorrelation?.bindToolCallRound(turn.toolCalls, round, parentTurnId) ?: AutoCloseable {}).use {
                     toolCallingManager.executeToolCalls(boundedPrompt, response)
                 }
             if (toolExecutionResult.returnDirect()) return buildDirectResponse(response, toolExecutionResult)
@@ -101,10 +103,12 @@ internal class ToolCallingLoop(
         toolCallbacks: List<ToolCallback>,
         callCorrelation: ProviderToolCallbacks? = null,
         contextWindow: ContextWindow = ContextWindow(),
+        requestMetadata: Map<String, Any> = emptyMap(),
     ): Mono<ChatResponse> =
         Mono
-            .fromCallable { runBlocking(chatModel, initialPrompt, token, toolCallbacks, callCorrelation, contextWindow) }
-            .subscribeOn(Schedulers.boundedElastic())
+            .fromCallable {
+                runBlocking(chatModel, initialPrompt, token, toolCallbacks, callCorrelation, contextWindow, requestMetadata)
+            }.subscribeOn(Schedulers.boundedElastic())
 
     /**
      * Runs Spring AI streaming without converting its native [Flux] to a coroutine [Flow].
@@ -120,6 +124,7 @@ internal class ToolCallingLoop(
         toolCallbacks: List<ToolCallback>,
         callCorrelation: ProviderToolCallbacks? = null,
         contextWindow: ContextWindow = ContextWindow(),
+        requestMetadata: Map<String, Any> = emptyMap(),
     ): Flux<ChatResponse> =
         Flux.defer {
             token?.throwIfCancelled()
@@ -140,7 +145,12 @@ internal class ToolCallingLoop(
                 .index()
                 .map { indexed ->
                     token?.throwIfCancelled()
-                    indexed.t2.toVisualAgentResponse(sequence = indexed.t1.toInt(), normalizeContent = false)
+                    indexed.t2.toVisualAgentResponse(
+                        requestId = requestMetadata["requestId"]?.toString(),
+                        round = 0,
+                        sequence = indexed.t1.toInt(),
+                        normalizeContent = false,
+                    )
                 }.concatWith(
                     Mono
                         .fromCallable {
@@ -152,6 +162,7 @@ internal class ToolCallingLoop(
                                 callCorrelation,
                                 toolCallbacks,
                                 contextWindow,
+                                requestMetadata,
                             )
                         }.subscribeOn(Schedulers.boundedElastic()),
                 )
@@ -165,12 +176,15 @@ internal class ToolCallingLoop(
         callCorrelation: ProviderToolCallbacks?,
         toolCallbacks: List<ToolCallback>,
         contextWindow: ContextWindow,
+        requestMetadata: Map<String, Any>,
     ): ChatResponse? {
         if (aggregated?.hasToolCalls() != true) return null
         val toolCallingManager = buildToolCallingManager()
-        val initialTurn = ProviderTurnResponseMapper.fromSpring(aggregated, round = 0)
+        val requestId = requestMetadata["requestId"]?.toString()
+        val initialTurn = ProviderTurnResponseMapper.fromSpring(aggregated, requestId = requestId, round = 0)
+        val parentTurnId = callCorrelation?.recordAssistantToolTurn(initialTurn, requestMetadata)
         val toolExecutionResult =
-            (callCorrelation?.bindToolCallRound(initialTurn.toolCalls, 0) ?: AutoCloseable {}).use {
+            (callCorrelation?.bindToolCallRound(initialTurn.toolCalls, 0, parentTurnId) ?: AutoCloseable {}).use {
                 toolCallingManager.executeToolCalls(initialPrompt, aggregated)
             }
         if (toolExecutionResult.returnDirect()) return buildDirectResponse(aggregated, toolExecutionResult)
@@ -185,11 +199,12 @@ internal class ToolCallingLoop(
             val boundedPrompt = fitPrompt(budgetRequest, prompt, toolCallbacks)
             val finalResponse = chatModel.call(boundedPrompt)
             lastFinalResponse = finalResponse
-            if (!finalResponse.hasToolCalls()) return finalResponse.toVisualAgentResponse(round = round)
+            if (!finalResponse.hasToolCalls()) return finalResponse.toVisualAgentResponse(requestId = requestId, round = round)
 
-            val turn = ProviderTurnResponseMapper.fromSpring(finalResponse, round = round)
+            val turn = ProviderTurnResponseMapper.fromSpring(finalResponse, requestId = requestId, round = round)
+            val nextParentTurnId = callCorrelation?.recordAssistantToolTurn(turn, requestMetadata)
             val nextToolResult =
-                (callCorrelation?.bindToolCallRound(turn.toolCalls, round) ?: AutoCloseable {}).use {
+                (callCorrelation?.bindToolCallRound(turn.toolCalls, round, nextParentTurnId) ?: AutoCloseable {}).use {
                     toolCallingManager.executeToolCalls(boundedPrompt, finalResponse)
                 }
             if (nextToolResult.returnDirect()) return buildDirectResponse(finalResponse, nextToolResult)
@@ -197,7 +212,7 @@ internal class ToolCallingLoop(
         }
 
         logger.warn { "Stream tool calling loop reached max rounds ($maxRounds); emitting last response" }
-        return lastFinalResponse?.toVisualAgentResponse(round = maxRounds)
+        return lastFinalResponse?.toVisualAgentResponse(requestId = requestId, round = maxRounds)
     }
 
     private fun buildToolCallingManager(): ToolCallingManager =
@@ -278,6 +293,7 @@ internal class ToolCallingLoop(
     }
 
     private fun SpringChatResponse.toVisualAgentResponse(
+        requestId: String? = null,
         round: Int? = null,
         sequence: Int? = null,
         normalizeContent: Boolean = true,
@@ -285,6 +301,7 @@ internal class ToolCallingLoop(
         ProviderTurnResponseMapper.toChatResponse(
             ProviderTurnResponseMapper.fromSpring(
                 this,
+                requestId = requestId,
                 round = round,
                 sequence = sequence,
             ),
