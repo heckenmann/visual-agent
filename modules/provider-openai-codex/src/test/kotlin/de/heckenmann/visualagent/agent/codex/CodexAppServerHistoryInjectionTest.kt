@@ -20,14 +20,23 @@ class CodexAppServerHistoryInjectionTest {
     @Test
     fun `previous assistant answers are injected with native roles before the current turn`() {
         val directory = createTempDirectory("codex-app-server-context-test-")
+        val previousMarkdown =
+            listOf(
+                "```markdown",
+                "# Heading",
+                "- First",
+                "- Second",
+                "**Done**",
+                "```",
+            ).joinToString("\n")
         try {
             val prompt =
                 Prompt(
                     listOf(
                         SystemMessage("system rules"),
-                        UserMessage("earlier question"),
-                        AssistantMessage("earlier answer"),
-                        UserMessage("follow-up question"),
+                        UserMessage("Create a five-line Markdown example"),
+                        AssistantMessage(previousMarkdown),
+                        UserMessage("Explain that"),
                     ),
                 )
             CodexAppServerChatModel(fakeServer(directory), "gpt-test", emptyList(), directory)
@@ -37,7 +46,7 @@ class CodexAppServerHistoryInjectionTest {
             val historyItems = params(directory.resolve("history-inject.json"))["items"]!!.jsonArray
             assertEquals(listOf("user", "assistant"), historyItems.map { it.jsonObject["role"]!!.jsonPrimitive.content })
             assertEquals(
-                "earlier answer",
+                previousMarkdown,
                 historyItems[1]
                     .jsonObject["content"]!!
                     .jsonArray
@@ -48,7 +57,7 @@ class CodexAppServerHistoryInjectionTest {
             val turnInputs = params(directory.resolve("turn-start.json"))["input"]!!.jsonArray
             assertEquals(1, turnInputs.size)
             assertEquals(
-                "follow-up question",
+                "Explain that",
                 turnInputs
                     .single()
                     .jsonObject["text"]!!

@@ -6,7 +6,7 @@ import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** Verifies the bounded and deterministic main-agent context projection. */
+/** Verifies deterministic main-agent history projection before model-aware token budgeting. */
 class MainAgentContextAssemblerTest {
     private val assembler = MainAgentContextAssembler()
 
@@ -31,7 +31,7 @@ class MainAgentContextAssemblerTest {
                 Message("assistant", "Second answer", id = "assistant-2"),
             )
 
-        val result = assembler.assemble(history, "You are the main agent.", 4096)
+        val result = assembler.assemble(history)
         val content = result.joinToString("\n") { it.content }
 
         assertTrue(content.contains("First request"))
@@ -60,11 +60,14 @@ class MainAgentContextAssemblerTest {
                 Message("assistant", "Done"),
             )
 
-        val summary = assembler.assemble(history, "System", 4096).first { it.content.startsWith("Historical execution context") }
+        val summary =
+            assembler
+                .assemble(history)
+                .filter { it.content.startsWith("Historical execution context") }
+                .joinToString("\n") { it.content }
 
-        assertTrue(summary.role == "assistant")
-        assertTrue(summary.content.contains("failed attempt"))
-        assertTrue(summary.content.contains("successful retry"))
+        assertTrue(summary.contains("failed attempt"))
+        assertTrue(summary.contains("successful retry"))
     }
 
     @Test
@@ -87,10 +90,15 @@ class MainAgentContextAssemblerTest {
                 Message("assistant", "Workspace inspected"),
             )
 
-        val summary = assembler.assemble(history, "System", 4096).first { it.content.startsWith("Historical execution context") }
+        val summary =
+            assembler
+                .assemble(
+                    history,
+                ).filter { it.content.startsWith("Historical execution context") }
+                .joinToString("\n") { it.content }
 
-        assertTrue(summary.content.contains("read result"))
-        assertTrue(summary.content.contains("list result"))
+        assertTrue(summary.contains("read result"))
+        assertTrue(summary.contains("list result"))
     }
 
     @Test
@@ -113,14 +121,19 @@ class MainAgentContextAssemblerTest {
                 Message("assistant", "The report was updated"),
             )
 
-        val summary = assembler.assemble(history, "System", 4096).first { it.content.startsWith("Historical execution context") }
+        val summary =
+            assembler
+                .assemble(
+                    history,
+                ).filter { it.content.startsWith("Historical execution context") }
+                .joinToString("\n") { it.content }
 
-        assertTrue(summary.content.contains("Report was read"))
-        assertTrue(summary.content.contains("Report was written"))
+        assertTrue(summary.contains("Report was read"))
+        assertTrue(summary.contains("Report was written"))
     }
 
     @Test
-    fun `reports execution events omitted by the per-turn summary limit`() {
+    fun `projects all execution events for provider-aware budgeting`() {
         val history =
             buildList {
                 add(Message("user", "Process the batch"))
@@ -137,13 +150,15 @@ class MainAgentContextAssemblerTest {
                 add(Message("assistant", "Batch complete"))
             }
 
-        val summary = assembler.assemble(history, "System", 4096).first { it.content.startsWith("Historical execution context") }
+        val summaries = assembler.assemble(history).filter { it.content.startsWith("Historical execution context") }
 
-        assertTrue(summary.content.contains("Additional execution events omitted: 6."))
+        assertTrue(summaries.size == 30)
+        assertTrue(summaries.any { it.content.contains("Completed item 0") })
+        assertTrue(summaries.any { it.content.contains("Completed item 29") })
     }
 
     @Test
-    fun `retains newest turns when token budget is exhausted`() {
+    fun `does not pre-trim history before the model-aware budgeter`() {
         val history =
             buildList {
                 repeat(12) { index ->
@@ -152,17 +167,15 @@ class MainAgentContextAssemblerTest {
                 }
             }
 
-        val result =
-            assembler.assemble(history, "System", 1024)
+        val result = assembler.assemble(history)
         val content = result.joinToString("\n") { it.content }
 
         assertTrue(content.contains("Request 11"))
-        assertFalse(content.contains("Request 0"))
-        assertTrue(content.contains("older conversation turn(s) omitted"))
+        assertTrue(content.contains("Request 0"))
     }
 
     @Test
-    fun `does not retain stale turns after a newer turn exceeds the budget`() {
+    fun `keeps older history available for exact provider budgeting`() {
         val history =
             listOf(
                 Message("user", "Old request"),
@@ -173,10 +186,10 @@ class MainAgentContextAssemblerTest {
                 Message("assistant", "Current answer"),
             )
 
-        val content = assembler.assemble(history, "System", 1_800).joinToString("\n") { it.content }
+        val content = assembler.assemble(history).joinToString("\n") { it.content }
 
         assertTrue(content.contains("Current request"))
-        assertFalse(content.contains("Old request"))
+        assertTrue(content.contains("Old request"))
     }
 
     @Test
@@ -205,9 +218,14 @@ class MainAgentContextAssemblerTest {
                 add(Message("assistant", "Finished"))
             }
 
-        val summary = assembler.assemble(history, "System", 4_096).first { it.content.startsWith("Historical execution context") }
+        val summary =
+            assembler
+                .assemble(
+                    history,
+                ).filter { it.content.startsWith("Historical execution context") }
+                .joinToString("\n") { it.content }
 
-        assertTrue(summary.content.contains("Final event 0"))
-        assertFalse(summary.content.contains("Initial event 0"))
+        assertTrue(summary.contains("Final event 0"))
+        assertFalse(summary.contains("Initial event 0"))
     }
 }

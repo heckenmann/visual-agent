@@ -195,10 +195,10 @@ internal class AgentConversationHistoryOps(
             .records
             .mapNotNull(::toMessage)
 
-    /** Loads the bounded context projection used for main-agent provider requests. */
+    /** Loads the complete eligible history used for main-agent provider requests. */
     fun loadMainAgentContextFromDb(
-        userTurnLimit: Int = 10,
-        recordLimit: Int = 512,
+        userTurnLimit: Int = Int.MAX_VALUE,
+        recordLimit: Int = Int.MAX_VALUE,
     ): List<Message> =
         owner.conversationStore
             .getConversationMessagesForContext(AgentManagerConstants.MAIN_SESSION_ID, userTurnLimit, recordLimit)

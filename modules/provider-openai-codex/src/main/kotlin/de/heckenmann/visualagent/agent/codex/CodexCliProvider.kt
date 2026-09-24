@@ -56,18 +56,19 @@ class CodexCliProvider internal constructor(
             val model = effectiveModel(request.model ?: profile.defaultModel)
             val executable = withContext(Dispatchers.IO) { resolveExecutable(profile) }
             val callbacks = callbacks(request, model)
-            val budgetedRequest = budgetRequest(request, callbacks, toolCallbacks.toolRuntimeGuidance())
+            val budgetPlan = budgetRequest(request, callbacks, toolCallbacks.toolRuntimeGuidance())
+            val selectedCallbacks = callbacks.filter { it.toolDefinition.name() in budgetPlan.toolNames }
             val chatModel =
                 CodexAppServerChatModel(
                     executable,
                     model,
-                    callbacks,
+                    selectedCallbacks,
                     request.workingDirectory(),
                     request.showReasoningSummary(),
                 )
             val response =
                 chatModel
-                    .completeReactive(budgetedRequest.toPrompt(), request.cancellationToken)
+                    .completeReactive(budgetPlan.request.toPrompt(), request.cancellationToken)
                     .awaitSingle()
             ChatResponse(
                 model = response.metadata.model.takeIf(String::isNotBlank) ?: model,
@@ -88,14 +89,15 @@ class CodexCliProvider internal constructor(
             ResolvedCodexRequest(executable, model)
         }.flatMapMany { resolved ->
             val callbacks = callbacks(request, resolved.model)
-            val budgetedRequest = budgetRequest(request, callbacks, toolCallbacks.toolRuntimeGuidance())
+            val budgetPlan = budgetRequest(request, callbacks, toolCallbacks.toolRuntimeGuidance())
+            val selectedCallbacks = callbacks.filter { it.toolDefinition.name() in budgetPlan.toolNames }
             CodexAppServerChatModel(
                 resolved.executable,
                 resolved.model,
-                callbacks,
+                selectedCallbacks,
                 request.workingDirectory(),
                 request.showReasoningSummary(),
-            ).streamReactive(budgetedRequest.toPrompt(), request.cancellationToken)
+            ).streamReactive(budgetPlan.request.toPrompt(), request.cancellationToken)
                 .map { chunk ->
                     ChatResponse(
                         model = chunk.metadata.model.takeIf(String::isNotBlank) ?: resolved.model,
@@ -199,6 +201,8 @@ class CodexCliProvider internal constructor(
     companion object {
         /** Explicit Codex CLI executable path option. */
         const val OPTION_EXECUTABLE_PATH = "codex.executable.path"
+        private const val TOOL_HELP_FUNCTION = "tool_help"
+        private const val TOOL_GUARD_MESSAGE_ID = "__provider_tool_guard__"
     }
 
     private fun effectiveModel(model: String): String = model.takeIf(String::isNotBlank).orEmpty()
@@ -220,15 +224,49 @@ class CodexCliProvider internal constructor(
         request: ChatRequestContext,
         callbacks: List<org.springframework.ai.tool.ToolCallback>,
         toolRuntimeGuidance: String,
-    ): ChatRequestContext =
-        contextBudgeter.fit(
-            request,
-            if (callbacks.isEmpty()) {
-                request.messages
-            } else {
-                listOf(Message("system", "Tool timeout contract: $toolRuntimeGuidance")) + request.messages
-            },
-            callbacks.map { callback -> callback.toProviderDefinition() },
+    ): de.heckenmann.visualagent.agent.ContextBudgetPlan {
+        val definitions = callbacks.map { it.toProviderDefinition() }
+        val helpDefinition = definitions.firstOrNull { it.name == TOOL_HELP_FUNCTION }
+        if (helpDefinition == null) {
+            val messages =
+                if (callbacks.isEmpty()) {
+                    request.messages
+                } else {
+                    listOf(Message("system", "Tool timeout contract: $toolRuntimeGuidance")) + request.messages
+                }
+            val budgeted = contextBudgeter.fit(request, messages, definitions)
+            return de.heckenmann.visualagent.agent.ContextBudgetPlan(
+                budgeted,
+                definitions.mapTo(linkedSetOf()) { it.name },
+                de.heckenmann.visualagent.agent.ContextBudgetStatus(
+                    historyReduced = budgeted.messages.size < messages.size,
+                    toolSchemasReduced = false,
+                ),
+            )
+        }
+        val allNames = definitions.map { it.name }.distinct().sorted()
+        return contextBudgeter.fitWithToolFallback(
+            request = request,
+            fallbackMessages = toolGuardMessages(listOf(TOOL_HELP_FUNCTION), toolRuntimeGuidance) + request.messages,
+            fallbackTools = listOf(helpDefinition),
+            fullMessages = toolGuardMessages(allNames, toolRuntimeGuidance) + request.messages,
+            fullTools = definitions,
+        )
+    }
+
+    private fun toolGuardMessages(
+        names: List<String>,
+        runtimeGuidance: String,
+    ): List<Message> =
+        listOf(
+            Message(
+                role = "system",
+                id = TOOL_GUARD_MESSAGE_ID,
+                content =
+                    "Tool calling strict mode. Use only these exact functions: ${names.joinToString(", ")}. " +
+                        "Do not invent function names. $runtimeGuidance " +
+                        "To list the tools available to you, call tool_help with {\"action\":\"list\"}.",
+            ),
         )
 
     private data class ResolvedCodexRequest(

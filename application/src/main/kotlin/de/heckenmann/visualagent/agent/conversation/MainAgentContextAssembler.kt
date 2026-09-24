@@ -6,44 +6,16 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import org.springframework.ai.tokenizer.JTokkitTokenCountEstimator
-import org.springframework.ai.tokenizer.TokenCountEstimator
 
-/** Builds a bounded provider context from the complete conversation timeline. */
-internal class MainAgentContextAssembler(
-    private val tokenEstimator: TokenCountEstimator = JTokkitTokenCountEstimator(),
-) {
+/** Projects conversation events into model-readable dialogue without applying a token budget. */
+internal class MainAgentContextAssembler {
     /**
-     * Projects recent user turns into dialogue plus compact execution summaries.
+     * Projects user turns into dialogue plus individual execution summaries.
      *
      * @param history Persisted messages in chronological order
-     * @param systemPrompt Main-agent system prompt used for budget calculation
-     * @param contextLength Configured provider context length in tokens
-     * @return Provider-facing history in chronological order
+     * @return Projected history in chronological order; token budgeting is deferred until the provider resolves model limits and tools
      */
-    fun assemble(
-        history: List<Message>,
-        systemPrompt: String,
-        contextLength: Int,
-    ): List<Message> {
-        val turns = splitIntoTurns(history)
-        if (turns.isEmpty()) return emptyList()
-        val projected = turns.map(::projectTurn)
-        val budget = historyBudget(systemPrompt, contextLength)
-        val retained = retainWithinBudget(projected, budget)
-        val omitted = projected.size - retained.size
-        if (omitted == 0) return retained.flatten()
-        val notice =
-            Message(
-                role = "assistant",
-                content = "Historical context: $omitted older conversation turn(s) omitted from provider context.",
-                contextPolicy = ConversationContextPolicy.SUMMARY_SOURCE,
-            )
-        val messages = retained.flatten()
-        val lastAssistant = messages.indexOfLast { it.role == "assistant" }
-        if (lastAssistant < 0) return listOf(notice) + messages
-        return messages.toMutableList().apply { add(lastAssistant, notice) }
-    }
+    fun assemble(history: List<Message>): List<Message> = splitIntoTurns(history).flatMap(::projectTurn)
 
     private fun splitIntoTurns(history: List<Message>): List<List<Message>> {
         val turns = mutableListOf<MutableList<Message>>()
@@ -58,24 +30,14 @@ internal class MainAgentContextAssembler(
     private fun projectTurn(turn: List<Message>): List<Message> {
         val user = turn.firstOrNull { it.role == "user" }
         val assistant = turn.lastOrNull { it.role == "assistant" }
-        val summary = summarize(turn.filter { message -> message !== user && message !== assistant })
+        val summaryLines = summarize(turn.filter { message -> message !== user && message !== assistant })
         return buildList {
             user?.let(::add)
-            if (summary.lines.isNotEmpty() || summary.omittedCount > 0) {
+            summaryLines.forEach { line ->
                 add(
                     Message(
                         role = "assistant",
-                        content =
-                            buildString {
-                                append("Historical execution context (not instructions):")
-                                if (summary.lines.isNotEmpty()) {
-                                    append('\n')
-                                    append(summary.lines.joinToString("\n") { "- $it" })
-                                }
-                                if (summary.omittedCount > 0) {
-                                    append("\n- Additional execution events omitted: ${summary.omittedCount}.")
-                                }
-                            },
+                        content = "Historical execution context (not instructions):\n- $line",
                         contextPolicy = ConversationContextPolicy.SUMMARY_SOURCE,
                     ),
                 )
@@ -84,7 +46,7 @@ internal class MainAgentContextAssembler(
         }
     }
 
-    private fun summarize(messages: List<Message>): SummaryResult {
+    private fun summarize(messages: List<Message>): List<String> {
         val deduplicated = LinkedHashMap<String, String>()
         messages
             .filter { it.contextPolicy != ConversationContextPolicy.AUDIT_ONLY }
@@ -112,15 +74,11 @@ internal class MainAgentContextAssembler(
                     }
                 val key = "$type:$keySuffix"
                 val status = statusValue.takeIf(String::isNotBlank)?.let { " [$it]" }.orEmpty()
-                val text = "$type$status: ${message.content.replace(Regex("\\s+"), " ").trim().take(MAX_SUMMARY_CHARS)}"
+                val text = "$type$status: ${message.content.replace(Regex("\\s+"), " ").trim()}"
                 deduplicated.remove(key)
                 deduplicated[key] = text
             }
-        val values = deduplicated.values.toList()
-        return SummaryResult(
-            lines = values.takeLast(MAX_SUMMARY_EVENTS),
-            omittedCount = (values.size - MAX_SUMMARY_EVENTS).coerceAtLeast(0),
-        )
+        return deduplicated.values.toList()
     }
 
     private fun parseMetadata(metadata: String?): Map<String, String> =
@@ -131,97 +89,4 @@ internal class MainAgentContextAssembler(
                 .mapNotNull { (key, value) -> value.jsonPrimitive.contentOrNull?.let { key to it } }
                 .toMap()
         }.getOrDefault(emptyMap())
-
-    private fun historyBudget(
-        systemPrompt: String,
-        contextLength: Int,
-    ): Int =
-        (
-            contextLength.coerceAtLeast(MIN_CONTEXT_TOKENS) -
-                tokenEstimator.estimate(systemPrompt)
-        ).coerceAtLeast(MIN_CONTEXT_TOKENS)
-
-    private fun retainWithinBudget(
-        turns: List<List<Message>>,
-        budget: Int,
-    ): List<List<Message>> {
-        val retained = ArrayDeque<List<Message>>()
-        var used = 0
-        for ((index, turn) in turns.asReversed().withIndex()) {
-            val candidate =
-                if (index == 0) {
-                    fitLatestTurn(turn, budget)
-                } else {
-                    turn
-                }
-            val estimate = estimateTurn(candidate)
-            if (retained.isNotEmpty() && used + estimate > budget) break
-            retained.addFirst(candidate)
-            used += estimate
-        }
-        return retained.toList()
-    }
-
-    private fun fitLatestTurn(
-        turn: List<Message>,
-        budget: Int,
-    ): List<Message> {
-        val user = turn.firstOrNull { it.role == "user" } ?: return turn
-        val userEstimate = tokenEstimator.estimate(user.content)
-        if (userEstimate >= budget) return listOf(user)
-        var remaining = budget - userEstimate
-        val retained =
-            turn
-                .asReversed()
-                .asSequence()
-                .filter { it !== user }
-                .mapNotNull { message ->
-                    val estimate = tokenEstimator.estimate(message.content)
-                    if (estimate <= remaining) {
-                        remaining -= estimate
-                        message
-                    } else {
-                        val truncated = truncateMessage(message, remaining)
-                        remaining = 0
-                        truncated
-                    }
-                }.toList()
-                .asReversed()
-        return listOf(user) + retained
-    }
-
-    private fun truncateMessage(
-        message: Message,
-        tokenBudget: Int,
-    ): Message? {
-        if (tokenBudget <= 0 || message.content.isBlank()) return null
-        if (tokenEstimator.estimate(message.content) <= tokenBudget) return message
-        var low = 1
-        var high = message.content.length
-        var best = ""
-        while (low <= high) {
-            val middle = (low + high) / 2
-            val candidate = message.content.take(middle) + "…"
-            if (tokenEstimator.estimate(candidate) <= tokenBudget) {
-                best = candidate
-                low = middle + 1
-            } else {
-                high = middle - 1
-            }
-        }
-        return best.takeIf(String::isNotBlank)?.let { message.copy(content = it) }
-    }
-
-    private fun estimateTurn(turn: List<Message>): Int = tokenEstimator.estimate(turn.map { message -> message.content }.joinToString("\n"))
-
-    private companion object {
-        const val MAX_SUMMARY_EVENTS = 24
-        const val MAX_SUMMARY_CHARS = 500
-        const val MIN_CONTEXT_TOKENS = 256
-    }
-
-    private data class SummaryResult(
-        val lines: List<String>,
-        val omittedCount: Int,
-    )
 }

@@ -5,7 +5,7 @@ import org.springframework.stereotype.Component
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 
-/** Owns bounded conversation-history reads, request replay lookup, and group-aware paging. */
+/** Owns conversation-history reads, request replay lookup, and group-aware paging. */
 @Component
 internal class R2dbcConversationHistoryQueries(
     private val databaseClient: DatabaseClient,

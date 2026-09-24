@@ -228,10 +228,10 @@ internal class AgentManagerConversationOps(
     fun loadRecentHistoryFromDb(limit: Int = AgentManagerConstants.INITIAL_HISTORY_LOAD_LIMIT): List<Message> =
         historyOps.loadRecentHistoryFromDb(limit)
 
-    /** Loads the bounded source records used to assemble main-agent context. */
+    /** Loads the full source history used to assemble main-agent context. */
     fun loadMainAgentContextFromDb(
-        userTurnLimit: Int = AgentManagerConstants.MAIN_CONTEXT_USER_TURN_LIMIT,
-        recordLimit: Int = AgentManagerConstants.MAIN_CONTEXT_RECORD_LIMIT,
+        userTurnLimit: Int = AgentManagerConstants.FULL_CONTEXT_USER_TURN_LIMIT,
+        recordLimit: Int = AgentManagerConstants.FULL_CONTEXT_RECORD_LIMIT,
     ): List<Message> = historyOps.loadMainAgentContextFromDb(userTurnLimit, recordLimit)
 
     /** Reloads persisted history and recovers any interrupted request state. */
@@ -252,7 +252,7 @@ internal class AgentManagerConversationOps(
             }
         }
 
-    /** Builds the main-agent request from a bounded context and active provider configuration. */
+    /** Builds the main-agent request from complete history and active provider configuration. */
     fun buildMainRequest(
         history: List<Message>,
         requestId: String? = null,

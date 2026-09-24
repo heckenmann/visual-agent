@@ -48,7 +48,7 @@ internal class AgentManagerContextOps(
         preparedMessages += Message("assistant", runtimeStatePrompt, contextPolicy = ConversationContextPolicy.SUMMARY_SOURCE)
         preparedMessages +=
             contextAssembler
-                .assemble(history, contextPrompt, owner.appConfig.contextLength)
+                .assemble(history)
                 .map(::normalizeHistoryRoleForProvider)
         val metadata =
             mutableMapOf<String, Any>(

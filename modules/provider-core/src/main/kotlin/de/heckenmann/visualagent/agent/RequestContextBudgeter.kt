@@ -21,6 +21,34 @@ import org.springframework.ai.tool.ToolCallback
 class RequestContextBudgeter(
     private val tokenEstimator: TokenCountEstimator = JTokkitTokenCountEstimator(),
 ) {
+    /** Fits a request while keeping history ahead of optional provider tool schemas. */
+    fun fitWithToolFallback(
+        request: ChatRequestContext,
+        fallbackMessages: List<Message>,
+        fallbackTools: List<ToolDefinition>,
+        fullMessages: List<Message>,
+        fullTools: List<ToolDefinition>,
+        toolHelpName: String = "tool_help",
+    ): ContextBudgetPlan {
+        val fallback = fitInternal(request, fallbackMessages, fallbackTools)
+        val full =
+            runCatching { fitInternal(request, fullMessages, fullTools) }
+                .getOrNull()
+                ?.takeIf { priorityMessages(it.messages) == priorityMessages(fallback.messages) }
+        val selected = full ?: fallback
+        val status =
+            ContextBudgetStatus(
+                historyReduced = hasReducedHistory(fullMessages, selected.messages),
+                toolSchemasReduced = full == null && fullTools.any { it.name != toolHelpName },
+            )
+        request.onContextBudgeted?.invoke(status)
+        return ContextBudgetPlan(
+            request = selected,
+            toolNames = if (full != null) fullTools.mapTo(linkedSetOf()) { it.name } else setOf(toolHelpName),
+            status = status,
+        )
+    }
+
     /**
      * Fits a request to its effective context window.
      *
@@ -35,7 +63,29 @@ class RequestContextBudgeter(
         messages: List<Message>,
         toolDefinitions: List<ToolDefinition> = emptyList(),
     ): ChatRequestContext {
-        val contextLimit = request.contextWindow.effectiveLimit() ?: return request.copy(messages = messages)
+        val fitted = fitInternal(request, messages, toolDefinitions)
+        request.onContextBudgeted?.invoke(
+            ContextBudgetStatus(
+                historyReduced = hasReducedHistory(messages, fitted.messages),
+                toolSchemasReduced = false,
+            ),
+        )
+        return fitted
+    }
+
+    private fun fitInternal(
+        request: ChatRequestContext,
+        messages: List<Message>,
+        toolDefinitions: List<ToolDefinition>,
+    ): ChatRequestContext {
+        val contextLimit = request.contextWindow.effectiveLimit()
+        if (contextLimit == null) {
+            val latestUser = messages.indexOfLast { it.role == "user" }
+            val leadingSystemCount = messages.indexOfFirst { it.role != "system" }.let { if (it < 0) messages.size else it }
+            val retained =
+                retainPrioritizedHistory(messages, mandatoryIndices(messages, leadingSystemCount, latestUser), latestUser, Int.MAX_VALUE)
+            return request.copy(messages = retained)
+        }
         val toolTokens = estimateTools(toolDefinitions)
         val latestUser = messages.indexOfLast { it.role == "user" }
         val leadingSystemCount = messages.indexOfFirst { it.role != "system" }.let { index -> if (index < 0) messages.size else index }
@@ -52,7 +102,7 @@ class RequestContextBudgeter(
 
         val effectiveOutput = outputLimit(request, contextLimit, toolTokens, mandatoryTokens)
         val messageBudget = contextLimit - toolTokens - effectiveOutput
-        val retained = retainNewestTurns(messages, mandatoryIndices, latestUser, messageBudget)
+        val retained = retainPrioritizedHistory(messages, mandatoryIndices, latestUser, messageBudget)
         return request.copy(messages = retained, parameters = request.parameters.copy(maxTokens = effectiveOutput))
     }
 
@@ -129,53 +179,98 @@ class RequestContextBudgeter(
         return desired.coerceIn(1, available)
     }
 
-    private fun retainNewestTurns(
+    private fun retainPrioritizedHistory(
         messages: List<Message>,
         mandatoryIndices: Set<Int>,
         latestUser: Int,
         messageBudget: Int,
     ): List<Message> {
         val retained = mandatoryIndices.toMutableSet()
-        optionalLeadingReferenceIndices(messages, mandatoryIndices)
-            .asReversed()
-            .forEach { retainIfFits(messages, retained, listOf(it), messageBudget) }
-        for (turn in completedTurnIndices(messages, latestUser).asReversed()) {
-            if (!retainIfFits(messages, retained, turn, messageBudget)) break
+        val replacements = mutableMapOf<Int, Message>()
+        val historyEndExclusive = if (latestUser < 0) messages.size else latestUser
+        val historyIndices = messages.indices.filter { it < historyEndExclusive && it !in mandatoryIndices }
+        val answerIndices =
+            historyIndices
+                .filter { index ->
+                    val message = messages[index]
+                    message.role == "assistant" &&
+                        message.contextPolicy != ConversationContextPolicy.SUMMARY_SOURCE &&
+                        !message.assistantToolTurn
+                }.takeLast(MAX_RETAINED_ASSISTANT_TURNS)
+                .asReversed()
+
+        for (index in answerIndices) {
+            if (retainIfFits(messages, retained, replacements, index, messageBudget)) continue
+            val truncated = truncateToRemainingBudget(messages[index], messages, retained, replacements, messageBudget)
+            if (truncated != null) {
+                retained += index
+                replacements[index] = truncated
+            }
+            break
         }
-        return messages.filterIndexed { index, _ -> index in retained }
-    }
 
-    private fun optionalLeadingReferenceIndices(
-        messages: List<Message>,
-        mandatoryIndices: Set<Int>,
-    ): List<Int> =
-        messages.indices
-            .takeWhile { index -> messages[index].role != "user" }
-            .filter { index -> messages[index].contextPolicy == ConversationContextPolicy.SUMMARY_SOURCE }
-            .filterNot(mandatoryIndices::contains)
+        val toolContextIndices =
+            historyIndices
+                .filter { index ->
+                    val message = messages[index]
+                    message.role == "tool" ||
+                        message.contextPolicy == ConversationContextPolicy.SUMMARY_SOURCE ||
+                        message.assistantToolTurn
+                }.asReversed()
+        toolContextIndices.forEach { index ->
+            retainIfFits(messages, retained, replacements, index, messageBudget)
+        }
 
-    private fun completedTurnIndices(
-        messages: List<Message>,
-        latestUser: Int,
-    ): List<List<Int>> {
-        val userIndices = messages.indices.filter { index -> messages[index].role == "user" }
-        if (latestUser < 0) return emptyList()
-        return userIndices.dropLast(1).mapIndexed { index, start ->
-            val endExclusive = userIndices.getOrElse(index + 1) { latestUser }
-            (start until endExclusive).toList()
+        val remainingHistoryIndices = historyIndices.filterNot { index -> index in answerIndices || index in toolContextIndices }
+        remainingHistoryIndices.asReversed().forEach { index ->
+            retainIfFits(messages, retained, replacements, index, messageBudget)
+        }
+        return messages.mapIndexedNotNull { index, message ->
+            if (index !in retained) null else replacements[index] ?: message
         }
     }
 
     private fun retainIfFits(
         messages: List<Message>,
         retained: MutableSet<Int>,
-        candidate: List<Int>,
+        replacements: Map<Int, Message>,
+        candidate: Int,
         messageBudget: Int,
     ): Boolean {
-        val candidateIndices = retained + candidate
-        if (estimateMessages(candidateIndices.sorted().map(messages::get)) > messageBudget) return false
+        val candidateIndices = (retained + candidate).sorted()
+        val candidateMessages = candidateIndices.map { index -> replacements[index] ?: messages[index] }
+        if (estimateMessages(candidateMessages) > messageBudget) return false
         retained += candidate
         return true
+    }
+
+    private fun truncateToRemainingBudget(
+        message: Message,
+        messages: List<Message>,
+        retained: Set<Int>,
+        replacements: Map<Int, Message>,
+        messageBudget: Int,
+    ): Message? {
+        if (message.content.isBlank()) return null
+        val retainedMessages = retained.sorted().map { index -> replacements[index] ?: messages[index] }
+        var low = 1
+        var high = message.content.length
+        var best: Message? = null
+        while (low <= high) {
+            val middle = (low + high) / 2
+            val candidate =
+                message.copy(
+                    content =
+                        message.content.take(middle) + "\n[Earlier answer truncated to fit the model context window.]",
+                )
+            if (estimateMessages(retainedMessages + candidate) <= messageBudget) {
+                best = candidate
+                low = middle + 1
+            } else {
+                high = middle - 1
+            }
+        }
+        return best
     }
 
     private fun estimateMessages(messages: List<Message>): Int =
@@ -188,6 +283,42 @@ class RequestContextBudgeter(
             },
         )
 
+    private fun withoutGuard(messages: List<Message>): List<Message> = messages.filterNot { it.id == TOOL_GUARD_MESSAGE_ID }
+
+    private fun priorityMessages(messages: List<Message>): List<Message> {
+        val conversation = withoutGuard(messages)
+        val latestUser = conversation.indexOfLast { it.role == "user" }
+        val leadingSystemCount = conversation.indexOfFirst { it.role != "system" }.let { if (it < 0) conversation.size else it }
+        val mandatory = mandatoryIndices(conversation, leadingSystemCount, latestUser)
+        val answers =
+            conversation.indices
+                .filter { index ->
+                    val message = conversation[index]
+                    index < latestUser &&
+                        message.role == "assistant" &&
+                        message.contextPolicy != ConversationContextPolicy.SUMMARY_SOURCE &&
+                        !message.assistantToolTurn
+                }.takeLast(MAX_RETAINED_ASSISTANT_TURNS)
+        return conversation.filterIndexed { index, _ -> index in mandatory || index in answers }
+    }
+
+    private fun hasReducedHistory(
+        source: List<Message>,
+        retained: List<Message>,
+    ): Boolean {
+        val sourceConversation =
+            withoutGuard(source).filter {
+                it.role != "system" ||
+                    it.contextPolicy == ConversationContextPolicy.SUMMARY_SOURCE
+            }
+        val retainedConversation =
+            withoutGuard(retained).filter {
+                it.role != "system" ||
+                    it.contextPolicy == ConversationContextPolicy.SUMMARY_SOURCE
+            }
+        return sourceConversation != retainedConversation
+    }
+
     private fun ToolCallback.toProviderDefinition(): ToolDefinition =
         ToolDefinition(
             id = ToolId(toolDefinition.name()),
@@ -198,8 +329,17 @@ class RequestContextBudgeter(
 
     private companion object {
         const val DEFAULT_OUTPUT_FRACTION_DIVISOR = 4
+        const val MAX_RETAINED_ASSISTANT_TURNS = 10
+        const val TOOL_GUARD_MESSAGE_ID = "__provider_tool_guard__"
     }
 }
+
+/** Result of fitting history before optional tools for one provider request. */
+data class ContextBudgetPlan(
+    val request: ChatRequestContext,
+    val toolNames: Set<String>,
+    val status: ContextBudgetStatus,
+)
 
 /** Signals that the selected model cannot accept the mandatory request payload. */
 class ContextWindowExceededException(
