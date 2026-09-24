@@ -180,6 +180,7 @@ class VisualAgentGrpcSessionService(
                             .newBuilder()
                             .setText(update.textDelta)
                             .setAssistantTurnId(update.assistantTurnId)
+                            .setContextReduced(update.contextReduced)
                             .build(),
                     ).build(),
             )

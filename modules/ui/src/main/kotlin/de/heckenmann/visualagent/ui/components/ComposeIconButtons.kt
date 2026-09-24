@@ -76,6 +76,7 @@ internal fun ActionTooltip(
  * @param selected Whether the button shows the active/mode-selected highlight
  * @param tooltipDescription Optional visual tooltip; the accessibility description is always retained
  * @param iconSize Icon size
+ * @param tint Optional icon color override for contextual emphasis
  * @param onLongClick Optional long-click handler
  */
 @Composable
@@ -88,10 +89,11 @@ internal fun ActionIconButton(
     selected: Boolean = false,
     tooltipDescription: String? = description,
     iconSize: Dp = 17.dp,
+    tint: Color? = null,
     onLongClick: (() -> Unit)? = null,
 ) {
     val backgroundColor = if (selected) MaterialTheme.colorScheme.tertiaryContainer else Color.Transparent
-    val iconTint = if (selected) MaterialTheme.colorScheme.tertiary else LocalContentColor.current
+    val iconTint = if (selected) MaterialTheme.colorScheme.tertiary else tint ?: LocalContentColor.current
     val actionButton: @Composable () -> Unit = {
         Box(
             modifier =

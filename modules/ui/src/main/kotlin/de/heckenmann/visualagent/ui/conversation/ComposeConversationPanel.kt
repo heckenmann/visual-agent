@@ -78,6 +78,7 @@ internal fun ConversationPanel(
     var inputPlacement by remember { mutableStateOf(preferences.inputPlacement) }
     val streamingContent by conversationState.streaming.collectAsState()
     val streamingTurns by conversationState.streamingTurns.collectAsState()
+    val contextReduced by conversationState.contextReduced.collectAsState()
     val suggestionController = rememberConversationSuggestionController(suggestionPort, settingsPort)
     val suggestionState by suggestionController.state.collectAsState()
     val todoState = rememberConversationTodoState(todoPort, conversationPort, conversationState)
@@ -128,6 +129,7 @@ internal fun ConversationPanel(
             inFlight = inFlight,
             conversationState = conversationState,
             suggestionController = suggestionController,
+            contextReducedFlow = conversationState.contextReduced,
             onActiveTokenChange = { activeToken = it },
         )
     val clearConversation = {
@@ -210,6 +212,7 @@ internal fun ConversationPanel(
                         ConversationInputCard(
                             input = conversationState.input,
                             sending = conversationState.sending,
+                            contextReduced = contextReduced,
                             onInputChange = { value ->
                                 conversationState.input = value
                                 suggestionController.onInputChanged(value)
@@ -266,6 +269,7 @@ internal fun ConversationPanel(
                 ConversationInputCard(
                     input = conversationState.input,
                     sending = conversationState.sending,
+                    contextReduced = contextReduced,
                     onInputChange = { value ->
                         conversationState.input = value
                         suggestionController.onInputChanged(value)

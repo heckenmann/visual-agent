@@ -45,6 +45,7 @@ internal class ConversationUiState(
         private set
     val streaming = MutableStateFlow("")
     val streamingTurns = MutableStateFlow<List<Message>>(emptyList())
+    val contextReduced = MutableStateFlow(false)
 
     private var historyGeneration = 0L
     private var reachedOldestHistory = false
