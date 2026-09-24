@@ -19,18 +19,19 @@ internal fun ConversationActivityHistoryEffect(
 ) {
     val scope = rememberCoroutineScope()
     DisposableEffect(activityPort) {
-        /** Reloads persisted conversation messages when the UI is idle. */
+        /** Reloads the newest complete page while preserving older pages and live stream deltas. */
         fun refreshHistory() {
             scope.launch {
-                if (!conversationState.sending) {
-                    val history = withContext(Dispatchers.IO) { conversationPort.currentHistory() }
-                    conversationState.replaceHistory(history)
-                }
+                val request = conversationState.beginLatestRequest()
+                val page = withContext(Dispatchers.IO) { conversationPort.latest() }
+                conversationState.applyLatest(request, page)
             }
         }
         val toolHandle =
             activityPort.addToolListener { event ->
-                if (event.phase == ToolActivityPhase.FINISHED) refreshHistory()
+                when (event.phase) {
+                    ToolActivityPhase.STARTED, ToolActivityPhase.FINISHED -> refreshHistory()
+                }
             }
         val downloadHandle = activityPort.addDownloadListener { refreshHistory() }
         onDispose {

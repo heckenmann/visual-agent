@@ -79,21 +79,64 @@ internal fun buildConversationTimeline(
     todoResponses: Map<String, TodoResponseState> = emptyMap(),
     streamingEntryId: String? = null,
     pendingUserEntryId: String? = null,
+    streamingMessages: List<Message> = emptyList(),
 ): List<ConversationTimelineItem> =
     buildList {
         if (includeInlineComposer) add(ConversationTimelineItem.InlineComposer)
         if (showWaitingIndicator) add(ConversationTimelineItem.Waiting)
         val uniqueHistory = history.distinctPersistedMessages()
         val persistedIds = uniqueHistory.mapNotNull { message -> message.id }.toSet()
-        if (streamingContent.isNotEmpty() && streamingEntryId != null && streamingEntryId !in persistedIds) {
-            add(ConversationTimelineItem.MessageEntry(Message("assistant", streamingContent, id = streamingEntryId), -2, true))
+        val activeStreamingMessages =
+            streamingMessages.ifEmpty {
+                if (streamingContent.isNotEmpty() && streamingEntryId != null) {
+                    listOf(Message("assistant", streamingContent, id = streamingEntryId))
+                } else {
+                    emptyList()
+                }
+            }
+        activeStreamingMessages.forEachIndexed { index, message ->
+            if (message.id != null && message.id !in persistedIds) {
+                add(ConversationTimelineItem.MessageEntry(message, -2 - index, true))
+            }
         }
         if (pendingUserMessage != null && pendingUserEntryId != null && pendingUserEntryId !in persistedIds) {
             add(ConversationTimelineItem.MessageEntry(Message("user", pendingUserMessage, id = pendingUserEntryId), -1))
         }
-        val persisted =
-            uniqueHistory.indices.reversed().map { index ->
-                ConversationTimelineItem.Persisted(uniqueHistory[index], index)
+        val toolMessagesByParent =
+            uniqueHistory
+                .filter {
+                    it.role == "tool" && it.parentAssistantTurnId != null
+                }.groupBy { it.parentAssistantTurnId }
+        val structuredTurnIds = uniqueHistory.filter { it.role == "assistant" && it.assistantToolTurn }.mapNotNull { it.id }.toSet()
+        val attachedToolIds =
+            toolMessagesByParent
+                .filterKeys { it in structuredTurnIds }
+                .values
+                .flatten()
+                .mapNotNull { it.id }
+                .toSet()
+        val persisted: List<ConversationTimelineItem> =
+            uniqueHistory.indices.reversed().mapNotNull { index ->
+                val message = uniqueHistory[index]
+                val parentId = message.id
+                when {
+                    message.id != null && message.id in attachedToolIds -> null
+                    message.role == "assistant" && message.assistantToolTurn && parentId != null -> {
+                        val parent = ConversationTimelineItem.Persisted(message, index)
+                        val tools =
+                            toolMessagesByParent[parentId]
+                                .orEmpty()
+                                .sortedWith(compareBy({ it.turnOrder ?: Int.MAX_VALUE }, { it.timelineSequence ?: Long.MAX_VALUE }))
+                                .map { tool ->
+                                    ConversationTimelineItem.Persisted(
+                                        tool,
+                                        uniqueHistory.indexOfFirst { it.id == tool.id }.coerceAtLeast(0),
+                                    )
+                                }
+                        ConversationTimelineItem.PersistedGroup(ConversationMessageGroup(listOf(parent) + tools))
+                    }
+                    else -> ConversationTimelineItem.Persisted(message, index)
+                }
             }
         val cards =
             (todos.map { todo -> todo to false } + deletedTodoSnapshots.values.map { todo -> todo to true })
@@ -107,9 +150,18 @@ internal fun buildConversationTimeline(
                 }
         val messageEntries: List<TimelineEntry<ConversationTimelineItem>> =
             persisted.mapIndexed { index, item ->
+                val message =
+                    when (item) {
+                        is ConversationTimelineItem.Persisted -> item.message
+                        is ConversationTimelineItem.PersistedGroup ->
+                            item.group.messages
+                                .first()
+                                .message
+                        else -> error("Unexpected timeline item in persisted history")
+                    }
                 TimelineEntry<ConversationTimelineItem>(
-                    sequence = item.message.timelineSequence ?: 0,
-                    timestamp = item.message.createdAtEpochMillis ?: Long.MIN_VALUE + (persisted.size - index),
+                    sequence = message.timelineSequence ?: 0,
+                    timestamp = message.createdAtEpochMillis ?: Long.MIN_VALUE + (persisted.size - index),
                     typeRank = 0,
                     fallbackOrder = index,
                     item = item,
@@ -137,30 +189,36 @@ internal fun buildConversationTimeline(
                         .thenByDescending { it.typeRank }
                         .thenBy { it.fallbackOrder },
                 ).map { it.item }
-        var messageRun = mutableListOf<ConversationTimelineItem.Persisted>()
+        var userRun = mutableListOf<ConversationTimelineItem.Persisted>()
 
-        /** Flushes the current consecutive message run into grouped timeline items. */
-        fun flushMessageRun() {
-            if (messageRun.isNotEmpty()) {
-                messageRun.forEach { item ->
-                    if (item.message.role == "user" || item.message.role == "assistant") {
-                        add(ConversationTimelineItem.MessageEntry(item.message, item.chronologicalIndex))
-                    } else {
-                        add(item)
-                    }
-                }
-                messageRun = mutableListOf()
+        /** Emits the current adjacent user-message run as one presentation group. */
+        fun flushUserRun() {
+            when (userRun.size) {
+                0 -> Unit
+                1 -> add(ConversationTimelineItem.MessageEntry(userRun.single().message, userRun.single().chronologicalIndex))
+                else -> add(ConversationTimelineItem.PersistedGroup(ConversationMessageGroup(userRun.toList())))
             }
+            userRun = mutableListOf()
         }
         merged.forEach { item ->
-            if (item is ConversationTimelineItem.Persisted) {
-                messageRun += item
+            if (item is ConversationTimelineItem.Persisted && item.message.role == "user") {
+                userRun += item
             } else {
-                flushMessageRun()
-                add(item)
+                flushUserRun()
+                when (item) {
+                    is ConversationTimelineItem.Persisted ->
+                        when {
+                            item.message.role == "assistant" && !item.message.assistantToolTurn ->
+                                add(ConversationTimelineItem.MessageEntry(item.message, item.chronologicalIndex))
+                            item.message.role == "assistant" ->
+                                add(ConversationTimelineItem.PersistedGroup(ConversationMessageGroup(listOf(item))))
+                            else -> add(item)
+                        }
+                    else -> add(item)
+                }
             }
         }
-        flushMessageRun()
+        flushUserRun()
         if (showOlderHistoryLoading) add(ConversationTimelineItem.OlderHistoryLoading)
         if (history.isEmpty() &&
             todos.isEmpty() &&

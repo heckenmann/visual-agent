@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -56,7 +57,7 @@ internal fun groupConsecutiveConversationMessages(messages: List<ConversationTim
     val groups = mutableListOf<MutableList<ConversationTimelineItem.Persisted>>()
     messages.forEach { message ->
         val previous = groups.lastOrNull()
-        if (previous != null && previous.first().message.role == message.message.role && message.message.role.isConversationalRole()) {
+        if (previous != null && previous.first().message.role == "user" && message.message.role == "user") {
             previous += message
         } else {
             groups += mutableListOf(message)
@@ -64,8 +65,6 @@ internal fun groupConsecutiveConversationMessages(messages: List<ConversationTim
     }
     return groups.map(::ConversationMessageGroup)
 }
-
-private fun String.isConversationalRole(): Boolean = this == "user" || this == "assistant"
 
 private val ConversationAuthorColumnWidth = 48.dp
 
@@ -102,7 +101,17 @@ internal fun ConversationMessageGroupRow(
             ) {
                 ConversationAuthorColumn(group.role)
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    group.messages.asReversed().forEach { item ->
+                    val orderedMessages =
+                        if (group.role == "assistant" &&
+                            group.messages
+                                .first()
+                                .message.assistantToolTurn
+                        ) {
+                            group.messages
+                        } else {
+                            group.messages.asReversed()
+                        }
+                    orderedMessages.forEach { item ->
                         key(item.stableKey) {
                             AnimatedVisibility(
                                 visibleState =
@@ -113,15 +122,29 @@ internal fun ConversationMessageGroupRow(
                                 enter = conversationMessageEnterTransition(),
                                 exit = conversationMessageDeleteTransition(),
                             ) {
-                                ConversationMessageGroupContent(
-                                    item = item,
-                                    sending = sending,
-                                    onDeleteMessage = onDeleteMessage,
-                                    onStatusChange = onStatusChange,
-                                    onEditMessage = onEditMessage,
-                                    onRetry = onRetry,
-                                    isStreaming = isStreaming,
-                                )
+                                when {
+                                    item.message.role == "tool" ->
+                                        ToolMessageRow(
+                                            message = item.message,
+                                            isDeleting = item.message.id in deletingMessageIds,
+                                            isInFlight = parseToolMetadata(item.message.metadata).status == "running",
+                                            onDelete = { item.message.id?.let(onDeleteMessage) },
+                                            modifier = Modifier.padding(start = 10.dp),
+                                        )
+                                    item.message.role == "assistant" &&
+                                        item.message.assistantToolTurn &&
+                                        item.message.content.isBlank() -> Unit
+                                    else ->
+                                        ConversationMessageGroupContent(
+                                            item = item,
+                                            sending = sending,
+                                            onDeleteMessage = onDeleteMessage,
+                                            onStatusChange = onStatusChange,
+                                            onEditMessage = onEditMessage,
+                                            onRetry = onRetry,
+                                            isStreaming = isStreaming,
+                                        )
+                                }
                             }
                         }
                     }

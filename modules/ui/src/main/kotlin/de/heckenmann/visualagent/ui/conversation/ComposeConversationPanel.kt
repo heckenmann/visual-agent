@@ -77,6 +77,7 @@ internal fun ConversationPanel(
     val preferences = remember(conversationPort) { conversationPort.preferences() }
     var inputPlacement by remember { mutableStateOf(preferences.inputPlacement) }
     val streamingContent by conversationState.streaming.collectAsState()
+    val streamingTurns by conversationState.streamingTurns.collectAsState()
     val suggestionController = rememberConversationSuggestionController(suggestionPort, settingsPort)
     val suggestionState by suggestionController.state.collectAsState()
     val todoState = rememberConversationTodoState(todoPort, conversationPort, conversationState)
@@ -100,6 +101,7 @@ internal fun ConversationPanel(
             pendingUserMessage = conversationState.pendingUserMessage,
             pendingUserEntryId = conversationState.pendingUserEntryId,
             streamingContent = streamingContent,
+            streamingMessages = streamingTurns,
             streamingEntryId = conversationState.streamingEntryId,
             showWaitingIndicator = showWaitingIndicator,
             showOlderHistoryLoading =

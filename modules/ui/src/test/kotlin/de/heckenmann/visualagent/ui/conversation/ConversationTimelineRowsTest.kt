@@ -4,6 +4,7 @@ package de.heckenmann.visualagent.ui.conversation
 
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -23,6 +24,7 @@ import kotlinx.serialization.json.put
 import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
+import kotlin.test.assertEquals
 import de.heckenmann.visualagent.protocol.ConversationMessage as Message
 
 /**
@@ -107,4 +109,142 @@ class ConversationTimelineRowsTest {
 
         composeTestRule.onNodeWithContentDescription("Message actions").assertExists()
     }
+
+    @Test
+    fun `assistant tool children are grouped by typed parent identity and declaration order`() {
+        val parent = Message("assistant", "Inspect both files", id = "turn-1", assistantToolTurn = true)
+        val laterCall = Message("tool", "second", id = "call-2", parentAssistantTurnId = "turn-1", turnOrder = 1)
+        val earlierCall = Message("tool", "first", id = "call-1", parentAssistantTurnId = "turn-1", turnOrder = 0)
+
+        val timeline =
+            buildConversationTimeline(
+                history = listOf(laterCall, parent, earlierCall),
+                pendingUserMessage = null,
+                streamingContent = "",
+                showWaitingIndicator = false,
+                showOlderHistoryLoading = false,
+                includeInlineComposer = false,
+            )
+        val group = timeline.filterIsInstance<ConversationTimelineItem.PersistedGroup>().single().group
+
+        assertEquals(listOf("turn-1", "call-1", "call-2"), group.messages.map { it.message.id })
+    }
+
+    @Test
+    fun `assistant prose renders above its tool children in declaration order`() {
+        val parent = Message("assistant", "Inspect both files", id = "turn-1", assistantToolTurn = true)
+        val laterCall = toolMessage("call-2", "file:grep", "turn-1", 1)
+        val earlierCall = toolMessage("call-1", "file:read", "turn-1", 0)
+        val timeline =
+            buildConversationTimeline(
+                history = listOf(laterCall, parent, earlierCall),
+                pendingUserMessage = null,
+                streamingContent = "",
+                showWaitingIndicator = false,
+                showOlderHistoryLoading = false,
+                includeInlineComposer = false,
+            )
+
+        composeTestRule.setContent {
+            MaterialTheme {
+                LazyColumn {
+                    conversationTimeline(
+                        items = timeline,
+                        sending = false,
+                        deletingMessageIds = emptySet(),
+                        onDeleteMessage = {},
+                        onStatusChange = {},
+                        onEditMessage = {},
+                        sendContent = {},
+                    )
+                }
+            }
+        }
+
+        composeTestRule.waitForIdle()
+        val contentBounds = composeTestRule.onNodeWithText("Inspect both files", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val readBounds = composeTestRule.onNodeWithText("file:read").getUnclippedBoundsInRoot()
+        val grepBounds = composeTestRule.onNodeWithText("file:grep").getUnclippedBoundsInRoot()
+        assert(contentBounds.top < readBounds.top)
+        assert(readBounds.top < grepBounds.top)
+    }
+
+    @Test
+    fun `legacy tool rows without an explicit parent remain standalone`() {
+        val timeline =
+            buildConversationTimeline(
+                history =
+                    listOf(
+                        Message("assistant", "I will inspect the file", id = "legacy-assistant"),
+                        Message("tool", "Old tool result", id = "legacy-tool"),
+                    ),
+                pendingUserMessage = null,
+                streamingContent = "",
+                showWaitingIndicator = false,
+                showOlderHistoryLoading = false,
+                includeInlineComposer = false,
+            )
+
+        val assistant = timeline.filterIsInstance<ConversationTimelineItem.MessageEntry>().single()
+        val standaloneTool = timeline.filterIsInstance<ConversationTimelineItem.Persisted>().single()
+
+        assertEquals("legacy-assistant", assistant.message.id)
+        assertEquals("legacy-tool", standaloneTool.message.id)
+    }
+
+    @Test
+    fun `tool only assistant turn renders child without placeholder prose`() {
+        val parent = Message("assistant", "", id = "turn-empty", assistantToolTurn = true)
+        val child =
+            Message(
+                "tool",
+                "Tool search running",
+                metadata = """{"type":"tool_call","toolId":"search","status":"running"}""",
+                id = "call-running",
+                parentAssistantTurnId = "turn-empty",
+                turnOrder = 0,
+            )
+
+        composeTestRule.setContent {
+            MaterialTheme {
+                LazyColumn {
+                    conversationTimeline(
+                        items =
+                            buildConversationTimeline(
+                                history = listOf(parent, child),
+                                pendingUserMessage = null,
+                                streamingContent = "",
+                                showWaitingIndicator = false,
+                                showOlderHistoryLoading = false,
+                                includeInlineComposer = false,
+                            ),
+                        sending = true,
+                        deletingMessageIds = emptySet(),
+                        onDeleteMessage = {},
+                        onStatusChange = {},
+                        onEditMessage = {},
+                        sendContent = {},
+                    )
+                }
+            }
+        }
+
+        composeTestRule.onNodeWithText("search").assertExists()
+        composeTestRule.onNodeWithText("running…").assertExists()
+        composeTestRule.onNodeWithText("(No text response. See tool results above.)").assertDoesNotExist()
+    }
+
+    private fun toolMessage(
+        id: String,
+        toolId: String,
+        parentId: String,
+        order: Int,
+    ) = Message(
+        "tool",
+        "Tool $toolId · ok",
+        metadata = """{"type":"tool_call","toolId":"$toolId","status":"ok"}""",
+        id = id,
+        parentAssistantTurnId = parentId,
+        turnOrder = order,
+    )
 }

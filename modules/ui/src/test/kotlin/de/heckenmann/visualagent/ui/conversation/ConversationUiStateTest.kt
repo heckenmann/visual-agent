@@ -48,6 +48,19 @@ class ConversationUiStateTest {
     }
 
     @Test
+    fun `latest refresh advances paging beyond all retained older history`() {
+        val state = ConversationUiState(listOf(message("oldest"), message("older"), message("recent")))
+        val latestRequest = state.beginLatestRequest()
+
+        state.applyLatest(
+            latestRequest,
+            ConversationHistoryPage(listOf(message("recent"), message("newest")), offset = 0, hasMore = true, nextOffset = 2),
+        )
+
+        assertEquals(4, state.beginOlderRequest()!!.offset)
+    }
+
+    @Test
     fun `history replacement resets the oldest-page exhaustion state`() {
         val state = ConversationUiState(listOf(message("recent-1")))
         val request = state.beginOlderRequest()!!
@@ -88,6 +101,41 @@ class ConversationUiStateTest {
         assertEquals(listOf("older-1", "recent-1"), state.history.map { it.id })
         assertFalse(state.hasMoreHistory)
         assertFalse(state.isLoadingOlder)
+    }
+
+    @Test
+    fun `older paging continues past expanded group duplicates`() {
+        val parent = Message("assistant", "Checking", id = "turn", assistantToolTurn = true)
+        val tool = Message("tool", "Tool result", id = "tool-call", parentAssistantTurnId = "turn", turnOrder = 0)
+        val state = ConversationUiState(emptyList())
+        val latestRequest = state.beginLatestRequest()
+        state.applyLatest(
+            latestRequest,
+            ConversationHistoryPage(listOf(parent, tool), offset = 0, hasMore = true, nextOffset = 1),
+        )
+
+        val duplicateRequest = state.beginOlderRequest()!!
+        val duplicateCount =
+            state.applyOlder(
+                duplicateRequest,
+                ConversationHistoryPage(listOf(parent, tool), offset = 1, hasMore = true, nextOffset = 2),
+            )
+        state.finishOlderRequest(duplicateRequest)
+
+        assertEquals(0, duplicateCount)
+        assertTrue(state.hasMoreHistory)
+        val olderRequest = state.beginOlderRequest()!!
+        assertEquals(2, olderRequest.offset)
+        val olderCount =
+            state.applyOlder(
+                olderRequest,
+                ConversationHistoryPage(listOf(message("older")), offset = 2, hasMore = false, nextOffset = 3),
+            )
+        state.finishOlderRequest(olderRequest)
+
+        assertEquals(1, olderCount)
+        assertEquals(listOf("older", "turn", "tool-call"), state.history.map { it.id })
+        assertFalse(state.hasMoreHistory)
     }
 
     @Test
@@ -143,8 +191,9 @@ class ConversationUiStateTest {
         assertIs<ConversationTimelineItem.MessageEntry>(items[2])
         assertIs<ConversationTimelineItem.MessageEntry>(items[3])
         assertEquals("newest", items[4].stableKey)
-        assertEquals("oldest", items[5].stableKey)
-        assertIs<ConversationTimelineItem.OlderHistoryLoading>(items[6])
+        val olderGroup = assertIs<ConversationTimelineItem.PersistedGroup>(items[4]).group
+        assertEquals(listOf("newest", "oldest"), olderGroup.messages.map { it.message.id })
+        assertIs<ConversationTimelineItem.OlderHistoryLoading>(items[5])
         assertEquals(items.size, items.map { it.stableKey }.distinct().size)
     }
 
