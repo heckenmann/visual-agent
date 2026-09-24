@@ -50,27 +50,29 @@ class OllamaClient(
 
     override fun chatReactive(request: ChatRequestContext): Mono<ChatResponse> {
         val selectedModel = request.model ?: appConfig.ollamaModel
-        val allowedFunctionNames = promptFactory.allowedFunctionNames(request, selectedModel)
+        val prompt = promptFactory.buildPrompt(request, selectedModel)
+        val allowedFunctionNames = promptFactory.allowedFunctionNames(prompt)
+        val selectedCallbacks = promptFactory.callbacks(prompt)
         return Mono
             .defer {
                 request.cancellationToken?.throwIfCancelled()
                 val supportsTools = request.supportsToolCalling()
-                val toolsEnabled = request.enabledTools.isNotEmpty()
+                val toolsEnabled = selectedCallbacks.isNotEmpty()
                 logger.debug {
                     "Ollama chat: model=$selectedModel, supportsTools=$supportsTools, toolsEnabled=$toolsEnabled"
                 }
                 if (supportsTools && toolsEnabled) {
-                    val prompt = promptFactory.buildPrompt(request, selectedModel)
                     val model = chatModelFor(request)
                     ToolCallingLoop(outputLimitUpdater = promptFactory::updateOutputLimit)
                         .runReactive(
                             model,
                             prompt,
                             request.cancellationToken,
-                            toolCallbacks(request, selectedModel),
+                            selectedCallbacks,
                             toolRegistry,
                             request.contextWindow.withRequestedOutput(request.parameters.maxTokens),
                             request.metadata,
+                            request.onContextBudgeted,
                         )
                 } else {
                     Mono
@@ -101,11 +103,10 @@ class OllamaClient(
 
     override fun streamReactive(request: ChatRequestContext): Flux<ChatResponse> {
         val selectedModel = request.model ?: appConfig.ollamaModel
-        val allowedFunctionNames = promptFactory.allowedFunctionNames(request, selectedModel)
         val prompt = promptFactory.buildPrompt(request, selectedModel)
+        val allowedFunctionNames = promptFactory.allowedFunctionNames(prompt)
         val supportsTools = request.supportsToolCalling()
-        val toolsEnabled = request.enabledTools.isNotEmpty()
-        val toolCallbacks = if (!supportsTools || !toolsEnabled) emptyList() else toolCallbacks(request, selectedModel)
+        val toolCallbacks = if (!supportsTools) emptyList() else promptFactory.callbacks(prompt)
         return Flux
             .defer {
                 request.cancellationToken?.throwIfCancelled()
@@ -128,6 +129,7 @@ class OllamaClient(
                             toolRegistry,
                             request.contextWindow.withRequestedOutput(request.parameters.maxTokens),
                             request.metadata,
+                            request.onContextBudgeted,
                         )
                 }
             }.onErrorResume { error ->
@@ -143,15 +145,6 @@ class OllamaClient(
                 }
             }
     }
-
-    private fun toolCallbacks(
-        request: ChatRequestContext,
-        selectedModel: String,
-    ) = toolRegistry.functionCallbacks(
-        request.enabledTools,
-        request.metadata + mapOf("model" to selectedModel) +
-            (request.cancellationToken?.let { mapOf("cancellationToken" to it) } ?: emptyMap()),
-    )
 
     private fun recoverUnknownTool(
         request: ChatRequestContext,

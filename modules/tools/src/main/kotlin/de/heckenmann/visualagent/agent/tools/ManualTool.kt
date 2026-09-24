@@ -44,21 +44,25 @@ class ManualTool(
         context: Map<String, Any>,
     ): ToolResult {
         val input = parseObject(inputJson)
+        val enabledIds = (context["enabledTools"] as? Set<*>)?.filterIsInstance<String>()?.toSet().orEmpty()
         return when ((input.string("action") ?: "show").lowercase()) {
-            "list" -> success("manual", availableTopics().joinToString("\n") { "- $it" })
-            "show" -> showTopic(input.string("topic") ?: "index")
+            "list" -> success("manual", availableTopics(enabledIds).joinToString("\n") { "- $it" })
+            "show" -> showTopic(input.string("topic") ?: "index", enabledIds)
             else -> failure("manual", "Unsupported manual action. Use 'list' or 'show'.")
         }
     }
 
-    private fun showTopic(topicInput: String): ToolResult {
+    private fun showTopic(
+        topicInput: String,
+        enabledIds: Set<String>,
+    ): ToolResult {
         val normalized = normalizeTopic(topicInput)
-        val pages = manualPages()
+        val pages = manualPages(enabledIds)
         val content =
             pages[normalized]
                 ?: return failure(
                     "manual",
-                    "Unknown topic '$topicInput'. Available topics: ${availableTopics().joinToString(", ")}",
+                    "Unknown topic '$topicInput'. Available topics: ${availableTopics(enabledIds).joinToString(", ")}",
                 )
         return success("manual", content)
     }
@@ -71,11 +75,15 @@ class ManualTool(
             .replace("-", "_")
             .replace(" ", "_")
 
-    private fun availableTopics(): List<String> = manualPages().keys.sorted()
+    private fun availableTopics(enabledIds: Set<String>): List<String> = manualPages(enabledIds).keys.sorted()
 
-    private fun manualPages(): Map<String, String> =
+    private fun manualPages(enabledIds: Set<String>): Map<String, String> =
         buildMap {
-            val toolDefinitions = allTools.map { it.definition.withRuntimeParameters() }.sortedBy { it.name }
+            val toolDefinitions =
+                allTools
+                    .filter { it.definition.id.value in enabledIds }
+                    .map { it.definition.withRuntimeParameters() }
+                    .sortedBy { it.name }
             put(
                 "index",
                 """

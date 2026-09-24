@@ -12,7 +12,9 @@ import org.springframework.ai.chat.messages.SystemMessage
 import org.springframework.ai.chat.messages.UserMessage
 import org.springframework.ai.chat.prompt.ChatOptions
 import org.springframework.ai.chat.prompt.Prompt
+import org.springframework.ai.model.tool.ToolCallingChatOptions
 import org.springframework.ai.openai.OpenAiChatOptions
+import org.springframework.ai.tool.ToolCallback
 import org.springframework.stereotype.Component
 import org.springframework.ai.chat.messages.Message as SpringMessage
 
@@ -24,6 +26,9 @@ class OpenAiPromptFactory(
     private val toolRegistry: ProviderToolCallbacks,
     private val contextBudgeter: RequestContextBudgeter = RequestContextBudgeter(),
 ) {
+    /** Returns the exact callbacks selected for the built prompt's context budget. */
+    fun callbacks(prompt: Prompt): List<ToolCallback> = (prompt.options as? ToolCallingChatOptions)?.toolCallbacks.orEmpty()
+
     /**
      * Returns provider-safe function names enabled for the request.
      *
@@ -72,16 +77,39 @@ class OpenAiPromptFactory(
                 emptyList()
             }
         val exactFunctionNames = callbacks.map { it.toolDefinition.name() }.distinct().sorted()
+        val definitions = callbacks.map { it.toProviderDefinition() }
+        val helpDefinition = definitions.firstOrNull { it.name == TOOL_HELP_FUNCTION }
+        val plan =
+            if (helpDefinition == null) {
+                null
+            } else {
+                contextBudgeter.fitWithToolFallback(
+                    request = request,
+                    fallbackMessages = toolNameGuardMessage(listOf(TOOL_HELP_FUNCTION)) + request.messages,
+                    fallbackTools = listOf(helpDefinition),
+                    fullMessages = toolNameGuardMessage(exactFunctionNames) + request.messages,
+                    fullTools = definitions,
+                )
+            }
         val budgetedRequest =
-            contextBudgeter.fit(
-                request,
-                toolNameGuardMessage(exactFunctionNames) + request.messages,
-                callbacks.map { callback -> callback.toProviderDefinition() },
-            )
+            plan?.request
+                ?: contextBudgeter.fit(
+                    request,
+                    toolNameGuardMessage(exactFunctionNames) + request.messages,
+                    definitions,
+                )
+        val selectedCallbacks = callbacks.filter { plan == null || it.toolDefinition.name() in plan.toolNames }
+        val selectedNames = selectedCallbacks.map { it.toolDefinition.name() }.distinct().sorted()
+        val finalMessages =
+            if (plan == null) {
+                budgetedRequest.messages
+            } else {
+                toolNameGuardMessage(selectedNames) + budgetedRequest.messages.filterNot { it.id == TOOL_GUARD_MESSAGE_ID }
+            }
         val optionsBuilder = OpenAiChatOptions.builder().model(selectedModel)
-        if (callbacks.isNotEmpty()) {
+        if (selectedCallbacks.isNotEmpty()) {
             optionsBuilder
-                .toolCallbacks(callbacks)
+                .toolCallbacks(selectedCallbacks)
                 .toolContext(toolContext)
         }
         budgetedRequest.parameters.temperature?.let(optionsBuilder::temperature)
@@ -91,7 +119,7 @@ class OpenAiPromptFactory(
         budgetedRequest.options["reasoningEffort"]?.let(optionsBuilder::reasoningEffort)
         budgetedRequest.options["verbosity"]?.let(optionsBuilder::verbosity)
         val options = optionsBuilder.build()
-        return Prompt(toSpringMessages(budgetedRequest.messages), options)
+        return Prompt(toSpringMessages(finalMessages), options)
     }
 
     private fun toolNameGuardMessage(exactFunctionNames: List<String>): List<Message> =
@@ -101,6 +129,7 @@ class OpenAiPromptFactory(
             listOf(
                 Message(
                     role = "system",
+                    id = TOOL_GUARD_MESSAGE_ID,
                     content =
                         """
                         Tool calling strict mode:
@@ -108,7 +137,7 @@ class OpenAiPromptFactory(
                         - Do not invent variants, prefixes, or suffixes.
                         - ${toolRegistry.toolRuntimeGuidance()}
                         - Use `async:true` when a tool can finish in the background.
-                        - If unsure about a tool name, do not call a tool; ask briefly or answer directly.
+                        - To list the tools available to you, call tool_help with {"action":"list"}.
                         """.trimIndent(),
                 ),
             )
@@ -130,6 +159,11 @@ class OpenAiPromptFactory(
             description = toolDefinition.description(),
             inputSchema = toolDefinition.inputSchema(),
         )
+
+    private companion object {
+        const val TOOL_HELP_FUNCTION = "tool_help"
+        const val TOOL_GUARD_MESSAGE_ID = "__provider_tool_guard__"
+    }
 
     internal fun updateOutputLimit(
         options: ChatOptions,

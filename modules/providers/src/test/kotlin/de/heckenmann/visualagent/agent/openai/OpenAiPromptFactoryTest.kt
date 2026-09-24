@@ -1,7 +1,9 @@
 package de.heckenmann.visualagent.agent.openai
 
 import de.heckenmann.visualagent.agent.ChatRequestContext
+import de.heckenmann.visualagent.agent.ContextWindow
 import de.heckenmann.visualagent.agent.Message
+import de.heckenmann.visualagent.agent.ModelParameters
 import de.heckenmann.visualagent.agent.TestToolRegistry
 import de.heckenmann.visualagent.agent.TestVisualAgentTool
 import de.heckenmann.visualagent.agent.ToolDefinition
@@ -98,6 +100,35 @@ class OpenAiPromptFactoryTest {
         assertEquals(listOf("context", "terminal"), names)
     }
 
+    @Test
+    fun `falls back to tool help rather than displacing assistant history`() {
+        val registry = TestToolRegistry(listOf(FakeTool("tool:help"), FakeTool("workspace:file", "x".repeat(5_000))))
+        val factory = OpenAiPromptFactory(registry)
+        val request =
+            ChatRequestContext(
+                messages =
+                    listOf(
+                        Message("system", "rules"),
+                        Message("user", "previous question"),
+                        Message("assistant", "previous answer"),
+                        Message("user", "latest question"),
+                    ),
+                parameters = ModelParameters(maxTokens = 40),
+                contextWindow = ContextWindow(configuredLimit = 512),
+                enabledTools = setOf(ToolId("tool:help"), ToolId("workspace:file")),
+                modelCapabilities = setOf("tools"),
+                modelCapabilitiesComplete = true,
+            )
+
+        val prompt = factory.buildPrompt(request, "gpt-test")
+        val options = prompt.options as ToolCallingChatOptions
+
+        assertEquals(listOf("tool_help"), options.toolCallbacks.orEmpty().map { it.toolDefinition.name() })
+        assertTrue(prompt.instructions.any { it.text == "previous answer" })
+        assertTrue(prompt.instructions.any { it.text == "latest question" })
+        assertTrue(prompt.instructions.any { it.text.orEmpty().contains("tool_help with {\"action\":\"list\"}") })
+    }
+
     private fun promptRequest() =
         ChatRequestContext(
             messages = emptyList(),
@@ -135,13 +166,14 @@ class OpenAiPromptFactoryTest {
 
     private class FakeTool(
         id: String,
+        schemaPadding: String = "",
     ) : TestVisualAgentTool {
         override val definition =
             ToolDefinition(
                 id = ToolId(id),
                 name = ToolId(id).toTestFunctionName(),
-                description = "Fake $id",
-                inputSchema = """{"type":"object"}""",
+                description = "Fake $id $schemaPadding",
+                inputSchema = """{"type":"object","description":"$schemaPadding"}""",
             )
 
         override fun execute(
