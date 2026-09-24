@@ -187,7 +187,7 @@ internal class AgentManagerConversationOps(
                     token?.throwIfCancelled()
                     chunk.providerTurn?.let { providerTurn = ProviderTurnAccumulator.merge(providerTurn, it) }
                     val part = chunk.message.content
-                    if (part.isNotBlank()) {
+                    if (part.isNotEmpty()) {
                         onChunk(appendStreamPart(collected, part))
                     }
                 }.then()
