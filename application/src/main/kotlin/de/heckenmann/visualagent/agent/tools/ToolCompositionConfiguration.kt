@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.agent.tools
 
 import de.heckenmann.visualagent.agent.AgentManager
+import de.heckenmann.visualagent.agent.AssistantTurnIdentity
 import de.heckenmann.visualagent.agent.CancellationToken
 import de.heckenmann.visualagent.agent.ProviderToolCall
 import de.heckenmann.visualagent.agent.javascript.GraalJavaScriptExecutionService
@@ -55,12 +56,16 @@ class ToolCompositionConfiguration {
 
     /** Exposes the Spring AI/provider callback adapter. */
     @Bean
-    fun providerToolCallbacks(registry: ToolRegistry): ProviderToolCallbacks = SpringAiToolCallbacksAdapter(registry)
+    fun providerToolCallbacks(
+        registry: ToolRegistry,
+        agentManager: ObjectProvider<AgentManager>,
+    ): ProviderToolCallbacks = SpringAiToolCallbacksAdapter(registry) { agentManager.getObject() }
 }
 
 /** Spring AI adaptation kept at the application composition boundary. */
 class SpringAiToolCallbacksAdapter(
     private val registry: ToolRegistry,
+    private val agentManager: (() -> AgentManager)? = null,
 ) : ProviderToolCallbacks {
     private val callCorrelation = ThreadLocal<List<CorrelatedToolCall>?>()
 
@@ -113,10 +118,24 @@ class SpringAiToolCallbacksAdapter(
     override fun bindToolCallRound(
         toolCalls: List<ProviderToolCall>,
         round: Int,
+        parentAssistantTurnId: String?,
     ): AutoCloseable {
         check(callCorrelation.get() == null) { "Tool-call correlation scope is already active" }
-        callCorrelation.set(toolCalls.mapIndexed { sequence, call -> CorrelatedToolCall(call, round, sequence) })
+        callCorrelation.set(toolCalls.mapIndexed { sequence, call -> CorrelatedToolCall(call, round, sequence, parentAssistantTurnId) })
         return AutoCloseable { callCorrelation.remove() }
+    }
+
+    override fun recordAssistantToolTurn(
+        turn: de.heckenmann.visualagent.agent.ProviderTurnResponse,
+        context: Map<String, Any>,
+    ): String? {
+        if (context["agent"] != "main") return null
+        val requestId = context["requestId"]?.toString()?.takeIf(String::isNotBlank) ?: return null
+        val manager = agentManager?.invoke() ?: return null
+        val round = turn.metadata.round ?: 0
+        val turnId = AssistantTurnIdentity.forRound(requestId, round)
+        manager.recordProviderAssistantTurn(turn, turnId, requestId)
+        return turnId
     }
 
     private fun correlatedContext(
@@ -134,7 +153,8 @@ class SpringAiToolCallbacksAdapter(
                 "providerToolCallId" to correlated.call.id,
                 "toolCallRound" to correlated.round,
                 "toolCallSequence" to correlated.sequence,
-            )
+            ) +
+            (correlated.parentAssistantTurnId?.let { mapOf("parentAssistantTurnId" to it) } ?: emptyMap())
     }
 
     /** Provider call identity awaiting callback execution in one loop round. */
@@ -142,5 +162,6 @@ class SpringAiToolCallbacksAdapter(
         val call: ProviderToolCall,
         val round: Int,
         val sequence: Int,
+        val parentAssistantTurnId: String?,
     )
 }

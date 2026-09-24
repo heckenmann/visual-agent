@@ -54,6 +54,7 @@ class OpenAiClient(
                 toolCallbacks(request, selectedModel),
                 toolRegistry,
                 request.contextWindow.withRequestedOutput(request.parameters.maxTokens),
+                request.metadata,
             ).onErrorMap(::buildDetailedProviderError)
     }
 
@@ -83,6 +84,7 @@ class OpenAiClient(
                             toolCallbacks,
                             toolRegistry,
                             request.contextWindow.withRequestedOutput(request.parameters.maxTokens),
+                            request.metadata,
                         )
                 }
             }.onErrorMap(::buildDetailedProviderError)

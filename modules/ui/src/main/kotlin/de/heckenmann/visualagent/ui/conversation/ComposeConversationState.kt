@@ -44,9 +44,11 @@ internal class ConversationUiState(
     var hasMoreHistory by mutableStateOf(true)
         private set
     val streaming = MutableStateFlow("")
+    val streamingTurns = MutableStateFlow<List<Message>>(emptyList())
 
     private var historyGeneration = 0L
     private var reachedOldestHistory = false
+    private var nextHistoryOffset = initialHistory.size
 
     /**
      * Tracks entries that have already been composed once.
@@ -62,6 +64,7 @@ internal class ConversationUiState(
         markEntriesKnown(history)
         isLoadingOlder = false
         hasMoreHistory = history.isNotEmpty()
+        nextHistoryOffset = history.size
         reachedOldestHistory = false
     }
 
@@ -73,8 +76,10 @@ internal class ConversationUiState(
         pendingUserEntryId = null
         streamingEntryId = null
         streaming.value = ""
+        streamingTurns.value = emptyList()
         isLoadingOlder = false
         hasMoreHistory = history.isNotEmpty()
+        nextHistoryOffset = history.size
         reachedOldestHistory = false
     }
 
@@ -93,6 +98,7 @@ internal class ConversationUiState(
         val latestIds = latestMessages.mapNotNull(Message::id).toSet()
         val retainedHistory = history.filter { it.id == null || it.id !in latestIds }
         history = retainedHistory + latestMessages
+        nextHistoryOffset = page.nextOffset + retainedHistory.count { it.id != null }
         if (!reachedOldestHistory) {
             hasMoreHistory = page.hasMore
         }
@@ -102,7 +108,7 @@ internal class ConversationUiState(
     fun beginOlderRequest(): ConversationHistoryRequest? {
         if (history.isEmpty() || isLoadingOlder || !hasMoreHistory) return null
         isLoadingOlder = true
-        return ConversationHistoryRequest(historyGeneration, history.size)
+        return ConversationHistoryRequest(historyGeneration, nextHistoryOffset)
     }
 
     fun applyOlder(
@@ -116,7 +122,8 @@ internal class ConversationUiState(
             history = older.toList() + history
             markEntriesKnown(older)
         }
-        hasMoreHistory = page.hasMore && older.isNotEmpty()
+        nextHistoryOffset = page.nextOffset
+        hasMoreHistory = page.hasMore
         reachedOldestHistory = !hasMoreHistory
         return older.size
     }
@@ -135,6 +142,8 @@ internal class ConversationUiState(
         pendingUserEntryId = null
         streamingEntryId = null
         streaming.value = ""
+        streamingTurns.value = emptyList()
+        nextHistoryOffset = messages.size
     }
 
     /** Returns whether this entry should play the new-message animation on first composition. */

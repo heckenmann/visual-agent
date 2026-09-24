@@ -28,7 +28,8 @@ collapsed by default.
    enter animation. The assistant answer appears as a primary row: borderless
    background tint, avatar icon, role label "Assistant", and Markdown content.
 3. A tool call fires during the turn. The tool appears as a compact tertiary
-   chip showing the tool id and duration, collapsed by default.
+   chip showing the tool id and duration, collapsed by default, nested under
+   the exact assistant turn that declared it.
 4. The user expands the tool chip to inspect input, result, and error blocks.
 5. A sub-agent completes a todo and returns a result. The result appears as a
    compact secondary row with a vertical accent bar, collapsed by default.
@@ -40,6 +41,8 @@ collapsed by default.
 
 - **Tool error:** the chip uses the error color for icon and status text; the
   error detail remains hidden until expanded.
+- **Multiple tool rounds:** each assistant turn remains separate, and its
+  ordered tool results stay attached to that turn.
 - **Empty history:** a placeholder row invites the user to start the
   conversation.
 

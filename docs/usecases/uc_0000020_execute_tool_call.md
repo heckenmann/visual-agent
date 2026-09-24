@@ -19,13 +19,15 @@ LLM provider.
 2. The provider dispatches the model's native structured call by its Provider Function Name, and the registry executes the matching Internal Tool ID.
 3. The selected tool receives JSON input and request metadata.
 4. The registry applies the configured server-owned timeout or a valid `timeoutSeconds` override, then executes the tool within that deadline.
-5. Tool start and finish events are emitted.
+5. The assistant turn is persisted before execution. Tool start and finish
+   events update one row whose explicit parent ID points to that assistant
+   turn and whose order matches the provider declaration.
 6. The registry normalizes the result into a JSON object with `toolId`, `success`, `data`, and `error` fields before returning it to the provider flow.
 7. The provider loop sends the tool result back to the model and requests the final user-facing answer.
 
 ## Result
 
-Tool behavior is centralized, auditable, and shown as its own message in the chat history. Tool results are fed back to the model so the assistant can answer from them instead of showing "(No text response. See tool results above.)".
+Tool behavior is centralized and auditable. Each tool call is shown beneath the assistant turn that declared it, and its persisted row is updated in place when execution finishes. Tool results are fed back through the provider's native tool-call history so the assistant can answer from them instead of showing "(No text response. See tool results above.)".
 
 ## Tool Calls
 
@@ -46,6 +48,7 @@ Tool behavior is centralized, auditable, and shown as its own message in the cha
 
 - Only request-enabled tools are callable.
 - Tool events are persisted and rendered.
+- A tool's stable child ID, declaration order, and explicit parent assistant-turn ID survive restart and history paging.
 - Tool results are sent back to the model to produce a real answer.
 - Unknown tool names get a controlled failure or recovery response.
 - JSON response text that resembles a tool call is never executed; only a provider-native structured tool call can reach the registry.

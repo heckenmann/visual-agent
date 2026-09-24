@@ -17,6 +17,34 @@ import org.springframework.ai.chat.model.ChatResponse as SpringChatResponse
  */
 class ProviderTurnResponseMapperTest {
     @Test
+    fun `maps assistant content and ordered tool calls from the same spring turn`() {
+        val response =
+            SpringChatResponse(
+                listOf(
+                    Generation(
+                        AssistantMessage
+                            .builder()
+                            .content("I'll inspect both files.")
+                            .toolCalls(
+                                listOf(
+                                    AssistantMessage.ToolCall("call-a", "function", "file_read", "{\"path\":\"a\"}"),
+                                    AssistantMessage.ToolCall("call-b", "function", "file_read", "{\"path\":\"b\"}"),
+                                ),
+                            ).build(),
+                        ChatGenerationMetadata.builder().finishReason("tool_calls").build(),
+                    ),
+                ),
+                ChatResponseMetadata.builder().model("model-a").build(),
+            )
+
+        val turn = ProviderTurnResponseMapper.fromSpring(response, requestId = "request-1", round = 0)
+
+        assertEquals("I'll inspect both files.", turn.content)
+        assertEquals(listOf("call-a", "call-b"), turn.toolCalls.map(ProviderToolCall::id))
+        assertEquals(listOf("{\"path\":\"a\"}", "{\"path\":\"b\"}"), turn.toolCalls.map(ProviderToolCall::argumentsJson))
+    }
+
+    @Test
     fun `maps spring tool calls with stable provider IDs and typed termination`() {
         val response =
             SpringChatResponse(

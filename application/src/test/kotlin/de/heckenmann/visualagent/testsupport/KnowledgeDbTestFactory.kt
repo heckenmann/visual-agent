@@ -112,7 +112,23 @@ class TestPersistence internal constructor(
         content: String,
         metadata: String?,
         contextPolicy: ConversationContextPolicy,
-    ): String = conversationStore.saveConversationMessage(id, sessionId, role, content, metadata, contextPolicy)
+        parentAssistantTurnId: String?,
+        turnOrder: Int?,
+        assistantToolTurn: Boolean,
+        conversationRequestId: String?,
+    ): String =
+        conversationStore.saveConversationMessage(
+            id,
+            sessionId,
+            role,
+            content,
+            metadata,
+            contextPolicy,
+            parentAssistantTurnId,
+            turnOrder,
+            assistantToolTurn,
+            conversationRequestId,
+        )
 
     /** Persists a test conversation message with a generated identifier. */
     fun saveConversationMessage(
@@ -143,6 +159,19 @@ class TestPersistence internal constructor(
         limit: Int,
         offset: Int,
     ) = conversationStore.getConversationMessagesPage(sessionId, limit, offset)
+
+    override fun getConversationMessagesForRequest(requestId: String) = conversationStore.getConversationMessagesForRequest(requestId)
+
+    override fun getConversationHistoryPage(
+        sessionId: String,
+        limit: Int,
+        offset: Int,
+    ) = conversationStore.getConversationHistoryPage(sessionId, limit, offset)
+
+    override fun getLatestConversationHistoryPage(
+        sessionId: String,
+        limit: Int,
+    ) = conversationStore.getLatestConversationHistoryPage(sessionId, limit)
 
     override fun searchConversationMessages(
         sessionId: String,

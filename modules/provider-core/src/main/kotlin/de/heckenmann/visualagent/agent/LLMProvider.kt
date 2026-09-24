@@ -355,6 +355,15 @@ data class Message(
     @kotlinx.serialization.Transient
     val timelineSequence: Long? = null,
     val contextPolicy: ConversationContextPolicy? = null,
+    /** Stable parent assistant-turn ID for a tool presentation row; null for legacy or top-level messages. */
+    val parentAssistantTurnId: String? = null,
+    /** Provider declaration order for a tool call within its assistant turn. */
+    val turnOrder: Int? = null,
+    /** Whether this assistant message is a structural parent for one or more tool-call rows. */
+    val assistantToolTurn: Boolean = false,
+    /** Request identity shared by assistant turns emitted while answering one streamed user message. */
+    @kotlinx.serialization.Transient
+    val conversationRequestId: String? = null,
 )
 
 /**

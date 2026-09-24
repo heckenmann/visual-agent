@@ -16,6 +16,7 @@ import java.time.Instant
  * @property requestId Visual Agent request identity
  * @property round Zero-based tool-loop round
  * @property sequence Provider call position within its round
+ * @property parentAssistantTurnId Stable assistant-turn identity that declared the call
  * @property inputJson Sanitized JSON input passed by the model
  * @property context Request-scoped context attached to the tool callback
  * @property result Structured tool execution result
@@ -30,6 +31,7 @@ data class ToolCallEvent(
     val requestId: String? = null,
     val round: Int? = null,
     val sequence: Int? = null,
+    val parentAssistantTurnId: String? = null,
     val phase: ToolCallPhase = ToolCallPhase.FINISHED,
     val inputJson: String,
     val context: Map<String, Any>,

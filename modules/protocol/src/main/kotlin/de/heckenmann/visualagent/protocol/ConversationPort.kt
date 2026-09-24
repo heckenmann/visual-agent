@@ -15,6 +15,12 @@ data class ConversationMessage(
     val timelineSequence: Long? = null,
     val reasoning: String? = null,
     val telemetry: ConversationResponseTelemetry? = null,
+    /** Explicit parent assistant-turn ID for a tool message; absent for legacy standalone rows. */
+    val parentAssistantTurnId: String? = null,
+    /** Provider declaration order for a tool call within its assistant turn. */
+    val turnOrder: Int? = null,
+    /** Whether this assistant message is a structural parent for one or more tool-call rows. */
+    val assistantToolTurn: Boolean = false,
 )
 
 /** Safe per-response diagnostics displayed without parsing provider payloads in the UI. */
@@ -35,6 +41,7 @@ data class ConversationHistoryPage(
     val messages: List<ConversationMessage>,
     val offset: Int,
     val hasMore: Boolean,
+    val nextOffset: Int = offset + messages.size,
 )
 
 /** Identifies the user and assistant entries of one streamed conversation turn. */
@@ -107,7 +114,7 @@ interface ConversationPort {
     suspend fun stream(
         request: ConversationStreamRequest,
         token: CancellationToken,
-        onChunk: (String) -> Unit,
+        onChunk: (ConversationStreamUpdate) -> Unit,
     ): ConversationStreamResult
 
     /** Resolves one Markdown image source through the server-owned media boundary. */
@@ -137,6 +144,12 @@ interface ConversationPort {
     /** Persists presentation preferences needed by the conversation panel. */
     fun updatePreferences(preferences: ConversationPreferences)
 }
+
+/** One exact text delta assigned to its structural assistant-turn identity. */
+data class ConversationStreamUpdate(
+    val assistantTurnId: String,
+    val textDelta: String,
+)
 
 /** Completed result of a streamed conversation turn. */
 data class ConversationStreamResult(

@@ -13,6 +13,7 @@ import de.heckenmann.visualagent.protocol.ConversationImageResolution
 import de.heckenmann.visualagent.protocol.ConversationInputPlacement
 import de.heckenmann.visualagent.protocol.ConversationPreferences
 import de.heckenmann.visualagent.protocol.ConversationStreamRequest
+import de.heckenmann.visualagent.protocol.ConversationStreamUpdate
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -35,16 +36,23 @@ class SpringConversationPortTest {
         runTest {
             every { manager.readLatestHistoryPage() } returns
                 ConversationHistoryPage(
-                    messages = listOf(Message("assistant", "ready", id = "m1")),
+                    messages =
+                        listOf(
+                            Message("assistant", "Inspect files", id = "turn-1", assistantToolTurn = true),
+                            Message("tool", "Tool file:read · ok", id = "call-1", parentAssistantTurnId = "turn-1", turnOrder = 0),
+                        ),
                     offset = 0,
                     hasMore = false,
                 )
 
             val page = port.latest()
 
-            assertEquals("assistant", page.messages.single().role)
-            assertEquals("ready", page.messages.single().content)
-            assertEquals("m1", page.messages.single().id)
+            assertEquals("assistant", page.messages.first().role)
+            assertEquals("Inspect files", page.messages.first().content)
+            assertEquals("turn-1", page.messages.first().id)
+            assertEquals(true, page.messages.first().assistantToolTurn)
+            assertEquals("turn-1", page.messages.last().parentAssistantTurnId)
+            assertEquals(0, page.messages.last().turnOrder)
         }
 
     @Test
@@ -136,11 +144,11 @@ class SpringConversationPortTest {
     fun `stream cancellation is bridged to application token`() =
         runTest {
             coEvery { manager.streamMessage(any(), any(), any(), any(), any()) } coAnswers {
-                thirdArg<(String) -> Unit>().invoke("delta")
+                thirdArg<(ConversationStreamUpdate) -> Unit>().invoke(ConversationStreamUpdate("assistant-stream-id", "delta"))
                 "delta"
             }
             val token = CancellationTokenImpl()
-            val chunks = mutableListOf<String>()
+            val chunks = mutableListOf<ConversationStreamUpdate>()
             val userEntryId = "11111111-1111-4111-8111-111111111111"
             val assistantEntryId = "22222222-2222-4222-8222-222222222222"
             every { manager.getHistory() } returns listOf(Message("assistant", "delta", id = assistantEntryId))
@@ -149,7 +157,7 @@ class SpringConversationPortTest {
                 port.stream(ConversationStreamRequest(userEntryId, assistantEntryId, "hello"), token) { chunks += it }
             token.cancel()
 
-            assertEquals(listOf("delta"), chunks)
+            assertEquals(listOf("delta"), chunks.map(ConversationStreamUpdate::textDelta))
             assertEquals(assistantEntryId, result.assistantMessage.id)
             coVerify(exactly = 1) { manager.streamMessage("hello", any(), any(), any(), any()) }
         }

@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.protocol.ConversationHistoryPage
 import de.heckenmann.visualagent.protocol.ConversationMessage
 import de.heckenmann.visualagent.protocol.ConversationPort
 import de.heckenmann.visualagent.protocol.ConversationStreamRequest
+import de.heckenmann.visualagent.protocol.ConversationStreamUpdate
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -29,7 +30,7 @@ internal interface ConversationMessageGateway {
     suspend fun stream(
         request: ConversationStreamRequest,
         token: CancellationToken,
-        onChunk: (String) -> Unit,
+        onChunk: (ConversationStreamUpdate) -> Unit,
     )
 
     suspend fun currentHistory(): List<ConversationMessage>
@@ -46,7 +47,7 @@ internal class ProtocolConversationGateway(
     override suspend fun stream(
         request: ConversationStreamRequest,
         token: CancellationToken,
-        onChunk: (String) -> Unit,
+        onChunk: (ConversationStreamUpdate) -> Unit,
     ) {
         withContext(Dispatchers.IO) { conversationPort.stream(request, token, onChunk) }
     }

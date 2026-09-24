@@ -140,6 +140,9 @@ private fun ApplicationMessage.toProtocol(): ConversationMessage =
         id = id,
         createdAtEpochMillis = createdAtEpochMillis,
         timelineSequence = timelineSequence,
+        parentAssistantTurnId = parentAssistantTurnId,
+        turnOrder = turnOrder,
+        assistantToolTurn = assistantToolTurn,
     )
 
 private fun SubAgentExecutionSnapshot.toProtocol(): AgentExecutionSnapshot =

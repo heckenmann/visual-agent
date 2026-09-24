@@ -31,6 +31,9 @@ class SpringActivityPort(
                             ToolCallPhase.FINISHED -> ToolActivityPhase.FINISHED
                         },
                     success = event.result.success,
+                    providerToolCallId = event.providerToolCallId,
+                    parentAssistantTurnId = event.parentAssistantTurnId,
+                    sequence = event.sequence,
                 ),
             )
         }

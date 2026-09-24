@@ -224,6 +224,7 @@ class ToolRegistry(
                 requestId = context["requestId"] as? String,
                 round = context["toolCallRound"] as? Int,
                 sequence = context["toolCallSequence"] as? Int,
+                parentAssistantTurnId = context["parentAssistantTurnId"] as? String,
                 phase = phase,
                 inputJson = functionInput,
                 context = context,

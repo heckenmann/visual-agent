@@ -31,6 +31,30 @@ Primary methods:
 
 This is what `AgentManager` sends into the provider.
 
+## Conversation Turn Structure
+
+Conversation history preserves provider assistant-turn boundaries. An assistant
+message that declared tools is stored as a structural assistant turn with a
+stable message ID. Each tool execution is a separate child message carrying
+`parentAssistantTurnId` and its provider declaration `turnOrder`. The parent
+relationship and order are persisted as typed columns, not inferred from row
+adjacency or decoded from UI metadata.
+
+Streaming deltas use `ConversationStreamUpdate(assistantTurnId, textDelta)`.
+The turn ID remains stable from the first streamed delta through persisted
+history, so separate provider rounds never share one transient UI message.
+Conversation protocol messages and history pages carry `parentAssistantTurnId`,
+`turnOrder`, and `assistantToolTurn`; gRPC chat deltas carry the same assistant
+turn ID. History paging expands any selected parent/tool row to include its
+complete group.
+
+Within one provider request, Spring AI's tool loop retains its native structured
+assistant/tool-call/result history and provider call IDs. Across completed user
+requests, persisted tool rows are projected as bounded historical execution
+summaries for context; these summaries are not used as a substitute for native
+tool-call protocol history within an active provider loop. Legacy tool rows
+without an explicit parent remain standalone.
+
 ## Provider Implementations
 
 `ConfiguredLLMProvider` is the primary `LLMProvider` bean injected into UI and agent orchestration code. It resolves each request through the H2-backed `ProviderCatalogService` and delegates to the configured adapter.
@@ -96,6 +120,12 @@ Tools are defined through app-level `ToolDefinition` and executed through `Visua
 - supports per-call timeout override via tool input: `{"timeoutSeconds": N}`
 - supports async execution via tool input: `{"async": true}` (returns immediate scheduled result; `FINISHED` event follows later)
 - lets `VisualAgentTool.managesExecution = true` opt out of the generic async/timeout wrapper; the sub-agent execution tools (`AgentStartTool`, `AgentMessageTool`) use this to call `AgentManager.runAgentJob` / `enqueueAgentJob` directly
+
+For main-agent calls, the tool-calling loop persists each provider assistant
+turn before its calls execute. Tool lifecycle events update stable child rows
+under that turn, ordered by the provider's original declaration sequence.
+Intermediate assistant prose and the later post-tool answer remain separate
+conversation messages.
 
 ### Main-agent tool set
 
