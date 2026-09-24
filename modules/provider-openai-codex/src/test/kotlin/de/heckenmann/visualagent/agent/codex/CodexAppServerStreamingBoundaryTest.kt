@@ -74,6 +74,28 @@ class CodexAppServerStreamingBoundaryTest {
             }
         }
 
+    @Test
+    fun `preserves newline-only native deltas in both streamed and collected responses`() =
+        run {
+            val directory = createTempDirectory("codex-app-server-whitespace-delta-test-")
+            val parts = listOf("```markdown", "\n", "# Heading", "\n", "```kotlin", "\n", "println(\"hello\")", "\n", "```")
+            val executable = fixture.fakeServer(directory, deltaParts = parts)
+            try {
+                val model = CodexAppServerChatModel(executable, "gpt-test", emptyList(), directory)
+                val responses =
+                    model
+                        .streamReactive(Prompt("hello"))
+                        .collectList()
+                        .block()
+                        .orEmpty()
+
+                assertEquals(parts, responses.dropLast(1).map(::responseText))
+                assertEquals(parts.joinToString(""), responseText(requireNotNull(model.completeReactive(Prompt("hello")).block())))
+            } finally {
+                fixture.deleteRecursively(directory)
+            }
+        }
+
     private fun responseText(response: ChatResponse): String =
         response.result
             ?.output

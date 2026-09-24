@@ -184,6 +184,7 @@ class CodexAppServerChatModelTest {
         directory: Path,
         singleDelta: Boolean = false,
         secondItem: Boolean = false,
+        deltaParts: List<String>? = null,
         firstDelta: String = "hel",
         secondDelta: String = "lo",
         reasoningSummary: Boolean = false,
@@ -192,13 +193,14 @@ class CodexAppServerChatModelTest {
     ): Path {
         val executable = directory.resolve("codex")
         val deltaEvents =
-            if (singleDelta) {
-                """printf '%s\n' '{"jsonrpc":"2.0","method":"item/agentMessage/delta","params":{"delta":"hello","itemId":"item-1","threadId":"thread-1","turnId":"turn-1"}}'"""
-            } else if (secondItem) {
-                deltaEvent(firstDelta, "item-1") + "\n                  " + deltaEvent(secondDelta, "item-2")
-            } else {
-                deltaEvent("hel") + "\n                  " + deltaEvent("lo")
-            }
+            deltaParts?.joinToString("\n                  ") { deltaEvent(it) }
+                ?: if (singleDelta) {
+                    """printf '%s\n' '{"jsonrpc":"2.0","method":"item/agentMessage/delta","params":{"delta":"hello","itemId":"item-1","threadId":"thread-1","turnId":"turn-1"}}'"""
+                } else if (secondItem) {
+                    deltaEvent(firstDelta, "item-1") + "\n                  " + deltaEvent(secondDelta, "item-2")
+                } else {
+                    deltaEvent("hel") + "\n                  " + deltaEvent("lo")
+                }
         Files.writeString(
             executable,
             """
