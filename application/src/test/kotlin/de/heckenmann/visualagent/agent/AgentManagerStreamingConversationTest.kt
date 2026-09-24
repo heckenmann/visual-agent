@@ -194,6 +194,26 @@ class AgentManagerStreamingConversationTest {
         }
 
     @Test
+    fun `stream message persists section boundaries exactly as emitted`() =
+        runBlocking {
+            val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
+            val provider = mockk<LLMProvider>(relaxed = true)
+            every { provider.streamReactive(any<ChatRequestContext>()) } returns
+                Flux.just(
+                    ChatResponse(model = "test", message = Message("assistant", "Searching now."), done = false),
+                    ChatResponse(model = "test", message = Message("assistant", "\n\nHere is the result."), done = true),
+                )
+            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
+            val chunks = mutableListOf<String>()
+
+            val result = manager.streamMessage("hi", onChunk = chunks::add, userEntryId = USER_ID, assistantEntryId = ASSISTANT_ID)
+
+            assertEquals("Searching now.\n\nHere is the result.", result)
+            assertEquals(listOf("Searching now.", "\n\nHere is the result."), chunks)
+            assertEquals(result, manager.getHistory().last().content)
+        }
+
+    @Test
     fun `stream message persists thinking markup but removes it from provider history`() =
         runBlocking {
             val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")

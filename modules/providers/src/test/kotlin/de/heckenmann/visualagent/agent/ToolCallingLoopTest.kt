@@ -151,6 +151,66 @@ class ToolCallingLoopTest {
         }
 
     @Test
+    fun `runStream separates visible initial prose from the final tool response`() =
+        runTest {
+            val chatModel = mockk<ChatModel>()
+            val tool = CountingTool()
+            val prompt = Prompt(listOf(UserMessage("stream and tool")))
+            every { chatModel.stream(any<Prompt>()) } returns
+                reactor.core.publisher.Flux.just(
+                    springToolResponse("unit", toolName = "count_tool", arguments = "{}", callId = "stream-1", content = "Searching now."),
+                )
+            every { chatModel.call(any<Prompt>()) } returns springResponse("unit", "Here is the result.")
+
+            val chunks = ToolCallingLoop().runStreamReactive(chatModel, prompt, null, listOf(tool)).collectList().awaitSingle()
+
+            assertEquals("Searching now.", chunks.first().message.content)
+            assertEquals("\n\nHere is the result.", chunks.last().message.content)
+            assertEquals(chunks.last().message.content, chunks.last().providerTurn?.content)
+        }
+
+    @Test
+    fun `runStream preserves existing whitespace and empty final responses`() =
+        runTest {
+            val chatModel = mockk<ChatModel>()
+            val tool = CountingTool()
+            val prompt = Prompt(listOf(UserMessage("stream and tool")))
+            every { chatModel.stream(any<Prompt>()) } returns
+                reactor.core.publisher.Flux.just(
+                    springToolResponse("unit", toolName = "count_tool", arguments = "{}", callId = "stream-1", content = "Searching now."),
+                )
+            every { chatModel.call(any<Prompt>()) }
+                .returnsMany(
+                    springResponse("unit", " Already separated."),
+                    springResponse("unit", ""),
+                )
+            val loop = ToolCallingLoop()
+
+            val whitespaceResult = loop.runStreamReactive(chatModel, prompt, null, listOf(tool)).collectList().awaitSingle()
+            val emptyResult = loop.runStreamReactive(chatModel, prompt, null, listOf(tool)).collectList().awaitSingle()
+
+            assertEquals(" Already separated.", whitespaceResult.last().message.content)
+            assertEquals("", emptyResult.last().message.content)
+        }
+
+    @Test
+    fun `runStream separates initial prose from a direct tool response`() =
+        runTest {
+            val chatModel = mockk<ChatModel>()
+            val directTool = DirectReturnTool()
+            val prompt = Prompt(listOf(UserMessage("stream and direct tool")))
+            every { chatModel.stream(any<Prompt>()) } returns
+                reactor.core.publisher.Flux.just(
+                    springToolResponse("unit", toolName = "direct_tool", arguments = "{}", callId = "stream-1", content = "Looking it up."),
+                )
+
+            val chunks = ToolCallingLoop().runStreamReactive(chatModel, prompt, null, listOf(directTool)).collectList().awaitSingle()
+
+            assertEquals("Looking it up.", chunks.first().message.content)
+            assertEquals("\n\ndirect result", chunks.last().message.content)
+        }
+
+    @Test
     fun `runStream emits only model chunks when no tool call is requested`() =
         runTest {
             val chatModel = mockk<ChatModel>()
@@ -225,12 +285,13 @@ class ToolCallingLoopTest {
         arguments: String,
         callId: String,
         additionalCalls: List<AssistantMessage.ToolCall> = emptyList(),
+        content: String = "",
     ): SpringChatResponse {
         val toolCall = AssistantMessage.ToolCall(callId, "function", toolName, arguments)
         val assistantMessage =
             AssistantMessage
                 .builder()
-                .content("")
+                .content(content)
                 .toolCalls(listOf(toolCall) + additionalCalls)
                 .build()
         val generation = Generation(assistantMessage, ChatGenerationMetadata.builder().finishReason("tool_calls").build())

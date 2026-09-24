@@ -19,7 +19,7 @@ Desktop user.
 2. The application starts a streaming provider request.
 3. The server builds the provider request from the bounded main-agent context projection rather than the unbounded audit timeline.
 4. While waiting for the first visible assistant chunk, the chat panel displays a `Thinking` indicator beside the newest pending conversation content.
-5. Response chunks are emitted as they arrive and replace the waiting indicator with a temporary assistant message.
+5. Response chunks are emitted as they arrive and replace the waiting indicator with a temporary assistant message. Provider chunks remain unchanged within one logical assistant section; a Markdown blank-line boundary is inserted only when a distinct visible section starts without existing whitespace separation.
 6. While the user's scroll position is at the bottom of the message list, each new chunk scrolls the conversation to the newest content.
 7. If the user has scrolled up to read older messages, new chunks do not disturb the current view; instead, a scroll-to-bottom button appears.
 8. After the final chunk, the completed assistant turn is persisted with the
@@ -42,11 +42,14 @@ The user sees progress during longer responses, stays at the bottom by default, 
 - `de.heckenmann.visualagent.agent.LLMProvider.stream`
 - `de.heckenmann.visualagent.agent.AgentManager.streamMessage`
 - `de.heckenmann.visualagent.agent.text.AgentResponseCoordinator`
+- `de.heckenmann.visualagent.agent.ToolCallingLoop`
+- `de.heckenmann.visualagent.agent.codex.CodexAppServerChatModel`
 - `de.heckenmann.visualagent.ui.conversation.ConversationPanel`
 
 ## Acceptance Criteria
 
 - Partial chunks are visible before completion.
+- Distinct visible provider sections render as separate Markdown blocks, while arbitrary chunks within one section remain unchanged.
 - Streaming requests use the same bounded context projection as non-streaming requests.
 - A visible waiting indicator is shown before the first assistant chunk, including for the first request in an empty conversation.
 - The persisted conversation contains the final complete assistant response, not partial duplicates.
