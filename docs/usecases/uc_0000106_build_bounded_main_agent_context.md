@@ -17,16 +17,28 @@ Main agent orchestration.
 
 ## Main Flow
 
-1. The application loads the latest user-turn boundary from the conversation store.
-2. It selects dialogue records and eligible summary-source records, excluding
-   audit-only lifecycle noise.
-3. It groups each user turn into the user request, a deduplicated low-priority
-   execution reference, and final visible assistant outcome.
-4. It retains recent turns newest-first under the provider token budget and never
-   removes the current user request.
-5. The resulting projection is sent to the provider for normal, streaming, retry,
+1. The application loads persisted dialogue and eligible summary-source records from the
+   conversation store; audit-only lifecycle noise is excluded.
+2. It projects each user turn into the user request, individually deduplicated
+   execution references, and final visible assistant outcome without applying an
+   independent token limit.
+3. After resolving the model-reported and configured context window, the provider
+   reserves output capacity and the minimal `tool_help` schema.
+4. The provider retains the complete latest user request, then up to ten final
+   assistant answers in reverse recency priority. An answer too large to fit is
+   shortened with an explicit truncation marker.
+5. Full tool schemas are included if they fit without displacing the latest user request
+   or those ten answers. Remaining capacity is then filled with execution references
+   and older history. Selected messages are sent in chronological order.
+6. The one-line `tool_help` example is always included for tooling-capable models. If
+   full schemas would displace prioritized history, only `tool_help` is sent; the model
+   can list, inspect, and invoke request-enabled tools through it.
+7. When the budgeter omits history or ordinary tool schemas, a request-scoped warning
+   is streamed to the conversation panel; the send action receives warning emphasis
+   and a subtle notice appears above the input.
+8. The resulting projection is sent to the provider for normal, streaming, retry,
    resume, and autonomous review requests.
-6. The complete unprojected timeline remains available to the conversation UI and
+9. The complete unprojected timeline remains available to the conversation UI and
    `history` tool.
 
 ## Result
@@ -51,7 +63,18 @@ user's current intent, while all events remain auditable.
   verbatim into provider context.
 - Todo, tool, sub-agent, and workspace events are deduplicated deterministically;
   actionable failures remain visible.
-- Context size is bounded using the configured token budget and explicit reserves.
+- The current user message is mandatory, followed by the ten newest final assistant
+  answers, then native tool schemas, execution references, and remaining history.
+- A non-fitting history item does not prevent smaller, lower-priority records from
+  using remaining capacity; selected records are kept in their original order.
+- The current user message is never truncated. If necessary, the newest prior assistant
+  answer is shortened and marked so the model retains its context.
+- History projection does not apply a second approximate token budget before provider
+  limits and exact tool schemas are known.
+- The token budget reserves output capacity and the minimal `tool_help` callback first.
+  Full schemas may displace only lower-priority execution references and older history.
+- Any history or regular-schema reduction produces a UI warning without changing
+  persisted conversation messages.
 - Historical execution, memory, and runtime state are reference data rather than
   system instructions; they cannot override the newest user request.
 - Initial history and full audit history remain unchanged for the UI.

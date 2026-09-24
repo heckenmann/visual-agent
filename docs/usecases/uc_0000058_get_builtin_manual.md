@@ -16,8 +16,9 @@ Enabled agent.
 
 1. The model calls the manual tool.
 2. The tool lists topics or renders a requested topic.
-3. Tool definitions are rendered with IDs, function names, descriptions, and schemas.
-4. The result is returned as Markdown text.
+3. The manual lists and renders only tools enabled for the requesting agent.
+4. Tool definitions are rendered with provider function names, descriptions, and schemas.
+5. The result is returned as Markdown text.
 
 ## Result
 
@@ -35,5 +36,5 @@ Agents can self-discover available tool usage without global prompt bloat.
 ## Acceptance Criteria
 
 - Unknown topics return available alternatives.
-- Tool schemas are included for tool topics.
+- Tool schemas are included only for tool topics available to the requester.
 - Markdown reference is available through `topic=markdown`.
