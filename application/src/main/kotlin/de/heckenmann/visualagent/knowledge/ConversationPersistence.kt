@@ -14,6 +14,10 @@ data class ConversationRecord(
     val createdAt: Instant,
     val timelineSequence: Long = 0,
     val contextPolicy: ConversationContextPolicy = ConversationContextPolicy.SUMMARY_SOURCE,
+    val parentAssistantTurnId: String? = null,
+    val turnOrder: Int? = null,
+    val assistantToolTurn: Boolean = false,
+    val conversationRequestId: String? = null,
 ) {
     /** Returns a field value by its persistence-facing name. */
     operator fun get(key: String): Any? =
@@ -25,9 +29,20 @@ data class ConversationRecord(
             "createdAt" -> createdAt.toString()
             "timelineSequence" -> timelineSequence
             "contextPolicy" -> contextPolicy.name
+            "parentAssistantTurnId" -> parentAssistantTurnId
+            "turnOrder" -> turnOrder
+            "assistantToolTurn" -> assistantToolTurn
+            "conversationRequestId" -> conversationRequestId
             else -> null
         }
 }
+
+/** A page whose records may include complete assistant/tool groups around the raw page boundary. */
+data class ConversationStorePage(
+    val records: List<ConversationRecord>,
+    val nextOffset: Int,
+    val hasMore: Boolean,
+)
 
 /** Stores, pages, searches, and deletes conversation messages. */
 interface ConversationStore {
@@ -38,7 +53,7 @@ interface ConversationStore {
         role: String,
         content: String,
         metadata: String? = null,
-    ): String
+    ): String = saveConversationMessage(id, sessionId, role, content, metadata, ConversationContextPolicy.forRole(role))
 
     /** Persists one message with an explicit model-context policy. */
     fun saveConversationMessage(
@@ -48,6 +63,10 @@ interface ConversationStore {
         content: String,
         metadata: String? = null,
         contextPolicy: ConversationContextPolicy,
+        parentAssistantTurnId: String? = null,
+        turnOrder: Int? = null,
+        assistantToolTurn: Boolean = false,
+        conversationRequestId: String? = null,
     ): String = saveConversationMessage(id, sessionId, role, content, metadata)
 
     /** Returns messages eligible for a bounded main-agent context projection. */
@@ -67,6 +86,13 @@ interface ConversationStore {
     /** Returns one persisted message, including its durable timeline ordering key. */
     fun getConversationMessage(id: String): ConversationRecord? = null
 
+    /** Returns every assistant message persisted for one conversation request in chronological order. */
+    fun getConversationMessagesForRequest(requestId: String): List<ConversationRecord> = emptyList()
+
+    /** Reactive counterpart of [getConversationMessagesForRequest]. */
+    fun getConversationMessagesForRequestReactive(requestId: String): Flux<ConversationRecord> =
+        Flux.defer { Flux.fromIterable(getConversationMessagesForRequest(requestId)) }
+
     /** Returns the latest messages for a session. */
     fun getConversationMessages(
         sessionId: String,
@@ -79,6 +105,25 @@ interface ConversationStore {
         limit: Int,
         offset: Int,
     ): List<ConversationRecord>
+
+    /** Reads a page and expands any assistant/tool groups touched by its raw rows. */
+    fun getConversationHistoryPage(
+        sessionId: String,
+        limit: Int,
+        offset: Int,
+    ): ConversationStorePage {
+        val records = getConversationMessagesPage(sessionId, limit, offset)
+        return ConversationStorePage(records, offset + records.size, records.size == limit)
+    }
+
+    /** Reads the latest page, expanding any assistant/tool groups it touches. */
+    fun getLatestConversationHistoryPage(
+        sessionId: String,
+        limit: Int,
+    ): ConversationStorePage {
+        val records = getConversationMessages(sessionId, limit)
+        return ConversationStorePage(records, records.size, records.size == limit)
+    }
 
     /** Searches session messages by text query. */
     fun searchConversationMessages(
@@ -99,6 +144,13 @@ interface ConversationStore {
         newContent: String,
     ): Int
 
+    /** Updates a persisted message's presentation content and metadata without changing its identity. */
+    fun updateConversationMessage(
+        id: String,
+        newContent: String,
+        newMetadata: String,
+    ): Int = updateConversationMessageContent(id, newContent)
+
     /** Reactive counterpart of [saveConversationMessage]. */
     fun saveConversationMessageReactive(
         id: String,
@@ -107,7 +159,25 @@ interface ConversationStore {
         content: String,
         metadata: String? = null,
         contextPolicy: ConversationContextPolicy = ConversationContextPolicy.forRole(role),
-    ): Mono<String> = Mono.fromCallable { saveConversationMessage(id, sessionId, role, content, metadata, contextPolicy) }
+        parentAssistantTurnId: String? = null,
+        turnOrder: Int? = null,
+        assistantToolTurn: Boolean = false,
+        conversationRequestId: String? = null,
+    ): Mono<String> =
+        Mono.fromCallable {
+            saveConversationMessage(
+                id,
+                sessionId,
+                role,
+                content,
+                metadata,
+                contextPolicy,
+                parentAssistantTurnId,
+                turnOrder,
+                assistantToolTurn,
+                conversationRequestId,
+            )
+        }
 
     /** Reactive counterpart of [getConversationMessage]. */
     fun getConversationMessageReactive(id: String): Mono<ConversationRecord> = Mono.fromCallable { getConversationMessage(id) }
@@ -150,4 +220,11 @@ interface ConversationStore {
         id: String,
         newContent: String,
     ): Mono<Int> = Mono.fromCallable { updateConversationMessageContent(id, newContent) }
+
+    /** Reactive counterpart of [updateConversationMessage]. */
+    fun updateConversationMessageReactive(
+        id: String,
+        newContent: String,
+        newMetadata: String,
+    ): Mono<Int> = Mono.fromCallable { updateConversationMessage(id, newContent, newMetadata) }
 }
