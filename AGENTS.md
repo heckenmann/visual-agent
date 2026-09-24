@@ -15,7 +15,7 @@
 
 ## Pre-Commit Quality Gates
 
-Run the Gradle formatting task before making any manual formatting adjustments. Manual formatting should only be used to refine the result after `gradle format` has completed.
+Run the Kotlin formatter for each changed module before making any manual formatting adjustments. Use the module task, for example `./gradlew :ui:ktlintFormat` or `./gradlew :application:ktlintFormat`; there is no root `format` task. Manual formatting should only refine the formatter's result.
 
 Always run, in this order:
 ```bash
