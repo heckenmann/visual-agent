@@ -40,6 +40,26 @@ class ComposeStreamingMarkdownTest {
     }
 
     @Test
+    fun `renders a streamed section boundary as a Markdown block boundary`() {
+        var markdown by mutableStateOf("Initial status.")
+        composeTestRule.setContent {
+            MaterialTheme {
+                ComposeStreamingMarkdown(
+                    markdown = markdown,
+                    streamKey = "tool-follow-up-response",
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+
+        updateMarkdown { markdown += "\n\n## Tool result\n\n- final item" }
+
+        composeTestRule.onNode(hasText("Tool result", substring = true), useUnmergedTree = true).assertExists()
+        composeTestRule.onNode(hasText("## Tool result", substring = true), useUnmergedTree = true).assertDoesNotExist()
+        composeTestRule.onNode(hasText("final item", substring = true), useUnmergedTree = true).assertExists()
+    }
+
+    @Test
     fun `renders an open code block as chunks arrive`() {
         var markdown by mutableStateOf("")
         composeTestRule.setContent {

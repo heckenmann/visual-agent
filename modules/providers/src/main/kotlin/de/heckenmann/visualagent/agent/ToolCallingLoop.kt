@@ -202,7 +202,14 @@ internal class ToolCallingLoop(
             (callCorrelation?.bindToolCallRound(initialTurn.toolCalls, 0, parentTurnId) ?: AutoCloseable {}).use {
                 toolCallingManager.executeToolCalls(initialPrompt, aggregated)
             }
-        if (toolExecutionResult.returnDirect()) return buildDirectResponse(aggregated, toolExecutionResult)
+        val initialVisibleText =
+            aggregated.result
+                ?.output
+                ?.text
+                .orEmpty()
+        if (toolExecutionResult.returnDirect()) {
+            return StreamSectionBoundary.separateResponse(initialVisibleText, buildDirectResponse(aggregated, toolExecutionResult))
+        }
 
         var prompt = appendToolConversationHistory(initialPrompt, toolExecutionResult)
         var lastFinalResponse: SpringChatResponse? = null
@@ -215,7 +222,12 @@ internal class ToolCallingLoop(
             val boundedPrompt = fitPrompt(budgetRequest, prompt, toolCallbacks)
             val finalResponse = chatModel.call(boundedPrompt)
             lastFinalResponse = finalResponse
-            if (!finalResponse.hasToolCalls()) return finalResponse.toVisualAgentResponse(requestId = requestId, round = round)
+            if (!finalResponse.hasToolCalls()) {
+                return StreamSectionBoundary.separateResponse(
+                    initialVisibleText,
+                    finalResponse.toVisualAgentResponse(requestId = requestId, round = round),
+                )
+            }
 
             val turn = ProviderTurnResponseMapper.fromSpring(finalResponse, requestId = requestId, round = round)
             val nextParentTurnId = callCorrelation?.recordAssistantToolTurn(turn, requestMetadata)
@@ -223,12 +235,16 @@ internal class ToolCallingLoop(
                 (callCorrelation?.bindToolCallRound(turn.toolCalls, round, nextParentTurnId) ?: AutoCloseable {}).use {
                     toolCallingManager.executeToolCalls(boundedPrompt, finalResponse)
                 }
-            if (nextToolResult.returnDirect()) return buildDirectResponse(finalResponse, nextToolResult)
+            if (nextToolResult.returnDirect()) {
+                return StreamSectionBoundary.separateResponse(initialVisibleText, buildDirectResponse(finalResponse, nextToolResult))
+            }
             prompt = appendToolConversationHistory(boundedPrompt, nextToolResult)
         }
 
         logger.warn { "Stream tool calling loop reached max rounds ($maxRounds); emitting last response" }
-        return lastFinalResponse?.toVisualAgentResponse(requestId = requestId, round = maxRounds)
+        return lastFinalResponse
+            ?.toVisualAgentResponse(requestId = requestId, round = maxRounds)
+            ?.let { StreamSectionBoundary.separateResponse(initialVisibleText, it) }
     }
 
     private fun buildToolCallingManager(): ToolCallingManager =

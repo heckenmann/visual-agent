@@ -190,6 +190,40 @@ class AgentManagerStreamingConversationTest {
         }
 
     @Test
+    fun `stream message preserves whitespace-only chunks through database persistence`() =
+        runBlocking {
+            val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
+            val provider = mockk<LLMProvider>(relaxed = true)
+            val parts =
+                listOf("```markdown", "\n", "# Heading", "\n", "## Code", "\n", "```kotlin", "\n", "println(\"hello\")", "\n", "```")
+            every { provider.streamReactive(any<ChatRequestContext>()) } returns
+                Flux.fromIterable(
+                    parts.mapIndexed { index, part ->
+                        ChatResponse(
+                            model = "test",
+                            message = Message("assistant", part),
+                            done = index == parts.lastIndex,
+                        )
+                    },
+                )
+            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
+            val deliveredParts = mutableListOf<ConversationStreamUpdate>()
+
+            val result =
+                manager.streamMessage(
+                    "show Markdown code",
+                    onChunk = deliveredParts::add,
+                    userEntryId = USER_ID,
+                    assistantEntryId = ASSISTANT_ID,
+                )
+            val expected = parts.joinToString("")
+
+            assertEquals(expected, result)
+            assertEquals(parts, deliveredParts.map(ConversationStreamUpdate::textDelta))
+            assertEquals(expected, manager.getHistory().last().content)
+        }
+
+    @Test
     fun `stream message persists thinking markup but removes it from provider history`() =
         runBlocking {
             val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
