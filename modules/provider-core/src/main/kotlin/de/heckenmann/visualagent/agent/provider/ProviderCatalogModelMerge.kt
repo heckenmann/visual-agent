@@ -6,6 +6,8 @@ internal fun List<ProviderModelConfig>.mergeWithExisting(existing: Map<String, P
         val configured = existing[discovered.id]
         configured?.copy(
             name = discovered.name,
+            contextLimit = discovered.contextLimit ?: configured.contextLimit,
+            outputLimit = discovered.outputLimit ?: configured.outputLimit,
             capabilities = discovered.capabilities.ifEmpty { configured.capabilities },
         ) ?: discovered
     }

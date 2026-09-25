@@ -25,10 +25,13 @@ internal fun modelSettingsContent(
     providerId: String,
     modelId: String,
     models: List<ProviderModel>,
+    contextLength: Int,
+    contextLimit: Int?,
     loadingModels: Boolean,
     modelDetails: String,
     favoriteModels: List<String>,
     onModelSelected: (String) -> Unit,
+    onContextLengthChanged: (Int) -> Unit,
     onRefreshModels: () -> Unit,
     onFavoriteChanged: (Boolean) -> Unit,
 ) {
@@ -40,6 +43,7 @@ internal fun modelSettingsContent(
         enabled = models.isNotEmpty(),
         information = "Selects the model used for future main-agent requests through the selected provider.",
     )
+    modelContextLengthSetting(contextLength, contextLimit, onContextLengthChanged)
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
         OutlinedButton(
             enabled = !loadingModels,

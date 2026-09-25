@@ -27,4 +27,21 @@ class CodexCliModelCatalogTest {
         assertEquals(setOf("vision"), models.first().capabilities)
         assertEquals(emptySet(), models.last().capabilities)
     }
+
+    @Test
+    fun `uses the reported context window and ignores the override maximum`() {
+        val catalog =
+            CodexCliModelCatalog(
+                mockk(),
+                mockk(),
+                ProviderWorkingDirectory { Path.of(".") },
+            )
+
+        val models =
+            catalog.parse(
+                """{"models":[{"slug":"codex-model","context_window":272000,"max_context_window":872000}]}""",
+            )
+
+        assertEquals(272000, models.single().contextLimit)
+    }
 }

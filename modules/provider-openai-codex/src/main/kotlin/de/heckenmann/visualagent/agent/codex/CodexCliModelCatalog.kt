@@ -6,6 +6,7 @@ import de.heckenmann.visualagent.agent.provider.ProviderWorkingDirectory
 import kotlinx.coroutines.reactor.mono
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -59,6 +60,7 @@ internal class CodexCliModelCatalog(
                     ProviderModelConfig(
                         id = id,
                         name = model["display_name"]?.jsonPrimitive?.content ?: id,
+                        contextLimit = model["context_window"]?.jsonPrimitive?.intOrNull?.takeIf { it > 0 },
                         capabilities =
                             setOfNotNull(
                                 "vision".takeIf {

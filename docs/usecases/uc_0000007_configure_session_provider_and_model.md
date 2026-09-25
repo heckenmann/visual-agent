@@ -19,7 +19,7 @@ Desktop user.
 2. The UI shows enabled provider connections and models selectable for the selected connection.
 3. Selecting a provider immediately refreshes its model list from that provider's endpoint. The stored active model is restored for the active provider; another provider uses its stored default model when it remains selectable.
 4. The user stages a provider, model, favorite, or profile change without affecting active agent requests. A manual refresh preserves the current draft model when it remains selectable.
-5. The user configures model instruction, context, startup history, parallel agents, tool timeout, queue behavior, and optional idle follow-up suggestions in the same local draft.
+5. The user configures model instruction, startup history, parallel agents, tool timeout, queue behavior, and optional idle follow-up suggestions in the same local draft. The context-length field appears beside the model and adopts that model's reported context limit whenever the model changes.
 6. The user selects **Save changes** to persist the staged catalog, conversation settings, and active provider/model together, or **Reset changes** to reload the persisted state from H2.
 7. The user may press **Esc** or select the title-bar close action to discard the local draft without saving.
 8. The user may select **Run onboarding again** to open the server-owned readiness wizard for the currently connected Visual Agent server.
@@ -59,6 +59,8 @@ Main-agent requests use the user-selected provider and model unless an agent-spe
 - Endpoint and credential configuration is available only through the separate provider-profile editor.
 - API-key entry is available in the provider-profile editor and is masked by default.
 - Model selection displays only catalog models that are selectable for the active provider.
+- Context length is shown beside the model, uses the model's reported context limit as its maximum, and adopts a newly selected model's limit whether it is higher or lower. If the provider reports no limit, the current value is retained and the field shows that the limit is unknown.
+- Codex CLI model discovery uses the catalog's `context_window` as the active limit; its `max_context_window` is only an override ceiling and must not be presented as the model's current window. Refreshing discovered metadata updates known limits without erasing stored values when a provider omits them.
 - The model section has a clear empty state when the active provider has no recognized selectable models.
 - Provider/model changes persist across restart.
 - Standard providers mirror settings to their legacy `AppConfig` fields.

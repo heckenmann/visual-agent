@@ -45,6 +45,9 @@ internal fun providerSettingsOverlay(
     var draft by remember { mutableStateOf(ProviderSettingsDraft()) }
     var persistedMemory by remember { mutableStateOf(initialMainAgentMemorySnapshot()) }
     var draftMemory by remember { mutableStateOf("") }
+    var selectedContextLimit by remember { mutableStateOf<Int?>(null) }
+    var modelSelectionRevision by remember { mutableStateOf(0) }
+    var adoptModelContextLimit by remember { mutableStateOf(false) }
     var loaded by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var refreshing by remember { mutableStateOf(false) }
@@ -56,6 +59,7 @@ internal fun providerSettingsOverlay(
     val enabledProviders = draft.providers.filter(ProviderProfile::enabled)
     val selectedProvider = draft.providers.firstOrNull { it.id == draft.providerId }
     val models = selectedProvider?.selectableModels().orEmpty()
+    val selectedModel = models.firstOrNull { it.id == draft.modelId }
     val providerConfigurationChanged =
         draft.providers != persisted.providers || draft.providerId != persisted.providerId || draft.modelId != persisted.modelId
     val canSave =
@@ -64,6 +68,19 @@ internal fun providerSettingsOverlay(
             draft.modelId.isNotBlank() &&
             (!providerConfigurationChanged || models.any { it.id == draft.modelId })
     val memoryFitsLimit = draftMemory.codePointCount(0, draftMemory.length) <= draft.conversationSettings.maxMainAgentMemoryChars
+
+    modelContextLimitEffect(
+        loaded = loaded,
+        providerId = draft.providerId,
+        modelId = draft.modelId,
+        catalogLimit = selectedModel?.contextLimit,
+        selectionRevision = modelSelectionRevision,
+        adoptLimit = adoptModelContextLimit,
+        providerPort = providerPort,
+        onLimitResolved = { selectedContextLimit = it },
+        onLimitApplied = { limit, adopt -> draft = draft.withModelContextLimit(limit, adopt) },
+        onSelectionResolved = { revision -> if (modelSelectionRevision == revision) adoptModelContextLimit = false },
+    )
 
     /** Loads the persisted catalog, optionally reporting that local edits were discarded. */
     fun loadPersistedDraft(discardingLocalEdits: Boolean) {
@@ -173,6 +190,16 @@ internal fun providerSettingsOverlay(
         }
     }
 
+    /** Stages a model selection and adopts its reported context capacity. */
+    fun selectModel(
+        providerId: String,
+        modelId: String,
+    ) {
+        adoptModelContextLimit = true
+        modelSelectionRevision++
+        draft = draft.copy(providerId = providerId, modelId = modelId)
+    }
+
     LaunchedEffect(settingsPort, providerPort) { loadPersistedDraft(discardingLocalEdits = false) }
     if (creatingProfile || editingProfile != null) {
         ProviderProfileEditor(
@@ -220,6 +247,8 @@ internal fun providerSettingsOverlay(
                     enabledProviders = enabledProviders,
                     selectedProvider = selectedProvider,
                     models = models,
+                    contextLength = draft.conversationSettings.contextLength,
+                    contextLimit = selectedContextLimit,
                     refreshing = refreshing,
                     onRunOnboarding = onRunOnboarding,
                     onProviderSelected = { providerId ->
@@ -235,7 +264,7 @@ internal fun providerSettingsOverlay(
                                 draft.providers.firstOrNull { it.id == providerId }?.defaultModel
                             }
                         val modelId = previous?.takeIf(String::isNotBlank) ?: nextModels.firstOrNull()?.id.orEmpty()
-                        draft = draft.copy(providerId = providerId, modelId = modelId)
+                        selectModel(providerId, modelId)
                         refreshModels(draft.providers.firstOrNull { it.id == providerId }, previous)
                     },
                     onAddProvider = { creatingProfile = true },
@@ -248,7 +277,10 @@ internal fun providerSettingsOverlay(
                             status = "Staged removal of ${profile.name}"
                         }
                     },
-                    onModelSelected = { modelId -> draft = draft.copy(modelId = modelId) },
+                    onModelSelected = { modelId -> selectModel(draft.providerId, modelId) },
+                    onContextLengthChanged = { value ->
+                        draft = draft.copy(conversationSettings = draft.conversationSettings.copy(contextLength = value))
+                    },
                     onRefreshModels = { refreshModels() },
                     onFavoriteChanged = { favorite ->
                         draft =
