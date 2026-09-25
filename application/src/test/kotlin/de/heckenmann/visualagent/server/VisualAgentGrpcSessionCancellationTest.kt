@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.protocol.ConversationMessage
 import de.heckenmann.visualagent.protocol.ConversationPort
 import de.heckenmann.visualagent.protocol.ConversationStreamRequest
 import de.heckenmann.visualagent.protocol.ConversationStreamResult
+import de.heckenmann.visualagent.protocol.ConversationStreamUpdate
 import de.heckenmann.visualagent.protocol.ProtocolVersion
 import de.heckenmann.visualagent.protocol.v1.CancelRequest
 import de.heckenmann.visualagent.protocol.v1.ChatRequest
@@ -39,7 +40,9 @@ class VisualAgentGrpcSessionCancellationTest {
                         releaseFirst.await()
                     }
                     "second" -> {
-                        thirdArg<(String) -> Unit>().invoke("second-result")
+                        thirdArg<(ConversationStreamUpdate) -> Unit>().invoke(
+                            ConversationStreamUpdate(REQUEST_TWO, "second-result"),
+                        )
                         secondCompleted.complete(Unit)
                     }
                 }

@@ -61,6 +61,16 @@ class ConversationMessageGroupTest {
         assertEquals("newest", group.stableKey)
     }
 
+    @Test
+    fun `assistant turns remain separate even when adjacent`() {
+        val groups =
+            groupConsecutiveConversationMessages(
+                listOf(persisted("turn two", "assistant"), persisted("turn one", "assistant")),
+            )
+
+        assertEquals(listOf(listOf("turn two"), listOf("turn one")), groups.map { group -> group.messages.map { it.message.content } })
+    }
+
     private fun persisted(
         content: String,
         role: String,

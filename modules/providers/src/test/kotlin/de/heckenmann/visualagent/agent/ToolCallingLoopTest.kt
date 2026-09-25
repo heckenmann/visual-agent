@@ -58,6 +58,35 @@ class ToolCallingLoopTest {
     }
 
     @Test
+    fun `run records assistant prose and binds tool calls to the same turn before execution`() {
+        val chatModel = mockk<ChatModel>()
+        val tool = CountingTool()
+        val correlation = CorrelatingCallbacks()
+        val prompt = Prompt(listOf(UserMessage("inspect the file")))
+        every { chatModel.call(any<Prompt>()) }
+            .returnsMany(
+                springToolResponse("unit", "I'll inspect the file first.", "count_tool", "{}", "call-1"),
+                springResponse("unit", "The file is valid."),
+            )
+
+        val response =
+            ToolCallingLoop()
+                .runReactive(
+                    chatModel,
+                    prompt,
+                    null,
+                    listOf(tool),
+                    correlation,
+                    requestMetadata = mapOf("requestId" to "request-1", "agent" to "main"),
+                ).block()!!
+
+        assertEquals("The file is valid.", response.message.content)
+        assertEquals("I'll inspect the file first.", correlation.recordedTurns.single().content)
+        assertEquals("assistant-turn-0", correlation.parentTurnIds.single())
+        assertEquals(1, tool.callCount)
+    }
+
+    @Test
     fun `run returns tool result directly when callback requests returnDirect`() {
         val chatModel = mockk<ChatModel>()
         val tool = DirectReturnTool()
@@ -151,66 +180,6 @@ class ToolCallingLoopTest {
         }
 
     @Test
-    fun `runStream separates visible initial prose from the final tool response`() =
-        runTest {
-            val chatModel = mockk<ChatModel>()
-            val tool = CountingTool()
-            val prompt = Prompt(listOf(UserMessage("stream and tool")))
-            every { chatModel.stream(any<Prompt>()) } returns
-                reactor.core.publisher.Flux.just(
-                    springToolResponse("unit", toolName = "count_tool", arguments = "{}", callId = "stream-1", content = "Searching now."),
-                )
-            every { chatModel.call(any<Prompt>()) } returns springResponse("unit", "Here is the result.")
-
-            val chunks = ToolCallingLoop().runStreamReactive(chatModel, prompt, null, listOf(tool)).collectList().awaitSingle()
-
-            assertEquals("Searching now.", chunks.first().message.content)
-            assertEquals("\n\nHere is the result.", chunks.last().message.content)
-            assertEquals(chunks.last().message.content, chunks.last().providerTurn?.content)
-        }
-
-    @Test
-    fun `runStream preserves existing whitespace and empty final responses`() =
-        runTest {
-            val chatModel = mockk<ChatModel>()
-            val tool = CountingTool()
-            val prompt = Prompt(listOf(UserMessage("stream and tool")))
-            every { chatModel.stream(any<Prompt>()) } returns
-                reactor.core.publisher.Flux.just(
-                    springToolResponse("unit", toolName = "count_tool", arguments = "{}", callId = "stream-1", content = "Searching now."),
-                )
-            every { chatModel.call(any<Prompt>()) }
-                .returnsMany(
-                    springResponse("unit", " Already separated."),
-                    springResponse("unit", ""),
-                )
-            val loop = ToolCallingLoop()
-
-            val whitespaceResult = loop.runStreamReactive(chatModel, prompt, null, listOf(tool)).collectList().awaitSingle()
-            val emptyResult = loop.runStreamReactive(chatModel, prompt, null, listOf(tool)).collectList().awaitSingle()
-
-            assertEquals(" Already separated.", whitespaceResult.last().message.content)
-            assertEquals("", emptyResult.last().message.content)
-        }
-
-    @Test
-    fun `runStream separates initial prose from a direct tool response`() =
-        runTest {
-            val chatModel = mockk<ChatModel>()
-            val directTool = DirectReturnTool()
-            val prompt = Prompt(listOf(UserMessage("stream and direct tool")))
-            every { chatModel.stream(any<Prompt>()) } returns
-                reactor.core.publisher.Flux.just(
-                    springToolResponse("unit", toolName = "direct_tool", arguments = "{}", callId = "stream-1", content = "Looking it up."),
-                )
-
-            val chunks = ToolCallingLoop().runStreamReactive(chatModel, prompt, null, listOf(directTool)).collectList().awaitSingle()
-
-            assertEquals("Looking it up.", chunks.first().message.content)
-            assertEquals("\n\ndirect result", chunks.last().message.content)
-        }
-
-    @Test
     fun `runStream emits only model chunks when no tool call is requested`() =
         runTest {
             val chatModel = mockk<ChatModel>()
@@ -281,11 +250,11 @@ class ToolCallingLoopTest {
 
     private fun springToolResponse(
         model: String,
+        content: String = "",
         toolName: String,
         arguments: String,
         callId: String,
         additionalCalls: List<AssistantMessage.ToolCall> = emptyList(),
-        content: String = "",
     ): SpringChatResponse {
         val toolCall = AssistantMessage.ToolCall(callId, "function", toolName, arguments)
         val assistantMessage =
@@ -331,6 +300,8 @@ class ToolCallingLoopTest {
 
     private class CorrelatingCallbacks : ProviderToolCallbacks {
         val rounds = mutableListOf<Pair<Int, List<ProviderToolCall>>>()
+        val recordedTurns = mutableListOf<ProviderTurnResponse>()
+        val parentTurnIds = mutableListOf<String?>()
 
         override fun functionCallbacks(
             enabledTools: Set<ToolId>,
@@ -340,9 +311,19 @@ class ToolCallingLoopTest {
         override fun bindToolCallRound(
             toolCalls: List<ProviderToolCall>,
             round: Int,
+            parentAssistantTurnId: String?,
         ): AutoCloseable {
             rounds += round to toolCalls
+            parentTurnIds += parentAssistantTurnId
             return AutoCloseable {}
+        }
+
+        override fun recordAssistantToolTurn(
+            turn: ProviderTurnResponse,
+            context: Map<String, Any>,
+        ): String {
+            recordedTurns += turn
+            return "assistant-turn-${turn.metadata.round ?: 0}"
         }
     }
 }

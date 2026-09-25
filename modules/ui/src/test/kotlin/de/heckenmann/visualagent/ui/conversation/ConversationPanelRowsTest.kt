@@ -122,6 +122,7 @@ class ConversationPanelRowsTest {
             )
         }
         composeTestRule.onNodeWithText("file:read").assertExists()
+        composeTestRule.onNodeWithText("Failed").assertExists()
     }
 
     @Test

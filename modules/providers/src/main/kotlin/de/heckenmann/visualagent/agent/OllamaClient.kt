@@ -70,6 +70,7 @@ class OllamaClient(
                             toolCallbacks(request, selectedModel),
                             toolRegistry,
                             request.contextWindow.withRequestedOutput(request.parameters.maxTokens),
+                            request.metadata,
                         )
                 } else {
                     Mono
@@ -126,6 +127,7 @@ class OllamaClient(
                             toolCallbacks,
                             toolRegistry,
                             request.contextWindow.withRequestedOutput(request.parameters.maxTokens),
+                            request.metadata,
                         )
                 }
             }.onErrorResume { error ->

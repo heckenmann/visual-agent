@@ -92,6 +92,7 @@ internal fun conversationSendAction(
                         onStreamingEntryIdChange = { conversationState.streamingEntryId = it },
                         onStreamCompletion = conversationState::completeStream,
                         streamingFlow = conversationState.streaming,
+                        streamingTurns = conversationState.streamingTurns,
                     )
                 }
             }
@@ -217,6 +218,7 @@ internal suspend fun executeSend(
     onStreamingEntryIdChange: (String?) -> Unit,
     onStreamCompletion: (List<Message>) -> Unit,
     streamingFlow: MutableStateFlow<String>,
+    streamingTurns: MutableStateFlow<List<Message>> = MutableStateFlow(emptyList()),
 ) {
     onInputChange("")
     onSendingChange(true)
@@ -233,6 +235,7 @@ internal suspend fun executeSend(
     onPendingUserEntryIdChange(userEntryId)
     onStreamingEntryIdChange(assistantEntryId)
     streamingFlow.value = ""
+    streamingTurns.value = emptyList()
     val streamRequestId =
         java.util.UUID
             .randomUUID()
@@ -241,11 +244,15 @@ internal suspend fun executeSend(
     onActiveTokenChange(token)
     inFlight.markStreamStart(streamRequestId)
     val streamedContent = StringBuilder()
+    val streamedTurns = linkedMapOf<String, StringBuilder>()
     val result =
         runCatching {
-            messageGateway.stream(ConversationStreamRequest(userEntryId, assistantEntryId, content), token) { chunk ->
-                streamedContent.append(chunk)
+            messageGateway.stream(ConversationStreamRequest(userEntryId, assistantEntryId, content), token) { update ->
+                streamedContent.append(update.textDelta)
                 streamingFlow.value = streamedContent.toString()
+                streamedTurns.getOrPut(update.assistantTurnId) { StringBuilder() }.append(update.textDelta)
+                streamingTurns.value =
+                    streamedTurns.map { (turnId, text) -> Message("assistant", text.toString(), id = turnId) }
             }
         }
     val completedHistory = messageGateway.currentHistory()

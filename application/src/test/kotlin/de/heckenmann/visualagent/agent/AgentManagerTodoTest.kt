@@ -120,6 +120,7 @@ class AgentManagerTodoTest {
                 manager.awaitTodoStatus(todo.id, TodoStatus.IN_PROGRESS) {
                     manager.startAutonomousProcessing(seed = false)
                 }
+                manager.awaitAgentStatus("1", AgentStatus.BUSY)
 
                 val busyCount = manager.getSubAgents().count { it.status == AgentStatus.BUSY }
                 assertEquals(1, busyCount)

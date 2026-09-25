@@ -68,7 +68,7 @@ internal fun ToolMessageRow(
 ) {
     val metadata = remember(message.metadata) { parseToolMetadata(message.metadata) }
     var expanded by remember { mutableStateOf(false) }
-    val error = metadata.status == "error"
+    val error = metadata.status in TOOL_FAILURE_STATUSES
     val tint =
         if (error) {
             MaterialTheme.colorScheme.error
@@ -115,6 +115,8 @@ internal fun ToolMessageRow(
                     text =
                         if (isInFlight) {
                             "running…"
+                        } else if (metadata.status in TOOL_FAILURE_STATUSES) {
+                            toolFailureLabel(metadata.status)
                         } else {
                             metadata.durationMillis?.let { "${it}ms" } ?: ""
                         },
@@ -156,6 +158,15 @@ internal fun ToolMessageRow(
         }
     }
 }
+
+private fun toolFailureLabel(status: String): String =
+    when (status) {
+        "timeout" -> "Timed out"
+        "cancelled" -> "Cancelled"
+        else -> "Failed"
+    }
+
+private val TOOL_FAILURE_STATUSES = setOf("error", "timeout", "cancelled")
 
 internal data class ParsedToolMetadata(
     val toolId: String,

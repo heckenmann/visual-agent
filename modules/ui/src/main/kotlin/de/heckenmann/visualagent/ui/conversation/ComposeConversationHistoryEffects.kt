@@ -64,7 +64,7 @@ private suspend fun loadOlderConversationPage(
     try {
         val page = gateway.older(request.offset)
         val added = state.applyOlder(request, page)
-        return added > 0
+        return added > 0 || state.hasMoreHistory
     } finally {
         state.finishOlderRequest(request)
     }

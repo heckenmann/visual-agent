@@ -3,6 +3,7 @@ package de.heckenmann.visualagent.server
 import de.heckenmann.visualagent.protocol.CancellationTokenImpl
 import de.heckenmann.visualagent.protocol.ConversationPort
 import de.heckenmann.visualagent.protocol.ConversationStreamRequest
+import de.heckenmann.visualagent.protocol.ConversationStreamUpdate
 import de.heckenmann.visualagent.protocol.ProtocolVersion
 import de.heckenmann.visualagent.protocol.v1.CancelRequest
 import de.heckenmann.visualagent.protocol.v1.ChatCompleted
@@ -114,7 +115,7 @@ class VisualAgentGrpcSessionService(
             activeRequest = state
             state.subscription =
                 mono(Dispatchers.IO) {
-                    conversationPort.stream(request, state.token) { chunk -> sendDelta(state.requestId, chunk) }
+                    conversationPort.stream(request, state.token) { update -> sendDelta(state.requestId, update) }
                 }.doOnCancel(state.token::cancel)
                     .subscribe(
                         {
@@ -166,7 +167,7 @@ class VisualAgentGrpcSessionService(
 
         private fun sendDelta(
             requestId: String,
-            text: String,
+            update: ConversationStreamUpdate,
         ) {
             send(
                 ServerFrame
@@ -174,8 +175,13 @@ class VisualAgentGrpcSessionService(
                     .setSessionId(sessionId)
                     .setRequestId(requestId)
                     .setServerRevision(revision)
-                    .setChatDelta(ChatDelta.newBuilder().setText(text).build())
-                    .build(),
+                    .setChatDelta(
+                        ChatDelta
+                            .newBuilder()
+                            .setText(update.textDelta)
+                            .setAssistantTurnId(update.assistantTurnId)
+                            .build(),
+                    ).build(),
             )
         }
 

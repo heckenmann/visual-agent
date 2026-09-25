@@ -66,7 +66,8 @@ The UI receives only protocol ports; it never receives Spring beans.
    `Enter` or clicks the send button.
 4. `ConversationPanel` calls the protocol-owned conversation port, whose
    Spring adapter delegates to the application service and maps application
-   models to UI DTOs. It updates a temporary assistant turn in place as chunks arrive. The
+   models to UI DTOs. Every stream delta carries its assistant-turn ID, so
+   chunks from separate provider rounds update separate temporary turns. The
    in-flight activity indicator in the header pulses for the duration
    of the request.
 5. `AgentManager` builds a `ChatRequestContext` with:
@@ -153,9 +154,14 @@ must fail explicitly rather than being hidden by a model-specific workaround.
    in-flight activity indicator increments while a tool is in flight.
 8. Tool events are persisted into conversation history as compact
    "Tool `<id>` · <status> · <first line>" entries with structured
-   metadata (tool id, function name, status, duration, input, result).
+   metadata (tool id, function name, status, duration, input, result). Every
+   tool row stores a foreign-key parent to the exact assistant turn that
+   declared it, plus provider declaration order; history never reconstructs
+   these relationships from row adjacency or metadata JSON.
 9. UI reflects streaming text, tool activity, in-flight indicator, and
-   stored history.
+   stored history. Intermediate assistant prose, tool rounds, and final text
+   remain separate ordered turns, with their tool rows rendered under the
+   corresponding parent.
 
 ## In-Flight Activity Indicator
 

@@ -1,6 +1,8 @@
 package de.heckenmann.visualagent.knowledge
 
 import de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+import org.flywaydb.core.Flyway
+import org.flywaydb.core.api.MigrationVersion
 import org.h2.jdbcx.JdbcDataSource
 import org.junit.jupiter.api.Test
 import org.springframework.core.io.ClassPathResource
@@ -32,11 +34,11 @@ class ReactiveKnowledgePersistenceConfigTest {
         assertEquals(1, tableCount)
         val migrationCount =
             db.databaseClient
-                .sql("SELECT COUNT(*) AS count FROM \"flyway_schema_history\" WHERE \"version\" IN ('1', '2') AND \"success\" = TRUE")
+                .sql("SELECT COUNT(*) AS count FROM \"flyway_schema_history\" WHERE \"version\" IN ('1', '2', '3') AND \"success\" = TRUE")
                 .map { row, _ -> (row.get("count") as Number).toInt() }
                 .one()
                 .block()
-        assertEquals(2, migrationCount)
+        assertEquals(3, migrationCount)
         val tables =
             db.databaseClient
                 .sql("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'PUBLIC'")
@@ -64,6 +66,39 @@ class ReactiveKnowledgePersistenceConfigTest {
 
         assertEquals(8, db.conversationStore.getConversationMessage(newId)?.timelineSequence)
         db.close()
+    }
+
+    @Test
+    fun `V3 migration preserves legacy conversation rows as ungrouped history`() {
+        val databasePath = Files.createTempDirectory("visual-agent-v2-upgrade").resolve("database")
+        val legacyIds = createV2DatabaseWithConversationHistory(databasePath)
+
+        KnowledgeDbTestFactory.create(databasePath.toString()).use { db ->
+            val history = db.conversationStore.getConversationMessages("main", 20).associateBy { it.id }
+
+            assertEquals(3, history.size)
+            assertEquals("legacy user prompt", history.getValue(legacyIds.userId).content)
+            assertEquals("What did the old assistant say?", history.getValue(legacyIds.assistantId).content)
+            assertEquals("legacy tool result", history.getValue(legacyIds.toolId).content)
+            assertEquals("{\"type\":\"tool_call\",\"tool\":\"todos\"}", history.getValue(legacyIds.toolId).metadata)
+            assertEquals(listOf(1L, 2L, 3L), history.values.sortedBy { it.timelineSequence }.map { it.timelineSequence })
+            assertTrue(history.values.all { it.parentAssistantTurnId == null })
+            assertTrue(history.values.all { it.turnOrder == null })
+            assertTrue(history.values.none { it.assistantToolTurn })
+            assertTrue(history.values.all { it.conversationRequestId == null })
+
+            val successfulVersions =
+                db.databaseClient
+                    .sql(
+                        "SELECT \"version\" FROM \"flyway_schema_history\" " +
+                            "WHERE \"success\" = TRUE AND \"version\" IS NOT NULL ORDER BY \"installed_rank\"",
+                    ).map { row, _ -> row.get("version", String::class.java) ?: error("Missing migration version") }
+                    .all()
+                    .collectList()
+                    .block()
+                    .orEmpty()
+            assertEquals(listOf("1", "2", "3"), successfulVersions)
+        }
     }
 
     @Test
@@ -130,6 +165,79 @@ class ReactiveKnowledgePersistenceConfigTest {
                 }
         }
     }
+
+    private fun createV2DatabaseWithConversationHistory(databasePath: Path): LegacyConversationIds {
+        val dataSource =
+            JdbcDataSource().apply {
+                setURL("jdbc:h2:file:$databasePath;DB_CLOSE_ON_EXIT=FALSE")
+                user = "sa"
+                password = ""
+            }
+        Flyway
+            .configure()
+            .dataSource(dataSource)
+            .locations("classpath:db/migration-h2")
+            .target(MigrationVersion.fromVersion("2"))
+            .load()
+            .migrate()
+
+        val ids =
+            LegacyConversationIds(
+                userId = "11111111-1111-4111-8111-111111111111",
+                assistantId = "22222222-2222-4222-8222-222222222222",
+                toolId = "33333333-3333-4333-8333-333333333333",
+            )
+        dataSource.connection.use { connection ->
+            connection
+                .prepareStatement(
+                    """
+                    INSERT INTO conversation_history
+                        (id, session_id, role, content, metadata, created_at, timeline_sequence, context_policy)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """.trimIndent(),
+                ).use { statement ->
+                    listOf(
+                        LegacyConversationRow(ids.userId, "user", "legacy user prompt", null, 1, "DIALOGUE"),
+                        LegacyConversationRow(ids.assistantId, "assistant", "What did the old assistant say?", null, 2, "DIALOGUE"),
+                        LegacyConversationRow(
+                            ids.toolId,
+                            "tool",
+                            "legacy tool result",
+                            "{\"type\":\"tool_call\",\"tool\":\"todos\"}",
+                            3,
+                            "AUDIT_ONLY",
+                        ),
+                    ).forEach { row ->
+                        statement.setString(1, row.id)
+                        statement.setString(2, "main")
+                        statement.setString(3, row.role)
+                        statement.setString(4, row.content)
+                        statement.setString(5, row.metadata)
+                        statement.setString(6, "2026-01-01T00:00:00Z")
+                        statement.setLong(7, row.timelineSequence)
+                        statement.setString(8, row.contextPolicy)
+                        statement.addBatch()
+                    }
+                    statement.executeBatch()
+                }
+        }
+        return ids
+    }
+
+    private data class LegacyConversationIds(
+        val userId: String,
+        val assistantId: String,
+        val toolId: String,
+    )
+
+    private data class LegacyConversationRow(
+        val id: String,
+        val role: String,
+        val content: String,
+        val metadata: String?,
+        val timelineSequence: Long,
+        val contextPolicy: String,
+    )
 
     private fun createPreferenceOnlyLegacySchema(databasePath: Path) {
         val dataSource =

@@ -18,6 +18,9 @@ data class ToolActivity(
     val requestId: String? = null,
     val phase: ToolActivityPhase,
     val success: Boolean = true,
+    val providerToolCallId: String? = null,
+    val parentAssistantTurnId: String? = null,
+    val sequence: Int? = null,
 )
 
 /** Tool execution phase. */

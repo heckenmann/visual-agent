@@ -11,6 +11,10 @@ internal data class ConversationIdentity(
     val content: String,
     val metadata: String?,
     val contextPolicy: ConversationContextPolicy,
+    val parentAssistantTurnId: String?,
+    val turnOrder: Int?,
+    val assistantToolTurn: Boolean,
+    val conversationRequestId: String?,
 )
 
 /** Maps the identity columns used by idempotent conversation inserts. */
@@ -23,6 +27,10 @@ internal fun Row.toConversationIdentity(): ConversationIdentity =
         contextPolicy =
             runCatching { ConversationContextPolicy.valueOf(R2dbcPersistenceSupport.requiredText(this, "context_policy")) }
                 .getOrDefault(ConversationContextPolicy.SUMMARY_SOURCE),
+        parentAssistantTurnId = R2dbcPersistenceSupport.text(this, "parent_assistant_turn_id"),
+        turnOrder = R2dbcPersistenceSupport.integer(this, "turn_order"),
+        assistantToolTurn = R2dbcPersistenceSupport.requiredText(this, "assistant_tool_turn").toBoolean(),
+        conversationRequestId = R2dbcPersistenceSupport.text(this, "conversation_request_id"),
     )
 
 /** Maps a conversation row into the persistence domain record. */
@@ -37,4 +45,8 @@ internal fun Row.toConversationRecord(): ConversationRecord =
         contextPolicy =
             runCatching { ConversationContextPolicy.valueOf(R2dbcPersistenceSupport.requiredText(this, "context_policy")) }
                 .getOrDefault(ConversationContextPolicy.SUMMARY_SOURCE),
+        parentAssistantTurnId = R2dbcPersistenceSupport.text(this, "parent_assistant_turn_id"),
+        turnOrder = R2dbcPersistenceSupport.integer(this, "turn_order"),
+        assistantToolTurn = R2dbcPersistenceSupport.requiredText(this, "assistant_tool_turn").toBoolean(),
+        conversationRequestId = R2dbcPersistenceSupport.text(this, "conversation_request_id"),
     )
