@@ -247,14 +247,16 @@ class AutonomousCoordinator
 
         private suspend fun drainWork() {
             if (executionControl?.isGloballyPaused() == true) return
-            requestedTodoIds.toList().forEach { requestedTodoId ->
-                val claimed = claimAndProcessOneTodo(requestedTodoId)
-                val current = todoStore.listTodos().firstOrNull { it.id == requestedTodoId }
-                if (claimed || current?.status != TodoStatus.PENDING) {
-                    requestedTodoIds.remove(requestedTodoId)
-                    requestedTodoIdSet.remove(requestedTodoId)
+            candidateSelector
+                .orderRequested(requestedTodoIds.toList())
+                .forEach { requestedTodoId ->
+                    val claimed = claimAndProcessOneTodo(requestedTodoId)
+                    val current = todoStore.listTodos().firstOrNull { it.id == requestedTodoId }
+                    if (claimed || current?.status != TodoStatus.PENDING) {
+                        requestedTodoIds.remove(requestedTodoId)
+                        requestedTodoIdSet.remove(requestedTodoId)
+                    }
                 }
-            }
             if (autonomousProcessingEnabled.get()) {
                 while (claimAndProcessOneTodo()) {
                     // Continue claiming while capacity is available.

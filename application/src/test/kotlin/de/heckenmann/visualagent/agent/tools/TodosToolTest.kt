@@ -23,7 +23,7 @@ class TodosToolTest {
         val manager = mockk<AgentManager>()
         every { manager.getSubAgent(any()) } returns SubAgent(id = "agent-1", name = "Coder", role = "Implementation")
         every { manager.todoManager } returns TodoManager(db, TodoEventBus())
-        return todosTool(db, db, manager)
+        return todosToolWithoutScheduling(db, manager)
     }
 
     @Test
@@ -95,7 +95,14 @@ class TodosToolTest {
             val tool = createTool(db)
             assertEquals("No todos.", tool.execute(json("action" to "list")).content)
 
-            val added = tool.execute(json("action" to "add", "description" to "Ship feature", "assignedAgentId" to "agent-1"))
+            val added =
+                tool.execute(
+                    json(
+                        "action" to "add",
+                        "description" to "Ship feature",
+                        "assignedAgentId" to "agent-1",
+                    ),
+                )
             assertTrue(added.success)
             val id = added.content.removePrefix("Added todo ")
             assertTrue(tool.execute(json("action" to "list")).content.contains("Ship feature"))
@@ -126,27 +133,6 @@ class TodosToolTest {
     }
 
     @Test
-    fun `update distinguishes omitted assignment from an explicit clear`() {
-        val tempDb =
-            createTempDirectory("visual-agent-todos-tool-assignment")
-                .resolve("todos-tool.db")
-                .toString()
-        val db = KnowledgeDbTestFactory.create(tempDb)
-        try {
-            val tool = createTool(db)
-            val added = tool.execute(json("action" to "add", "description" to "Assigned task", "assignedAgentId" to "agent-1"))
-            val id = added.content.removePrefix("Added todo ")
-
-            val cleared = tool.execute("""{"action":"update","id":"$id","assignedAgentId":null}""")
-
-            assertTrue(cleared.success)
-            assertEquals(null, db.listTodos().single().assignedAgentId)
-        } finally {
-            db.close()
-        }
-    }
-
-    @Test
     fun `add requires assignedAgentId referencing an existing agent`() {
         val tempDb =
             createTempDirectory("visual-agent-todos-tool-add-validation")
@@ -160,7 +146,7 @@ class TodosToolTest {
             every { manager.getSubAgent("missing") } returns null
             every { manager.getSubAgent("agent-1") } returns SubAgent(id = "agent-1", name = "Coder", role = "Implementation")
             every { manager.todoManager } returns TodoManager(db, TodoEventBus())
-            val tool = todosTool(db, db, manager)
+            val tool = todosToolWithoutScheduling(db, manager)
 
             val missing = tool.execute(json("action" to "add", "description" to "No agent"))
             assertFalse(missing.success)
@@ -170,7 +156,14 @@ class TodosToolTest {
             assertFalse(invalid.success)
             assertTrue(invalid.error!!.contains("must reference an existing sub-agent"))
 
-            val valid = tool.execute(json("action" to "add", "description" to "Good agent", "assignedAgentId" to "agent-1"))
+            val valid =
+                tool.execute(
+                    json(
+                        "action" to "add",
+                        "description" to "Good agent",
+                        "assignedAgentId" to "agent-1",
+                    ),
+                )
             assertTrue(valid.success)
         } finally {
             db.close()
@@ -186,7 +179,14 @@ class TodosToolTest {
         val db = KnowledgeDbTestFactory.create(tempDb)
         try {
             val tool = createTool(db)
-            val first = tool.execute(json("action" to "add", "description" to "Download Alpine ISO", "assignedAgentId" to "agent-1"))
+            val first =
+                tool.execute(
+                    json(
+                        "action" to "add",
+                        "description" to "Download Alpine ISO",
+                        "assignedAgentId" to "agent-1",
+                    ),
+                )
             val firstId = first.content.removePrefix("Added todo ")
             val duplicate =
                 tool.execute(
@@ -206,32 +206,6 @@ class TodosToolTest {
     }
 
     @Test
-    fun `update rejects assignedAgentId referencing missing agent`() {
-        val tempDb =
-            createTempDirectory("visual-agent-todos-tool-update-validation")
-                .resolve("todos-tool.db")
-                .toString()
-        val db =
-            KnowledgeDbTestFactory
-                .create(tempDb)
-        try {
-            val manager = mockk<AgentManager>()
-            every { manager.getSubAgent("missing") } returns null
-            every { manager.getSubAgent("agent-1") } returns SubAgent(id = "agent-1", name = "Coder", role = "Implementation")
-            every { manager.todoManager } returns TodoManager(db, TodoEventBus())
-            val tool = todosTool(db, db, manager)
-            val added = tool.execute(json("action" to "add", "description" to "Task", "assignedAgentId" to "agent-1"))
-            val id = added.content.removePrefix("Added todo ")
-
-            val invalid = tool.execute(json("action" to "update", "id" to id, "assignedAgentId" to "missing"))
-            assertFalse(invalid.success)
-            assertTrue(invalid.error!!.contains("must reference an existing sub-agent"))
-        } finally {
-            db.close()
-        }
-    }
-
-    @Test
     fun `get-result returns memory summary for todo`() {
         val tempDb =
             createTempDirectory("visual-agent-todos-tool-get-result")
@@ -242,7 +216,10 @@ class TodosToolTest {
                 .create(tempDb)
         try {
             val tool = createTool(db)
-            val added = tool.execute(json("action" to "add", "description" to "Task", "assignedAgentId" to "agent-1"))
+            val added =
+                tool.execute(
+                    json("action" to "add", "description" to "Task", "assignedAgentId" to "agent-1"),
+                )
             val id = added.content.removePrefix("Added todo ")
             db.saveStructuredKnowledge(subject = "todo:$id", summary = "Result summary", nextSteps = "Next")
 

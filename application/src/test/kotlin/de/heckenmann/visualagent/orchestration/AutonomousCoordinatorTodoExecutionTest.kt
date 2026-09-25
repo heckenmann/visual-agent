@@ -73,6 +73,28 @@ class AutonomousCoordinatorTodoExecutionTest {
         }
 
     @Test
+    fun `queued todos are claimed in persisted position order`() =
+        runBlocking {
+            val fixture = buildFixture(workerResponseGate = CompletableDeferred())
+            fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))
+            val first = fixture.todoManager.add("First task", "agent-1")
+            val second = fixture.todoManager.add("Second task", "agent-1")
+            fixture.executionControl.pauseAll()
+
+            try {
+                assertTrue(fixture.coordinator.startTodo(second.id))
+                assertTrue(fixture.coordinator.startTodo(first.id))
+                fixture.executionControl.resumeAll()
+                fixture.awaitWorkerStart()
+
+                assertEquals(TodoStatus.IN_PROGRESS, fixture.todoManager.getById(first.id)?.status)
+                assertEquals(TodoStatus.PENDING, fixture.todoManager.getById(second.id)?.status)
+            } finally {
+                fixture.cancel()
+            }
+        }
+
+    @Test
     fun `blocked requested todo does not prevent another requested todo from starting`() =
         runBlocking {
             val fixture = buildFixture(workerResponseGate = CompletableDeferred())

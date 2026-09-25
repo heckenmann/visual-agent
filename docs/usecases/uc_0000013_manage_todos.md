@@ -37,7 +37,7 @@ Todos stay synchronized between UI, database, and agent context.
 
 ## Tool Calls
 
-- `todos`: manage persisted todo state when the action is initiated by a model call, including the `reorder` action.
+- `todos`: manage persisted todo state when the action is initiated by a model call, including the `reorder` action. `add` requires `description` and `assignedAgentId`; a newly created todo is queued for execution. Reusing an existing todo never queues it again.
 
 ## Code Entry Points
 
@@ -56,6 +56,7 @@ Todos stay synchronized between UI, database, and agent context.
 - The panel provides start-all and stop-all controls for unfinished todos.
 - Each todo row provides start and stop controls with status-appropriate enablement.
 - An in-progress todo row expands with an animated one-line LLM response preview. Supported streaming models move newer text in from the right and older text out to the left; providers without streaming support use the complete-response fallback.
+- Each streamed response delta is queued and applied in order by one UI collector, so partial text appears before the provider finishes instead of being deferred behind a separate UI task per delta.
 - The animated working indicator is vertically centered with the one-line streaming response.
 - The streaming response preview is visible only while the todo is `IN_PROGRESS` and disappears when execution reaches a terminal status.
 - The one-line preview measures the available text width, keeps the newest response suffix visible at the right edge, and recalculates that suffix when the user resizes the Todo panel.
@@ -66,6 +67,7 @@ Todos stay synchronized between UI, database, and agent context.
 - Terminal review is triggered only after a real non-terminal to terminal transition;
   later metadata edits do not retrigger it.
 - The first pending todo is visually highlighted as the next task.
+- Tool-created todos are queued automatically and claimed in persisted position order when their assigned agent and a parallel execution slot are available.
 - Status is edited in the todo editor through a bounded dropdown choice, not free text.
 - The `todos` tool supports a `reorder` action to change which task is next.
 - Sub-agents can read todo state and stored results, but only the main agent and orchestrator can change todo lifecycle state.
