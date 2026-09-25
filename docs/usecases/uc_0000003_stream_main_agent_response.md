@@ -19,7 +19,7 @@ Desktop user.
 2. The application starts a streaming provider request.
 3. The server builds the provider request from the bounded main-agent context projection rather than the unbounded audit timeline.
 4. While waiting for the first visible assistant chunk, the chat panel displays a `Thinking` indicator beside the newest pending conversation content.
-5. Response chunks are emitted with their provider assistant-turn identity. Separate tool-calling rounds update separate temporary assistant messages instead of being concatenated.
+5. Response chunks are emitted with their provider assistant-turn identity. Separate tool-calling rounds update separate temporary assistant messages instead of being concatenated. Non-empty whitespace-only chunks, including newline-only chunks, are preserved exactly; a Markdown section boundary is added only when distinct visible sections lack existing whitespace separation.
 6. While the user's scroll position is at the bottom of the message list, each new chunk scrolls the conversation to the newest content.
 7. If the user has scrolled up to read older messages, new chunks do not disturb the current view; instead, a scroll-to-bottom button appears.
 8. Each completed assistant turn is persisted with the same stable UUID as its
@@ -48,6 +48,8 @@ The user sees progress during longer responses, with intermediate assistant pros
 ## Acceptance Criteria
 
 - Partial chunks are visible before completion.
+- Whitespace-only chunks that carry Markdown line breaks reach both the streaming UI and the persisted assistant response unchanged.
+- Distinct visible provider sections render as separate Markdown blocks, while arbitrary chunks within one section remain unchanged.
 - Streaming requests use the same bounded context projection as non-streaming requests.
 - A visible waiting indicator is shown before the first assistant chunk, including for the first request in an empty conversation.
 - The persisted conversation contains every complete assistant turn, not partial duplicates.

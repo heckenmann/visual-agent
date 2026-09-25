@@ -23,7 +23,7 @@ LLM provider.
    events update one row whose explicit parent ID points to that assistant
    turn and whose order matches the provider declaration.
 6. The registry normalizes the result into a JSON object with `toolId`, `success`, `data`, and `error` fields before returning it to the provider flow.
-7. The provider loop sends the tool result back to the model and requests the final user-facing answer.
+7. The provider loop sends the tool result back to the model and requests the final user-facing answer. During streaming, visible initial assistant text and a non-empty final answer are separated by a Markdown blank line unless provider-supplied whitespace already separates them.
 
 ## Result
 
@@ -54,3 +54,4 @@ Tool behavior is centralized and auditable. Each tool call is shown beneath the 
 - JSON response text that resembles a tool call is never executed; only a provider-native structured tool call can reach the registry.
 - Timeouts, invalid timeout arguments, and cancellation return sanitized actionable result categories.
 - Provider callbacks never receive raw text, stack traces, or non-JSON tool results.
+- Streaming preserves token chunks within each assistant section and inserts a boundary only between visible initial text and a separate final tool-informed response.

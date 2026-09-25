@@ -1,7 +1,10 @@
 package de.heckenmann.visualagent.agent.codex
 
+import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ProviderFinishReason
+import de.heckenmann.visualagent.agent.provider.ProviderAdapter
+import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import io.mockk.mockk
 import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.runBlocking
@@ -11,6 +14,8 @@ import org.springframework.ai.chat.metadata.ChatGenerationMetadata
 import org.springframework.ai.chat.metadata.ChatResponseMetadata
 import org.springframework.ai.chat.model.ChatResponse
 import org.springframework.ai.chat.model.Generation
+import java.nio.file.Path
+import kotlin.io.path.createTempDirectory
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
@@ -39,6 +44,62 @@ class CodexCliProviderTest {
         assertEquals("hello", message.content)
         assertEquals("""{"codexItemId":"item-7"}""", message.metadata)
     }
+
+    @Test
+    fun `stream provider mapping preserves whitespace-only delta content`() {
+        val response =
+            ChatResponse(
+                listOf(Generation(AssistantMessage("\n\n"), ChatGenerationMetadata.builder().build())),
+                ChatResponseMetadata.builder().model("gpt-test").build(),
+            )
+
+        assertEquals("\n\n", response.toCodexProviderMessage(normalizeContent = false).content)
+    }
+
+    @Test
+    fun `Codex provider stream preserves newline-only deltas from the app server`() =
+        runBlocking {
+            val directory = createTempDirectory("codex-provider-stream-whitespace-test-")
+            val fixture = CodexAppServerChatModelTest()
+            val parts = listOf("Before", "\n", "After")
+            val executable = fixture.fakeServer(directory, deltaParts = parts)
+            val locator =
+                CodexCliLocator(
+                    environment =
+                        object : CodexCliEnvironment {
+                            override fun pathDirectories(): List<Path> = emptyList()
+
+                            override fun homeDirectory(): Path = directory
+
+                            override fun isWindows(): Boolean = false
+                        },
+                    versionProbe =
+                        object : CodexCliVersionProbe {
+                            override suspend fun probe(executable: Path): String = "test"
+                        },
+                )
+            val provider = CodexCliProvider(locator, mockk(relaxed = true), mockk(relaxed = true))
+            val profile =
+                ProviderProfile(
+                    id = "codex-test",
+                    name = "Codex test",
+                    adapter = ProviderAdapter.CODEX_CLI,
+                    baseUrl = "",
+                    defaultModel = "gpt-test",
+                    options = mapOf(CodexCliProvider.OPTION_EXECUTABLE_PATH to executable.toString()),
+                )
+            try {
+                val responses =
+                    provider
+                        .streamReactive(ChatRequestContext(listOf(Message("user", "hello")), providerProfile = profile))
+                        .collectList()
+                        .awaitSingle()
+
+                assertEquals(parts, responses.dropLast(1).map { it.message.content })
+            } finally {
+                fixture.deleteRecursively(directory)
+            }
+        }
 
     @Test
     fun `provider boundary maps Codex reasoning and completion fields`() {
