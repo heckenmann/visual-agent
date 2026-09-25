@@ -28,6 +28,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
@@ -177,19 +178,22 @@ internal fun TransientConversationMessageGroupRow(
 @Composable
 private fun ConversationAuthorColumn(role: String) {
     val isUser = role == "user"
-    val accent = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
-    val onAccent = if (isUser) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onTertiary
+    val avatarBackground = MaterialTheme.colorScheme.surfaceContainerHighest
+    val avatarContent = MaterialTheme.colorScheme.onSurface
     val label = if (isUser) "You" else "Assistant"
     Column(
         modifier = Modifier.width(ConversationAuthorColumnWidth),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Box(modifier = Modifier.size(24.dp).background(accent, CircleShape), contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier.size(24.dp).background(avatarBackground, CircleShape).testTag("conversation-author-avatar"),
+            contentAlignment = Alignment.Center,
+        ) {
             Icon(
                 imageVector = if (isUser) Icons.Filled.Person else Icons.Filled.SmartToy,
                 contentDescription = "$label avatar",
-                tint = onAccent,
+                tint = avatarContent,
                 modifier = Modifier.size(16.dp),
             )
         }

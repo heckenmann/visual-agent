@@ -26,7 +26,9 @@ collapsed by default.
    opaque identity from its pending or streaming state through persistence, so
    completing an answer updates the existing row without flicker or a second
    enter animation. The assistant answer appears as a primary row: borderless
-   background tint, avatar icon, role label "Assistant", and Markdown content.
+   background tint, a monochrome avatar icon, role label "Assistant", and
+   Markdown content. User and assistant avatars share neutral theme colors and
+   are distinguished by their person and agent icons.
 3. A tool call fires during the turn. The tool appears as a compact tertiary
    chip showing the tool id and duration, collapsed by default, nested under
    the exact assistant turn that declared it.
