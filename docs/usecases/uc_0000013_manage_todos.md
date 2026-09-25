@@ -20,7 +20,7 @@ Desktop user.
 3. The user sees all todos in their persisted order; the panel does not filter them by status.
 4. The user drags a todo by its drag handle to reorder the list. The first pending todo is the next one to process.
 5. The user starts all unfinished todos or stops all pending and in-progress todos with the panel actions.
-6. The user starts or stops an individual todo from its row. Starting a cancelled todo resets it to `PENDING`; stopping a todo changes it to `CANCELLED` and cancels its worker cooperatively.
+6. The user starts or stops an individual todo from its row. Starting a cancelled todo resets it to `PENDING`; stopping a todo changes it to `CANCELLED`, cancels its worker cooperatively, and immediately releases its assigned agent.
 7. The user changes status, assignment, and description from the edit dialog. The
    complete edit is submitted as one atomic todo mutation.
 8. For delete actions, the UI shows an internal confirmation modal before removing the todo.
@@ -60,6 +60,7 @@ Todos stay synchronized between UI, database, and agent context.
 - The streaming response preview is visible only while the todo is `IN_PROGRESS` and disappears when execution reaches a terminal status.
 - The one-line preview measures the available text width, keeps the newest response suffix visible at the right edge, and recalculates that suffix when the user resizes the Todo panel.
 - Start and stop actions never change or restart todos that are already `COMPLETED`.
+- Stopping a todo releases its agent assignment as part of the stop operation; late cleanup from the cancelled processor cannot clear a newer todo assignment.
 - Todos can be reordered by dragging the row drag handle.
 - A combined edit emits one persisted state transition and one todo change event.
 - Terminal review is triggered only after a real non-terminal to terminal transition;

@@ -222,7 +222,9 @@ class AutonomousCoordinatorTodoExecutionTest {
                 assertTrue(fixture.coordinator.stopTodo(todo.id))
 
                 assertEquals(0, fixture.scheduler.snapshot().queued)
+                assertEquals(AgentStatus.IDLE, fixture.subAgents["agent-1"]?.status)
                 assertEquals(null, fixture.subAgents["agent-1"]?.currentTodoId)
+                assertEquals(null, fixture.subAgents["agent-1"]?.currentTask)
             } finally {
                 releaseBlocker.complete(Unit)
                 blocker.await()
