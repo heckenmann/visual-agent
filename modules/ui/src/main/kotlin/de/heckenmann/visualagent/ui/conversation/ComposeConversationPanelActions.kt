@@ -262,16 +262,19 @@ internal suspend fun executeSend(
                 }
             }
         }
-    val completedHistory = messageGateway.currentHistory()
-    onStreamCompletion(completedHistory)
-    result
-        .onSuccess {
-            onStatusChange("Ready")
-        }.onFailure {
-            onStatusChange(it.toUiErrorMessage())
-        }.also {
-            inFlight.markStreamEnd(streamRequestId)
-            onSendingChange(false)
-            onActiveTokenChange(null)
-        }
+    try {
+        val completedHistory = messageGateway.currentHistory()
+        onStreamCompletion(completedHistory)
+        result
+            .onSuccess {
+                onStatusChange("Ready")
+            }.onFailure {
+                onStatusChange(it.toUiErrorMessage())
+            }
+    } finally {
+        contextReducedFlow.value = false
+        inFlight.markStreamEnd(streamRequestId)
+        onSendingChange(false)
+        onActiveTokenChange(null)
+    }
 }
