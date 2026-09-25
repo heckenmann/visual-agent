@@ -49,6 +49,36 @@ class ToolHelpToolTest {
         assertFalse(denied.success)
     }
 
+    @Test
+    fun `delegated failures remain failures`() {
+        val registry = ToolRegistry(listOf(FailingTool("workspace:file")), ToolEventBus())
+        val help = ToolHelpTool { registry }
+
+        val result =
+            help.execute(
+                """{"action":"call","name":"workspace_file","arguments":{"value":"bad"}}""",
+                mapOf("enabledTools" to setOf("workspace:file")),
+            )
+
+        assertFalse(result.success)
+        assertTrue(result.error.orEmpty().contains("rejected"))
+    }
+
+    @Test
+    fun `delegated async calls report that execution was scheduled`() {
+        val registry = ToolRegistry(listOf(FakeTool("workspace:file")), ToolEventBus())
+        val help = ToolHelpTool { registry }
+
+        val result =
+            help.execute(
+                """{"action":"call","name":"workspace_file","arguments":{"value":"hello","async":true}}""",
+                mapOf("enabledTools" to setOf("workspace:file")),
+            )
+
+        assertTrue(result.success)
+        assertTrue(result.content.contains("scheduled async tool call"))
+    }
+
     private class FakeTool(
         id: String,
     ) : VisualAgentTool {
@@ -69,5 +99,22 @@ class ToolHelpToolTest {
             called = true
             return success(toolId = definition.id.value, content = "executed:${parseObject(inputJson).string("value")}")
         }
+    }
+
+    private class FailingTool(
+        id: String,
+    ) : VisualAgentTool {
+        override val definition =
+            ToolDefinition(
+                id = ToolId(id),
+                name = ToolId(id).toFunctionName(),
+                description = "Rejects calls",
+                inputSchema = """{"type":"object"}""",
+            )
+
+        override fun execute(
+            inputJson: String,
+            context: Map<String, Any>,
+        ): ToolResult = failure(definition.id.value, "rejected")
     }
 }

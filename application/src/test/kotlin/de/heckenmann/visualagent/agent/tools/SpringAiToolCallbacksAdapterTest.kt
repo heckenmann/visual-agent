@@ -13,6 +13,25 @@ import de.heckenmann.visualagent.agent.ToolId as ProviderToolId
 /** Verifies provider callback execution through the registry's function-name contract. */
 class SpringAiToolCallbacksAdapterTest {
     @Test
+    fun `does not inject globally disabled tool help into provider callbacks`() {
+        val regularTool =
+            object : VisualAgentTool {
+                override val definition = ToolDefinition(ToolId("workspace:file"), "workspace_file", "Reads files", "{}")
+
+                override fun execute(
+                    inputJson: String,
+                    context: Map<String, Any>,
+                ): ToolResult = ToolResult(definition.id.value, true, "read")
+            }
+        val helpTool = ToolHelpTool { error("Tool help must not execute in this test") }
+        val adapter = SpringAiToolCallbacksAdapter(ToolRegistry(listOf(regularTool, helpTool), ToolEventBus()))
+
+        val callbacks = adapter.functionCallbacks(setOf(ProviderToolId("workspace:file")))
+
+        assertEquals(listOf("workspace_file"), callbacks.map { it.toolDefinition.name() })
+    }
+
+    @Test
     fun `structured agent list callback executes the matching internal tool`() {
         var executions = 0
         val tool =

@@ -76,7 +76,13 @@ class ToolRegistry(
         tool: VisualAgentTool,
         functionInput: String,
         context: Map<String, Any>,
-    ): Mono<String> {
+    ): Mono<String> = executeReactiveResult(tool, functionInput, context).map(::serialize)
+
+    private fun executeReactiveResult(
+        tool: VisualAgentTool,
+        functionInput: String,
+        context: Map<String, Any>,
+    ): Mono<ToolResult> {
         val definition = tool.definition
         val inputObject = parseObject(functionInput)
         return Mono.defer {
@@ -124,16 +130,9 @@ class ToolRegistry(
                     {},
                     { error -> logger.warn(error) { "Asynchronous tool execution failed for toolId=${definition.id.value}." } },
                 )
-                Mono.just(
-                    serialize(
-                        success(
-                            definition.id.value,
-                            "scheduled async tool call (timeout=${options.timeoutSeconds}s)",
-                        ),
-                    ),
-                )
+                Mono.just(success(definition.id.value, "scheduled async tool call (timeout=${options.timeoutSeconds}s)"))
             } else {
-                execution.map(::serialize)
+                execution
             }
         }
     }
@@ -148,7 +147,15 @@ class ToolRegistry(
         tool: VisualAgentTool,
         functionInput: String,
         context: Map<String, Any>,
-    ): String = checkNotNull(executeReactive(tool, functionInput, context).block()) { "Tool execution completed without a result." }
+    ): String = serialize(executeBlockingResult(tool, functionInput, context))
+
+    /** Executes a tool through the synchronous provider boundary and returns its structured result. */
+    fun executeBlockingResult(
+        tool: VisualAgentTool,
+        functionInput: String,
+        context: Map<String, Any>,
+    ): ToolResult =
+        checkNotNull(executeReactiveResult(tool, functionInput, context).block()) { "Tool execution completed without a result." }
 
     private fun deadlineNanos(
         context: Map<String, Any>,
@@ -167,7 +174,7 @@ class ToolRegistry(
         context: Map<String, Any>,
         startedAt: Instant,
         result: ToolResult,
-    ): String {
+    ): ToolResult {
         publishEvent(
             definition,
             ToolCallPhase.STARTED,
@@ -186,7 +193,7 @@ class ToolRegistry(
             startedAt,
             Instant.now(),
         )
-        return serialize(result)
+        return result
     }
 
     private fun serialize(result: ToolResult): String = envelopeJson.encodeToString(ToolResultNormalization.envelope(result))

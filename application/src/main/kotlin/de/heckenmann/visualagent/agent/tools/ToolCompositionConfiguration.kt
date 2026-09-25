@@ -78,7 +78,7 @@ class SpringAiToolCallbacksAdapter(
         context: Map<String, Any>,
     ): List<ToolCallback> {
         val requestToolIds =
-            if (ToolId(TOOL_HELP_ID) in registry.allToolIds()) {
+            if (ToolId(TOOL_HELP_ID) in registry.allToolIds() && ProviderToolId(TOOL_HELP_ID) in enabledTools) {
                 enabledTools + ProviderToolId(TOOL_HELP_ID)
             } else {
                 enabledTools

@@ -47,6 +47,7 @@ class AgentToolConfigService(
             "javascript:execute",
             "memory",
             "skills",
+            TOOL_HELP_ID,
         ).let(::filterEnabledTools).map(::ToolId).toSet()
 
     /**
@@ -62,11 +63,11 @@ class AgentToolConfigService(
      */
     fun toolsFor(agent: SubAgent): Set<ToolId> {
         agent.config.tools?.let { configured ->
-            return filterEnabledTools(configured).map(::ToolId).toSet()
+            return filterEnabledTools(configured + TOOL_HELP_ID).map(::ToolId).toSet()
         }
         val key = resolveTemplateName(agent)
         val configured = configStore.getSubAgentConfig(key)?.tools ?: defaultConfigs().firstOrNull { it.id == key }?.tools
-        return filterEnabledTools(configured ?: emptyList()).map(::ToolId).toSet()
+        return filterEnabledTools((configured ?: emptyList()) + TOOL_HELP_ID).map(::ToolId).toSet()
     }
 
     private fun resolveTemplateName(agent: SubAgent): String {
@@ -252,6 +253,7 @@ class AgentToolConfigService(
 }
 
 private const val DISABLED_TOOLS_KEY = "tools.disabled.global"
+private const val TOOL_HELP_ID = "tool:help"
 
 private val RESTRICTED_HOST_ACCESS_TOOL_IDS =
     setOf(

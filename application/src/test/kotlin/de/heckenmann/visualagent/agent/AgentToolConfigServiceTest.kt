@@ -23,6 +23,7 @@ class AgentToolConfigServiceTest {
         assertTrue("agent:log" in tools)
         assertTrue("todos" in tools)
         assertTrue("skills" in tools)
+        assertTrue("tool:help" in tools)
         assertTrue("workspace:file" in tools)
         assertTrue("workspace:download" in tools)
         assertTrue("update:check" in tools)
@@ -96,6 +97,18 @@ class AgentToolConfigServiceTest {
         assertTrue(ToolId("canvas") in service.toolsFor(agent))
         assertFalse(ToolId("file:read") in service.toolsFor(agent))
         assertFalse(ToolId("file:write") in service.toolsFor(agent))
+    }
+
+    @Test
+    fun `globally disabled tool help is excluded for main and sub-agents`() {
+        val store = MapSubAgentConfigStore()
+        val service = AgentToolConfigService(store)
+        val agent = SubAgent(id = "a", name = "Coder", role = "Implementation", config = AgentConfig.fromTemplate("coder"))
+
+        service.setToolGloballyEnabled("tool:help", false)
+
+        assertFalse(ToolId("tool:help") in service.mainAgentTools())
+        assertFalse(ToolId("tool:help") in service.toolsFor(agent))
     }
 
     private class MapSubAgentConfigStore :

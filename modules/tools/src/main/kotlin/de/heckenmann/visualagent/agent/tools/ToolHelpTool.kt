@@ -78,7 +78,8 @@ class ToolHelpTool(
             registry().resolve(enabledIds).firstOrNull { it.definition.id == definition.id }
                 ?: return failure(TOOL_ID, "Tool not available to this agent: $functionName")
         val nestedContext = context + ("toolHelpDelegated" to true)
-        return success(TOOL_ID, registry().executeBlocking(tool, arguments.toString(), nestedContext))
+        val result = registry().executeBlockingResult(tool, arguments.toString(), nestedContext)
+        return ToolResult(TOOL_ID, result.success, result.content, result.error, result.data)
     }
 
     private fun availableTools(context: Map<String, Any>): List<ToolDefinition> {
