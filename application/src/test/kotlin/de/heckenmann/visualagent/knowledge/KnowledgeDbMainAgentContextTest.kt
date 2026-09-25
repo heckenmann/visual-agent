@@ -10,8 +10,8 @@ import kotlin.test.assertTrue
 @de.heckenmann.visualagent.testsupport.DatabaseTest
 class KnowledgeDbMainAgentContextTest {
     @Test
-    fun `main context query can load history beyond ten user turns`() {
-        val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:unbounded-main-context")
+    fun `main context query returns only the newest bounded dialogue rows`() {
+        val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:bounded-main-context")
         repeat(12) { index ->
             db.conversationStore.saveConversationMessage(
                 UUID.randomUUID().toString(),
@@ -29,12 +29,11 @@ class KnowledgeDbMainAgentContextTest {
             )
         }
 
-        val context = db.conversationStore.getConversationMessagesForContext("main", Int.MAX_VALUE, Int.MAX_VALUE)
+        val context = db.conversationStore.getConversationMessagesForContext("main", Int.MAX_VALUE, 4)
 
-        assertEquals(12, context.count { it.role == "user" })
-        assertEquals("Request 0", context.first { it.role == "user" }.content)
-        assertTrue(context.any { it.content == "Answer 0" })
-        assertTrue(context.any { it.content == "Answer 11" })
+        assertEquals(listOf("Request 10", "Answer 10", "Request 11", "Answer 11"), context.map { it.content })
+        assertEquals(2, context.count { it.role == "user" })
+        assertTrue(context.none { it.content == "Request 0" || it.content == "Answer 0" })
         db.close()
     }
 }

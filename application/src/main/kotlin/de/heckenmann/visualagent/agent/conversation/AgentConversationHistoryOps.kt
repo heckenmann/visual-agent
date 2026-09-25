@@ -22,6 +22,8 @@ internal class AgentConversationHistoryOps(
     private val owner: AgentManager,
     private val buildMainRequest: (List<Message>, String?) -> ChatRequestContext,
 ) {
+    private val mainAgentContextHistoryLoader = MainAgentContextHistoryLoader(owner)
+
     fun clearHistory() {
         owner.conversationHistory.clear()
         owner.conversationStore.deleteConversationMessages(AgentManagerConstants.MAIN_SESSION_ID)
@@ -197,12 +199,9 @@ internal class AgentConversationHistoryOps(
 
     /** Loads the complete eligible history used for main-agent provider requests. */
     fun loadMainAgentContextFromDb(
-        userTurnLimit: Int = Int.MAX_VALUE,
-        recordLimit: Int = Int.MAX_VALUE,
-    ): List<Message> =
-        owner.conversationStore
-            .getConversationMessagesForContext(AgentManagerConstants.MAIN_SESSION_ID, userTurnLimit, recordLimit)
-            .mapNotNull(::toMessage)
+        userTurnLimit: Int = owner.appConfig.contextLength,
+        recordLimit: Int = owner.appConfig.contextLength,
+    ): List<Message> = mainAgentContextHistoryLoader.load(userTurnLimit, recordLimit)
 
     fun loadConversationFromDb() {
         owner.conversationHistory.clear()

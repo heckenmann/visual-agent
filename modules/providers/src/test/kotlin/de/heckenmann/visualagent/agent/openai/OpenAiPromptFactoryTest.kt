@@ -1,7 +1,9 @@
 package de.heckenmann.visualagent.agent.openai
 
 import de.heckenmann.visualagent.agent.ChatRequestContext
+import de.heckenmann.visualagent.agent.ContextPolicyMetadata
 import de.heckenmann.visualagent.agent.ContextWindow
+import de.heckenmann.visualagent.agent.ConversationContextPolicy
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ModelParameters
 import de.heckenmann.visualagent.agent.TestToolRegistry
@@ -11,6 +13,7 @@ import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.agent.ToolResult
 import de.heckenmann.visualagent.agent.toTestFunctionName
 import org.junit.jupiter.api.Test
+import org.springframework.ai.chat.messages.AssistantMessage
 import org.springframework.ai.model.tool.ToolCallingChatOptions
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -56,6 +59,25 @@ class OpenAiPromptFactoryTest {
         val prompt = factory.buildPrompt(ChatRequestContext(messages = listOf(Message("user", "hi"))), "gpt-test")
 
         assertTrue(prompt.instructions.none { it.text.orEmpty().contains("Tool calling strict mode") })
+    }
+
+    @Test
+    fun `prompt preserves context policy metadata for subsequent budget passes`() {
+        val factory = OpenAiPromptFactory(TestToolRegistry())
+        val request =
+            ChatRequestContext(
+                messages =
+                    listOf(
+                        Message("user", "prior question"),
+                        Message("assistant", "summary", contextPolicy = ConversationContextPolicy.SUMMARY_SOURCE),
+                        Message("user", "latest question"),
+                    ),
+            )
+
+        val prompt = factory.buildPrompt(request, "gpt-test")
+        val summary = prompt.instructions.filterIsInstance<AssistantMessage>().single()
+
+        assertEquals(ConversationContextPolicy.SUMMARY_SOURCE.name, summary.metadata[ContextPolicyMetadata.KEY])
     }
 
     @Test

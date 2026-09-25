@@ -24,3 +24,9 @@ enum class ConversationContextPolicy {
             }
     }
 }
+
+/** Metadata key used to preserve context classification across Spring AI prompt rounds. */
+object ContextPolicyMetadata {
+    /** Spring AI message metadata field carrying a [ConversationContextPolicy] enum name. */
+    const val KEY = "visualAgentContextPolicy"
+}

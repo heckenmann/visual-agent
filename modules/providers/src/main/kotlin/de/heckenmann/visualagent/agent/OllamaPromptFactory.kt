@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.agent.ollama
 
 import de.heckenmann.visualagent.agent.ChatRequestContext
+import de.heckenmann.visualagent.agent.ContextPolicyMetadata
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.RequestContextBudgeter
 import de.heckenmann.visualagent.agent.ToolDefinition
@@ -146,10 +147,27 @@ class OllamaPromptFactory(
 
     private fun toSpringMessages(messages: List<Message>): List<SpringMessage> =
         messages.map { msg ->
+            val metadata =
+                msg.contextPolicy?.let { mapOf(ContextPolicyMetadata.KEY to it.name) }.orEmpty()
             when (msg.role) {
-                "system" -> SystemMessage(msg.content)
-                "assistant" -> AssistantMessage(msg.content)
-                else -> UserMessage(msg.content)
+                "system" ->
+                    SystemMessage
+                        .builder()
+                        .text(msg.content)
+                        .metadata(metadata)
+                        .build()
+                "assistant" ->
+                    AssistantMessage
+                        .builder()
+                        .content(msg.content)
+                        .properties(metadata)
+                        .build()
+                else ->
+                    UserMessage
+                        .builder()
+                        .text(msg.content)
+                        .metadata(metadata)
+                        .build()
             }
         }
 

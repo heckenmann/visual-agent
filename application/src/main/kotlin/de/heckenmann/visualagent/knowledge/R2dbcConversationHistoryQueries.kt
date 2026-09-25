@@ -123,7 +123,7 @@ internal class R2dbcConversationHistoryQueries(
                               (created_at > (SELECT created_at FROM boundary) OR
                                (created_at = (SELECT created_at FROM boundary) AND id >= (SELECT id FROM boundary))))
                       )
-                    ORDER BY timeline_sequence ASC, created_at ASC, id ASC
+                    ORDER BY timeline_sequence DESC, created_at DESC, id DESC
                     LIMIT :recordLimit
                     """.trimIndent(),
                 ).bind("sessionId", sessionId)
