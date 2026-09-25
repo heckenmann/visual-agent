@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.LifecyclePort
 import de.heckenmann.visualagent.protocol.TodoItem
 import de.heckenmann.visualagent.protocol.TodoPort
+import de.heckenmann.visualagent.protocol.TodoProgress
 import de.heckenmann.visualagent.protocol.TodoState
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
@@ -42,6 +43,7 @@ import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import sh.calvin.reorderable.ReorderableColumn
@@ -66,6 +68,7 @@ internal fun TodoPanel(
     var todos by remember { mutableStateOf<List<TodoItem>>(emptyList()) }
     var responseStates by remember { mutableStateOf<Map<String, TodoResponseState>>(emptyMap()) }
     val scope = rememberCoroutineScope()
+    val progressUpdates = remember(todoPort) { Channel<TodoProgress>(Channel.UNLIMITED) }
 
     /** Loads persisted todos without blocking the Compose dispatcher. */
     suspend fun refreshTodos() {
@@ -85,7 +88,14 @@ internal fun TodoPanel(
         if (!lifecycle.closing) scope.launch { refreshTodos() }
     }
     LaunchedEffect(todoPort) { refreshTodos() }
-    DisposableEffect(todoPort) {
+    LaunchedEffect(progressUpdates) {
+        for (update in progressUpdates) {
+            val state = responseStates[update.todoId] ?: TodoResponseState()
+            state.apply(update.executionId, update.agentId, update.delta, update.completed)
+            responseStates = responseStates + (update.todoId to state)
+        }
+    }
+    DisposableEffect(todoPort, progressUpdates) {
         val todoHandle =
             todoPort.addListener { change ->
                 if (lifecycle.closing) return@addListener
@@ -101,15 +111,12 @@ internal fun TodoPanel(
         val progressHandle =
             todoPort.addProgressListener { update ->
                 if (lifecycle.closing) return@addProgressListener
-                scope.launch {
-                    val state = responseStates[update.todoId] ?: TodoResponseState()
-                    state.apply(update.executionId, update.agentId, update.delta, update.completed)
-                    responseStates = responseStates + (update.todoId to state)
-                }
+                progressUpdates.trySend(update)
             }
         onDispose {
             todoHandle.close()
             progressHandle.close()
+            progressUpdates.close()
         }
     }
     val nextTodoId = remember(todos) { todos.firstOrNull { it.status == TodoState.PENDING }?.id }

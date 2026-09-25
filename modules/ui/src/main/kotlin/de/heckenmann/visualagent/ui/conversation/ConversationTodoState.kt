@@ -12,9 +12,11 @@ import androidx.compose.runtime.setValue
 import de.heckenmann.visualagent.protocol.ConversationPort
 import de.heckenmann.visualagent.protocol.TodoItem
 import de.heckenmann.visualagent.protocol.TodoPort
+import de.heckenmann.visualagent.protocol.TodoProgress
 import de.heckenmann.visualagent.protocol.TodoResponseSnapshot
 import de.heckenmann.visualagent.ui.todo.TodoResponseState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -42,6 +44,7 @@ internal fun rememberConversationTodoState(
 ): ConversationTodoState {
     val state = remember(todoPort) { ConversationTodoState() }
     val scope = rememberCoroutineScope()
+    val progressUpdates = remember(todoPort) { Channel<TodoProgress>(Channel.UNLIMITED) }
     LaunchedEffect(todoPort) {
         val loadedTodos = withContext(Dispatchers.IO) { todoPort.list() }
         val loadedDeleted = withContext(Dispatchers.IO) { todoPort.deletedSnapshots() }
@@ -52,7 +55,14 @@ internal fun rememberConversationTodoState(
                 todoPort.responseSnapshots((loadedTodos + loadedDeleted).map { it.id }.toSet())
             }.associate(TodoResponseSnapshot::toResponseEntry)
     }
-    DisposableEffect(todoPort) {
+    LaunchedEffect(progressUpdates) {
+        for (update in progressUpdates) {
+            val response = state.responses[update.todoId] ?: TodoResponseState()
+            response.apply(update.executionId, update.agentId, update.delta, update.completed)
+            state.responses = state.responses + (update.todoId to response)
+        }
+    }
+    DisposableEffect(todoPort, progressUpdates) {
         val todoHandle =
             todoPort.addListener { change ->
                 val removedSnapshot = change.todoId?.let { id -> state.todos.firstOrNull { todo -> todo.id == id } }
@@ -76,15 +86,12 @@ internal fun rememberConversationTodoState(
             }
         val progressHandle =
             todoPort.addProgressListener { update ->
-                scope.launch {
-                    val response = state.responses[update.todoId] ?: TodoResponseState()
-                    response.apply(update.executionId, update.agentId, update.delta, update.completed)
-                    state.responses = state.responses + (update.todoId to response)
-                }
+                progressUpdates.trySend(update)
             }
         onDispose {
             todoHandle.close()
             progressHandle.close()
+            progressUpdates.close()
         }
     }
     return state
