@@ -13,6 +13,7 @@ import kotlinx.coroutines.reactor.awaitSingleOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import mu.KotlinLogging
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** Owns streamed assistant-turn persistence and transport retry replay. */
 internal class AgentManagerConversationStreamingOps(
@@ -55,11 +56,26 @@ internal class AgentManagerConversationStreamingOps(
         val turnsByRound = linkedMapOf<Int, ProviderTurnResponse>()
         var cancelled = false
         var providerFailure: Throwable? = null
+        val contextWarningPublished = AtomicBoolean(false)
         token?.throwIfCancelled()
         try {
             owner.llmProvider
-                .streamReactive(buildRequest(loadHistoryContext(), requestId).copy(cancellationToken = token))
-                .doOnNext { chunk ->
+                .streamReactive(
+                    buildRequest(loadHistoryContext(), requestId).copy(
+                        cancellationToken = token,
+                        onContextBudgeted = { status ->
+                            if (status.reduced && contextWarningPublished.compareAndSet(false, true)) {
+                                onChunk(
+                                    ConversationStreamUpdate(
+                                        assistantTurnId = AssistantTurnIdentity.forRound(requestId, 0),
+                                        textDelta = "",
+                                        contextReduced = true,
+                                    ),
+                                )
+                            }
+                        },
+                    ),
+                ).doOnNext { chunk ->
                     token?.throwIfCancelled()
                     val round = chunk.providerTurn?.metadata?.round ?: 0
                     chunk.providerTurn?.let { turn -> turnsByRound[round] = ProviderTurnAccumulator.merge(turnsByRound[round], turn) }

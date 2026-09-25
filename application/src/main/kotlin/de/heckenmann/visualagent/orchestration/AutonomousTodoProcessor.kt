@@ -236,7 +236,6 @@ internal suspend fun processTodoWithLLM(
         )
         watcher.close()
         activeCancellationTokens.remove(todoId, token)
-        agentBusySince.remove(agent.id)
         if (cancelledByChange && scope.isActive) {
             handleTodoChangeAfterCancellation(
                 agent = agent,
@@ -246,7 +245,9 @@ internal suspend fun processTodoWithLLM(
                 todoManager = todoManager,
                 persistMessage = { conversationOps.persist(it) },
                 saveAgentToDb = { subAgentOps.saveSubAgent(it) },
-                notifyAgent = subAgentOps::notifyAgent,
+                releaseAgent = { currentAgent, currentTodoId ->
+                    releaseAutonomousTodoAgent(currentAgent, currentTodoId, agentBusySince, subAgentOps)
+                },
                 onDescriptionChanged = { changedAgent, todo ->
                     scope.launch {
                         processTodoWithLLM(
@@ -273,7 +274,7 @@ internal suspend fun processTodoWithLLM(
                 },
             )
         } else if (scope.isActive) {
-            setAgentIdle(agent, subAgentOps::saveSubAgent, subAgentOps::notifyAgent)
+            releaseAutonomousTodoAgent(agent, todoId, agentBusySince, subAgentOps)
         }
     }
 }

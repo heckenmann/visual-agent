@@ -32,7 +32,8 @@ class TodosTool(
                     "- count: no parameters. Returns counts per status.\n" +
                     "- add: {\"action\":\"add\",\"description\":\"task description here\",\"assignedAgentId\":\"...\"}. " +
                     "Creates a new work item. The description must be a short task description, NOT code or data. " +
-                    "assignedAgentId is required and must reference an existing sub-agent.\n" +
+                    "assignedAgentId is required and must reference an existing sub-agent. " +
+                    "New todos are queued for execution and start when their assigned agent is available.\n" +
                     "- update: {\"action\":\"update\",\"id\":\"...\",\"description\":\"...\"," +
                     "\"assignedAgentId\":\"...\",\"status\":\"PENDING|IN_PROGRESS|COMPLETED|CANCELLED\"}. " +
                     "All fields except id are optional. Update only when the objective and scope " +
@@ -134,6 +135,9 @@ class TodosTool(
                 "Todo already exists: ${existing.id} [${existing.status}] " +
                     "${existing.description}. Reuse this todo instead of creating a duplicate.",
             )
+        }
+        if (!todos.start(creation.todo.id)) {
+            return failure("todos", "Todo ${creation.todo.id} was created but could not be queued for execution")
         }
         return success("todos", "Added todo ${creation.todo.id}")
     }

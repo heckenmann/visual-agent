@@ -26,6 +26,12 @@ internal class AutonomousTodoCandidateSelector(
             isAgentEligible = { agentId -> executionControl?.isExecutionAllowed(agentId) ?: true },
         )
 
+    /** Returns requested todos in their persisted display order. */
+    fun orderRequested(todoIds: List<String>): List<String> {
+        val positions = todoStore.listTodos().associate { it.id to it.position }
+        return todoIds.sortedBy { positions[it] ?: Int.MAX_VALUE }
+    }
+
     private fun shouldDecomposeBeforeExecution(
         todo: Todo,
         requestedTodoId: String?,

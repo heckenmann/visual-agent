@@ -149,6 +149,8 @@ interface ConversationPort {
 data class ConversationStreamUpdate(
     val assistantTurnId: String,
     val textDelta: String,
+    /** True when context fitting omitted history or regular tool schemas for this request. */
+    val contextReduced: Boolean = false,
 )
 
 /** Completed result of a streamed conversation turn. */

@@ -15,7 +15,6 @@ import de.heckenmann.visualagent.agent.provider.ProviderEnvironmentCredentials
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.agent.provider.ProviderRuntimeConfig
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
-import de.heckenmann.visualagent.agent.supportsToolCalling
 import io.micrometer.observation.ObservationRegistry
 import org.springframework.ai.chat.messages.UserMessage
 import org.springframework.ai.chat.model.ChatModel
@@ -46,15 +45,17 @@ class OpenAiClient(
         val selectedModel = request.model ?: appConfig.openAiModel
         val prompt = promptFactory.buildPrompt(request, selectedModel)
         val model = chatModel(request.providerProfile, selectedModel)
+        val callbacks = promptFactory.callbacks(prompt)
         return ToolCallingLoop(outputLimitUpdater = promptFactory::updateOutputLimit)
             .runReactive(
                 model,
                 prompt,
                 request.cancellationToken,
-                toolCallbacks(request, selectedModel),
+                callbacks,
                 toolRegistry,
                 request.contextWindow.withRequestedOutput(request.parameters.maxTokens),
                 request.metadata,
+                request.onContextBudgeted,
             ).onErrorMap(::buildDetailedProviderError)
     }
 
@@ -64,7 +65,7 @@ class OpenAiClient(
         val selectedModel = request.model ?: appConfig.openAiModel
         val prompt = promptFactory.buildPrompt(request, selectedModel)
         val model = chatModel(request.providerProfile, selectedModel)
-        val toolCallbacks = toolCallbacks(request, selectedModel)
+        val toolCallbacks = promptFactory.callbacks(prompt)
         return Flux
             .defer {
                 request.cancellationToken?.throwIfCancelled()
@@ -85,22 +86,10 @@ class OpenAiClient(
                             toolRegistry,
                             request.contextWindow.withRequestedOutput(request.parameters.maxTokens),
                             request.metadata,
+                            request.onContextBudgeted,
                         )
                 }
             }.onErrorMap(::buildDetailedProviderError)
-    }
-
-    private fun toolCallbacks(
-        request: ChatRequestContext,
-        selectedModel: String,
-    ) = if (request.enabledTools.isEmpty() || !request.supportsToolCalling()) {
-        emptyList()
-    } else {
-        toolRegistry.functionCallbacks(
-            request.enabledTools,
-            request.metadata + mapOf("model" to selectedModel, "provider" to "openai") +
-                (request.cancellationToken?.let { mapOf("cancellationToken" to it) } ?: emptyMap()),
-        )
     }
 
     override fun visionReactive(

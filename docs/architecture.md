@@ -75,9 +75,11 @@ The UI receives only protocol ports; it never receives Spring beans.
      execution rules, active provider and model, and a conditional resume hint);
    - optional low-priority reference sections for durable memory and current
      runtime state;
-   - a bounded context projection assembled from the latest persisted user turns;
-     routine audit events are classified and compacted, while the complete history
-     remains available through the `history` tool;
+   - a history projection from persisted dialogue and individually summarized
+     execution events; the active provider applies one model-aware token budget that
+     prioritizes the latest user message, ten recent assistant answers, then native
+     tool schemas, execution references, and remaining history, while the complete
+     history remains available through the `history` tool;
    - tool-name guard system message from the active provider's prompt
      factory;
    - `enabledTools = agentToolConfigService.mainAgentTools()`;
@@ -96,6 +98,14 @@ and `AUDIT_ONLY` records remain visible to the UI without being copied to the mo
 tool, sub-agent, and workspace events, and applies a token budget while never evicting
 the current user request. It is used for normal requests, streaming, retries, resume,
 and autonomous terminal reviews.
+
+Request budgeting prioritizes the complete latest user message, then completed assistant
+answers from newest to oldest through the tenth answer, retaining each answer with its
+initiating user message. The minimal `tool_help` callback and one-line JSON example are
+reserved for tooling-capable requests. Full tool schemas use only the budget remaining
+after this dialogue history; when those schemas do not fit, `tool_help` lists, documents,
+and delegates to only the tools enabled for that request. History or tool-schema reduction
+is reported to the conversation UI as a request-scoped warning.
 
 Only static application policy is sent with the `system` role. Runtime state, durable
 memory, historical execution summaries, and omitted-history notices use low-priority

@@ -100,7 +100,6 @@ internal fun startTodoChangeWatcher(
  * @param todoManager Manager used to cancel or update the todo
  * @param persistMessage Callback that persists a conversation message
  * @param saveAgentToDb Callback that persists agent state changes
- * @param notifyAgent Callback that sends a status notification to the UI
  * @param onDescriptionChanged Continuation invoked when the todo description changed
  */
 internal fun handleTodoChangeAfterCancellation(
@@ -111,7 +110,7 @@ internal fun handleTodoChangeAfterCancellation(
     todoManager: TodoManager,
     persistMessage: (Message) -> Unit,
     saveAgentToDb: (SubAgent) -> Unit,
-    notifyAgent: (String, String) -> Unit,
+    releaseAgent: (SubAgent, String) -> Unit,
     onDescriptionChanged: (SubAgent, Todo) -> Unit,
 ) {
     val change = pendingTodoChanges.remove(todoId)
@@ -134,9 +133,9 @@ internal fun handleTodoChangeAfterCancellation(
                     metadata = metadata,
                 ),
             )
-            setAgentIdle(agent, saveAgentToDb, notifyAgent)
+            releaseAgent(agent, todoId)
         }
-        change?.todo != null && change.todo.description != agent.currentTask -> {
+        change?.todo != null && change.todo.description != agent.currentTask && agent.currentTodoId == todoId -> {
             agent.currentTask = currentTodo.description
             saveAgentToDb(agent)
             persistMessage(
@@ -148,7 +147,7 @@ internal fun handleTodoChangeAfterCancellation(
             onDescriptionChanged(agent, currentTodo)
         }
         else -> {
-            setAgentIdle(agent, saveAgentToDb, notifyAgent)
+            releaseAgent(agent, todoId)
         }
     }
 }

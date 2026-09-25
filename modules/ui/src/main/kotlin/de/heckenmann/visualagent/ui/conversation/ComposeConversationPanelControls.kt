@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.ui.conversation
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.StartOffset
@@ -7,6 +8,10 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -94,6 +99,7 @@ internal fun ScrollToBottomButton(
 internal fun ConversationInputArea(
     input: String,
     sending: Boolean,
+    contextReduced: Boolean = false,
     onInputChange: (String) -> Unit,
     onSend: () -> Unit,
     onCancel: () -> Unit,
@@ -144,6 +150,18 @@ internal fun ConversationInputArea(
                 modifier = Modifier.size(24.dp),
             )
         }
+        AnimatedVisibility(
+            visible = contextReduced,
+            enter = fadeIn(tween(180)) + expandVertically(tween(180)),
+            exit = fadeOut(tween(150)) + shrinkVertically(tween(150)),
+        ) {
+            Text(
+                text = "Recent context or tool details were omitted to fit the model's token limit.",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+            )
+        }
         OutlinedTextField(
             value = input,
             onValueChange = onInputChange,
@@ -179,10 +197,11 @@ internal fun ConversationInputArea(
                 } else {
                     ActionIconButton(
                         icon = Icons.AutoMirrored.Filled.Send,
-                        description = "Send message",
+                        description = if (contextReduced) "Send message; context was reduced" else "Send message",
                         onClick = onSend,
                         enabled = input.isNotBlank(),
                         modifier = Modifier.size(32.dp),
+                        tint = if (contextReduced) MaterialTheme.colorScheme.error else null,
                     )
                 }
             },

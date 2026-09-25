@@ -191,6 +191,7 @@ interface LLMProvider {
  * @property modelCapabilitiesComplete Whether the capability set is authoritative
  * @property metadata Additional provider-neutral execution context
  * @property cancellationToken Optional token the provider can consult to honour user cancellation
+ * @property onContextBudgeted Optional request-scoped notification when history or tools are reduced
  * @see docs/usecases/uc_0000002_send_main_agent_message.md
  * @see docs/usecases/uc_0000007_configure_session_provider_and_model.md
  * @see docs/usecases/uc_0000020_execute_tool_call.md
@@ -210,7 +211,18 @@ data class ChatRequestContext(
     val modelCapabilities: Set<String> = emptySet(),
     val modelCapabilitiesComplete: Boolean = false,
     val contextWindow: ContextWindow = ContextWindow(),
+    val onContextBudgeted: ((ContextBudgetStatus) -> Unit)? = null,
 )
+
+/** Describes whether assembling a request omitted conversation history or ordinary tool schemas. */
+data class ContextBudgetStatus(
+    val historyReduced: Boolean,
+    val toolSchemasReduced: Boolean,
+) {
+    /** Whether the request was reduced to fit the selected model's available context. */
+    val reduced: Boolean
+        get() = historyReduced || toolSchemasReduced
+}
 
 /**
  * Returns whether the selected model may receive tool definitions.

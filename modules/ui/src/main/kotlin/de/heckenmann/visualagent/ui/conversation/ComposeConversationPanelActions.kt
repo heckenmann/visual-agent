@@ -54,6 +54,7 @@ internal fun conversationSendAction(
     inFlight: InFlightStateHolder,
     conversationState: ConversationUiState,
     suggestionController: ConversationSuggestionController,
+    contextReducedFlow: MutableStateFlow<Boolean>,
     onActiveTokenChange: (CancellationToken?) -> Unit,
 ): (String) -> Unit =
     { rawContent ->
@@ -93,6 +94,7 @@ internal fun conversationSendAction(
                         onStreamCompletion = conversationState::completeStream,
                         streamingFlow = conversationState.streaming,
                         streamingTurns = conversationState.streamingTurns,
+                        contextReducedFlow = contextReducedFlow,
                     )
                 }
             }
@@ -219,6 +221,7 @@ internal suspend fun executeSend(
     onStreamCompletion: (List<Message>) -> Unit,
     streamingFlow: MutableStateFlow<String>,
     streamingTurns: MutableStateFlow<List<Message>> = MutableStateFlow(emptyList()),
+    contextReducedFlow: MutableStateFlow<Boolean> = MutableStateFlow(false),
 ) {
     onInputChange("")
     onSendingChange(true)
@@ -236,6 +239,7 @@ internal suspend fun executeSend(
     onStreamingEntryIdChange(assistantEntryId)
     streamingFlow.value = ""
     streamingTurns.value = emptyList()
+    contextReducedFlow.value = false
     val streamRequestId =
         java.util.UUID
             .randomUUID()
@@ -248,23 +252,29 @@ internal suspend fun executeSend(
     val result =
         runCatching {
             messageGateway.stream(ConversationStreamRequest(userEntryId, assistantEntryId, content), token) { update ->
-                streamedContent.append(update.textDelta)
-                streamingFlow.value = streamedContent.toString()
-                streamedTurns.getOrPut(update.assistantTurnId) { StringBuilder() }.append(update.textDelta)
-                streamingTurns.value =
-                    streamedTurns.map { (turnId, text) -> Message("assistant", text.toString(), id = turnId) }
+                if (update.contextReduced) contextReducedFlow.value = true
+                if (update.textDelta.isNotEmpty()) {
+                    streamedContent.append(update.textDelta)
+                    streamingFlow.value = streamedContent.toString()
+                    streamedTurns.getOrPut(update.assistantTurnId) { StringBuilder() }.append(update.textDelta)
+                    streamingTurns.value =
+                        streamedTurns.map { (turnId, text) -> Message("assistant", text.toString(), id = turnId) }
+                }
             }
         }
-    val completedHistory = messageGateway.currentHistory()
-    onStreamCompletion(completedHistory)
-    result
-        .onSuccess {
-            onStatusChange("Ready")
-        }.onFailure {
-            onStatusChange(it.toUiErrorMessage())
-        }.also {
-            inFlight.markStreamEnd(streamRequestId)
-            onSendingChange(false)
-            onActiveTokenChange(null)
-        }
+    try {
+        val completedHistory = messageGateway.currentHistory()
+        onStreamCompletion(completedHistory)
+        result
+            .onSuccess {
+                onStatusChange("Ready")
+            }.onFailure {
+                onStatusChange(it.toUiErrorMessage())
+            }
+    } finally {
+        contextReducedFlow.value = false
+        inFlight.markStreamEnd(streamRequestId)
+        onSendingChange(false)
+        onActiveTokenChange(null)
+    }
 }

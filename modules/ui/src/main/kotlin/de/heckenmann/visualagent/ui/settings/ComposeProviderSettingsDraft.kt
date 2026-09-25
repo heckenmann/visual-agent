@@ -96,6 +96,21 @@ internal fun ProviderSettingsDraft.withModels(
     return copy(providers = updated, modelId = selectedModel)
 }
 
+/** Applies a discovered model context limit, optionally adopting it as the new user setting. */
+internal fun ProviderSettingsDraft.withModelContextLimit(
+    limit: Int,
+    adoptLimit: Boolean,
+): ProviderSettingsDraft {
+    if (limit <= 0) return this
+    val contextLength =
+        if (adoptLimit) {
+            limit
+        } else {
+            conversationSettings.contextLength.coerceAtMost(limit)
+        }
+    return copy(conversationSettings = conversationSettings.copy(contextLength = contextLength))
+}
+
 /** Returns models that are enabled by the profile's allow and block lists. */
 internal fun ProviderProfile.selectableModels(): List<ProviderModel> =
     models.filter { model ->

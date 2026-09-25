@@ -55,6 +55,7 @@ message ChatRequest {
 message ChatDelta {
   string text = 1;
   string assistant_turn_id = 2;
+  bool context_reduced = 3;
 }
 
 message ChatCompleted {

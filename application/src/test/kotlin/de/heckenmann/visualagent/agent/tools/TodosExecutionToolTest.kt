@@ -5,10 +5,25 @@ import de.heckenmann.visualagent.agent.tools.api.TodoUpdateRequest
 import de.heckenmann.visualagent.agent.tools.api.ToolTodo
 import de.heckenmann.visualagent.agent.tools.api.ToolTodoCreation
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /** Tests explicit todo execution actions exposed to the main agent. */
 class TodosExecutionToolTest {
+    @Test
+    fun `add without status queues only a newly created todo`() {
+        val port = FakeTodoPort()
+        val tool = TodosTool(port)
+        val input = """{"action":"add","description":"Task","assignedAgentId":"agent-1"}"""
+
+        assertTrue(tool.execute(input).success)
+        assertEquals(listOf("todo-1"), port.startedIds)
+
+        port.creationIsNew = false
+        assertTrue(tool.execute(input).success)
+        assertEquals(listOf("todo-1"), port.startedIds)
+    }
+
     @Test
     fun `execution actions delegate through the todo port`() {
         val port = FakeTodoPort()
@@ -24,6 +39,9 @@ class TodosExecutionToolTest {
 }
 
 private class FakeTodoPort : TodoToolPort {
+    val startedIds = mutableListOf<String>()
+    var creationIsNew = true
+
     override fun list(): List<ToolTodo> = listOf(ToolTodo("todo-1", "Task", "PENDING", 0, "agent-1"))
 
     override fun agentExists(agentId: String): Boolean = agentId == "agent-1"
@@ -36,7 +54,7 @@ private class FakeTodoPort : TodoToolPort {
     override fun addIfAbsent(
         description: String,
         assignedAgentId: String,
-    ): ToolTodoCreation = ToolTodoCreation(list().single(), created = true)
+    ): ToolTodoCreation = ToolTodoCreation(list().single(), created = creationIsNew)
 
     override fun update(request: TodoUpdateRequest): Boolean = true
 
@@ -45,7 +63,10 @@ private class FakeTodoPort : TodoToolPort {
         status: String,
     ): Boolean = true
 
-    override fun start(id: String): Boolean = true
+    override fun start(id: String): Boolean {
+        startedIds += id
+        return true
+    }
 
     override fun startAll(): Int = 1
 

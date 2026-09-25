@@ -58,7 +58,7 @@ class CodexAppServerChatModelTest {
         }
 
     @Test
-    fun `a single native delta is animated in small chunks`() =
+    fun `a single native delta is forwarded without artificial chunks`() =
         runBlocking {
             val directory = createTempDirectory("codex-app-server-single-delta-test-")
             val executable = fakeServer(directory, singleDelta = true)
@@ -68,10 +68,31 @@ class CodexAppServerChatModelTest {
                         .streamBlocking(Prompt("hello"))
 
                 assertEquals(
-                    listOf("hel", "lo", ""),
+                    listOf("hello", ""),
                     responses.map(::responseText),
                 )
                 assertTrue(responses.last().hasFinishReasons(setOf("stop")))
+            } finally {
+                deleteRecursively(directory)
+            }
+        }
+
+    @Test
+    fun `a native delta is emitted even when the turn fails afterward`() =
+        runBlocking {
+            val directory = createTempDirectory("codex-app-server-delta-before-failure-test-")
+            val executable = fakeServer(directory, singleDelta = true, turnStatus = "failed")
+            try {
+                val signals =
+                    CodexAppServerChatModel(executable, "gpt-test", emptyList(), directory)
+                        .streamReactive(Prompt("hello"))
+                        .materialize()
+                        .collectList()
+                        .block()
+                        .orEmpty()
+
+                assertEquals(listOf("hello"), signals.filter { it.isOnNext }.map { responseText(it.get()!!) })
+                assertTrue(signals.last().isOnError)
             } finally {
                 deleteRecursively(directory)
             }

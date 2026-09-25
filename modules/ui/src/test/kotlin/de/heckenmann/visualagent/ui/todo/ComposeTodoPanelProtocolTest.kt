@@ -88,7 +88,7 @@ class ComposeTodoPanelProtocolTest {
     }
 
     @Test
-    fun `progress listener hides the streaming response after completion`() {
+    fun `progress listener renders ordered partial responses before completion`() {
         var progressListener: ((TodoProgress) -> Unit)? = null
         var todoListener: ((TodoChange) -> Unit)? = null
         var currentTodo = TodoItem("todo", "Streaming task", TodoState.IN_PROGRESS)
@@ -105,10 +105,13 @@ class ComposeTodoPanelProtocolTest {
         composeTestRule.setContent { MaterialTheme { TodoPanel(port, ComposeModalRequester { }, LifecycleState()) } }
 
         composeTestRule.waitForIdle()
-        progressListener!!.invoke(TodoProgress("todo", "New response"))
+        progressListener!!.invoke(TodoProgress("todo", "New "))
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("New").assertExists()
+        composeTestRule.onNodeWithContentDescription("Todo working").assertExists()
+        progressListener!!.invoke(TodoProgress("todo", "response"))
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("New response").assertExists()
-        composeTestRule.onNodeWithContentDescription("Todo working").assertExists()
         progressListener!!.invoke(TodoProgress("todo", completed = true))
         currentTodo = currentTodo.copy(status = TodoState.COMPLETED)
         todoListener!!.invoke(TodoChange(todo = currentTodo))

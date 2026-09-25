@@ -47,6 +47,10 @@ class ToolCompositionConfiguration {
         settings: ToolSettingsPort,
     ) = ToolRegistry(tools, toolEventBus) { settings.read().timeoutSeconds }
 
+    /** Creates the lazy tool-help dispatcher without creating a registry dependency cycle. */
+    @Bean
+    fun toolHelpTool(registry: ObjectProvider<ToolRegistry>): ToolHelpTool = ToolHelpTool(registry::getObject)
+
     /** Creates the sandbox runtime lazily so the JavaScript tool can be part of the registry. */
     @Bean
     fun javaScriptExecutionService(
@@ -73,11 +77,17 @@ class SpringAiToolCallbacksAdapter(
         enabledTools: Set<ProviderToolId>,
         context: Map<String, Any>,
     ): List<ToolCallback> {
+        val requestToolIds =
+            if (ToolId(TOOL_HELP_ID) in registry.allToolIds() && ProviderToolId(TOOL_HELP_ID) in enabledTools) {
+                enabledTools + ProviderToolId(TOOL_HELP_ID)
+            } else {
+                enabledTools
+            }
         val requestContext =
             context +
                 ("enabledTools" to enabledTools.map { it.value }.toSet()) +
                 toolCancellationRegistrar(context)
-        return registry.resolve(enabledTools.mapTo(mutableSetOf()) { ToolId(it.value) }).map { tool ->
+        return registry.resolve(requestToolIds.mapTo(mutableSetOf()) { ToolId(it.value) }).map { tool ->
             /** Provider callback delegating one resolved tool to the provider-neutral registry. */
             object : ToolCallback {
                 override fun getToolDefinition(): SpringToolDefinition =
@@ -164,4 +174,8 @@ class SpringAiToolCallbacksAdapter(
         val sequence: Int,
         val parentAssistantTurnId: String?,
     )
+
+    private companion object {
+        const val TOOL_HELP_ID = "tool:help"
+    }
 }

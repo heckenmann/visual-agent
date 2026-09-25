@@ -44,7 +44,7 @@ class ConversationOpsProvider(
         loadRecentHistoryFromDb = fn
     }
 
-    /** Sets the lambda for loading the bounded context projection for the main agent. */
+    /** Sets the lambda for loading complete source history for the main agent. */
     fun setLoadMainAgentContextFromDb(fn: (Int, Int) -> List<Message>) {
         loadMainAgentContextFromDb = fn
     }
@@ -80,8 +80,8 @@ class ConversationOpsProvider(
 
     /** Loads the bounded, provider-facing context projection for the main agent. */
     fun loadMainAgentContextFromDb(
-        userTurnLimit: Int = 10,
-        recordLimit: Int = 512,
+        userTurnLimit: Int = Int.MAX_VALUE,
+        recordLimit: Int = Int.MAX_VALUE,
     ): List<Message> =
         checkNotNull(loadMainAgentContextFromDb) {
             "loadMainAgentContextFromDb not wired; ensure AgentManager.init completed"

@@ -54,6 +54,8 @@ Keep the user aware of autonomous todo work by showing each todo as a compact ca
 - Conversation messages and todo activity use one database-generated total order. Legacy rows without a sequence use timestamps and a documented deterministic fallback.
 - Existing todos are updated only when the objective and scope remain the same; a different objective gets a new todo so prior history remains meaningful.
 - One canonical execution stream is fanned out to Conversation, Todo, and the overlay.
+- Each progress consumer applies deltas in order through a single UI collector while the provider stream is active; rendering does not wait for the final response event.
+- Codex provider text is forwarded on its first native delta, including when it is the only delta; completed text is never replayed as simulated progress.
 - Compact previews are bounded; the canonical full response is not truncated.
 - Deleting a todo never removes unrelated conversation content, and its retained snapshot survives panel reloads and application restarts.
 

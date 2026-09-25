@@ -47,13 +47,6 @@ internal fun conversationSettingsSection(
             )
         }
         conversationNumberSetting(
-            label = "Context length",
-            value = settings.contextLength,
-            help = "Maximum context budget sent to the model. Larger values preserve more history but can use more provider capacity.",
-            range = 1024..32768,
-            onChange = { value -> onChange(settings.copy(contextLength = value)) },
-        )
-        conversationNumberSetting(
             label = "Startup history",
             value = settings.loadLimit,
             help =
@@ -137,6 +130,32 @@ internal fun conversationSettingsSection(
                 onSelected = { selected -> onChange(settings.copy(queueFlushMode = selected)) },
             )
         }
+    }
+}
+
+/** Renders the context budget beside its model, bounded by the model's reported capacity when known. */
+@Composable
+internal fun modelContextLengthSetting(
+    value: Int,
+    modelLimit: Int?,
+    onChange: (Int) -> Unit,
+) {
+    val maximum = modelLimit?.takeIf { it > 0 } ?: maxOf(32768, value)
+    val minimum = minOf(1024, maximum)
+    conversationSettingField(
+        label = "Context length",
+        help = "Maximum context budget for this model. The value is capped to the model's reported context limit.",
+    ) {
+        OutlinedTextField(
+            value = value.toString(),
+            onValueChange = { input -> input.toIntOrNull()?.let { onChange(it.coerceIn(minimum, maximum)) } },
+            label = { Text("Tokens") },
+            supportingText = {
+                Text(modelLimit?.takeIf { it > 0 }?.let { "Model limit: $it tokens" } ?: "Model limit not reported")
+            },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Context length" },
+        )
     }
 }
 

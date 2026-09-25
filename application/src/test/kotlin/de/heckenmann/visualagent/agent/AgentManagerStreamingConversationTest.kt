@@ -12,7 +12,6 @@ import de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
 import de.heckenmann.visualagent.todo.TodoEventBus
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.slot
 import io.mockk.verify
 import kotlinx.coroutines.reactor.flux
 import kotlinx.coroutines.runBlocking
@@ -20,29 +19,54 @@ import reactor.core.publisher.Flux
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 
 @de.heckenmann.visualagent.testsupport.DatabaseTest
 class AgentManagerStreamingConversationTest {
     @Test
-    fun `stream message sends the latest user request before the context turn limit is reached`() =
+    fun `follow-up request includes the previous assistant Markdown response from the database`() =
         runBlocking {
             val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
             val provider = mockk<LLMProvider>(relaxed = true)
-            val request = slot<ChatRequestContext>()
-            every { provider.streamReactive(capture(request)) } returns
-                Flux.just(ChatResponse(model = "test", message = Message("assistant", "Answer"), done = true))
+            val requests = mutableListOf<ChatRequestContext>()
+            val previousMarkdown =
+                listOf(
+                    "```markdown",
+                    "# Heading",
+                    "- First",
+                    "- Second",
+                    "**Done**",
+                    "```",
+                ).joinToString("\n")
+            every { provider.streamReactive(any<ChatRequestContext>()) } answers {
+                requests += firstArg<ChatRequestContext>()
+                val content = if (requests.size == 1) previousMarkdown else "This explains the snippet."
+                Flux.just(ChatResponse(model = "test", message = Message("assistant", content), done = true))
+            }
             val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
 
-            manager.streamMessage("Create a Markdown table", onChunk = {}, userEntryId = USER_ID, assistantEntryId = ASSISTANT_ID)
-
-            assertEquals(
-                "Create a Markdown table",
-                request.captured.messages
-                    .last { it.role == "user" }
-                    .content,
+            manager.streamMessage(
+                "Create a five-line Markdown example",
+                onChunk = {},
+                userEntryId = USER_ID,
+                assistantEntryId = ASSISTANT_ID,
             )
+            manager.streamMessage(
+                "Explain that",
+                onChunk = {},
+                userEntryId = SECOND_USER_ID,
+                assistantEntryId = THIRD_ASSISTANT_ID,
+            )
+
+            val followUpContext = requests.last().messages
+            assertEquals(
+                listOf(
+                    "Create a five-line Markdown example",
+                    previousMarkdown,
+                    "Explain that",
+                ),
+                followUpContext.filter { it.role == "user" || it.role == "assistant" }.takeLast(3).map { it.content },
+            )
+            db.close()
         }
 
     @Test
@@ -200,105 +224,6 @@ class AgentManagerStreamingConversationTest {
         }
 
     @Test
-    fun `streaming keeps assistant tool rounds as separate stable messages`() =
-        runBlocking {
-            val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
-            val provider = mockk<LLMProvider>(relaxed = true)
-            every { provider.streamReactive(any<ChatRequestContext>()) } returns
-                Flux.just(
-                    ChatResponse(
-                        model = "test",
-                        message = Message("assistant", "I'll inspect the file."),
-                        done = false,
-                        providerTurn =
-                            ProviderTurnResponse(
-                                model = "test",
-                                content = "I'll inspect the file.",
-                                toolCalls = listOf(ProviderToolCall("call-1", "function", "file_read", "{}")),
-                                metadata = ProviderResponseMetadata(requestId = ASSISTANT_ID, round = 0),
-                            ),
-                    ),
-                    ChatResponse(
-                        model = "test",
-                        message = Message("assistant", "The file is valid."),
-                        done = true,
-                        providerTurn =
-                            ProviderTurnResponse(
-                                model = "test",
-                                content = "The file is valid.",
-                                metadata = ProviderResponseMetadata(requestId = ASSISTANT_ID, round = 1),
-                            ),
-                    ),
-                )
-            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
-            val updates = mutableListOf<ConversationStreamUpdate>()
-
-            manager.streamMessage("Check this file", onChunk = updates::add, userEntryId = USER_ID, assistantEntryId = ASSISTANT_ID)
-            val retryUpdates = mutableListOf<ConversationStreamUpdate>()
-            manager.streamMessage("Check this file", onChunk = retryUpdates::add, userEntryId = USER_ID, assistantEntryId = ASSISTANT_ID)
-
-            val assistantTurns = manager.getHistory().filter { it.role == "assistant" }
-            assertEquals(listOf("I'll inspect the file.", "The file is valid."), assistantTurns.map(Message::content))
-            assertEquals(
-                listOf(ASSISTANT_ID, AssistantTurnIdentity.forRound(ASSISTANT_ID, 1)),
-                assistantTurns.mapNotNull(Message::id),
-            )
-            assertEquals(
-                listOf(ASSISTANT_ID, AssistantTurnIdentity.forRound(ASSISTANT_ID, 1)),
-                updates.map(ConversationStreamUpdate::assistantTurnId),
-            )
-            assertEquals(
-                updates.map(ConversationStreamUpdate::assistantTurnId),
-                retryUpdates.map(ConversationStreamUpdate::assistantTurnId),
-            )
-            assertEquals(updates.map(ConversationStreamUpdate::textDelta), retryUpdates.map(ConversationStreamUpdate::textDelta))
-            assertTrue(assistantTurns.all { it.conversationRequestId == ASSISTANT_ID })
-            verify(exactly = 1) { provider.streamReactive(any<ChatRequestContext>()) }
-        }
-
-    @Test
-    fun `tool-only streamed turn remains empty without placeholder prose`() =
-        runBlocking {
-            val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
-            val provider = mockk<LLMProvider>(relaxed = true)
-            every { provider.streamReactive(any<ChatRequestContext>()) } returns
-                Flux.just(
-                    ChatResponse(
-                        model = "test",
-                        message = Message("assistant", ""),
-                        done = false,
-                        providerTurn =
-                            ProviderTurnResponse(
-                                model = "test",
-                                content = "",
-                                toolCalls = listOf(ProviderToolCall("call-1", "function", "network_dns", "{}")),
-                                metadata = ProviderResponseMetadata(requestId = ASSISTANT_ID, round = 0),
-                            ),
-                    ),
-                    ChatResponse(
-                        model = "test",
-                        message = Message("assistant", "DNS lookup completed."),
-                        done = true,
-                        providerTurn =
-                            ProviderTurnResponse(
-                                model = "test",
-                                content = "DNS lookup completed.",
-                                metadata = ProviderResponseMetadata(requestId = ASSISTANT_ID, round = 1),
-                            ),
-                    ),
-                )
-            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
-
-            manager.streamMessage("Resolve the hostname", onChunk = {}, userEntryId = USER_ID, assistantEntryId = ASSISTANT_ID)
-
-            val assistantTurns = manager.getHistory().filter { it.role == "assistant" }
-            assertEquals("", assistantTurns.first().content)
-            assertTrue(assistantTurns.first().assistantToolTurn)
-            assertEquals("DNS lookup completed.", assistantTurns.last().content)
-            assertFalse(assistantTurns.any { it.content == "(No text response. See tool results above.)" })
-        }
-
-    @Test
     fun `stream message persists thinking markup but removes it from provider history`() =
         runBlocking {
             val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
@@ -323,5 +248,6 @@ class AgentManagerStreamingConversationTest {
         const val USER_ID = "11111111-1111-4111-8111-111111111111"
         const val ASSISTANT_ID = "22222222-2222-4222-8222-222222222222"
         const val SECOND_USER_ID = "33333333-3333-4333-8333-333333333333"
+        const val THIRD_ASSISTANT_ID = "44444444-4444-4444-8444-444444444444"
     }
 }

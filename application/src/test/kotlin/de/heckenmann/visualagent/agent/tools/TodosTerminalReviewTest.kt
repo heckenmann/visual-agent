@@ -24,8 +24,15 @@ class TodosTerminalReviewTest {
             val manager = mockk<AgentManager>()
             every { manager.getSubAgent(any()) } returns SubAgent(id = "agent-1", name = "Coder", role = "Implementation")
             every { manager.todoManager } returns TodoManager(db, TodoEventBus())
-            val tool = todosTool(db, db, manager)
-            val added = tool.execute(json("action" to "add", "description" to "Run script", "assignedAgentId" to "agent-1"))
+            val tool = todosToolWithoutScheduling(db, manager)
+            val added =
+                tool.execute(
+                    json(
+                        "action" to "add",
+                        "description" to "Run script",
+                        "assignedAgentId" to "agent-1",
+                    ),
+                )
             val id = added.content.removePrefix("Added todo ")
             db.saveTodo(db.listTodos().single().copy(status = TodoStatus.COMPLETED))
             val reviewContext = mapOf<String, Any>("requestId" to "todo-trigger-$id")

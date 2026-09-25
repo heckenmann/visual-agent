@@ -51,9 +51,10 @@ internal class ToolCallingLoop(
         callCorrelation: ProviderToolCallbacks? = null,
         contextWindow: ContextWindow = ContextWindow(),
         requestMetadata: Map<String, Any> = emptyMap(),
+        onContextBudgeted: ((ContextBudgetStatus) -> Unit)? = null,
     ): ChatResponse {
         token?.throwIfCancelled()
-        val budgetRequest = ChatRequestContext(messages = emptyList(), contextWindow = contextWindow)
+        val budgetRequest = ChatRequestContext(messages = emptyList(), contextWindow = contextWindow, onContextBudgeted = onContextBudgeted)
         if (toolCallbacks.isEmpty()) {
             return fitPrompt(budgetRequest, initialPrompt).let(chatModel::call).toVisualAgentResponse()
         }
@@ -104,10 +105,20 @@ internal class ToolCallingLoop(
         callCorrelation: ProviderToolCallbacks? = null,
         contextWindow: ContextWindow = ContextWindow(),
         requestMetadata: Map<String, Any> = emptyMap(),
+        onContextBudgeted: ((ContextBudgetStatus) -> Unit)? = null,
     ): Mono<ChatResponse> =
         Mono
             .fromCallable {
-                runBlocking(chatModel, initialPrompt, token, toolCallbacks, callCorrelation, contextWindow, requestMetadata)
+                runBlocking(
+                    chatModel,
+                    initialPrompt,
+                    token,
+                    toolCallbacks,
+                    callCorrelation,
+                    contextWindow,
+                    requestMetadata,
+                    onContextBudgeted,
+                )
             }.subscribeOn(Schedulers.boundedElastic())
 
     /**
@@ -125,10 +136,12 @@ internal class ToolCallingLoop(
         callCorrelation: ProviderToolCallbacks? = null,
         contextWindow: ContextWindow = ContextWindow(),
         requestMetadata: Map<String, Any> = emptyMap(),
+        onContextBudgeted: ((ContextBudgetStatus) -> Unit)? = null,
     ): Flux<ChatResponse> =
         Flux.defer {
             token?.throwIfCancelled()
-            val budgetRequest = ChatRequestContext(messages = emptyList(), contextWindow = contextWindow)
+            val budgetRequest =
+                ChatRequestContext(messages = emptyList(), contextWindow = contextWindow, onContextBudgeted = onContextBudgeted)
             val boundedPrompt = fitPrompt(budgetRequest, initialPrompt, toolCallbacks)
             if (toolCallbacks.isEmpty()) {
                 return@defer chatModel.stream(boundedPrompt).map { springResponse ->
@@ -163,6 +176,7 @@ internal class ToolCallingLoop(
                                 toolCallbacks,
                                 contextWindow,
                                 requestMetadata,
+                                onContextBudgeted,
                             )
                         }.subscribeOn(Schedulers.boundedElastic()),
                 )
@@ -177,6 +191,7 @@ internal class ToolCallingLoop(
         toolCallbacks: List<ToolCallback>,
         contextWindow: ContextWindow,
         requestMetadata: Map<String, Any>,
+        onContextBudgeted: ((ContextBudgetStatus) -> Unit)?,
     ): ChatResponse? {
         if (aggregated?.hasToolCalls() != true) return null
         val toolCallingManager = buildToolCallingManager()
@@ -198,7 +213,8 @@ internal class ToolCallingLoop(
 
         var prompt = appendToolConversationHistory(initialPrompt, toolExecutionResult)
         var lastFinalResponse: SpringChatResponse? = null
-        val budgetRequest = ChatRequestContext(messages = emptyList(), contextWindow = contextWindow)
+        val budgetRequest =
+            ChatRequestContext(messages = emptyList(), contextWindow = contextWindow, onContextBudgeted = onContextBudgeted)
         repeat(maxRounds) { followUpRoundIndex ->
             val round = followUpRoundIndex + 1
             token?.throwIfCancelled()

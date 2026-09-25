@@ -209,7 +209,7 @@ class AutonomousCoordinator
             activeCancellationTokens[todoId]?.cancel()
             activeTodoJobs[todoId]?.cancel()
             decompositionScheduler.cancel(todoId)
-            return todoManager.cancelTodo(todoId)
+            return cancelTodoAndReleaseAgent(todoId, todoManager::cancelTodo, subAgents, agentBusySince, subAgentOps)
         }
 
         /**
@@ -223,7 +223,7 @@ class AutonomousCoordinator
                 activeCancellationTokens[todo.id]?.cancel()
                 activeTodoJobs[todo.id]?.cancel()
                 decompositionScheduler.cancel(todo.id)
-                todoManager.cancelTodo(todo.id)
+                cancelTodoAndReleaseAgent(todo.id, todoManager::cancelTodo, subAgents, agentBusySince, subAgentOps)
             }
             return stoppableTodos.size
         }
@@ -247,14 +247,16 @@ class AutonomousCoordinator
 
         private suspend fun drainWork() {
             if (executionControl?.isGloballyPaused() == true) return
-            requestedTodoIds.toList().forEach { requestedTodoId ->
-                val claimed = claimAndProcessOneTodo(requestedTodoId)
-                val current = todoStore.listTodos().firstOrNull { it.id == requestedTodoId }
-                if (claimed || current?.status != TodoStatus.PENDING) {
-                    requestedTodoIds.remove(requestedTodoId)
-                    requestedTodoIdSet.remove(requestedTodoId)
+            candidateSelector
+                .orderRequested(requestedTodoIds.toList())
+                .forEach { requestedTodoId ->
+                    val claimed = claimAndProcessOneTodo(requestedTodoId)
+                    val current = todoStore.listTodos().firstOrNull { it.id == requestedTodoId }
+                    if (claimed || current?.status != TodoStatus.PENDING) {
+                        requestedTodoIds.remove(requestedTodoId)
+                        requestedTodoIdSet.remove(requestedTodoId)
+                    }
                 }
-            }
             if (autonomousProcessingEnabled.get()) {
                 while (claimAndProcessOneTodo()) {
                     // Continue claiming while capacity is available.

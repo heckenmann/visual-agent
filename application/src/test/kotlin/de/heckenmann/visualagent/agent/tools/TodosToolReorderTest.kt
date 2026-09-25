@@ -22,7 +22,14 @@ class TodosToolReorderTest {
         val db = createDatabase("reorder-before")
         try {
             val tool = createTool(db)
-            val first = tool.execute(reorderJson("action" to "add", "description" to "A", "assignedAgentId" to "agent-1"))
+            val first =
+                tool.execute(
+                    reorderJson(
+                        "action" to "add",
+                        "description" to "A",
+                        "assignedAgentId" to "agent-1",
+                    ),
+                )
             val firstId = first.content.removePrefix("Added todo ")
             tool.execute(reorderJson("action" to "add", "description" to "B", "assignedAgentId" to "agent-1"))
             val secondId = db.listTodos().first { it.description == "B" }.id
@@ -54,7 +61,7 @@ class TodosToolReorderTest {
         val manager = mockk<AgentManager>()
         every { manager.getSubAgent(any()) } returns SubAgent(id = "agent-1", name = "Coder", role = "Implementation")
         every { manager.todoManager } returns TodoManager(db, TodoEventBus())
-        return todosTool(db, db, manager)
+        return todosToolWithoutScheduling(db, manager)
     }
 }
 

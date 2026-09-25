@@ -31,6 +31,7 @@ import de.heckenmann.visualagent.ui.workspace.*
 internal fun ConversationInputCard(
     input: String,
     sending: Boolean,
+    contextReduced: Boolean = false,
     onInputChange: (String) -> Unit,
     onSend: () -> Unit,
     onCancel: () -> Unit,
@@ -55,6 +56,7 @@ internal fun ConversationInputCard(
         ConversationInputArea(
             input = input,
             sending = sending,
+            contextReduced = contextReduced,
             onInputChange = onInputChange,
             onSend = onSend,
             onCancel = onCancel,

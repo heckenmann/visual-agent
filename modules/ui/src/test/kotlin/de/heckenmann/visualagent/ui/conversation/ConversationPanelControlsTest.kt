@@ -80,6 +80,27 @@ class ConversationPanelControlsTest {
     }
 
     @Test
+    fun `context reduction shows warning and emphasizes the send action`() {
+        composeTestRule.setContent {
+            MaterialTheme {
+                ConversationInputArea(
+                    input = "Follow up",
+                    sending = false,
+                    contextReduced = true,
+                    onInputChange = {},
+                    onSend = {},
+                    onCancel = {},
+                    onClear = {},
+                    inputFocusRequester = FocusRequester(),
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Recent context or tool details were omitted to fit the model's token limit.").assertExists()
+        composeTestRule.onNodeWithContentDescription("Send message; context was reduced").assertExists()
+    }
+
+    @Test
     fun `cancel button is visible while sending and invokes onCancel`() {
         var cancelled = false
         composeTestRule.setContent {

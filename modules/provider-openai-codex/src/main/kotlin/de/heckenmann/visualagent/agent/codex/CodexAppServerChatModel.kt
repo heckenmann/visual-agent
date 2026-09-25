@@ -2,7 +2,6 @@ package de.heckenmann.visualagent.agent.codex
 
 import de.heckenmann.visualagent.agent.CancellationToken
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.reactor.flux
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -124,8 +123,8 @@ internal class CodexAppServerChatModel(
                                                     ?.jsonPrimitive
                                                     ?.contentOrNull
                                                     .orEmpty()
-                                            deltaBuffer.accept(delta, itemId)?.let { previous ->
-                                                send(response(previous.text, done = false, itemId = previous.itemId))
+                                            deltaBuffer.accept(delta, itemId)?.let { received ->
+                                                send(response(received.text, done = false, itemId = received.itemId))
                                             }
                                         }
                                         "item/reasoning/summaryTextDelta" -> {
@@ -160,12 +159,6 @@ internal class CodexAppServerChatModel(
                                                         ?.contentOrNull
                                                         ?: "Codex turn $status"
                                                 error(message)
-                                            }
-                                            deltaBuffer.complete()?.let { batch ->
-                                                batch.chunks.forEachIndexed { index, chunk ->
-                                                    send(response(chunk, done = false, itemId = batch.itemId))
-                                                    if (batch.animate && index < batch.chunks.lastIndex) delay(SIMULATED_CHUNK_DELAY_MS)
-                                                }
                                             }
                                             return@withTimeout
                                         }
@@ -283,7 +276,6 @@ internal class CodexAppServerChatModel(
         private const val CODEX_REASONING = "codexReasoning"
         private const val WORKSPACE_FILE_TOOL_NAME = "workspace_file"
         private const val WORKSPACE_IMAGE_ACTION = "imageBytes"
-        private const val SIMULATED_CHUNK_DELAY_MS = 16L
         private const val TURN_TIMEOUT_MILLIS = 300_000L
     }
 }
