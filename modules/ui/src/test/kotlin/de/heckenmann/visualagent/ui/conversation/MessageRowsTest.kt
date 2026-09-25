@@ -53,7 +53,8 @@ class MessageRowsTest {
         }
         composeTestRule.onNodeWithText("You").assertExists()
         composeTestRule.onNodeWithText("hello").assertExists()
-        composeTestRule.onNodeWithContentDescription("Copy user message").performClick()
+        composeTestRule.onNodeWithContentDescription("Message actions").performClick()
+        composeTestRule.onNodeWithText("Copy").performClick()
         assertTrue(copied)
     }
 
@@ -76,7 +77,8 @@ class MessageRowsTest {
                 )
             }
         }
-        composeTestRule.onNodeWithContentDescription("Retry from previous user message").performClick()
+        composeTestRule.onNodeWithContentDescription("Message actions").performClick()
+        composeTestRule.onNodeWithText("Retry").performClick()
         assertTrue(retried)
     }
 
@@ -99,7 +101,8 @@ class MessageRowsTest {
                 )
             }
         }
-        composeTestRule.onNodeWithContentDescription("Edit user message").performClick()
+        composeTestRule.onNodeWithContentDescription("Message actions").performClick()
+        composeTestRule.onNodeWithText("Edit").performClick()
         assertTrue(edited)
     }
 
@@ -143,7 +146,8 @@ class MessageRowsTest {
                 )
             }
         }
-        composeTestRule.onNodeWithContentDescription("Delete assistant message").performClick()
+        composeTestRule.onNodeWithContentDescription("Message actions").performClick()
+        composeTestRule.onNodeWithText("Delete").performClick()
         assertTrue(deleted)
     }
 
@@ -165,9 +169,11 @@ class MessageRowsTest {
                 )
             }
         }
-        composeTestRule.onNodeWithContentDescription("Retry from previous user message").assertExists()
-        composeTestRule.onNodeWithContentDescription("Edit assistant message").assertDoesNotExist()
-        composeTestRule.onNodeWithContentDescription("Delete assistant message").assertDoesNotExist()
+        composeTestRule.onNodeWithContentDescription("Message actions").performClick()
+        composeTestRule.onNodeWithText("Copy").assertExists()
+        composeTestRule.onNodeWithText("Retry").assertExists()
+        composeTestRule.onNodeWithText("Edit").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Delete").assertDoesNotExist()
     }
 
     @Test

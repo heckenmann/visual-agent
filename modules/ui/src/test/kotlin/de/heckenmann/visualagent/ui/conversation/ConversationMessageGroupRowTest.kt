@@ -143,6 +143,30 @@ class ConversationMessageGroupRowTest {
     }
 
     @Test
+    fun `copy action is available in the same menu as message actions`() {
+        var status = ""
+        val group = ConversationMessageGroup(listOf(persisted("Copy this", "user")))
+
+        composeTestRule.setContent {
+            MaterialTheme {
+                ConversationMessageGroupRow(
+                    group = group,
+                    sending = false,
+                    deletingMessageIds = emptySet(),
+                    onDeleteMessage = {},
+                    onStatusChange = { status = it },
+                    onEditMessage = {},
+                    onRetry = {},
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithContentDescription("Message actions").performClick()
+        composeTestRule.onNodeWithText("Copy").performClick()
+        composeTestRule.runOnIdle { assertEquals("Copied user message", status) }
+    }
+
+    @Test
     fun `hover timestamp does not reduce message content width`() {
         var showTimestamp by mutableStateOf(false)
         val message = persisted("A message that must retain its available width", "user")

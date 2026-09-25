@@ -17,10 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -89,31 +85,16 @@ internal fun MessageRow(
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
-                ConversationCopyAction(message = message, onCopied = onCopied)
-                if (canEdit) {
-                    ActionIconButton(
-                        icon = Icons.Filled.Edit,
-                        description = "Edit ${message.role} message",
-                        modifier = Modifier.size(24.dp).alpha(0.6f),
-                        onClick = onEdit,
-                    )
-                }
-                if (canDelete) {
-                    ActionIconButton(
-                        icon = Icons.Filled.Delete,
-                        description = "Delete ${message.role} message",
-                        modifier = Modifier.size(24.dp).alpha(0.6f),
-                        onClick = onDelete,
-                    )
-                }
-                if (canRetry) {
-                    ActionIconButton(
-                        icon = Icons.Filled.Refresh,
-                        description = "Retry from previous user message",
-                        modifier = Modifier.size(24.dp).alpha(0.6f),
-                        onClick = onRetry,
-                    )
-                }
+                conversationMessageActionMenu(
+                    message = message,
+                    canEdit = canEdit,
+                    canDelete = canDelete,
+                    canRetry = canRetry,
+                    onEdit = onEdit,
+                    onDelete = onDelete,
+                    onRetry = onRetry,
+                    onCopied = onCopied,
+                )
             }
             ConversationMessageContent(message, isStreamingPlaceholder, isStreaming)
         }

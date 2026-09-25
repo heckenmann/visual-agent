@@ -57,7 +57,6 @@ internal fun conversationMessageActionMenu(
     var expanded by remember(message.id) { mutableStateOf(false) }
     Box(modifier = modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            ConversationCopyAction(message = message, onCopied = onCopied)
             ActionIconButton(
                 icon = Icons.Filled.MoreVert,
                 description = "Message actions",
@@ -71,6 +70,7 @@ internal fun conversationMessageActionMenu(
                 canEdit = canEdit,
                 canDelete = canDelete,
                 canRetry = canRetry,
+                onCopied = onCopied,
                 onEdit = onEdit,
                 onDelete = onDelete,
                 onRetry = onRetry,
@@ -81,25 +81,6 @@ internal fun conversationMessageActionMenu(
             conversationTimestampPopup(timestamp)
         }
     }
-}
-
-/** Copies the exact unrendered content of one conversation message. */
-@Composable
-internal fun ConversationCopyAction(
-    message: Message,
-    onCopied: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    ActionIconButton(
-        icon = Icons.Filled.ContentCopy,
-        description = "Copy ${message.role} message",
-        tooltipDescription = null,
-        modifier = modifier.size(24.dp).alpha(0.6f),
-        onClick = {
-            copyToClipboard(message.content)
-            onCopied()
-        },
-    )
 }
 
 /** Displays a timestamp outside the message layout without intercepting pointer input. */
@@ -132,11 +113,16 @@ private fun conversationActionMenuItems(
     canEdit: Boolean,
     canDelete: Boolean,
     canRetry: Boolean,
+    onCopied: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onRetry: () -> Unit,
     dismiss: () -> Unit,
 ) {
+    conversationActionMenuItem("Copy", Icons.Filled.ContentCopy, {
+        copyToClipboard(message.content)
+        onCopied()
+    }, dismiss)
     if (canEdit) conversationActionMenuItem("Edit", Icons.Filled.Edit, onEdit, dismiss)
     if (canRetry) conversationActionMenuItem("Retry", Icons.Filled.Refresh, onRetry, dismiss)
     if (canDelete) conversationActionMenuItem("Delete", Icons.Filled.Delete, onDelete, dismiss)
