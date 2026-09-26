@@ -152,11 +152,14 @@ These entries are restored on restart and rendered in conversation UI as minimiz
 ## Migration Notes
 
 - Flyway runs before the R2DBC store beans through Spring Boot's `flywayInitializer`.
+- A `FlywayMigrationStrategy` rejects schema versions newer than this build and takes a pre-migration snapshot before applying pending migrations to an existing file database. A failed snapshot blocks migration and startup.
+- Snapshots live under `<server-data-root>/migration-backups/snapshot-<timestamp>-<id>/` and contain `database.zip` (H2's online `BACKUP TO` archive), `manifest.properties`, and a copy of `workspace/` when present. Snapshot directories and files are private to the current user on POSIX systems. Treat them as sensitive: the database can contain plaintext provider keys.
+- Fresh databases and databases already at the current schema version do not create a snapshot.
 - Migration resources use Flyway's `V<number>__<description>.sql` convention under `db/migration-h2/`.
 - The initial H2 schema is defined in `db/migration-h2/V1__initial_h2_schema.sql` and is recorded in `flyway_schema_history`.
 - Future schema changes add a new versioned resource; existing migrations must never be edited after release.
 - Flyway validates applied migrations and records checksums, execution order, success, and timestamps.
-- A failed migration prevents application startup. After the cause is fixed, startup retries the pending migration.
+- A failed migration prevents application startup. The desktop shows a sanitized error and the snapshot location, if one was made. Keep the failed database and the snapshot until recovery has been verified; do not blindly retry a partially applied migration.
 - `spring.flyway.baseline-on-migrate=true` provides the one-time transition for databases already initialized by the former R2DBC runner. New databases execute `V1` normally.
 - Runtime queries and writes continue to use R2DBC; the JDBC data source exists only for Flyway.
 - Legacy database files from the pre-H2 runtime must be exported or migrated through a dedicated migration process before they can be used by the H2 runtime.
@@ -166,6 +169,28 @@ These entries are restored on restart and rendered in conversation UI as minimiz
   The workspace is then derived from that database's parent. Do not merge legacy and target roots;
   copy the complete directory only while the application is stopped and only when the target does
   not already exist.
+
+### Compatibility And Recovery
+
+- This build upgrades H2 schema versions V1 and V2 forward to V3 through Flyway; V3 is the current schema. An older application must not open a database whose Flyway history contains newer migrations. Downgrades are not supported. Preserve the original data and use the newer application or a verified compatible backup.
+- Add a new migration for every released schema change. Never change or reorder a released migration: Flyway checksum validation must identify drift. Test upgrades from every retained release fixture before shipping a new schema.
+- Destructive changes require an explicit data-preserving migration: create a replacement table/column, copy and backfill existing rows, validate counts and key relationships, then remove the old structure in a later release after compatibility has been verified. Do not use an in-place `DROP` or a startup reset to resolve schema drift.
+- Stop all Visual Agent processes before restoring. Make a separate copy of the current failed database and workspace first. Select the correct snapshot by its `manifest.properties`; it records source and target schema versions.
+- Restore the H2 archive into an **empty, separate directory** using H2's `org.h2.tools.Restore` command or API, with the database name matching the original H2 file stem. For the default `visual-agent.db` path, the H2 file stem is `visual-agent.db`. Verify the restored database opens and its Flyway history/data are correct before replacing the failed files.
+- Restore the snapshot's `workspace/` alongside that database, not independently: workspace metadata and canvas documents must refer to the same point in time. Replace the live database and workspace only while the server is stopped, then start the compatible application and verify conversation, todos, provider settings, imported files, and canvas. Keep the snapshot until that verification passes.
+- Snapshot creation is only an upgrade guard. It is not a scheduled/general backup or a replacement for export/restore tooling (tracked separately by issue #361). H2's SQL `BACKUP TO` supports online consistent database archives; the offline `org.h2.tools.Backup` utility is not used.
+- Pre-H2 SQLite databases are outside this automatic upgrade path. Their data must be exported through a dedicated conversion process; pointing the H2 runtime at a SQLite file is unsupported.
+
+This design uses the existing H2 and Flyway dependencies rather than adding a backup library. The hook is Spring Boot's documented `FlywayMigrationStrategy`, and the archive is produced with H2's documented `BACKUP TO` command.
+
+For the default database name, run the following while the server is stopped. Set `H2_JAR` to the H2 dependency JAR matching the application version, and use a new empty directory for `RESTORE_DIR`:
+
+```bash
+java -cp "$H2_JAR" org.h2.tools.Restore \
+  -file "$SNAPSHOT_DIR/database.zip" -dir "$RESTORE_DIR" -db visual-agent.db
+```
+
+After verification, the restored `visual-agent.db.mv.db` and the snapshot's `workspace/` replace their live counterparts together, with the server still stopped. Do not copy `database.zip` over an H2 database file.
 
 ## Operational Notes
 

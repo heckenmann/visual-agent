@@ -112,13 +112,23 @@ private fun ComposeStartupHost(exitApplication: () -> Unit) {
             }
             throw cancelled
         } catch (failure: Exception) {
-            logger.error("Could not start the desktop server", failure)
+            val migrationFailure = failure.databaseMigrationFailure()
+            if (migrationFailure == null) {
+                logger.error("Could not start the desktop server", failure)
+            } else {
+                logger.error(
+                    "Database migration failed: reason={}, backup={}, causeType={}",
+                    migrationFailure.kind,
+                    migrationFailure.backupDirectory,
+                    migrationFailure.cause?.javaClass?.simpleName,
+                )
+            }
             withContext(Dispatchers.IO + NonCancellable) { context?.close() }
             startupStatus =
                 if (endpoint is DesktopServerEndpoint.RemoteTls) {
                     StartupStatus.failed("The remote server could not be used by this desktop build")
                 } else {
-                    StartupStatus.failed()
+                    StartupStatus.failed(migrationFailure?.userMessage())
                 }
         }
     }

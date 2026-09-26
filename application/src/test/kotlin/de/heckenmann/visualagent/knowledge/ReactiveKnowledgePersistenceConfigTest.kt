@@ -66,6 +66,9 @@ class ReactiveKnowledgePersistenceConfigTest {
 
         assertEquals(8, db.conversationStore.getConversationMessage(newId)?.timelineSequence)
         db.close()
+        Files.list(databasePath.parent.resolve("migration-backups")).use { snapshots ->
+            assertEquals(1, snapshots.count(), "A V1 upgrade must preserve a pre-migration snapshot")
+        }
     }
 
     @Test
@@ -131,6 +134,9 @@ class ReactiveKnowledgePersistenceConfigTest {
         assertTrue("CONVERSATION_HISTORY" in tables, "Migrated schema tables: $tables")
         assertTrue("SUB_AGENT_CONFIGS" in tables, "Migrated schema tables: $tables")
         db.close()
+        Files.list(databasePath.parent.resolve("migration-backups")).use { snapshots ->
+            assertEquals(1, snapshots.count(), "An unversioned legacy schema must be backed up before migration")
+        }
     }
 
     private fun createCurrentV1SchemaWithTimelineValue(
