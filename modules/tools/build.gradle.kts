@@ -21,6 +21,7 @@ dependencies {
     compileOnly(libs.spring.context)
     implementation(libs.serialization.json)
     implementation(libs.reactor.core)
+    implementation(libs.dnsjava)
 
     testImplementation(libs.kotlin.test)
     testImplementation(libs.junit.jupiter)

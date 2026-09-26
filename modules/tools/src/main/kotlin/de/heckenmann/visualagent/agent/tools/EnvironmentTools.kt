@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
 import de.heckenmann.visualagent.agent.tools.api.ToolSettingsPort
 import de.heckenmann.visualagent.agent.tools.api.ToolSettingsUpdate
+import java.net.URI
 
 /** Tool that exposes safe application/session settings to the model. */
 @AgentTool
@@ -67,6 +68,7 @@ class SettingsTool(
 @AgentTool
 class ContextTool(
     private val settings: ToolSettingsPort,
+    private val runtimeDiagnostics: RuntimeDiagnosticsProvider,
 ) : VisualAgentTool {
     override val definition =
         ToolDefinition(
@@ -90,11 +92,26 @@ class ContextTool(
                 val current = settings.read()
                 appendLine("Provider: ${current.provider}")
                 appendLine("Model: ${current.model}")
-                appendLine("OpenAI Base URL: ${current.openAiBaseUrl}")
+                appendLine("OpenAI Base URL: ${current.openAiBaseUrl.sanitizedEndpoint()}")
                 appendLine("OpenAI API key configured: ${current.openAiApiKeyConfigured}")
-                context.entries.sortedBy { it.key }.forEach { (key, value) ->
-                    appendLine("$key: $value")
-                }
+                appendLine(runCatching { runtimeDiagnostics.snapshot().toContextText() }.getOrDefault("Server runtime: unavailable"))
+                context.entries
+                    .filter { (key, _) -> key in SAFE_CONTEXT_KEYS }
+                    .sortedBy { it.key }
+                    .forEach { (key, value) ->
+                        appendLine("$key: $value")
+                    }
             }.trim(),
         )
+
+    private fun String.sanitizedEndpoint(): String =
+        runCatching {
+            val uri = URI(this)
+            require(uri.scheme != null && uri.host != null)
+            URI(uri.scheme, null, uri.host, uri.port, uri.path, null, null).toString().trimEnd('/')
+        }.getOrDefault("[configured endpoint]")
+
+    private companion object {
+        val SAFE_CONTEXT_KEYS = setOf("agent", "agentId", "agentName", "agentRole", "requestId", "sessionId", "trigger")
+    }
 }

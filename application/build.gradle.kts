@@ -106,7 +106,11 @@ val jacocoExcludedClasses = emptyList<String>()
 
 tasks.jacocoTestReport {
     dependsOn(tasks.test)
-    executionData(layout.buildDirectory.file("jacoco/test.exec"))
+    dependsOn(":tool-standard:test")
+    executionData(
+        layout.buildDirectory.file("jacoco/test.exec"),
+        project(":tool-standard").layout.buildDirectory.file("jacoco/test.exec"),
+    )
     classDirectories.setFrom(
         files(
             classDirectories.files.map {
@@ -127,7 +131,11 @@ tasks.jacocoTestReport {
 
 tasks.jacocoTestCoverageVerification {
     dependsOn(tasks.test)
-    executionData(layout.buildDirectory.file("jacoco/test.exec"))
+    dependsOn(":tool-standard:test")
+    executionData(
+        layout.buildDirectory.file("jacoco/test.exec"),
+        project(":tool-standard").layout.buildDirectory.file("jacoco/test.exec"),
+    )
     classDirectories.setFrom(
         files(
             classDirectories.files.map {
