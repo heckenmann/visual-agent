@@ -59,13 +59,11 @@ internal fun MessageRow(
     modifier: Modifier = Modifier,
 ) {
     val isUser = message.role == "user"
-    val accent = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
+    val accent = ConversationMessageColors.accent(message.role, MaterialTheme.colorScheme)
     val background =
-        if (isUser) {
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-        } else {
-            MaterialTheme.colorScheme.surfaceContainerLow
-        }
+        ConversationMessageColors
+            .background(message.role, MaterialTheme.colorScheme)
+            .let { if (isUser) it.copy(alpha = 0.3f) else it }
     AnimatedVisibility(
         visibleState = rememberConversationMessageVisibility(isVisible = !isDeleting),
         enter = conversationMessageEnterTransition(),

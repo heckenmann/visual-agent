@@ -11,10 +11,6 @@ internal sealed interface ConversationTimelineItem {
         override val stableKey = "conversation-input"
     }
 
-    data object Waiting : ConversationTimelineItem {
-        override val stableKey = "streaming-indicator"
-    }
-
     data class Streaming(
         val content: String,
         val id: String,
@@ -71,7 +67,7 @@ internal fun buildConversationTimeline(
     history: List<Message>,
     pendingUserMessage: String?,
     streamingContent: String,
-    showWaitingIndicator: Boolean,
+    requestActive: Boolean,
     showOlderHistoryLoading: Boolean,
     includeInlineComposer: Boolean,
     todos: List<TodoItem> = emptyList(),
@@ -83,7 +79,6 @@ internal fun buildConversationTimeline(
 ): List<ConversationTimelineItem> =
     buildList {
         if (includeInlineComposer) add(ConversationTimelineItem.InlineComposer)
-        if (showWaitingIndicator) add(ConversationTimelineItem.Waiting)
         val uniqueHistory = history.distinctPersistedMessages()
         val persistedIds = uniqueHistory.mapNotNull { message -> message.id }.toSet()
         val activeStreamingMessages =
@@ -225,7 +220,7 @@ internal fun buildConversationTimeline(
             deletedTodoSnapshots.isEmpty() &&
             pendingUserMessage == null &&
             streamingContent.isEmpty() &&
-            !showWaitingIndicator
+            !requestActive
         ) {
             add(ConversationTimelineItem.Empty)
         }

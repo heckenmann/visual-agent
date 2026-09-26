@@ -246,12 +246,7 @@ private fun ConversationMessageGroupContent(
 }
 
 @Composable
-private fun groupBackground(role: String) =
-    if (role == "user") {
-        MaterialTheme.colorScheme.primaryContainer
-    } else {
-        MaterialTheme.colorScheme.surfaceContainerLow
-    }
+private fun groupBackground(role: String) = ConversationMessageColors.background(role, MaterialTheme.colorScheme)
 
 @Composable
 internal fun SubAgentTimelineRow(

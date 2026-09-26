@@ -18,9 +18,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.ActivityPort
@@ -70,10 +73,13 @@ internal fun ConversationPanel(
     val conversationState = rememberConversationUiState(emptyList())
     loadConversationHistory(conversationPort, conversationState)
     onScrollStateObserved?.invoke(conversationState, listState)
-    RegisterPanelScrollbar(rememberScrollbarAdapter(listState))
+    val listScrollbarAdapter = rememberScrollbarAdapter(listState)
+    RegisterPanelScrollbar(remember(listScrollbarAdapter) { ConversationReversedScrollbarAdapter(listScrollbarAdapter) })
     var activeToken by remember { mutableStateOf<CancellationToken?>(null) }
     var hasNewMessages by remember { mutableStateOf(false) }
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
+    var overlayHeightPx by remember { mutableStateOf(0) }
+    var inlineComposerHeightPx by remember { mutableStateOf(0) }
     val preferences = remember(conversationPort) { conversationPort.preferences() }
     var inputPlacement by remember { mutableStateOf(preferences.inputPlacement) }
     val streamingContent by conversationState.streaming.collectAsState()
@@ -95,25 +101,17 @@ internal fun ConversationPanel(
             }
     }
     val inputIsConversationMessage = inputPlacement == ConversationInputPlacement.CONVERSATION_MESSAGE
-    val showWaitingIndicator = inFlight.state.value.totalActive > 0 && streamingContent.isEmpty()
+    val isRequestActive = inFlight.state.value.totalActive > 0
+    val overlayBottomPadding = with(LocalDensity.current) { overlayHeightPx.toDp() + 8.dp }.coerceAtLeast(112.dp)
+    val emptyStateTopInset = conversationEmptyStateTopInset(inputIsConversationMessage, inlineComposerHeightPx, overlayBottomPadding)
     val timeline =
-        buildConversationTimeline(
-            history = conversationState.history,
-            pendingUserMessage = conversationState.pendingUserMessage,
-            pendingUserEntryId = conversationState.pendingUserEntryId,
-            streamingContent = streamingContent,
-            streamingMessages = streamingTurns,
-            streamingEntryId = conversationState.streamingEntryId,
-            showWaitingIndicator = showWaitingIndicator,
-            showOlderHistoryLoading =
-                shouldShowOlderHistoryLoadingIndicator(
-                    conversationState.isLoadingOlder,
-                    conversationState.hasMoreHistory,
-                ),
+        buildConversationPanelTimeline(
+            conversationState,
+            streamingContent,
+            streamingTurns,
+            isRequestActive,
+            todoState,
             includeInlineComposer = inputIsConversationMessage,
-            todos = todoState.todos,
-            deletedTodoSnapshots = todoState.deletedSnapshots,
-            todoResponses = todoState.responses,
         )
     ConversationHistoryPagingEffect(
         state = conversationState,
@@ -192,7 +190,16 @@ internal fun ConversationPanel(
         streamingFlow = conversationState.streaming,
     )
     val onInputPlacementChange =
-        conversationInputPlacementChange(scope, conversationPort) { placement -> inputPlacement = placement }
+        conversationInputPlacementChange(scope, conversationPort, listState) { placement -> inputPlacement = placement }
+    val onComposerInputChange: (String) -> Unit = { value ->
+        conversationState.input = value
+        suggestionController.onInputChanged(value)
+    }
+    val onComposerSend: () -> Unit = { sendContent(conversationState.input) }
+    val onComposerCancel: () -> Unit = {
+        suggestionController.onUserInteraction()
+        activeToken?.cancel()
+    }
     CompositionLocalProvider(
         LocalConversationPort provides conversationPort,
         LocalClientImagePort provides clientImagePort,
@@ -209,31 +216,55 @@ internal fun ConversationPanel(
                     scope = scope,
                     sendContent = sendContent,
                     inlineComposer = {
-                        ConversationInputCard(
-                            input = conversationState.input,
-                            sending = conversationState.sending,
-                            contextReduced = contextReduced,
-                            onInputChange = { value ->
-                                conversationState.input = value
-                                suggestionController.onInputChanged(value)
-                            },
-                            onSend = { sendContent(conversationState.input) },
-                            onCancel = {
-                                suggestionController.onUserInteraction()
-                                activeToken?.cancel()
-                            },
-                            onClear = clearConversation,
-                            inputPlacement = inputPlacement,
-                            onInputPlacementChange = onInputPlacementChange,
-                            inputFocusRequester = inputFocusRequester,
-                            ghostText = suggestionState.text,
-                            ghostCursorVisible = suggestionState.cursorVisible,
-                            onFocusChanged = suggestionController::onFocusChanged,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
+                        Box(Modifier.fillMaxWidth().onSizeChanged { inlineComposerHeightPx = it.height }) {
+                            ConversationInputCard(
+                                input = conversationState.input,
+                                sending = conversationState.sending,
+                                isRequestActive = isRequestActive,
+                                contextReduced = contextReduced,
+                                onInputChange = onComposerInputChange,
+                                onSend = onComposerSend,
+                                onCancel = onComposerCancel,
+                                onClear = clearConversation,
+                                inputPlacement = inputPlacement,
+                                onInputPlacementChange = onInputPlacementChange,
+                                inputFocusRequester = inputFocusRequester,
+                                ghostText = suggestionState.text,
+                                ghostCursorVisible = suggestionState.cursorVisible,
+                                onFocusChanged = suggestionController::onFocusChanged,
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                            )
+                        }
                     },
+                    bottomContentPadding = if (inputIsConversationMessage) 4.dp else overlayBottomPadding,
+                    emptyStateTopInset = emptyStateTopInset,
                     modifier = Modifier.fillMaxSize(),
                 )
+                if (!inputIsConversationMessage) {
+                    ConversationInputOverlay(
+                        input = conversationState.input,
+                        sending = conversationState.sending,
+                        isRequestActive = isRequestActive,
+                        contextReduced = contextReduced,
+                        onInputChange = onComposerInputChange,
+                        onSend = onComposerSend,
+                        onCancel = onComposerCancel,
+                        onClear = clearConversation,
+                        inputPlacement = inputPlacement,
+                        onInputPlacementChange = onInputPlacementChange,
+                        inputFocusRequester = inputFocusRequester,
+                        ghostText = suggestionState.text,
+                        ghostCursorVisible = suggestionState.cursorVisible,
+                        onFocusChanged = suggestionController::onFocusChanged,
+                        onSizeChanged = { overlayHeightPx = it.height },
+                        modifier =
+                            Modifier
+                                .align(Alignment.BottomCenter)
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp, vertical = 8.dp)
+                                .testTag("conversation-input-overlay"),
+                    )
+                }
                 ConversationPanelQueueStrip(
                     queue = queue,
                     scope = scope,
@@ -256,37 +287,14 @@ internal fun ConversationPanel(
                     onStreamCompletion = conversationState::completeStream,
                     streamingFlow = conversationState.streaming,
                 )
-                ConversationScrollToLatestArea(
-                    isAtLatest = isAtLatest,
-                    hasNewMessages = hasNewMessages,
-                    state = conversationState,
-                    gateway = conversationGateway,
-                    listState = listState,
-                    scope = scope,
-                )
-            }
-            if (!inputIsConversationMessage) {
-                ConversationInputCard(
-                    input = conversationState.input,
-                    sending = conversationState.sending,
-                    contextReduced = contextReduced,
-                    onInputChange = { value ->
-                        conversationState.input = value
-                        suggestionController.onInputChanged(value)
-                    },
-                    onSend = { sendContent(conversationState.input) },
-                    onCancel = {
-                        suggestionController.onUserInteraction()
-                        activeToken?.cancel()
-                    },
-                    onClear = clearConversation,
-                    inputPlacement = inputPlacement,
-                    onInputPlacementChange = onInputPlacementChange,
-                    inputFocusRequester = inputFocusRequester,
-                    ghostText = suggestionState.text,
-                    ghostCursorVisible = suggestionState.cursorVisible,
-                    onFocusChanged = suggestionController::onFocusChanged,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
+                ConversationPanelScrollToLatest(
+                    isAtLatest,
+                    hasNewMessages,
+                    conversationState,
+                    conversationGateway,
+                    listState,
+                    scope,
+                    if (inputIsConversationMessage) 0.dp else overlayBottomPadding + 8.dp,
                 )
             }
             ConversationEditMessageOverlay(conversationState, conversationPort, modalRequester)

@@ -4,9 +4,9 @@
 
 While work is happening — a todo being processed, a sub-agent running, a tool
 call executing, or the main agent streaming a response — the conversation panel
-shows ephemeral, inline indicators derived from the existing `InFlightState`
-holder. The user can see at a glance where activity is happening without
-switching to other panels.
+shows ephemeral row indicators and a composer activity outline derived from the
+existing `InFlightState` holder. The user can see where activity is happening
+without switching to other panels.
 
 ## Actors
 
@@ -46,13 +46,13 @@ switching to other panels.
     animated left-edge accent bar in the primary color and renders received
     Markdown incrementally. Completed blocks remain stable while an unfinished
     Markdown tail continues to update as new chunks arrive.
-12. Before the first streamed token arrives, a "Thinking" indicator is shown
-    only while `InFlightState.totalActive > 0`; a stale local send flag cannot
-    keep it visible after activity ends.
-13. When the composer is fixed at the panel bottom, the message viewport ends
-    above it, so the inline "Thinking" indicator remains visible and cannot be
-    covered. When the composer is a conversation message, it remains inline in
-    the message list.
+12. Before the first streamed token arrives, the composer shows a rotating
+    theme-colored outline while `InFlightState.totalActive > 0`. No separate
+    pre-stream "Thinking" row is added to the conversation.
+13. When the composer is pinned at the panel bottom, the message list has enough
+    bottom clearance to keep its newest content readable above the translucent
+    overlay. Older messages can scroll behind it. Without a pin, the composer is
+    the newest scrollable item.
 14. When all activity ends, `totalActive == 0` and all ephemeral indicators are
     gone; the conversation reads as a static transcript.
 
@@ -73,10 +73,10 @@ switching to other panels.
   including `setCurrentTodoInProgress`.
 - `AgentStatusCallbackEffect.kt` — wires agent status and todo events into
   `InFlightState`.
-- `ComposeConversationPanel.kt` — derives the waiting state and keeps the
-  fixed composer outside the message viewport.
-- `ComposeConversationMessageList.kt` — passes `InFlightState` into tool and
-  sub-agent rows and renders the inline waiting indicator.
+- `ComposeConversationPanel.kt` — derives request activity and places the
+  pinned composer over the message viewport.
+- `ComposeConversationMessageList.kt` — renders conversation timeline rows
+  without a separate pre-stream waiting row.
 - `ComposeStreamingMarkdown.kt` — uses the Markdown renderer's append-only
   streaming state for live assistant and todo-response content without
   rewriting the raw Markdown.
@@ -109,11 +109,10 @@ switching to other panels.
   response content is dropped or normalized.
 - Replacing a transient streamed row with its persisted assistant message does
   not duplicate or lose Markdown content.
-- The pre-stream "Thinking" indicator derives exclusively from
-  `InFlightState.totalActive` and disappears after successful, failed, timed
-  out, or cancelled requests complete their shared terminal path.
-- With a fixed composer, the pre-stream indicator remains in the visible
-  message viewport and is not covered by the input card.
+- The pre-stream composer outline derives from `InFlightState.totalActive` and
+  disappears after successful, failed, timed out, or cancelled requests complete.
+- With a pinned composer, the newest message remains visible above the input
+  overlay while older messages can scroll behind it.
 - All indicators use only Material3 theme tokens and Compose-native animations.
 - No new global state holder is introduced; all indicators derive from
   `InFlightStateHolder` and the existing event buses.

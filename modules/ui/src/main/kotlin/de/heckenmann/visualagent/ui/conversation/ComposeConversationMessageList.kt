@@ -1,17 +1,12 @@
 package de.heckenmann.visualagent.ui.conversation
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.TodoItem
 import de.heckenmann.visualagent.ui.agents.*
@@ -36,6 +31,7 @@ internal fun LazyListScope.conversationTimeline(
     onEditMessage: (String?) -> Unit,
     sendContent: (String) -> Unit,
     inlineComposer: @Composable () -> Unit = {},
+    emptyStateTopInset: Dp = 0.dp,
     onOpenTodoResponse: (TodoItem, de.heckenmann.visualagent.ui.todo.TodoResponseState) -> Unit = { _, _ -> },
     shouldAnimateEntry: (String?) -> Boolean = { false },
     onMessageEntryRendered: (String?) -> Unit = {},
@@ -43,7 +39,6 @@ internal fun LazyListScope.conversationTimeline(
     itemsIndexed(items, key = { _, item -> item.stableKey }) { index, item ->
         when (item) {
             ConversationTimelineItem.InlineComposer -> inlineComposer()
-            ConversationTimelineItem.Waiting -> ConversationWaitingIndicator()
             is ConversationTimelineItem.Streaming -> streamingTimelineRow(item, onStatusChange)
             is ConversationTimelineItem.PendingUser -> pendingTimelineRow(item, onStatusChange)
             is ConversationTimelineItem.MessageEntry ->
@@ -91,10 +86,7 @@ internal fun LazyListScope.conversationTimeline(
                 )
             ConversationTimelineItem.OlderHistoryLoading -> OlderHistoryLoadingIndicator()
             ConversationTimelineItem.Empty ->
-                PanelEmptyState(
-                    title = "No conversation yet",
-                    body = "Send a message to start the main agent session.",
-                )
+                ConversationEmptyState(Modifier.fillParentMaxSize().padding(top = emptyStateTopInset))
         }
     }
 }
@@ -145,7 +137,7 @@ internal fun LazyListScope.conversationMessageList(
     onStatusChange: (String) -> Unit,
     onEditMessage: (String?) -> Unit,
     sendContent: (String) -> Unit,
-    showWaitingIndicator: Boolean = inFlight.state.value.totalActive > 0 && streamingContent.isEmpty(),
+    requestActive: Boolean = inFlight.state.value.totalActive > 0,
     todos: List<TodoItem> = emptyList(),
     deletedTodoSnapshots: Map<String, TodoItem> = emptyMap(),
     todoResponses: Map<String, de.heckenmann.visualagent.ui.todo.TodoResponseState> = emptyMap(),
@@ -159,7 +151,7 @@ internal fun LazyListScope.conversationMessageList(
                 history = history.reversed(),
                 pendingUserMessage = pendingUserMessage,
                 streamingContent = streamingContent,
-                showWaitingIndicator = showWaitingIndicator,
+                requestActive = requestActive,
                 showOlderHistoryLoading = false,
                 includeInlineComposer = false,
                 todos = todos,
@@ -272,16 +264,3 @@ private fun List<ConversationTimelineItem>.persistedMessages(): List<Conversatio
             else -> emptyList()
         }
     }
-
-/** Renders the conversation waiting indicator from the canonical in-flight state. */
-@Composable
-internal fun ConversationWaitingIndicator(modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.Start),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text("Thinking", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        PulsingDots()
-    }
-}

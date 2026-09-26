@@ -25,7 +25,9 @@ Desktop user.
 5. If the user browses older history, viewport changes preserve that position instead of forcing the list back to the newest message. New content raises a compact **New messages** control instead.
 6. User input invalidates pending programmatic navigation immediately, but enters history-browsing mode only after it actually moves the list.
 7. Follow mode is restored only after Compose publishes an actual return to index 0 with zero offset.
-8. A fixed composer reserves space below the timeline and does not change list padding or schedule delayed resize navigation.
+8. A pinned composer overlays the timeline. Its measured height sets bottom
+   list padding so the newest message stays readable; older messages may scroll
+   behind the translucent input.
 
 ## Result
 
@@ -55,7 +57,9 @@ The conversation panel follows the latest message automatically without overridi
 - When the structural timeline viewport changes height while the list is at the newest end, the newest message remains visible.
 - When the user is browsing older history, composer and panel size changes preserve the browsed position.
 - While browsing older history, new messages and streaming updates do not move the viewport; the **New messages** control navigates explicitly to the latest content.
-- The fixed composer reserves layout space instead of overlaying the timeline or feeding its measured height back into list padding.
+- The pinned composer overlays the timeline. Its measured height updates bottom
+  list padding and the scroll-to-latest control's inset without obscuring the
+  newest message.
 - No fixed delay or retry loop is used for viewport resize navigation.
 - Pointer input that consumes no scroll distance must not leave the coordinator in history-browsing mode.
 - The first actual user movement after a stale latest snapshot must enter history-browsing mode.

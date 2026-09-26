@@ -163,7 +163,7 @@ class ConversationUiStateTest {
                 history = listOf(message("duplicate", "stale"), message("duplicate", "newest")),
                 pendingUserMessage = null,
                 streamingContent = "",
-                showWaitingIndicator = false,
+                requestActive = false,
                 showOlderHistoryLoading = false,
                 includeInlineComposer = false,
             )
@@ -181,19 +181,18 @@ class ConversationUiStateTest {
                 streamingContent = "streaming",
                 pendingUserEntryId = "pending-id",
                 streamingEntryId = "streaming-id",
-                showWaitingIndicator = true,
+                requestActive = true,
                 showOlderHistoryLoading = true,
                 includeInlineComposer = true,
             )
 
         assertIs<ConversationTimelineItem.InlineComposer>(items[0])
-        assertIs<ConversationTimelineItem.Waiting>(items[1])
+        assertIs<ConversationTimelineItem.MessageEntry>(items[1])
         assertIs<ConversationTimelineItem.MessageEntry>(items[2])
-        assertIs<ConversationTimelineItem.MessageEntry>(items[3])
-        assertEquals("newest", items[4].stableKey)
-        val olderGroup = assertIs<ConversationTimelineItem.PersistedGroup>(items[4]).group
+        assertEquals("newest", items[3].stableKey)
+        val olderGroup = assertIs<ConversationTimelineItem.PersistedGroup>(items[3]).group
         assertEquals(listOf("newest", "oldest"), olderGroup.messages.map { it.message.id })
-        assertIs<ConversationTimelineItem.OlderHistoryLoading>(items[5])
+        assertIs<ConversationTimelineItem.OlderHistoryLoading>(items[4])
         assertEquals(items.size, items.map { it.stableKey }.distinct().size)
     }
 
@@ -204,14 +203,13 @@ class ConversationUiStateTest {
                 history = emptyList(),
                 pendingUserMessage = "Hello, agent!",
                 streamingContent = "",
-                showWaitingIndicator = true,
+                requestActive = true,
                 showOlderHistoryLoading = false,
                 includeInlineComposer = false,
                 pendingUserEntryId = "pending-user",
             )
 
-        assertIs<ConversationTimelineItem.Waiting>(items.first())
-        val pending = assertIs<ConversationTimelineItem.MessageEntry>(items.last())
+        val pending = assertIs<ConversationTimelineItem.MessageEntry>(items.single())
         assertEquals("user", pending.message.role)
         assertEquals("Hello, agent!", pending.message.content)
         assertEquals("pending-user", pending.stableKey)
@@ -241,7 +239,7 @@ class ConversationUiStateTest {
                 pendingUserMessage = null,
                 streamingContent = "Partial answer",
                 streamingEntryId = id,
-                showWaitingIndicator = false,
+                requestActive = false,
                 showOlderHistoryLoading = false,
                 includeInlineComposer = false,
             )
@@ -318,7 +316,7 @@ class ConversationUiStateTest {
                 history = state.history,
                 pendingUserMessage = state.pendingUserMessage,
                 streamingContent = state.streaming.value,
-                showWaitingIndicator = false,
+                requestActive = false,
                 showOlderHistoryLoading = false,
                 includeInlineComposer = false,
                 pendingUserEntryId = state.pendingUserEntryId,
