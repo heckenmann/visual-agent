@@ -5,7 +5,7 @@ import java.lang.management.ManagementFactory
 import java.lang.management.ThreadInfo
 import java.lang.management.ThreadMXBean
 
-/** Implements bounded thread diagnostics with the standard JVM management API. */
+/** Implements bounded platform-thread diagnostics with ThreadMXBean, which excludes virtual threads. */
 @Component
 class JvmThreadDiagnosticsProbe : ThreadDiagnosticsProbe {
     override fun inspect(request: ThreadDiagnosticsRequest): ThreadDiagnosticsResult {

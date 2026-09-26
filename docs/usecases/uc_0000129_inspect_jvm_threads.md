@@ -25,7 +25,9 @@ An enabled researcher or analyst sub-agent.
 
 ## Result
 
-The tool is read-only and describes the server JVM, not the desktop client. It does not expose
+The tool is read-only and describes only platform threads in the server JVM, not the desktop client.
+`ThreadMXBean` does not enumerate virtual threads; `threadScope` marks this limit in every result.
+It does not expose
 thread-local values, monitor contents, environment variables, or arbitrary JVM arguments. A missing
 deadlock count means the JVM did not provide that optional metric; it is not treated as a failure of
 the complete tool.

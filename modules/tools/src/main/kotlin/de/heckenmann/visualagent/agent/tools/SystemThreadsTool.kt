@@ -19,7 +19,7 @@ class SystemThreadsTool(
             id = TOOL_ID,
             name = TOOL_ID.toFunctionName(),
             description =
-                "Inspect a bounded summary, deadlock report, or thread dump for the Visual Agent server JVM. " +
+                "Inspect platform threads in the Visual Agent server JVM; virtual threads are not included. " +
                     "Thread dumps include names, states, lock owners, and bounded stack frames only. " +
                     "Input: {\"action\":\"summary|deadlocks|dump\",\"state\":\"RUNNABLE\",\"maxThreads\":50,\"maxFrames\":12}.",
             inputSchema =
@@ -89,7 +89,7 @@ data class ThreadDiagnosticsResult(
     val truncated: Boolean,
 )
 
-/** Aggregate counts for the current Visual Agent JVM. */
+/** Aggregate platform-thread counts for the current Visual Agent JVM; virtual threads are excluded. */
 data class ThreadSummary(
     /** Current live thread count. */
     val liveThreads: Int,
@@ -129,6 +129,7 @@ private fun ThreadDiagnosticsResult.toJson() =
     buildJsonObject {
         put("action", action)
         put("runtimeScope", "visual-agent-server-jvm")
+        put("threadScope", "platform-only")
         put("matchingThreads", matchingThreads)
         put("truncated", truncated)
         putJsonObject("summary") {

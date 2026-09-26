@@ -34,6 +34,8 @@ class SystemThreadsToolTest {
         assertEquals(ThreadDiagnosticsRequest("dump", "RUNNABLE", 1, 1), observed)
         assertTrue(result.success)
         assertTrue(result.content.contains("\"runtimeScope\":\"visual-agent-server-jvm\""))
+        assertTrue(result.content.contains("\"threadScope\":\"platform-only\""))
+        assertTrue(tool.definition.description.contains("virtual threads are not included"))
         assertTrue(result.content.contains("\"deadlockedThreads\":0"))
         assertTrue(result.content.contains("\"name\":\"worker\""))
         assertTrue(result.content.contains("\"stack\":[\"example.Work.run(Work.kt:10)\"]"))
