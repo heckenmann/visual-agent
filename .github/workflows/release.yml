@@ -69,7 +69,7 @@ jobs:
           }
 
       - name: Run quality gates
-        run: xvfb-run -a ./gradlew ktlintCheck check test --no-daemon --parallel --max-workers=4 -PdatabaseTestMaxParallelForks=4
+        run: xvfb-run -a ./gradlew ktlintCheck check test verifyPackages --no-daemon --parallel --max-workers=4 -PtestMaxParallelForks=4
 
   package:
     name: Package ${{ matrix.platform }}
