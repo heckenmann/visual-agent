@@ -94,8 +94,8 @@ internal fun ReorderableListItemScope.DraggableRailButton(
         verticalOffset.snapTo(reorderOffsetPx.toFloat())
         verticalOffset.animateTo(0f, tween(RAIL_REORDER_ANIMATION_DURATION_MILLIS))
     }
-    val backgroundColor = if (selected) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainer
-    val borderColor = if (selected) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outline.copy(alpha = 0x2A / 255f)
+    val backgroundColor = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainer
+    val borderColor = if (selected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline.copy(alpha = 0x2A / 255f)
     Row(
         modifier =
             Modifier
@@ -148,12 +148,12 @@ internal fun ReorderableListItemScope.DraggableRailButton(
                 imageVector = window.railIcon(),
                 contentDescription = null,
                 modifier = Modifier.size(18.dp),
-                tint = if (selected) MaterialTheme.colorScheme.tertiary else LocalContentColor.current,
+                tint = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else LocalContentColor.current,
             )
             if (showLabel) {
                 Text(
                     text = window.title,
-                    color = if (selected) MaterialTheme.colorScheme.tertiary else LocalContentColor.current,
+                    color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else LocalContentColor.current,
                     style = MaterialTheme.typography.labelLarge,
                     maxLines = 1,
                 )
@@ -161,6 +161,7 @@ internal fun ReorderableListItemScope.DraggableRailButton(
         }
         RailDragHandle(
             window = window,
+            selected = selected,
             modifier = Modifier.draggableHandle(),
         )
     }
@@ -182,9 +183,10 @@ internal fun ReorderableListItemScope.DraggableRailButton(
 @Composable
 private fun RailDragHandle(
     window: ComposeWorkspaceWindow,
+    selected: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val gripColor = MaterialTheme.colorScheme.tertiary
+    val gripColor = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.secondary
     Box(
         modifier =
             modifier
@@ -224,19 +226,19 @@ internal fun StaticRailButton(
     val backgroundColor =
         when {
             alert -> MaterialTheme.colorScheme.errorContainer
-            selected -> MaterialTheme.colorScheme.surfaceContainerHigh
+            selected -> MaterialTheme.colorScheme.secondaryContainer
             else -> MaterialTheme.colorScheme.surfaceContainer
         }
     val borderColor =
         when {
             alert -> MaterialTheme.colorScheme.error
-            selected -> MaterialTheme.colorScheme.tertiary
+            selected -> MaterialTheme.colorScheme.secondary
             else -> MaterialTheme.colorScheme.outline.copy(alpha = 0x2A / 255f)
         }
     val iconTint =
         when {
             alert -> MaterialTheme.colorScheme.onErrorContainer
-            selected -> MaterialTheme.colorScheme.tertiary
+            selected -> MaterialTheme.colorScheme.onSecondaryContainer
             else -> LocalContentColor.current
         }
     ActionTooltip(description = description) {
