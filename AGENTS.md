@@ -6,6 +6,8 @@
 - Run desktop app: `./gradlew :desktop:run` (Compose desktop; starts one embedded non-web Spring context with ANSI-colored Spring logs).
 - Run standalone server: `./gradlew :application:runServer` (Spring Boot without Compose).
 - Run all tests: `./gradlew test`.
+- Application database and non-database tests share `:application:test`; its default fork count is `min(4, max(1, availableProcessors / 2))` and can be overridden with `-PtestMaxParallelForks=N`.
+- Verify executable JARs and the native launcher: `./gradlew verifyPackages`. The root `build` includes this task; `check` does not.
 - Run one test class/method: `./gradlew test --tests "de.heckenmann.visualagent.<path>.<TestClass>.<method>"`.
 - Run smoke tests against real Ollama: `./gradlew test -Dvisualagent.ollama.smoke=true` (default `false`).
 - Copy dependencies to `./lib/`: `./gradlew :application:copyAllDependencies`.
@@ -26,6 +28,7 @@ Always run, in this order:
 - `tasks.test` is finalized by `jacocoTestReport` and uses JUnit Platform.
 - `generateUseCaseResources` runs as part of `processResources`; use cases are packaged to `build/generated/usecase-resources/usecases/`.
 - CI runs the desktop Compose test path under `xvfb-run -a` because Compose needs an X server; locally on macOS / Windows / a Linux desktop this is unnecessary.
+- PR CI runs `Gradle tests` and `Package and launch` independently. Both must pass; the package job reads the Gradle cache without writing to it.
 
 > **Agent efficiency note:** Full `./gradlew ktlintCheck check test` is slow and produces a lot of output. During iterative development, prefer running the relevant test class/method in isolation, e.g. `./gradlew test --tests "de.heckenmann.visualagent.<path>.<TestClass>.<method>"`. Run the complete gate only when the change is ready for commit or when CI-like verification is needed. The full gate must still pass before any commit.
 
