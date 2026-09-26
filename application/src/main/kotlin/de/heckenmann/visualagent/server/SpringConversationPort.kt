@@ -50,7 +50,14 @@ class SpringConversationPort(
             protocolBoundary {
                 val applicationToken = ApplicationCancellationToken()
                 token.onCancelled(applicationToken::cancel)
-                agentManager.streamMessage(request.content, applicationToken, onChunk, request.userEntryId, request.assistantEntryId)
+                agentManager.streamMessage(
+                    request.content,
+                    applicationToken,
+                    onChunk,
+                    request.userEntryId,
+                    request.assistantEntryId,
+                    request.clientRuntime,
+                )
                 val history = agentManager.getHistory()
                 val message =
                     history.lastOrNull { it.role == "assistant" && it.conversationRequestId == request.assistantEntryId }

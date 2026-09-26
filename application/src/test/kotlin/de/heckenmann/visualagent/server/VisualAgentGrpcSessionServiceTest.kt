@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.server
 
+import de.heckenmann.visualagent.protocol.ClientRuntimeSnapshot
 import de.heckenmann.visualagent.protocol.ConversationMessage
 import de.heckenmann.visualagent.protocol.ConversationPort
 import de.heckenmann.visualagent.protocol.ConversationStreamRequest
@@ -166,6 +167,51 @@ class VisualAgentGrpcSessionServiceTest {
                 .first { it.hasChatCompleted() }
                 .chatCompleted.successful,
         )
+    }
+
+    @Test
+    fun `chat forwards client runtime snapshot as a separate request field`() {
+        val conversationPort = mockk<ConversationPort>(relaxed = true)
+        coEvery { conversationPort.stream(any(), any(), any()) } coAnswers {
+            val request = firstArg<ConversationStreamRequest>()
+            assertEquals("Test Client OS", request.clientRuntime?.osName)
+            ConversationStreamResult(ConversationMessage("assistant", "ok", id = request.assistantEntryId))
+        }
+        val sessionService = VisualAgentGrpcSessionService(conversationPort)
+        val observer = RecordingObserver<ServerFrame>()
+        val requestObserver = sessionService.openSession(observer)
+        requestObserver.onNext(
+            ClientFrame
+                .newBuilder()
+                .setSessionId("test-session")
+                .setHello(Hello.newBuilder().setProtocolVersion(ProtocolVersion.CURRENT).build())
+                .build(),
+        )
+        requestObserver.onNext(
+            ClientFrame
+                .newBuilder()
+                .setSessionId("test-session")
+                .setRequestId(REQUEST_ONE)
+                .setChatRequest(
+                    ChatRequest
+                        .newBuilder()
+                        .setContent("hello")
+                        .setUserEntryId(USER_ONE)
+                        .setClientRuntime(
+                            de.heckenmann.visualagent.protocol.v1.ClientRuntimeSnapshot
+                                .newBuilder()
+                                .setProcessId(42)
+                                .setOsName("Test Client OS")
+                                .setAvailableProcessors(2)
+                                .setHeapUsedBytes(100)
+                                .setHeapCommittedBytes(200)
+                                .build(),
+                        ),
+                ).build(),
+        )
+
+        runBlocking { observer.awaitFrame(ServerFrame::hasChatCompleted) }
+        coVerify(exactly = 1) { conversationPort.stream(match { it.clientRuntime?.processId == 42L }, any(), any()) }
     }
 
     @Test

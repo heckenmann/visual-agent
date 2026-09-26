@@ -1,5 +1,7 @@
 package de.heckenmann.visualagent.desktop
 
+import de.heckenmann.visualagent.protocol.ClientRuntimeDiagnosticsPort
+import de.heckenmann.visualagent.protocol.ClientRuntimeSnapshot
 import de.heckenmann.visualagent.protocol.v1.ClientFrame
 import de.heckenmann.visualagent.protocol.v1.ServerFrame
 import de.heckenmann.visualagent.protocol.v1.VisualAgentSessionServiceGrpc
@@ -27,6 +29,7 @@ sealed interface DesktopServerEndpoint {
 /** Owns the client channel and generated gRPC session stub for one desktop connection. */
 class DesktopServerConnection(
     endpoint: DesktopServerEndpoint,
+    private val clientRuntimeDiagnostics: ClientRuntimeDiagnosticsPort = JvmClientRuntimeDiagnosticsPort(),
 ) : AutoCloseable {
     private val channel: ManagedChannel =
         when (endpoint) {
@@ -49,7 +52,7 @@ class DesktopServerConnection(
     /** Opens a protocol session and sends the mandatory version handshake. */
     fun openReadySession(observer: StreamObserver<ServerFrame>): DesktopServerSession {
         val requestObserver = openSession(observer)
-        val session = DesktopServerSession(requestObserver)
+        val session = DesktopServerSession(requestObserver, clientRuntimeDiagnostics)
         session.sendHello()
         return session
     }
@@ -62,6 +65,7 @@ class DesktopServerConnection(
 /** Client-side operations for one negotiated Visual Agent protocol session. */
 class DesktopServerSession internal constructor(
     private val requestObserver: StreamObserver<ClientFrame>,
+    private val clientRuntimeDiagnostics: ClientRuntimeDiagnosticsPort = ClientRuntimeDiagnosticsPort { null },
     private val sessionId: String = UUID.randomUUID().toString(),
 ) : AutoCloseable {
     private val requestSequence = AtomicLong()
@@ -88,6 +92,7 @@ class DesktopServerSession internal constructor(
         require(content.isNotBlank()) { "Chat content must not be blank" }
         val requestId = UUID.randomUUID().toString()
         val userEntryId = UUID.randomUUID().toString()
+        val runtime = runCatching { clientRuntimeDiagnostics.snapshot() }.getOrNull()
         requestObserver.onNext(
             ClientFrame
                 .newBuilder()
@@ -99,6 +104,7 @@ class DesktopServerSession internal constructor(
                         .newBuilder()
                         .setContent(content)
                         .setUserEntryId(userEntryId)
+                        .apply { runtime?.let { setClientRuntime(it.toGrpcSnapshot()) } }
                         .build(),
                 ).build(),
         )
@@ -129,3 +135,23 @@ class DesktopServerSession internal constructor(
         requestObserver.onCompleted()
     }
 }
+
+private fun ClientRuntimeSnapshot.toGrpcSnapshot(): de.heckenmann.visualagent.protocol.v1.ClientRuntimeSnapshot =
+    de.heckenmann.visualagent.protocol.v1.ClientRuntimeSnapshot
+        .newBuilder()
+        .setProcessId(processId)
+        .setOsName(osName)
+        .setOsVersion(osVersion)
+        .setArchitecture(architecture)
+        .setAvailableProcessors(availableProcessors)
+        .setJavaVersion(javaVersion)
+        .setJvmVendor(jvmVendor)
+        .setVmName(vmName)
+        .setUptimeMillis(uptimeMillis)
+        .setHeapUsedBytes(heapUsedBytes)
+        .setHeapCommittedBytes(heapCommittedBytes)
+        .apply { this@toGrpcSnapshot.heapMaxBytes?.let(::setHeapMaxBytes) }
+        .apply { this@toGrpcSnapshot.totalPhysicalMemoryBytes?.let(::setTotalPhysicalMemoryBytes) }
+        .apply { this@toGrpcSnapshot.freePhysicalMemoryBytes?.let(::setFreePhysicalMemoryBytes) }
+        .apply { this@toGrpcSnapshot.processCpuLoad?.let(::setProcessCpuLoad) }
+        .build()

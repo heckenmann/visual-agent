@@ -154,6 +154,7 @@ private fun ComposeStartupHost(exitApplication: () -> Unit) {
                     applicationPort = applicationPort,
                     beanDefinitionCount = context.beanDefinitionCount,
                     clientImagePort = LocalClientImagePort(),
+                    clientRuntimeDiagnostics = JvmClientRuntimeDiagnosticsPort(),
                     clientDirectoryAccess =
                         LocalClientDirectoryGrantAdministrationPort(
                             context.getBean(de.heckenmann.visualagent.workspace.ClientDirectoryCapabilityRegistry::class.java),

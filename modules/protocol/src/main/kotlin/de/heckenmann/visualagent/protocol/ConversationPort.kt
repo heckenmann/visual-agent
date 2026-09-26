@@ -49,6 +49,8 @@ data class ConversationStreamRequest(
     val userEntryId: String,
     val assistantEntryId: String,
     val content: String,
+    /** Optional, request-scoped snapshot of the desktop client's JVM; never persisted in history. */
+    val clientRuntime: ClientRuntimeSnapshot? = null,
 ) {
     init {
         require(content.isNotBlank()) { "Conversation content must not be blank" }

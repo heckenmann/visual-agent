@@ -7,6 +7,8 @@ import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ProviderTurnResponse
 import de.heckenmann.visualagent.agent.text.ResponseRepetitionGuard
+import de.heckenmann.visualagent.agent.tools.ClientRuntimeReport
+import de.heckenmann.visualagent.protocol.ClientRuntimeSnapshot
 import de.heckenmann.visualagent.protocol.ConversationStreamRequest
 import de.heckenmann.visualagent.protocol.ConversationStreamUpdate
 import kotlinx.coroutines.reactor.awaitSingleOrNull
@@ -33,6 +35,7 @@ internal class AgentManagerConversationStreamingOps(
         onChunk: (ConversationStreamUpdate) -> Unit,
         userEntryId: String,
         assistantEntryId: String,
+        clientRuntime: ClientRuntimeSnapshot? = null,
     ): String {
         ConversationStreamRequest(userEntryId, assistantEntryId, content)
         owner.conversationStore.getConversationMessage(assistantEntryId)?.let { existing ->
@@ -61,20 +64,27 @@ internal class AgentManagerConversationStreamingOps(
         try {
             owner.llmProvider
                 .streamReactive(
-                    buildRequest(loadHistoryContext(), requestId).copy(
-                        cancellationToken = token,
-                        onContextBudgeted = { status ->
-                            if (status.reduced && contextWarningPublished.compareAndSet(false, true)) {
-                                onChunk(
-                                    ConversationStreamUpdate(
-                                        assistantTurnId = AssistantTurnIdentity.forRound(requestId, 0),
-                                        textDelta = "",
-                                        contextReduced = true,
-                                    ),
+                    buildRequest(loadHistoryContext(), requestId)
+                        .let { request ->
+                            clientRuntime?.let { snapshot ->
+                                request.copy(
+                                    metadata = request.metadata + (CLIENT_RUNTIME_METADATA_KEY to snapshot.toClientRuntimeReport()),
                                 )
-                            }
-                        },
-                    ),
+                            } ?: request
+                        }.copy(
+                            cancellationToken = token,
+                            onContextBudgeted = { status ->
+                                if (status.reduced && contextWarningPublished.compareAndSet(false, true)) {
+                                    onChunk(
+                                        ConversationStreamUpdate(
+                                            assistantTurnId = AssistantTurnIdentity.forRound(requestId, 0),
+                                            textDelta = "",
+                                            contextReduced = true,
+                                        ),
+                                    )
+                                }
+                            },
+                        ),
                 ).doOnNext { chunk ->
                     token?.throwIfCancelled()
                     val round = chunk.providerTurn?.metadata?.round ?: 0
@@ -163,6 +173,29 @@ internal class AgentManagerConversationStreamingOps(
             put("type", "conversation_turn")
             put("assistantEntryId", assistantEntryId)
         }.toString()
+
+    private companion object {
+        const val CLIENT_RUNTIME_METADATA_KEY = "clientRuntimeSnapshot"
+    }
+
+    private fun ClientRuntimeSnapshot.toClientRuntimeReport() =
+        ClientRuntimeReport(
+            processId = processId,
+            osName = osName,
+            osVersion = osVersion,
+            architecture = architecture,
+            availableProcessors = availableProcessors,
+            javaVersion = javaVersion,
+            jvmVendor = jvmVendor,
+            vmName = vmName,
+            uptimeMillis = uptimeMillis,
+            heapUsedBytes = heapUsedBytes,
+            heapCommittedBytes = heapCommittedBytes,
+            heapMaxBytes = heapMaxBytes,
+            totalPhysicalMemoryBytes = totalPhysicalMemoryBytes,
+            freePhysicalMemoryBytes = freePhysicalMemoryBytes,
+            processCpuLoad = processCpuLoad,
+        )
 
     private fun persistStreamTurns(
         requestId: String,
