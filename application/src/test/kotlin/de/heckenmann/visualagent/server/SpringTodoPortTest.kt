@@ -18,6 +18,7 @@ import io.mockk.mockk
 import io.mockk.verify
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** Verifies todo mapping and event forwarding at the Spring-to-protocol seam. */
@@ -93,5 +94,22 @@ class SpringTodoPortTest {
         eventBus.publishProgress(TodoProgressUpdate("todo-1", delta = "ignored"))
         assertEquals(listOf<String?>("todo-2"), changes)
         assertEquals(listOf<String>("chunk"), progress)
+    }
+
+    @Test
+    fun `reorder events retain their type even when a moved todo is present`() {
+        val changes = mutableListOf<de.heckenmann.visualagent.protocol.TodoChange>()
+        val handle = port.addListener(changes::add)
+
+        eventBus.publish(TodoChange(TodoChangeType.REORDERED, todo = Todo("todo-2", "Second", position = 0)))
+        eventBus.publish(TodoChange(TodoChangeType.REORDERED))
+        eventBus.publish(TodoChange(TodoChangeType.UPDATED, todo = Todo("todo-2", "Second", position = 0)))
+
+        assertEquals(3, changes.size)
+        assertTrue(changes[0].reordered)
+        assertEquals("todo-2", changes[0].todo?.id)
+        assertTrue(changes[1].reordered)
+        assertFalse(changes[2].reordered)
+        handle.close()
     }
 }

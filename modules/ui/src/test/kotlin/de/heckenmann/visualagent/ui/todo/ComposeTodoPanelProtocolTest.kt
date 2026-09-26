@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.ui.todo
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -17,9 +18,12 @@ import de.heckenmann.visualagent.ui.modal.ComposeContentModal
 import de.heckenmann.visualagent.ui.modal.ComposeModalRequester
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import org.junit.Rule
 import org.junit.Test
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /** Verifies todo rendering and controls through the protocol boundary. */
 class ComposeTodoPanelProtocolTest {
@@ -118,6 +122,35 @@ class ComposeTodoPanelProtocolTest {
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("New response").assertDoesNotExist()
         assertEquals(0, composeTestRule.onAllNodesWithContentDescription("Todo working").fetchSemanticsNodes().size)
+        verify(exactly = 1) { port.list() }
+    }
+
+    @Test
+    fun `tool reorder reloads all positions and updates the next todo`() {
+        val initial =
+            listOf(TodoItem("a", "Task A", position = 0), TodoItem("b", "Task B", position = 1), TodoItem("c", "Task C", position = 2))
+        val reordered = listOf(initial[2].copy(position = 0), initial[0].copy(position = 1), initial[1].copy(position = 2))
+        val current = AtomicReference(initial)
+        var listener: ((TodoChange) -> Unit)? = null
+        val port = protocolPort(initial)
+        every { port.list() } answers { current.get() }
+        every { port.addListener(any()) } answers {
+            listener = firstArg()
+            AutoCloseable { }
+        }
+        composeTestRule.setContent { MaterialTheme { TodoPanel(port, ComposeModalRequester { }, LifecycleState()) } }
+        composeTestRule.waitForIdle()
+
+        current.set(reordered)
+        listener!!.invoke(TodoChange(todo = reordered.first(), reordered = true))
+        composeTestRule.waitForIdle()
+
+        val cTop = composeTestRule.onNodeWithText("Task C").getBoundsInRoot().top
+        val aTop = composeTestRule.onNodeWithText("Task A").getBoundsInRoot().top
+        val bTop = composeTestRule.onNodeWithText("Task B").getBoundsInRoot().top
+        assertTrue(cTop < aTop && aTop < bTop)
+        assertTrue(composeTestRule.onNodeWithText("NEXT").getBoundsInRoot().top < aTop)
+        verify(atLeast = 2) { port.list() }
     }
 
     @Test

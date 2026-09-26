@@ -102,6 +102,7 @@ internal fun TodoPanel(
                 scope.launch {
                     val changedTodo = change.todo
                     when {
+                        change.reordered -> refreshTodos()
                         change.removed -> {
                             val removedId = change.todoId ?: change.todo?.id ?: return@launch
                             todos = todos.filterNot { it.id == removedId }

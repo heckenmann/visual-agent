@@ -93,6 +93,7 @@ class SpringTodoPort(
                     todo = change.todo?.toTodoItem(),
                     todoId = change.todoId,
                     removed = change.type == de.heckenmann.visualagent.todo.TodoChangeType.REMOVED,
+                    reordered = change.type == de.heckenmann.visualagent.todo.TodoChangeType.REORDERED,
                 ),
             )
         }

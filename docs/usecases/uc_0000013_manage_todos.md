@@ -27,6 +27,9 @@ Desktop user.
 9. The todo manager validates and records the change once; a no-op does not write or
    allocate a new activity sequence.
 10. The todo store persists the authoritative state ordered by `position`.
+    Reorder events refresh the complete panel list because moving one todo also
+    changes the positions of other todos. Ordinary single-todo updates remain
+    visible immediately from their event payloads.
 11. Agent prompts and tools read current todo summaries from persistence.
 12. When an autonomous todo reaches `COMPLETED` or `CANCELLED`, the main agent receives a request-local user instruction to review the persisted status notification.
 13. The main agent removes a terminal todo once its history and result are no longer needed, or after its result has been incorporated into the final answer, unless the user requested that it be retained.
@@ -70,6 +73,8 @@ Todos stay synchronized between UI, database, and agent context.
 - Tool-created todos are queued automatically and claimed in persisted position order when their assigned agent and a parallel execution slot are available.
 - Status is edited in the todo editor through a bounded dropdown choice, not free text.
 - The `todos` tool supports a `reorder` action to change which task is next.
+- A reorder initiated by either the panel or the `todos` tool updates the full
+  displayed order and highlights the first pending todo in the persisted order.
 - Sub-agents can read todo state and stored results, but only the main agent and orchestrator can change todo lifecycle state.
 - Autonomous terminal-status reviews always end with an explicit user instruction accepted by every configured provider.
 - Terminal todos are cleaned up after their history and result are no longer needed or have been incorporated into the final answer, unless they remain useful for follow-up, reporting, or a user-requested record.
