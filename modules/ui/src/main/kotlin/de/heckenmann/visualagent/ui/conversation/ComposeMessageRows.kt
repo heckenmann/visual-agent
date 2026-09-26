@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
@@ -217,13 +216,8 @@ internal fun rememberConversationMessageVisibility(
 internal fun conversationMessageEnterTransition() =
     fadeIn(animationSpec = tween(MESSAGE_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing))
 
-/** Reveals a new card from the bottom so the reverse-layout timeline keeps its lower edge anchored. */
-internal fun conversationMessageGroupEnterTransition() =
-    conversationMessageEnterTransition() +
-        expandVertically(
-            expandFrom = Alignment.Bottom,
-            animationSpec = tween(MESSAGE_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing),
-        )
+/** Fades in a new card without animating its measured height or shifting neighboring messages. */
+internal fun conversationMessageGroupEnterTransition() = conversationMessageEnterTransition()
 
 /** Fades a deleted conversation row before its height collapses. */
 internal fun conversationMessageDeleteTransition() =

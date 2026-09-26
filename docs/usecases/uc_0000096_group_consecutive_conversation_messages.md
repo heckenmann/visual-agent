@@ -47,3 +47,4 @@ The grouping is implemented as a local Compose presentation transformation. The 
 - User and assistant avatars share neutral theme colors while retaining distinct role icons.
 - Copy is available in the same contextual menu as Edit, Retry, and Delete; the existing eligibility rules for editing, retrying, and deleting remain enforced.
 - Every grouped message remains selectable, renders Markdown, and exposes its applicable actions without increasing the height of a one-line message.
+- New message groups fade in without animating their measured height, so neighboring messages do not jump during insertion.
