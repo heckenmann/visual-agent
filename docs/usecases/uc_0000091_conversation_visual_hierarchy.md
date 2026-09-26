@@ -22,8 +22,8 @@ collapsed by default.
 ## Main Flow
 
 1. The user sends a message to the main agent.
-2. New conversation cards fade in and expand gently from their lower edge without
-   shifting their content by a distance proportional to the card height. Every dynamic row keeps one
+2. New conversation cards fade in without changing their measured height or
+   shifting neighboring messages. Every dynamic row keeps one
    opaque identity from its pending or streaming state through persistence, so
    completing an answer updates the existing row without flicker or a second
    enter animation. The assistant answer appears as a primary row with a
@@ -114,8 +114,8 @@ collapsed by default.
   icon surface, icon contrast, and supporting text.
 - Clear, pin, send, and cancel composer actions provide at least 40 dp hit
   targets; their colors come from the active theme rather than a fixed palette.
-- New cards fade in while their height expands from the lower edge; their
-  contents do not slide independently. Streaming updates and their
+- New cards fade in without expanding their height or sliding their contents.
+  Streaming updates and their
   persisted completion retain the same row identity without a second enter
   animation or visible replacement.
 - All conversation-row colors come from `MaterialTheme.colorScheme` tokens; no
