@@ -30,4 +30,7 @@ internal object ConversationMessageColors {
         role: String,
         colorScheme: ColorScheme,
     ): Color = if (role == "user") colorScheme.secondaryContainer else Color.Transparent
+
+    /** Returns the shared theme surface used by user-message cards and selected workspace controls. */
+    fun userMessagePanelBackground(colorScheme: ColorScheme): Color = background("user", colorScheme)
 }

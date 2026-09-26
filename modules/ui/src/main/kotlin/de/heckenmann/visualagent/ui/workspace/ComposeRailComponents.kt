@@ -94,8 +94,9 @@ internal fun ReorderableListItemScope.DraggableRailButton(
         verticalOffset.snapTo(reorderOffsetPx.toFloat())
         verticalOffset.animateTo(0f, tween(RAIL_REORDER_ANIMATION_DURATION_MILLIS))
     }
-    val backgroundColor = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainer
-    val borderColor = if (selected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline.copy(alpha = 0x2A / 255f)
+    val colorScheme = MaterialTheme.colorScheme
+    val backgroundColor = if (selected) ConversationMessageColors.userMessagePanelBackground(colorScheme) else colorScheme.surfaceContainer
+    val borderColor = if (selected) colorScheme.secondary else colorScheme.outline.copy(alpha = 0x2A / 255f)
     Row(
         modifier =
             Modifier
@@ -148,12 +149,12 @@ internal fun ReorderableListItemScope.DraggableRailButton(
                 imageVector = window.railIcon(),
                 contentDescription = null,
                 modifier = Modifier.size(18.dp),
-                tint = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else LocalContentColor.current,
+                tint = if (selected) colorScheme.onSecondaryContainer else LocalContentColor.current,
             )
             if (showLabel) {
                 Text(
                     text = window.title,
-                    color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else LocalContentColor.current,
+                    color = if (selected) colorScheme.onSecondaryContainer else LocalContentColor.current,
                     style = MaterialTheme.typography.labelLarge,
                     maxLines = 1,
                 )
@@ -223,22 +224,23 @@ internal fun StaticRailButton(
     modifier: Modifier = Modifier,
     alert: Boolean = false,
 ) {
+    val colorScheme = MaterialTheme.colorScheme
     val backgroundColor =
         when {
-            alert -> MaterialTheme.colorScheme.errorContainer
-            selected -> MaterialTheme.colorScheme.secondaryContainer
-            else -> MaterialTheme.colorScheme.surfaceContainer
+            alert -> colorScheme.errorContainer
+            selected -> ConversationMessageColors.userMessagePanelBackground(colorScheme)
+            else -> colorScheme.surfaceContainer
         }
     val borderColor =
         when {
-            alert -> MaterialTheme.colorScheme.error
-            selected -> MaterialTheme.colorScheme.secondary
-            else -> MaterialTheme.colorScheme.outline.copy(alpha = 0x2A / 255f)
+            alert -> colorScheme.error
+            selected -> colorScheme.secondary
+            else -> colorScheme.outline.copy(alpha = 0x2A / 255f)
         }
     val iconTint =
         when {
-            alert -> MaterialTheme.colorScheme.onErrorContainer
-            selected -> MaterialTheme.colorScheme.onSecondaryContainer
+            alert -> colorScheme.onErrorContainer
+            selected -> colorScheme.onSecondaryContainer
             else -> LocalContentColor.current
         }
     ActionTooltip(description = description) {

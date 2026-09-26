@@ -58,8 +58,8 @@ The user can keep multiple panels visible and ordered for the current task witho
 
 - Workspace panels stay inside the visible horizontal row.
 - Each registered panel can be opened through navigation.
-- Selected navigation buttons use the same theme `secondaryContainer` surface as
-  user conversation cards, with theme-derived foreground and accent colors.
+- Selected navigation buttons and user conversation cards use the same
+  theme-derived user-message panel color, with theme-derived foreground and accent colors.
 - Each visible panel can be hidden from its own panel header or the rail.
 - Dragging a panel header reorders the user-defined panel order with an animated settle.
 - Dragging a rail button vertically reorders the user-defined panel order with an animated preview and settle.

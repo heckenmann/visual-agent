@@ -15,6 +15,7 @@ class ConversationMessageColorsTest {
 
         assertEquals(scheme.secondary, ConversationMessageColors.accent("user", scheme))
         assertEquals(scheme.secondaryContainer, ConversationMessageColors.background("user", scheme))
+        assertEquals(ConversationMessageColors.background("user", scheme), ConversationMessageColors.userMessagePanelBackground(scheme))
     }
 
     @Test
