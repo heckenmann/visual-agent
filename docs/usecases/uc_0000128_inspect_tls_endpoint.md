@@ -19,7 +19,7 @@ An enabled researcher or analyst sub-agent.
 1. The agent supplies one hostname or IP address, a port, an optional address family, and a bounded
    timeout.
 2. The server validates the host and input bounds; DNS resolution uses the JVM system resolver.
-3. JSSE performs a TLS handshake using the JVM default trust store. SNI is sent for DNS hostnames,
+3. JSSE performs a TLS handshake using platform roots plus the Visual Agent managed trust store. SNI is sent for DNS hostnames,
    and the JVM HTTPS hostname verifier checks the peer identity before the result is accepted.
 4. The tool returns a normalized status, selected numeric address, negotiated protocol and cipher
    suite when available, verification results, and bounded public metadata from the peer certificate.
@@ -45,7 +45,7 @@ the independent `network:reverse-dns` tool.
 
 ## Acceptance Criteria
 
-- Uses JDK JSSE and the default JVM trust configuration; no extra TLS library is added.
+- Uses JDK JSSE and platform roots plus the application-managed additional trust roots; no extra TLS library is added.
 - Verifies the certificate chain and hostname independently, with no trust bypass or hostname
   heuristic.
 - Bounds input, address candidates, socket timeout, and returned certificate metadata.

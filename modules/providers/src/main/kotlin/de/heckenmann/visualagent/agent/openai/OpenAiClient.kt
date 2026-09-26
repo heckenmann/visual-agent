@@ -15,12 +15,15 @@ import de.heckenmann.visualagent.agent.provider.ProviderEnvironmentCredentials
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.agent.provider.ProviderRuntimeConfig
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
+import de.heckenmann.visualagent.agent.provider.ServerTrustManagerProvider
+import de.heckenmann.visualagent.agent.provider.resolveTrustManager
 import io.micrometer.observation.ObservationRegistry
 import org.springframework.ai.chat.messages.UserMessage
 import org.springframework.ai.chat.model.ChatModel
 import org.springframework.ai.chat.prompt.Prompt
 import org.springframework.ai.openai.OpenAiChatModel
 import org.springframework.ai.openai.OpenAiChatOptions
+import org.springframework.ai.openai.http.okhttp.OpenAiHttpClientBuilderCustomizer
 import org.springframework.ai.openai.setup.OpenAiSetup
 import org.springframework.stereotype.Component
 import reactor.core.publisher.Flux
@@ -29,6 +32,7 @@ import reactor.core.scheduler.Schedulers
 import java.lang.reflect.Method
 import java.net.URI
 import java.time.Duration
+import javax.net.ssl.SSLContext
 
 /**
  * LLM provider implementation for OpenAI and OpenAI-compatible chat endpoints.
@@ -38,6 +42,7 @@ class OpenAiClient(
     private val promptFactory: OpenAiPromptFactory,
     private val toolRegistry: ProviderToolCallbacks,
     private val appConfig: ProviderRuntimeConfig = DefaultProviderRuntimeConfig(),
+    private val serverTrustManagerProvider: ServerTrustManagerProvider? = null,
 ) : LLMProvider {
     override fun chatReactive(messages: List<Message>): Mono<ChatResponse> = chatReactive(ChatRequestContext(messages = messages))
 
@@ -201,7 +206,11 @@ class OpenAiClient(
                 .baseUrl(baseUrl)
                 .model(model)
                 .build()
-        return OpenAiChatModel.builder().options(options).build()
+        return OpenAiChatModel
+            .builder()
+            .options(options)
+            .httpClientBuilderCustomizer(tlsClientCustomizer())
+            .build()
     }
 
     private fun openAiClient(profile: ProviderProfile): OpenAIClient =
@@ -221,7 +230,7 @@ class OpenAiClient(
             emptyMap(),
             ObservationRegistry.NOOP,
             null,
-            emptyList(),
+            listOf(tlsClientCustomizer()),
         )
 
     private fun apiKeyFor(
@@ -258,8 +267,17 @@ class OpenAiClient(
             emptyMap(),
             ObservationRegistry.NOOP,
             null,
-            emptyList(),
+            listOf(tlsClientCustomizer()),
         )
+
+    private fun tlsClientCustomizer(): OpenAiHttpClientBuilderCustomizer {
+        val trustManager = serverTrustManagerProvider.resolveTrustManager()
+        val sslContext = SSLContext.getInstance("TLS").apply { init(null, arrayOf(trustManager), null) }
+        return OpenAiHttpClientBuilderCustomizer { builder ->
+            builder.sslSocketFactory(sslContext.socketFactory)
+            builder.trustManager(trustManager)
+        }
+    }
 
     private fun apiBaseUrl(): String = OpenAiEndpointNormalizer.apiBaseUrl(appConfig.openAiBaseUrl)
 

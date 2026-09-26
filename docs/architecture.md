@@ -325,6 +325,18 @@ The standalone gRPC server is disabled by default (`visualagent.server.port=0`).
 enabled, it binds to loopback unless a future authenticated listener is configured; non-loopback
 binding is rejected rather than exposing an unauthenticated service.
 
+Server-owned TLS material is stored as separate managed PKCS#12 trust and key stores under the
+server data root. Spring Boot SslBundle is the common API for exposing these stores and their
+managers. The outbound trust bundle combines explicitly imported CA roots with platform JVM roots
+and retains normal certificate-chain and hostname verification. Server-side HTTPS clients,
+including providers, workspace downloads, remote conversation images, update checks, and network
+diagnostics, explicitly derive their TLS configuration from that bundle; Spring does not apply it
+automatically to arbitrary clients. Long-lived clients load store changes after a server restart.
+The optional remote gRPC listener uses a key bundle for the configured managed key-store alias
+when PEM certificate files are not configured; generated server certificates must be signed by a
+managed CA entry. The external Codex CLI and SSH-based SFTP/SCP use their own process or SSH host-key
+trust configuration and do not consume the server JVM's TLS bundles.
+
 The desktop and server have separate storage ownership. Before a connection exists, `:desktop`
 loads client-local server bookmarks from its platform config directory. After the selected
 `ApplicationPort` is ready, server-owned settings and runtime data are read through that port;

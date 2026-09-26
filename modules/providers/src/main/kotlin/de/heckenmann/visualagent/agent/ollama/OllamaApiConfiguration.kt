@@ -2,7 +2,10 @@ package de.heckenmann.visualagent.agent.ollama
 
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.agent.provider.ProviderRuntimeConfig
+import de.heckenmann.visualagent.agent.provider.ServerTrustManagerProvider
+import de.heckenmann.visualagent.agent.provider.resolveTrustManager
 import io.netty.channel.ChannelOption
+import io.netty.handler.ssl.SslContextBuilder
 import org.springframework.ai.ollama.api.OllamaApi
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -22,9 +25,10 @@ import java.time.Duration
  * [RestClient] serves synchronous Ollama API calls, while [WebClient] serves
  * [OllamaApi.streamingChat]. Authentication reads the current key for every request.
  */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 class OllamaApiConfiguration(
     private val appConfig: ProviderRuntimeConfig,
+    private val serverTrustManagerProvider: ServerTrustManagerProvider? = null,
 ) {
     /**
      * Creates the shared Ollama API client.
@@ -34,30 +38,37 @@ class OllamaApiConfiguration(
      * @return Ollama API client configured with the persisted endpoint and optional bearer token
      */
     @Bean
-    fun ollamaApi(): OllamaApi = createOllamaApi(appConfig)
+    fun ollamaApi(): OllamaApi = createOllamaApi(appConfig, serverTrustManagerProvider)
 }
 
-internal fun createOllamaApi(config: ProviderRuntimeConfig): OllamaApi =
+internal fun createOllamaApi(
+    config: ProviderRuntimeConfig,
+    serverTrustManagerProvider: ServerTrustManagerProvider? = null,
+): OllamaApi =
     createOllamaApi(
         baseUrl = config.ollamaLocalUrl,
         timeoutSeconds = config.timeoutSeconds,
         apiKey = { config.ollamaApiKey },
+        serverTrustManagerProvider = serverTrustManagerProvider,
     )
 
 internal fun createOllamaApi(
     profile: ProviderProfile,
     appConfig: ProviderRuntimeConfig,
+    serverTrustManagerProvider: ServerTrustManagerProvider? = null,
 ): OllamaApi =
     createOllamaApi(
         baseUrl = profile.baseUrl,
         timeoutSeconds = profile.options["timeoutSeconds"]?.toIntOrNull() ?: appConfig.timeoutSeconds,
         apiKey = { profile.apiKey },
+        serverTrustManagerProvider = serverTrustManagerProvider,
     )
 
 private fun createOllamaApi(
     baseUrl: String,
     timeoutSeconds: Int,
     apiKey: () -> String,
+    serverTrustManagerProvider: ServerTrustManagerProvider? = null,
 ): OllamaApi {
     val effectiveTimeout = timeoutSeconds.coerceIn(MIN_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS)
     val httpClient =
@@ -65,6 +76,13 @@ private fun createOllamaApi(
             .create()
             .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, CONNECT_TIMEOUT_MILLIS)
             .responseTimeout(Duration.ofSeconds(effectiveTimeout.toLong()))
+            .let { client ->
+                serverTrustManagerProvider?.let { trustProvider ->
+                    client.secure { spec ->
+                        spec.sslContext(SslContextBuilder.forClient().trustManager(trustProvider.resolveTrustManager()).build())
+                    }
+                } ?: client
+            }
     val restConnector = ReactorClientHttpRequestFactory(httpClient)
     val webConnector = ReactorClientHttpConnector(httpClient)
     return OllamaApi

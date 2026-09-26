@@ -77,6 +77,37 @@ class AgentToolConfigServiceTest {
     }
 
     @Test
+    fun `TLS management tools are main-agent-only and disabled by default`() {
+        val store = MapSubAgentConfigStore()
+        val service = AgentToolConfigService(store)
+        val trustStoreTool = ToolId("security:truststore")
+        val keyStoreTool = ToolId("security:keystore")
+        val agent =
+            SubAgent(
+                id = "custom",
+                name = "Custom",
+                role = "Custom",
+                config = AgentConfig(tools = listOf(trustStoreTool.value, keyStoreTool.value)),
+            )
+
+        assertTrue(trustStoreTool !in service.mainAgentTools())
+        assertTrue(keyStoreTool !in service.mainAgentTools())
+        assertTrue(trustStoreTool !in service.toolsFor(agent))
+        assertTrue(keyStoreTool !in service.toolsFor(agent))
+
+        service.setToolGloballyEnabled(trustStoreTool.value, true)
+        service.setToolGloballyEnabled(keyStoreTool.value, true)
+
+        assertTrue(trustStoreTool in service.mainAgentTools())
+        assertTrue(keyStoreTool in service.mainAgentTools())
+        assertTrue(trustStoreTool !in service.toolsFor(agent))
+        assertTrue(keyStoreTool !in service.toolsFor(agent))
+        AgentToolConfigService(store)
+        assertTrue(trustStoreTool in service.mainAgentTools())
+        assertTrue(keyStoreTool in service.mainAgentTools())
+    }
+
+    @Test
     fun `template name falls back to researcher when no config stored and no tools match`() {
         val store = MapSubAgentConfigStore()
         val service = AgentToolConfigService(store)

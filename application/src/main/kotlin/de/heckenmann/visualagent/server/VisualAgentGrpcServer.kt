@@ -1,9 +1,12 @@
 package de.heckenmann.visualagent.server
 
+import de.heckenmann.visualagent.security.ManagedTlsMaterialService
 import io.grpc.BindableService
 import io.grpc.Server
 import io.grpc.inprocess.InProcessServerBuilder
+import io.grpc.netty.shaded.io.grpc.netty.GrpcSslContexts
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContextBuilder
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import java.io.File
@@ -20,6 +23,8 @@ class VisualAgentGrpcServer(
     @Value("\${visualagent.server.tls.certificate-chain:}") private val certificateChain: String,
     @Value("\${visualagent.server.tls.private-key:}") private val privateKey: String,
     @Value("\${visualagent.server.bind-address:127.0.0.1}") private val bindAddress: String = LOOPBACK_ADDRESS,
+    @Value("\${visualagent.server.tls.key-store-alias:server}") private val keyStoreAlias: String = DEFAULT_KEY_STORE_ALIAS,
+    private val managedTlsMaterialService: ManagedTlsMaterialService? = null,
 ) : AutoCloseable {
     private var inProcessServer: Server? = null
     private var remoteServer: Server? = null
@@ -29,8 +34,8 @@ class VisualAgentGrpcServer(
     fun start() {
         if (inProcessServer != null) return
         if (port > 0) {
-            require(certificateChain.isNotBlank() && privateKey.isNotBlank()) {
-                "TLS certificate-chain and private-key are required when visualagent.server.port is enabled"
+            require(certificateChain.isBlank() == privateKey.isBlank()) {
+                "Configure both visualagent.server.tls.certificate-chain and private-key, or neither to use the managed key store"
             }
             require(InetAddress.getByName(bindAddress).isLoopbackAddress) {
                 "Non-loopback server binding is disabled until authentication is configured"
@@ -49,11 +54,21 @@ class VisualAgentGrpcServer(
                 NettyServerBuilder
                     .forAddress(InetSocketAddress(bindAddress, port))
                     .addService(service)
+            if (certificateChain.isNotBlank()) {
+                builder.useTransportSecurity(File(certificateChain), File(privateKey))
+            } else {
+                val keyManagerFactory =
+                    checkNotNull(managedTlsMaterialService) {
+                        "Managed key-store TLS is unavailable in this server configuration"
+                    }.keyManagerFactory(keyStoreAlias)
+                builder.sslContext(
+                    GrpcSslContexts
+                        .configure(SslContextBuilder.forServer(keyManagerFactory))
+                        .build(),
+                )
+            }
             remoteServer =
-                builder
-                    .useTransportSecurity(File(certificateChain), File(privateKey))
-                    .build()
-                    .start()
+                builder.build().start()
         }
     }
 
@@ -81,5 +96,6 @@ class VisualAgentGrpcServer(
 
     private companion object {
         const val LOOPBACK_ADDRESS = "127.0.0.1"
+        const val DEFAULT_KEY_STORE_ALIAS = "server"
     }
 }

@@ -45,6 +45,8 @@ class AgentToolConfigService(
             "update:check",
             "context",
             "system:client-runtime",
+            SERVER_TLS_TRUST_TOOL_ID,
+            SERVER_TLS_KEY_TOOL_ID,
             "javascript:execute",
             "memory",
             "skills",
@@ -64,11 +66,11 @@ class AgentToolConfigService(
      */
     fun toolsFor(agent: SubAgent): Set<ToolId> {
         agent.config.tools?.let { configured ->
-            return filterEnabledTools(configured + TOOL_HELP_ID).map(::ToolId).toSet()
+            return filterSubAgentTools(configured + TOOL_HELP_ID).map(::ToolId).toSet()
         }
         val key = resolveTemplateName(agent)
         val configured = configStore.getSubAgentConfig(key)?.tools ?: defaultConfigs().firstOrNull { it.id == key }?.tools
-        return filterEnabledTools((configured ?: emptyList()) + TOOL_HELP_ID).map(::ToolId).toSet()
+        return filterSubAgentTools((configured ?: emptyList()) + TOOL_HELP_ID).map(::ToolId).toSet()
     }
 
     private fun resolveTemplateName(agent: SubAgent): String {
@@ -160,6 +162,13 @@ class AgentToolConfigService(
     }
 
     private fun ensureDefaultConfigs() {
+        if (preferenceStore?.getPreference(SECURITY_TOOLS_INITIALIZED_KEY) != "true") {
+            preferenceStore?.setPreference(
+                DISABLED_TOOLS_KEY,
+                (disabledToolIds() + SERVER_TLS_TOOL_IDS).sorted().joinToString("\n"),
+            )
+            preferenceStore?.setPreference(SECURITY_TOOLS_INITIALIZED_KEY, "true")
+        }
         defaultConfigs().forEach { config ->
             val existing = configStore.getSubAgentConfig(config.id)
             if (existing == null) {
@@ -174,6 +183,9 @@ class AgentToolConfigService(
     }
 
     private fun filterEnabledTools(tools: Collection<String>): List<String> = tools.filter(::isToolGloballyEnabled)
+
+    private fun filterSubAgentTools(tools: Collection<String>): List<String> =
+        filterEnabledTools(tools).filterNot { it in MAIN_AGENT_ONLY_TOOL_IDS }
 
     /**
      * Returns the human-readable description for a default config id.
@@ -276,7 +288,13 @@ class AgentToolConfigService(
 }
 
 private const val DISABLED_TOOLS_KEY = "tools.disabled.global"
+private const val SECURITY_TOOLS_INITIALIZED_KEY = "tools.security-management.defaults.v1"
 private const val TOOL_HELP_ID = "tool:help"
+private const val SERVER_TLS_TRUST_TOOL_ID = "security:truststore"
+private const val SERVER_TLS_KEY_TOOL_ID = "security:keystore"
+
+private val SERVER_TLS_TOOL_IDS = setOf(SERVER_TLS_TRUST_TOOL_ID, SERVER_TLS_KEY_TOOL_ID)
+private val MAIN_AGENT_ONLY_TOOL_IDS = SERVER_TLS_TOOL_IDS
 
 private val RESTRICTED_HOST_ACCESS_TOOL_IDS =
     setOf(

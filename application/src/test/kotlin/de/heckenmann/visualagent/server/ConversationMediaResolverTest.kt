@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.server
 
 import com.sun.net.httpserver.HttpServer
+import de.heckenmann.visualagent.agent.provider.ServerTrustManagerProvider
 import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
 import de.heckenmann.visualagent.protocol.ConversationImageResolution
 import de.heckenmann.visualagent.protocol.MAX_MARKDOWN_IMAGE_BYTES
@@ -9,18 +10,15 @@ import de.heckenmann.visualagent.workspace.UnifiedFileService
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
 import io.mockk.every
 import io.mockk.mockk
-import okhttp3.Dns
-import okhttp3.OkHttpClient
 import org.apache.tika.Tika
-import java.net.InetAddress
+import org.springframework.web.client.RestClient
 import java.net.InetSocketAddress
 import java.net.URI
 import java.nio.file.Files
-import java.time.Duration
+import java.security.cert.X509Certificate
 import java.time.Instant
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
+import javax.net.ssl.X509TrustManager
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -43,16 +41,9 @@ class ConversationMediaResolverTest {
         }
         server.start()
         try {
-            val client =
-                OkHttpClient
-                    .Builder()
-                    .dns(
-                        Dns { hostname ->
-                            listOf(InetAddress.getByName(hostname))
-                        },
-                    ).build()
+            val client = RestClient.builder().build()
             val result =
-                OkHttpConversationImageFetcher(client)
+                SpringConversationImageFetcher(client)
                     .fetch(URI("http://127.0.0.1:${server.address.port}/image.png"))
             assertEquals(200, result.status)
             assertEquals("image/png", result.contentType)
@@ -64,33 +55,37 @@ class ConversationMediaResolverTest {
     }
 
     @Test
-    fun `remote fetcher aborts a response body that stalls`() {
-        val release = CountDownLatch(1)
+    fun `remote image fetcher initializes its client with the server trust manager`() {
+        var requested = false
+        val provider =
+            ServerTrustManagerProvider {
+                requested = true
+                testTrustManager()
+            }
+
+        SpringConversationImageFetcher(serverTrustManagerProvider = provider)
+
+        assertTrue(requested)
+    }
+
+    @Test
+    fun `remote fetcher reads at most the configured image limit plus one byte`() {
+        val bytes = ByteArray(MAX_MARKDOWN_IMAGE_BYTES.toInt() + 1) { 7 }
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
-        server.createContext("/stalled.png") { exchange ->
+        server.createContext("/bounded.png") { exchange ->
             exchange.responseHeaders.add("Content-Type", "image/png")
-            exchange.sendResponseHeaders(200, 0)
-            exchange.responseBody.write(byteArrayOf(0x89.toByte()))
-            exchange.responseBody.flush()
-            release.await(2, TimeUnit.SECONDS)
-            exchange.close()
+            exchange.sendResponseHeaders(200, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
         }
         server.start()
         try {
-            val client =
-                OkHttpClient
-                    .Builder()
-                    .callTimeout(Duration.ofMillis(100))
-                    .readTimeout(Duration.ofMillis(100))
-                    .dns(Dns { hostname -> listOf(InetAddress.getByName(hostname)) })
-                    .build()
             val result =
-                OkHttpConversationImageFetcher(client)
-                    .fetch(URI("http://127.0.0.1:${server.address.port}/stalled.png"))
+                SpringConversationImageFetcher(RestClient.builder().build())
+                    .fetch(URI("http://127.0.0.1:" + server.address.port + "/bounded.png"))
 
-            assertEquals(0, result.status)
+            assertEquals(200, result.status)
+            assertEquals(bytes.size, result.bytes.size)
         } finally {
-            release.countDown()
             server.stop(0)
         }
     }
@@ -270,6 +265,21 @@ class ConversationMediaResolverTest {
             Files.deleteIfExists(path)
         }
     }
+
+    private fun testTrustManager() =
+        object : X509TrustManager {
+            override fun checkClientTrusted(
+                chain: Array<out X509Certificate>,
+                authType: String,
+            ) = Unit
+
+            override fun checkServerTrusted(
+                chain: Array<out X509Certificate>,
+                authType: String,
+            ) = Unit
+
+            override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
+        }
 
     private fun newResolver(fetcher: ConversationImageFetcher): ConversationMediaResolver =
         ConversationMediaResolver(workspace, mockk<UnifiedFileService>(relaxed = true), fetcher, Tika())

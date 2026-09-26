@@ -36,6 +36,7 @@ dependencies {
     implementation(platform(libs.protobuf.bom))
     implementation(platform(libs.coroutines.bom))
     implementation(libs.spring.boot.starter)
+    implementation(libs.spring.boot.starter.restclient)
     implementation(libs.spring.boot.starter.flyway)
     implementation(libs.grpc.inprocess)
     implementation(libs.grpc.netty.shaded)
@@ -60,7 +61,7 @@ dependencies {
     // Workspace document analysis
     implementation(libs.pdfbox)
     implementation(libs.tika.core)
-    implementation(libs.okhttp.jvm)
+    implementation(libs.apache.httpclient5)
     implementation(libs.commons.net)
     implementation(libs.mina.sshd.scp)
     implementation(libs.spring.integration.sftp)
