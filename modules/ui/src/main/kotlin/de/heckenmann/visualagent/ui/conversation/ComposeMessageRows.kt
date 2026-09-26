@@ -1,12 +1,13 @@
 package de.heckenmann.visualagent.ui.conversation
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -200,7 +201,7 @@ internal fun EditMessageForm(
     )
 }
 
-internal const val MESSAGE_TRANSITION_DURATION_MS = 180
+internal const val MESSAGE_TRANSITION_DURATION_MS = 240
 internal const val DELETE_ANIMATION_DURATION_MS = 220
 
 /** Keeps a row's first appearance animated while preserving its deletion transition. */
@@ -212,10 +213,17 @@ internal fun rememberConversationMessageVisibility(
     remember { MutableTransitionState(if (animateInitial) false else isVisible) }
         .also { visibility -> visibility.targetState = isVisible }
 
-/** Animates a newly added conversation row upward from below its final position. */
+/** Fades in newly added content without a displacement proportional to its height. */
 internal fun conversationMessageEnterTransition() =
-    fadeIn(animationSpec = tween(MESSAGE_TRANSITION_DURATION_MS)) +
-        slideInVertically(animationSpec = tween(MESSAGE_TRANSITION_DURATION_MS)) { height -> height / 2 }
+    fadeIn(animationSpec = tween(MESSAGE_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing))
+
+/** Reveals a new card from the bottom so the reverse-layout timeline keeps its lower edge anchored. */
+internal fun conversationMessageGroupEnterTransition() =
+    conversationMessageEnterTransition() +
+        expandVertically(
+            expandFrom = Alignment.Bottom,
+            animationSpec = tween(MESSAGE_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing),
+        )
 
 /** Fades a deleted conversation row before its height collapses. */
 internal fun conversationMessageDeleteTransition() =

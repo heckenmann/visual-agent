@@ -22,7 +22,8 @@ collapsed by default.
 ## Main Flow
 
 1. The user sends a message to the main agent.
-2. New conversation rows slide upward into place. Every dynamic row keeps one
+2. New conversation cards fade in and expand gently from their lower edge without
+   shifting their content by a distance proportional to the card height. Every dynamic row keeps one
    opaque identity from its pending or streaming state through persistence, so
    completing an answer updates the existing row without flicker or a second
    enter animation. The assistant answer appears as a primary row with a
@@ -40,7 +41,7 @@ collapsed by default.
 7. If the model emits a thinking block, it appears as a collapsible
    "Thinking" row in `onSurfaceVariant` and `bodySmall` typography.
 8. While a request is active, the composer panel indicates activity with a
-   slowly rotating outline using the active theme's `tertiary` color. The
+   soft light band and outline using active theme colors. The
    pinned composer overlays the conversation list with a translucent theme
    surface, so scrolling messages remain visible behind it. Without a pin, it
    is the newest scrollable timeline item. The composer has no
@@ -103,15 +104,18 @@ collapsed by default.
   list, with enough bottom clearance for the newest message while older content
   scrolls visibly behind it.
 - The activity outline is drawn behind and inset from the input content, and
-  displays an animated `tertiary` theme outline only while a request is active.
+  displays a soft animated theme light band only while a request is active.
 - The conversation scrollbar maps offset and drag direction correctly for the
   reverse-layout list; a transient request does not create a conversation row.
+- A hovered message displays its timestamp in the message composition without
+  opening a separate popup window that could outlive the lazily rendered row.
 - The empty-history prompt is centered in the visible area above either composer
   placement, including in a short panel, and uses active theme tokens for its
   icon surface, icon contrast, and supporting text.
 - Clear, pin, send, and cancel composer actions provide at least 40 dp hit
   targets; their colors come from the active theme rather than a fixed palette.
-- New rows slide upward into the conversation; streaming updates and their
+- New cards fade in while their height expands from the lower edge; their
+  contents do not slide independently. Streaming updates and their
   persisted completion retain the same row identity without a second enter
   animation or visible replacement.
 - All conversation-row colors come from `MaterialTheme.colorScheme` tokens; no

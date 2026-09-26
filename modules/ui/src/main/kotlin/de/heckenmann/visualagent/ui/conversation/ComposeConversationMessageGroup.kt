@@ -1,7 +1,6 @@
 package de.heckenmann.visualagent.ui.conversation
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -88,9 +87,7 @@ internal fun ConversationMessageGroupRow(
                 isVisible = group.messages.any { it.message.id !in deletingMessageIds },
                 animateInitial = animateEntry,
             ),
-        // Individual rows own their enter transition. Animating the containing group as well
-        // would run the same slide twice and can interrupt it when the group is recomposed.
-        enter = EnterTransition.None,
+        enter = conversationMessageGroupEnterTransition(),
         exit = conversationMessageDeleteTransition(),
         modifier = modifier.fillMaxWidth(),
     ) {
