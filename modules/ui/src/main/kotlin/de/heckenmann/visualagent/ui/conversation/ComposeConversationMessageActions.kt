@@ -25,11 +25,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import com.mobilebytelabs.kmptoolkit.clipboard.copyToClipboard
 import de.heckenmann.visualagent.ui.components.ActionIconButton
 import java.time.Instant
@@ -77,33 +75,31 @@ internal fun conversationMessageActionMenu(
                 dismiss = { expanded = false },
             )
         }
-        if (showTimestamp && timestamp != null) {
-            conversationTimestampPopup(timestamp)
-        }
+        if (showTimestamp && timestamp != null) conversationTimestampLabel(timestamp)
     }
 }
 
-/** Displays a timestamp outside the message layout without intercepting pointer input. */
+/** Keeps the hover timestamp in the message's composition rather than opening a disposable window. */
 @Composable
-private fun conversationTimestampPopup(timestamp: Long) {
-    val verticalOffset = with(LocalDensity.current) { -32.dp.roundToPx() }
-    Popup(
-        alignment = Alignment.TopCenter,
-        offset = IntOffset(0, verticalOffset),
-        properties = PopupProperties(focusable = false),
+private fun conversationTimestampLabel(timestamp: Long) {
+    Surface(
+        modifier =
+            Modifier.layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints.copy(maxWidth = Constraints.Infinity))
+                layout(0, 0) {
+                    placeable.placeRelative(-placeable.width, 0)
+                }
+            },
+        color = MaterialTheme.colorScheme.inverseSurface,
+        contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+        shape = MaterialTheme.shapes.extraSmall,
+        tonalElevation = 2.dp,
     ) {
-        Surface(
-            color = MaterialTheme.colorScheme.inverseSurface,
-            contentColor = MaterialTheme.colorScheme.inverseOnSurface,
-            shape = MaterialTheme.shapes.extraSmall,
-            tonalElevation = 2.dp,
-        ) {
-            Text(
-                text = formatConversationTimestamp(timestamp),
-                style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            )
-        }
+        Text(
+            text = formatConversationTimestamp(timestamp),
+            style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+        )
     }
 }
 
