@@ -30,7 +30,7 @@ Desktop user.
 12. Opening or hiding a panel animates its horizontal expansion or collapse and fades the panel content in or out.
 13. When the combined panel widths exceed the viewport, the user can scroll horizontally with a horizontal mouse wheel, the on-screen scroll arrows, or the horizontal scrollbar.
 14. Scrollable panel bodies use a shared vertical scrollbar in the common panel chrome; the canvas remains free of a generic vertical scrollbar because it has direct surface interactions.
-15. Panel cards use consistent spacing, rounded chrome, subtle borders, and compact headers.
+15. Panel cards use consistent spacing, rounded chrome, subtle borders, and compact headers whose identity and action icons use the active theme's secondary accent.
 16. Both the rail and the workspace row call the same reorder callback so the user-defined order stays synchronized.
 17. The Compose shell exposes panel order, visibility, and preferred width through the workspace layout service.
 
@@ -76,4 +76,5 @@ The user can keep multiple panels visible and ordered for the current task witho
 - Scrollable panel bodies register their adapters with the shared workspace-panel scrollbar host instead of rendering separate scrollbars.
 - The canvas panel does not receive a generic vertical scrollbar.
 - Panel cards remain visually separable through spacing, borders, and header contrast; top, bottom, and left workspace-edge spacing use the shared panel-gap token, while the gap between adjacent panels remains unchanged.
+- All panel-header identity and action icons use the active theme's secondary accent without hard-coded colors.
 - The `workspace:layout` tool exposes and accepts order, visibility, and preferred width.
