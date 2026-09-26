@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -149,35 +150,7 @@ private fun ReorderableCollectionItemScope.SplitPanelHeader(
         horizontalArrangement = Arrangement.spacedBy(9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(if (primary) 28.dp else 26.dp)
-                    .clip(RoundedCornerShape(7.dp))
-                    .background(
-                        if (primary) {
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0x14 / 255f)
-                        } else {
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0x12 / 255f)
-                        },
-                    ).border(
-                        1.dp,
-                        if (primary) {
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0x40 / 255f)
-                        } else {
-                            MaterialTheme.colorScheme.tertiary.copy(alpha = 0x20 / 255f)
-                        },
-                        RoundedCornerShape(7.dp),
-                    ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = window.railIcon(),
-                contentDescription = null,
-                tint = if (primary) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary,
-                modifier = Modifier.size(if (primary) 17.dp else 16.dp),
-            )
-        }
+        PanelHeaderIdentityIcon(window, primary)
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = window.title,
@@ -198,6 +171,42 @@ private fun ReorderableCollectionItemScope.SplitPanelHeader(
     }
 }
 
+@Composable
+internal fun PanelHeaderIdentityIcon(
+    window: ComposeWorkspaceWindow,
+    primary: Boolean,
+) {
+    Box(
+        modifier =
+            Modifier
+                .size(if (primary) 28.dp else 26.dp)
+                .clip(RoundedCornerShape(7.dp))
+                .background(
+                    if (primary) {
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0x14 / 255f)
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0x12 / 255f)
+                    },
+                ).border(
+                    1.dp,
+                    if (primary) {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0x40 / 255f)
+                    } else {
+                        MaterialTheme.colorScheme.tertiary.copy(alpha = 0x20 / 255f)
+                    },
+                    RoundedCornerShape(7.dp),
+                ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = window.railIcon(),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.secondary,
+            modifier = Modifier.size(if (primary) 17.dp else 16.dp).testTag("workspace-panel-identity-icon"),
+        )
+    }
+}
+
 /** Renders the settings and close actions for one workspace panel header. */
 @Composable
 internal fun workspacePanelHeaderActions(
@@ -215,6 +224,7 @@ internal fun workspacePanelHeaderActions(
             onClick = openSettings,
             modifier = Modifier.size(buttonSize),
             iconSize = iconSize,
+            tint = MaterialTheme.colorScheme.secondary,
         )
     }
     ActionIconButton(
@@ -223,5 +233,6 @@ internal fun workspacePanelHeaderActions(
         onClick = onClose,
         modifier = Modifier.size(buttonSize),
         iconSize = iconSize,
+        tint = MaterialTheme.colorScheme.secondary,
     )
 }
