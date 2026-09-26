@@ -76,9 +76,9 @@ class ConversationMessageListEmptyHistoryTest {
             composeTestRule.waitForIdle()
 
             val listInfo = listStateHolder.single().layoutInfo
-            assertEquals(2, listInfo.totalItemsCount)
+            assertEquals(1, listInfo.totalItemsCount)
             assertEquals(0, listInfo.visibleItemsInfo.first().index)
-            composeTestRule.onNodeWithText("Thinking").assertExists()
+            composeTestRule.onNodeWithText("Thinking").assertDoesNotExist()
         }
 
     @Test
@@ -88,7 +88,7 @@ class ConversationMessageListEmptyHistoryTest {
                 history = emptyList(),
                 pendingUserMessage = null,
                 streamingContent = "I'm thinking...",
-                showWaitingIndicator = false,
+                requestActive = false,
                 showOlderHistoryLoading = false,
                 includeInlineComposer = false,
                 streamingEntryId = STREAMING_ENTRY_ID,
@@ -107,7 +107,7 @@ class ConversationMessageListEmptyHistoryTest {
                 history = emptyList(),
                 pendingUserMessage = "Hello!",
                 streamingContent = "Streaming response...",
-                showWaitingIndicator = false,
+                requestActive = false,
                 showOlderHistoryLoading = false,
                 includeInlineComposer = false,
                 pendingUserEntryId = PENDING_ENTRY_ID,
@@ -119,7 +119,7 @@ class ConversationMessageListEmptyHistoryTest {
     }
 
     @Test
-    fun `shows waiting indicator at newest end with existing history`(): Unit =
+    fun `active request does not add a separate waiting row`(): Unit =
         runTest {
             val listStateHolder = mutableListOf<androidx.compose.foundation.lazy.LazyListState>()
             val inFlight = InFlightStateHolder().also { it.markStreamStart("request-1") }
@@ -155,7 +155,7 @@ class ConversationMessageListEmptyHistoryTest {
             }
             composeTestRule.waitForIdle()
 
-            composeTestRule.onNodeWithText("Thinking").assertExists()
+            composeTestRule.onNodeWithText("Thinking").assertDoesNotExist()
             val newestVisibleIndex =
                 listStateHolder
                     .single()
@@ -167,7 +167,7 @@ class ConversationMessageListEmptyHistoryTest {
         }
 
     @Test
-    fun `shows waiting indicator for an active tool without streaming text`(): Unit =
+    fun `active tool does not add a separate waiting row`(): Unit =
         runTest {
             val inFlight = InFlightStateHolder()
             inFlight.state.value = InFlightState(pendingToolIds = setOf("file:read"))
@@ -200,7 +200,7 @@ class ConversationMessageListEmptyHistoryTest {
             }
             composeTestRule.waitForIdle()
 
-            composeTestRule.onNodeWithText("Thinking").assertExists()
+            composeTestRule.onNodeWithText("Thinking").assertDoesNotExist()
         }
 
     private companion object {

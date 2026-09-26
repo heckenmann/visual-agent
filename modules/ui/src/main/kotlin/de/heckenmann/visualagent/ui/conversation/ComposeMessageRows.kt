@@ -1,12 +1,12 @@
 package de.heckenmann.visualagent.ui.conversation
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,10 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -63,13 +59,11 @@ internal fun MessageRow(
     modifier: Modifier = Modifier,
 ) {
     val isUser = message.role == "user"
-    val accent = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
+    val accent = ConversationMessageColors.accent(message.role, MaterialTheme.colorScheme)
     val background =
-        if (isUser) {
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-        } else {
-            MaterialTheme.colorScheme.surfaceContainerLow
-        }
+        ConversationMessageColors
+            .background(message.role, MaterialTheme.colorScheme)
+            .let { if (isUser) it.copy(alpha = 0.3f) else it }
     AnimatedVisibility(
         visibleState = rememberConversationMessageVisibility(isVisible = !isDeleting),
         enter = conversationMessageEnterTransition(),
@@ -89,31 +83,16 @@ internal fun MessageRow(
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
-                ConversationCopyAction(message = message, onCopied = onCopied)
-                if (canEdit) {
-                    ActionIconButton(
-                        icon = Icons.Filled.Edit,
-                        description = "Edit ${message.role} message",
-                        modifier = Modifier.size(24.dp).alpha(0.6f),
-                        onClick = onEdit,
-                    )
-                }
-                if (canDelete) {
-                    ActionIconButton(
-                        icon = Icons.Filled.Delete,
-                        description = "Delete ${message.role} message",
-                        modifier = Modifier.size(24.dp).alpha(0.6f),
-                        onClick = onDelete,
-                    )
-                }
-                if (canRetry) {
-                    ActionIconButton(
-                        icon = Icons.Filled.Refresh,
-                        description = "Retry from previous user message",
-                        modifier = Modifier.size(24.dp).alpha(0.6f),
-                        onClick = onRetry,
-                    )
-                }
+                conversationMessageActionMenu(
+                    message = message,
+                    canEdit = canEdit,
+                    canDelete = canDelete,
+                    canRetry = canRetry,
+                    onEdit = onEdit,
+                    onDelete = onDelete,
+                    onRetry = onRetry,
+                    onCopied = onCopied,
+                )
             }
             ConversationMessageContent(message, isStreamingPlaceholder, isStreaming)
         }
@@ -221,7 +200,7 @@ internal fun EditMessageForm(
     )
 }
 
-internal const val MESSAGE_TRANSITION_DURATION_MS = 180
+internal const val MESSAGE_TRANSITION_DURATION_MS = 240
 internal const val DELETE_ANIMATION_DURATION_MS = 220
 
 /** Keeps a row's first appearance animated while preserving its deletion transition. */
@@ -233,10 +212,12 @@ internal fun rememberConversationMessageVisibility(
     remember { MutableTransitionState(if (animateInitial) false else isVisible) }
         .also { visibility -> visibility.targetState = isVisible }
 
-/** Animates a newly added conversation row upward from below its final position. */
+/** Fades in newly added content without a displacement proportional to its height. */
 internal fun conversationMessageEnterTransition() =
-    fadeIn(animationSpec = tween(MESSAGE_TRANSITION_DURATION_MS)) +
-        slideInVertically(animationSpec = tween(MESSAGE_TRANSITION_DURATION_MS)) { height -> height / 2 }
+    fadeIn(animationSpec = tween(MESSAGE_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing))
+
+/** Fades in a new card without animating its measured height or shifting neighboring messages. */
+internal fun conversationMessageGroupEnterTransition() = conversationMessageEnterTransition()
 
 /** Fades a deleted conversation row before its height collapses. */
 internal fun conversationMessageDeleteTransition() =

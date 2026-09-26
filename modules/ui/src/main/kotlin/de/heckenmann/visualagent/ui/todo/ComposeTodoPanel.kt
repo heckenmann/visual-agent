@@ -100,11 +100,17 @@ internal fun TodoPanel(
             todoPort.addListener { change ->
                 if (lifecycle.closing) return@addListener
                 scope.launch {
-                    refreshTodos()
-                    val todo = change.todo
-                    if (todo == null) {
-                        val removedId = change.todoId ?: return@launch
-                        responseStates = responseStates - removedId
+                    val changedTodo = change.todo
+                    when {
+                        change.removed -> {
+                            val removedId = change.todoId ?: change.todo?.id ?: return@launch
+                            todos = todos.filterNot { it.id == removedId }
+                            responseStates = responseStates - removedId
+                        }
+                        changedTodo != null -> {
+                            todos = (todos.filterNot { it.id == changedTodo.id } + changedTodo).sortedBy(TodoItem::position)
+                        }
+                        else -> refreshTodos()
                     }
                 }
             }

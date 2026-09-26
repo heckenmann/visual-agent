@@ -15,7 +15,7 @@ Keep the user aware of autonomous todo work by showing each todo as a compact ca
 1. A user action, todo tool call, or orchestration operation creates a todo through the canonical todo service.
 2. The server publishes the todo change through `TodoPort`; it does not append a synthetic user/system turn for the visual card.
 3. The Conversation panel inserts exactly one todo card using the persisted global activity sequence; this puts a todo created by a user request after that request even when both mutations share a millisecond timestamp.
-4. The card displays the description, status, and assigned agent when available.
+4. The card displays the description and assigned agent when available. Its canonical todo status is shown as both readable text and a matching semantic icon (pending, in progress, completed, or cancelled).
 5. While the todo is `IN_PROGRESS`, an animated working indicator remains visible next to the current output.
 6. When execution starts, progress events update the same card with a bounded tail of the latest response lines.
 7. The Todo panel consumes the same response presentation behavior and can open the same full-response overlay.
@@ -57,6 +57,7 @@ Keep the user aware of autonomous todo work by showing each todo as a compact ca
 - Each progress consumer applies deltas in order through a single UI collector while the provider stream is active; rendering does not wait for the final response event.
 - Codex provider text is forwarded on its first native delta, including when it is the only delta; completed text is never replayed as simulated progress.
 - Compact previews are bounded; the canonical full response is not truncated.
+- Every canonical todo state is represented by both a readable status label and its corresponding accessible status icon; deleted snapshots use the unavailable state.
 - Deleting a todo never removes unrelated conversation content, and its retained snapshot survives panel reloads and application restarts.
 
 ## Related Issues

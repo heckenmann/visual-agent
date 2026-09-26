@@ -18,8 +18,8 @@ Desktop user.
 2. Assistant turns remain separate so provider rounds, intermediate prose, and final answers keep their own stable identity.
 3. A tool row with a typed parent ID is nested beneath that assistant turn in provider declaration order; legacy tool rows without a parent remain standalone.
 4. A system or sub-agent entry renders as its own timeline item.
-5. Each user group shows only the author avatar in its first column and the chronological message contents in its second column.
-6. Each applicable message action (Edit, Retry, or Delete) is exposed through one compact contextual menu at its top-right corner; actions never consume a dedicated message row.
+5. Each user group shows only the author avatar in its first column and the chronological message contents in its second column. User and assistant avatars use the same monochrome theme colors and remain distinguishable by their person and agent icons.
+6. Copy, Edit, Retry, and Delete are exposed through one compact contextual menu at the message's top-right corner when applicable; actions never consume a dedicated message row.
 
 ## Result
 
@@ -44,4 +44,7 @@ The grouping is implemented as a local Compose presentation transformation. The 
 - Adjacent user messages are grouped, while assistant turns are never merged.
 - A tool is grouped only when its persisted parent assistant-turn ID resolves to a structural assistant parent; row adjacency and metadata are not used to infer ownership.
 - User groups use their avatar without repeating role labels beside grouped content.
+- User and assistant avatars share neutral theme colors while retaining distinct role icons.
+- Copy is available in the same contextual menu as Edit, Retry, and Delete; the existing eligibility rules for editing, retrying, and deleting remain enforced.
 - Every grouped message remains selectable, renders Markdown, and exposes its applicable actions without increasing the height of a one-line message.
+- New message groups fade in without animating their measured height, so neighboring messages do not jump during insertion.

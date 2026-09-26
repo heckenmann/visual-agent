@@ -16,8 +16,8 @@ Desktop user.
 
 ## Main Flow
 
-1. The user enters text in the conversation input, which may be fixed to the panel or rendered as the latest conversation message.
-2. The user toggles the sticky pin button beside the clear button to switch between the two input placements; the choice is persisted.
+1. The user enters text in the conversation input, which appears as the newest scrollable conversation item without a pin or as a translucent overlay at the bottom of the panel when pinned.
+2. The user toggles the sticky pin button beside the clear button to switch between the two input placements; the choice is persisted. Without a pin, the input scrolls out of view with the newest item. With a pin, messages scroll behind the visible input. Unpinning while browsing older history returns to the newest item so the input is visible.
 3. The user sends the message with the send icon button or presses Enter while the input is focused.
 4. Shift+Enter inserts a newline instead of sending.
 5. Before rendering the turn, the chat panel allocates distinct opaque UUIDs for

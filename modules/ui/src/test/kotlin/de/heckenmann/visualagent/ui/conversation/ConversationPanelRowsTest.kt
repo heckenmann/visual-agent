@@ -196,7 +196,8 @@ class ConversationPanelRowsTest {
                 onDelete = { deleted = true },
             )
         }
-        composeTestRule.onNodeWithContentDescription("Delete assistant message").performClick()
+        composeTestRule.onNodeWithContentDescription("Message actions").performClick()
+        composeTestRule.onNodeWithText("Delete").performClick()
         assertTrue(deleted)
     }
 
@@ -217,7 +218,8 @@ class ConversationPanelRowsTest {
                 onDelete = { deleteClicked = true },
             )
         }
-        composeTestRule.onNodeWithContentDescription("Delete assistant message").assertDoesNotExist()
+        composeTestRule.onNodeWithContentDescription("Message actions").performClick()
+        composeTestRule.onNodeWithText("Delete").assertDoesNotExist()
         assertFalse(deleteClicked)
     }
 

@@ -84,7 +84,7 @@ class ConversationTodoTimelineTest {
                 history = emptyList(),
                 pendingUserMessage = null,
                 streamingContent = "",
-                showWaitingIndicator = false,
+                requestActive = false,
                 showOlderHistoryLoading = false,
                 includeInlineComposer = false,
                 deletedTodoSnapshots = mapOf(todo.id to todo),

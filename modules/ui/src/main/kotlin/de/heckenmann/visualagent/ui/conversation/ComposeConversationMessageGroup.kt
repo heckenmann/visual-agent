@@ -1,7 +1,6 @@
 package de.heckenmann.visualagent.ui.conversation
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,6 +27,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
@@ -87,9 +87,7 @@ internal fun ConversationMessageGroupRow(
                 isVisible = group.messages.any { it.message.id !in deletingMessageIds },
                 animateInitial = animateEntry,
             ),
-        // Individual rows own their enter transition. Animating the containing group as well
-        // would run the same slide twice and can interrupt it when the group is recomposed.
-        enter = EnterTransition.None,
+        enter = conversationMessageGroupEnterTransition(),
         exit = conversationMessageDeleteTransition(),
         modifier = modifier.fillMaxWidth(),
     ) {
@@ -177,19 +175,22 @@ internal fun TransientConversationMessageGroupRow(
 @Composable
 private fun ConversationAuthorColumn(role: String) {
     val isUser = role == "user"
-    val accent = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
-    val onAccent = if (isUser) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onTertiary
+    val avatarBackground = MaterialTheme.colorScheme.surfaceContainerHighest
+    val avatarContent = MaterialTheme.colorScheme.onSurface
     val label = if (isUser) "You" else "Assistant"
     Column(
         modifier = Modifier.width(ConversationAuthorColumnWidth),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Box(modifier = Modifier.size(24.dp).background(accent, CircleShape), contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier.size(24.dp).background(avatarBackground, CircleShape).testTag("conversation-author-avatar"),
+            contentAlignment = Alignment.Center,
+        ) {
             Icon(
                 imageVector = if (isUser) Icons.Filled.Person else Icons.Filled.SmartToy,
                 contentDescription = "$label avatar",
-                tint = onAccent,
+                tint = avatarContent,
                 modifier = Modifier.size(16.dp),
             )
         }
@@ -242,12 +243,7 @@ private fun ConversationMessageGroupContent(
 }
 
 @Composable
-private fun groupBackground(role: String) =
-    if (role == "user") {
-        MaterialTheme.colorScheme.primaryContainer
-    } else {
-        MaterialTheme.colorScheme.surfaceContainerLow
-    }
+private fun groupBackground(role: String) = ConversationMessageColors.background(role, MaterialTheme.colorScheme)
 
 @Composable
 internal fun SubAgentTimelineRow(

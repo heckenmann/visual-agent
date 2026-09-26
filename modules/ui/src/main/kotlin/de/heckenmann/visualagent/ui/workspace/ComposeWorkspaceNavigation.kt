@@ -95,7 +95,7 @@ internal fun ComposeRail(
             Modifier
                 .width(animatedRailWidth)
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+                .background(MaterialTheme.colorScheme.background)
                 .padding(horizontal = 12.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {

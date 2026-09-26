@@ -8,6 +8,7 @@ import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
 import kotlin.io.path.exists
 import kotlin.io.path.readBytes
@@ -136,29 +137,39 @@ class WorkspaceDownloadServiceTest {
         val store = FakeWorkspaceFileStore()
         val files = WorkspaceFileService(store, root.resolve("db/visual-agent.db").toString())
         val started = CountDownLatch(1)
-        val release = CountDownLatch(1)
+        val firstWriteCompleted = CountDownLatch(1)
+        val continueTransfer = CountDownLatch(1)
+        val downloadCompleted = CountDownLatch(1)
+        val downloadFailure = AtomicReference<Throwable?>()
         val transfer =
             WorkspaceDownloadTransfer { _, destination, control ->
                 started.countDown()
-                while (release.count > 0) {
-                    control.awaitReady()
-                    destination.writeBytes(byteArrayOf(1))
-                    control.recordProgress(1)
-                    Thread.yield()
-                }
+                control.awaitReady()
+                destination.writeBytes(byteArrayOf(1))
+                control.recordProgress(1)
+                firstWriteCompleted.countDown()
+                continueTransfer.await()
+                control.awaitReady()
+                destination.writeBytes(byteArrayOf(2))
+                control.recordProgress(1)
             }
         val service = WorkspaceDownloadService(files, transfer)
-        val worker = thread(start = true) { service.download(WorkspaceDownloadRequest("https://example.org/file.bin")) }
+        thread(start = true) {
+            runCatching { service.download(WorkspaceDownloadRequest("https://example.org/file.bin")) }
+                .onFailure(downloadFailure::set)
+                .also { downloadCompleted.countDown() }
+        }
 
         started.await()
-        while (service.activeDownloads().isEmpty()) Thread.yield()
+        firstWriteCompleted.await()
         val id = service.activeDownloads().single().id
         service.pauseDownload(id)
         assertEquals(WorkspaceDownloadState.PAUSED, service.activeDownloads().single().state)
         service.resumeDownload(id)
         assertEquals(WorkspaceDownloadState.DOWNLOADING, service.activeDownloads().single().state)
-        release.countDown()
-        worker.join(5_000)
+        continueTransfer.countDown()
+        downloadCompleted.await()
+        downloadFailure.get()?.let { throw it }
         assertTrue(store.records.isNotEmpty())
     }
 
@@ -168,6 +179,7 @@ class WorkspaceDownloadServiceTest {
         val store = FakeWorkspaceFileStore()
         val files = WorkspaceFileService(store, root.resolve("db/visual-agent.db").toString())
         val started = CountDownLatch(1)
+        val downloadCompleted = CountDownLatch(1)
         val transfer =
             WorkspaceDownloadTransfer { _, destination, control ->
                 started.countDown()
@@ -179,12 +191,14 @@ class WorkspaceDownloadServiceTest {
                 }
             }
         val service = WorkspaceDownloadService(files, transfer)
-        val worker = thread(start = true) { runCatching { service.download(WorkspaceDownloadRequest("https://example.org/file.bin")) } }
+        thread(start = true) {
+            runCatching { service.download(WorkspaceDownloadRequest("https://example.org/file.bin")) }
+                .also { downloadCompleted.countDown() }
+        }
 
         started.await()
-        while (service.activeDownloads().isEmpty()) Thread.yield()
         service.cancelDownload(service.activeDownloads().single().id)
-        worker.join(5_000)
+        downloadCompleted.await()
 
         assertTrue(service.activeDownloads().isEmpty())
         assertTrue(store.records.isEmpty())

@@ -103,7 +103,7 @@ private fun todoStatusColor(status: TodoState) =
         TodoState.CANCELLED -> MaterialTheme.colorScheme.error
     }
 
-private fun todoStatusIcon(status: TodoState) =
+internal fun todoStatusIcon(status: TodoState) =
     when (status) {
         TodoState.PENDING -> Icons.Filled.Schedule
         TodoState.IN_PROGRESS -> Icons.Filled.PlayArrow

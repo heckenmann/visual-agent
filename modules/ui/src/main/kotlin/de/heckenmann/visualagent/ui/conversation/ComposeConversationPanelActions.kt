@@ -1,7 +1,9 @@
 package de.heckenmann.visualagent.ui.conversation
 
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.withFrameNanos
 import de.heckenmann.visualagent.protocol.CancellationToken
 import de.heckenmann.visualagent.protocol.CancellationTokenImpl
 import de.heckenmann.visualagent.protocol.ConversationPort
@@ -39,10 +41,17 @@ internal suspend fun persistConversationInputPlacement(
 internal fun conversationInputPlacementChange(
     scope: CoroutineScope,
     conversationPort: ConversationPort,
+    listState: LazyListState,
     onPlacementChanged: (de.heckenmann.visualagent.protocol.ConversationInputPlacement) -> Unit,
 ): (de.heckenmann.visualagent.protocol.ConversationInputPlacement) -> Unit =
     { placement ->
         onPlacementChanged(placement)
+        if (placement == de.heckenmann.visualagent.protocol.ConversationInputPlacement.CONVERSATION_MESSAGE) {
+            scope.launch {
+                withFrameNanos { }
+                listState.jumpToLatest()
+            }
+        }
         scope.launch { persistConversationInputPlacement(conversationPort, placement) }
     }
 

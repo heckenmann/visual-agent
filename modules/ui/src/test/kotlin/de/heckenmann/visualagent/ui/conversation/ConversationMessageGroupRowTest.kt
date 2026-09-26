@@ -34,6 +34,7 @@ import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
 import org.junit.Rule
 import org.junit.Test
+import kotlin.math.abs
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import de.heckenmann.visualagent.protocol.ConversationMessage as Message
@@ -44,6 +45,49 @@ import de.heckenmann.visualagent.protocol.ConversationMessage as Message
 class ConversationMessageGroupRowTest {
     @get:Rule
     val composeTestRule = createComposeRule()
+
+    @Test
+    fun `new message group fades in without animating its measured height`() {
+        var messages by mutableStateOf(listOf(persisted("existing message", "user")))
+        composeTestRule.mainClock.autoAdvance = false
+
+        composeTestRule.setContent {
+            MaterialTheme {
+                Column {
+                    messages.forEach { message ->
+                        ConversationMessageGroupRow(
+                            group = ConversationMessageGroup(listOf(message)),
+                            sending = false,
+                            deletingMessageIds = emptySet(),
+                            onDeleteMessage = {},
+                            onStatusChange = {},
+                            onEditMessage = {},
+                            onRetry = {},
+                            animateEntry = message.message.id == "new-message",
+                            modifier = Modifier.testTag("message-${message.message.id}"),
+                        )
+                    }
+                }
+            }
+        }
+
+        composeTestRule.runOnIdle {
+            messages = messages + persisted("new message", "user", id = "new-message")
+        }
+        composeTestRule.mainClock.advanceTimeBy(100)
+        val initialBounds = composeTestRule.onNodeWithTag("message-new-message").getUnclippedBoundsInRoot()
+        val initialHeight = initialBounds.bottom - initialBounds.top
+
+        composeTestRule.mainClock.advanceTimeBy(300)
+        val settledBounds = composeTestRule.onNodeWithTag("message-new-message").getUnclippedBoundsInRoot()
+        val settledHeight = settledBounds.bottom - settledBounds.top
+
+        assertTrue(initialHeight > 0.dp)
+        assertTrue(
+            abs((initialHeight - settledHeight).value) <= 2f,
+            "The entry animation must not progressively change the row's measured height",
+        )
+    }
 
     @Test
     fun `group renders one user identity next to every chronological message`() {
@@ -113,6 +157,7 @@ class ConversationMessageGroupRowTest {
             }
         }
 
+        composeTestRule.waitForIdle()
         val messageBounds = composeTestRule.onNodeWithText("Short message").getUnclippedBoundsInRoot()
         val actionBounds = composeTestRule.onNodeWithContentDescription("Message actions").getUnclippedBoundsInRoot()
         assertTrue(actionBounds.top < messageBounds.bottom)
@@ -140,6 +185,30 @@ class ConversationMessageGroupRowTest {
         composeTestRule.onNodeWithContentDescription("Message actions").performClick()
 
         composeTestRule.onNodeWithText("Delete").assertDoesNotExist()
+    }
+
+    @Test
+    fun `copy action is available in the same menu as message actions`() {
+        var status = ""
+        val group = ConversationMessageGroup(listOf(persisted("Copy this", "user")))
+
+        composeTestRule.setContent {
+            MaterialTheme {
+                ConversationMessageGroupRow(
+                    group = group,
+                    sending = false,
+                    deletingMessageIds = emptySet(),
+                    onDeleteMessage = {},
+                    onStatusChange = { status = it },
+                    onEditMessage = {},
+                    onRetry = {},
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithContentDescription("Message actions").performClick()
+        composeTestRule.onNodeWithText("Copy").performClick()
+        composeTestRule.runOnIdle { assertEquals("Copied user message", status) }
     }
 
     @Test
@@ -211,5 +280,6 @@ class ConversationMessageGroupRowTest {
     private fun persisted(
         content: String,
         role: String,
-    ): ConversationTimelineItem.Persisted = ConversationTimelineItem.Persisted(Message(role, content, id = content), 0)
+        id: String = content,
+    ): ConversationTimelineItem.Persisted = ConversationTimelineItem.Persisted(Message(role, content, id = id), 0)
 }
