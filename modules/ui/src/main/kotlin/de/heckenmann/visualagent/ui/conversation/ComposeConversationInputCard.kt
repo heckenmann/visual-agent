@@ -1,8 +1,10 @@
 package de.heckenmann.visualagent.ui.conversation
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -65,7 +67,7 @@ internal fun ConversationInputCard(
             sizedModifier
                 .clip(RoundedCornerShape(12.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.68f))
-                .conversationActivityBorder(isRequestActive)
+                .conversationActivityGlow(isRequestActive)
                 .animateContentSize(animationSpec = tween(200))
                 .padding(bottom = if (isRequestActive) 3.dp else 0.dp),
     ) {
@@ -88,33 +90,67 @@ internal fun ConversationInputCard(
 }
 
 @Composable
-private fun Modifier.conversationActivityBorder(active: Boolean): Modifier {
-    if (!active) return this
+private fun Modifier.conversationActivityGlow(active: Boolean): Modifier {
+    val visibility by
+        animateFloatAsState(
+            targetValue = if (active) 1f else 0f,
+            animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
+            label = "conversation-input-activity-visibility",
+        )
+    if (visibility == 0f) return this
 
     val accent = MaterialTheme.colorScheme.tertiary
-    val transition = rememberInfiniteTransition(label = "conversation-input-activity-border")
+    val companion = MaterialTheme.colorScheme.secondary
+    val transition = rememberInfiniteTransition(label = "conversation-input-activity-light-band")
     val phase by
         transition.animateFloat(
             initialValue = 0f,
             targetValue = 1f,
-            animationSpec = infiniteRepeatable(tween(durationMillis = 16_000, easing = LinearEasing)),
+            animationSpec = infiniteRepeatable(tween(durationMillis = 9_000, easing = LinearEasing)),
             label = "conversation-input-activity-phase",
         )
-    val colorStops =
-        Array(49) { index ->
-            val position = index / 48f
-            val delta = (position - phase + 1f) % 1f
-            val distance = min(delta, 1f - delta)
-            val highlight = (1f - distance / 0.15f).coerceIn(0f, 1f)
-            val alpha = 0.16f + highlight * highlight * 0.84f
-            position to accent.copy(alpha = alpha)
-        }
 
     return drawBehind {
-        val strokeWidth = 1.5.dp.toPx()
+        val strokeWidth = 1.25.dp.toPx()
         val inset = strokeWidth / 2
+        val backgroundInset = strokeWidth + 1.dp.toPx()
+        val halfBandWidth = min(size.width * 0.45f, 300.dp.toPx())
+        val centerX = -halfBandWidth + phase * (size.width + halfBandWidth * 2)
+        val gradientStart = Offset(centerX - halfBandWidth, -size.height * 0.2f)
+        val gradientEnd = Offset(centerX + halfBandWidth, size.height * 1.2f)
         drawRoundRect(
-            brush = Brush.sweepGradient(colorStops = colorStops),
+            brush =
+                Brush.linearGradient(
+                    0f to companion.copy(alpha = 0f),
+                    0.27f to companion.copy(alpha = 0.06f * visibility),
+                    0.5f to accent.copy(alpha = 0.17f * visibility),
+                    0.73f to companion.copy(alpha = 0.06f * visibility),
+                    1f to accent.copy(alpha = 0f),
+                    start = gradientStart,
+                    end = gradientEnd,
+                ),
+            topLeft = Offset(backgroundInset, backgroundInset),
+            size = Size(size.width - backgroundInset * 2, size.height - backgroundInset * 2),
+            cornerRadius = CornerRadius((12.dp - 1.dp).toPx()),
+        )
+        drawRoundRect(
+            color = accent.copy(alpha = 0.09f * visibility),
+            topLeft = Offset(inset, inset),
+            size = Size(size.width - strokeWidth, size.height - strokeWidth),
+            cornerRadius = CornerRadius(12.dp.toPx()),
+            style = Stroke(width = strokeWidth),
+        )
+        drawRoundRect(
+            brush =
+                Brush.linearGradient(
+                    0f to companion.copy(alpha = 0f),
+                    0.32f to companion.copy(alpha = 0.24f * visibility),
+                    0.5f to accent.copy(alpha = 0.62f * visibility),
+                    0.68f to companion.copy(alpha = 0.24f * visibility),
+                    1f to accent.copy(alpha = 0f),
+                    start = gradientStart,
+                    end = gradientEnd,
+                ),
             topLeft = Offset(inset, inset),
             size = Size(size.width - strokeWidth, size.height - strokeWidth),
             cornerRadius = CornerRadius(12.dp.toPx()),

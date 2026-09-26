@@ -46,9 +46,10 @@ without switching to other panels.
     animated left-edge accent bar in the primary color and renders received
     Markdown incrementally. Completed blocks remain stable while an unfinished
     Markdown tail continues to update as new chunks arrive.
-12. Before the first streamed token arrives, the composer shows a rotating
-    theme-colored outline while `InFlightState.totalActive > 0`. No separate
-    pre-stream "Thinking" row is added to the conversation.
+12. Before the first streamed token arrives, a soft theme-colored light band
+    moves across the composer's translucent background and outline while
+    `InFlightState.totalActive > 0`. It fades in and out with request activity.
+    No separate pre-stream "Thinking" row is added to the conversation.
 13. When the composer is pinned at the panel bottom, the message list has enough
     bottom clearance to keep its newest content readable above the translucent
     overlay. Older messages can scroll behind it. Without a pin, the composer is
@@ -109,8 +110,9 @@ without switching to other panels.
   response content is dropped or normalized.
 - Replacing a transient streamed row with its persisted assistant message does
   not duplicate or lose Markdown content.
-- The pre-stream composer outline derives from `InFlightState.totalActive` and
-  disappears after successful, failed, timed out, or cancelled requests complete.
+- The pre-stream composer light band and outline derive from
+  `InFlightState.totalActive`, preserve the translucent surface, and fade away
+  after successful, failed, timed out, or cancelled requests complete.
 - With a pinned composer, the newest message remains visible above the input
   overlay while older messages can scroll behind it.
 - All indicators use only Material3 theme tokens and Compose-native animations.
