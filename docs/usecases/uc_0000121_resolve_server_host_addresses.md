@@ -20,6 +20,8 @@ An enabled researcher or analyst sub-agent.
 2. Optionally, the model supplies a numeric IPv4/IPv6 `dnsServer` and `dnsPort` (default 53).
 3. The server validates the hostname, address family, DNS server address, and port.
 4. Resolution runs inside the common bounded/cancellable tool execution path.
+   With an explicit server, only the requested address family is queried, aliases are followed,
+   and numeric IP literals are returned without a DNS request.
 5. The tool returns deduplicated, sorted, bounded A/AAAA answers and identifies whether the system
    or explicitly selected DNS server was used.
 
@@ -58,3 +60,4 @@ fits this server-side JVM module.
 - URL syntax, arbitrary DNS server hostnames, invalid ports, and unsupported families are rejected.
 - Tests use a fake resolver and require no public DNS or Internet access.
 - DNS server selection is verified through the resolver contract.
+- Explicit DNS resolution follows CNAME aliases and does not fail because an unrequested family fails.

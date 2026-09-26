@@ -130,6 +130,7 @@ class JvmPingProbeTest {
             override fun resolve(
                 host: String,
                 dnsServer: DnsServerEndpoint?,
+                family: String,
             ): List<InetAddress> = resolveBlock()
 
             override fun reverse(

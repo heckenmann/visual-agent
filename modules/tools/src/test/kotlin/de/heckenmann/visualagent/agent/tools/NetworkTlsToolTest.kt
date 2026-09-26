@@ -66,6 +66,7 @@ class NetworkTlsToolTest {
                 override fun resolve(
                     host: String,
                     dnsServer: DnsServerEndpoint?,
+                    family: String,
                 ) = listOf(ipv6, second, first)
 
                 override fun reverse(
@@ -105,6 +106,7 @@ class NetworkTlsToolTest {
                 override fun resolve(
                     host: String,
                     dnsServer: DnsServerEndpoint?,
+                    family: String,
                 ) = listOf(InetAddress.getByAddress(byteArrayOf(192.toByte(), 0, 2, 1)))
 
                 override fun reverse(
@@ -129,6 +131,7 @@ class NetworkTlsToolTest {
                 override fun resolve(
                     host: String,
                     dnsServer: DnsServerEndpoint?,
+                    family: String,
                 ): List<InetAddress> {
                     resolved = true
                     throw UnknownHostException()

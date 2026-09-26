@@ -273,6 +273,7 @@ class ServerDiagnosticsToolsTest {
             override fun resolve(
                 host: String,
                 dnsServer: DnsServerEndpoint?,
+                family: String,
             ): List<InetAddress> = resolve(host, dnsServer)
 
             override fun reverse(

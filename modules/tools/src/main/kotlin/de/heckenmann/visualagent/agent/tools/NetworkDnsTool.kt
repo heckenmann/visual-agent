@@ -52,7 +52,7 @@ class NetworkDnsTool(
                 }
         val addresses =
             try {
-                resolver.resolve(host, server)
+                resolver.resolve(host, server, family)
             } catch (_: UnknownHostException) {
                 return failure(TOOL_ID.value, "The server could not resolve the requested host.")
             } catch (_: Exception) {
