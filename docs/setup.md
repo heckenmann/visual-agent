@@ -168,3 +168,7 @@ process can create and write its per-user directory. For an intentional legacy r
 store, pass its absolute path explicitly with `-Dvisual-agent.db.path=/path/to/data/visual-agent.db`.
 The application never merges a legacy `./data/` directory into an existing target automatically;
 keep the server stopped while copying a complete legacy database/workspace to a new empty root.
+An existing H2 database receives a private snapshot under `migration-backups/` before a pending
+schema migration. If snapshot creation fails, migration does not run. If migration itself fails,
+keep both the original database and the snapshot and follow the version/restore procedure in
+`docs/database.md`. A database written by a newer application version cannot be downgraded.
