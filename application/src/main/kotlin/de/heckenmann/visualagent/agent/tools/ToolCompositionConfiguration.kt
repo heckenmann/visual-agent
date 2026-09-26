@@ -18,12 +18,21 @@ import org.springframework.ai.tool.ToolCallback
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import java.time.Clock
 import de.heckenmann.visualagent.agent.ToolId as ProviderToolId
 import org.springframework.ai.tool.definition.ToolDefinition as SpringToolDefinition
 
 /** Composes tool implementations with application adapters and the provider boundary. */
 @Configuration
 class ToolCompositionConfiguration {
+    /** Supplies the server-local clock used by deterministic model-facing time queries. */
+    @Bean
+    fun serverClock(): Clock = Clock.systemDefaultZone()
+
+    /** Supplies system and explicit-server DNS behavior to the independent network tools. */
+    @Bean
+    fun hostResolver(): HostResolver = JvmHostResolver()
+
     /** Adapts todo persistence and lifecycle services without eagerly creating the agent manager. */
     @Bean
     fun todoToolPort(
