@@ -1,4 +1,3 @@
-import org.gradle.api.tasks.testing.Test
 import org.springframework.boot.gradle.tasks.bundling.BootJar
 import java.nio.file.Files
 import java.util.jar.JarFile
@@ -81,43 +80,17 @@ dependencies {
     testImplementation(libs.reactor.test)
 }
 
-val databaseTestTag = "database"
-val databaseCategoryTag = "de.heckenmann.visualagent.testsupport.DatabaseTestCategory"
-val databaseTestMaxParallelForks =
+val testMaxParallelForks =
     providers
-        .gradleProperty("databaseTestMaxParallelForks")
+        .gradleProperty("testMaxParallelForks")
         .map { value ->
             value.toIntOrNull()?.takeIf { it > 0 }
-                ?: error("databaseTestMaxParallelForks must be a positive integer")
-        }.getOrElse(1)
-
-val databaseTest =
-    tasks.register<Test>("databaseTest") {
-        description = "Runs database-backed tests with configurable parallel forks."
-        group = "verification"
-        useJUnitPlatform {
-            includeTags(databaseTestTag, databaseCategoryTag)
-        }
-        testClassesDirs = sourceSets["test"].output.classesDirs
-        classpath = sourceSets["test"].runtimeClasspath
-        maxParallelForks = databaseTestMaxParallelForks
-        filter {
-            isFailOnNoMatchingTests = false
-        }
-        workingDir = rootProject.projectDir
-        systemProperty("visualagent.ollama.smoke", System.getProperty("visualagent.ollama.smoke", "false"))
-        systemProperty("visualagent.codex.smoke", System.getProperty("visualagent.codex.smoke", "false"))
-        jvmArgs("-Xshare:off", "-Xmx2g", "-Dkotlinx.coroutines.debug=off")
-        // JaCoCo execution data from this task is consumed by the root coverage gate.
-        // Reusing a cached database run can pair stale execution data with current classes.
-        outputs.cacheIf { false }
-    }
-databaseTest.configure { mustRunAfter(tasks.test) }
+                ?: error("testMaxParallelForks must be a positive integer")
+        }.getOrElse(minOf(4, maxOf(1, Runtime.getRuntime().availableProcessors() / 2)))
 
 tasks.test {
-    useJUnitPlatform {
-        excludeTags(databaseTestTag, databaseCategoryTag)
-    }
+    useJUnitPlatform()
+    maxParallelForks = testMaxParallelForks
     filter {
         isFailOnNoMatchingTests = false
     }
@@ -125,16 +98,15 @@ tasks.test {
     systemProperty("visualagent.ollama.smoke", System.getProperty("visualagent.ollama.smoke", "false"))
     systemProperty("visualagent.codex.smoke", System.getProperty("visualagent.codex.smoke", "false"))
     jvmArgs("-Xshare:off", "-Xmx2g", "-Dkotlinx.coroutines.debug=off")
+    // The root coverage gate consumes this execution data alongside current classes.
+    outputs.cacheIf { false }
 }
 
 val jacocoExcludedClasses = emptyList<String>()
 
 tasks.jacocoTestReport {
-    dependsOn(tasks.test, databaseTest)
-    executionData(
-        layout.buildDirectory.file("jacoco/test.exec"),
-        layout.buildDirectory.file("jacoco/databaseTest.exec"),
-    )
+    dependsOn(tasks.test)
+    executionData(layout.buildDirectory.file("jacoco/test.exec"))
     classDirectories.setFrom(
         files(
             classDirectories.files.map {
@@ -154,11 +126,8 @@ tasks.jacocoTestReport {
 }
 
 tasks.jacocoTestCoverageVerification {
-    dependsOn(tasks.test, databaseTest)
-    executionData(
-        layout.buildDirectory.file("jacoco/test.exec"),
-        layout.buildDirectory.file("jacoco/databaseTest.exec"),
-    )
+    dependsOn(tasks.test)
+    executionData(layout.buildDirectory.file("jacoco/test.exec"))
     classDirectories.setFrom(
         files(
             classDirectories.files.map {
@@ -211,10 +180,6 @@ val verifyExecutableJar =
             }
         }
     }
-
-tasks.named("check") {
-    dependsOn(verifyExecutableJar)
-}
 
 tasks.register("runServer") {
     group = "application"

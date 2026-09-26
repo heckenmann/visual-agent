@@ -614,10 +614,7 @@ val verifyMacOsNativeDnsResolver =
     }
 
 tasks.named("check") {
-    dependsOn(verifyExecutableJar)
-    dependsOn(verifyMacOsNativeDnsResolver)
     dependsOn(verifyNativeDistributionIcons)
-    dependsOn(verifyNativeDistributionLauncher)
     dependsOn(verifyLinuxDesktopEntry)
 }
 

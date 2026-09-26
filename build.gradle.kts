@@ -102,6 +102,18 @@ tasks.named("build") {
         ":tool-standard:build",
         ":tool-javascript:build",
         ":tools:build",
+        "verifyPackages",
+    )
+}
+
+tasks.register("verifyPackages") {
+    group = "verification"
+    description = "Verifies executable JARs and the native desktop launcher."
+    dependsOn(
+        ":application:verifyExecutableJar",
+        ":desktop:verifyExecutableJar",
+        ":desktop:verifyMacOsNativeDnsResolver",
+        ":desktop:verifyNativeDistributionLauncher",
     )
 }
 
@@ -130,19 +142,13 @@ gradle.projectsEvaluated {
             project(modulePath).layout.buildDirectory.file("jacoco/test.exec")
         }
     tasks.named<Test>("test") {
-        dependsOn(
-            moduleProjects.map { modulePath -> "$modulePath:test" },
-            ":application:databaseTest",
-        )
+        dependsOn(moduleProjects.map { modulePath -> "$modulePath:test" })
         // Native module test tasks execute every suite once and preserve their classpaths.
         finalizedBy(tasks.jacocoTestReport)
     }
     tasks.jacocoTestReport {
         dependsOn(tasks.test)
-        executionData(
-            moduleTestExecutionData,
-            project(":application").layout.buildDirectory.file("jacoco/databaseTest.exec"),
-        )
+        executionData(moduleTestExecutionData)
         classDirectories.setFrom(
             files(
                 moduleMainSourceSets.map { sourceSet ->
@@ -167,10 +173,7 @@ gradle.projectsEvaluated {
     }
     tasks.jacocoTestCoverageVerification {
         dependsOn(tasks.test)
-        executionData(
-            moduleTestExecutionData,
-            project(":application").layout.buildDirectory.file("jacoco/databaseTest.exec"),
-        )
+        executionData(moduleTestExecutionData)
         classDirectories.setFrom(
             files(
                 moduleMainSourceSets.map { sourceSet ->
