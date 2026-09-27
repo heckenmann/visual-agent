@@ -66,6 +66,7 @@ fun VisualAgentComposeApp(
     val workspaceFocusRequester = remember { FocusRequester() }
     val composeScope = rememberCoroutineScope()
     val inFlight = rememberInFlightState(deps.applicationPort.activity)
+    val conversationPort = rememberClientRuntimeConversationPort(deps)
     val panelServices =
         remember {
             ComposePanelServices(
@@ -81,7 +82,7 @@ fun VisualAgentComposeApp(
                 workspaceFiles = deps.applicationPort.workspaceFiles,
                 directoryAccess = deps.applicationPort.directoryAccess,
                 canvas = deps.applicationPort.canvas,
-                conversation = deps.applicationPort.conversation,
+                conversation = conversationPort,
                 conversationSuggestions = deps.applicationPort.conversationSuggestions,
                 clientImagePort = deps.clientImagePort,
                 clientDirectoryAccess = deps.clientDirectoryAccess,

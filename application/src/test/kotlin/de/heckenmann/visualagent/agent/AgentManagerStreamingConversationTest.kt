@@ -4,8 +4,10 @@ import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.conversation.ConversationCompletionEventBus
 import de.heckenmann.visualagent.agent.provider.ProviderUserFacingError
 import de.heckenmann.visualagent.agent.provider.ProviderUserFacingException
+import de.heckenmann.visualagent.agent.tools.ClientRuntimeReport
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.config.AppConfigBean
+import de.heckenmann.visualagent.protocol.ClientRuntimeSnapshot
 import de.heckenmann.visualagent.protocol.ConversationCompletionEvent
 import de.heckenmann.visualagent.protocol.ConversationStreamUpdate
 import de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
@@ -19,9 +21,60 @@ import reactor.core.publisher.Flux
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 
 @de.heckenmann.visualagent.testsupport.DatabaseTest
 class AgentManagerStreamingConversationTest {
+    @Test
+    fun `client runtime snapshot reaches request metadata but is not persisted in conversation`() =
+        runBlocking {
+            val db = KnowledgeDbTestFactory.create("jdbc:h2:mem:test")
+            val provider = mockk<LLMProvider>(relaxed = true)
+            var capturedRequest: ChatRequestContext? = null
+            every { provider.streamReactive(any<ChatRequestContext>()) } answers {
+                capturedRequest = firstArg()
+                Flux.just(ChatResponse(model = "test", message = Message("assistant", "ok"), done = true))
+            }
+            val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
+            val snapshot =
+                ClientRuntimeSnapshot(
+                    processId = 42,
+                    osName = "Test Client OS",
+                    osVersion = "1",
+                    architecture = "test-arch",
+                    availableProcessors = 2,
+                    javaVersion = "24",
+                    jvmVendor = "Test Vendor",
+                    vmName = "Test VM",
+                    uptimeMillis = 10,
+                    heapUsedBytes = 100,
+                    heapCommittedBytes = 200,
+                    heapMaxBytes = null,
+                    totalPhysicalMemoryBytes = null,
+                    freePhysicalMemoryBytes = null,
+                    processCpuLoad = null,
+                )
+
+            manager.streamMessage(
+                "diagnose client",
+                onChunk = {},
+                userEntryId = USER_ID,
+                assistantEntryId = ASSISTANT_ID,
+                clientRuntime = snapshot,
+            )
+
+            val report = capturedRequest?.metadata?.get("clientRuntimeSnapshot") as? ClientRuntimeReport
+            assertEquals(snapshot.osName, report?.osName)
+            assertEquals(snapshot.heapUsedBytes, report?.heapUsedBytes)
+            assertFalse(
+                manager.getHistory().any {
+                    it.content.contains("Test Client OS") ||
+                        it.metadata.orEmpty().contains("clientRuntimeSnapshot")
+                },
+            )
+            db.close()
+        }
+
     @Test
     fun `follow-up request includes the previous assistant Markdown response from the database`() =
         runBlocking {

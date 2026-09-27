@@ -179,8 +179,44 @@ role-based sets above and the global blocklist:
 - `todos`: actions `list`, `get`, `add`, `update`, `complete`,
   `cancel`, `clear`, `assignToAgent`, `get-result`. `add` requires a
   valid `assignedAgentId`.
-- `context`: runtime context (active provider/model/key configured/
-  streaming/thinking).
+- `context`: active provider/model and request metadata plus bounded OS/JVM, memory, and optional
+  physical-memory/CPU diagnostics for the Visual Agent server process. A separate desktop client's
+  JVM is not included; in embedded desktop mode the server may share the desktop process.
+- `system:time`: current Visual Agent server time in UTC and server-local time, with optional
+  timezone conversion.
+- `network:dns`: resolve A/AAAA addresses from the server; defaults to the
+  system resolver and optionally accepts a DNS server IP and port.
+- `network:reverse-dns`: query PTR names for one IPv4/IPv6 literal, using the system resolver or an
+  explicitly selected DNS server.
+- `network:tcp`: test one server-side TCP connection to a single host and port; it does not scan
+  port ranges.
+- `network:ping`: run bounded best-effort server-side reachability checks with the JDK
+  `InetAddress.isReachable` API. The JVM may use ICMP or a platform-specific fallback; a missing
+  response does not prove the target is down.
+- `network:traceroute`: trace one server-side route with bounded platform utilities on Linux,
+  macOS, or Windows. It returns parsed numeric hops where available; silent hops are not proof of
+  a network failure.
+- `network:interfaces`: list bounded interface flags, MTU, and numeric addresses using the JDK;
+  hardware addresses and unrelated host data are omitted.
+- `network:http`: inspect one HTTP(S) endpoint using the JDK HTTP client; reports status, safe
+  redirect authorities, timing, and limited metadata without response bodies or credential headers.
+- `network:tls`: inspect one TLS endpoint using the JDK JSSE implementation and the server's
+  platform plus managed CA trust roots; reports verification status and bounded public certificate
+  metadata without exposing certificate key material. This is separate from DNS and reverse-DNS tools.
+- `security:truststore`: main-agent-only tool for listing, inspecting, importing, and removing CA
+  certificates from the managed server trust store. It is disabled by default; changes take effect
+  in long-lived clients after a server restart.
+- `security:keystore`: main-agent-only tool for listing and inspecting managed key entries,
+  generating CA/server certificates, removing entries, and exporting public certificates. Private
+  keys and passwords are never returned. The managed alias can be used by the optional gRPC server.
+- `system:threads`: request a bounded JVM thread summary, deadlock report, or thread dump filtered
+  by state. Thread dumps limit both thread count and stack frames and omit thread-local values.
+- `system:filesystem`: inspect capacity and access status for the server data root, managed
+  workspace, database directory, and temporary directory through JDK NIO. Results explicitly refer
+  to the server host and omit the configured paths.
+- `system:client-runtime`: return the desktop client's JVM and OS snapshot explicitly attached to
+  the current chat request. This is separate from server-side `context`, `system:threads`, and
+  `system:filesystem` diagnostics; no client snapshot is persisted or exposed by ordinary context.
 - `sleep`: blocks the calling coroutine for `seconds.coerceIn(0, 300)`.
 - `browser`: placeholder that returns "not configured" until a real
   backend is wired (issues #16 and #40).
@@ -283,7 +319,9 @@ Saved canvas documents are regular managed workspace files with MIME type `appli
 sources, redirects, private network targets, unsupported protocols, and
 incomplete transfers. Downloads have no application-imposed size limit. SFTP
 and SCP remain separate protocols;
-both are supported with their matching server-side adapter.
+both are supported with their matching server-side adapter. HTTP(S) downloads use Spring's
+`RestClient` with the server-managed `SslBundle` trust configuration; FTP and SSH-based transfers do
+not use TLS bundles.
 
 ### Use Cases Tool
 

@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.server
 
 import de.heckenmann.visualagent.protocol.CancellationTokenImpl
+import de.heckenmann.visualagent.protocol.ClientRuntimeSnapshot
 import de.heckenmann.visualagent.protocol.ConversationPort
 import de.heckenmann.visualagent.protocol.ConversationStreamRequest
 import de.heckenmann.visualagent.protocol.ConversationStreamUpdate
@@ -52,7 +53,15 @@ class VisualAgentGrpcSessionService(
             sessionId = frame.sessionId.ifBlank { sessionId }
             when (frame.payloadCase) {
                 ClientFrame.PayloadCase.HELLO -> hello(frame.hello.protocolVersion)
-                ClientFrame.PayloadCase.CHAT_REQUEST -> chat(frame.requestId, frame.chatRequest.content, frame.chatRequest.userEntryId)
+                ClientFrame.PayloadCase.CHAT_REQUEST ->
+                    chat(
+                        frame.requestId,
+                        frame.chatRequest.content,
+                        frame.chatRequest.userEntryId,
+                        frame.chatRequest.clientRuntime
+                            .takeIf { frame.chatRequest.hasClientRuntime() }
+                            ?.toProtocolSnapshot(),
+                    )
                 ClientFrame.PayloadCase.CANCEL_REQUEST -> cancel(frame.requestId, frame.cancelRequest)
                 ClientFrame.PayloadCase.SNAPSHOT_ACK, ClientFrame.PayloadCase.PAYLOAD_NOT_SET -> Unit
             }
@@ -90,6 +99,7 @@ class VisualAgentGrpcSessionService(
             requestId: String,
             content: String,
             userEntryId: String,
+            clientRuntime: ClientRuntimeSnapshot?,
         ) {
             if (!helloReceived) {
                 error("SESSION_NOT_READY", "The session must complete the handshake first", retryable = false)
@@ -100,7 +110,7 @@ class VisualAgentGrpcSessionService(
                 return
             }
             val request =
-                runCatching { ConversationStreamRequest(userEntryId, requestId, content) }
+                runCatching { ConversationStreamRequest(userEntryId, requestId, content, clientRuntime) }
                     .getOrElse { error ->
                         error(
                             "INVALID_ARGUMENT",
@@ -258,3 +268,22 @@ class VisualAgentGrpcSessionService(
         var subscription: Disposable? = null,
     )
 }
+
+private fun de.heckenmann.visualagent.protocol.v1.ClientRuntimeSnapshot.toProtocolSnapshot() =
+    ClientRuntimeSnapshot(
+        processId = processId,
+        osName = osName,
+        osVersion = osVersion,
+        architecture = architecture,
+        availableProcessors = availableProcessors,
+        javaVersion = javaVersion,
+        jvmVendor = jvmVendor,
+        vmName = vmName,
+        uptimeMillis = uptimeMillis,
+        heapUsedBytes = heapUsedBytes,
+        heapCommittedBytes = heapCommittedBytes,
+        heapMaxBytes = heapMaxBytes.takeIf { hasHeapMaxBytes() },
+        totalPhysicalMemoryBytes = totalPhysicalMemoryBytes.takeIf { hasTotalPhysicalMemoryBytes() },
+        freePhysicalMemoryBytes = freePhysicalMemoryBytes.takeIf { hasFreePhysicalMemoryBytes() },
+        processCpuLoad = processCpuLoad.takeIf { hasProcessCpuLoad() },
+    )

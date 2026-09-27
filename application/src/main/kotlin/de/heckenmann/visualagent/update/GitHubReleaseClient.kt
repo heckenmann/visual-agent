@@ -1,6 +1,9 @@
 package de.heckenmann.visualagent.update
 
+import de.heckenmann.visualagent.agent.provider.ServerTrustManagerProvider
+import de.heckenmann.visualagent.agent.provider.resolveTrustManager
 import io.netty.channel.ChannelOption
+import io.netty.handler.ssl.SslContextBuilder
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -59,8 +62,10 @@ internal interface GitHubReleaseClient {
 /** Public unauthenticated GitHub Releases API client for the Visual Agent repository. */
 @Component
 internal class GitHubReleaseHttpClient(
-    private val webClient: WebClient = defaultWebClient(),
+    webClientOverride: WebClient? = null,
+    serverTrustManagerProvider: ServerTrustManagerProvider? = null,
 ) : GitHubReleaseClient {
+    private val webClient = webClientOverride ?: defaultWebClient(serverTrustManagerProvider)
     private val json = Json { ignoreUnknownKeys = true }
 
     override fun latestRelease(): Mono<GitHubRelease> =
@@ -115,13 +120,18 @@ internal class GitHubReleaseHttpClient(
         const val MAX_RELEASES = 100
         const val USER_AGENT = "VisualAgentUpdateCheck/1.0"
 
-        fun defaultWebClient(): WebClient {
+        fun defaultWebClient(serverTrustManagerProvider: ServerTrustManagerProvider?): WebClient {
             val httpClient =
                 HttpClient
                     .create()
                     .followRedirect(true)
                     .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, CONNECT_TIMEOUT_MILLIS)
                     .responseTimeout(Duration.ofSeconds(10))
+                    .secure { spec ->
+                        spec.sslContext(
+                            SslContextBuilder.forClient().trustManager(serverTrustManagerProvider.resolveTrustManager()).build(),
+                        )
+                    }
             return WebClient
                 .builder()
                 .clientConnector(ReactorClientHttpConnector(httpClient))

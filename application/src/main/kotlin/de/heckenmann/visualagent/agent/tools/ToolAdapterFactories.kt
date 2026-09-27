@@ -73,7 +73,8 @@ fun agentShowTool(
 fun contextTool(
     appConfig: AppConfigBean,
     providerCatalog: ProviderCatalogService,
-) = ContextTool(LegacySettingsPort(appConfig, providerCatalog))
+    runtimeDiagnostics: RuntimeDiagnosticsProvider,
+) = ContextTool(LegacySettingsPort(appConfig, providerCatalog), runtimeDiagnostics)
 
 /** Compatibility factory supplying the mutable application timeout to the provider-neutral registry. */
 fun toolRegistry(

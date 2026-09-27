@@ -4,6 +4,7 @@ import de.heckenmann.visualagent.protocol.ApplicationPort
 import de.heckenmann.visualagent.protocol.ClientDirectoryCapabilityRegistration
 import de.heckenmann.visualagent.protocol.ClientDirectoryGrantAdministrationPort
 import de.heckenmann.visualagent.protocol.ClientImagePort
+import de.heckenmann.visualagent.protocol.ClientRuntimeDiagnosticsPort
 import de.heckenmann.visualagent.protocol.ConversationImageResolution
 import de.heckenmann.visualagent.protocol.DirectoryAccessMode
 
@@ -13,6 +14,7 @@ data class ComposeApplicationDependencies(
     val beanDefinitionCount: Int = 0,
     val clientImagePort: ClientImagePort = UnavailableClientImagePort,
     val clientDirectoryAccess: ClientDirectoryGrantAdministrationPort = UnavailableClientDirectoryGrantAdministrationPort,
+    val clientRuntimeDiagnostics: ClientRuntimeDiagnosticsPort = ClientRuntimeDiagnosticsPort { null },
 )
 
 private object UnavailableClientImagePort : ClientImagePort {

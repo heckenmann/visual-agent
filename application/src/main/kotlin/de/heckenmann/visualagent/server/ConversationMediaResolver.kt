@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.server
 
+import de.heckenmann.visualagent.agent.provider.ServerTrustManagerProvider
 import de.heckenmann.visualagent.protocol.ConversationImageResolution
 import de.heckenmann.visualagent.protocol.ConversationImageSources
 import de.heckenmann.visualagent.protocol.FileReference
@@ -7,19 +8,17 @@ import de.heckenmann.visualagent.protocol.MAX_MARKDOWN_IMAGE_BYTES
 import de.heckenmann.visualagent.protocol.MAX_MARKDOWN_IMAGE_DIMENSION
 import de.heckenmann.visualagent.protocol.MAX_MARKDOWN_IMAGE_PIXELS
 import de.heckenmann.visualagent.workspace.ImageHeaderReader
+import de.heckenmann.visualagent.workspace.SpringHttpClientFactory
 import de.heckenmann.visualagent.workspace.UnifiedFileService
 import de.heckenmann.visualagent.workspace.WorkspaceFileService
-import okhttp3.Dns
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import org.apache.tika.Tika
 import org.springframework.stereotype.Component
 import org.springframework.stereotype.Service
+import org.springframework.web.client.RestClient
 import java.net.InetAddress
-import java.net.Proxy
 import java.net.URI
-import java.time.Duration
 import java.util.Base64
+import java.util.concurrent.Executors
 import kotlin.io.path.fileSize
 import kotlin.io.path.readBytes
 
@@ -39,45 +38,62 @@ data class ConversationImageFetchResult(
     val bytes: ByteArray,
 )
 
-/** OkHttp adapter used by the server-side Markdown media resolver. */
+/** Spring RestClient adapter used by the server-side Markdown media resolver. */
 @Component
-class OkHttpConversationImageFetcher(
-    private val client: OkHttpClient =
-        OkHttpClient
-            .Builder()
-            .connectTimeout(Duration.ofSeconds(5))
-            .readTimeout(Duration.ofSeconds(15))
-            .callTimeout(Duration.ofSeconds(15))
-            .followRedirects(false)
-            .followSslRedirects(false)
-            .proxy(Proxy.NO_PROXY)
-            .dns(PublicOnlyDns)
-            .build(),
-) : ConversationImageFetcher {
+class SpringConversationImageFetcher(
+    clientOverride: RestClient? = null,
+    serverTrustManagerProvider: ServerTrustManagerProvider? = null,
+) : ConversationImageFetcher,
+    AutoCloseable {
+    private val managedClient =
+        if (clientOverride == null) {
+            SpringHttpClientFactory.create(
+                serverTrustManagerProvider,
+                PublicImageAddressPolicy::resolve,
+                HTTP_CONNECT_TIMEOUT_MILLIS,
+                HTTP_READ_TIMEOUT_MILLIS,
+            )
+        } else {
+            null
+        }
+    private val client = clientOverride ?: checkNotNull(managedClient).client
+    private val fetchExecutor = Executors.newVirtualThreadPerTaskExecutor()
+
     override fun fetch(uri: URI): ConversationImageFetchResult =
         runCatching {
-            val request =
-                Request
-                    .Builder()
-                    .url(uri.toString())
+            fetchBeforeDeadline(fetchExecutor, HTTP_CALL_TIMEOUT_MILLIS) {
+                client
+                    .get()
+                    .uri(uri)
                     .header("Accept", IMAGE_ACCEPT_HEADER)
                     .header("User-Agent", IMAGE_USER_AGENT)
-                    .get()
-                    .build()
-            client.newCall(request).execute().use { response ->
-                ConversationImageFetchResult(
-                    status = response.code,
-                    contentType = response.header("Content-Type")?.substringBefore(';')?.trim(),
-                    bytes = response.body.byteStream().use { it.readNBytes(MAX_MARKDOWN_IMAGE_BYTES.toInt() + 1) },
-                )
+                    .exchange { _, response ->
+                        ConversationImageFetchResult(
+                            status = response.statusCode.value(),
+                            contentType =
+                                response.headers.contentType
+                                    ?.toString()
+                                    ?.substringBefore(';')
+                                    ?.trim(),
+                            bytes = response.body.use { it.readNBytes(MAX_MARKDOWN_IMAGE_BYTES.toInt() + 1) },
+                        )
+                    }
             }
         }.getOrElse {
             ConversationImageFetchResult(status = 0, contentType = null, bytes = ByteArray(0))
         }
 
+    override fun close() {
+        fetchExecutor.shutdownNow()
+        managedClient?.close()
+    }
+
     private companion object {
         const val IMAGE_ACCEPT_HEADER = "image/png,image/jpeg,image/gif"
         const val IMAGE_USER_AGENT = "VisualAgent/0.1 (https://github.com/heckenmann/visual-agent)"
+        const val HTTP_CONNECT_TIMEOUT_MILLIS = 5_000
+        const val HTTP_READ_TIMEOUT_MILLIS = 15_000
+        const val HTTP_CALL_TIMEOUT_MILLIS = 15_000L
     }
 }
 
@@ -204,8 +220,15 @@ class ConversationMediaResolver(
 private object PublicImageAddressPolicy {
     fun isAllowed(uri: URI): Boolean {
         val host = uri.host ?: return false
-        val addresses = runCatching { InetAddress.getAllByName(host) }.getOrNull() ?: return false
-        return addresses.isNotEmpty() && addresses.all(::isPublicAddress)
+        return runCatching { resolve(host) }.isSuccess
+    }
+
+    fun resolve(host: String): Array<InetAddress> {
+        val addresses = InetAddress.getAllByName(host)
+        require(addresses.isNotEmpty() && addresses.all(::isPublicAddress)) {
+            "Image host resolves to a non-public address"
+        }
+        return addresses
     }
 
     fun isPublicAddress(address: InetAddress): Boolean {
@@ -252,16 +275,5 @@ private object PublicImageAddressPolicy {
             first >= 224 -> false
             else -> true
         }
-    }
-}
-
-/** Resolves only public addresses so OkHttp connects to the same validated DNS result. */
-private object PublicOnlyDns : Dns {
-    override fun lookup(hostname: String): List<InetAddress> {
-        val addresses = InetAddress.getAllByName(hostname).toList()
-        require(addresses.isNotEmpty() && addresses.all(PublicImageAddressPolicy::isPublicAddress)) {
-            "Image host resolves to a non-public address"
-        }
-        return addresses
     }
 }

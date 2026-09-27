@@ -28,6 +28,7 @@ class AgentToolConfigServiceTest {
         assertTrue("workspace:download" in tools)
         assertTrue("update:check" in tools)
         assertTrue("context" in tools)
+        assertTrue("system:client-runtime" in tools)
         assertFalse("agent:start" in tools)
         assertFalse("agent:message" in tools)
         assertFalse("agent:assign-todo" in tools)
@@ -46,6 +47,64 @@ class AgentToolConfigServiceTest {
         assertTrue(service.findConfigIdFor(agent) == "coder")
         assertTrue(ToolId("workspace:file") in service.toolsFor(agent))
         assertFalse(ToolId("file:write") in service.toolsFor(agent))
+    }
+
+    @Test
+    fun `server diagnostics are enabled only for researcher and analyst defaults`() {
+        val service = AgentToolConfigService(MapSubAgentConfigStore())
+        val researcher =
+            SubAgent(id = "researcher", name = "Researcher", role = "Research", config = AgentConfig.fromTemplate("researcher"))
+        val analyst = SubAgent(id = "analyst", name = "Analyst", role = "Analysis", config = AgentConfig.fromTemplate("analyst"))
+        val coder = SubAgent(id = "coder", name = "Coder", role = "Implementation", config = AgentConfig.fromTemplate("coder"))
+        val diagnosticTools =
+            setOf(
+                ToolId("system:time"),
+                ToolId("network:dns"),
+                ToolId("network:reverse-dns"),
+                ToolId("network:tcp"),
+                ToolId("network:ping"),
+                ToolId("network:traceroute"),
+                ToolId("network:interfaces"),
+                ToolId("network:http"),
+                ToolId("network:tls"),
+                ToolId("system:threads"),
+                ToolId("system:filesystem"),
+            )
+
+        assertTrue(diagnosticTools.all { it in service.toolsFor(researcher) })
+        assertTrue(diagnosticTools.all { it in service.toolsFor(analyst) })
+        assertTrue(diagnosticTools.none { it in service.toolsFor(coder) })
+    }
+
+    @Test
+    fun `TLS management tools are main-agent-only and disabled by default`() {
+        val store = MapSubAgentConfigStore()
+        val service = AgentToolConfigService(store)
+        val trustStoreTool = ToolId("security:truststore")
+        val keyStoreTool = ToolId("security:keystore")
+        val agent =
+            SubAgent(
+                id = "custom",
+                name = "Custom",
+                role = "Custom",
+                config = AgentConfig(tools = listOf(trustStoreTool.value, keyStoreTool.value)),
+            )
+
+        assertTrue(trustStoreTool !in service.mainAgentTools())
+        assertTrue(keyStoreTool !in service.mainAgentTools())
+        assertTrue(trustStoreTool !in service.toolsFor(agent))
+        assertTrue(keyStoreTool !in service.toolsFor(agent))
+
+        service.setToolGloballyEnabled(trustStoreTool.value, true)
+        service.setToolGloballyEnabled(keyStoreTool.value, true)
+
+        assertTrue(trustStoreTool in service.mainAgentTools())
+        assertTrue(keyStoreTool in service.mainAgentTools())
+        assertTrue(trustStoreTool !in service.toolsFor(agent))
+        assertTrue(keyStoreTool !in service.toolsFor(agent))
+        AgentToolConfigService(store)
+        assertTrue(trustStoreTool in service.mainAgentTools())
+        assertTrue(keyStoreTool in service.mainAgentTools())
     }
 
     @Test

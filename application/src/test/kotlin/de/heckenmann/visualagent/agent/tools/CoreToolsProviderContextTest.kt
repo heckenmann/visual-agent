@@ -20,17 +20,38 @@ class CoreToolsProviderContextTest {
         try {
             appConfig.llmProvider = "openai"
             appConfig.openAiApiKey = "sk-secret-value"
-            appConfig.openAiBaseUrl = "https://openai-compatible.example"
+            appConfig.openAiBaseUrl = "https://user:password@openai-compatible.example/path?api_key=url-secret"
             appConfig.openAiModel = "legacy-model"
             val catalog = mockk<ProviderCatalogService>()
             every { catalog.activeModelId() } returns "gpt-context"
 
-            val result = contextTool(appConfig = appConfig, providerCatalog = catalog).execute("""{}""", emptyMap())
+            val runtimeDiagnostics = RuntimeDiagnosticsProvider { sampleRuntimeSnapshot() }
+            val result =
+                contextTool(appConfig = appConfig, providerCatalog = catalog, runtimeDiagnostics)
+                    .execute(
+                        """{}""",
+                        mapOf(
+                            "sessionId" to "safe-session",
+                            "apiKey" to "request-secret",
+                            "toolCancellationToken" to Any(),
+                            "clientRuntimeSnapshot" to "must-not-appear-in-general-context",
+                        ),
+                    )
 
             assertTrue(result.content.contains("Provider: openai"))
             assertTrue(result.content.contains("Model: gpt-context"))
             assertTrue(result.content.contains("OpenAI API key configured: true"))
+            assertTrue(result.content.contains("Visual Agent server JVM runtime (a separate desktop client's JVM is not included):"))
+            assertTrue(result.content.contains("Heap used/committed/max:"))
+            assertTrue(result.content.contains("https://openai-compatible.example/path"))
+            assertTrue(result.content.contains("sessionId: safe-session"))
             assertFalse(result.content.contains("sk-secret-value"))
+            assertFalse(result.content.contains("password"))
+            assertFalse(result.content.contains("url-secret"))
+            assertFalse(result.content.contains("request-secret"))
+            assertFalse(result.content.contains("toolCancellationToken"))
+            assertFalse(result.content.contains("must-not-appear-in-general-context"))
+            assertFalse(result.content.contains(System.getProperty("user.home")))
         } finally {
             appConfig.llmProvider = originalProvider
             appConfig.openAiApiKey = originalKey
@@ -38,4 +59,24 @@ class CoreToolsProviderContextTest {
             appConfig.openAiModel = originalModel
         }
     }
+
+    private fun sampleRuntimeSnapshot() =
+        RuntimeDiagnosticSnapshot(
+            osName = "Test OS",
+            osVersion = "1",
+            architecture = "test-arch",
+            availableProcessors = 2,
+            javaVersion = "24",
+            jvmVendor = "Test Vendor",
+            vmName = "Test VM",
+            uptimeMillis = 3_661_000,
+            heapUsedBytes = 1024,
+            heapCommittedBytes = 2048,
+            heapMaxBytes = 4096,
+            nonHeapUsedBytes = 512,
+            totalPhysicalMemoryBytes = null,
+            freePhysicalMemoryBytes = null,
+            processCpuLoad = null,
+            systemCpuLoad = null,
+        )
 }
