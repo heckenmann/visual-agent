@@ -18,7 +18,8 @@ class NetworkTlsTool(
             id = TOOL_ID,
             name = TOOL_ID.toFunctionName(),
             description =
-                "Inspect TLS for one server-side host and port using the JVM trust store and hostname verification. " +
+                "Inspect TLS for one server-side host and port using platform roots plus Visual Agent's managed CA roots " +
+                    "and hostname verification. " +
                     "Returns public certificate metadata only; it never exposes key material. " +
                     "Input: {\"host\":\"example.org\",\"port\":443,\"family\":\"auto\",\"timeoutSeconds\":10}.",
             inputSchema =
@@ -113,7 +114,7 @@ data class TlsDiagnosticResult(
     val cipherSuite: String?,
     /** Whether JSSE HTTPS endpoint identification passed. */
     val hostnameVerified: Boolean?,
-    /** Whether the JVM default trust manager accepted the certificate chain. */
+    /** Whether the server's platform and application-managed trust policy accepted the certificate chain. */
     val trustValidated: Boolean?,
     /** Public certificate summary, if the peer certificate was captured. */
     val certificate: TlsCertificateSummary?,

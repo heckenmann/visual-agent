@@ -4,6 +4,8 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jlleitschuh.gradle.ktlint.tasks.BaseKtLintCheckTask
 import org.springframework.boot.gradle.tasks.bundling.BootJar
 import java.net.URI
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 import java.security.MessageDigest
 import java.util.jar.JarFile
 
@@ -126,8 +128,11 @@ compose.desktop {
                 "java.security.jgss",
                 "java.sql",
                 "java.sql.rowset",
+                "jdk.crypto.ec",
                 "jdk.jfr",
+                "jdk.jartool",
                 "jdk.management",
+                "jdk.net",
                 "jdk.security.auth",
                 "jdk.unsupported",
             )
@@ -147,6 +152,44 @@ compose.desktop {
             }
         }
     }
+}
+
+val installPackagedKeytool =
+    tasks.register("installPackagedKeytool") {
+        group = "distribution"
+        description = "Adds the JDK keytool launcher to the trimmed application runtime."
+        dependsOn("createRuntimeImage")
+        doLast {
+            val runtimeHome =
+                layout.buildDirectory
+                    .dir("compose/tmp/main/runtime")
+                    .get()
+                    .asFile
+            val osName = System.getProperty("os.name")
+            val isWindows = osName.startsWith("Windows", ignoreCase = true)
+            val launcherName = if (isWindows) "keytool.exe" else "keytool"
+            val source = file(System.getProperty("java.home")).resolve("bin/$launcherName")
+            check(source.isFile) { "The configured JDK does not provide $launcherName: $source" }
+            val target = runtimeHome.resolve("bin/$launcherName")
+            target.parentFile.mkdirs()
+            Files.copy(source.toPath(), target.toPath(), REPLACE_EXISTING)
+            check(target.setExecutable(true, false) || target.canExecute()) { "Could not make packaged keytool executable: $target" }
+            val result =
+                ProcessBuilder(target.absolutePath, "-help")
+                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                    .start()
+                    .waitFor()
+            check(result == 0) { "The packaged keytool launcher failed with exit code $result." }
+        }
+    }
+
+installPackagedKeytool.configure {
+    mustRunAfter("createRuntimeImage")
+}
+
+tasks.matching { it.name == "createDistributable" }.configureEach {
+    dependsOn(installPackagedKeytool)
 }
 
 val linuxApplicationImage =
@@ -523,6 +566,15 @@ val verifyNativeDistributionLauncher =
                     else -> distributionDirectory.resolve("$appName/bin/$appName")
                 }
             check(launcher.isFile && launcher.canExecute()) { "Native distribution launcher is missing or not executable: $launcher" }
+            val runtimeHome =
+                when {
+                    osName.equals("Mac OS X", ignoreCase = true) ->
+                        distributionDirectory.resolve("$appName.app/Contents/runtime/Contents/Home")
+                    osName.startsWith("Windows", ignoreCase = true) -> distributionDirectory.resolve("$appName/runtime")
+                    else -> distributionDirectory.resolve("$appName/lib/runtime")
+                }
+            val keytool = runtimeHome.resolve("bin/${if (osName.startsWith("Windows", ignoreCase = true)) "keytool.exe" else "keytool"}")
+            check(keytool.isFile && keytool.canExecute()) { "Native distribution keytool is missing or not executable: $keytool" }
         }
     }
 

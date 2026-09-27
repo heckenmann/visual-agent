@@ -16,7 +16,6 @@ coroutines = "1.11.0"
 serialization = "1.11.0"
 pdfbox = "3.0.8"
 tika = "4.0.0"
-okhttp = "5.5.0"
 commons-net = "3.13.0"
 mina-sshd = "2.19.0"
 kotlin-logging = "3.0.5"
@@ -42,6 +41,7 @@ kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref =
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 spring-boot-bom = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
 spring-boot-starter = { module = "org.springframework.boot:spring-boot-starter" }
+spring-boot-starter-restclient = { module = "org.springframework.boot:spring-boot-starter-restclient" }
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
 spring-boot-starter-flyway = { module = "org.springframework.boot:spring-boot-starter-flyway" }
 spring-context = { module = "org.springframework:spring-context" }
@@ -65,7 +65,7 @@ coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", ve
 serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 pdfbox = { module = "org.apache.pdfbox:pdfbox", version.ref = "pdfbox" }
 tika-core = { module = "org.apache.tika:tika-core", version.ref = "tika" }
-okhttp-jvm = { module = "com.squareup.okhttp3:okhttp-jvm", version.ref = "okhttp" }
+apache-httpclient5 = { module = "org.apache.httpcomponents.client5:httpclient5" }
 commons-net = { module = "commons-net:commons-net", version.ref = "commons-net" }
 mina-sshd-scp = { module = "org.apache.sshd:sshd-scp", version.ref = "mina-sshd" }
 kotlin-logging = { module = "io.github.microutils:kotlin-logging-jvm", version.ref = "kotlin-logging" }

@@ -200,9 +200,15 @@ role-based sets above and the global blocklist:
   hardware addresses and unrelated host data are omitted.
 - `network:http`: inspect one HTTP(S) endpoint using the JDK HTTP client; reports status, safe
   redirect authorities, timing, and limited metadata without response bodies or credential headers.
-- `network:tls`: inspect one TLS endpoint using the JDK JSSE implementation and default JVM trust
-  store; reports verification status and bounded public certificate metadata without exposing
-  certificate key material. This is separate from DNS and reverse-DNS tools.
+- `network:tls`: inspect one TLS endpoint using the JDK JSSE implementation and the server's
+  platform plus managed CA trust roots; reports verification status and bounded public certificate
+  metadata without exposing certificate key material. This is separate from DNS and reverse-DNS tools.
+- `security:truststore`: main-agent-only tool for listing, inspecting, importing, and removing CA
+  certificates from the managed server trust store. It is disabled by default; changes take effect
+  in long-lived clients after a server restart.
+- `security:keystore`: main-agent-only tool for listing and inspecting managed key entries,
+  generating CA/server certificates, removing entries, and exporting public certificates. Private
+  keys and passwords are never returned. The managed alias can be used by the optional gRPC server.
 - `system:threads`: request a bounded JVM thread summary, deadlock report, or thread dump filtered
   by state. Thread dumps limit both thread count and stack frames and omit thread-local values.
 - `system:filesystem`: inspect capacity and access status for the server data root, managed
@@ -313,7 +319,9 @@ Saved canvas documents are regular managed workspace files with MIME type `appli
 sources, redirects, private network targets, unsupported protocols, and
 incomplete transfers. Downloads have no application-imposed size limit. SFTP
 and SCP remain separate protocols;
-both are supported with their matching server-side adapter.
+both are supported with their matching server-side adapter. HTTP(S) downloads use Spring's
+`RestClient` with the server-managed `SslBundle` trust configuration; FTP and SSH-based transfers do
+not use TLS bundles.
 
 ### Use Cases Tool
 

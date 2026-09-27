@@ -2,9 +2,12 @@ package de.heckenmann.visualagent.agent.ollama
 
 import com.sun.net.httpserver.HttpServer
 import de.heckenmann.visualagent.agent.TestProviderRuntimeConfig
+import de.heckenmann.visualagent.agent.provider.ServerTrustManagerProvider
 import org.junit.jupiter.api.Test
 import java.net.InetSocketAddress
+import java.security.cert.X509Certificate
 import java.util.concurrent.atomic.AtomicReference
+import javax.net.ssl.X509TrustManager
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
@@ -58,6 +61,35 @@ class OllamaApiConfigurationTest {
             server.stop(0)
         }
     }
+
+    @Test
+    fun `api configures the supplied server trust manager for outbound TLS`() {
+        var requested = false
+        val provider =
+            ServerTrustManagerProvider {
+                requested = true
+                testTrustManager()
+            }
+
+        createOllamaApi(appConfig, provider)
+
+        assertEquals(true, requested)
+    }
+
+    private fun testTrustManager() =
+        object : X509TrustManager {
+            override fun checkClientTrusted(
+                chain: Array<out X509Certificate>,
+                authType: String,
+            ) = Unit
+
+            override fun checkServerTrusted(
+                chain: Array<out X509Certificate>,
+                authType: String,
+            ) = Unit
+
+            override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
+        }
 
     private fun modelServer(authorization: AtomicReference<String?>): HttpServer =
         HttpServer

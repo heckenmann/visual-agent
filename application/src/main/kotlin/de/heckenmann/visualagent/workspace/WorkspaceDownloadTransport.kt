@@ -1,7 +1,6 @@
 package de.heckenmann.visualagent.workspace
 
-import okhttp3.OkHttpClient
-import okhttp3.Request
+import de.heckenmann.visualagent.agent.provider.ServerTrustManagerProvider
 import org.apache.commons.net.ftp.FTP
 import org.apache.commons.net.ftp.FTPClient
 import org.apache.commons.net.ftp.FTPReply
@@ -9,9 +8,9 @@ import org.springframework.core.io.FileSystemResource
 import org.springframework.integration.sftp.session.DefaultSftpSessionFactory
 import org.springframework.integration.sftp.session.SftpRemoteFileTemplate
 import org.springframework.stereotype.Component
+import org.springframework.web.client.RestClient
 import java.io.IOException
 import java.net.InetAddress
-import java.net.Proxy
 import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
@@ -32,8 +31,23 @@ fun interface WorkspaceDownloadTransfer {
 @Component
 class WorkspaceDownloadTransport(
     private val scp: WorkspaceScpTransport,
-    private val httpClient: OkHttpClient = defaultHttpClient(),
-) : WorkspaceDownloadTransfer {
+    httpClientOverride: RestClient? = null,
+    serverTrustManagerProvider: ServerTrustManagerProvider? = null,
+) : WorkspaceDownloadTransfer,
+    AutoCloseable {
+    private val managedHttpClient =
+        if (httpClientOverride == null) {
+            SpringHttpClientFactory.create(
+                serverTrustManagerProvider,
+                PublicDownloadAddressPolicy::resolve,
+                HTTP_CONNECT_TIMEOUT_MILLIS,
+                TRANSFER_TIMEOUT_MILLIS,
+            )
+        } else {
+            null
+        }
+    private val httpClient = httpClientOverride ?: checkNotNull(managedHttpClient).client
+
     /** Transfers a source into an already-created temporary destination. */
     override fun download(
         source: URI,
@@ -57,23 +71,19 @@ class WorkspaceDownloadTransport(
         control: WorkspaceDownloadControl,
     ) {
         require(source.userInfo == null) { "HTTP credentials are not accepted in a tool source" }
-        val request =
-            Request
-                .Builder()
-                .url(source.toString())
-                .header("User-Agent", USER_AGENT)
-                .get()
-                .build()
-        httpClient.newCall(request).execute().use { response ->
-            require(response.code in 200..299) { "Remote HTTP request failed" }
-            val length = response.header("Content-Length")?.toLongOrNull()
-            control.setTotalBytes(length)
-            response.body.byteStream().use { input ->
-                Files.newOutputStream(destination).use { output ->
-                    copyDownload(input, output, control)
+        httpClient
+            .get()
+            .uri(source)
+            .header("User-Agent", USER_AGENT)
+            .exchange { _, response ->
+                require(response.statusCode.is2xxSuccessful) { "Remote HTTP request failed" }
+                control.setTotalBytes(response.headers.contentLength.takeIf { it >= 0 })
+                response.body.use { input ->
+                    Files.newOutputStream(destination).use { output ->
+                        copyDownload(input, output, control)
+                    }
                 }
             }
-        }
     }
 
     private fun downloadFtp(
@@ -140,38 +150,37 @@ class WorkspaceDownloadTransport(
         }
     }
 
+    override fun close() {
+        managedHttpClient?.close()
+    }
+
     private companion object {
         const val DEFAULT_FTP_PORT = 21
         const val DEFAULT_SSH_PORT = 22
+        const val HTTP_CONNECT_TIMEOUT_MILLIS = 5_000
         const val TRANSFER_TIMEOUT_MILLIS = 15_000
         const val USER_AGENT = "VisualAgent/0.1 (https://github.com/heckenmann/visual-agent)"
-
-        /** Builds an HTTP client that cannot follow redirects or use ambient proxies. */
-        fun defaultHttpClient(): OkHttpClient =
-            OkHttpClient
-                .Builder()
-                .connectTimeout(Duration.ofSeconds(5))
-                .readTimeout(Duration.ofSeconds(15))
-                .followRedirects(false)
-                .followSslRedirects(false)
-                .proxy(Proxy.NO_PROXY)
-                .build()
     }
 }
 
 internal object PublicDownloadAddressPolicy {
-    fun isAllowed(host: String): Boolean =
-        runCatching { InetAddress.getAllByName(host).toList() }
-            .getOrNull()
-            ?.takeIf(List<InetAddress>::isNotEmpty)
-            ?.all { address ->
+    fun isAllowed(host: String): Boolean = runCatching { resolve(host) }.isSuccess
+
+    fun resolve(host: String): Array<InetAddress> {
+        val addresses = InetAddress.getAllByName(host)
+        require(addresses.isNotEmpty()) { "Remote source host did not resolve" }
+        require(
+            addresses.all { address ->
                 !address.isAnyLocalAddress &&
                     !address.isLoopbackAddress &&
                     !address.isLinkLocalAddress &&
                     !address.isSiteLocalAddress &&
                     !address.isMulticastAddress &&
                     !address.isPrivateOrReserved()
-            } == true
+            },
+        ) { "Remote source host is not public" }
+        return addresses
+    }
 
     private fun InetAddress.isPrivateOrReserved(): Boolean {
         val bytes = address

@@ -6,11 +6,11 @@ import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
-import java.security.KeyStore
 import java.security.cert.CertificateException
 import java.security.cert.X509Certificate
 import java.time.Clock
 import java.util.Date
+import java.util.function.Supplier
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SNIHostName
 import javax.net.ssl.SSLContext
@@ -18,7 +18,6 @@ import javax.net.ssl.SSLException
 import javax.net.ssl.SSLHandshakeException
 import javax.net.ssl.SSLParameters
 import javax.net.ssl.SSLSocket
-import javax.net.ssl.TrustManagerFactory
 import javax.net.ssl.X509TrustManager
 
 /** Resolves one bounded target and normalizes JVM TLS handshake diagnostics. */
@@ -133,6 +132,7 @@ data class TlsHandshakeResult(
 @Component
 class JvmTlsHandshakeProbe(
     private val clock: Clock,
+    private val serverTrustManagerSupplier: Supplier<X509TrustManager>? = null,
 ) : TlsHandshakeProbe {
     override fun connect(
         address: InetAddress,
@@ -184,12 +184,7 @@ class JvmTlsHandshakeProbe(
 
     private fun String.isIpLiteral(): Boolean = ':' in this || IPV4_LITERAL.matches(this)
 
-    private fun recordingTrustManager(): RecordingTrustManager {
-        val factory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
-        factory.init(null as KeyStore?)
-        val defaultManager = factory.trustManagers.filterIsInstance<X509TrustManager>().first()
-        return RecordingTrustManager(defaultManager)
-    }
+    private fun recordingTrustManager(): RecordingTrustManager = RecordingTrustManager(serverTrustManagerSupplier.resolveTrustManager())
 
     private fun failed(
         status: String,

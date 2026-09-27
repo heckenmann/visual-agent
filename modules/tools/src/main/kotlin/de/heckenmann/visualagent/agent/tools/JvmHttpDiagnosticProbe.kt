@@ -9,7 +9,12 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.net.http.HttpTimeoutException
+import java.security.KeyStore
 import java.time.Duration
+import java.util.function.Supplier
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManagerFactory
+import javax.net.ssl.X509TrustManager
 
 /** Implements bounded redirects and normalized HTTP diagnostic outcomes. */
 @Component
@@ -105,12 +110,15 @@ class JvmHttpDiagnosticProbe(
 
 /** JDK HTTP client transport that never follows redirects or exposes response bodies. */
 @Component
-class JvmHttpDiagnosticTransport : HttpDiagnosticTransport {
+class JvmHttpDiagnosticTransport(
+    serverTrustManagerSupplier: Supplier<X509TrustManager>? = null,
+) : HttpDiagnosticTransport {
     private val client =
         HttpClient
             .newBuilder()
             .connectTimeout(Duration.ofSeconds(CONNECT_TIMEOUT_SECONDS))
             .followRedirects(HttpClient.Redirect.NEVER)
+            .sslContext(SSLContext.getInstance("TLS").apply { init(null, arrayOf(serverTrustManagerSupplier.resolveTrustManager()), null) })
             .build()
 
     override fun request(
@@ -142,4 +150,11 @@ class JvmHttpDiagnosticTransport : HttpDiagnosticTransport {
     private companion object {
         const val CONNECT_TIMEOUT_SECONDS = 30L
     }
+}
+
+internal fun Supplier<X509TrustManager>?.resolveTrustManager(): X509TrustManager {
+    if (this != null) return get()
+    val factory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
+    factory.init(null as KeyStore?)
+    return factory.trustManagers.filterIsInstance<X509TrustManager>().first()
 }
