@@ -14,7 +14,7 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.util.concurrent.TimeUnit
 
-/** Owns the local in-process and optional remote gRPC server lifecycle. */
+/** Owns the local in-process and optional loopback-network gRPC server lifecycle. */
 @Component
 class VisualAgentGrpcServer(
     private val sessionService: VisualAgentGrpcSessionService,
@@ -75,7 +75,7 @@ class VisualAgentGrpcServer(
     /** Returns the configured in-process transport name for a local desktop client. */
     fun inProcessServerName(): String = inProcessName
 
-    /** Returns the configured remote port, or zero when no network endpoint is enabled. */
+    /** Returns the configured loopback-network port, or zero when no network endpoint is enabled. */
     fun remotePort(): Int = port
 
     /** Returns true when the local server has completed endpoint startup. */
