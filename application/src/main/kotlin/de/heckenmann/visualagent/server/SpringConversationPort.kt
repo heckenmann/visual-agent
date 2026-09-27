@@ -56,7 +56,7 @@ class SpringConversationPort(
                     onChunk,
                     request.userEntryId,
                     request.assistantEntryId,
-                    request.clientRuntime,
+                    request.clientDataRequester,
                 )
                 val history = agentManager.getHistory()
                 val message =

@@ -29,6 +29,11 @@ class AgentToolConfigServiceTest {
         assertTrue("update:check" in tools)
         assertTrue("context" in tools)
         assertTrue("system:client-runtime" in tools)
+        assertTrue("diagnostics:config" in tools)
+        assertTrue("diagnostics:database" in tools)
+        assertTrue("diagnostics:provider" in tools)
+        assertTrue("diagnostics:health" in tools)
+        assertTrue("diagnostics:connectors" in tools)
         assertFalse("agent:start" in tools)
         assertFalse("agent:message" in tools)
         assertFalse("agent:assign-todo" in tools)
@@ -65,15 +70,59 @@ class AgentToolConfigServiceTest {
                 ToolId("network:ping"),
                 ToolId("network:traceroute"),
                 ToolId("network:interfaces"),
+                ToolId("network:routes"),
                 ToolId("network:http"),
                 ToolId("network:tls"),
                 ToolId("system:threads"),
+                ToolId("system:gc"),
+                ToolId("system:process"),
                 ToolId("system:filesystem"),
             )
 
         assertTrue(diagnosticTools.all { it in service.toolsFor(researcher) })
         assertTrue(diagnosticTools.all { it in service.toolsFor(analyst) })
         assertTrue(diagnosticTools.none { it in service.toolsFor(coder) })
+        val processInventory = ToolId("system:processes")
+        assertFalse(processInventory in service.toolsFor(researcher))
+        assertFalse(processInventory in service.toolsFor(analyst))
+        val clientProcessInventory = ToolId("system:client-processes")
+        assertFalse(clientProcessInventory in service.toolsFor(researcher))
+        assertFalse(clientProcessInventory in service.toolsFor(analyst))
+        assertFalse(processInventory in service.mainAgentTools())
+        assertFalse(clientProcessInventory in service.mainAgentTools())
+        service.setToolGloballyEnabled(processInventory.value, true)
+        service.setToolGloballyEnabled(clientProcessInventory.value, true)
+        assertTrue(processInventory in service.mainAgentTools())
+        assertTrue(clientProcessInventory in service.mainAgentTools())
+        val explicitlyEnabled =
+            SubAgent(id = "custom", name = "Custom", role = "Custom", config = AgentConfig(tools = listOf(processInventory.value)))
+        assertTrue(processInventory in service.toolsFor(explicitlyEnabled))
+        val clientRuntime = ToolId("system:client-runtime")
+        val clientToolsRequested =
+            SubAgent(
+                id = "client-custom",
+                name = "Client Custom",
+                role = "Custom",
+                config = AgentConfig(tools = listOf(clientProcessInventory.value, clientRuntime.value)),
+            )
+        assertTrue(clientRuntime in service.mainAgentTools())
+        assertFalse(clientProcessInventory in service.toolsFor(clientToolsRequested))
+        assertFalse(clientRuntime in service.toolsFor(clientToolsRequested))
+    }
+
+    @Test
+    fun `log diagnostics are main-agent-only and disabled until explicitly enabled`() {
+        val store = MapSubAgentConfigStore()
+        val service = AgentToolConfigService(store)
+        val researcher = SubAgent(id = "r", name = "Researcher", role = "Research", config = AgentConfig.fromTemplate("researcher"))
+
+        assertFalse(ToolId("diagnostics:logs") in service.mainAgentTools())
+        assertFalse(ToolId("diagnostics:logs") in service.toolsFor(researcher))
+
+        service.setToolGloballyEnabled("diagnostics:logs", true)
+
+        assertTrue(ToolId("diagnostics:logs") in service.mainAgentTools())
+        assertFalse(ToolId("diagnostics:logs") in service.toolsFor(researcher))
     }
 
     @Test
@@ -105,6 +154,56 @@ class AgentToolConfigServiceTest {
         AgentToolConfigService(store)
         assertTrue(trustStoreTool in service.mainAgentTools())
         assertTrue(keyStoreTool in service.mainAgentTools())
+    }
+
+    @Test
+    fun `configuration diagnostics are main-agent-only`() {
+        val service = AgentToolConfigService(MapSubAgentConfigStore())
+        val researcher =
+            SubAgent(id = "researcher", name = "Researcher", role = "Research", config = AgentConfig.fromTemplate("researcher"))
+        val explicit =
+            SubAgent(
+                id = "custom",
+                name = "Custom",
+                role = "Custom",
+                config =
+                    AgentConfig(
+                        tools = listOf("diagnostics:config", "diagnostics:provider", "diagnostics:health", "diagnostics:connectors"),
+                    ),
+            )
+
+        assertTrue(ToolId("diagnostics:config") in service.mainAgentTools())
+        assertTrue(ToolId("diagnostics:provider") in service.mainAgentTools())
+        assertFalse(ToolId("diagnostics:config") in service.toolsFor(researcher))
+        assertFalse(ToolId("diagnostics:config") in service.toolsFor(explicit))
+        assertFalse(ToolId("diagnostics:provider") in service.toolsFor(explicit))
+        assertFalse(ToolId("diagnostics:health") in service.toolsFor(explicit))
+        assertFalse(ToolId("diagnostics:connectors") in service.toolsFor(explicit))
+    }
+
+    @Test
+    fun `server environment access is globally disabled and requires explicit enablement`() {
+        val store = MapSubAgentConfigStore()
+        val service = AgentToolConfigService(store)
+        val tool = ToolId("system:env")
+        val explicitAgent =
+            SubAgent(
+                id = "custom",
+                name = "Custom",
+                role = "Custom",
+                config = AgentConfig(tools = listOf(tool.value)),
+            )
+
+        assertFalse(tool in service.mainAgentTools())
+        assertFalse(tool in service.toolsFor(explicitAgent))
+
+        service.setToolGloballyEnabled(tool.value, true)
+
+        assertTrue(tool in service.mainAgentTools())
+        assertTrue(tool in service.toolsFor(explicitAgent))
+        val defaultResearcher =
+            SubAgent(id = "researcher", name = "Researcher", role = "Research", config = AgentConfig.fromTemplate("researcher"))
+        assertFalse(tool in service.toolsFor(defaultResearcher))
     }
 
     @Test

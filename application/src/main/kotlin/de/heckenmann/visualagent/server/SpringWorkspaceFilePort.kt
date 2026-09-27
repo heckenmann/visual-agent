@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.server
 
 import de.heckenmann.visualagent.knowledge.WorkspaceFileRecord
+import de.heckenmann.visualagent.protocol.MAX_WORKSPACE_FILE_IMPORT_BYTES
 import de.heckenmann.visualagent.protocol.WorkspaceDirectoryDeletion
 import de.heckenmann.visualagent.protocol.WorkspaceDownload
 import de.heckenmann.visualagent.protocol.WorkspaceFile
@@ -34,7 +35,11 @@ class SpringWorkspaceFilePort(
         directory: String,
         name: String,
         bytes: ByteArray,
-    ): WorkspaceFile = protocolBoundary { workspaceFileService.importFile(directory, name, bytes).toProtocol() }
+    ): WorkspaceFile =
+        protocolBoundary {
+            require(bytes.size.toLong() <= MAX_WORKSPACE_FILE_IMPORT_BYTES) { "Workspace file is too large." }
+            workspaceFileService.importFile(directory, name, bytes).toProtocol()
+        }
 
     override fun activeDownloads(): List<WorkspaceDownload> = protocolBoundary { workspaceDownloadService.activeDownloads() }
 

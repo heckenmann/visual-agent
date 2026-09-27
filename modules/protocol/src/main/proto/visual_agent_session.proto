@@ -20,6 +20,7 @@ message ClientFrame {
     ChatRequest chat_request = 11;
     CancelRequest cancel_request = 12;
     SnapshotAck snapshot_ack = 13;
+    ClientDataResponse client_data_response = 14;
   }
 }
 
@@ -33,6 +34,7 @@ message ServerFrame {
     ChatDelta chat_delta = 11;
     ChatCompleted chat_completed = 12;
     OperationError error = 13;
+    ClientDataRequest client_data_request = 14;
   }
 }
 
@@ -50,25 +52,21 @@ message HelloAck {
 message ChatRequest {
   string content = 1;
   string user_entry_id = 2;
-  ClientRuntimeSnapshot client_runtime = 3;
+  string assistant_entry_id = 3;
 }
 
-message ClientRuntimeSnapshot {
-  int64 process_id = 1;
-  string os_name = 2;
-  string os_version = 3;
-  string architecture = 4;
-  int32 available_processors = 5;
-  string java_version = 6;
-  string jvm_vendor = 7;
-  string vm_name = 8;
-  int64 uptime_millis = 9;
-  int64 heap_used_bytes = 10;
-  int64 heap_committed_bytes = 11;
-  optional int64 heap_max_bytes = 12;
-  optional int64 total_physical_memory_bytes = 13;
-  optional int64 free_physical_memory_bytes = 14;
-  optional double process_cpu_load = 15;
+message ClientDataRequest {
+  string data_request_id = 1;
+  string purpose = 2;
+  int64 max_payload_bytes = 3;
+  repeated string accepted_content_types = 4;
+}
+
+message ClientDataResponse {
+  string data_request_id = 1;
+  bytes payload = 2;
+  string name = 3;
+  string content_type = 4;
 }
 
 message ChatDelta {

@@ -6,7 +6,7 @@ import de.heckenmann.visualagent.agent.tools.api.ToolResult
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** Returns only the desktop client's explicitly transferred JVM snapshot. */
+/** Requests and returns the desktop client's JVM snapshot only when explicitly called. */
 @AgentTool
 class SystemClientRuntimeTool : VisualAgentTool {
     override val definition =
@@ -14,8 +14,7 @@ class SystemClientRuntimeTool : VisualAgentTool {
             id = TOOL_ID,
             name = TOOL_ID.toFunctionName(),
             description =
-                "Return the desktop client's separately reported JVM and OS metrics for the current conversation request. " +
-                    "This is not the server runtime. Input: {}.",
+                "Ask the desktop client for its current JVM and OS metrics. This is not the server runtime. Input: {}.",
             inputSchema = STRING_SCHEMA,
         )
 
@@ -23,9 +22,12 @@ class SystemClientRuntimeTool : VisualAgentTool {
         inputJson: String,
         context: Map<String, Any>,
     ): ToolResult {
+        val requester =
+            context[ClientDataRequester.METADATA_KEY] as? ClientDataRequester
+                ?: return failure(TOOL_ID.value, "The server has no request-scoped access to client diagnostics.")
         val snapshot =
-            context[CLIENT_RUNTIME_METADATA_KEY] as? ClientRuntimeReport
-                ?: return failure(TOOL_ID.value, "Client JVM diagnostics were not supplied with this conversation request.")
+            requester.requestRuntimeReport()
+                ?: return failure(TOOL_ID.value, "The client could not provide JVM diagnostics when requested.")
         if (snapshot.processId <= 0 ||
             snapshot.availableProcessors !in 1..MAX_PROCESSORS ||
             snapshot.uptimeMillis < 0 ||
@@ -63,7 +65,6 @@ class SystemClientRuntimeTool : VisualAgentTool {
 
     private companion object {
         val TOOL_ID = ToolId("system:client-runtime")
-        const val CLIENT_RUNTIME_METADATA_KEY = "clientRuntimeSnapshot"
         const val MAX_PROCESSORS = 1024
         const val MAX_DESCRIPTOR_LENGTH = 96
         const val SAFE_DESCRIPTOR_PUNCTUATION = " ._()+-/,:"

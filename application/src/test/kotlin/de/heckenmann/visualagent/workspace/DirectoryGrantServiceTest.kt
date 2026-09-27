@@ -129,8 +129,10 @@ class DirectoryGrantServiceTest {
         assertEquals(DirectoryGrantOrigin.CLIENT, grant.origin)
         assertNull(grant.canonicalRoot)
         assertEquals("desktop-a", grant.ownerClientId)
+        assertEquals(0, access.contentRequestCount)
         assertEquals("client content", service.readText(grant.id, "notes.txt"))
         assertEquals(listOf("notes.txt"), service.list(grant.id, "").map { it.path })
+        assertEquals(2, access.contentRequestCount)
         assertThrows(IllegalArgumentException::class.java) { service.writeText(grant.id, "notes.txt", "changed") }
         assertFalse(access.writeCalled)
     }
@@ -174,18 +176,27 @@ class DirectoryGrantServiceTest {
 
 private class FakeClientDirectoryAccess : ClientDirectoryFileAccess {
     var writeCalled = false
+    var contentRequestCount = 0
 
     override fun isAvailable(): Boolean = true
 
-    override fun list(relativePath: String): List<ClientDirectoryEntry> =
-        listOf(ClientDirectoryEntry("notes.txt", directory = false, sizeBytes = 14))
+    override fun list(relativePath: String): List<ClientDirectoryEntry> {
+        contentRequestCount++
+        return listOf(ClientDirectoryEntry("notes.txt", directory = false, sizeBytes = 14))
+    }
 
-    override fun readText(relativePath: String): String = "client content"
+    override fun readText(relativePath: String): String {
+        contentRequestCount++
+        return "client content"
+    }
 
     override fun readBytes(
         relativePath: String,
         maximumBytes: Long,
-    ): ByteArray = "client content".encodeToByteArray()
+    ): ByteArray {
+        contentRequestCount++
+        return "client content".encodeToByteArray()
+    }
 
     override fun search(
         query: String,

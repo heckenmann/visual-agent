@@ -20,10 +20,11 @@ Desktop user.
 2. The user toggles the sticky pin button beside the clear button to switch between the two input placements; the choice is persisted. Without a pin, the input scrolls out of view with the newest item. With a pin, messages scroll behind the visible input. Unpinning while browsing older history returns to the newest item so the input is visible.
 3. The user sends the message with the send icon button or presses Enter while the input is focused.
 4. Shift+Enter inserts a newline instead of sending.
-5. Before rendering the turn, the chat panel allocates distinct opaque UUIDs for
-   the user entry and the assistant entry, then sends both through the
-   protocol-owned conversation port.
-6. The server adapter delegates the request to the agent manager.
+5. Before rendering the turn, the chat panel allocates distinct opaque UUIDs for the user entry
+   and assistant entry, then sends the bounded message text with the explicit user request through
+   the protocol-owned conversation port.
+6. The server adapter delegates the submitted message to the agent manager. Client diagnostics
+   are not attached to the message; the server must request them if a tool needs them.
 7. The agent manager loads the complete audit history from H2, then builds a history projection from persisted dialogue and eligible execution summaries. Dialogue is retained verbatim at this stage; audit-only records remain available to the history UI but are excluded from the provider context.
 8. Immediately before each provider round, the provider resolves the effective context window as the smaller of the configured session limit and the selected model's reported limit. The complete latest user message has highest priority, followed by the newest completed assistant answer and preceding answers through a maximum of ten, each with its initiating user request. The model's output capacity and the minimal `tool_help` callback are reserved; full tool schemas use only remaining capacity.
 9. If history or regular tool schemas must be omitted to fit the request, the server sends a request-scoped context-reduction event. The conversation input shows a subtle warning above the field and emphasizes the send action; persisted messages are unchanged.

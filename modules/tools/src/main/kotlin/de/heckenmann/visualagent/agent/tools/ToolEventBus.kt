@@ -89,7 +89,11 @@ class ToolEventBus {
      * @param event Event payload to broadcast
      */
     fun publish(event: ToolCallEvent) {
-        val safeEvent = event.copy(inputJson = sanitizeToolInputForEvent(event.inputJson, event.toolId))
+        val safeEvent =
+            event.copy(
+                inputJson = sanitizeToolInputForEvent(event.inputJson, event.toolId),
+                context = event.context - ClientDataRequester.METADATA_KEY,
+            )
         synchronized(emissionLock) {
             val emission = eventSink.tryEmitNext(safeEvent)
             if (emission != Sinks.EmitResult.OK) {

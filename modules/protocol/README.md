@@ -9,6 +9,9 @@ errors, protocol-version negotiation, and the gRPC schema.
 - Defines ports for conversation, todos, settings, providers, workspace files, canvas, activity,
   lifecycle, searchable skills, and application control.
 - Owns `visual_agent_session.proto` and generated gRPC bindings.
+- Uses protocol version `v4`; explicitly submitted chat text travels with the chat request.
+  Server-initiated access to desktop diagnostics or client-owned files requires a specific,
+  authorized request before the client collects and transfers that data.
 - Remains implementation-neutral: it does not depend on Spring, Compose, providers, or tools.
 
 Both `:ui` and `:application` depend on this module. Any new UI-to-server capability must be

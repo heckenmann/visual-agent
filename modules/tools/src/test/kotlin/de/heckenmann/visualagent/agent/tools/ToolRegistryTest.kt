@@ -72,6 +72,29 @@ class ToolRegistryTest {
     }
 
     @Test
+    fun `client data requester is excluded from tool lifecycle events`() {
+        val events = mutableListOf<ToolCallEvent>()
+        val bus = ToolEventBus()
+        bus.addListener(events::add)
+        val registry = ToolRegistry(listOf(FakeTool("context")), bus) { timeoutSeconds }
+        val requester =
+            object : ClientDataRequester {
+                override fun requestRuntimeReport() = null
+
+                override fun requestProcessInventoryReport(request: ProcessInventoryRequest) = null
+            }
+
+        registry.executeBlocking(
+            registry.resolve(setOf(ToolId("context"))).single(),
+            "{}",
+            mapOf(ClientDataRequester.METADATA_KEY to requester),
+        )
+
+        assertEquals(2, events.size)
+        assertTrue(events.all { ClientDataRequester.METADATA_KEY !in it.context })
+    }
+
+    @Test
     fun `reactive execution defers work until subscription and publishes lifecycle events`() {
         val bus = ToolEventBus()
         val events = mutableListOf<ToolCallEvent>()

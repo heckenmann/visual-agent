@@ -81,6 +81,18 @@ class AutonomousCoordinator
                 executionControl = executionControl,
                 signalWork = workSignal::signal,
             )
+        private val todoControl =
+            AutonomousTodoControl(
+                todoManager = todoManager,
+                todoStore = todoStore,
+                activeCancellationTokens = activeCancellationTokens,
+                activeTodoJobs = activeTodoJobs,
+                jobScheduler = jobScheduler,
+                decompositionScheduler = decompositionScheduler,
+                subAgents = { subAgents },
+                agentBusySince = agentBusySince,
+                subAgentOps = subAgentOps,
+            )
         private val candidateSelector =
             AutonomousTodoCandidateSelector(
                 todoStore = todoStore,
@@ -203,30 +215,14 @@ class AutonomousCoordinator
          * @param todoId Identifier of the todo to stop
          * @return true when the todo was cancelled
          */
-        fun stopTodo(todoId: String): Boolean {
-            val todo = todoStore.listTodos().firstOrNull { it.id == todoId } ?: return false
-            if (todo.status == TodoStatus.COMPLETED || todo.status == TodoStatus.CANCELLED) return false
-            activeCancellationTokens[todoId]?.cancel()
-            activeTodoJobs[todoId]?.cancel()
-            decompositionScheduler.cancel(todoId)
-            return cancelTodoAndReleaseAgent(todoId, todoManager::cancelTodo, subAgents, agentBusySince, subAgentOps)
-        }
+        fun stopTodo(todoId: String): Boolean = todoControl.stopTodo(todoId)
 
         /**
          * Stops every unfinished todo and cancels active workers cooperatively.
          *
          * @return Number of todos cancelled
          */
-        fun stopAllTodos(): Int {
-            val stoppableTodos = todoStore.listTodos().filter { it.status == TodoStatus.PENDING || it.status == TodoStatus.IN_PROGRESS }
-            stoppableTodos.forEach { todo ->
-                activeCancellationTokens[todo.id]?.cancel()
-                activeTodoJobs[todo.id]?.cancel()
-                decompositionScheduler.cancel(todo.id)
-                cancelTodoAndReleaseAgent(todo.id, todoManager::cancelTodo, subAgents, agentBusySince, subAgentOps)
-            }
-            return stoppableTodos.size
-        }
+        fun stopAllTodos(): Int = todoControl.stopAllTodos()
 
         /**
          * Cancels the in-progress todo assigned to the given agent.

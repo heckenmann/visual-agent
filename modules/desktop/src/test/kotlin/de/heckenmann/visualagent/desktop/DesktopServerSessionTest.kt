@@ -1,7 +1,6 @@
 package de.heckenmann.visualagent.desktop
 
-import de.heckenmann.visualagent.protocol.ClientRuntimeDiagnosticsPort
-import de.heckenmann.visualagent.protocol.ClientRuntimeSnapshot
+import de.heckenmann.visualagent.protocol.ClientProcessInventoryRequest
 import de.heckenmann.visualagent.protocol.ProtocolVersion
 import de.heckenmann.visualagent.protocol.v1.ClientFrame
 import io.grpc.stub.StreamObserver
@@ -27,7 +26,7 @@ class DesktopServerSessionTest {
     }
 
     @Test
-    fun `chat and cancel frames carry a stable request id`() {
+    fun `chat submission carries the user text and separate identities`() {
         val observer = RecordingObserver<ClientFrame>()
         val session = DesktopServerSession(observer)
 
@@ -37,28 +36,51 @@ class DesktopServerSessionTest {
         assertEquals(2, observer.values.size)
         assertEquals(requestId, observer.values[0].requestId)
         assertEquals(requestId, observer.values[1].requestId)
-        assertEquals("hello", observer.values[0].chatRequest.content)
         assertTrue(UUID.fromString(requestId).toString() == requestId)
         assertTrue(UUID.fromString(observer.values[0].chatRequest.userEntryId).toString() == observer.values[0].chatRequest.userEntryId)
         assertTrue(requestId != observer.values[0].chatRequest.userEntryId)
+        assertEquals(requestId, observer.values[0].chatRequest.assistantEntryId)
+        assertEquals("hello", observer.values[0].chatRequest.content)
         assertEquals("Cancelled by desktop", observer.values[1].cancelRequest.reason)
     }
 
     @Test
-    fun `chat frame carries a separately supplied client runtime snapshot`() {
+    fun `chat text is sent in the user submission without waiting for a server request`() {
         val observer = RecordingObserver<ClientFrame>()
-        val snapshot = sampleSnapshot()
-        val session = DesktopServerSession(observer, ClientRuntimeDiagnosticsPort { snapshot })
+        val session = DesktopServerSession(observer)
 
         session.sendChat("hello")
+        assertEquals(1, observer.values.size)
+        assertEquals(ClientFrame.PayloadCase.CHAT_REQUEST, observer.values.single().payloadCase)
+        assertEquals(
+            "hello",
+            observer.values
+                .single()
+                .chatRequest.content,
+        )
+    }
 
-        val chatRequest = observer.values.single().chatRequest
-        assertTrue(chatRequest.hasClientRuntime())
-        val runtime = chatRequest.clientRuntime
-        assertEquals(snapshot.processId, runtime.processId)
-        assertEquals(snapshot.osName, runtime.osName)
-        assertEquals(snapshot.heapMaxBytes, runtime.heapMaxBytes)
-        assertEquals(snapshot.processCpuLoad, runtime.processCpuLoad)
+    @Test
+    fun `desktop process inventory is bounded by explicit pagination at the model tool`() {
+        val snapshot = JvmClientProcessInventoryDiagnosticsPort().snapshot(ClientProcessInventoryRequest("list", 0, 1, null))
+
+        assertEquals(1, snapshot.processes.size)
+        assertTrue(snapshot.totalProcesses >= snapshot.processes.size)
+        assertTrue(snapshot.processes.all { it.pid >= 0 })
+        assertEquals(snapshot.processes.size, snapshot.processes.distinctBy { it.pid }.size)
+        assertEquals(0, snapshot.offset)
+        assertEquals(snapshot.totalProcesses > snapshot.processes.size, snapshot.hasMore)
+    }
+
+    @Test
+    fun `desktop process inventory show returns only the requested pid`() {
+        val pid = ProcessHandle.current().pid()
+        val snapshot = JvmClientProcessInventoryDiagnosticsPort().snapshot(ClientProcessInventoryRequest("show", 0, 1, pid))
+
+        assertEquals(0, snapshot.offset)
+        assertEquals(1, snapshot.processes.size)
+        assertEquals(pid, snapshot.processes.single().pid)
+        assertEquals(false, snapshot.hasMore)
     }
 
     @Test
@@ -74,25 +96,6 @@ class DesktopServerSessionTest {
         assertTrue(snapshot.javaVersion.length <= 96)
         snapshot.processCpuLoad?.let { assertTrue(it in 0.0..1.0) }
     }
-
-    private fun sampleSnapshot() =
-        ClientRuntimeSnapshot(
-            processId = 42,
-            osName = "Test OS",
-            osVersion = "1",
-            architecture = "test-arch",
-            availableProcessors = 2,
-            javaVersion = "24",
-            jvmVendor = "Test Vendor",
-            vmName = "Test VM",
-            uptimeMillis = 10,
-            heapUsedBytes = 100,
-            heapCommittedBytes = 200,
-            heapMaxBytes = 300,
-            totalPhysicalMemoryBytes = 400,
-            freePhysicalMemoryBytes = 200,
-            processCpuLoad = 0.25,
-        )
 
     private class RecordingObserver<T> : StreamObserver<T> {
         val values = mutableListOf<T>()
