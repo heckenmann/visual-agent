@@ -1,8 +1,12 @@
 package de.heckenmann.visualagent.security
 
 import de.heckenmann.visualagent.agent.tools.ServerTlsStore
+import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.stereotype.Component
+import java.io.IOException
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
+import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption.ATOMIC_MOVE
 import java.nio.file.StandardCopyOption.REPLACE_EXISTING
@@ -13,8 +17,9 @@ import java.security.SecureRandom
 import java.util.Base64
 
 /** Owns private files and crash-recoverable persistence for managed TLS stores. */
+@Component
 internal class ManagedTlsStoreFiles(
-    serverDataRoot: Path,
+    @Qualifier("serverDataRoot") serverDataRoot: Path,
 ) {
     val directory: Path =
         serverDataRoot
@@ -34,21 +39,43 @@ internal class ManagedTlsStoreFiles(
         val password = password(store)
         val keyStore = KeyStore.getInstance(STORE_TYPE)
         val path = storePath(store)
-        if (Files.exists(path)) {
-            try {
-                Files.newInputStream(path).use { keyStore.load(it, password) }
-            } finally {
-                password.fill('\u0000')
-            }
-        } else {
-            try {
+        try {
+            validateManagedFile(path)
+            if (!Files.exists(path, NOFOLLOW_LINKS)) {
+                val backup = backupPath(store)
+                validateManagedFile(backup)
+                if (Files.exists(backup, NOFOLLOW_LINKS)) {
+                    val recovered = loadStore(backup, password)
+                    restoreBackup(
+                        backup,
+                        path,
+                        IOException("The primary managed TLS store was missing."),
+                    )
+                    return recovered
+                }
                 keyStore.load(null, password)
-            } finally {
-                password.fill('\u0000')
+                persist(store, keyStore)
+                return keyStore
             }
-            persist(store, keyStore)
+            try {
+                return loadStore(path, password)
+            } catch (primaryFailure: Exception) {
+                val backup = backupPath(store)
+                validateManagedFile(backup)
+                if (!Files.exists(backup, NOFOLLOW_LINKS)) throw primaryFailure
+                val recovered =
+                    try {
+                        loadStore(backup, password)
+                    } catch (backupFailure: Exception) {
+                        primaryFailure.addSuppressed(backupFailure)
+                        throw primaryFailure
+                    }
+                restoreBackup(backup, path, primaryFailure)
+                return recovered
+            }
+        } finally {
+            password.fill('\u0000')
         }
-        return keyStore
     }
 
     /** Persists one complete store atomically and retains the previous valid version as a backup. */
@@ -59,6 +86,9 @@ internal class ManagedTlsStoreFiles(
     ) {
         prepareDirectory()
         val path = storePath(store)
+        validateManagedFile(path)
+        val backup = backupPath(store)
+        validateManagedFile(backup)
         val temporary = Files.createTempFile(directory, TEMP_PREFIX, TEMP_SUFFIX)
         try {
             val password = password(store)
@@ -68,9 +98,8 @@ internal class ManagedTlsStoreFiles(
                 password.fill('\u0000')
             }
             restrictFile(temporary)
-            if (Files.exists(path)) {
-                Files.copy(path, backupPath(store), REPLACE_EXISTING)
-                restrictFile(backupPath(store))
+            if (Files.exists(path, NOFOLLOW_LINKS)) {
+                backupPrimary(path, backup)
             }
             moveIntoPlace(temporary, path)
             restrictFile(path)
@@ -92,9 +121,19 @@ internal class ManagedTlsStoreFiles(
     /** Returns the canonical path for one of the two managed stores. */
     fun storePath(store: ServerTlsStore): Path = if (store == ServerTlsStore.KEY) keyStoreFile else trustStoreFile
 
+    @Synchronized
     private fun password(store: ServerTlsStore): CharArray {
+        prepareDirectory()
         val path = if (store == ServerTlsStore.KEY) keyPasswordFile else trustPasswordFile
-        if (!Files.exists(path)) {
+        validateManagedFile(path)
+        if (!Files.exists(path, NOFOLLOW_LINKS)) {
+            val primaryStore = storePath(store)
+            val backupStore = backupPath(store)
+            validateManagedFile(primaryStore)
+            validateManagedFile(backupStore)
+            if (Files.exists(primaryStore, NOFOLLOW_LINKS) || Files.exists(backupStore, NOFOLLOW_LINKS)) {
+                throw IOException("Managed TLS store password is missing.")
+            }
             val bytes = ByteArray(PASSWORD_RANDOM_BYTES).also(SecureRandom()::nextBytes)
             val generated = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
             bytes.fill(0)
@@ -109,12 +148,26 @@ internal class ManagedTlsStoreFiles(
                 // Another server component initialized the same managed store concurrently.
             }
         }
+        validateManagedFile(path)
         restrictFile(path)
-        return Files.readString(path).trim().toCharArray()
+        val storedPassword = Files.readString(path).trim()
+        if (storedPassword.isEmpty()) throw IOException("Managed TLS store password is unavailable.")
+        return storedPassword.toCharArray()
     }
 
     private fun prepareDirectory() {
+        val securityDirectory = directory.parent
+        if (Files.isSymbolicLink(securityDirectory)) {
+            throw java.io.IOException("Managed TLS directories must not be symbolic links.")
+        }
+        Files.createDirectories(securityDirectory)
+        if (Files.isSymbolicLink(securityDirectory) || Files.isSymbolicLink(directory)) {
+            throw java.io.IOException("Managed TLS directories must not be symbolic links.")
+        }
         Files.createDirectories(directory)
+        if (Files.isSymbolicLink(securityDirectory) || Files.isSymbolicLink(directory)) {
+            throw java.io.IOException("Managed TLS directories must not be symbolic links.")
+        }
         runCatching { Files.setPosixFilePermissions(directory, OWNER_READ_WRITE_EXECUTE) }
     }
 
@@ -137,6 +190,67 @@ internal class ManagedTlsStoreFiles(
             Files.move(source, destination, ATOMIC_MOVE, REPLACE_EXISTING)
         } catch (_: AtomicMoveNotSupportedException) {
             Files.move(source, destination, REPLACE_EXISTING)
+        }
+    }
+
+    private fun backupPrimary(
+        primary: Path,
+        backup: Path,
+    ) {
+        val temporary = Files.createTempFile(directory, TEMP_PREFIX, TEMP_SUFFIX)
+        try {
+            Files.copy(primary, temporary, REPLACE_EXISTING)
+            restrictFile(temporary)
+            moveIntoPlace(temporary, backup)
+            restrictFile(backup)
+        } finally {
+            Files.deleteIfExists(temporary)
+        }
+    }
+
+    private fun loadStore(
+        path: Path,
+        password: CharArray,
+    ): KeyStore {
+        val keyStore = KeyStore.getInstance(STORE_TYPE)
+        val passwordCopy = password.clone()
+        try {
+            Files.newInputStream(path).use { keyStore.load(it, passwordCopy) }
+        } finally {
+            passwordCopy.fill('\u0000')
+        }
+        return keyStore
+    }
+
+    private fun validateManagedFile(path: Path) {
+        if (Files.isSymbolicLink(path)) {
+            throw java.io.IOException("Managed TLS files must not be symbolic links.")
+        }
+        if (Files.exists(path, NOFOLLOW_LINKS) && !Files.isRegularFile(path, NOFOLLOW_LINKS)) {
+            throw java.io.IOException("Managed TLS paths must be regular files.")
+        }
+    }
+
+    private fun restoreBackup(
+        backup: Path,
+        destination: Path,
+        primaryFailure: Exception,
+    ) {
+        validateManagedFile(backup)
+        validateManagedFile(destination)
+        val temporary = Files.createTempFile(directory, TEMP_PREFIX, TEMP_SUFFIX)
+        try {
+            Files.copy(backup, temporary, REPLACE_EXISTING)
+            restrictFile(temporary)
+            try {
+                moveIntoPlace(temporary, destination)
+            } catch (restoreFailure: Exception) {
+                restoreFailure.addSuppressed(primaryFailure)
+                throw restoreFailure
+            }
+            restrictFile(destination)
+        } finally {
+            Files.deleteIfExists(temporary)
         }
     }
 
