@@ -52,6 +52,7 @@ This use case covers server identity material and its use by the optional gRPC l
 - The tool is disabled by default, main-agent-only, and omitted from model schemas while disabled.
 - Private material is kept in the server-managed PKCS#12 file with restrictive filesystem permissions where supported.
 - A corrupt primary key-store file is restored only from a validated managed backup; symlinked TLS directories, store files, and password files are rejected.
+- Recovery must not restore a private key that was removed by a successful mutation.
 - A missing or empty password file fails closed; the server leaves existing key material untouched.
 - Generated certificates use allowed key/signature algorithms, appropriate CA/server X.509 extensions, and bounded validity.
 - Server certificates include subject alternative names and are usable by the configured gRPC server after the documented activation step.

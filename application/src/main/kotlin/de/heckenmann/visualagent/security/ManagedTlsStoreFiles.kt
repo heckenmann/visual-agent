@@ -78,7 +78,7 @@ internal class ManagedTlsStoreFiles(
         }
     }
 
-    /** Persists one complete store atomically and retains the previous valid version as a backup. */
+    /** Persists one complete store with a matching recovery copy before replacing the primary file. */
     @Synchronized
     fun persist(
         store: ServerTlsStore,
@@ -98,9 +98,7 @@ internal class ManagedTlsStoreFiles(
                 password.fill('\u0000')
             }
             restrictFile(temporary)
-            if (Files.exists(path, NOFOLLOW_LINKS)) {
-                backupPrimary(path, backup)
-            }
+            replaceBackup(temporary, backup)
             moveIntoPlace(temporary, path)
             restrictFile(path)
         } finally {
@@ -193,13 +191,13 @@ internal class ManagedTlsStoreFiles(
         }
     }
 
-    private fun backupPrimary(
-        primary: Path,
+    private fun replaceBackup(
+        source: Path,
         backup: Path,
     ) {
         val temporary = Files.createTempFile(directory, TEMP_PREFIX, TEMP_SUFFIX)
         try {
-            Files.copy(primary, temporary, REPLACE_EXISTING)
+            Files.copy(source, temporary, REPLACE_EXISTING)
             restrictFile(temporary)
             moveIntoPlace(temporary, backup)
             restrictFile(backup)

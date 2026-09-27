@@ -152,7 +152,7 @@ class ManagedTlsMaterialServiceTest {
     }
 
     @Test
-    fun `recovers the last valid managed store after the primary store is corrupted`() {
+    fun `recovers the latest managed store after the primary store is corrupted`() {
         val service = service(temporaryDirectory)
         service.generateCertificate("root-ca", "CN=Test Root CA", emptyList(), emptyList(), true, 30)
         service.generateCertificate(
@@ -170,12 +170,12 @@ class ManagedTlsMaterialServiceTest {
         val restartedService = service(temporaryDirectory)
 
         assertNotNull(restartedService.inspect(ServerTlsStore.KEY, "root-ca", false))
-        assertNull(restartedService.inspect(ServerTlsStore.KEY, "server-cert", false))
+        assertNotNull(restartedService.inspect(ServerTlsStore.KEY, "server-cert", false))
         assertNotNull(restartedService.inspect(ServerTlsStore.KEY, "root-ca", false))
     }
 
     @Test
-    fun `recovers the last valid managed store when the primary store is missing`() {
+    fun `recovers the latest managed store when the primary store is missing`() {
         val service = service(temporaryDirectory)
         service.generateCertificate("root-ca", "CN=Test Root CA", emptyList(), emptyList(), true, 30)
         service.generateCertificate("secondary-ca", "CN=Secondary CA", emptyList(), emptyList(), true, 30)
@@ -184,12 +184,12 @@ class ManagedTlsMaterialServiceTest {
         val restartedService = service(temporaryDirectory)
 
         assertNotNull(restartedService.inspect(ServerTlsStore.KEY, "root-ca", false))
-        assertNull(restartedService.inspect(ServerTlsStore.KEY, "secondary-ca", false))
+        assertNotNull(restartedService.inspect(ServerTlsStore.KEY, "secondary-ca", false))
         assertTrue(Files.exists(temporaryDirectory.resolve("security/tls/keystore.p12")))
     }
 
     @Test
-    fun `recovers the last valid trust store when its primary file is missing`() {
+    fun `recovers the latest trust store when its primary file is missing`() {
         val service = service(temporaryDirectory)
         service.generateCertificate("root-ca", "CN=Test Root CA", emptyList(), emptyList(), true, 30)
         service.generateCertificate("secondary-ca", "CN=Secondary CA", emptyList(), emptyList(), true, 30)
@@ -200,7 +200,7 @@ class ManagedTlsMaterialServiceTest {
         val restartedService = service(temporaryDirectory)
 
         assertNotNull(restartedService.inspect(ServerTlsStore.TRUST, "trusted-root", false))
-        assertNull(restartedService.inspect(ServerTlsStore.TRUST, "trusted-secondary", false))
+        assertNotNull(restartedService.inspect(ServerTlsStore.TRUST, "trusted-secondary", false))
         assertTrue(Files.exists(temporaryDirectory.resolve("security/tls/truststore.p12")))
     }
 
