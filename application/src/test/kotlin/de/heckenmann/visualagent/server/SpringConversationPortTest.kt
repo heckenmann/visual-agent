@@ -14,6 +14,7 @@ import de.heckenmann.visualagent.protocol.ConversationInputPlacement
 import de.heckenmann.visualagent.protocol.ConversationPreferences
 import de.heckenmann.visualagent.protocol.ConversationStreamRequest
 import de.heckenmann.visualagent.protocol.ConversationStreamUpdate
+import de.heckenmann.visualagent.protocol.MAX_CONVERSATION_TEXT_BYTES
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -23,6 +24,7 @@ import io.mockk.verifyOrder
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 
 /** Verifies mapping and cancellation at the Spring-to-protocol conversation seam. */
@@ -143,7 +145,7 @@ class SpringConversationPortTest {
     @Test
     fun `stream cancellation is bridged to application token`() =
         runTest {
-            coEvery { manager.streamMessage(any(), any(), any(), any(), any()) } coAnswers {
+            coEvery { manager.streamMessage(any(), any(), any(), any(), any(), any()) } coAnswers {
                 thirdArg<(ConversationStreamUpdate) -> Unit>().invoke(ConversationStreamUpdate("assistant-stream-id", "delta"))
                 "delta"
             }
@@ -154,13 +156,34 @@ class SpringConversationPortTest {
             every { manager.getHistory() } returns listOf(Message("assistant", "delta", id = assistantEntryId))
 
             val result =
-                port.stream(ConversationStreamRequest(userEntryId, assistantEntryId, "hello"), token) { chunks += it }
+                port.stream(
+                    ConversationStreamRequest(
+                        userEntryId,
+                        assistantEntryId,
+                        "hello",
+                    ),
+                    token,
+                ) { chunks += it }
             token.cancel()
 
             assertEquals(listOf("delta"), chunks.map(ConversationStreamUpdate::textDelta))
             assertEquals(assistantEntryId, result.assistantMessage.id)
-            coVerify(exactly = 1) { manager.streamMessage("hello", any(), any(), any(), any()) }
+            coVerify(exactly = 1) { manager.streamMessage("hello", any(), any(), any(), any(), any()) }
         }
+
+    @Test
+    fun `oversized submitted conversation text is rejected before agent execution`() {
+        val userEntryId = "11111111-1111-4111-8111-111111111111"
+        val assistantEntryId = "22222222-2222-4222-8222-222222222222"
+        assertFailsWith<IllegalArgumentException> {
+            ConversationStreamRequest(
+                userEntryId,
+                assistantEntryId,
+                "x".repeat(MAX_CONVERSATION_TEXT_BYTES.toInt() + 1),
+            )
+        }
+        coVerify(exactly = 0) { manager.streamMessage(any(), any(), any(), any(), any(), any()) }
+    }
 
     @Test
     fun `message edits and cancellation are delegated to the application`() {

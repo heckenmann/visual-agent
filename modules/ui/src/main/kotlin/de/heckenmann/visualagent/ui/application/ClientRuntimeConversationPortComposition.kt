@@ -7,6 +7,10 @@ import de.heckenmann.visualagent.protocol.ConversationPort
 /** Remembers the client-aware conversation boundary for the supplied desktop dependencies. */
 @Composable
 internal fun rememberClientRuntimeConversationPort(deps: ComposeApplicationDependencies): ConversationPort =
-    remember(deps.applicationPort.conversation, deps.clientRuntimeDiagnostics) {
-        ClientRuntimeConversationPort(deps.applicationPort.conversation, deps.clientRuntimeDiagnostics)
+    remember(deps.applicationPort.conversation, deps.clientRuntimeDiagnostics, deps.clientProcessInventoryDiagnostics) {
+        ClientRuntimeConversationPort(
+            deps.applicationPort.conversation,
+            deps.clientRuntimeDiagnostics,
+            deps.clientProcessInventoryDiagnostics,
+        )
     }

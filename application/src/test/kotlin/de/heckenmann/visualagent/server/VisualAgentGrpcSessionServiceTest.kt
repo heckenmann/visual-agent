@@ -1,6 +1,5 @@
 package de.heckenmann.visualagent.server
 
-import de.heckenmann.visualagent.protocol.ClientRuntimeSnapshot
 import de.heckenmann.visualagent.protocol.ConversationMessage
 import de.heckenmann.visualagent.protocol.ConversationPort
 import de.heckenmann.visualagent.protocol.ConversationStreamRequest
@@ -98,8 +97,14 @@ class VisualAgentGrpcSessionServiceTest {
             ClientFrame
                 .newBuilder()
                 .setSessionId("test-session")
-                .setChatRequest(ChatRequest.newBuilder().setContent("hello").build())
-                .build(),
+                .setChatRequest(
+                    ChatRequest
+                        .newBuilder()
+                        .setContent("hello")
+                        .setUserEntryId(USER_ONE)
+                        .setAssistantEntryId(REQUEST_ONE)
+                        .build(),
+                ).build(),
         )
 
         assertEquals(
@@ -118,6 +123,7 @@ class VisualAgentGrpcSessionServiceTest {
             val request = firstArg<ConversationStreamRequest>()
             assertEquals(USER_ONE, request.userEntryId)
             assertEquals(REQUEST_ONE, request.assistantEntryId)
+            assertEquals("hello", request.content)
             thirdArg<(ConversationStreamUpdate) -> Unit>().invoke(ConversationStreamUpdate(REQUEST_ONE, "world"))
             ConversationStreamResult(ConversationMessage("assistant", "world", id = request.assistantEntryId))
         }
@@ -143,11 +149,13 @@ class VisualAgentGrpcSessionServiceTest {
                         .newBuilder()
                         .setContent("hello")
                         .setUserEntryId(USER_ONE)
+                        .setAssistantEntryId(REQUEST_ONE)
                         .build(),
                 ).build(),
         )
 
         runBlocking { observer.awaitFrame(ServerFrame::hasChatCompleted) }
+        assertEquals(false, observer.values.any(ServerFrame::hasClientDataRequest))
 
         assertEquals(
             "world",
@@ -170,11 +178,12 @@ class VisualAgentGrpcSessionServiceTest {
     }
 
     @Test
-    fun `chat forwards client runtime snapshot as a separate request field`() {
+    fun `ordinary grpc chat sends no client diagnostics`() {
         val conversationPort = mockk<ConversationPort>(relaxed = true)
         coEvery { conversationPort.stream(any(), any(), any()) } coAnswers {
             val request = firstArg<ConversationStreamRequest>()
-            assertEquals("Test Client OS", request.clientRuntime?.osName)
+            assertEquals("hello", request.content)
+            assertEquals(null, request.clientDataRequester)
             ConversationStreamResult(ConversationMessage("assistant", "ok", id = request.assistantEntryId))
         }
         val sessionService = VisualAgentGrpcSessionService(conversationPort)
@@ -197,21 +206,13 @@ class VisualAgentGrpcSessionServiceTest {
                         .newBuilder()
                         .setContent("hello")
                         .setUserEntryId(USER_ONE)
-                        .setClientRuntime(
-                            de.heckenmann.visualagent.protocol.v1.ClientRuntimeSnapshot
-                                .newBuilder()
-                                .setProcessId(42)
-                                .setOsName("Test Client OS")
-                                .setAvailableProcessors(2)
-                                .setHeapUsedBytes(100)
-                                .setHeapCommittedBytes(200)
-                                .build(),
-                        ),
+                        .setAssistantEntryId(REQUEST_ONE)
+                        .build(),
                 ).build(),
         )
 
         runBlocking { observer.awaitFrame(ServerFrame::hasChatCompleted) }
-        coVerify(exactly = 1) { conversationPort.stream(match { it.clientRuntime?.processId == 42L }, any(), any()) }
+        coVerify(exactly = 1) { conversationPort.stream(any(), any(), any()) }
     }
 
     @Test
@@ -238,6 +239,7 @@ class VisualAgentGrpcSessionServiceTest {
                         .newBuilder()
                         .setContent("hello")
                         .setUserEntryId("invalid")
+                        .setAssistantEntryId(REQUEST_ONE)
                         .build(),
                 ).build(),
         )

@@ -44,19 +44,23 @@ data class ConversationHistoryPage(
     val nextOffset: Int = offset + messages.size,
 )
 
-/** Identifies the user and assistant entries of one streamed conversation turn. */
+/** Carries one user-submitted message and its conversation entry identities. */
 data class ConversationStreamRequest(
     val userEntryId: String,
     val assistantEntryId: String,
+    /** Text explicitly sent by the user with this request. */
     val content: String,
-    /** Optional, request-scoped snapshot of the desktop client's JVM; never persisted in history. */
-    val clientRuntime: ClientRuntimeSnapshot? = null,
+    /** Optional request-scoped source for data the server later asks the client to provide. */
+    val clientDataRequester: ClientDataRequestPort? = null,
 ) {
     init {
-        require(content.isNotBlank()) { "Conversation content must not be blank" }
         require(userEntryId != assistantEntryId) { "Conversation entry IDs must differ" }
         requireCanonicalUuid(userEntryId)
         requireCanonicalUuid(assistantEntryId)
+        require(content.isNotBlank()) { "Conversation text must not be blank" }
+        require(content.toByteArray(Charsets.UTF_8).size.toLong() <= MAX_CONVERSATION_TEXT_BYTES) {
+            "Conversation text exceeds the maximum payload size"
+        }
     }
 }
 

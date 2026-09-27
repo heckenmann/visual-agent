@@ -7,15 +7,19 @@ import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ProviderTurnResponse
 import de.heckenmann.visualagent.agent.text.ResponseRepetitionGuard
+import de.heckenmann.visualagent.agent.tools.ClientProcessInventoryReport
 import de.heckenmann.visualagent.agent.tools.ClientRuntimeReport
-import de.heckenmann.visualagent.protocol.ClientRuntimeSnapshot
-import de.heckenmann.visualagent.protocol.ConversationStreamRequest
+import de.heckenmann.visualagent.agent.tools.HostProcessEntry
+import de.heckenmann.visualagent.protocol.ClientDataRequestPort
+import de.heckenmann.visualagent.protocol.ClientProcessInventoryRequest
 import de.heckenmann.visualagent.protocol.ConversationStreamUpdate
 import kotlinx.coroutines.reactor.awaitSingleOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import mu.KotlinLogging
 import java.util.concurrent.atomic.AtomicBoolean
+import de.heckenmann.visualagent.agent.tools.ClientDataRequester as ToolClientDataRequester
+import de.heckenmann.visualagent.agent.tools.ProcessInventoryRequest as ToolProcessInventoryRequest
 
 /** Owns streamed assistant-turn persistence and transport retry replay. */
 internal class AgentManagerConversationStreamingOps(
@@ -35,9 +39,9 @@ internal class AgentManagerConversationStreamingOps(
         onChunk: (ConversationStreamUpdate) -> Unit,
         userEntryId: String,
         assistantEntryId: String,
-        clientRuntime: ClientRuntimeSnapshot? = null,
+        clientDataRequester: ClientDataRequestPort? = null,
     ): String {
-        ConversationStreamRequest(userEntryId, assistantEntryId, content)
+        require(content.isNotBlank()) { "Conversation content must not be blank" }
         owner.conversationStore.getConversationMessage(assistantEntryId)?.let { existing ->
             require(existing.role == "assistant") { "Conversation retry assistant entry must have role assistant" }
             val userEntry =
@@ -66,9 +70,9 @@ internal class AgentManagerConversationStreamingOps(
                 .streamReactive(
                     buildRequest(loadHistoryContext(), requestId)
                         .let { request ->
-                            clientRuntime?.let { snapshot ->
+                            clientDataRequester?.let { source ->
                                 request.copy(
-                                    metadata = request.metadata + (CLIENT_RUNTIME_METADATA_KEY to snapshot.toClientRuntimeReport()),
+                                    metadata = request.metadata + (ToolClientDataRequester.METADATA_KEY to source.toToolRequester()),
                                 )
                             } ?: request
                         }.copy(
@@ -174,11 +178,17 @@ internal class AgentManagerConversationStreamingOps(
             put("assistantEntryId", assistantEntryId)
         }.toString()
 
-    private companion object {
-        const val CLIENT_RUNTIME_METADATA_KEY = "clientRuntimeSnapshot"
-    }
+    private fun ClientDataRequestPort.toToolRequester() =
+        object : ToolClientDataRequester {
+            override fun requestRuntimeReport() = requestRuntimeSnapshot()?.toClientRuntimeReport()
 
-    private fun ClientRuntimeSnapshot.toClientRuntimeReport() =
+            override fun requestProcessInventoryReport(request: ToolProcessInventoryRequest) =
+                requestProcessInventory(
+                    ClientProcessInventoryRequest(request.action, request.offset, request.pageSize, request.pid),
+                )?.toClientProcessInventoryReport()
+        }
+
+    private fun de.heckenmann.visualagent.protocol.ClientRuntimeSnapshot.toClientRuntimeReport() =
         ClientRuntimeReport(
             processId = processId,
             osName = osName,
@@ -195,6 +205,24 @@ internal class AgentManagerConversationStreamingOps(
             totalPhysicalMemoryBytes = totalPhysicalMemoryBytes,
             freePhysicalMemoryBytes = freePhysicalMemoryBytes,
             processCpuLoad = processCpuLoad,
+        )
+
+    private fun de.heckenmann.visualagent.protocol.ClientProcessInventorySnapshot.toClientProcessInventoryReport() =
+        ClientProcessInventoryReport(
+            offset = offset,
+            totalProcesses = totalProcesses,
+            processes =
+                processes.map { process ->
+                    HostProcessEntry(
+                        pid = process.pid,
+                        parentPid = process.parentPid,
+                        startEpochMillis = process.startEpochMillis,
+                        commandLine = process.commandLine,
+                        command = process.command,
+                        arguments = process.arguments,
+                    )
+                },
+            hasMore = hasMore,
         )
 
     private fun persistStreamTurns(

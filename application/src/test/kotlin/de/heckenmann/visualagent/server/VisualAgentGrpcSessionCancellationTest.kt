@@ -34,7 +34,8 @@ class VisualAgentGrpcSessionCancellationTest {
             val secondCompleted = CompletableDeferred<Unit>()
             val conversationPort = mockk<ConversationPort>(relaxed = true)
             coEvery { conversationPort.stream(any(), any(), any()) } coAnswers {
-                when (firstArg<ConversationStreamRequest>().content) {
+                val request = firstArg<ConversationStreamRequest>()
+                when (request.content) {
                     "first" -> {
                         firstStarted.complete(Unit)
                         releaseFirst.await()
@@ -147,6 +148,7 @@ class VisualAgentGrpcSessionCancellationTest {
                     .newBuilder()
                     .setContent(content)
                     .setUserEntryId(userEntryId)
+                    .setAssistantEntryId(requestId)
                     .build(),
             ).build()
 

@@ -12,41 +12,45 @@ The main agent, when explicitly asked to diagnose the desktop client.
 ## Preconditions
 
 - The `system:client-runtime` tool is enabled.
-- The desktop client can provide a JVM snapshot for the current chat request.
+- A request-scoped client-data requester is available to the server.
 
 ## Main Flow
 
-1. The desktop captures a bounded snapshot of its own JVM and operating system when submitting a
-   chat request.
-2. The snapshot is transferred as a separate protocol field; it is not added to conversation text,
-   persisted history, or ordinary `context` output.
-3. The main agent invokes `system:client-runtime` to retrieve the snapshot.
-4. The tool labels the data as `desktop-client-jvm`, distinct from server-scoped diagnostics.
+1. The desktop sends an ordinary chat request without collecting or attaching a client snapshot.
+2. Only when the main agent calls `system:client-runtime` does the server invoke the request-scoped
+   client-data requester to collect the current JVM and operating-system metrics.
+3. The tool labels the returned data as `desktop-client-jvm`, distinct from server-scoped diagnostics.
 
 ## Result
 
 Client metrics and server metrics remain explicitly distinct. Server-side `context`,
-`system:threads`, and `system:filesystem` describe the server JVM/host. This tool reports only the
-separately supplied desktop client snapshot. In embedded mode both scopes may describe the same
-JVM; in remote mode they describe distinct JVMs. Missing client diagnostics do not block
-conversation requests.
+`system:threads`, `system:gc`, `system:process`, `system:processes`, and `system:filesystem` describe
+the server JVM/host. This tool reports only data collected after its explicit tool invocation.
+`system:client-processes` separately requests the distinct client-host process inventory. In
+embedded mode both scopes may describe the same JVM; in remote mode they describe distinct JVMs.
+Missing client diagnostics do not block conversation requests.
+The request-scoped client-data channel itself is not persisted. Once explicitly called, the tool
+result follows normal tool-call history persistence and may be available in later conversation
+history; do not enable the tool for data that must never be retained.
 
 ## Tool Calls
 
-- `system:client-runtime`: return the client snapshot attached to the current request, for example
-  `{}`.
+- `system:client-runtime`: request the client's current JVM snapshot, for example `{}`.
 
 ## Code Entry Points
 
 - `de.heckenmann.visualagent.desktop.JvmClientRuntimeDiagnosticsPort`
 - `de.heckenmann.visualagent.ui.application.ClientRuntimeConversationPort`
+- `de.heckenmann.visualagent.protocol.ClientDataRequestPort`
 - `de.heckenmann.visualagent.server.VisualAgentGrpcSessionService`
 - `de.heckenmann.visualagent.agent.tools.SystemClientRuntimeTool`
 
 ## Acceptance Criteria
 
-- Client metrics are captured on the client side and passed independently from server diagnostics.
-- The general context tool and conversation history do not reveal the client snapshot.
+- An ordinary chat does not capture or transmit client metrics.
+- The client metrics provider is invoked only after the server executes this tool.
+- The general context tool and ordinary chats do not reveal a client snapshot before the explicit
+  call; the completed tool result can be retained in conversation history.
 - Missing or failed client snapshot collection does not prevent chat submission.
-- Tests verify the protocol transfer and tool response without timing-based assertions or external
+- Tests verify lazy collection, request-scoped access, and tool response without timing-based assertions or external
   services.
