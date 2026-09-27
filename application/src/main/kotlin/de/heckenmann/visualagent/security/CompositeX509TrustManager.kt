@@ -72,9 +72,8 @@ internal class CompositeX509TrustManager(
 
     override fun getAcceptedIssuers(): Array<X509Certificate> =
         (platform.acceptedIssuers + managed.acceptedIssuers)
-            .distinctBy {
-                it.subjectX500Principal
-            }.toTypedArray()
+            .distinct()
+            .toTypedArray()
 
     private fun check(validation: (X509TrustManager) -> Unit) {
         try {

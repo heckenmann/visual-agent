@@ -22,12 +22,15 @@ Let an explicitly authorized main agent inspect public metadata in Visual Agent'
 3. To generate a server credential, it supplies a CA signing alias, subject, DNS/IP SANs, and bounded validity period through `generateCertificate` with `certificateAuthority=false`.
 4. The server generates the key pair and signed certificate with the JDK `keytool` utility and stores them in the managed PKCS#12 key store.
 5. The private key remains encrypted at rest and is available to the server TLS configuration without being returned through tools.
-6. Configure `visualagent.server.tls.key-store-alias` to select the generated alias for the optional remote gRPC endpoint. If PEM certificate properties are configured, they continue to take precedence for compatibility.
-7. Restart the server so the remote gRPC listener loads the selected key and certificate.
+6. Configure `visualagent.server.tls.key-store-alias` to select the generated alias for the optional loopback-network gRPC endpoint. If PEM certificate properties are configured, they continue to take precedence for compatibility.
+7. Restart the server so the loopback-network gRPC listener loads the selected key and certificate.
+8. The server audit log records each mutation's operation, store, validated alias, certificate fingerprint when available, and outcome.
 
 ## Result
 
-Generated material is persisted only inside the server-managed security directory and exposed to the server through Spring Boot's `SslBundle` API. The agent can inspect and export public certificates, but cannot read or export private keys or store passwords. The optional remote gRPC endpoint can select a generated server certificate by alias; the default managed alias is `server`.
+Generated material is persisted only inside the server-managed security directory and exposed to the server through Spring Boot's `SslBundle` API. The agent can inspect and export public certificates, but cannot read or export private keys or store passwords. The optional loopback-network gRPC endpoint can select a generated server certificate by alias; the default managed alias is `server`. Audit entries never include passwords, private-key bytes, raw certificate material, or raw exception messages.
+
+This use case covers server identity material and its use by the optional gRPC listener. A complete remote desktop connection, including client trust configuration and mutual TLS, belongs to issue #345 rather than this server-store feature.
 
 ## Tool Calls
 
@@ -48,6 +51,10 @@ Generated material is persisted only inside the server-managed security director
 
 - The tool is disabled by default, main-agent-only, and omitted from model schemas while disabled.
 - Private material is kept in the server-managed PKCS#12 file with restrictive filesystem permissions where supported.
+- A corrupt primary key-store file is restored only from a validated managed backup; symlinked TLS directories, store files, and password files are rejected.
+- Recovery must not restore a private key that was removed by a successful mutation.
+- A missing or empty password file fails closed; the server leaves existing key material untouched.
 - Generated certificates use allowed key/signature algorithms, appropriate CA/server X.509 extensions, and bounded validity.
 - Server certificates include subject alternative names and are usable by the configured gRPC server after the documented activation step.
-- No result, error, or log contains a password, private key, or arbitrary local path.
+- A local TLS handshake verifies the selected gRPC certificate chain and hostname against the managed trust store.
+- No result, error, or log contains a password, private key, raw certificate payload, or arbitrary local path.

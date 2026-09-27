@@ -19,13 +19,14 @@ Let an explicitly authorized main agent inspect and manage certificates in Visua
 
 1. The model calls `security_truststore` with `list` or `inspect` to view aliases and public certificate metadata.
 2. To add a CA, the model supplies an alias and certificate content through `importCertificate`.
-3. The server validates the X.509 certificate, writes the managed PKCS#12 trust store atomically, and preserves a recoverable prior version.
+3. The server validates the X.509 certificate, writes the managed PKCS#12 trust store atomically, and preserves a recovery copy of the newly saved state.
 4. To remove an entry, the model supplies its exact alias through `removeCertificate`.
 5. The tool reports the certificate fingerprint and whether a server restart is required before dependent clients use the change.
+6. The server audit log records each mutation's operation, store, validated alias, certificate fingerprint when available, and outcome.
 
 ## Result
 
-The managed trust store is exposed through Spring Boot's `SslBundle` API and combined with platform/JVM trust roots for Visual Agent's server-side TLS clients; normal hostname verification remains enabled. Each HTTPS client must explicitly use the bundle; adding a CA does not modify client-JVM or external-process trust. Restart the server after changing trusted roots so long-lived clients reload them. Results expose public certificate metadata only; they never include passwords, raw store bytes, or private keys.
+The managed trust store is exposed through Spring Boot's `SslBundle` API and combined with platform/JVM trust roots for Visual Agent's server-side TLS clients; normal hostname verification remains enabled. Spring AI/OpenAI, Ollama, the shared Spring HTTP transport, and the GitHub release client use the managed trust manager. Local HTTPS integration tests verify managed-CA acceptance and hostname rejection for these consumers. Each HTTPS client must explicitly use the bundle; adding a CA does not modify client-JVM or external-process trust. Restart the server after changing trusted roots so long-lived clients reload them. Audit entries never include passwords, certificate payloads, private keys, or raw exception messages. Results expose public certificate metadata only; they never include passwords, raw store bytes, or private keys.
 
 ## Tool Calls
 
@@ -46,5 +47,8 @@ The managed trust store is exposed through Spring Boot's `SslBundle` API and com
 - The tool is disabled by default, main-agent-only, and omitted from model schemas while disabled.
 - Store paths resolve beneath the server data root and cannot traverse outside the managed security directory.
 - Only CA certificates can be trusted; every mutation is atomic and recoverable.
+- A corrupt primary trust-store file is restored only from a validated managed backup; symlinked store or backup paths are rejected.
+- Recovery must not restore a CA that was removed by a successful mutation.
+- A missing or empty password file fails closed; the server never replaces credentials for an existing store.
 - Tool output and logs contain no passwords, key bytes, certificate payloads, or arbitrary local paths.
 - The activation result accurately describes when server-side TLS clients begin using an imported CA.

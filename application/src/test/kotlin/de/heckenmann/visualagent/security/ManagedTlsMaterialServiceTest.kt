@@ -1,8 +1,12 @@
 package de.heckenmann.visualagent.security
 
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
 import de.heckenmann.visualagent.agent.tools.ServerTlsStore
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.slf4j.LoggerFactory
 import java.io.ByteArrayInputStream
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
@@ -21,9 +25,15 @@ class ManagedTlsMaterialServiceTest {
     @TempDir
     lateinit var temporaryDirectory: Path
 
+    private fun service(root: Path): ManagedTlsMaterialService {
+        val files = ManagedTlsStoreFiles(root)
+        val audit = TlsMutationAudit()
+        return ManagedTlsMaterialService(files, audit, ManagedTlsCertificateOperations(files, audit))
+    }
+
     @Test
     fun `generates a constrained CA key entry without returning private key material`() {
-        val service = ManagedTlsMaterialService(temporaryDirectory)
+        val service = service(temporaryDirectory)
 
         val generated = service.generateCertificate("test-root", "CN=Test Root CA", emptyList(), emptyList(), true, 30)
 
@@ -38,7 +48,7 @@ class ManagedTlsMaterialServiceTest {
 
     @Test
     fun `generates TLS certificate with DNS and IP subject alternative names`() {
-        val service = ManagedTlsMaterialService(temporaryDirectory)
+        val service = service(temporaryDirectory)
         service.generateCertificate("root-ca", "CN=Test Root CA", emptyList(), emptyList(), true, 30)
 
         val result =
@@ -62,7 +72,7 @@ class ManagedTlsMaterialServiceTest {
 
     @Test
     fun `imports only valid CA certificates and removes the exact managed alias`() {
-        val service = ManagedTlsMaterialService(temporaryDirectory)
+        val service = service(temporaryDirectory)
         val ca = service.generateCertificate("trusted-root", "CN=Trusted Root", emptyList(), emptyList(), true, 30)
         val caPem = service.exportPublicCertificate(ca.alias)!!
         assertIllegalArgument { service.importTrustedCertificate("binary-input", "\u0000$caPem") }
@@ -77,7 +87,7 @@ class ManagedTlsMaterialServiceTest {
 
     @Test
     fun `rejects non-CA certificate and duplicate trust alias`() {
-        val service = ManagedTlsMaterialService(temporaryDirectory)
+        val service = service(temporaryDirectory)
         service.generateCertificate("root-ca", "CN=Test Root CA", emptyList(), emptyList(), true, 30)
         val leaf =
             service.generateCertificate(
@@ -101,7 +111,7 @@ class ManagedTlsMaterialServiceTest {
 
     @Test
     fun `rejects path traversal aliases malformed subjects and server certificates without SANs`() {
-        val service = ManagedTlsMaterialService(temporaryDirectory)
+        val service = service(temporaryDirectory)
 
         assertIllegalArgument { service.inspect(ServerTlsStore.TRUST, "../outside", false) }
         assertIllegalArgument { service.generateCertificate("../outside", "CN=bad", emptyList(), emptyList(), true, 30) }
@@ -126,7 +136,7 @@ class ManagedTlsMaterialServiceTest {
 
     @Test
     fun `uses separate restricted password files and preserves the JDK trust store`() {
-        val service = ManagedTlsMaterialService(temporaryDirectory)
+        val service = service(temporaryDirectory)
         service.list(ServerTlsStore.TRUST)
         service.generateCertificate("root-ca", "CN=Test Root CA", emptyList(), emptyList(), true, 30)
         service.generateCertificate("local-server", "CN=localhost", listOf("localhost"), listOf("127.0.0.1"), false, 30, "root-ca")
@@ -142,8 +152,61 @@ class ManagedTlsMaterialServiceTest {
     }
 
     @Test
+    fun `recovers the latest managed store after the primary store is corrupted`() {
+        val service = service(temporaryDirectory)
+        service.generateCertificate("root-ca", "CN=Test Root CA", emptyList(), emptyList(), true, 30)
+        service.generateCertificate(
+            "server-cert",
+            "CN=agent.example.test",
+            listOf("agent.example.test"),
+            emptyList(),
+            false,
+            30,
+            "root-ca",
+        )
+        val keyStorePath = temporaryDirectory.resolve("security/tls/keystore.p12")
+        Files.writeString(keyStorePath, "corrupt-store")
+
+        val restartedService = service(temporaryDirectory)
+
+        assertNotNull(restartedService.inspect(ServerTlsStore.KEY, "root-ca", false))
+        assertNotNull(restartedService.inspect(ServerTlsStore.KEY, "server-cert", false))
+        assertNotNull(restartedService.inspect(ServerTlsStore.KEY, "root-ca", false))
+    }
+
+    @Test
+    fun `recovers the latest managed store when the primary store is missing`() {
+        val service = service(temporaryDirectory)
+        service.generateCertificate("root-ca", "CN=Test Root CA", emptyList(), emptyList(), true, 30)
+        service.generateCertificate("secondary-ca", "CN=Secondary CA", emptyList(), emptyList(), true, 30)
+        Files.delete(temporaryDirectory.resolve("security/tls/keystore.p12"))
+
+        val restartedService = service(temporaryDirectory)
+
+        assertNotNull(restartedService.inspect(ServerTlsStore.KEY, "root-ca", false))
+        assertNotNull(restartedService.inspect(ServerTlsStore.KEY, "secondary-ca", false))
+        assertTrue(Files.exists(temporaryDirectory.resolve("security/tls/keystore.p12")))
+    }
+
+    @Test
+    fun `recovers the latest trust store when its primary file is missing`() {
+        val service = service(temporaryDirectory)
+        service.generateCertificate("root-ca", "CN=Test Root CA", emptyList(), emptyList(), true, 30)
+        service.generateCertificate("secondary-ca", "CN=Secondary CA", emptyList(), emptyList(), true, 30)
+        service.importTrustedCertificate("trusted-root", service.exportPublicCertificate("root-ca")!!)
+        service.importTrustedCertificate("trusted-secondary", service.exportPublicCertificate("secondary-ca")!!)
+        Files.delete(temporaryDirectory.resolve("security/tls/truststore.p12"))
+
+        val restartedService = service(temporaryDirectory)
+
+        assertNotNull(restartedService.inspect(ServerTlsStore.TRUST, "trusted-root", false))
+        assertNotNull(restartedService.inspect(ServerTlsStore.TRUST, "trusted-secondary", false))
+        assertTrue(Files.exists(temporaryDirectory.resolve("security/tls/truststore.p12")))
+    }
+
+    @Test
     fun `managed CA is accepted by additive trust manager and key entry creates a JDK key manager`() {
-        val service = ManagedTlsMaterialService(temporaryDirectory)
+        val service = service(temporaryDirectory)
         val ca = service.generateCertificate("root-ca", "CN=Test Root CA", emptyList(), emptyList(), true, 30)
         service.generateCertificate("server", "CN=localhost", listOf("localhost"), emptyList(), false, 30, "root-ca")
         val caCertificate = parseCertificate(service.exportPublicCertificate(ca.alias)!!)
@@ -167,7 +230,7 @@ class ManagedTlsMaterialServiceTest {
 
     @Test
     fun `key bundle exposes only the selected server alias`() {
-        val service = ManagedTlsMaterialService(temporaryDirectory)
+        val service = service(temporaryDirectory)
         service.generateCertificate("root-ca", "CN=Test Root CA", emptyList(), emptyList(), true, 30)
         service.generateCertificate(
             "first-server",
@@ -197,6 +260,41 @@ class ManagedTlsMaterialServiceTest {
                 .single()
 
         assertEquals(listOf("selected-server"), keyManager.getServerAliases("RSA", null).orEmpty().toList())
+    }
+
+    @Test
+    fun `store mutations log operation alias fingerprint and outcome without material`() {
+        val service = service(temporaryDirectory)
+        val logger = LoggerFactory.getLogger(TlsMutationAudit::class.java) as Logger
+        val appender = ListAppender<ILoggingEvent>().apply { start() }
+        logger.addAppender(appender)
+
+        try {
+            val generated = service.generateCertificate("audit-root", "CN=Audit Root", emptyList(), emptyList(), true, 30)
+            assertFalse(service.removeKeyEntry("missing-entry"))
+            assertIllegalArgument { service.importTrustedCertificate("bad-cert", "PRIVATE-MARKER is not a certificate") }
+
+            val events = appender.list.map { it.formattedMessage }
+            assertTrue(
+                events.any {
+                    it.contains("operation=generate_certificate") &&
+                        it.contains(generated.certificate.sha256) &&
+                        it.contains("outcome=success")
+                },
+            )
+            assertTrue(
+                events.any {
+                    it.contains("operation=remove_key_entry") &&
+                        it.contains("alias=missing-entry") &&
+                        it.contains("outcome=not_found")
+                },
+            )
+            assertTrue(events.any { it.contains("operation=import_certificate") && it.contains("outcome=failed") })
+            assertTrue(events.none { it.contains("PRIVATE-MARKER") || it.contains("-----BEGIN CERTIFICATE-----") })
+        } finally {
+            logger.detachAppender(appender)
+            appender.stop()
+        }
     }
 
     private fun assertIllegalArgument(block: () -> Unit) {
