@@ -80,7 +80,7 @@ internal suspend fun processTodoWithLLM(
                 )
                 executionControl?.awaitExecutionAllowed(agent.id)
                 val result =
-                    jobScheduler.run(agent.id) {
+                    jobScheduler.run(agent.id, "todo:$todoId") {
                         agent.performTodo(
                             todoId,
                             taskDescription,
@@ -115,7 +115,7 @@ internal suspend fun processTodoWithLLM(
                     }
                 executionControl?.awaitExecutionAllowed(agent.id)
                 val approved =
-                    jobScheduler.run(agent.id) {
+                    jobScheduler.run(agent.id, "todo:$todoId") {
                         taskPlanner.reviewWorkerResult(
                             todoId,
                             taskDescription,
