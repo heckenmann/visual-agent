@@ -130,6 +130,7 @@ class AutonomousCoordinatorLifecycleTest {
                 fixture.coordinator.startAutonomousProcessing(seed = false)
                 fixture.awaitWorkerCompletion()
 
+                fixture.awaitTodoStatus(todo.id, TodoStatus.COMPLETED)
                 assertEquals(TodoStatus.COMPLETED, fixture.todoManager.getById(todo.id)!!.status)
                 assertNotNull(fixture.awaitMessageContaining("completed todo"))
             } finally {
@@ -150,6 +151,7 @@ class AutonomousCoordinatorLifecycleTest {
 
                 assertTrue(fixture.awaitMessageContaining("failed attempt 1").content.contains("failed attempt 1"))
                 assertTrue(fixture.awaitMessageContaining("completed todo ${todo.id}").content.contains("completed todo ${todo.id}"))
+                fixture.awaitTodoStatus(todo.id, TodoStatus.COMPLETED)
                 assertEquals(TodoStatus.COMPLETED, fixture.todoManager.getById(todo.id)?.status)
             } finally {
                 fixture.cancel()

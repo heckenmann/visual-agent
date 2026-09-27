@@ -16,8 +16,10 @@ import de.heckenmann.visualagent.knowledge.MemoryStore
 import de.heckenmann.visualagent.knowledge.PreferenceStore
 import de.heckenmann.visualagent.knowledge.TodoStore
 import de.heckenmann.visualagent.todo.Todo
+import de.heckenmann.visualagent.todo.TodoChange
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoManager
+import de.heckenmann.visualagent.todo.TodoStatus
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
@@ -41,6 +43,8 @@ import java.util.concurrent.atomic.AtomicInteger
  * @param notifications Captured notification strings
  * @param savedAgents Captured saved agent instances
  * @param messages Captured persisted messages
+ * @param todoChanges Captured persisted todo change events
+ * @param todoChangeSubscription Registration handle for the change listener
  * @param scope Coroutine scope used by the fixture; cancel via [cancel]
  */
 internal class CoordinatorFixture(
@@ -56,9 +60,12 @@ internal class CoordinatorFixture(
     private val workerStarts: Channel<Unit>,
     private val workerCompletions: Channel<Unit>,
     private val messageEvents: Channel<Message>,
+    private val todoChanges: Channel<TodoChange>,
+    private val todoChangeSubscription: AutoCloseable,
     private val scope: CoroutineScope,
 ) {
     fun cancel() {
+        todoChangeSubscription.close()
         coordinator.close()
         scheduler.close()
         scope.cancel()
@@ -70,6 +77,17 @@ internal class CoordinatorFixture(
 
     suspend fun awaitWorkerCompletion() {
         workerCompletions.receive()
+    }
+
+    suspend fun awaitTodoStatus(
+        todoId: String,
+        status: TodoStatus,
+    ) {
+        if (todoManager.getById(todoId)?.status == status) return
+        while (true) {
+            val changedTodo = todoChanges.receive().todo
+            if (changedTodo?.id == todoId && changedTodo.status == status) return
+        }
     }
 
     suspend fun awaitMessageContaining(text: String): Message {
@@ -94,6 +112,8 @@ internal fun buildFixture(
 ): CoordinatorFixture {
     val todoStore = FakeTodoStore()
     val todoEventBus = TodoEventBus()
+    val todoChanges = Channel<TodoChange>(Channel.UNLIMITED)
+    val todoChangeSubscription = todoEventBus.addListener { change -> todoChanges.trySend(change) }
     val todoManager = TodoManager(todoStore, todoEventBus)
     val provider = mockk<LLMProvider>()
     val workerAttempts = AtomicInteger()
@@ -214,6 +234,8 @@ internal fun buildFixture(
         workerStarts,
         workerCompletions,
         messageEvents,
+        todoChanges,
+        todoChangeSubscription,
         scope,
     )
 }
