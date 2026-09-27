@@ -1,6 +1,6 @@
 package de.heckenmann.visualagent.agent.tools
 
-/** Safe runtime metrics explicitly reported by the desktop client for one request. */
+/** Safe runtime metrics returned by the desktop client in response to an explicit server request. */
 data class ClientRuntimeReport(
     /** Client process identifier. */
     val processId: Long,
@@ -32,4 +32,16 @@ data class ClientRuntimeReport(
     val freePhysicalMemoryBytes: Long?,
     /** Client process CPU load from zero to one, when available. */
     val processCpuLoad: Double?,
+)
+
+/** Bounded process inventory page returned by the desktop client after an explicit server request. */
+data class ClientProcessInventoryReport(
+    /** Zero-based offset returned for a list request, or zero for a show request. */
+    val offset: Int,
+    /** Number of process identifiers visible when the client collected the page. */
+    val totalProcesses: Int,
+    /** Process entries in the requested page. */
+    val processes: List<HostProcessEntry>,
+    /** Whether more entries follow this page. */
+    val hasMore: Boolean,
 )

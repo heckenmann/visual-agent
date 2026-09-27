@@ -116,6 +116,41 @@ class SubAgentJobSchedulerTest {
         }
 
     @Test
+    fun `request cancellation removes only its queued job`() =
+        runBlocking {
+            val scheduler = scheduler(1)
+            val firstStarted = CompletableDeferred<Unit>()
+            val releaseFirst = CompletableDeferred<Unit>()
+            val first =
+                async {
+                    scheduler.run {
+                        firstStarted.complete(Unit)
+                        releaseFirst.await()
+                    }
+                }
+            firstStarted.await()
+            val todoQueued =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    scheduler.run("agent-1", "todo:one") {}
+                }
+            val unrelatedQueued =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    scheduler.run("agent-2", "todo:two") {}
+                }
+
+            assertEquals(1, scheduler.cancelQueuedRequest("todo:one"))
+            assertEquals(SubAgentJobQueueSnapshot(active = 1, queued = 1), scheduler.snapshot())
+            todoQueued.join()
+            assertTrue(todoQueued.isCancelled)
+
+            releaseFirst.complete(Unit)
+            first.await()
+            unrelatedQueued.join()
+            assertTrue(unrelatedQueued.isCompleted)
+            assertEquals(SubAgentJobQueueSnapshot(active = 0, queued = 0), scheduler.snapshot())
+        }
+
+    @Test
     fun `close cancels active jobs and releases scheduler subscriptions`() =
         runBlocking {
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)

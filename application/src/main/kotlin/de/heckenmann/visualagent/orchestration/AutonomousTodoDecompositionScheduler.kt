@@ -41,6 +41,7 @@ internal class AutonomousTodoDecompositionScheduler(
     fun hasAttemptedDecomposition(todoId: String): Boolean = todoId in attemptedTodoIds
 
     fun cancel(todoId: String) {
+        jobScheduler.cancelQueuedRequest("decomposition:$todoId")
         activeJobs[todoId]?.cancel()
     }
 
@@ -92,7 +93,7 @@ internal class AutonomousTodoDecompositionScheduler(
         val job =
             scope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
                 try {
-                    jobScheduler.run(analyst.id) { taskPlanner.expandComplexTodo(todo, analyst) }
+                    jobScheduler.run(analyst.id, "decomposition:${todo.id}") { taskPlanner.expandComplexTodo(todo, analyst) }
                 } catch (error: Throwable) {
                     if (error !is CancellationException) {
                         logger.warn(error) { "Could not decompose todo ${todo.id}; leaving it available for execution" }

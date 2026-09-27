@@ -6,8 +6,8 @@ import kotlin.test.assertEquals
 /** Verifies that protocol compatibility has one centrally owned version. */
 class ProtocolVersionTest {
     @Test
-    fun `current protocol version is v2`() {
-        assertEquals("v2", ProtocolVersion.CURRENT)
+    fun `current protocol version is v4`() {
+        assertEquals("v4", ProtocolVersion.CURRENT)
     }
 
     @Test

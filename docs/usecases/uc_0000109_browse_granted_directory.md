@@ -18,9 +18,12 @@ Let an enabled model inspect only explicitly granted directory contents without 
 
 1. The model calls `workspace:file` with `listRoots` and receives opaque root IDs, names, origins, modes, and availability only.
 2. The model supplies one root ID and a relative path to list entries or read bounded UTF-8 text.
-3. The filesystem owner reloads the grant, rejects absolute paths, parent traversal, control characters, and symlink escapes, and canonicalizes the target.
-4. Search visits a bounded number of regular files and returns bounded relative-path matches.
-5. Missing, revoked, unreadable, disconnected-client, and unavailable grants fail closed.
+3. The server invokes the matching client capability for only the requested listing, file, or
+   search. Capability registration itself does not enumerate or transfer file metadata/content.
+4. The filesystem owner reloads the grant, rejects absolute paths, parent traversal, control
+   characters, and symlink escapes, and canonicalizes the target.
+5. Search visits a bounded number of regular files and returns bounded relative-path matches.
+6. Missing, revoked, unreadable, disconnected-client, and unavailable grants fail closed.
 
 ## Result
 

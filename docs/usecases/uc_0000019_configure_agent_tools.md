@@ -17,13 +17,19 @@ Desktop user.
 
 1. The user opens a sub-agent's details dialog.
 2. The UI shows model/runtime controls and lists registered tools with toggles.
-3. The user enables or disables tools for that agent.
+3. The user enables or disables tools for that agent. Globally disabled tools remain unavailable;
+   the user can explicitly enable globally disabled capabilities such as process inventories or
+   server-log diagnostics in global tool settings first.
 4. The agent configuration is persisted.
 5. Future request contexts expose only enabled tools to that agent, after global policy filtering.
 
 ## Result
 
-Agents receive only the tools allowed by persisted configuration.
+Agents receive only the tools allowed by persisted configuration. `system:processes` and
+`system:client-processes` are globally disabled by default because their unredacted command lines can
+contain credentials. `diagnostics:logs` is main-agent-only and disabled by default; if enabled, it
+exposes only bounded in-memory logs after common credential redaction. Enabling any of these tools
+delegates its result to the selected model when that model calls the tool.
 
 ## Tool Calls
 
@@ -48,3 +54,7 @@ Agents receive only the tools allowed by persisted configuration.
 - Model-facing prompts and function schemas never expose Internal Tool IDs; provider function names are derived rather than persisted separately.
 - Per-agent tool overrides are resolved before template defaults and are still filtered by globally disabled tools.
 - Tool toggles remain separate from provider/model dropdowns so capability changes are explicit.
+- Full server/client process inventories remain globally disabled until explicitly enabled; the two
+  tools always identify their host scope separately.
+- Server log diagnostics remain main-agent-only and globally disabled until explicitly enabled; they
+  cannot read arbitrary log files and return only bounded, redacted in-memory events.

@@ -51,7 +51,7 @@ class SubAgentJobScheduler(
      * @param block Job implementation
      * @return Job result
      */
-    suspend fun <T> run(block: suspend () -> T): T = run(agentId = null, block = block)
+    suspend fun <T> run(block: suspend () -> T): T = run(agentId = null, requestId = null, block = block)
 
     /**
      * Runs one job after a slot becomes available and after its execution gates allow it.
@@ -63,9 +63,16 @@ class SubAgentJobScheduler(
     suspend fun <T> run(
         agentId: String?,
         block: suspend () -> T,
+    ): T = run(agentId, requestId = null, block = block)
+
+    /** Runs one job with a cancellation key that an owning operation can remove from the queue. */
+    suspend fun <T> run(
+        agentId: String?,
+        requestId: String?,
+        block: suspend () -> T,
     ): T {
         val permit = CompletableDeferred<Unit>()
-        val waitingJob = WaitingJob(agentId, permit)
+        val waitingJob = WaitingJob(agentId, requestId, permit)
         synchronized(lock) {
             waiting.addLast(waitingJob)
         }
@@ -143,6 +150,16 @@ class SubAgentJobScheduler(
         return true
     }
 
+    /** Removes and cancels queued work belonging to one request without affecting other jobs. */
+    fun cancelQueuedRequest(requestId: String): Int {
+        val cancelled =
+            synchronized(lock) {
+                waiting.filter { it.requestId == requestId }.also { jobs -> jobs.forEach(waiting::remove) }
+            }
+        cancelled.forEach { it.permit.cancel(CancellationException("Queued operation was cancelled.")) }
+        return cancelled.size
+    }
+
     /**
      * Cancels every queued or running background job.
      *
@@ -190,6 +207,7 @@ class SubAgentJobScheduler(
 
     private data class WaitingJob(
         val agentId: String?,
+        val requestId: String?,
         val permit: CompletableDeferred<Unit>,
         var dispatched: Boolean = false,
     )

@@ -17,7 +17,7 @@ interface WorkspaceFilePort {
         name: String,
     ): String
 
-    /** Imports an external file into a workspace-relative directory. */
+    /** Imports a file explicitly selected and sent by the user. */
     fun importFile(
         directory: String,
         name: String,

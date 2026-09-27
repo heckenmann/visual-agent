@@ -1,6 +1,10 @@
 package de.heckenmann.visualagent.ui.application
 
 import de.heckenmann.visualagent.protocol.CancellationTokenImpl
+import de.heckenmann.visualagent.protocol.ClientProcessEntry
+import de.heckenmann.visualagent.protocol.ClientProcessInventoryDiagnosticsPort
+import de.heckenmann.visualagent.protocol.ClientProcessInventoryRequest
+import de.heckenmann.visualagent.protocol.ClientProcessInventorySnapshot
 import de.heckenmann.visualagent.protocol.ClientRuntimeDiagnosticsPort
 import de.heckenmann.visualagent.protocol.ClientRuntimeSnapshot
 import de.heckenmann.visualagent.protocol.ConversationMessage
@@ -12,11 +16,12 @@ import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class ClientRuntimeConversationPortTest {
     @Test
-    fun `conversation request carries a separate client runtime snapshot`() =
+    fun `ordinary chat does not collect client diagnostics`() =
         runBlocking {
             val delegate = mockk<ConversationPort>(relaxed = true)
             var transferredRequest: ConversationStreamRequest? = null
@@ -24,16 +29,25 @@ class ClientRuntimeConversationPortTest {
                 transferredRequest = firstArg()
                 ConversationStreamResult(ConversationMessage("assistant", "ok"))
             }
-            val clientPort = ClientRuntimeConversationPort(delegate, ClientRuntimeDiagnosticsPort { sampleSnapshot() })
+            var snapshotReads = 0
+            val lazyClientPort =
+                ClientRuntimeConversationPort(
+                    delegate,
+                    ClientRuntimeDiagnosticsPort {
+                        snapshotReads++
+                        sampleSnapshot()
+                    },
+                )
+            lazyClientPort.stream(request(), CancellationTokenImpl()) {}
 
-            clientPort.stream(request(), CancellationTokenImpl()) {}
-
-            assertEquals(sampleSnapshot(), transferredRequest?.clientRuntime)
+            assertEquals(0, snapshotReads)
             assertEquals("hello", transferredRequest?.content)
+            assertEquals(sampleSnapshot(), transferredRequest?.clientDataRequester?.requestRuntimeSnapshot())
+            assertEquals(1, snapshotReads)
         }
 
     @Test
-    fun `unavailable diagnostics do not prevent conversation requests`() =
+    fun `diagnostic collection failure does not prevent ordinary chat`() =
         runBlocking {
             val delegate = mockk<ConversationPort>(relaxed = true)
             var transferredRequest: ConversationStreamRequest? = null
@@ -45,7 +59,47 @@ class ClientRuntimeConversationPortTest {
 
             clientPort.stream(request(), CancellationTokenImpl()) {}
 
-            assertNull(transferredRequest?.clientRuntime)
+            assertNotNull(transferredRequest?.clientDataRequester)
+            assertNull(runCatching { transferredRequest?.clientDataRequester?.requestRuntimeSnapshot() }.getOrNull())
+        }
+
+    @Test
+    fun `process inventory is collected only after the request-scoped capability is invoked`() =
+        runBlocking {
+            val delegate = mockk<ConversationPort>(relaxed = true)
+            var transferredRequest: ConversationStreamRequest? = null
+            coEvery { delegate.stream(any(), any(), any()) } coAnswers {
+                transferredRequest = firstArg()
+                ConversationStreamResult(ConversationMessage("assistant", "ok"))
+            }
+            val processes =
+                ClientProcessInventorySnapshot(
+                    offset = 2,
+                    totalProcesses = 5,
+                    processes = listOf(ClientProcessEntry(42, 1, null, "agent --token secret", "agent", listOf("--token", "secret"))),
+                    hasMore = true,
+                )
+            var processReadCount = 0
+            var capturedProcessRequest: ClientProcessInventoryRequest? = null
+            val clientPort =
+                ClientRuntimeConversationPort(
+                    delegate,
+                    ClientRuntimeDiagnosticsPort { null },
+                    ClientProcessInventoryDiagnosticsPort { request ->
+                        processReadCount++
+                        capturedProcessRequest = request
+                        processes
+                    },
+                )
+
+            clientPort.stream(request(), CancellationTokenImpl()) {}
+
+            assertEquals(0, processReadCount)
+            val processRequest = ClientProcessInventoryRequest("list", 2, 1, null)
+            assertEquals(processes, transferredRequest?.clientDataRequester?.requestProcessInventory(processRequest))
+            assertEquals(processRequest, capturedProcessRequest)
+            assertEquals(1, processReadCount)
+            assertEquals("hello", transferredRequest?.content)
         }
 
     private fun request() =

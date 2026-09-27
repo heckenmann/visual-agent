@@ -23,6 +23,8 @@ data class ClientDirectoryMatch(
 
 /**
  * Filesystem operations supplied by the exact desktop client that owns a directory capability.
+ * Reads transfer data only as a response to an explicit authorized server operation; registering
+ * a capability does not enumerate or transfer directory contents.
  *
  * The server selects this capability only by opaque identifiers. The implementation owns path
  * canonicalization and must never accept a host path from the server.

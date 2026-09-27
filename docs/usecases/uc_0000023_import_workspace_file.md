@@ -15,11 +15,13 @@ Desktop user.
 
 ## Main Flow
 
-1. The user opens a file chooser.
-2. The selected file is copied into the currently open browser directory.
-3. Metadata is recorded with ID, relative path, MIME type, size, SHA-256, and timestamps.
-4. The files panel refreshes.
-5. A concise history entry can reference the imported managed file.
+1. The user starts an import; the desktop opens a file chooser locally.
+2. After selection, the client sends only the selected filename and bounded bytes with the
+   explicit import request. It does not send the external source path or other local files.
+3. The server copies the selected file into the requested managed workspace directory.
+4. Metadata is recorded with ID, relative path, MIME type, size, SHA-256, and timestamps.
+5. The files panel refreshes.
+6. A concise history entry can reference the imported managed file.
 
 ## Result
 

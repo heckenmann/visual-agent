@@ -248,8 +248,8 @@ class AgentManager
             onChunk: (ConversationStreamUpdate) -> Unit,
             userEntryId: String,
             assistantEntryId: String,
-            clientRuntime: de.heckenmann.visualagent.protocol.ClientRuntimeSnapshot? = null,
-        ): String = conversationOps.streamMessage(content, token, onChunk, userEntryId, assistantEntryId, clientRuntime)
+            clientDataRequester: de.heckenmann.visualagent.protocol.ClientDataRequestPort? = null,
+        ): String = conversationOps.streamMessage(content, token, onChunk, userEntryId, assistantEntryId, clientDataRequester)
 
         /**
          * Cancels all running sub-agent jobs. Returns the set of cancelled job IDs.

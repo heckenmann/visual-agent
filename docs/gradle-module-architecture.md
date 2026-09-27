@@ -73,6 +73,13 @@ desktop startup and endpoint selection, and embeds one non-web application conte
 the same `ApplicationPort` boundary after `ApplicationConnection` reports readiness; the desktop
 host owns Spring startup and converts the server-side adapters into the protocol bundle.
 
+Explicit user submissions, including chat text and selected file imports, travel to the server with
+the corresponding user action. The client never attaches unrelated local state to those requests.
+When the server needs other client-owned data, such as runtime diagnostics, process commands, or
+contents of a granted directory, it first issues a specific authorized request. The client collects
+and transfers only the data named by that request. Apply this boundary to local and remote
+transports alike.
+
 `:provider-core` owns provider-facing contracts, provider profiles/catalog models, and shared cancellation primitives. It has no dependency on a concrete provider implementation.
 
 `:provider-standard` owns the configured-provider router and the built-in Ollama and OpenAI-compatible adapters. It depends on `:provider-core` and `:agent-core`.

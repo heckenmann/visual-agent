@@ -151,8 +151,8 @@ internal class AgentManagerConversationOps(
         onChunk: (ConversationStreamUpdate) -> Unit,
         userEntryId: String,
         assistantEntryId: String,
-        clientRuntime: de.heckenmann.visualagent.protocol.ClientRuntimeSnapshot? = null,
-    ): String = streamingOps.streamMessage(content, token, onChunk, userEntryId, assistantEntryId, clientRuntime)
+        clientDataRequester: de.heckenmann.visualagent.protocol.ClientDataRequestPort? = null,
+    ): String = streamingOps.streamMessage(content, token, onChunk, userEntryId, assistantEntryId, clientDataRequester)
 
     /** Composes and persists the welcome message displayed after a history reset. */
     suspend fun addWelcomeMessageAfterReset(): WelcomeResult = owner.welcomeMessageComposer.compose(persist = ::persist)

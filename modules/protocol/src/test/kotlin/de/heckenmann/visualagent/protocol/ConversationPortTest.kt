@@ -37,14 +37,26 @@ class ConversationPortTest {
     @Test
     fun `stream request rejects invalid identities before it can cross a boundary`() {
         assertFailsWith<IllegalArgumentException> {
-            ConversationStreamRequest("not-a-uuid", "22222222-2222-4222-8222-222222222222", "Hello")
+            ConversationStreamRequest("not-a-uuid", "22222222-2222-4222-8222-222222222222", "hello")
         }
         assertFailsWith<IllegalArgumentException> {
             ConversationStreamRequest(
                 "11111111-1111-4111-8111-111111111111",
                 "11111111-1111-4111-8111-111111111111",
-                "Hello",
+                "hello",
             )
+        }
+    }
+
+    @Test
+    fun `stream request rejects blank or oversized submitted text`() {
+        val userId = "11111111-1111-4111-8111-111111111111"
+        val assistantId = "22222222-2222-4222-8222-222222222222"
+        assertFailsWith<IllegalArgumentException> {
+            ConversationStreamRequest(userId, assistantId, " ")
+        }
+        assertFailsWith<IllegalArgumentException> {
+            ConversationStreamRequest(userId, assistantId, "x".repeat(MAX_CONVERSATION_TEXT_BYTES.toInt() + 1))
         }
     }
 }
