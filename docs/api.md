@@ -146,6 +146,13 @@ the shared registry; it does not bypass that delegation or permission policy.
 | `agent:log` | `get` | Returns up to 50 persisted work-log entries for one sub-agent. |
 | `todos` | multiple | Lists and manages todos, including assigning work to a sub-agent and retrieving a stored result. |
 | `javascript:execute` | `execute` | Runs sandboxed inline JavaScript or a workspace-relative JavaScript file for complex logic or large CSV/Markdown output; `workspace.write/read/delete` provides hardened text access, and actionable execution errors are returned to the model. |
+| `diagnostics:config` | `get` | Reports the sanitized effective server provider/model selection, declared model limits/capabilities, and runtime limits; main-agent only. |
+| `diagnostics:database` | `get` | Reports server H2 reachability and Flyway schema status using static read-only probes; main-agent only. |
+| `diagnostics:provider` | `check` | Performs an active model-catalog request and reports sanitized endpoint origin, connectivity, model availability, and provider-reported selected-model capabilities without changing the provider catalog; main-agent only. |
+| `diagnostics:health` | `get` | Aggregates database, provider, and effective-configuration status with stable non-sensitive reason codes; main-agent only. |
+| `diagnostics:connectors` | `get` | Reports connector diagnostic availability; currently returns `not_available` until issue #52 implements the connector framework; main-agent only. |
+| `diagnostics:logs` | `search` | Searches a bounded in-memory window of recent server Logback events with common secret redaction; main-agent only and disabled by default. It cannot read arbitrary files. |
+| `network:routes` | `get` | Reads bounded IPv4/IPv6 route tables from the Visual Agent server using fixed Linux, macOS, or Windows commands and returns normalized destinations, gateways, interfaces, default-route flags, and available metrics. |
 
 ### Sub-agent role-based tool sets
 
@@ -198,6 +205,8 @@ role-based sets above and the global blocklist:
   a network failure.
 - `network:interfaces`: list bounded interface flags, MTU, and numeric addresses using the JDK;
   hardware addresses and unrelated host data are omitted.
+- `network:routes`: inspect bounded IPv4/IPv6 route tables using fixed, no-shell OS commands; normalized route fields include destination, gateway, interface, default-route status, and available metric;
+  model input cannot select a command, host, or interface.
 - `network:http`: inspect one HTTP(S) endpoint using the JDK HTTP client; reports status, safe
   redirect authorities, timing, and limited metadata without response bodies or credential headers.
 - `network:tls`: inspect one TLS endpoint using the JDK JSSE implementation and the server's
@@ -211,12 +220,39 @@ role-based sets above and the global blocklist:
   keys and passwords are never returned. The managed alias can be used by the optional gRPC server.
 - `system:threads`: request a bounded JVM thread summary, deadlock report, or thread dump filtered
   by state. Thread dumps limit both thread count and stack frames and omit thread-local values.
+- `system:gc`: inspect bounded garbage-collection counts/times and memory-pool usage for the server
+  JVM. Unsupported metrics are omitted; no heap dump is created.
+- `system:process`: report PID, start time, CPU time/load, JVM uptime, and JVM heap metrics for the
+  current Visual Agent server process only. It does not inspect other processes, command lines, or
+  environment values.
+- `system:processes`: opt-in inventory of process IDs and operating-system-reported full command
+  lines visible to the server account. Use `list` with `offset`/`pageSize` (maximum 100) to page
+  through the complete current snapshot, `filter` with a command substring, or `show` with one PID.
+  Output identifies `hostRole=server`. The default list includes every visible process, and returned
+  values are neither truncated nor redacted; process arguments can contain secrets, so keep this capability
+  disabled unless the assigned agent is trusted with every visible process command.
+- `system:client-processes`: separately inspect process IDs and complete commands from the desktop
+  client's host. The inventory is collected only when the server executes this tool; ordinary chats
+  do not enumerate or transmit client processes. Output identifies `hostRole=client`; the
+  request-scoped channel is not persisted, but the completed tool result follows normal tool-call
+  history persistence and can retain credentials from command arguments. This main-agent-only tool
+  is globally disabled by default and returns all command values unfiltered and unredacted.
+- `system:env`: explicitly inspect values from the Visual Agent server process environment using
+  `list`, name-substring `search`, or exact-name `get`. Results include actual values without
+  redaction, including secrets, and are returned only after the user enables this globally disabled
+  tool and the agent calls it. List/search are paginated; `valueLimit` bounds each returned value,
+  while `get` supports `valueOffset` chunks for longer values. It never reads or changes another
+  process environment, does not mutate this process, and does not log results.
 - `system:filesystem`: inspect capacity and access status for the server data root, managed
   workspace, database directory, and temporary directory through JDK NIO. Results explicitly refer
   to the server host and omit the configured paths.
-- `system:client-runtime`: return the desktop client's JVM and OS snapshot explicitly attached to
-  the current chat request. This is separate from server-side `context`, `system:threads`, and
-  `system:filesystem` diagnostics; no client snapshot is persisted or exposed by ordinary context.
+- `system:client-runtime`: return the desktop client's JVM and OS snapshot collected only when the
+  main agent executes this tool. An ordinary chat does not collect or transmit client runtime metrics.
+  This is separate from server-side `context`, `system:threads`, `system:gc`, `system:process`, and
+  `system:filesystem` diagnostics; the request channel is not persisted or exposed by ordinary
+  context, but the completed tool result may be retained in conversation history.
+  Sub-agents cannot use request-scoped client tools because their background jobs have no live
+  desktop-client data channel.
 - `sleep`: blocks the calling coroutine for `seconds.coerceIn(0, 300)`.
 - `browser`: placeholder that returns "not configured" until a real
   backend is wired (issues #16 and #40).

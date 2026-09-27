@@ -45,6 +45,15 @@ class AgentToolConfigService(
             "update:check",
             "context",
             "system:client-runtime",
+            "system:processes",
+            "system:client-processes",
+            "system:env",
+            "diagnostics:config",
+            "diagnostics:database",
+            "diagnostics:provider",
+            "diagnostics:health",
+            "diagnostics:connectors",
+            "diagnostics:logs",
             SERVER_TLS_TRUST_TOOL_ID,
             SERVER_TLS_KEY_TOOL_ID,
             "javascript:execute",
@@ -90,7 +99,11 @@ class AgentToolConfigService(
      * @return true when the tool is not globally disabled
      * @see docs/usecases/uc_0000019_configure_agent_tools.md
      */
-    fun isToolGloballyEnabled(toolId: String): Boolean = toolId !in RESTRICTED_HOST_ACCESS_TOOL_IDS && toolId !in disabledToolIds()
+    fun isToolGloballyEnabled(toolId: String): Boolean =
+        toolId !in RESTRICTED_HOST_ACCESS_TOOL_IDS &&
+            toolId !in disabledToolIds() &&
+            (toolId !in PROCESS_INVENTORY_TOOL_IDS || preferenceStore?.getPreference(PROCESS_INVENTORY_INITIALIZED_KEY) == "true") &&
+            (toolId != SYSTEM_ENV_TOOL_ID || preferenceStore?.getPreference(SYSTEM_ENV_INITIALIZED_KEY) == "true")
 
     /**
      * Returns the persisted tool configuration id for the given sub-agent.
@@ -169,6 +182,21 @@ class AgentToolConfigService(
             )
             preferenceStore?.setPreference(SECURITY_TOOLS_INITIALIZED_KEY, "true")
         }
+        if (preferenceStore?.getPreference(PROCESS_INVENTORY_INITIALIZED_KEY) != "true") {
+            preferenceStore?.setPreference(
+                DISABLED_TOOLS_KEY,
+                (disabledToolIds() + PROCESS_INVENTORY_TOOL_IDS).sorted().joinToString("\n"),
+            )
+            preferenceStore?.setPreference(PROCESS_INVENTORY_INITIALIZED_KEY, "true")
+        }
+        if (preferenceStore?.getPreference(SYSTEM_ENV_INITIALIZED_KEY) != "true") {
+            preferenceStore?.setPreference(DISABLED_TOOLS_KEY, (disabledToolIds() + SYSTEM_ENV_TOOL_ID).sorted().joinToString("\n"))
+            preferenceStore?.setPreference(SYSTEM_ENV_INITIALIZED_KEY, "true")
+        }
+        if (preferenceStore?.getPreference(LOG_DIAGNOSTICS_INITIALIZED_KEY) != "true") {
+            preferenceStore?.setPreference(DISABLED_TOOLS_KEY, (disabledToolIds() + LOG_DIAGNOSTICS_TOOL_ID).sorted().joinToString("\n"))
+            preferenceStore?.setPreference(LOG_DIAGNOSTICS_INITIALIZED_KEY, "true")
+        }
         defaultConfigs().forEach { config ->
             val existing = configStore.getSubAgentConfig(config.id)
             if (existing == null) {
@@ -218,9 +246,12 @@ class AgentToolConfigService(
                         "network:ping",
                         "network:traceroute",
                         "network:interfaces",
+                        "network:routes",
                         "network:http",
                         "network:tls",
                         "system:threads",
+                        "system:gc",
+                        "system:process",
                         "system:filesystem",
                         "todos",
                         "history",
@@ -268,9 +299,12 @@ class AgentToolConfigService(
                         "network:ping",
                         "network:traceroute",
                         "network:interfaces",
+                        "network:routes",
                         "network:http",
                         "network:tls",
                         "system:threads",
+                        "system:gc",
+                        "system:process",
                         "system:filesystem",
                         "todos",
                         "history",
@@ -289,12 +323,28 @@ class AgentToolConfigService(
 
 private const val DISABLED_TOOLS_KEY = "tools.disabled.global"
 private const val SECURITY_TOOLS_INITIALIZED_KEY = "tools.security-management.defaults.v1"
+private const val PROCESS_INVENTORY_INITIALIZED_KEY = "tools.process-inventory.defaults.v1"
+private const val SYSTEM_ENV_INITIALIZED_KEY = "tools.system-env.defaults.v1"
+private const val LOG_DIAGNOSTICS_INITIALIZED_KEY = "tools.log-diagnostics.defaults.v1"
 private const val TOOL_HELP_ID = "tool:help"
+private const val SYSTEM_ENV_TOOL_ID = "system:env"
+private const val LOG_DIAGNOSTICS_TOOL_ID = "diagnostics:logs"
 private const val SERVER_TLS_TRUST_TOOL_ID = "security:truststore"
 private const val SERVER_TLS_KEY_TOOL_ID = "security:keystore"
 
 private val SERVER_TLS_TOOL_IDS = setOf(SERVER_TLS_TRUST_TOOL_ID, SERVER_TLS_KEY_TOOL_ID)
-private val MAIN_AGENT_ONLY_TOOL_IDS = SERVER_TLS_TOOL_IDS
+private val PROCESS_INVENTORY_TOOL_IDS = setOf("system:processes", "system:client-processes")
+private val MAIN_AGENT_ONLY_TOOL_IDS =
+    SERVER_TLS_TOOL_IDS +
+        setOf(
+            "diagnostics:config",
+            "diagnostics:provider",
+            "diagnostics:health",
+            "diagnostics:connectors",
+            LOG_DIAGNOSTICS_TOOL_ID,
+            "system:client-runtime",
+            "system:client-processes",
+        )
 
 private val RESTRICTED_HOST_ACCESS_TOOL_IDS =
     setOf(
