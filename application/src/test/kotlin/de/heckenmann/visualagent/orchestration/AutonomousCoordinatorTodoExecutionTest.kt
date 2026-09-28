@@ -230,6 +230,11 @@ class AutonomousCoordinatorTodoExecutionTest {
             val todo = fixture.todoManager.add("Queued stop task", "agent-1")
             val blockerStarted = CompletableDeferred<Unit>()
             val releaseBlocker = CompletableDeferred<Unit>()
+            val todoWasQueued = CompletableDeferred<Unit>()
+            val queueSubscription =
+                fixture.scheduler.addQueueListener { snapshot ->
+                    if (snapshot.queued > 0) todoWasQueued.complete(Unit)
+                }
             val blocker =
                 async {
                     fixture.scheduler.run("blocker") {
@@ -241,6 +246,7 @@ class AutonomousCoordinatorTodoExecutionTest {
             try {
                 blockerStarted.await()
                 assertTrue(fixture.coordinator.startTodo(todo.id))
+                todoWasQueued.await()
                 assertTrue(fixture.coordinator.stopTodo(todo.id))
 
                 assertEquals(0, fixture.scheduler.snapshot().queued)
@@ -248,6 +254,7 @@ class AutonomousCoordinatorTodoExecutionTest {
                 assertEquals(null, fixture.subAgents["agent-1"]?.currentTodoId)
                 assertEquals(null, fixture.subAgents["agent-1"]?.currentTask)
             } finally {
+                queueSubscription.close()
                 releaseBlocker.complete(Unit)
                 blocker.await()
                 fixture.cancel()
