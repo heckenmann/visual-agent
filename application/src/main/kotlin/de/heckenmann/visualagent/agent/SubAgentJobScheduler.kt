@@ -4,6 +4,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import java.util.ArrayDeque
 import java.util.UUID
@@ -71,9 +73,11 @@ class SubAgentJobScheduler(
         requestId: String?,
         block: suspend () -> T,
     ): T {
+        val callerContext = currentCoroutineContext()
         val permit = CompletableDeferred<Unit>()
         val waitingJob = WaitingJob(agentId, requestId, permit)
         synchronized(lock) {
+            callerContext.ensureActive()
             waiting.addLast(waitingJob)
         }
         dispatchWaitingJobs()
