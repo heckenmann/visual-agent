@@ -10,6 +10,7 @@ import kotlinx.coroutines.launch
 import java.util.ArrayDeque
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Schedules sub-agent jobs against the user-configured parallelism limit.
@@ -30,6 +31,7 @@ class SubAgentJobScheduler(
     private var activeJobs = 0
     private val jobsById = ConcurrentHashMap<String, Job>()
     private val subscriptions = mutableListOf<AutoCloseable>()
+    private val queueListeners = CopyOnWriteArrayList<(SubAgentJobQueueSnapshot) -> Unit>()
 
     init {
         executionControl?.let { control ->
@@ -80,6 +82,7 @@ class SubAgentJobScheduler(
             callerContext.ensureActive()
             waiting.addLast(waitingJob)
         }
+        publishSnapshot()
         dispatchWaitingJobs()
         try {
             permit.await()
@@ -89,6 +92,7 @@ class SubAgentJobScheduler(
                     val wasWaiting = waiting.remove(waitingJob)
                     !wasWaiting && waitingJob.dispatched
                 }
+            publishSnapshot()
             if (releaseSlot) {
                 synchronized(lock) {
                     activeJobs = (activeJobs - 1).coerceAtLeast(0)
@@ -161,7 +165,15 @@ class SubAgentJobScheduler(
                 waiting.filter { it.requestId == requestId }.also { jobs -> jobs.forEach(waiting::remove) }
             }
         cancelled.forEach { it.permit.cancel(CancellationException("Queued operation was cancelled.")) }
+        if (cancelled.isNotEmpty()) publishSnapshot()
         return cancelled.size
+    }
+
+    /** Observes queue snapshots after a queued job is added, removed, or dispatched. */
+    internal fun addQueueListener(listener: (SubAgentJobQueueSnapshot) -> Unit): AutoCloseable {
+        queueListeners += listener
+        listener(snapshot())
+        return AutoCloseable { queueListeners -= listener }
     }
 
     /**
@@ -198,7 +210,15 @@ class SubAgentJobScheduler(
                 permits += next.permit
             }
         }
-        permits.forEach { it.complete(Unit) }
+        if (permits.isNotEmpty()) {
+            publishSnapshot()
+            permits.forEach { it.complete(Unit) }
+        }
+    }
+
+    private fun publishSnapshot() {
+        val current = snapshot()
+        queueListeners.forEach { listener -> runCatching { listener(current) } }
     }
 
     private fun isExecutionAllowed(agentId: String?): Boolean = executionControl?.isExecutionAllowed(agentId) != false

@@ -56,6 +56,7 @@ class AutonomousCoordinator
         private val subAgents: Map<String, SubAgent>
             get() = subAgentOps.allSubAgents
         private val pendingTodoChanges = ConcurrentHashMap<String, TodoChange>()
+        private val todoLifecycleLock = Any()
         private val activeCancellationTokens = ConcurrentHashMap<String, CancellationToken>()
         private val activeTodoJobs = ConcurrentHashMap<String, Job>()
         private val agentBusySince = ConcurrentHashMap<String, Long>()
@@ -83,6 +84,7 @@ class AutonomousCoordinator
             )
         private val todoControl =
             AutonomousTodoControl(
+                todoLifecycleLock = todoLifecycleLock,
                 todoManager = todoManager,
                 todoStore = todoStore,
                 activeCancellationTokens = activeCancellationTokens,
@@ -261,7 +263,10 @@ class AutonomousCoordinator
             }
         }
 
-        private fun claimAndProcessOneTodo(requestedTodoId: String? = null): Boolean {
+        private fun claimAndProcessOneTodo(requestedTodoId: String? = null): Boolean =
+            synchronized(todoLifecycleLock) { claimAndProcessOneTodoUnderLock(requestedTodoId) }
+
+        private fun claimAndProcessOneTodoUnderLock(requestedTodoId: String?): Boolean {
             if (executionControl?.isGloballyPaused() == true) return false
             val busyCount =
                 subAgents.values.count {
