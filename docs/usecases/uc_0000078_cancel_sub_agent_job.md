@@ -20,8 +20,9 @@ Desktop user.
 ## Main Flow
 
 1. The user clicks the stop action for one todo or all unfinished todos.
-2. The coordinator cancels the assigned worker cooperatively and immediately releases the agent assignment after the todo is persisted as cancelled.
-3. The todo is persisted as `CANCELLED` and can be started again later.
+2. The coordinator cancels the assigned worker cooperatively, including any request waiting for a scheduler slot, and immediately releases the agent assignment after the todo is persisted as cancelled.
+3. A cancelled request waiting for a scheduler slot is removed and cannot begin execution when a slot later becomes available.
+4. The todo is persisted as `CANCELLED` and can be started again later.
 
 ## Result
 
@@ -40,6 +41,7 @@ The user can stop unfinished sub-agent work while keeping completed todos unchan
 
 - Todo stop controls are visible for pending and in-progress work.
 - Completed todos are not affected by stop-all actions.
+- A queued todo cancellation cannot leave a stale scheduler request or start work after cancellation.
 - A cancelled worker's late cleanup cannot release an agent that has since been assigned another todo.
 - `./gradlew ktlintCheck check test` passes.
 - `jacocoTestCoverageVerification` (≥ 0.80 LINE) continues to pass.
