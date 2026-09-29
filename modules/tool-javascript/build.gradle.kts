@@ -29,8 +29,6 @@ dependencies {
             System.getProperty("os.name").contains("linux", ignoreCase = true) &&
                 System.getProperty("os.arch").lowercase() in setOf("aarch64", "arm64") -> "linux-aarch64"
             System.getProperty("os.name").contains("mac", ignoreCase = true) &&
-                System.getProperty("os.arch").lowercase() in setOf("amd64", "x86_64") -> "darwin-amd64"
-            System.getProperty("os.name").contains("mac", ignoreCase = true) &&
                 System.getProperty("os.arch").lowercase() in setOf("aarch64", "arm64") -> "darwin-aarch64"
             System.getProperty("os.name").contains("windows", ignoreCase = true) &&
                 System.getProperty("os.arch").lowercase() in setOf("amd64", "x86_64") -> "windows-amd64"
