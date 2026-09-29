@@ -1,0 +1,98 @@
+name: License inventory
+
+on:
+  pull_request:
+    paths:
+      - "**/*.gradle.kts"
+      - "gradle/libs.versions.toml"
+      - "gradle/wrapper/gradle-wrapper.properties"
+      - "scripts/license-settings.init.gradle.kts"
+      - "scripts/generate-package-inventory.sh"
+      - ".github/workflows/license-inventory.yml"
+      - "docs/dependency-license-audit.md"
+      - "docs/*plugin-dependencies-*.csv"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GRADLE_OPTS: -Dorg.gradle.daemon=false
+
+jobs:
+  inventory:
+    name: Inventory ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x64
+            runner: ubuntu-latest
+          - platform: macos-arm64
+            runner: macos-latest
+          - platform: macos-x64
+            runner: macos-15-intel
+          - platform: windows-x64
+            runner: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          lfs: true
+
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "24"
+
+      - name: Read Gradle wrapper version
+        id: gradle_wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's#.*gradle-\([0-9][0-9.]*\)-[^/]*\.zip.*#\1#p' gradle/wrapper/gradle-wrapper.properties)"
+          test -n "$version"
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6.3.0
+        with:
+          gradle-version: ${{ steps.gradle_wrapper.outputs.version }}
+
+      - name: Generate Gradle wrapper
+        run: gradle wrapper --gradle-version "${{ steps.gradle_wrapper.outputs.version }}"
+        shell: bash
+
+      - name: Validate generated Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v6.3.0
+
+      - name: Generate dependency and package inventories
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew -I scripts/license-settings.init.gradle.kts \
+            generateLicenseReport generateBuildPluginInventory generateDependencyScopeInventory \
+            :desktop:generateDistributionArtifactInventory \
+            --no-daemon --no-parallel --no-configuration-cache
+          bash scripts/generate-package-inventory.sh \
+            modules/desktop/build/compose/binaries/main/app \
+            build/reports/dependency-license
+
+      - name: Upload inventories
+        uses: actions/upload-artifact@v7
+        with:
+          name: license-inventory-${{ matrix.platform }}
+          if-no-files-found: error
+          path: |
+            build/reports/dependency-license/licenses.csv
+            build/reports/dependency-license/build-plugins.csv
+            build/reports/dependency-license/dependency-scopes.csv
+            build/reports/dependency-license/settings-plugins.csv
+            build/reports/dependency-license/package-files.txt
+            build/reports/dependency-license/embedded-assets.txt
+            build/reports/dependency-license/embedded-notices.txt
+            modules/desktop/build/reports/dependency-license/packaged-artifacts.csv

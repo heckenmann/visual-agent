@@ -3,9 +3,11 @@ import org.gradle.api.tasks.SourceSetContainer
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jlleitschuh.gradle.ktlint.tasks.BaseKtLintCheckTask
 import org.springframework.boot.gradle.tasks.bundling.BootJar
+import java.io.OutputStream
 import java.net.URI
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption.REPLACE_EXISTING
+import java.security.DigestInputStream
 import java.security.MessageDigest
 import java.util.jar.JarFile
 
@@ -330,6 +332,75 @@ val desktopBootJar =
     tasks.named<BootJar>("bootJar") {
         setClasspath(files(desktopMainOutput, desktopRuntimeClasspath))
     }
+
+tasks.register("generateDistributionArtifactInventory") {
+    group = "reporting"
+    description = "Maps packaged JAR names to resolved desktop runtime artifacts."
+    dependsOn("createDistributable")
+    val report = layout.buildDirectory.file("reports/dependency-license/packaged-artifacts.csv")
+    doLast {
+        val artifactsByPackagingHash =
+            configurations
+                .getByName("runtimeClasspath")
+                .incoming.artifacts.artifacts
+                .filter { artifact -> artifact.file.isFile && artifact.file.extension == "jar" }
+                .groupBy { artifact -> auditPackagingHash(artifact.file) }
+        val packageRoot =
+            layout.buildDirectory
+                .dir("compose/binaries/main/app")
+                .get()
+                .asFile
+        val rows =
+            packageRoot
+                .walkTopDown()
+                .filter { file -> file.isFile && file.extension == "jar" }
+                .map { file ->
+                    val packagingHash = file.name.removeSuffix(".jar").substringAfterLast('-')
+                    val artifacts =
+                        artifactsByPackagingHash[packagingHash].orEmpty().filter { artifact ->
+                            file.name == "${artifact.file.name.removeSuffix(".jar")}-$packagingHash.jar"
+                        }
+                    val artifact = artifacts.singleOrNull()
+                    val component = artifact?.id?.componentIdentifier
+                    val coordinate =
+                        if (component is ModuleComponentIdentifier) {
+                            "${component.group}:${component.module}:${component.version}"
+                        } else {
+                            component?.displayName ?: if (artifacts.size > 1) "AMBIGUOUS" else "UNMATCHED"
+                        }
+                    val sourceHash = artifact?.let { auditHash(it.file, "SHA-256") }.orEmpty()
+                    val packageHash = auditHash(file, "SHA-256")
+                    "${file.relativeTo(
+                        packageRoot,
+                    ).invariantSeparatorsPath},$coordinate,${artifact?.file?.name.orEmpty()},$sourceHash,$packageHash"
+                }.sorted()
+                .toList()
+        report.get().asFile.apply {
+            parentFile.mkdirs()
+            writeText((listOf("packagePath,coordinate,resolvedFile,sourceSha256,packageSha256") + rows).joinToString("\n", postfix = "\n"))
+        }
+    }
+}
+
+// Compose encodes each MD5 byte without zero-padding when naming packaged JARs.
+private fun auditPackagingHash(file: File): String =
+    auditDigest(file, "MD5").joinToString(separator = "") { byte -> (byte.toInt() and 0xff).toString(16) }
+
+private fun auditHash(
+    file: File,
+    algorithm: String,
+): String = auditDigest(file, algorithm).joinToString(separator = "") { byte -> "%02x".format(byte.toInt() and 0xff) }
+
+private fun auditDigest(
+    file: File,
+    algorithm: String,
+): ByteArray {
+    val digest = MessageDigest.getInstance(algorithm)
+    DigestInputStream(file.inputStream(), digest).use { input ->
+        input.transferTo(OutputStream.nullOutputStream())
+    }
+    return digest.digest()
+}
 
 val stageReleaseJar =
     tasks.register<Copy>("stageReleaseJar") {
