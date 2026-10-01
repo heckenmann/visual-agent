@@ -9,6 +9,10 @@ Visual Agent is a Kotlin desktop application. Its goal is to provide the model w
 > **Development notice:** This project was written entirely with LLM assistance and is still under active development.
 > Expect rapid changes, incomplete features, and rough edges until the project reaches a stable release.
 
+Visual Agent's own source is [MIT-licensed](LICENSE). Dependencies and packaged components retain their
+own licenses; see the [dependency and distribution license audit](docs/dependency-license-audit.md)
+for the current inventory, outstanding notice obligations, and binary-release limitations.
+
 ## Download and Run
 
 Download the matching artifact from [GitHub Releases](https://github.com/heckenmann/visual-agent/releases). Native packages contain the Visual Agent JAR, all runtime dependencies, and a platform-native launcher, so no Java installation is required. The platform-specific JAR downloads require Java 24.

@@ -56,6 +56,7 @@ Execution exceptions are returned to the model as actionable tool errors (for ex
 - Nested calls inherit the outer deadline. Their `timeoutSeconds` argument can shorten the remaining budget but cannot extend it.
 - Workspace reads and writes count toward the request tool-call budget and are bounded per file and cumulatively for the execution. Reads are bounded before their UTF-8 content is copied into JavaScript. These data-transfer limits do not cap inline JavaScript source length.
 - The Oracle GraalVM isolate path applies hard isolate and retained guest-heap limits. Supported runtimes without the isolate image use Graal's constrained host-access policy plus the same bounded result traversal; no host filesystem or application classes are exposed.
+- GraalJS no longer publishes a macOS x64 isolate for the configured version. On macOS x64, JavaScript execution therefore uses the constrained policy rather than claiming the isolate-only memory limits.
 - Nested registry calls are always awaited; asynchronous scheduling is rejected so permits remain held until side effects finish.
 - Syntax, runtime, access, tool, timeout, cancellation, and limit failures are returned as compact safe categories without stack traces or internal paths.
 

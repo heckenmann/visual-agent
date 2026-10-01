@@ -1,3 +1,7 @@
+import com.github.jk1.license.render.CsvReportRenderer
+import com.github.jk1.license.render.InventoryHtmlReportRenderer
+import com.github.jk1.license.render.ReportRenderer
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.testing.Test
 
@@ -5,6 +9,104 @@ plugins {
     base
     java
     jacoco
+    alias(libs.plugins.license.report)
+}
+
+licenseReport {
+    projects = (listOf(project) + subprojects).toTypedArray()
+    buildScriptProjects = (listOf(project) + subprojects).toTypedArray()
+    configurations = arrayOf("compileClasspath", "runtimeClasspath", "testRuntimeClasspath")
+    renderers = arrayOf<ReportRenderer>(CsvReportRenderer(), InventoryHtmlReportRenderer())
+}
+
+val pluginClasspathReports =
+    allprojects.map { target ->
+        target.tasks.register("exportBuildPluginClasspath") {
+            val report = target.layout.buildDirectory.file("reports/dependency-license/build-plugins.txt")
+            doLast {
+                val coordinates =
+                    target.buildscript.configurations.getByName("classpath").incoming.resolutionResult.allComponents
+                        .mapNotNull { component ->
+                            (component.id as? ModuleComponentIdentifier)?.let { id ->
+                                "${id.group}:${id.module}:${id.version}"
+                            }
+                        }.distinct()
+                        .sorted()
+                report.get().asFile.apply {
+                    parentFile.mkdirs()
+                    writeText(coordinates.joinToString("\n", postfix = "\n"))
+                }
+            }
+        }
+    }
+
+tasks.register("generateBuildPluginInventory") {
+    group = "reporting"
+    description = "Lists the resolved build-plugin classpath of every project."
+    dependsOn(pluginClasspathReports)
+    val report = layout.buildDirectory.file("reports/dependency-license/build-plugins.csv")
+    doLast {
+        val projectsByCoordinate =
+            allprojects.flatMap { target ->
+                target.layout.buildDirectory.file("reports/dependency-license/build-plugins.txt").get().asFile
+                    .readLines()
+                    .filter(String::isNotBlank)
+                    .map { coordinate -> coordinate to target.path }
+            }.groupBy({ it.first }, { it.second })
+        val rows =
+            projectsByCoordinate.toSortedMap().map { (coordinate, projects) ->
+                "$coordinate,\"${projects.distinct().sorted().joinToString(" ")}\""
+            }
+        report.get().asFile.apply {
+            parentFile.mkdirs()
+            writeText((listOf("coordinate,projects") + rows).joinToString("\n", postfix = "\n"))
+        }
+    }
+}
+
+val dependencyScopeReports =
+    allprojects.map { target ->
+        target.tasks.register("exportDependencyScopes") {
+            val report = target.layout.buildDirectory.file("reports/dependency-license/dependency-scopes.txt")
+            doLast {
+                val rows =
+                    listOf("compileClasspath", "runtimeClasspath", "testRuntimeClasspath")
+                        .flatMap { configurationName ->
+                            val configuration = target.configurations.findByName(configurationName)
+                            configuration?.incoming?.resolutionResult?.allComponents.orEmpty()
+                                .mapNotNull { component ->
+                                    (component.id as? ModuleComponentIdentifier)?.let { id ->
+                                        "${id.group}:${id.module}:${id.version},${target.path},$configurationName"
+                                    }
+                                }
+                        }.distinct()
+                        .sorted()
+                report.get().asFile.apply {
+                    parentFile.mkdirs()
+                    writeText(rows.joinToString("\n", postfix = "\n"))
+                }
+            }
+        }
+    }
+
+tasks.register("generateDependencyScopeInventory") {
+    group = "reporting"
+    description = "Lists resolved dependencies by project and classpath scope."
+    dependsOn(dependencyScopeReports)
+    val report = layout.buildDirectory.file("reports/dependency-license/dependency-scopes.csv")
+    doLast {
+        val rows =
+            allprojects.flatMap { target ->
+                target.layout.buildDirectory.file("reports/dependency-license/dependency-scopes.txt").get().asFile
+                    .readLines()
+                    .filter(String::isNotBlank)
+            }.distinct()
+                .sorted()
+        report.get().asFile.apply {
+            parentFile.mkdirs()
+            writeText((listOf("coordinate,project,configuration") + rows).joinToString("\n", postfix = "\n"))
+        }
+    }
 }
 
 group = "de.heckenmann.visualagent"
