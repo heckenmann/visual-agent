@@ -16,6 +16,7 @@ jobs:
     name: Publish verified artifacts
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'release' &&
       github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -31,12 +32,12 @@ jobs:
           gh run download "$RUN_ID" --repo "$GH_REPO" --name release-metadata --dir release-metadata
           tag="$(sed -n 's/^tag=//p' release-metadata/manifest)"
           publish="$(sed -n 's/^publish=//p' release-metadata/manifest)"
-          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-+][a-zA-Z0-9.-]+)?$ ]]
-          [[ "$publish" == "true" || "$publish" == "false" ]]
+          [[ "$publish" == "true" || "$publish" == "false" ]] || exit 1
           if [[ "$publish" != "true" ]]; then
-            echo "Smoke-only workflow completed; skipping publication for $tag."
+            echo "Manual smoke workflow completed; skipping publication."
             exit 0
           fi
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-+][a-zA-Z0-9.-]+)?$ ]] || exit 1
           echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
           echo "PUBLISH_RELEASE=true" >> "$GITHUB_ENV"
 
@@ -63,7 +64,7 @@ jobs:
             gh run download "$RUN_ID" --repo "$GH_REPO" --name "$artifact" --dir release-assets
           done
 
-      - name: Create or update GitHub release
+      - name: Attach artifacts to existing GitHub release
         if: env.PUBLISH_RELEASE == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -72,8 +73,5 @@ jobs:
           set -euo pipefail
           mapfile -t assets < <(find release-assets -maxdepth 1 -type f -print | sort)
           test "${#assets[@]}" -eq 10
-          if gh release view "$RELEASE_TAG" --repo "$GH_REPO" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" "${assets[@]}" --repo "$GH_REPO" --clobber
-          else
-            gh release create "$RELEASE_TAG" "${assets[@]}" --repo "$GH_REPO" --generate-notes --verify-tag
-          fi
+          gh release view "$RELEASE_TAG" --repo "$GH_REPO" >/dev/null
+          gh release upload "$RELEASE_TAG" "${assets[@]}" --repo "$GH_REPO" --clobber

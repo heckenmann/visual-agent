@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - Java 21+ (the project auto-resolves the JDK 24 toolchain locally; CI uses JDK 21 so the Foojay toolchain resolver can fetch 24).
-- The Gradle wrapper version is defined centrally in `gradle/wrapper/gradle-wrapper.properties`; the release workflow validates release tags against the project version. The Wrapper JAR is intentionally excluded from version control. In a fresh clone, run `gradle wrapper --gradle-version <version from gradle-wrapper.properties>` once before using `./gradlew`.
+- The Gradle wrapper version is defined centrally in `gradle/wrapper/gradle-wrapper.properties`; the package-and-smoke workflow validates release tags against the project version only for release-triggered runs. The Wrapper JAR is intentionally excluded from version control. In a fresh clone, run `gradle wrapper --gradle-version <version from gradle-wrapper.properties>` once before using `./gradlew`.
 - Ollama running locally (`ollama serve`) or a reachable remote Ollama endpoint.
 - H2 is embedded and accessed through Spring Data R2DBC. Versioned schema migrations run automatically before the stores are created.
 
@@ -45,7 +45,8 @@ Build the executable JAR staged for a GitHub release with:
 ```
 
 The package-and-smoke workflow builds a JAR on every supported platform; the separate release
-workflow publishes the matching asset alongside the native packages only after all smoke checks pass:
+workflow attaches the matching asset alongside the native packages to an existing GitHub release
+only after all smoke checks pass:
 
 - `visual-agent-linux-x64-jar.jar`
 - `visual-agent-macos-arm64-jar.jar`
@@ -57,8 +58,12 @@ their target systems. DEB and AppImage are tested in Ubuntu containers; RPM is t
 container; DMGs and MSI are tested on matching macOS and Windows runners. Platform JARs are launched
 with Java 24. Smoke runs use isolated temporary data and require an explicit desktop-ready signal,
 database/workspace creation, and orderly shutdown. Native packages are tested without a system JDK.
-These platform checks run in parallel after packaging. Maintainers can manually dispatch the package-and-smoke
-workflow with `smoke_only` enabled to validate a selected tag without publishing a GitHub release.
+These platform checks run in parallel after packaging. Maintainers can manually dispatch the
+package-and-smoke workflow for `master` or another branch using GitHub's branch selector, without
+creating a tag or release. Manual runs never publish assets. All jobs test the same selected commit.
+Publishing a release through GitHub triggers the package-and-smoke workflow for that release's tag;
+the separate asset workflow uploads the verified packages to the existing release. The release
+itself is already visible while packages are being tested; a failed test leaves it without these assets.
 
 Each JAR requires Java 24 and must be used only on the platform for which it was built. It does
 not provide native launcher or package-manager integration.
