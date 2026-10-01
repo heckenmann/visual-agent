@@ -102,4 +102,23 @@ class ComposeStartupHostLifecycleTest {
 
         assertEquals(1, closeCount)
     }
+
+    @Test
+    fun `smoke startup opens the workspace but keeps manual onboarding available`() {
+        val dependencies = ComposeApplicationDependencies(mockk(relaxed = true))
+        val onboarding = OnboardingState(OnboardingStatus.NOT_STARTED, 1)
+
+        assertEquals(
+            StartupWindowMode.MAIN,
+            startupWindowMode(StartupStatus.ready(), dependencies, onboarding, skipAutomaticOnboarding = true),
+        )
+        assertEquals(
+            StartupWindowMode.ONBOARDING,
+            startupWindowMode(StartupStatus.ready(), dependencies, onboarding, true, skipAutomaticOnboarding = true),
+        )
+        assertEquals(
+            StartupWindowMode.SPLASH,
+            startupWindowMode(StartupStatus.startingServer(), dependencies, onboarding, skipAutomaticOnboarding = true),
+        )
+    }
 }

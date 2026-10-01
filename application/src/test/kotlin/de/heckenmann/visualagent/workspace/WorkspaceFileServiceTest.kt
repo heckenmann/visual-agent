@@ -24,9 +24,9 @@ import kotlin.test.assertTrue
 class WorkspaceFileServiceTest {
     @Test
     fun `workspace rejects relative database paths instead of using the working directory`() {
-        val service = WorkspaceFileService(FakeWorkspaceFileStore(), "relative/visual-agent.db")
-
-        assertFailsWith<IllegalArgumentException> { service.workspaceRoot() }
+        assertFailsWith<IllegalArgumentException> {
+            WorkspaceFileService(FakeWorkspaceFileStore(), "relative/visual-agent.db")
+        }
     }
 
     @Test

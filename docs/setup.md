@@ -44,13 +44,21 @@ Build the executable JAR staged for a GitHub release with:
 ./gradlew :desktop:stageReleaseJar
 ```
 
-The release workflow builds a JAR on every supported platform and publishes the matching asset
-alongside the native packages:
+The package-and-smoke workflow builds a JAR on every supported platform; the separate release
+workflow publishes the matching asset alongside the native packages only after all smoke checks pass:
 
 - `visual-agent-linux-x64-jar.jar`
 - `visual-agent-macos-arm64-jar.jar`
 - `visual-agent-macos-x64-jar.jar`
 - `visual-agent-windows-x64-jar.jar`
+
+Before publishing, the package-and-smoke workflow installs and launches the uploaded package artifacts on
+their target systems. DEB and AppImage are tested in Ubuntu containers; RPM is tested in a Fedora
+container; DMGs and MSI are tested on matching macOS and Windows runners. Platform JARs are launched
+with Java 24. Smoke runs use isolated temporary data and require an explicit desktop-ready signal,
+database/workspace creation, and orderly shutdown. Native packages are tested without a system JDK.
+These platform checks run in parallel after packaging. Maintainers can manually dispatch the package-and-smoke
+workflow with `smoke_only` enabled to validate a selected tag without publishing a GitHub release.
 
 Each JAR requires Java 24 and must be used only on the platform for which it was built. It does
 not provide native launcher or package-manager integration.

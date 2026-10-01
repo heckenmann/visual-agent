@@ -25,8 +25,11 @@ Desktop user.
 4. The desktop host resolves the selected endpoint without resolving or transmitting a server database path.
 5. With no remote endpoint, it starts the local Spring Boot server in the same JVM; with a remote endpoint, it performs a TLS gRPC handshake and never falls back to local startup.
 6. The server resolves its own data root, then initializes configuration, persistence, activity, and protocol port adapters.
-7. The desktop host resolves the protocol application port and loads the initial workspace snapshot through the server boundary.
-8. UI panels are wired, the splash window is disposed, and a separate main application window is created.
+7. The server creates the default managed workspace directory below its own data root.
+8. The desktop host resolves the protocol application port and loads the initial workspace snapshot through the server boundary.
+9. UI panels are wired, the splash window is disposed, and a separate main application window is created.
+
+For release smoke tests only, the opt-in system property `visualagent.startup.auto-start-local=true` requests the same local-start action as the splash button. Automatic onboarding is hidden without changing its persisted status. After the server connection, initial layout, and onboarding state are loaded and the main window has been composed with restored geometry, the desktop host emits `VISUAL_AGENT_DESKTOP_READY`. Normal launches do not auto-start or emit this smoke marker.
 
 ## Result
 
@@ -56,6 +59,8 @@ The user sees the Visual Agent main window and can interact with chat, session s
 - A startup failure keeps only the actionable splash window open; retry does not create a main window prematurely.
 - Closing either window requests shutdown at most once and releases the server session without orphaned resources.
 - Startup does not lose persisted runtime state.
+- Local startup creates the managed workspace root alongside the default server data before the main workspace is shown.
+- Automated release smoke can opt into local startup and observe readiness without changing normal interactive startup behavior.
 - Client bootstrap configuration remains client-owned and server runtime data remains server-owned, including when both run in one JVM.
 - The UI never opens H2 or receives a server filesystem path; server-owned settings are accessed through protocol ports after readiness.
 - The portable Linux AppImage starts without installation and provides the same Visual Agent desktop window as the DEB and RPM packages.

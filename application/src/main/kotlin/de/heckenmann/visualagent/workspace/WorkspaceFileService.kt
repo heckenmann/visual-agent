@@ -58,6 +58,11 @@ class WorkspaceFileService
                 mimeDetector = mimeDetector,
                 recordActivity = ::recordActivity,
             )
+
+        init {
+            workspaceRoot()
+        }
+
         private val writeOperations =
             WorkspaceFileWriteOperations(
                 ::workspaceRoot,

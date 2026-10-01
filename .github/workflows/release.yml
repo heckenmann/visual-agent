@@ -1,198 +1,79 @@
-name: Create native desktop release
+name: Publish verified desktop release
 
 on:
-  push:
-    tags:
-      - "v*"
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: Release tag to create or update
-        required: true
-        type: string
+  workflow_run:
+    workflows:
+      - Build and smoke release packages
+    types:
+      - completed
 
 permissions:
+  actions: read
   contents: write
 
-env:
-  GRADLE_OPTS: -Dorg.gradle.daemon=false
-
 jobs:
-  verify:
-    name: Verify release source
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-        with:
-          lfs: true
-          ref: ${{ inputs.tag || github.ref }}
-
-      - name: Set up Java
-        uses: actions/setup-java@v6
-        with:
-          distribution: temurin
-          java-version: "24"
-
-      - name: Read Gradle wrapper version
-        id: gradle_wrapper
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="$(sed -n 's#.*gradle-\([0-9][0-9.]*\)-[^/]*\.zip.*#\1#p' gradle/wrapper/gradle-wrapper.properties)"
-          test -n "$version"
-          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6.4.0
-        with:
-          gradle-version: ${{ steps.gradle_wrapper.outputs.version }}
-
-      - name: Generate Gradle wrapper
-        run: gradle wrapper --gradle-version "${{ steps.gradle_wrapper.outputs.version }}"
-
-      - name: Validate generated Gradle wrapper
-        uses: gradle/actions/wrapper-validation@v6.4.0
-
-      - name: Verify release tag matches Gradle version
-        env:
-          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
-        run: |
-          set -euo pipefail
-          gradle_version="$(./gradlew --quiet printProjectVersion --no-daemon --no-configuration-cache)"
-          expected_tag="v${gradle_version}"
-          test "$RELEASE_TAG" = "$expected_tag" || {
-            echo "Release tag must be $expected_tag, but was $RELEASE_TAG."
-            exit 1
-          }
-
-      - name: Run quality gates
-        run: xvfb-run -a ./gradlew ktlintCheck check test verifyPackages --no-daemon --parallel --max-workers=4 -PtestMaxParallelForks=4
-
-  package:
-    name: Package ${{ matrix.platform }}
-    needs: verify
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: linux-deb
-            runner: ubuntu-latest
-            task: packageLinuxDeb
-            extension: deb
-            install_rpm: false
-          - platform: linux-rpm
-            runner: ubuntu-latest
-            task: packageLinuxRpm
-            extension: rpm
-            install_rpm: true
-          - platform: linux-appimage
-            runner: ubuntu-latest
-            task: packageAppImage
-            extension: AppImage
-            install_rpm: false
-          - platform: linux-x64-jar
-            runner: ubuntu-latest
-            task: stageReleaseJar
-            extension: jar
-            install_rpm: false
-          - platform: macos-arm64-jar
-            runner: macos-latest
-            task: stageReleaseJar
-            extension: jar
-            install_rpm: false
-          - platform: macos-x64-jar
-            runner: macos-15-intel
-            task: stageReleaseJar
-            extension: jar
-            install_rpm: false
-          - platform: windows-x64-jar
-            runner: windows-latest
-            task: stageReleaseJar
-            extension: jar
-            install_rpm: false
-          - platform: macos-arm64
-            runner: macos-latest
-            task: packageDmg
-            extension: dmg
-            install_rpm: false
-          - platform: macos-x64
-            runner: macos-15-intel
-            task: packageDmg
-            extension: dmg
-            install_rpm: false
-          - platform: windows
-            runner: windows-latest
-            task: packageMsi
-            extension: msi
-            install_rpm: false
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-        with:
-          lfs: true
-          ref: ${{ inputs.tag || github.ref }}
-
-      - name: Set up Java
-        uses: actions/setup-java@v6
-        with:
-          distribution: temurin
-          java-version: "24"
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6.4.0
-
-      - name: Install RPM packaging tools
-        if: matrix.install_rpm
-        run: sudo apt-get update && sudo apt-get install --yes rpm
-
-      - name: Build native package
-        run: gradle :desktop:${{ matrix.task }} --no-daemon --no-configuration-cache
-        shell: bash
-
-      - name: Stage release asset
-        shell: bash
-        run: |
-          set -euo pipefail
-          package_file="$(find modules/desktop/build/compose/binaries -type f -name '*.${{ matrix.extension }}' -print -quit)"
-          test -n "$package_file"
-          mkdir release-assets
-          cp "$package_file" "release-assets/visual-agent-${{ matrix.platform }}.${{ matrix.extension }}"
-
-      - name: Upload native package
-        uses: actions/upload-artifact@v7
-        with:
-          name: visual-agent-${{ matrix.platform }}
-          if-no-files-found: error
-          path: release-assets/
-
-  release:
-    name: Publish GitHub release
-    needs: package
+  publish:
+    name: Publish verified artifacts
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
-      - name: Download native packages
-        uses: actions/download-artifact@v8
-        with:
-          path: release-assets
-          merge-multiple: true
-
-      - name: Create or update release
+      - name: Read package workflow metadata
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
           set -euo pipefail
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" release-assets/* --clobber
+          gh run download "$RUN_ID" --repo "$GH_REPO" --name release-metadata --dir release-metadata
+          tag="$(sed -n 's/^tag=//p' release-metadata/manifest)"
+          publish="$(sed -n 's/^publish=//p' release-metadata/manifest)"
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-+][a-zA-Z0-9.-]+)?$ ]]
+          [[ "$publish" == "true" || "$publish" == "false" ]]
+          if [[ "$publish" != "true" ]]; then
+            echo "Smoke-only workflow completed; skipping publication for $tag."
+            exit 0
+          fi
+          echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
+          echo "PUBLISH_RELEASE=true" >> "$GITHUB_ENV"
+
+      - name: Download verified release artifacts
+        if: env.PUBLISH_RELEASE == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          mkdir release-assets
+          for artifact in \
+            visual-agent-linux-deb \
+            visual-agent-linux-rpm \
+            visual-agent-linux-appimage \
+            visual-agent-linux-x64-jar \
+            visual-agent-macos-arm64-jar \
+            visual-agent-macos-x64-jar \
+            visual-agent-windows-x64-jar \
+            visual-agent-macos-arm64 \
+            visual-agent-macos-x64 \
+            visual-agent-windows; do
+            gh run download "$RUN_ID" --repo "$GH_REPO" --name "$artifact" --dir release-assets
+          done
+
+      - name: Create or update GitHub release
+        if: env.PUBLISH_RELEASE == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mapfile -t assets < <(find release-assets -maxdepth 1 -type f -print | sort)
+          test "${#assets[@]}" -eq 10
+          if gh release view "$RELEASE_TAG" --repo "$GH_REPO" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "${assets[@]}" --repo "$GH_REPO" --clobber
           else
-            gh release create "$RELEASE_TAG" release-assets/* --generate-notes
+            gh release create "$RELEASE_TAG" "${assets[@]}" --repo "$GH_REPO" --generate-notes --verify-tag
           fi

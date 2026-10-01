@@ -1,0 +1,361 @@
+name: Build and smoke release packages
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to create or update
+        required: true
+        type: string
+      smoke_only:
+        description: Build and smoke packages only; disable this option to publish after all tests pass
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  GRADLE_OPTS: -Dorg.gradle.daemon=false
+
+jobs:
+  verify:
+    name: Verify release source
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      gradle_version: ${{ steps.gradle_wrapper.outputs.version }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          lfs: true
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "24"
+
+      - name: Read Gradle wrapper version
+        id: gradle_wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's#.*gradle-\([0-9][0-9.]*\)-[^/]*\.zip.*#\1#p' gradle/wrapper/gradle-wrapper.properties)"
+          test -n "$version"
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6.4.0
+        with:
+          gradle-version: ${{ steps.gradle_wrapper.outputs.version }}
+
+      - name: Generate Gradle wrapper
+        run: gradle wrapper --gradle-version "${{ steps.gradle_wrapper.outputs.version }}" --no-daemon
+
+      - name: Validate generated Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v6.4.0
+
+      - name: Verify release tag matches Gradle version
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          gradle_version="$(./gradlew --quiet printProjectVersion --no-daemon --no-configuration-cache)"
+          expected_tag="v${gradle_version}"
+          test "$RELEASE_TAG" = "$expected_tag" || {
+            echo "Release tag must be $expected_tag, but was $RELEASE_TAG."
+            exit 1
+          }
+
+      - name: Run quality gates
+        run: xvfb-run -a ./gradlew ktlintCheck check test verifyPackages --no-daemon --parallel --max-workers=4 -PtestMaxParallelForks=4
+
+      - name: Verify package smoke runner contracts
+        run: python3 -m unittest discover -s scripts -p test_release_smoke.py
+
+      - name: Prepare release workflow metadata
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          PUBLISH_RELEASE: ${{ github.event_name != 'workflow_dispatch' || inputs.smoke_only != true }}
+        run: |
+          set -euo pipefail
+          mkdir release-metadata
+          printf 'tag=%s\npublish=%s\n' "$RELEASE_TAG" "$PUBLISH_RELEASE" > release-metadata/manifest
+
+      - name: Upload release workflow metadata
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-metadata
+          if-no-files-found: error
+          path: release-metadata/manifest
+
+  package:
+    name: Package ${{ matrix.platform }}
+    needs: verify
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-deb
+            runner: ubuntu-latest
+            task: packageLinuxDeb
+            extension: deb
+            install_rpm: false
+          - platform: linux-rpm
+            runner: ubuntu-latest
+            task: packageLinuxRpm
+            extension: rpm
+            install_rpm: true
+          - platform: linux-appimage
+            runner: ubuntu-latest
+            task: packageAppImage
+            extension: AppImage
+            install_rpm: false
+          - platform: linux-x64-jar
+            runner: ubuntu-latest
+            task: stageReleaseJar
+            extension: jar
+            install_rpm: false
+          - platform: macos-arm64-jar
+            runner: macos-latest
+            task: stageReleaseJar
+            extension: jar
+            install_rpm: false
+          - platform: macos-x64-jar
+            runner: macos-15-intel
+            task: stageReleaseJar
+            extension: jar
+            install_rpm: false
+          - platform: windows-x64-jar
+            runner: windows-latest
+            task: stageReleaseJar
+            extension: jar
+            install_rpm: false
+          - platform: macos-arm64
+            runner: macos-latest
+            task: packageDmg
+            extension: dmg
+            install_rpm: false
+          - platform: macos-x64
+            runner: macos-15-intel
+            task: packageDmg
+            extension: dmg
+            install_rpm: false
+          - platform: windows
+            runner: windows-latest
+            task: packageMsi
+            extension: msi
+            install_rpm: false
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          lfs: true
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "24"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6.4.0
+        with:
+          gradle-version: ${{ needs.verify.outputs.gradle_version }}
+
+      - name: Bootstrap repository Gradle wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's#.*gradle-\([0-9][0-9.]*\)-[^/]*\.zip.*#\1#p' gradle/wrapper/gradle-wrapper.properties)"
+          test -n "$version"
+          gradle wrapper --gradle-version "$version" --no-daemon
+
+      - name: Install RPM packaging tools
+        if: matrix.install_rpm
+        run: sudo apt-get update && sudo apt-get install --yes rpm
+
+      - name: Build native package
+        run: ./gradlew :desktop:${{ matrix.task }} --no-daemon --no-configuration-cache
+        shell: bash
+
+      - name: Stage release asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          package_file="$(find modules/desktop/build/compose/binaries -type f -name '*.${{ matrix.extension }}' -print -quit)"
+          test -n "$package_file"
+          mkdir release-assets
+          cp "$package_file" "release-assets/visual-agent-${{ matrix.platform }}.${{ matrix.extension }}"
+
+      - name: Upload native package
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-agent-${{ matrix.platform }}
+          if-no-files-found: error
+          path: release-assets/
+
+  smoke-linux-native:
+    name: Smoke ${{ matrix.platform }} in ${{ matrix.image }}
+    needs: package
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ matrix.image }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-deb
+            image: ubuntu:24.04
+            kind: deb
+          - platform: linux-appimage
+            image: ubuntu:24.04
+            kind: appimage
+          - platform: linux-rpm
+            image: fedora:latest
+            kind: rpm
+
+    steps:
+      - name: Check out smoke-test scripts
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Download native package
+        uses: actions/download-artifact@v8
+        with:
+          name: visual-agent-${{ matrix.platform }}
+          path: artifact
+
+      - name: Install Ubuntu desktop runtime dependencies
+        if: matrix.image == 'ubuntu:24.04'
+        run: |
+          apt-get update
+          apt-get install --yes python3 xvfb xauth dbus-x11 libgtk-3-0t64 libasound2t64 libx11-xcb1 libxrender1 libxtst6 libxi6 libxrandr2 libfuse2t64
+
+      - name: Install Fedora desktop runtime dependencies
+        if: matrix.image == 'fedora:latest'
+        run: dnf install --assumeyes python3 gtk3 alsa-lib libX11-xcb libXrender libXtst libXi libXrandr mesa-libgbm xorg-x11-server-Xvfb xorg-x11-xauth dbus-x11
+
+      - name: Install, launch, and verify native package
+        run: python3 scripts/smoke-release-posix.py linux "${{ matrix.kind }}" "artifact/visual-agent-${{ matrix.platform }}.${{ matrix.kind == 'appimage' && 'AppImage' || matrix.kind }}"
+
+  smoke-linux-jar:
+    name: Smoke Linux executable JAR
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out smoke-test scripts
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "24"
+
+      - name: Download Linux JAR
+        uses: actions/download-artifact@v8
+        with:
+          name: visual-agent-linux-x64-jar
+          path: artifact
+
+      - name: Install virtual display
+        run: sudo apt-get update && sudo apt-get install --yes xvfb xauth
+
+      - name: Launch and verify Linux JAR
+        run: python3 scripts/smoke-release-posix.py linux jar artifact/visual-agent-linux-x64-jar.jar
+
+  smoke-macos:
+    name: Smoke ${{ matrix.platform }} ${{ matrix.kind }}
+    needs: package
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-arm64
+            runner: macos-latest
+            kind: dmg
+          - platform: macos-arm64-jar
+            runner: macos-latest
+            kind: jar
+          - platform: macos-x64
+            runner: macos-15-intel
+            kind: dmg
+          - platform: macos-x64-jar
+            runner: macos-15-intel
+            kind: jar
+
+    steps:
+      - name: Check out smoke-test scripts
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Set up Java for executable JAR
+        if: matrix.kind == 'jar'
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "24"
+
+      - name: Download release artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: visual-agent-${{ matrix.platform }}
+          path: artifact
+
+      - name: Launch and verify macOS artifact
+        run: python3 scripts/smoke-release-posix.py macos "${{ matrix.kind }}" "artifact/visual-agent-${{ matrix.platform }}.${{ matrix.kind }}"
+
+  smoke-windows:
+    name: Smoke Windows ${{ matrix.kind }}
+    needs: package
+    runs-on: windows-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        kind: [msi, jar]
+
+    steps:
+      - name: Check out smoke-test scripts
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Set up Java for executable JAR
+        if: matrix.kind == 'jar'
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "24"
+
+      - name: Download release artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: visual-agent-windows${{ matrix.kind == 'jar' && '-x64-jar' || '' }}
+          path: artifact
+
+      - name: Install, launch, and verify Windows artifact
+        shell: pwsh
+        run: ./scripts/smoke-release-windows.ps1 -Kind "${{ matrix.kind }}" -Artifact "artifact/visual-agent-windows${{ matrix.kind == 'jar' && '-x64-jar.jar' || '.msi' }}"
