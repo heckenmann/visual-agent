@@ -3,6 +3,7 @@
 import importlib.util
 import os
 import pathlib
+import re
 import subprocess
 import tempfile
 import unittest
@@ -78,6 +79,57 @@ class ReleaseSmokeTest(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "without publishing a display"):
                     SMOKE.start_virtual_display({}, pathlib.Path(temporary))
                 stop.assert_called_once_with(process)
+
+
+class ReleaseWorkflowTest(unittest.TestCase):
+    def metadata_script(self):
+        workflow = (pathlib.Path(__file__).parents[1] / ".github/workflows/release.yml").read_text()
+        block = re.search(r"      - name: Read package workflow metadata\n.*?        run: \|\n(.*?)(?=\n      - name:)", workflow, re.S)
+        self.assertIsNotNone(block)
+        return "\n".join(line[10:] for line in block.group(1).splitlines())
+
+    def run_metadata(self, tag, publish):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            (root / "release-metadata").mkdir()
+            (root / "release-metadata/manifest").write_text(f"tag={tag}\npublish={publish}\n")
+            output = root / "github-env"
+            output.touch()
+            result = subprocess.run(
+                ["bash", "-c", "gh() { return 0; }\n" + self.metadata_script()],
+                cwd=root,
+                env={**os.environ, "GH_REPO": "owner/repo", "RUN_ID": "1", "GITHUB_ENV": str(output)},
+                capture_output=True,
+                text=True,
+            )
+            return result, output.read_text()
+
+    def test_manual_smoke_without_a_tag_never_enables_upload(self):
+        result, environment = self.run_metadata("", "false")
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual("", environment)
+
+    def test_release_tag_enables_upload_only_when_valid(self):
+        result, environment = self.run_metadata("v1.0.0", "true")
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("PUBLISH_RELEASE=true", environment)
+        for tag, publish in (("master", "true"), ("", "true"), ("v1.0.0", "unexpected")):
+            with self.subTest(tag=tag, publish=publish):
+                result, environment = self.run_metadata(tag, publish)
+                self.assertNotEqual(0, result.returncode)
+                self.assertEqual("", environment)
+
+    def test_workflow_dispatch_is_tag_free_and_release_creation_is_disabled(self):
+        root = pathlib.Path(__file__).parents[1] / ".github/workflows"
+        smoke = (root / "package-smoke.yml").read_text()
+        self.assertIn("types: [published]", smoke)
+        self.assertNotIn("inputs.", smoke)
+        self.assertIn("if: github.event_name == 'release'", smoke)
+        self.assertIn("PUBLISH_RELEASE: ${{ github.event_name == 'release' }}", smoke)
+        self.assertEqual(6, smoke.count("ref: ${{ github.sha }}"))
+        release = (root / "release.yml").read_text()
+        self.assertNotIn("gh release create", release)
+        self.assertIn("github.event.workflow_run.event == 'release'", release)
 
 
 if __name__ == "__main__":
