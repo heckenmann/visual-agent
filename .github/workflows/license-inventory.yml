@@ -10,6 +10,7 @@ on:
       - "scripts/generate-package-inventory.sh"
       - ".github/workflows/license-inventory.yml"
       - "docs/dependency-license-audit.md"
+      - "docs/dependency-licenses-*.csv"
       - "docs/*plugin-dependencies-*.csv"
   workflow_dispatch:
 
