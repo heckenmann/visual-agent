@@ -36,6 +36,7 @@ import de.heckenmann.visualagent.ui.onboarding.ComposeOnboardingWizard
 import de.heckenmann.visualagent.ui.workspace.visualAgentDarkColorScheme
 import de.heckenmann.visualagent.ui.workspace.visualAgentTypography
 import org.jetbrains.compose.resources.painterResource
+import org.slf4j.LoggerFactory
 
 /** Identifies which native window the desktop host must currently render. */
 internal enum class StartupWindowMode {
@@ -61,10 +62,12 @@ internal fun startupWindowMode(
     dependencies: ComposeApplicationDependencies?,
     onboarding: OnboardingState? = null,
     manualOnboardingRequested: Boolean = false,
+    skipAutomaticOnboarding: Boolean = false,
 ): StartupWindowMode =
     when {
         status.phase != StartupPhase.READY || dependencies == null -> StartupWindowMode.SPLASH
-        manualOnboardingRequested || onboarding?.status == OnboardingStatus.NOT_STARTED -> StartupWindowMode.ONBOARDING
+        manualOnboardingRequested || (!skipAutomaticOnboarding && onboarding?.status == OnboardingStatus.NOT_STARTED) ->
+            StartupWindowMode.ONBOARDING
         else -> StartupWindowMode.MAIN
     }
 
@@ -167,6 +170,15 @@ internal fun ComposeMainWindow(
         LaunchedEffect(persistedLayout) {
             restoreMainWindowGeometry(windowState, persistedLayout, currentScreenBounds())
             geometryRestored = true
+        }
+        LaunchedEffect(geometryRestored) {
+            if (geometryRestored &&
+                DesktopStartupSmokeSupport.autoStartRequested(System.getProperty(DesktopStartupSmokeSupport.AUTO_START_PROPERTY))
+            ) {
+                LoggerFactory
+                    .getLogger("de.heckenmann.visualagent.desktop.ComposeStartupHost")
+                    .info(DesktopStartupSmokeSupport.READY_LOG_MARKER)
+            }
         }
         VisualAgentComposeApp(
             deps = dependencies,

@@ -45,7 +45,14 @@ fun runVisualAgentComposeApplication() {
 private fun ComposeStartupHost(exitApplication: () -> Unit) {
     var startupAttempt by remember { mutableStateOf(0) }
     var startupStatus by remember { mutableStateOf(StartupStatus.waitingForServerSelection()) }
-    var startRequested by remember { mutableStateOf(false) }
+    var startRequested by
+        remember {
+            mutableStateOf(
+                DesktopStartupSmokeSupport.autoStartRequested(
+                    System.getProperty(DesktopStartupSmokeSupport.AUTO_START_PROPERTY),
+                ),
+            )
+        }
     var springContext by remember { mutableStateOf<ConfigurableApplicationContext?>(null) }
     var serverConnection by remember { mutableStateOf<ApplicationConnection?>(null) }
     var dependencies by remember { mutableStateOf<ComposeApplicationDependencies?>(null) }
@@ -192,7 +199,16 @@ private fun ComposeStartupHost(exitApplication: () -> Unit) {
     }
 
     val readyDependencies = dependencies
-    when (startupWindowMode(startupStatus, readyDependencies, onboardingState, manualOnboardingRequested)) {
+    when (
+        startupWindowMode(
+            startupStatus,
+            readyDependencies,
+            onboardingState,
+            manualOnboardingRequested,
+            skipAutomaticOnboarding =
+                DesktopStartupSmokeSupport.autoStartRequested(System.getProperty(DesktopStartupSmokeSupport.AUTO_START_PROPERTY)),
+        )
+    ) {
         StartupWindowMode.SPLASH ->
             ComposeStartupSplashWindow(
                 status = startupStatus,
