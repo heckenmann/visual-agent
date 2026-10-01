@@ -49,6 +49,7 @@ Supported native release platforms are macOS (Apple Silicon and Intel), Windows 
 - Managed workspace files the model can import, read, search, and render (including PDF page previews).
 - Todo list and sub-agents that can work on tasks autonomously.
 - Per-agent tool configuration, provider profiles, and persisted settings.
+- Self-model switching through `model_selection`, with explicit grants required for sub-agents.
 - Searchable reusable Markdown skills that the main agent can save and retrieve explicitly,
   with a user-facing Skills panel and database-backed search.
 - Command palette (`Cmd/Ctrl+K`) and customizable workspace panel layout.

@@ -240,6 +240,13 @@ Main-agent tool set (`agentToolConfigService.mainAgentTools()`):
 `agent:log`, `todos`, `workspace:file`,
 `workspace:download`, `memory`, `skills`, and `javascript:execute`.
 
+Self-model selection uses `model:selection` (provider function `model_selection`). Main-agent calls
+update the active Conversation selection and publish the catalog's existing change notification.
+Sub-agents require an explicit grant and can change only their own persisted provider/model override.
+Caller identity comes from trusted request metadata, never tool arguments. In-flight provider requests
+are immutable; switching applies to the next agent request. Validation uses selectable catalog models,
+not adapter-specific heuristics. See [UC-0000147](usecases/uc_0000147_switch_agent_model.md).
+
 Sub-agent role-based sets (`AgentToolConfigService.toolsFor(agent)`,
 default templates `researcher`, `coder`, `analyst`): `todos` plus the
 non-agent tool IDs applicable to the configured role.

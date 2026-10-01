@@ -14,9 +14,8 @@ import org.springframework.stereotype.Service
 @Service
 class AgentToolConfigService(
     private val configStore: SubAgentConfigStore,
+    private val preferenceStore: PreferenceStore? = configStore as? PreferenceStore,
 ) {
-    private val preferenceStore = configStore as? PreferenceStore
-
     init {
         ensureDefaultConfigs()
     }
@@ -44,6 +43,7 @@ class AgentToolConfigService(
             "workspace:download",
             "update:check",
             "context",
+            "model:selection",
             "system:client-runtime",
             "system:processes",
             "system:client-processes",
