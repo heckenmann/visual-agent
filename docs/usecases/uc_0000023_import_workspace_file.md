@@ -45,3 +45,4 @@ The file becomes durable application workspace data with a stable ID and hash.
 - No local path field is required; imports target the currently open browser directory.
 - Duplicate names are handled with generated destination names.
 - SHA-256 is persisted.
+- The managed workspace root is created during server startup, before the first import.
