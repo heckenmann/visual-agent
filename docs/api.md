@@ -277,6 +277,16 @@ role-based sets above and the global blocklist:
   Search is bounded by database-neutral `LIKE` matching; model reads update persisted
   read statistics, while user-panel reads do not.
 
+### Self-Model Selection Tool
+
+`model_selection` (Internal Tool ID `model:selection`) supports `get`, `listProviders`, `listModels`, `refreshModels`,
+and `set`. `refreshModels` queries the API and persists model metadata without changing selection.
+Discovery is paginated (`offset`, `limit`, maximum 50). `set` takes `modelId` and optional
+`providerId`, never a target agent ID. The server rechecks the caller's grant and global policy.
+Main-agent changes update the Conversation selection; permitted sub-agents change only their own
+persisted override. Changes apply to subsequent agent requests. Examples and full behavior:
+[UC-0000147](usecases/uc_0000147_switch_agent_model.md).
+
 ### Canvas Tool
 
 The `canvas` tool is available to sub-agents, not to the main orchestration agent. It lets model calls inspect and mutate the editable JVM canvas model canvas through Compose Multiplatform-safe service calls.

@@ -183,6 +183,11 @@ See `README.md` for the full tree and the feature status table.
 
 ## Patterns & Conventions
 
+- **Self-model selection**: `model:selection` (`model_selection`) is available to the main agent
+  and explicitly granted sub-agents. It updates the active Conversation selection or only the calling
+  sub-agent's persisted override. Caller identity must come from trusted server context. Changes apply
+  to subsequent agent requests, never rewrite in-flight requests, and preserve unrelated settings.
+
 - **Threading**: network requests, database writes, file I/O, and any operation that may take longer than ~1ms must run on a background dispatcher (`Dispatchers.IO` or `Dispatchers.Default`). UI state updates (Compose `mutableStateOf` writes) must happen on `Dispatchers.Main`. Never block the main thread with a suspend call that waits on I/O — use `withContext(Dispatchers.IO/Default)` to shift the blocking work, then `withContext(Dispatchers.Main)` to publish results. The `onChunk` callback in streaming paths is called from a background dispatcher and must use `withContext(Dispatchers.Main)` for any Compose state writes.
 - **Constructor DI**: required dependencies are direct `private val`/`private var` constructor properties; never reassign them in the class body.
 - **Spring-managed beans**: every class that holds state or provides a service must be a Spring `@Component`, `@Service`, or `@Configuration` bean with constructor injection. No `object` singletons, no `lateinit var` for collaborators, no `AppConfig.instance` outside the bootstrap path. Exceptions: pure-Kotlin stateless utilities (`object` with only `const val` or pure functions), per-composition UI holders (`remember { }`), and data class factories.
