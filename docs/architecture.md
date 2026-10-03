@@ -56,6 +56,33 @@ The UI receives only protocol ports; it never receives Spring beans.
    integration test; direct unit tests do not exercise transaction interception.
    See Spring's [transaction interceptor documentation](https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-decl-explained.html).
 
+## UI Thread and I/O Boundary
+
+Database reads and writes, network operations, filesystem access, and long-running
+work must never execute on the presentation/UI thread. This includes indirect
+access through protocol ports, provider catalog getters, preferences, and layout
+services, as well as DNS/TLS requests, downloads, provider calls, parsing,
+rendering, and other expensive computation. This invariant applies even to I/O
+that normally finishes quickly and when the local server shares the desktop JVM.
+
+Compose composition, `remember` calculations, measurement, placement, drawing,
+and resize/drag callbacks only consume presentation state. Load authoritative
+data asynchronously in lifecycle-keyed effects or event handlers. Synchronous
+port calls and blocking network/filesystem work must run on `Dispatchers.IO`;
+CPU-intensive work must run on `Dispatchers.Default`. Publish results on
+`Dispatchers.Main` and keep UI-thread updates short. Merely declaring a function `suspend`, or putting a blocking
+getter inside `LaunchedEffect`, does not move the work off the UI thread.
+`block()`, `runBlocking`, and blocking waits for I/O are forbidden there.
+
+Presentation snapshots are refreshed on source-change events or explicit reload,
+not on every frame, resize, or recomposition. These snapshots are display state,
+not a replacement for the database as the authoritative source. Server-side
+operations remain Reactor-native; presentation and protocol remain Reactor-free.
+
+Regression tests must use synchronization events rather than elapsed-time success
+criteria to prove that blocked I/O or long-running work does not block UI progress and that
+resize/recomposition does not repeat database reads.
+
 ## Current Implemented Flow
 
 1. The desktop shell opens immediately and renders a safe, centered, frameless splash window. The main window is not created until startup is ready.
