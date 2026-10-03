@@ -46,3 +46,26 @@ Server-location bootstrap data remains separate from LLM provider configuration,
 - Rendering the splash or loading bookmarks never starts a local server.
 - Selecting Local starts the bundled server only after the selection action.
 - Client and server storage roots are resolved independently; a remote client never receives or computes the server database path.
+- The splash uses a decorative bundled light/dark background with centered
+  aspect-preserving crop and a theme-derived contrast overlay. Status, errors,
+  and server-selection controls remain readable and accessible.
+- Before connecting, appearance follows the operating system because theme
+  configuration belongs to the server database. No duplicate client theme
+  preference or direct database access is introduced. Once settings are loaded,
+  startup screens use the server-selected Light, Dark, or System mode.
+- Missing or invalid images fall back to the theme background without stopping
+  startup. Resource reads and image decoding run off the UI thread.
+
+## Background Assets and Dependency Decision
+
+Splash and onboarding share the same 880 x 600 dp initial window dimensions and
+the same paired 1519 x 1035 PNG resources. The generated light asset was normalized
+by cropping one extra pixel of height to match the dark asset. Both resources use
+Git LFS through the repository's existing PNG rule.
+
+Use the existing Compose resources and `Image` APIs, not an additional image
+loader. Library research on klibs.io and the official
+[Compose resource documentation](https://kotlinlang.org/docs/multiplatform/compose-multiplatform-resources-usage.html)
+confirmed that packaged byte loading and decoding are already supported.
+The resource paths and safe loader live in `ComposeStartupBackground.kt`;
+foreground sizing is independent of the background's intrinsic dimensions.

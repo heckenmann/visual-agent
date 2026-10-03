@@ -1,10 +1,8 @@
 package de.heckenmann.visualagent.desktop
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,11 +10,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -32,9 +28,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -58,26 +51,10 @@ internal fun ComposeStartupSplashPresentation(
     onRetry: () -> Unit,
     onCreateServer: () -> Unit,
     onEditServer: (DesktopServerBookmark) -> Unit,
+    darkTheme: Boolean,
 ) {
     val colors = MaterialTheme.colorScheme
-    Box(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.linearGradient(
-                        listOf(colors.surface, colors.surfaceContainerHigh, colors.surface),
-                    ),
-                ),
-    ) {
-        SplashAmbientLight(
-            modifier = Modifier.align(Alignment.TopStart).offset(x = 40.dp, y = (-104).dp),
-            color = colors.primary,
-        )
-        SplashAmbientLight(
-            modifier = Modifier.align(Alignment.BottomEnd).offset(x = 120.dp, y = 152.dp),
-            color = colors.tertiary,
-        )
+    ComposeStartupBackground(darkTheme = darkTheme, modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier.fillMaxSize().padding(44.dp),
             horizontalArrangement = Arrangement.spacedBy(36.dp),
@@ -106,20 +83,6 @@ internal fun ComposeStartupSplashPresentation(
             }
         }
     }
-}
-
-@Composable
-private fun SplashAmbientLight(
-    modifier: Modifier,
-    color: Color,
-) {
-    Box(
-        modifier =
-            modifier
-                .size(280.dp)
-                .clip(CircleShape)
-                .background(Brush.radialGradient(listOf(color.copy(alpha = 0.28f), Color.Transparent))),
-    )
 }
 
 @Composable
