@@ -110,6 +110,7 @@ internal fun ComposeStartupSplashWindow(
             onStartLocal = onStartLocal,
             onRetry = onRetry,
             themeMode = themeMode,
+            onCloseRequest = onCloseRequest,
         )
     }
 }
@@ -259,6 +260,7 @@ internal fun ComposeStartupSplash(
     onStartLocal: () -> Unit = {},
     onRetry: () -> Unit,
     themeMode: ThemeMode = ThemeMode.SYSTEM,
+    onCloseRequest: () -> Unit = {},
 ) {
     val bookmarksState = (bookmarks as? DesktopServerBookmarkLoadResult.Loaded)?.state ?: DesktopServerBookmarkState()
     var bookmarkDialog by remember { mutableStateOf<StartupServerBookmarkDialog?>(null) }
@@ -276,6 +278,7 @@ internal fun ComposeStartupSplash(
                 onCreateServer = { bookmarkDialog = StartupServerBookmarkDialog.Create },
                 onEditServer = { bookmarkDialog = StartupServerBookmarkDialog.Edit(it) },
                 darkTheme = darkTheme,
+                onCloseRequest = onCloseRequest,
             )
             ComposeStartupServerBookmarkDialog(
                 dialog = bookmarkDialog,

@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.desktop
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -14,6 +15,25 @@ import org.junit.Test
 class ComposeStartupSplashTest {
     @get:Rule
     val composeTestRule = createComposeRule()
+
+    @Test
+    fun `close action stays available during selection startup and failure`() {
+        val status = mutableStateOf(StartupStatus.waitingForServerSelection())
+        var closeRequests = 0
+        composeTestRule.setContent {
+            ComposeStartupSplash(
+                status = status.value,
+                onRetry = {},
+                onCloseRequest = { closeRequests += 1 },
+            )
+        }
+        listOf(StartupStatus.waitingForServerSelection(), StartupStatus.startingServer(), StartupStatus.failed("Unavailable"))
+            .forEachIndexed { index, next ->
+                composeTestRule.runOnIdle { status.value = next }
+                composeTestRule.onNodeWithContentDescription("Close Visual Agent").assertIsDisplayed().performClick()
+                composeTestRule.runOnIdle { kotlin.test.assertEquals(index + 1, closeRequests) }
+            }
+    }
 
     @Test
     fun `progress state shows application name and status`() {
