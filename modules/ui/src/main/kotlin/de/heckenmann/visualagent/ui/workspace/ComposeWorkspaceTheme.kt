@@ -75,66 +75,25 @@ internal fun semanticActionColors(darkTheme: Boolean): SemanticActionColors =
  * Resolves the effective dark-mode flag for the current platform.
  *
  * [ThemeMode.LIGHT] always returns false, [ThemeMode.DARK] always returns true,
- * and [ThemeMode.SYSTEM] queries the OS appearance. Detection uses native CLI or
- * registry commands and falls back to dark on failure so the app remains usable.
+ * and [ThemeMode.SYSTEM] uses Compose's platform appearance without launching
+ * blocking OS commands. Unknown system appearance follows Compose's light fallback.
  *
  * @param mode Theme mode selected by the user
  * @return True when the effective UI should render in dark colors
  */
-fun isSystemInDarkTheme(mode: ThemeMode): Boolean =
+@Composable
+fun isSystemInDarkTheme(mode: ThemeMode): Boolean = resolveDarkTheme(mode, androidx.compose.foundation.isSystemInDarkTheme())
+
+/** Applies explicit overrides consistently to the platform's effective appearance. */
+internal fun resolveDarkTheme(
+    mode: ThemeMode,
+    systemDark: Boolean,
+): Boolean =
     when (mode) {
         ThemeMode.LIGHT -> false
         ThemeMode.DARK -> true
-        ThemeMode.SYSTEM -> detectSystemDarkTheme()
+        ThemeMode.SYSTEM -> systemDark
     }
-
-private fun detectSystemDarkTheme(): Boolean {
-    val os = System.getProperty("os.name")?.lowercase().orEmpty()
-    return when {
-        os.contains("mac") -> detectMacOsDarkTheme()
-        os.contains("win") -> detectWindowsDarkTheme()
-        os.contains("nix") || os.contains("nux") -> detectGnomeDarkTheme()
-        else -> true
-    }
-}
-
-private fun detectMacOsDarkTheme(): Boolean {
-    val output = runProcess("defaults", "read", "-g", "AppleInterfaceStyle") ?: return true
-    return output.contains("Dark", ignoreCase = true)
-}
-
-private fun detectWindowsDarkTheme(): Boolean {
-    val output =
-        runProcess(
-            "reg",
-            "query",
-            "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
-            "/v",
-            "AppsUseLightTheme",
-        ) ?: return true
-    val match = Regex("AppsUseLightTheme\\s+REG_DWORD\\s+0x([0-9a-fA-F]+)").find(output)
-    return match
-        ?.groupValues
-        ?.get(1)
-        ?.toIntOrNull(16)
-        ?.let { it == 0 }
-        ?: true
-}
-
-private fun detectGnomeDarkTheme(): Boolean {
-    val output = runProcess("gsettings", "get", "org.gnome.desktop.interface", "color-scheme") ?: return true
-    return output.contains("dark", ignoreCase = true)
-}
-
-private fun runProcess(vararg command: String): String? =
-    runCatching {
-        val process = ProcessBuilder(*command).redirectErrorStream(true).start()
-        process.inputStream
-            .bufferedReader()
-            .use { it.readText().trim() }
-            .also { process.waitFor() }
-            .takeIf { process.exitValue() == 0 }
-    }.getOrNull()
 
 /**
  * Scales the Material3 baseline typography by the user-selected font size.

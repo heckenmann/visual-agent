@@ -50,8 +50,16 @@ class ComposeWorkspaceThemeTest {
 
     @Test
     fun `isSystemInDarkTheme resolves explicit modes`() {
-        assertFalse(isSystemInDarkTheme(ThemeMode.LIGHT))
-        assertTrue(isSystemInDarkTheme(ThemeMode.DARK))
+        for (systemDark in listOf(false, true)) {
+            assertFalse(resolveDarkTheme(ThemeMode.LIGHT, systemDark))
+            assertTrue(resolveDarkTheme(ThemeMode.DARK, systemDark))
+        }
+    }
+
+    @Test
+    fun `system mode preserves platform appearance including light fallback`() {
+        assertFalse(resolveDarkTheme(ThemeMode.SYSTEM, false))
+        assertTrue(resolveDarkTheme(ThemeMode.SYSTEM, true))
     }
 
     @Test

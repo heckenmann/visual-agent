@@ -63,6 +63,9 @@ connection/startup, and failure; it does not start a server or bypass lifecycle 
   configuration belongs to the server database. No duplicate client theme
   preference or direct database access is introduced. Once settings are loaded,
   startup screens use the server-selected Light, Dark, or System mode.
+- Startup, onboarding, and the workspace share Compose's system-theme resolver.
+  Unknown platform appearance uses the same light fallback everywhere; no OS
+  command is executed during composition to determine appearance.
 - Missing or invalid images fall back to the theme background without stopping
   startup. Resource reads and image decoding run off the UI thread.
 

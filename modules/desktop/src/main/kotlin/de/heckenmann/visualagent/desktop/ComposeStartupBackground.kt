@@ -2,7 +2,6 @@ package de.heckenmann.visualagent.desktop
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,6 +16,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import de.heckenmann.visualagent.desktop.generated.resources.Res
 import de.heckenmann.visualagent.protocol.ThemeMode
+import de.heckenmann.visualagent.ui.workspace.isSystemInDarkTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -24,12 +24,7 @@ import org.jetbrains.compose.resources.decodeToImageBitmap
 
 /** Resolves startup appearance without blocking OS queries on the UI thread. */
 @Composable
-internal fun startupDarkTheme(mode: ThemeMode): Boolean =
-    when (mode) {
-        ThemeMode.LIGHT -> false
-        ThemeMode.DARK -> true
-        ThemeMode.SYSTEM -> isSystemInDarkTheme()
-    }
+internal fun startupDarkTheme(mode: ThemeMode): Boolean = isSystemInDarkTheme(mode)
 
 /** Shared decorative, full-bleed layer for splash and onboarding, with safe resource fallback. */
 @Composable

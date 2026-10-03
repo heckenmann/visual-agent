@@ -18,6 +18,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.ThemeMode
+import de.heckenmann.visualagent.ui.workspace.isSystemInDarkTheme
 import de.heckenmann.visualagent.ui.workspace.visualAgentDarkColorScheme
 import de.heckenmann.visualagent.ui.workspace.visualAgentLightColorScheme
 import kotlinx.coroutines.CancellationException
@@ -36,6 +37,21 @@ import kotlin.test.assertTrue
 class ComposeStartupBackgroundTest {
     @get:Rule
     val compose = createComposeRule()
+
+    @Test
+    fun `startup and workspace share all theme mode decisions`() {
+        val decisions = mutableListOf<Pair<Boolean, Boolean>>()
+        compose.setContent {
+            decisions.clear()
+            ThemeMode.entries.forEach { mode ->
+                decisions.add(startupDarkTheme(mode) to isSystemInDarkTheme(mode))
+            }
+        }
+        compose.runOnIdle {
+            assertEquals(ThemeMode.entries.size, decisions.size)
+            decisions.forEach { (startup, workspace) -> assertEquals(workspace, startup) }
+        }
+    }
 
     @Test
     fun `translucent onboarding uses theme foreground in both modes`() {
