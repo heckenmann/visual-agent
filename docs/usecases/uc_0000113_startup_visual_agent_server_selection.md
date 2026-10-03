@@ -28,6 +28,9 @@ remote Visual Agent server bookmarks before any application server is contacted.
 
 Server-location bootstrap data remains separate from LLM provider configuration, credentials, models, and server persistence. The client-local bootstrap file remains client-owned after connection; server-owned settings are read later through `ApplicationPort`, never through direct database access.
 
+The splash logo uses a narrow inset, a subtle one-dp outline, and low elevation
+on a translucent neutral theme surface rather than a thick accent-colored frame.
+
 ## Tool Calls
 
 - None.

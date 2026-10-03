@@ -40,7 +40,7 @@ import org.jetbrains.compose.resources.painterResource
 
 private val SplashContentShape = RoundedCornerShape(28.dp)
 private val SplashStatusShape = RoundedCornerShape(18.dp)
-private val SplashIconShape = RoundedCornerShape(32.dp)
+private val SplashIconShape = RoundedCornerShape(24.dp)
 
 /** Renders the polished server-selection experience inside the desktop splash window. */
 @Composable
@@ -95,13 +95,14 @@ private fun SplashHero(modifier: Modifier) {
         Surface(
             modifier = Modifier.size(92.dp),
             shape = SplashIconShape,
-            color = colors.primaryContainer.copy(alpha = 0.9f),
-            shadowElevation = 16.dp,
+            color = colors.surfaceContainer.copy(alpha = 0.72f),
+            border = androidx.compose.foundation.BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.5f)),
+            shadowElevation = 2.dp,
         ) {
             Image(
                 painter = painterResource(Res.drawable.visual_agent),
                 contentDescription = AppIdentity.DISPLAY_NAME,
-                modifier = Modifier.padding(18.dp),
+                modifier = Modifier.padding(6.dp),
             )
         }
         Spacer(Modifier.height(28.dp))
