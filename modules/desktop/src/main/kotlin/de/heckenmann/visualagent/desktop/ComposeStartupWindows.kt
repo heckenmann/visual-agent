@@ -131,6 +131,7 @@ internal fun ComposeOnboardingWindow(
         },
         title = "$STARTUP_WINDOW_TITLE – Setup",
         icon = applicationIcon,
+        resizable = false,
         state =
             rememberWindowState(
                 width = DEFAULT_SPLASH_WIDTH,
