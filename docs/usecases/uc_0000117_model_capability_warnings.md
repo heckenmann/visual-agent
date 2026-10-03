@@ -32,6 +32,13 @@ Visual Agent user.
 
 ## Result
 
+The header keeps application identity separate from warnings: a non-interactive
+40 x 40 dp logo is vertically centered beside the title and subtitle, without a frame or colored
+tile. Its tooltip and accessibility label identify Visual Agent. The bundled
+asset loads off the UI thread into a reserved area to avoid layout shifts.
+The navigation rail contains no duplicate application logo.
+The subtitle aligns with the title text, not with the logo.
+
 Users can select a suitable model before starting a request that needs sustained
 conversation context or agent tool calls. Unknown provider metadata is not
 presented as an unsupported capability.
