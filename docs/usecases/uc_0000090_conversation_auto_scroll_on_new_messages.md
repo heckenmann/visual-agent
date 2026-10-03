@@ -61,6 +61,7 @@ The conversation panel follows the latest message automatically without overridi
   list padding and the scroll-to-latest control's inset without obscuring the
   newest message.
 - No fixed delay or retry loop is used for viewport resize navigation.
+- Resize positioning is requested for the next list measurement, rather than forcing immediate scrolling across multiple frames; history browsing does not request positioning.
 - Pointer input that consumes no scroll distance must not leave the coordinator in history-browsing mode.
 - The first actual user movement after a stale latest snapshot must enter history-browsing mode.
 - Startup restoration is covered with a newly created manager and variable-height Markdown history.

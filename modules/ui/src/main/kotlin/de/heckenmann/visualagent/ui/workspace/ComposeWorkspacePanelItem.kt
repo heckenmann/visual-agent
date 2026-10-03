@@ -75,12 +75,6 @@ internal fun LazyItemScope.splitPanelItem(
             animationSpec = workspacePanelAnimationSpec(),
             label = "workspace panel width",
         )
-    val animatedHeight by
-        animateDpAsState(
-            targetValue = rowHeight.dp,
-            animationSpec = workspacePanelAnimationSpec(),
-            label = "workspace panel height",
-        )
     val renderedWidth = if (isResizing) width.coerceAtLeast(minPanelWidth).dp else animatedWidth
     val renderedWidthUnits = renderedWidth.value.roundToInt()
     ReorderableItem(
@@ -93,7 +87,7 @@ internal fun LazyItemScope.splitPanelItem(
                 modifier =
                     Modifier
                         .padding(vertical = WORKSPACE_PANEL_GAP.dp)
-                        .height(animatedHeight),
+                        .height(rowHeight.dp),
             ) {
                 SplitPanelContent(
                     window = window,
@@ -104,7 +98,7 @@ internal fun LazyItemScope.splitPanelItem(
                     minPanelWidth = minPanelWidth,
                     modifier =
                         Modifier
-                            .height(animatedHeight)
+                            .height(rowHeight.dp)
                             .testTag("workspace-panel-content-${window.id}"),
                 )
                 panelResizer(

@@ -17,8 +17,13 @@ Desktop user.
 
 1. The user opens, hides, or reorders workspace panels from the rail or the workspace row, or resizes the main application window.
 2. The main window size, panel visibility, user-defined order, and preferred panel widths are captured.
-3. Layout state is persisted through the workspace layout service.
-4. When the application exits, the latest workspace state and window size have been saved.
+3. Layout state is persisted through the workspace layout service on a background
+   dispatcher. Updates are processed sequentially; geometry-only updates do not
+   rewrite panel preferences, and intermediate updates may be coalesced while a
+   previous operation is still running.
+4. When the application exits, the desktop awaits the shared layout coordinator's
+   final background write before closing the server. It saves the main window size
+   and position off the UI thread and ignores duplicate close requests.
 5. On startup, the stored main window size and workspace layout are loaded while the independent splash window remains visible.
 6. After server readiness, the splash is disposed and the main window opens with the previously saved size.
 7. Workspace panels are restored to their previous visibility state, user-defined order, and preferred widths.
@@ -41,6 +46,8 @@ The user's preferred main window size, panel set, panel order, and persisted pan
 - `de.heckenmann.visualagent.workspace.layout.WorkspaceLayoutService`
 - `de.heckenmann.visualagent.workspace.layout.WorkspaceLayoutPersistence`
 - `de.heckenmann.visualagent.ui.application.VisualAgentComposeApp`
+- `de.heckenmann.visualagent.ui.application.WorkspaceLayoutEffects`
+- `de.heckenmann.visualagent.ui.application.WorkspaceLayoutPersistenceCoordinator`
 
 ## Acceptance Criteria
 
@@ -53,3 +60,10 @@ The user's preferred main window size, panel set, panel order, and persisted pan
 - Missing panels or invalid stored bounds do not prevent startup.
 - Restored panels are always placed inside the visible horizontal workspace row.
 - A persisted main-window position outside the current screen is clamped before the main window is presented.
+- Layout protocol calls and persistence never block composition or the UI thread.
+- Slow persistence preserves update order and eventually saves the newest panel state.
+- Application exit flushes pending panel changes before server resources close;
+  finished coordinators never issue later writes against the closed server.
+- Temporary workspace composition disposal flushes pending state without
+  permanently finishing the window-owned coordinator. Recreated compositions
+  continue persisting visibility, order, and preferred widths.

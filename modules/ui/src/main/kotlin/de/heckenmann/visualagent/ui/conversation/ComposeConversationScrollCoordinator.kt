@@ -174,16 +174,6 @@ internal class ConversationScrollCoordinator(
         return false
     }
 
-    /** Keeps latest content visible after resize without overriding user movement. */
-    suspend fun maintainLatestAfterViewportChange() =
-        mutationMutex.withLock {
-            if (mode != ConversationScrollMode.FOLLOWING_LATEST) return@withLock
-            withFrameNanos { }
-            if (mode == ConversationScrollMode.FOLLOWING_LATEST) {
-                listState.scrollToBottom()
-            }
-        }
-
     /** Starts restoring the visible anchor after an older-history page is loaded. */
     fun beginHistoryAnchorRestore(): Long {
         navigationGeneration++

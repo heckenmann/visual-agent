@@ -66,6 +66,7 @@ The user can keep multiple panels visible and ordered for the current task witho
 - Reordering from either location updates the other view with an animated transition.
 - Opening and hiding panels uses a smooth horizontal expand/collapse and fade transition.
 - During an active resizer drag, the panel follows the pointer directly without an interpolation delay or persisted intermediate widths; external and rail-driven width changes may animate to their persisted preferred width.
+- Panel heights follow main-window geometry directly, without a separate size animation that trails continuous native-window resizing.
 - Active preview widths participate in overflow calculation immediately. If the active resizer would leave the viewport, the horizontal row follows it directly without an animation; the user's scroll position is unchanged while the handle remains visible.
 - Panel widths are attached to the panel identity, not to its position; reordering does not change panel widths.
 - Dragging a resizer on any panel's right edge, including the rightmost panel, changes only that panel's width and shifts all panels to the right instead of shrinking a neighbour; the resizer shows a visible three-bar grip.

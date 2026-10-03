@@ -31,9 +31,6 @@ import de.heckenmann.visualagent.ui.workspace.*
 
 @Composable
 internal fun ComposeWorkspaceHeader(
-    providerName: String,
-    modelName: String,
-    beanDefinitionCount: Int,
     inFlight: InFlightState,
     capabilityWarnings: ModelCapabilityWarnings = ModelCapabilityWarnings(),
     onStopAll: () -> Unit = {},
@@ -59,9 +56,6 @@ internal fun ComposeWorkspaceHeader(
                 style = MaterialTheme.typography.bodySmall,
             )
         }
-        HeaderChip("Provider", providerName)
-        HeaderChip("Model", modelName)
-        HeaderChip("Beans", beanDefinitionCount.toString())
         ModelCapabilityWarningBadges(warnings = capabilityWarnings)
         InFlightIndicator(state = inFlight, onStopAll = onStopAll)
     }

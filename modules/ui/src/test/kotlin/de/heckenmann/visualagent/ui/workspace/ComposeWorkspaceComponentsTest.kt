@@ -140,6 +140,37 @@ class ComposeWorkspaceComponentsTest {
     }
 
     @Test
+    fun `panel height follows the viewport without waiting for animation frames`() {
+        var viewportHeight by mutableStateOf(600)
+        composeTestRule.setContent {
+            MaterialTheme {
+                Box(Modifier.size(1_200.dp, 600.dp)) {
+                    ComposeSplitWorkspace(
+                        windows = listOf(testWindow("first", "First")),
+                        panelServices = mockk(relaxed = true),
+                        onToggleWindow = {},
+                        onReorderWindows = {},
+                        onResizeWindow = { _, _ -> },
+                        minPanelWidth = ComposeWorkspaceWindowBounds.MIN_WIDTH,
+                        viewport = ComposeWorkspaceViewport(1_200, viewportHeight),
+                    )
+                }
+            }
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.mainClock.autoAdvance = false
+        composeTestRule.runOnIdle { viewportHeight = 450 }
+        composeTestRule.mainClock.advanceTimeByFrame()
+        composeTestRule.waitForIdle()
+
+        val bounds = composeTestRule.onNodeWithTag("workspace-panel-content-first").getUnclippedBoundsInRoot()
+        assertEquals(
+            (450 - 2 * WORKSPACE_PANEL_GAP).dp,
+            bounds.bottom - bounds.top,
+        )
+    }
+
+    @Test
     fun `workspace starts the first visible panel at the shared edge gap`() {
         composeTestRule.setContent {
             MaterialTheme {

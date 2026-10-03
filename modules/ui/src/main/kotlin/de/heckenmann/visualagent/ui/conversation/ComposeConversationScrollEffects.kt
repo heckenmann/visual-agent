@@ -111,8 +111,7 @@ internal fun ConversationResizeScrollEffect(
 ) {
     LaunchedEffect(viewportSize) {
         if (isAtLatest && viewportSize != IntSize.Zero && hasConversationContent) {
-            withFrameNanos { }
-            listState.scrollToBottom()
+            listState.requestScrollToItem(0)
         }
     }
 }

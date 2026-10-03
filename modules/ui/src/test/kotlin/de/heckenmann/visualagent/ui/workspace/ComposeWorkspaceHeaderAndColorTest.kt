@@ -26,13 +26,10 @@ class ComposeWorkspaceHeaderTest {
     val composeTestRule = createComposeRule()
 
     @Test
-    fun `workspace header renders provider model and bean chips`() {
+    fun `workspace header renders identity without status badges`() {
         composeTestRule.setContent {
             MaterialTheme {
                 ComposeWorkspaceHeader(
-                    providerName = "Ollama",
-                    modelName = "llava",
-                    beanDefinitionCount = 42,
                     inFlight = InFlightState(),
                     onStopAll = {},
                 )
@@ -40,9 +37,12 @@ class ComposeWorkspaceHeaderTest {
         }
 
         composeTestRule.onNodeWithText("Visual Agent").assertExists()
-        composeTestRule.onNodeWithText("Provider Ollama").assertExists()
-        composeTestRule.onNodeWithText("Model llava").assertExists()
-        composeTestRule.onNodeWithText("Beans 42").assertExists()
+        composeTestRule.onNodeWithText("Compose Multiplatform workspace").assertExists()
+        composeTestRule.onNodeWithText("Provider", substring = true).assertDoesNotExist()
+        composeTestRule.onNodeWithText("Model", substring = true).assertDoesNotExist()
+        composeTestRule.onNodeWithText("Beans", substring = true).assertDoesNotExist()
+        composeTestRule.onNodeWithText("Context", substring = true).assertDoesNotExist()
+        composeTestRule.onNodeWithText("Tools unavailable").assertDoesNotExist()
     }
 }
 

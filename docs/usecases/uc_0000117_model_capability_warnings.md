@@ -17,7 +17,9 @@ Visual Agent user.
 ## Main Flow
 
 1. The workspace reads the active model metadata from the provider catalog and
-   refreshes its detail metadata through the provider boundary.
+   refreshes its detail metadata through the provider boundary asynchronously,
+   off the UI thread, when the selection or catalog changes. Resize and ordinary
+   recomposition never trigger these reads.
 2. It calculates the effective context limit from the configured limit and the
    current provider-reported model limit, using the lower positive value.
 3. When the effective limit is below 4096 tokens, it shows a context warning in
@@ -54,3 +56,5 @@ presented as an unsupported capability.
   warning.
 - All model-capability badges share the same entrance and exit animation.
 - The badges are rendered in the top-right header region and provide a tooltip.
+- Provider, model-name, and bean-count informational badges are not displayed;
+  capability warnings and the in-flight indicator remain available.
