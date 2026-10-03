@@ -12,6 +12,8 @@ build/
 *.iws
 .vscode/
 .codegraph/
+application/bin/
+modules/*/bin/
 
 # Kotlin
 *.class
