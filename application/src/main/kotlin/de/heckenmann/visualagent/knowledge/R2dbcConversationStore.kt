@@ -20,7 +20,15 @@ internal class R2dbcConversationStore(
     private val sequenceStore: R2dbcTimelineSequenceStore,
     private val historyQueries: R2dbcConversationHistoryQueries,
     private val transactionOperator: TransactionalOperator,
+    private val requestLifecycle: R2dbcConversationRequestLifecycle,
 ) : ConversationStore {
+    override fun beginConversationRequest(
+        sessionId: String,
+        requestId: String,
+    ) {
+        transactionOperator.transactional(requestLifecycle.guard(sessionId, requestId)).block()
+    }
+
     override fun saveConversationMessage(
         id: String,
         sessionId: String,
@@ -156,65 +164,71 @@ internal class R2dbcConversationStore(
     ): Mono<String> {
         require(UUID.fromString(id).toString() == id) { "Conversation message ID must be a canonical UUID" }
         return transactionOperator.transactional(
-            existingIdentity(id)
-                .flatMap { existing ->
-                    require(
-                        existing.sessionId == sessionId &&
-                            existing.role == role &&
-                            existing.content == content &&
-                            existing.metadata == metadata &&
-                            existing.contextPolicy == contextPolicy &&
-                            existing.parentAssistantTurnId == parentAssistantTurnId &&
-                            existing.turnOrder == turnOrder &&
-                            existing.assistantToolTurn == assistantToolTurn &&
-                            existing.conversationRequestId == conversationRequestId,
-                    ) { "Conversation message $id conflicts with an existing entry" }
-                    Mono.just(id)
-                }.switchIfEmpty(
-                    sequenceStore.nextReactive().flatMap { sequence ->
-                        var statement =
-                            databaseClient
-                                .sql(
-                                    """
-                                    INSERT INTO conversation_history
-                                        (id, session_id, role, content, metadata, created_at, timeline_sequence, context_policy,
-                                         parent_assistant_turn_id, turn_order, assistant_tool_turn, conversation_request_id)
-                                    VALUES (:id, :sessionId, :role, :content, :metadata, :createdAt, :timelineSequence, :contextPolicy,
-                                            :parentAssistantTurnId, :turnOrder, :assistantToolTurn, :conversationRequestId)
-                                    """.trimIndent(),
-                                ).bind("id", id)
-                                .bind("sessionId", sessionId)
-                                .bind("role", role)
-                                .bind("content", content)
-                        statement = R2dbcPersistenceSupport.bindText(statement, "metadata", metadata)
-                        statement = R2dbcPersistenceSupport.bindText(statement, "parentAssistantTurnId", parentAssistantTurnId)
-                        statement = R2dbcPersistenceSupport.bindText(statement, "conversationRequestId", conversationRequestId)
-                        statement =
-                            if (turnOrder == null) {
-                                statement.bindNull("turnOrder", Int::class.java)
-                            } else {
-                                statement.bind("turnOrder", turnOrder)
-                            }
-                        statement
-                            .bind("createdAt", Instant.now().toString())
-                            .bind("timelineSequence", sequence)
-                            .bind("contextPolicy", contextPolicy.name)
-                            .bind("assistantToolTurn", assistantToolTurn)
-                            .fetch()
-                            .rowsUpdated()
-                            .thenReturn(id)
-                    },
-                ),
+            requestLifecycle.guard(sessionId, conversationRequestId).then(
+                existingIdentity(id)
+                    .flatMap { existing ->
+                        require(
+                            existing.sessionId == sessionId &&
+                                existing.role == role &&
+                                existing.content == content &&
+                                existing.metadata == metadata &&
+                                existing.contextPolicy == contextPolicy &&
+                                existing.parentAssistantTurnId == parentAssistantTurnId &&
+                                existing.turnOrder == turnOrder &&
+                                existing.assistantToolTurn == assistantToolTurn &&
+                                existing.conversationRequestId == conversationRequestId,
+                        ) { "Conversation message $id conflicts with an existing entry" }
+                        Mono.just(id)
+                    }.switchIfEmpty(
+                        sequenceStore.nextReactive().flatMap { sequence ->
+                            var statement =
+                                databaseClient
+                                    .sql(
+                                        """
+                                        INSERT INTO conversation_history
+                                            (id, session_id, role, content, metadata, created_at, timeline_sequence, context_policy,
+                                             parent_assistant_turn_id, turn_order, assistant_tool_turn, conversation_request_id)
+                                        VALUES (:id, :sessionId, :role, :content, :metadata, :createdAt, :timelineSequence, :contextPolicy,
+                                                :parentAssistantTurnId, :turnOrder, :assistantToolTurn, :conversationRequestId)
+                                        """.trimIndent(),
+                                    ).bind("id", id)
+                                    .bind("sessionId", sessionId)
+                                    .bind("role", role)
+                                    .bind("content", content)
+                            statement = R2dbcPersistenceSupport.bindText(statement, "metadata", metadata)
+                            statement = R2dbcPersistenceSupport.bindText(statement, "parentAssistantTurnId", parentAssistantTurnId)
+                            statement = R2dbcPersistenceSupport.bindText(statement, "conversationRequestId", conversationRequestId)
+                            statement =
+                                if (turnOrder == null) {
+                                    statement.bindNull("turnOrder", Int::class.java)
+                                } else {
+                                    statement.bind("turnOrder", turnOrder)
+                                }
+                            statement
+                                .bind("createdAt", Instant.now().toString())
+                                .bind("timelineSequence", sequence)
+                                .bind("contextPolicy", contextPolicy.name)
+                                .bind("assistantToolTurn", assistantToolTurn)
+                                .fetch()
+                                .rowsUpdated()
+                                .thenReturn(id)
+                        },
+                    ),
+            ),
         )
     }
 
     override fun deleteConversationMessagesReactive(sessionId: String): Mono<Int> =
-        databaseClient
-            .sql("DELETE FROM conversation_history WHERE session_id = :sessionId")
-            .bind("sessionId", sessionId)
-            .fetch()
-            .rowsUpdated()
-            .map(Long::toInt)
+        transactionOperator.transactional(
+            requestLifecycle.invalidate(sessionId).then(
+                databaseClient
+                    .sql("DELETE FROM conversation_history WHERE session_id = :sessionId")
+                    .bind("sessionId", sessionId)
+                    .fetch()
+                    .rowsUpdated()
+                    .map(Long::toInt),
+            ),
+        )
 
     override fun deleteConversationMessageByIdReactive(id: String): Mono<Int> =
         databaseClient

@@ -21,6 +21,8 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import io.mockk.verifyOrder
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -224,6 +226,50 @@ class SpringConversationPortTest {
         )
         assertEquals("ONE_BY_ONE", config.queueFlushMode)
     }
+
+    @Test
+    fun `persisted reset is reported before a blocked welcome request finishes`() =
+        runTest {
+            val welcomeStarted = CompletableDeferred<Unit>()
+            val releaseWelcome = CompletableDeferred<Unit>()
+            val cleared = CompletableDeferred<Unit>()
+            every { manager.clearTodos() } returns Unit
+            every { manager.clearHistory() } returns Unit
+            coEvery { manager.addWelcomeMessageAfterReset() } coAnswers {
+                welcomeStarted.complete(Unit)
+                releaseWelcome.await()
+                WelcomeResult.Generated("Hello")
+            }
+
+            val operation =
+                async {
+                    port.clearAndCreateWelcome {
+                        verifyOrder {
+                            manager.clearTodos()
+                            manager.clearHistory()
+                        }
+                        cleared.complete(Unit)
+                    }
+                }
+            cleared.await()
+            welcomeStarted.await()
+            assertEquals(false, operation.isCompleted)
+            releaseWelcome.complete(Unit)
+            assertEquals(null, operation.await().warning)
+        }
+
+    @Test
+    fun `failed deletion never reports a cleared conversation or requests a welcome`() =
+        runTest {
+            every { manager.clearTodos() } throws IllegalStateException("Deletion failed")
+            var cleared = false
+
+            assertFailsWith<de.heckenmann.visualagent.protocol.ProtocolOperationException> {
+                port.clearAndCreateWelcome { cleared = true }
+            }
+            assertEquals(false, cleared)
+            coVerify(exactly = 0) { manager.addWelcomeMessageAfterReset() }
+        }
 
     @Test
     fun `welcome fallback is returned as a protocol warning`() =

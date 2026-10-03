@@ -49,10 +49,13 @@ internal suspend fun processTodoWithLLM(
     jobScheduler: SubAgentJobScheduler,
     executionControl: SubAgentExecutionControl? = null,
     cancellationToken: CancellationToken? = null,
+    conversationRequestId: String? = null,
     retryDelay: suspend (Long) -> Unit,
 ) {
     val logger = KotlinLogging.logger {}
     val token = cancellationToken ?: CancellationToken()
+    token.throwIfCancelled()
+    val requestId = conversationRequestId ?: conversationOps.beginConversationRequest()
     activeCancellationTokens[todoId] = token
     val processingJob = currentCoroutineContext()[Job]
     var executionId = ""
@@ -88,6 +91,7 @@ internal suspend fun processTodoWithLLM(
                             memoryStore,
                             agentToolConfigService.toolsFor(agent),
                             token,
+                            requestId = requestId,
                             onChunk = { delta ->
                                 todoEventBus.publishProgress(
                                     TodoProgressUpdate(
@@ -131,7 +135,7 @@ internal suspend fun processTodoWithLLM(
                                 "Result:\n${result.take(2000)}\n\n" +
                                 "Use `todos` with `get-result` to read the full stored result.",
                         success = true,
-                        persistMessage = { conversationOps.persist(it) },
+                        persistMessage = { conversationOps.persist(it.copy(conversationRequestId = requestId)) },
                         attempt = attempt + 1,
                         executionId = executionId,
                         todoId = todoId,
@@ -147,7 +151,7 @@ internal suspend fun processTodoWithLLM(
                             "Agent ${agent.name} (${agent.id}) stopped todo $todoId. " +
                                 "Main review rejected attempt $attempt after the final retry.",
                         success = false,
-                        persistMessage = { conversationOps.persist(it) },
+                        persistMessage = { conversationOps.persist(it.copy(conversationRequestId = requestId)) },
                         attempt = attempt,
                         executionId = executionId,
                         todoId = todoId,
@@ -159,7 +163,7 @@ internal suspend fun processTodoWithLLM(
                     agent = agent,
                     content = "Main review rejected attempt $attempt for todo $todoId; retrying with the same objective.",
                     success = false,
-                    persistMessage = { conversationOps.persist(it) },
+                    persistMessage = { conversationOps.persist(it.copy(conversationRequestId = requestId)) },
                     attempt = attempt,
                     executionId = executionId,
                     todoId = todoId,
@@ -180,7 +184,7 @@ internal suspend fun processTodoWithLLM(
                             "Agent ${agent.name} (${agent.id}) stopped todo $todoId. " +
                                 "Failed: ${userError.summary}: ${userError.detail}",
                         success = false,
-                        persistMessage = { conversationOps.persist(it) },
+                        persistMessage = { conversationOps.persist(it.copy(conversationRequestId = requestId)) },
                         attempt = attempt,
                         executionId = executionId,
                         todoId = todoId,
@@ -198,7 +202,7 @@ internal suspend fun processTodoWithLLM(
                         "Agent ${agent.name} (${agent.id}) failed attempt $attempt for todo $todoId. " +
                             "Retrying after ${backoff}ms: ${userError.summary}: ${userError.detail}",
                     success = false,
-                    persistMessage = { conversationOps.persist(it) },
+                    persistMessage = { conversationOps.persist(it.copy(conversationRequestId = requestId)) },
                     attempt = attempt,
                     executionId = executionId,
                     todoId = todoId,
@@ -214,7 +218,7 @@ internal suspend fun processTodoWithLLM(
             agent = agent,
             content = "Agent ${agent.name} (${agent.id}) stopped todo $todoId. Crashed unexpectedly",
             success = false,
-            persistMessage = { conversationOps.persist(it) },
+            persistMessage = { conversationOps.persist(it.copy(conversationRequestId = requestId)) },
             attempt = attempt,
             executionId = executionId,
             todoId = todoId,
@@ -243,7 +247,7 @@ internal suspend fun processTodoWithLLM(
                 pendingTodoChanges = pendingTodoChanges,
                 currentTodo = todoManager.getAll().firstOrNull { it.id == todoId },
                 todoManager = todoManager,
-                persistMessage = { conversationOps.persist(it) },
+                persistMessage = { conversationOps.persist(it.copy(conversationRequestId = requestId)) },
                 saveAgentToDb = { subAgentOps.saveSubAgent(it) },
                 releaseAgent = { currentAgent, currentTodoId ->
                     releaseAutonomousTodoAgent(currentAgent, currentTodoId, agentBusySince, subAgentOps)

@@ -80,6 +80,11 @@ class TestPersistence internal constructor(
     val databaseClient: DatabaseClient = context.getBean(DatabaseClient::class.java)
     val transactionalOperator: TransactionalOperator = context.getBean(TransactionalOperator::class.java)
 
+    override fun beginConversationRequest(
+        sessionId: String,
+        requestId: String,
+    ) = conversationStore.beginConversationRequest(sessionId, requestId)
+
     fun createAgentManager(
         provider: LLMProvider,
         toolEventBus: ToolEventBus = ToolEventBus(),

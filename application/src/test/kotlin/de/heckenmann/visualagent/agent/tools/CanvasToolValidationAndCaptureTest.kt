@@ -49,13 +49,18 @@ class CanvasToolValidationAndCaptureTest {
 
         assertTrue(tool.definition.description.contains("conversation image attachment"))
 
-        val result = tool.execute("""{"action":"captureImage","format":"png"}""", mapOf("sessionId" to "main"))
+        val result =
+            tool.execute(
+                """{"action":"captureImage","format":"png"}""",
+                mapOf("sessionId" to "main", "requestId" to "capture-request"),
+            )
 
         assertTrue(result.success)
         assertEquals(listOf("captureImage:png"), canvas.actions)
         assertFalse(result.content.contains("base64"))
         val saved = store.saved.single()
         assertEquals("main", saved.sessionId)
+        assertEquals("capture-request", saved.conversationRequestId)
         assertEquals("assistant", saved.role)
         assertEquals("Canvas snapshot (PNG)", saved.content)
         assertTrue(saved.metadata.orEmpty().contains(""""type":"image""""))

@@ -20,6 +20,7 @@ internal object CanvasCapture {
             canvas.saveCapture(
                 context["sessionId"]?.toString()?.ifBlank { null } ?: CanvasToolConstants.MAIN_SESSION_ID,
                 snapshot,
+                context["requestId"] as? String,
             )
         return success(
             CanvasToolConstants.TOOL_ID,

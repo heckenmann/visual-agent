@@ -22,6 +22,15 @@ class ConversationOpsProvider(
     private var loadRecentHistoryFromDb: ((Int) -> List<Message>)? = null
     private var loadMainAgentContextFromDb: ((Int, Int) -> List<Message>)? = null
     private var persistMessage: ((Message) -> Message)? = null
+    private var beginRequest: (() -> String)? = null
+
+    /** Sets the database-backed registration callback for delayed conversation producers. */
+    fun setBeginConversationRequest(fn: () -> String) {
+        beginRequest = fn
+    }
+
+    /** Registers work before scheduling and returns its reset-protected identity. */
+    fun beginConversationRequest(): String = checkNotNull(beginRequest) { "beginRequest not wired; ensure AgentManager.init completed" }()
 
     /**
      * Sets the lambda for building a main-agent chat request.

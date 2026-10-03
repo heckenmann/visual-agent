@@ -109,6 +109,8 @@ internal fun buildFixture(
     reviewContent: String = "APPROVED",
     failingWorkerAttempts: Int = 0,
     onWorkerStreamStarted: (() -> Unit)? = null,
+    fixtureScope: CoroutineScope? = null,
+    onPersistMessage: (Message) -> Unit = {},
 ): CoordinatorFixture {
     val todoStore = FakeTodoStore()
     val todoEventBus = TodoEventBus()
@@ -180,7 +182,7 @@ internal fun buildFixture(
     val notifications = CopyOnWriteArrayList<String>()
     val savedAgents = CopyOnWriteArrayList<SubAgent>()
     val messages = CopyOnWriteArrayList<Message>()
-    val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    val scope = fixtureScope ?: CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val executionControl = SubAgentExecutionControl(FixturePreferenceStore())
     val parallelismProvider =
         object : ParallelismProvider() {
@@ -189,7 +191,13 @@ internal fun buildFixture(
     val scheduler = SubAgentJobScheduler(scope, parallelismProvider, executionControl)
     val conversationOps =
         ConversationOpsProvider(mockk<ToolEventBus>(relaxed = true)).apply {
+            setBeginConversationRequest {
+                java.util.UUID
+                    .randomUUID()
+                    .toString()
+            }
             setPersistMessage {
+                onPersistMessage(it)
                 messages.add(it)
                 messageEvents.trySend(it)
                 it

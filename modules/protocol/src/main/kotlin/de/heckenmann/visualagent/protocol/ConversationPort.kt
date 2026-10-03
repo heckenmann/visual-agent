@@ -141,8 +141,8 @@ interface ConversationPort {
     /** Cancels active application work before clearing persisted conversation history. */
     fun cancelActiveWork()
 
-    /** Clears history and creates a fresh welcome message. */
-    suspend fun clearAndCreateWelcome(): ConversationClearResult
+    /** Confirms the persisted reset through [onCleared] before creating the fresh welcome message. */
+    suspend fun clearAndCreateWelcome(onCleared: suspend () -> Unit = {}): ConversationClearResult
 
     /** Reads presentation preferences needed by the conversation panel. */
     fun preferences(): ConversationPreferences

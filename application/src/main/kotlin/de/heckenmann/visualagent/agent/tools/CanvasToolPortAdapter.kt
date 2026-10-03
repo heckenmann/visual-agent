@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent.tools
 
+import de.heckenmann.visualagent.agent.ConversationContextPolicy
 import de.heckenmann.visualagent.agent.tools.api.CanvasToolPort
 import de.heckenmann.visualagent.agent.tools.api.ToolCanvasImage
 import de.heckenmann.visualagent.agent.tools.api.ToolCanvasPoint
@@ -105,6 +106,7 @@ class CanvasToolPortAdapter(
     override fun saveCapture(
         sessionId: String,
         image: ToolCanvasImage,
+        requestId: String?,
     ): String {
         val metadata =
             buildJsonObject {
@@ -125,6 +127,8 @@ class CanvasToolPortAdapter(
             "assistant",
             "Canvas snapshot (${image.format.uppercase()})",
             metadata,
+            contextPolicy = ConversationContextPolicy.forRole("assistant"),
+            conversationRequestId = requestId,
         )
     }
 

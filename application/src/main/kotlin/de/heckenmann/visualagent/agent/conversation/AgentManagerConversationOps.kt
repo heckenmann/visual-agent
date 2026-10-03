@@ -5,7 +5,6 @@ import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.AgentManagerConstants
 import de.heckenmann.visualagent.agent.CancellationToken
 import de.heckenmann.visualagent.agent.ChatRequestContext
-import de.heckenmann.visualagent.agent.ConversationContextPolicy
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ProviderTurnResponse
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
@@ -15,7 +14,6 @@ import de.heckenmann.visualagent.protocol.ConversationCompletionEvent
 import de.heckenmann.visualagent.protocol.ConversationStreamUpdate
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import java.time.Instant
 
 /** Handles conversation orchestration and delegates persistence and streaming details. */
 internal class AgentManagerConversationOps(
@@ -35,53 +33,43 @@ internal class AgentManagerConversationOps(
     }
 
     /** Persists one conversation message and mirrors its generated timeline metadata in memory. */
-    internal fun persist(message: Message): Message {
-        val messageId =
-            message.id ?: java.util.UUID
+    internal fun persist(message: Message): Message = historyOps.persist(message)
+
+    /** Registers delayed work before scheduling so a reset can invalidate its first write. */
+    internal fun beginConversationRequest(
+        requestId: String =
+            java.util.UUID
                 .randomUUID()
-                .toString()
-        val id =
-            owner.conversationStore.saveConversationMessage(
-                messageId,
-                AgentManagerConstants.MAIN_SESSION_ID,
-                message.role,
-                message.content,
-                message.metadata,
-                message.contextPolicy ?: ConversationContextPolicy.forRole(message.role),
-                message.parentAssistantTurnId,
-                message.turnOrder,
-                message.assistantToolTurn,
-                message.conversationRequestId,
-            )
-        val record = owner.conversationStore.getConversationMessage(id)
-        val persisted =
-            message.copy(
-                id = id,
-                createdAtEpochMillis = record?.createdAt?.toEpochMilli() ?: Instant.now().toEpochMilli(),
-                timelineSequence = record?.timelineSequence,
-                contextPolicy = record?.contextPolicy ?: message.contextPolicy ?: ConversationContextPolicy.forRole(message.role),
-            )
-        val existingIndex = owner.conversationHistory.indexOfFirst { it.id == id }
-        if (existingIndex >= 0) owner.conversationHistory[existingIndex] = persisted else owner.conversationHistory.add(persisted)
-        return persisted
+                .toString(),
+    ): String {
+        owner.conversationStore.beginConversationRequest(AgentManagerConstants.MAIN_SESSION_ID, requestId)
+        return requestId
     }
 
     /** Sends a single request to a configured sub-agent. */
     suspend fun sendMessageToAgent(
         agentId: String,
         content: String,
+        requestId: String? = null,
     ): String {
         val agent = owner.subAgentOpsProvider.getSubAgent(agentId) ?: return "Error: Agent not found"
-        return agent.chat(listOf(Message("user", content)), owner.llmProvider, owner.agentToolConfigService.toolsFor(agent)).message.content
+        return agent
+            .chat(
+                listOf(Message("user", content)),
+                owner.llmProvider,
+                owner.agentToolConfigService.toolsFor(agent),
+                requestId = requestId,
+            ).message.content
     }
 
     /** Executes one scheduled sub-agent job. */
     suspend fun runAgentJob(
         agentId: String,
         content: String,
+        requestId: String? = null,
     ): AgentJobResult {
         val agent = owner.subAgentOpsProvider.getSubAgent(agentId) ?: throw IllegalArgumentException("Agent not found: $agentId")
-        return owner.executeSubAgentJob(agent, content)
+        return owner.executeSubAgentJob(agent, content, requestId)
     }
 
     /** Creates a sub-agent from a template and executes its first job. */
@@ -90,12 +78,14 @@ internal class AgentManagerConversationOps(
         role: String,
         templateName: String,
         content: String,
-    ): AgentJobResult = owner.executeSubAgentJob(owner.createAgent(name, role, templateName), content)
+        requestId: String? = null,
+    ): AgentJobResult = owner.executeSubAgentJob(owner.createAgent(name, role, templateName), content, requestId)
 
     /** Persists a sub-agent completion notification and reports it to the agent status observer. */
     fun notifyMainAgentOfJobCompletion(
         jobId: String,
         result: Result<AgentJobResult>,
+        requestId: String? = null,
     ) {
         val completed = result.getOrNull()
         val notification =
@@ -111,7 +101,7 @@ internal class AgentManagerConversationOps(
                 put("agentId", completed?.agentId ?: "")
                 put("agentName", completed?.agentName ?: "")
             }.toString()
-        persist(Message(role = "sub_agent", content = notification, metadata = metadata))
+        persist(Message(role = "sub_agent", content = notification, metadata = metadata, conversationRequestId = requestId))
         owner.agentStatusCallbackAdapter.notify(completed?.agentId ?: "main", notification)
     }
 
@@ -120,11 +110,12 @@ internal class AgentManagerConversationOps(
         content: String,
         token: CancellationToken? = null,
     ): String {
-        persist(Message("user", content))
         val requestId =
             java.util.UUID
                 .randomUUID()
                 .toString()
+        owner.conversationStore.beginConversationRequest(AgentManagerConstants.MAIN_SESSION_ID, requestId)
+        persist(Message("user", content, conversationRequestId = requestId))
         token?.throwIfCancelled()
         var providerFailed = false
         val assistantContent =
@@ -137,7 +128,7 @@ internal class AgentManagerConversationOps(
                 providerFailureMessage(error)
             }
         token?.throwIfCancelled()
-        val assistantMessage = Message(role = "assistant", content = assistantContent)
+        val assistantMessage = Message(role = "assistant", content = assistantContent, conversationRequestId = requestId)
         val persisted = persist(assistantMessage)
         if (!providerFailed) publishAssistantCompletion(persisted)
         owner.finishedToolEventsByRequestId.remove(requestId)
@@ -155,7 +146,14 @@ internal class AgentManagerConversationOps(
     ): String = streamingOps.streamMessage(content, token, onChunk, userEntryId, assistantEntryId, clientDataRequester)
 
     /** Composes and persists the welcome message displayed after a history reset. */
-    suspend fun addWelcomeMessageAfterReset(): WelcomeResult = owner.welcomeMessageComposer.compose(persist = ::persist)
+    suspend fun addWelcomeMessageAfterReset(): WelcomeResult {
+        val requestId =
+            java.util.UUID
+                .randomUUID()
+                .toString()
+        owner.conversationStore.beginConversationRequest(AgentManagerConstants.MAIN_SESSION_ID, requestId)
+        return owner.welcomeMessageComposer.compose(persist = { persist(it.copy(conversationRequestId = requestId)) })
+    }
 
     /** Clears both in-memory and persisted conversation history. */
     fun clearHistory() = historyOps.clearHistory()

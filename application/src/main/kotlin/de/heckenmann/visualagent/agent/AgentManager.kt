@@ -127,6 +127,7 @@ class AgentManager
             conversationOpsProvider.setLoadRecentHistoryFromDb(conversationOps::loadRecentHistoryFromDb)
             conversationOpsProvider.setLoadMainAgentContextFromDb(conversationOps::loadMainAgentContextFromDb)
             conversationOpsProvider.setPersistMessage(conversationOps::persist)
+            conversationOpsProvider.setBeginConversationRequest { conversationOps.beginConversationRequest() }
             subAgentOpsProvider.setSaveSubAgent(lifecycleOps::saveAgentToDb)
             subAgentOpsProvider.setCreateAgent { name, role, templateName -> lifecycleOps.createAgent(name, role, templateName) }
             subAgentOpsProvider.setNotifyAgent(agentStatusCallbackAdapter::notify)

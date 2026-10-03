@@ -200,6 +200,22 @@ internal class FakeConversationStore : ConversationStore {
         role: String,
         content: String,
         metadata: String?,
+        contextPolicy: de.heckenmann.visualagent.agent.ConversationContextPolicy,
+        parentAssistantTurnId: String?,
+        turnOrder: Int?,
+        assistantToolTurn: Boolean,
+        conversationRequestId: String?,
+    ): String {
+        saved += SavedMessage(sessionId, role, content, metadata, conversationRequestId)
+        return "message-${saved.size}"
+    }
+
+    override fun saveConversationMessage(
+        id: String,
+        sessionId: String,
+        role: String,
+        content: String,
+        metadata: String?,
     ): String {
         saved += SavedMessage(sessionId, role, content, metadata)
         return "message-${saved.size}"
@@ -237,4 +253,5 @@ internal data class SavedMessage(
     val role: String,
     val content: String,
     val metadata: String?,
+    val conversationRequestId: String? = null,
 )

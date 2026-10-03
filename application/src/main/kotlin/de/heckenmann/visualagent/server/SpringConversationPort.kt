@@ -100,11 +100,16 @@ class SpringConversationPort(
         }
     }
 
-    override suspend fun clearAndCreateWelcome(): ConversationClearResult =
-        protocolBoundary {
-            agentManager.clearTodos()
-            agentManager.clearHistory()
-            val result = agentManager.addWelcomeMessageAfterReset()
+    override suspend fun clearAndCreateWelcome(onCleared: suspend () -> Unit): ConversationClearResult {
+        withContext(Dispatchers.IO) {
+            protocolBoundary {
+                agentManager.clearTodos()
+                agentManager.clearHistory()
+            }
+        }
+        onCleared()
+        return withContext(Dispatchers.IO) {
+            val result = protocolBoundary { agentManager.addWelcomeMessageAfterReset() }
             when (result) {
                 is de.heckenmann.visualagent.agent.conversation.WelcomeResult.Generated -> ConversationClearResult()
                 is de.heckenmann.visualagent.agent.conversation.WelcomeResult.Fallback ->
@@ -113,6 +118,7 @@ class SpringConversationPort(
                     )
             }
         }
+    }
 
     override fun preferences(): ConversationPreferences =
         ConversationPreferences(

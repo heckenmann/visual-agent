@@ -46,6 +46,12 @@ data class ConversationStorePage(
 
 /** Stores, pages, searches, and deletes conversation messages. */
 interface ConversationStore {
+    /** Registers work before its first message so resetting the session can invalidate every late write. */
+    fun beginConversationRequest(
+        sessionId: String,
+        requestId: String,
+    ) = Unit
+
     /** Persists one conversation message using the caller-provided immutable identifier. */
     fun saveConversationMessage(
         id: String,
