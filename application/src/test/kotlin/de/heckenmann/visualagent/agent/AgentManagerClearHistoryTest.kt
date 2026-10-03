@@ -6,13 +6,45 @@ import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.todo.TodoEventBus
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.spyk
 import kotlinx.coroutines.runBlocking
 import reactor.core.publisher.Mono
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 @de.heckenmann.visualagent.testsupport.DatabaseTest
 class AgentManagerClearHistoryTest {
+    @Test
+    fun `failed persisted reset preserves displayed history`() {
+        val db =
+            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
+                .create("jdbc:h2:mem:test")
+        val store = spyk(db)
+        val manager =
+            AgentManager(
+                store,
+                mockk<LLMProvider>(relaxed = true),
+                AgentToolConfigService(db),
+                ToolEventBus(),
+                TodoEventBus(),
+                AppConfigBean(db),
+            )
+        try {
+            manager.appendSystemMessage("Keep this history")
+            val before = manager.getHistory()
+            every { store.deleteConversationMessages("main") } throws IllegalStateException("Deletion failed")
+
+            assertFailsWith<IllegalStateException> { manager.clearHistory() }
+
+            assertEquals(before, manager.getHistory())
+            assertEquals("Keep this history", db.getConversationMessages("main", 100).single().content)
+        } finally {
+            manager.destroy()
+            db.close()
+        }
+    }
+
     private fun createManager(): AgentManager {
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory

@@ -45,6 +45,7 @@ import de.heckenmann.visualagent.ui.settings.*
 import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
+import kotlinx.coroutines.sync.Mutex
 
 internal typealias ConversationScrollStateObserver = (ConversationUiState, LazyListState) -> Unit
 
@@ -66,6 +67,7 @@ internal fun ConversationPanel(
     onScrollStateObserved: ConversationScrollStateObserver? = null,
 ) {
     val scope = rememberCoroutineScope()
+    val clearGuard = remember { Mutex() }
     val inputFocusRequester = remember { FocusRequester() }
     val listState = rememberLazyListState()
     val isAtLatest by remember(listState) { derivedStateOf { listState.conversationPosition().isAtLatest } }
@@ -144,6 +146,7 @@ internal fun ConversationPanel(
             onStatusChange = { conversationState.status = it },
             onHistoryRefresh = { conversationState.resetHistory(conversationPort.currentHistory()) },
             onTodosCleared = todoState::clear,
+            clearGuard = clearGuard,
         )
     }
     LaunchedEffect(Unit) {

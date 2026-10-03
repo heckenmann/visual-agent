@@ -13,34 +13,104 @@ import de.heckenmann.visualagent.protocol.WorkspaceLayoutPort
 import de.heckenmann.visualagent.protocol.WorkspaceLayoutSnapshot
 import de.heckenmann.visualagent.ui.application.ComposeApplicationDependencies
 import de.heckenmann.visualagent.ui.application.StartupStatus
+import de.heckenmann.visualagent.ui.application.WorkspaceLayoutPersistenceCoordinator
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import io.mockk.verifyOrder
+import kotlinx.coroutines.runBlocking
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 /** Verifies that desktop shutdown hands context disposal to the Compose lifecycle. */
 class ComposeStartupHostLifecycleTest {
     @Test
-    fun `exit callback is invoked before spring context disposal`() {
-        val lifecycle = mockk<LifecyclePort>(relaxed = true)
-        val layout = mockk<WorkspaceLayoutPort>(relaxed = true)
-        val applicationPort = mockk<ApplicationPort>(relaxed = true)
-        every { applicationPort.lifecycle } returns lifecycle
-        every { applicationPort.layout } returns layout
-        var exited = false
-
-        closeApplication(
-            dependencies = ComposeApplicationDependencies(applicationPort),
-            windowState = WindowState(size = DpSize(800.dp, 600.dp)),
-            exitApplication = { exited = true },
-        )
-
-        assertTrue(exited)
-        verify { lifecycle.beginShutdown() }
-        verify { applicationPort.cancelActiveWork() }
+    fun `resource cleanup leaves the caller responsive and is awaited before process completion`() {
+        val coordinator = DesktopShutdownCoordinator()
+        val caller = Thread.currentThread()
+        val entered = CompletableFuture<Unit>()
+        val release = CompletableFuture<Unit>()
+        var completed = false
+        coordinator.closeResources {
+            assertNotEquals(caller, Thread.currentThread())
+            entered.complete(Unit)
+            release.get(10, TimeUnit.SECONDS)
+            completed = true
+        }
+        try {
+            entered.get(10, TimeUnit.SECONDS)
+            assertTrue(!completed)
+        } finally {
+            release.complete(Unit)
+            coordinator.awaitResourceCleanup()
+        }
+        assertTrue(completed)
     }
+
+    @Test
+    fun `shutdown flushes layout off the caller thread before closing the application`() =
+        runBlocking {
+            val caller = Thread.currentThread()
+            val applicationPort = mockk<ApplicationPort>(relaxed = true)
+            val layout = mockk<WorkspaceLayoutPort>(relaxed = true)
+            val lifecycle = mockk<LifecyclePort>(relaxed = true)
+            every { applicationPort.layout } returns layout
+            every { applicationPort.lifecycle } returns lifecycle
+            every { layout.bind(any(), any(), any()) } answers { assertNotEquals(caller, Thread.currentThread()) }
+            every { lifecycle.beginShutdown() } answers { assertNotEquals(caller, Thread.currentThread()) }
+            every { applicationPort.cancelActiveWork() } answers { assertNotEquals(caller, Thread.currentThread()) }
+            every { layout.saveStage(any(), any()) } answers { assertNotEquals(caller, Thread.currentThread()) }
+            val persistence = WorkspaceLayoutPersistenceCoordinator(layout)
+            val size = LayoutSize(800.0, 600.0)
+            persistence.update(size, size, emptyList())
+            val shutdown = DesktopShutdownCoordinator()
+            var exits = 0
+            repeat(2) {
+                closeApplication(
+                    ComposeApplicationDependencies(applicationPort),
+                    WindowState(size = DpSize(800.dp, 600.dp)),
+                    {
+                        assertEquals(caller, Thread.currentThread())
+                        exits += 1
+                    },
+                    shutdown,
+                    persistence,
+                )
+            }
+            assertEquals(1, exits)
+            verifyOrder {
+                layout.bind(size, size, emptyList())
+                layout.applyWindowStates(emptyList(), false)
+                lifecycle.beginShutdown()
+                applicationPort.cancelActiveWork()
+                layout.saveStage(size, any())
+            }
+        }
+
+    @Test
+    fun `exit callback is invoked before spring context disposal`() =
+        runBlocking {
+            val lifecycle = mockk<LifecyclePort>(relaxed = true)
+            val layout = mockk<WorkspaceLayoutPort>(relaxed = true)
+            val applicationPort = mockk<ApplicationPort>(relaxed = true)
+            every { applicationPort.lifecycle } returns lifecycle
+            every { applicationPort.layout } returns layout
+            var exited = false
+
+            closeApplication(
+                dependencies = ComposeApplicationDependencies(applicationPort),
+                windowState = WindowState(size = DpSize(800.dp, 600.dp)),
+                exitApplication = { exited = true },
+            )
+
+            assertTrue(exited)
+            verify { lifecycle.beginShutdown() }
+            verify { applicationPort.cancelActiveWork() }
+        }
 
     @Test
     fun `restored window position is clamped to the current screen`() {
@@ -99,6 +169,7 @@ class ComposeStartupHostLifecycleTest {
         assertTrue(!coordinator.requestExit())
         coordinator.closeResources { closeCount += 1 }
         coordinator.closeResources { closeCount += 1 }
+        coordinator.awaitResourceCleanup()
 
         assertEquals(1, closeCount)
     }

@@ -54,6 +54,8 @@ fun VisualAgentComposeApp(
     onCloseApplication: () -> Unit,
     persistedWindows: List<LayoutWindowState>,
     onRunOnboarding: () -> Unit = {},
+    layoutPersistence: WorkspaceLayoutPersistenceCoordinator =
+        remember(deps.applicationPort.layout) { WorkspaceLayoutPersistenceCoordinator(deps.applicationPort.layout) },
 ) {
     var windows by remember { mutableStateOf(restoreWorkspaceWindows(defaultWindows(), persistedWindows)) }
     var modal by remember { mutableStateOf<ComposeModal?>(null) }
@@ -110,16 +112,16 @@ fun VisualAgentComposeApp(
             }
         onDispose { registration.close() }
     }
+    LaunchedEffect(deps.applicationPort.settings) {
+        settings = deps.applicationPort.settings.snapshotAsync()
+        settingsLoaded = true
+    }
     DisposableEffect(deps.applicationPort.providers) {
         val registration =
             deps.applicationPort.providers.addChangeListener {
                 composeScope.launch { providerRevision += 1 }
             }
         onDispose { registration.close() }
-    }
-    LaunchedEffect(deps.applicationPort.settings) {
-        settings = deps.applicationPort.settings.snapshotAsync()
-        settingsLoaded = true
     }
     ComposeAutomaticUpdateCheck(
         settings = settings,
@@ -241,27 +243,23 @@ fun VisualAgentComposeApp(
                                         )
                                     val minPanelWidth = ComposeWorkspaceWindowBounds.MIN_WIDTH
                                     val workspaceStates = windows.mapIndexed { index, window -> window.toLayoutWindowState(index) }
-                                    deps.applicationPort.layout.bind(
+                                    WorkspaceLayoutEffects(
+                                        port = deps.applicationPort.layout,
                                         stage = stage,
                                         desktop = LayoutSize(width = viewport.width.toDouble(), height = viewport.height.toDouble()),
                                         windows = workspaceStates,
+                                        coordinator = layoutPersistence,
                                     )
-                                    LaunchedEffect(workspaceStates) {
-                                        deps.applicationPort.layout.applyWindowStates(workspaceStates, notifyListeners = false)
-                                    }
                                     val capabilityWarnings =
                                         rememberModelCapabilityWarnings(
-                                            providers = panelServices.providers,
-                                            configuredContextLength = settings.contextLength,
-                                            providerRevision = providerRevision,
-                                            selectionProviderId = settings.providerId,
-                                            selectionModelId = settings.modelId,
+                                            panelServices.providers,
+                                            settings.contextLength,
+                                            providerRevision,
+                                            settings.providerId,
+                                            settings.modelId,
                                         )
                                     Column(modifier = Modifier.fillMaxSize()) {
                                         ComposeWorkspaceHeader(
-                                            providerName = panelServices.providers.activeProviderId(),
-                                            modelName = panelServices.providers.activeModelId(),
-                                            beanDefinitionCount = deps.beanDefinitionCount,
                                             inFlight = inFlight.state.value,
                                             capabilityWarnings = capabilityWarnings,
                                             onStopAll = {

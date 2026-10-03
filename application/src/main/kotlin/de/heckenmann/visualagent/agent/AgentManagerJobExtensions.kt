@@ -5,28 +5,30 @@ internal suspend fun AgentManager.sendMessageToAgent(
     agentId: String,
     content: String,
 ): String {
+    val requestId = conversationOps.beginConversationRequest()
     subAgentExecutionControl.awaitExecutionAllowed(agentId)
-    return conversationOps.sendMessageToAgent(agentId, content)
+    return conversationOps.sendMessageToAgent(agentId, content, requestId)
 }
 
 /** Runs a sub-agent job synchronously. */
 internal suspend fun AgentManager.runAgentJob(
     agentId: String,
     content: String,
-): AgentJobResult =
-    subAgentJobScheduler.run(agentId) {
-        conversationOps.runAgentJob(agentId, content)
+): AgentJobResult {
+    val requestId = conversationOps.beginConversationRequest()
+    return subAgentJobScheduler.run(agentId) {
+        conversationOps.runAgentJob(agentId, content, requestId)
     }
+}
 
 /** Enqueues a job for an existing sub-agent. */
 internal fun AgentManager.enqueueAgentJob(
     agentId: String,
     content: String,
 ): String =
-    subAgentJobScheduler.enqueue(
+    enqueueConversationJob(
         agentId = agentId,
-        block = { conversationOps.runAgentJob(agentId, content) },
-        onFinished = conversationOps::notifyMainAgentOfJobCompletion,
+        block = { requestId -> conversationOps.runAgentJob(agentId, content, requestId) },
     )
 
 /** Runs a temporary sub-agent job synchronously. */
@@ -35,10 +37,12 @@ internal suspend fun AgentManager.startAgentJob(
     role: String,
     templateName: String,
     content: String,
-): AgentJobResult =
-    subAgentJobScheduler.run {
-        conversationOps.startAgentJob(name, role, templateName, content)
+): AgentJobResult {
+    val requestId = conversationOps.beginConversationRequest()
+    return subAgentJobScheduler.run {
+        conversationOps.startAgentJob(name, role, templateName, content, requestId)
     }
+}
 
 /** Enqueues a temporary sub-agent job. */
 internal fun AgentManager.enqueueAgentJob(
@@ -47,10 +51,22 @@ internal fun AgentManager.enqueueAgentJob(
     templateName: String,
     content: String,
 ): String =
-    subAgentJobScheduler.enqueue(
-        block = { conversationOps.startAgentJob(name, role, templateName, content) },
-        onFinished = conversationOps::notifyMainAgentOfJobCompletion,
+    enqueueConversationJob(
+        agentId = null,
+        block = { requestId -> conversationOps.startAgentJob(name, role, templateName, content, requestId) },
     )
+
+private fun AgentManager.enqueueConversationJob(
+    agentId: String?,
+    block: suspend (String) -> AgentJobResult,
+): String {
+    val requestId = conversationOps.beginConversationRequest()
+    return subAgentJobScheduler.enqueue(
+        agentId = agentId,
+        block = { block(requestId) },
+        onFinished = { jobId, result -> conversationOps.notifyMainAgentOfJobCompletion(jobId, result, requestId) },
+    )
+}
 
 /** Cancels a queued or running sub-agent job. */
 internal fun AgentManager.cancelSubAgentJob(jobId: String): Boolean = subAgentJobScheduler.cancelJob(jobId)

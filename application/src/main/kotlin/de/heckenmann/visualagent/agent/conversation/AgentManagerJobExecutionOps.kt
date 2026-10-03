@@ -10,6 +10,7 @@ import de.heckenmann.visualagent.agent.SubAgent
 internal suspend fun AgentManager.executeSubAgentJob(
     agent: SubAgent,
     content: String,
+    requestId: String? = null,
 ): AgentJobResult {
     activeJobsByAgentId.compute(agent.id) { _, count -> (count ?: 0) + 1 }
     agent.status = AgentStatus.BUSY
@@ -23,6 +24,7 @@ internal suspend fun AgentManager.executeSubAgentJob(
                 messages = listOf(Message("user", content)),
                 provider = llmProvider,
                 enabledTools = agentToolConfigService.toolsFor(agent),
+                requestId = requestId,
             )
         AgentJobResult(agent.id, agent.name, response.message.content)
     } finally {

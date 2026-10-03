@@ -6,13 +6,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import de.heckenmann.visualagent.protocol.ProviderModel
 import de.heckenmann.visualagent.protocol.ProviderPort
 import de.heckenmann.visualagent.ui.workspace.ModelCapabilityWarnings
 import de.heckenmann.visualagent.ui.workspace.modelCapabilityWarnings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Resolves active-model warnings, refreshing the context limit when the provider exposes one. */
+/** Loads active-model metadata off the UI thread only when the selection or catalog changes. */
 @Composable
 internal fun rememberModelCapabilityWarnings(
     providers: ProviderPort,
@@ -21,23 +22,22 @@ internal fun rememberModelCapabilityWarnings(
     selectionProviderId: String,
     selectionModelId: String,
 ): ModelCapabilityWarnings {
-    var reportedContextLimit by remember { mutableStateOf<Int?>(null) }
-    val activeProvider =
-        remember(providerRevision, selectionProviderId, selectionModelId) {
-            providers.getProvider(providers.activeProviderId())
-        }
-    val activeModel = activeProvider?.models?.firstOrNull { it.id == providers.activeModelId() }
-    LaunchedEffect(activeProvider?.id, activeModel?.id, providerRevision) {
-        reportedContextLimit = activeModel?.contextLimit
-        val providerId = activeProvider?.id ?: return@LaunchedEffect
-        val modelId = activeModel?.id ?: return@LaunchedEffect
-        reportedContextLimit =
+    var activeModel by remember(providers, selectionProviderId, selectionModelId) { mutableStateOf<ProviderModel?>(null) }
+    LaunchedEffect(providers, providerRevision, selectionProviderId, selectionModelId) {
+        val selection =
             withContext(Dispatchers.IO) {
-                runCatching { providers.modelDetails(providerId, modelId).contextLimit }.getOrNull()
-            } ?: activeModel.contextLimit
+                val providerId = providers.activeProviderId()
+                val modelId = providers.activeModelId()
+                val model = providers.getProvider(providerId)?.models?.firstOrNull { it.id == modelId }
+                Triple(providerId, modelId, model)
+            }
+        activeModel = selection.third
+        val model = selection.third ?: return@LaunchedEffect
+        val limit =
+            withContext(Dispatchers.IO) {
+                runCatching { providers.modelDetails(selection.first, selection.second).contextLimit }.getOrNull()
+            }
+        activeModel = model.copy(contextLimit = limit ?: model.contextLimit)
     }
-    return modelCapabilityWarnings(
-        configuredContextLength,
-        activeModel?.copy(contextLimit = reportedContextLimit ?: activeModel.contextLimit),
-    )
+    return modelCapabilityWarnings(configuredContextLength, activeModel)
 }

@@ -4,7 +4,6 @@ import de.heckenmann.visualagent.agent.AgentStatus
 import de.heckenmann.visualagent.agent.CancellationToken
 import de.heckenmann.visualagent.agent.ConversationOpsProvider
 import de.heckenmann.visualagent.agent.LLMProvider
-import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ParallelismProvider
 import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.agent.SubAgentExecutionControl
@@ -22,7 +21,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import mu.KotlinLogging
@@ -115,7 +116,7 @@ class AutonomousCoordinator
                         if (error !is kotlinx.coroutines.CancellationException) {
                             logger.warn(error) { "Autonomous work pickup failed; waiting for the next signal" }
                         }
-                        if (error is kotlinx.coroutines.CancellationException) throw error
+                        if (error is kotlinx.coroutines.CancellationException) currentCoroutineContext().ensureActive()
                     }
                 }
             }
@@ -276,6 +277,7 @@ class AutonomousCoordinator
 
             val candidate = candidateSelector.find(requestedTodoId) ?: return false
             val agent = candidate.agent
+            val requestId = conversationOps.beginConversationRequest()
             val todo = todoManager.claimPendingTodo(candidate.todo.id, agent.id) ?: return false
             try {
                 agent.status = AgentStatus.BUSY
@@ -283,12 +285,7 @@ class AutonomousCoordinator
                 agent.currentTask = todo.description
                 agentBusySince[agent.id] = System.currentTimeMillis()
                 subAgentOps.saveSubAgent(agent)
-                conversationOps.persist(
-                    Message(
-                        role = "system",
-                        content = "Started todo ${todo.id} (${todo.description.take(80)}) with agent ${agent.id} (${agent.name}).",
-                    ),
-                )
+                persistTodoStart(agent, todo, requestId, conversationOps::persist)
                 subAgentOps.notifyAgent(agent.id, "STATUS:${agent.status.name}")
 
                 val token = CancellationToken().also { activeCancellationTokens[todo.id] = it }
@@ -323,6 +320,7 @@ class AutonomousCoordinator
                             jobScheduler = jobScheduler,
                             executionControl = executionControl,
                             cancellationToken = token,
+                            conversationRequestId = requestId,
                             retryDelay = retryDelay,
                         )
                     }

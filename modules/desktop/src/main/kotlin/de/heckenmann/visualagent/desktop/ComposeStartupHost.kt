@@ -38,11 +38,19 @@ private val logger = LoggerFactory.getLogger("de.heckenmann.visualagent.desktop.
 /** Starts Compose before the local Spring server and keeps the splash responsive during startup. */
 fun runVisualAgentComposeApplication() {
     AppIdentity.configureProcessProperties()
-    application { ComposeStartupHost(::exitApplication) }
+    val shutdownCoordinator = DesktopShutdownCoordinator()
+    try {
+        application(exitProcessOnExit = false) { ComposeStartupHost(::exitApplication, shutdownCoordinator) }
+    } finally {
+        shutdownCoordinator.awaitResourceCleanup()
+    }
 }
 
 @Composable
-private fun ComposeStartupHost(exitApplication: () -> Unit) {
+private fun ComposeStartupHost(
+    exitApplication: () -> Unit,
+    shutdownCoordinator: DesktopShutdownCoordinator,
+) {
     var startupAttempt by remember { mutableStateOf(0) }
     var startupStatus by remember { mutableStateOf(StartupStatus.waitingForServerSelection()) }
     var startRequested by
@@ -62,7 +70,6 @@ private fun ComposeStartupHost(exitApplication: () -> Unit) {
     var manualOnboardingRequested by remember { mutableStateOf(false) }
     val currentContext = rememberUpdatedState(springContext)
     val currentConnection = rememberUpdatedState(serverConnection)
-    val shutdownCoordinator = remember { DesktopShutdownCoordinator() }
     val bookmarkStore = remember { DesktopServerBookmarkStore() }
     var bookmarks by remember {
         mutableStateOf<DesktopServerBookmarkLoadResult>(DesktopServerBookmarkLoadResult.Loaded(DesktopServerBookmarkState()))
@@ -191,9 +198,14 @@ private fun ComposeStartupHost(exitApplication: () -> Unit) {
 
     DisposableEffect(Unit) {
         onDispose {
+            val connection = currentConnection.value
+            val context = currentContext.value
             shutdownCoordinator.closeResources {
-                currentConnection.value?.close()
-                currentContext.value?.close()
+                try {
+                    connection?.close()
+                } finally {
+                    context?.close()
+                }
             }
         }
     }
@@ -270,12 +282,13 @@ private fun ComposeStartupHost(exitApplication: () -> Unit) {
                 persistedLayout = checkNotNull(persistedLayout),
                 persistedWindows = persistedWindows,
                 onRunOnboarding = { manualOnboardingRequested = true },
-                onCloseApplication = { windowState ->
+                onCloseApplication = { windowState, layoutPersistence ->
                     closeApplication(
                         dependencies = checkNotNull(readyDependencies),
                         windowState = windowState,
                         exitApplication = exitApplication,
                         shutdownCoordinator = shutdownCoordinator,
+                        layoutPersistence = layoutPersistence,
                     )
                 },
             )
@@ -312,32 +325,33 @@ internal fun selectEndpoint(): DesktopServerEndpoint {
     return DesktopServerEndpointSelector.select(properties)
 }
 
-internal fun closeApplication(
+internal suspend fun closeApplication(
     dependencies: ComposeApplicationDependencies,
     windowState: androidx.compose.ui.window.WindowState,
     exitApplication: () -> Unit,
     shutdownCoordinator: DesktopShutdownCoordinator = DesktopShutdownCoordinator(),
+    layoutPersistence: de.heckenmann.visualagent.ui.application.WorkspaceLayoutPersistenceCoordinator? = null,
 ) {
     if (!shutdownCoordinator.requestExit()) return
     try {
-        dependencies.applicationPort.lifecycle.beginShutdown()
-        dependencies.applicationPort.cancelActiveWork()
+        layoutPersistence?.finish()
         val size = windowState.size
         val position =
             windowState.position.takeIf { it.isSpecified }?.let {
                 LayoutPosition(it.x.value.toDouble(), it.y.value.toDouble())
             }
-        dependencies.applicationPort.layout.saveStage(
-            LayoutSize(size.width.value.toDouble(), size.height.value.toDouble()),
-            position,
-        )
+        withContext(Dispatchers.IO + NonCancellable) {
+            dependencies.applicationPort.lifecycle.beginShutdown()
+            dependencies.applicationPort.cancelActiveWork()
+            dependencies.applicationPort.layout.saveStage(
+                LayoutSize(size.width.value.toDouble(), size.height.value.toDouble()),
+                position,
+            )
+        }
     } catch (_: Exception) {
         // A shutdown failure must not keep the native window or the Compose application alive.
     } finally {
-        // Exit the Compose application before the Spring context is closed. The root
-        // DisposableEffect cancels presentation coroutines and unregisters their listeners
-        // before it closes the context. Closing Spring here races with a final TodoPanel
-        // refresh and can leave it trying to create an EntityManager from a closed factory.
+        // Exit only after the final layout write; composition disposal then closes the server.
         exitApplication()
     }
 }

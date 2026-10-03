@@ -23,6 +23,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import de.heckenmann.visualagent.protocol.ConversationMessage as Message
 
@@ -122,6 +123,7 @@ internal fun handleClearConversation(
     onStatusChange: (String) -> Unit,
     onHistoryRefresh: suspend () -> Unit,
     onTodosCleared: () -> Unit,
+    clearGuard: Mutex,
 ) {
     modalRequester.requestConfirmation(
         ComposeConfirmationModal(
@@ -132,20 +134,31 @@ internal fun handleClearConversation(
             confirmDescription = "Clear conversation",
         ) {
             scope.launch {
-                onSendingChange(true)
-                onStatusChange("Stopping active work and clearing conversation...")
-                activeToken()?.cancel()
-                conversationPort.cancelActiveWork()
-                runCatching {
-                    conversationPort.clearAndCreateWelcome()
-                }.onSuccess { result ->
-                    onTodosCleared()
+                if (!clearGuard.tryLock()) return@launch
+                var cleared = false
+                try {
+                    onSendingChange(true)
+                    onStatusChange("Stopping active work and clearing conversation...")
+                    activeToken()?.cancel()
+                    withContext(Dispatchers.IO) { conversationPort.cancelActiveWork() }
+                    val result =
+                        conversationPort.clearAndCreateWelcome {
+                            cleared = true
+                            onTodosCleared()
+                            onHistoryRefresh()
+                            onStatusChange("Conversation cleared. Preparing welcome message...")
+                        }
+                    onHistoryRefresh()
                     onStatusChange(result.warning?.let { "Welcome could not be generated: $it" } ?: "Conversation cleared")
-                }.onFailure { error ->
-                    onStatusChange("Welcome could not be generated: ${error.message ?: error::class.simpleName.orEmpty()}")
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    val action = if (cleared) "Welcome could not be generated" else "Conversation could not be cleared"
+                    onStatusChange("$action: ${error.message ?: error::class.simpleName.orEmpty()}")
+                } finally {
+                    clearGuard.unlock()
+                    onSendingChange(false)
                 }
-                onHistoryRefresh()
-                onSendingChange(false)
             }
         },
     )

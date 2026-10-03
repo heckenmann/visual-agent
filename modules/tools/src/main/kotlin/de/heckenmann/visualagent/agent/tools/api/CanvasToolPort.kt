@@ -99,6 +99,7 @@ interface CanvasToolPort {
     fun saveCapture(
         sessionId: String,
         image: ToolCanvasImage,
+        requestId: String? = null,
     ): String
 }
 

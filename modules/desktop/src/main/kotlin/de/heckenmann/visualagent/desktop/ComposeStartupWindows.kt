@@ -8,6 +8,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -32,9 +33,11 @@ import de.heckenmann.visualagent.ui.application.ComposeApplicationDependencies
 import de.heckenmann.visualagent.ui.application.StartupPhase
 import de.heckenmann.visualagent.ui.application.StartupStatus
 import de.heckenmann.visualagent.ui.application.VisualAgentComposeApp
+import de.heckenmann.visualagent.ui.application.WorkspaceLayoutPersistenceCoordinator
 import de.heckenmann.visualagent.ui.onboarding.ComposeOnboardingWizard
 import de.heckenmann.visualagent.ui.workspace.visualAgentDarkColorScheme
 import de.heckenmann.visualagent.ui.workspace.visualAgentTypography
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import org.slf4j.LoggerFactory
 
@@ -145,10 +148,15 @@ internal fun ComposeMainWindow(
     dependencies: ComposeApplicationDependencies,
     persistedLayout: WorkspaceLayoutSnapshot,
     persistedWindows: List<LayoutWindowState>,
-    onCloseApplication: (WindowState) -> Unit,
+    onCloseApplication: suspend (WindowState, WorkspaceLayoutPersistenceCoordinator) -> Unit,
     onRunOnboarding: () -> Unit,
 ) {
     val applicationIcon = painterResource(Res.drawable.visual_agent)
+    val scope = rememberCoroutineScope()
+    val layoutPersistence =
+        remember(dependencies.applicationPort.layout) {
+            WorkspaceLayoutPersistenceCoordinator(dependencies.applicationPort.layout)
+        }
     val initialStage = persistedLayout.stage
     val initialPosition = persistedLayout.stagePosition
     var geometryRestored by remember { mutableStateOf(false) }
@@ -160,9 +168,10 @@ internal fun ComposeMainWindow(
                 initialPosition?.let { WindowPosition.Absolute(it.x.dp, it.y.dp) }
                     ?: WindowPosition.Aligned(Alignment.Center),
         )
+    val requestClose: () -> Unit = { scope.launch { onCloseApplication(windowState, layoutPersistence) } }
     Window(
         visible = geometryRestored,
-        onCloseRequest = { onCloseApplication(windowState) },
+        onCloseRequest = requestClose,
         title = STARTUP_WINDOW_TITLE,
         icon = applicationIcon,
         state = windowState,
@@ -182,9 +191,10 @@ internal fun ComposeMainWindow(
         }
         VisualAgentComposeApp(
             deps = dependencies,
-            onCloseApplication = { onCloseApplication(windowState) },
+            onCloseApplication = requestClose,
             persistedWindows = persistedWindows,
             onRunOnboarding = onRunOnboarding,
+            layoutPersistence = layoutPersistence,
         )
     }
 }

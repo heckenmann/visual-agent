@@ -14,6 +14,22 @@ import de.heckenmann.visualagent.todo.TodoTerminalReason
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
+/** Persists the initial todo notification with the identity shared by its worker. */
+internal fun persistTodoStart(
+    agent: SubAgent,
+    todo: Todo,
+    requestId: String,
+    persistMessage: (Message) -> Unit,
+) {
+    persistMessage(
+        Message(
+            role = "system",
+            content = "Started todo ${todo.id} (${todo.description.take(80)}) with agent ${agent.id} (${agent.name}).",
+            conversationRequestId = requestId,
+        ),
+    )
+}
+
 /**
  * Builds a `sub_agent` conversation message with metadata that the UI uses to show
  * success or failure status.
@@ -124,16 +140,19 @@ internal fun handleTodoChangeAfterCancellation(
                     put("agentName", agent.name)
                     put("success", false)
                 }.toString()
-            persistMessage(
-                Message(
-                    role = "sub_agent",
-                    content =
-                        "Agent ${agent.name} (${agent.id}) stopped todo $todoId. " +
-                            "Stopped because the todo was cancelled, deleted, or reassigned",
-                    metadata = metadata,
-                ),
-            )
-            releaseAgent(agent, todoId)
+            try {
+                persistMessage(
+                    Message(
+                        role = "sub_agent",
+                        content =
+                            "Agent ${agent.name} (${agent.id}) stopped todo $todoId. " +
+                                "Stopped because the todo was cancelled, deleted, or reassigned",
+                        metadata = metadata,
+                    ),
+                )
+            } finally {
+                releaseAgent(agent, todoId)
+            }
         }
         change?.todo != null && change.todo.description != agent.currentTask && agent.currentTodoId == todoId -> {
             agent.currentTask = currentTodo.description

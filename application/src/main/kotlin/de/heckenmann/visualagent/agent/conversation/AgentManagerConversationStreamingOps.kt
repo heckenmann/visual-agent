@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.agent.conversation
 
 import de.heckenmann.visualagent.agent.AgentManager
+import de.heckenmann.visualagent.agent.AgentManagerConstants
 import de.heckenmann.visualagent.agent.AssistantTurnIdentity
 import de.heckenmann.visualagent.agent.CancellationToken
 import de.heckenmann.visualagent.agent.ChatRequestContext
@@ -42,6 +43,7 @@ internal class AgentManagerConversationStreamingOps(
         clientDataRequester: ClientDataRequestPort? = null,
     ): String {
         require(content.isNotBlank()) { "Conversation content must not be blank" }
+        owner.conversationStore.beginConversationRequest(AgentManagerConstants.MAIN_SESSION_ID, assistantEntryId)
         owner.conversationStore.getConversationMessage(assistantEntryId)?.let { existing ->
             require(existing.role == "assistant") { "Conversation retry assistant entry must have role assistant" }
             val userEntry =
@@ -57,7 +59,15 @@ internal class AgentManagerConversationStreamingOps(
             turns.forEach { turn -> onChunk(ConversationStreamUpdate(turn.id, turn.content)) }
             return turns.last().content
         }
-        persist(Message("user", content, metadata = conversationTurnMetadata(assistantEntryId), id = userEntryId))
+        persist(
+            Message(
+                "user",
+                content,
+                metadata = conversationTurnMetadata(assistantEntryId),
+                id = userEntryId,
+                conversationRequestId = assistantEntryId,
+            ),
+        )
         val requestId = assistantEntryId
         val collectedByRound = linkedMapOf<Int, StringBuilder>()
         val turnsByRound = linkedMapOf<Int, ProviderTurnResponse>()

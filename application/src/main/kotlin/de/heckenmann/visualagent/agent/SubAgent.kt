@@ -118,8 +118,9 @@ data class SubAgent(
         provider: LLMProvider,
         enabledTools: Set<ToolId> = emptySet(),
         token: CancellationToken? = null,
+        requestId: String? = null,
     ): ChatResponse {
-        val response = provider.chatReactive(buildRequest(messages, enabledTools, token)).awaitSingle()
+        val response = provider.chatReactive(buildRequest(messages, enabledTools, token, requestId)).awaitSingle()
         appendChatHistory(messages, response)
         return response
     }
@@ -148,6 +149,7 @@ data class SubAgent(
         token: CancellationToken? = null,
         onChunk: ((String) -> Unit)? = null,
         onStreamReset: (() -> Unit)? = null,
+        requestId: String? = null,
     ): String {
         val messages =
             listOf(
@@ -202,7 +204,7 @@ data class SubAgent(
                 Message("user", description),
             )
 
-        val resp = responseForTodo(messages, provider, enabledTools, token, onChunk, onStreamReset)
+        val resp = responseForTodo(messages, provider, enabledTools, token, onChunk, onStreamReset, requestId)
 
         val summary =
             resp.message.content
@@ -234,14 +236,15 @@ data class SubAgent(
         token: CancellationToken?,
         onChunk: ((String) -> Unit)?,
         onStreamReset: (() -> Unit)?,
+        requestId: String?,
     ): ChatResponse {
-        if (onChunk == null) return chat(messages, provider, enabledTools, token)
+        if (onChunk == null) return chat(messages, provider, enabledTools, token, requestId)
         return try {
-            stream(messages, provider, enabledTools, token, onChunk)
+            stream(messages, provider, enabledTools, token, onChunk, requestId)
         } catch (error: Exception) {
             if (!isStreamingUnavailable(error)) throw error
             logger.info { "Streaming is unavailable for sub-agent $id; using a complete response instead" }
-            val fallback = chat(messages, provider, enabledTools, token)
+            val fallback = chat(messages, provider, enabledTools, token, requestId)
             onStreamReset?.invoke()
             fallback.message.content
                 .takeIf(String::isNotEmpty)
@@ -256,11 +259,12 @@ data class SubAgent(
         enabledTools: Set<ToolId>,
         token: CancellationToken?,
         onChunk: (String) -> Unit,
+        requestId: String?,
     ): ChatResponse {
         val collected = StringBuilder()
         var terminalResponse: ChatResponse? = null
         provider
-            .streamReactive(buildRequest(messages, enabledTools, token))
+            .streamReactive(buildRequest(messages, enabledTools, token, requestId))
             .doOnNext { chunk ->
                 token?.throwIfCancelled()
                 if (chunk.done) terminalResponse = chunk
@@ -280,6 +284,7 @@ data class SubAgent(
         messages: List<Message>,
         enabledTools: Set<ToolId>,
         token: CancellationToken?,
+        requestId: String?,
     ): ChatRequestContext {
         val modelSelection = config.modelSelection()
         return ChatRequestContext(
@@ -290,7 +295,9 @@ data class SubAgent(
             parameters = modelSelection.parameters,
             options = modelSelection.options,
             enabledTools = enabledTools,
-            metadata = mapOf("agentId" to id, "agentName" to name, "agentRole" to role),
+            metadata =
+                mapOf("agentId" to id, "agentName" to name, "agentRole" to role) +
+                    requestId?.let { mapOf("requestId" to it, "sessionId" to AgentManagerConstants.MAIN_SESSION_ID) }.orEmpty(),
             cancellationToken = token,
         )
     }

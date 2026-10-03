@@ -59,21 +59,19 @@ class ComposeWorkspaceNavigationTest {
     }
 
     @Test
-    fun `workspace header renders provider model and beans chips`() {
+    fun `workspace header renders identity without informational chips`() {
         composeTestRule.setContent {
             MaterialTheme {
                 ComposeWorkspaceHeader(
-                    providerName = "ollama",
-                    modelName = "llava",
-                    beanDefinitionCount = 123,
                     inFlight = InFlightState(),
                     onStopAll = {},
                 )
             }
         }
-        composeTestRule.onNodeWithText("Provider ollama").assertExists()
-        composeTestRule.onNodeWithText("Model llava").assertExists()
-        composeTestRule.onNodeWithText("Beans 123").assertExists()
+        composeTestRule.onNodeWithText("Visual Agent").assertExists()
+        composeTestRule.onNodeWithText("Provider", substring = true).assertDoesNotExist()
+        composeTestRule.onNodeWithText("Model", substring = true).assertDoesNotExist()
+        composeTestRule.onNodeWithText("Beans", substring = true).assertDoesNotExist()
     }
 
     @Test
@@ -93,9 +91,6 @@ class ComposeWorkspaceNavigationTest {
         composeTestRule.setContent {
             MaterialTheme {
                 ComposeWorkspaceHeader(
-                    providerName = "provider",
-                    modelName = "small",
-                    beanDefinitionCount = 1,
                     inFlight = InFlightState(),
                     capabilityWarnings = warnings,
                 )

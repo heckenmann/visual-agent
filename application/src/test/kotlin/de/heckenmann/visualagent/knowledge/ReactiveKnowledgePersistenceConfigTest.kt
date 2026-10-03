@@ -100,7 +100,7 @@ class ReactiveKnowledgePersistenceConfigTest {
                     .collectList()
                     .block()
                     .orEmpty()
-            assertEquals(listOf("1", "2", "3"), successfulVersions)
+            assertEquals(listOf("1", "2", "3", "4"), successfulVersions)
         }
     }
 
