@@ -18,6 +18,7 @@ import de.heckenmann.visualagent.protocol.LayoutPosition
 import de.heckenmann.visualagent.protocol.LayoutSize
 import de.heckenmann.visualagent.protocol.LayoutWindowState
 import de.heckenmann.visualagent.protocol.OnboardingState
+import de.heckenmann.visualagent.protocol.ThemeMode
 import de.heckenmann.visualagent.protocol.WorkspaceLayoutSnapshot
 import de.heckenmann.visualagent.server.VisualAgentGrpcServer
 import de.heckenmann.visualagent.ui.application.ComposeApplicationDependencies
@@ -68,6 +69,7 @@ private fun ComposeStartupHost(
     var persistedWindows by remember { mutableStateOf<List<LayoutWindowState>>(emptyList()) }
     var onboardingState by remember { mutableStateOf<OnboardingState?>(null) }
     var manualOnboardingRequested by remember { mutableStateOf(false) }
+    var startupThemeMode by remember { mutableStateOf(ThemeMode.SYSTEM) }
     val currentContext = rememberUpdatedState(springContext)
     val currentConnection = rememberUpdatedState(serverConnection)
     val bookmarkStore = remember { DesktopServerBookmarkStore() }
@@ -177,6 +179,7 @@ private fun ComposeStartupHost(
                         ),
                 )
             val loadedLayout = withContext(Dispatchers.IO) { applicationPort.layout.report() }
+            startupThemeMode = withContext(Dispatchers.IO) { applicationPort.settings.snapshot().uiThemeMode }
             dependencies = loadedDependencies
             persistedLayout = loadedLayout
             persistedWindows = loadedLayout.windows
@@ -223,6 +226,7 @@ private fun ComposeStartupHost(
     ) {
         StartupWindowMode.SPLASH ->
             ComposeStartupSplashWindow(
+                themeMode = startupThemeMode,
                 status = startupStatus,
                 bookmarks = bookmarks,
                 onSaveBookmarks = { next ->
@@ -253,6 +257,7 @@ private fun ComposeStartupHost(
             )
         StartupWindowMode.ONBOARDING ->
             ComposeOnboardingWindow(
+                themeMode = startupThemeMode,
                 applicationPort = checkNotNull(readyDependencies).applicationPort,
                 automatic = !manualOnboardingRequested,
                 onFinished = {
@@ -281,7 +286,16 @@ private fun ComposeStartupHost(
                 dependencies = checkNotNull(readyDependencies),
                 persistedLayout = checkNotNull(persistedLayout),
                 persistedWindows = persistedWindows,
-                onRunOnboarding = { manualOnboardingRequested = true },
+                onRunOnboarding = {
+                    composeScope.launch {
+                        startupThemeMode =
+                            checkNotNull(readyDependencies)
+                                .applicationPort.settings
+                                .snapshotAsync()
+                                .uiThemeMode
+                        manualOnboardingRequested = true
+                    }
+                },
                 onCloseApplication = { windowState, layoutPersistence ->
                     closeApplication(
                         dependencies = checkNotNull(readyDependencies),

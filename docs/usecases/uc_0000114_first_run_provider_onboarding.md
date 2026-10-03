@@ -62,6 +62,14 @@ and persisted sub-agents; the desktop never reads existing credentials.
 ## Acceptance Criteria
 
 - Onboarding begins only after the Visual Agent server connection is ready.
+- Onboarding shares the splash screen's initial 880 x 600 dp dimensions and
+  decorative background resources. The connected server's theme selection
+  determines the light/dark variant; System follows the OS appearance.
+- The onboarding window is not user-resizable; longer content remains accessible
+  through the wizard's scrollable content area.
+- Reopening onboarding refreshes theme settings from the server asynchronously.
+- Missing or malformed background assets do not interrupt the wizard; theme
+  colors provide the fallback and all foreground/contrast treatments.
 - Provider views expose credential presence but not credential values.
 - Skip changes only the server-owned onboarding state.
 - Manual cancellation does not change the server-owned onboarding state.

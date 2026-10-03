@@ -28,6 +28,7 @@ import de.heckenmann.visualagent.protocol.LayoutSize
 import de.heckenmann.visualagent.protocol.LayoutWindowState
 import de.heckenmann.visualagent.protocol.OnboardingState
 import de.heckenmann.visualagent.protocol.OnboardingStatus
+import de.heckenmann.visualagent.protocol.ThemeMode
 import de.heckenmann.visualagent.protocol.WorkspaceLayoutSnapshot
 import de.heckenmann.visualagent.ui.application.ComposeApplicationDependencies
 import de.heckenmann.visualagent.ui.application.StartupPhase
@@ -36,6 +37,7 @@ import de.heckenmann.visualagent.ui.application.VisualAgentComposeApp
 import de.heckenmann.visualagent.ui.application.WorkspaceLayoutPersistenceCoordinator
 import de.heckenmann.visualagent.ui.onboarding.ComposeOnboardingWizard
 import de.heckenmann.visualagent.ui.workspace.visualAgentDarkColorScheme
+import de.heckenmann.visualagent.ui.workspace.visualAgentLightColorScheme
 import de.heckenmann.visualagent.ui.workspace.visualAgentTypography
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
@@ -84,6 +86,7 @@ internal fun ComposeStartupSplashWindow(
     onStartLocal: () -> Unit = {},
     onRetry: () -> Unit,
     onCloseRequest: () -> Unit,
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
 ) {
     val applicationIcon = painterResource(Res.drawable.visual_agent)
     val windowState =
@@ -106,6 +109,8 @@ internal fun ComposeStartupSplashWindow(
             onSaveBookmarks = onSaveBookmarks,
             onStartLocal = onStartLocal,
             onRetry = onRetry,
+            themeMode = themeMode,
+            onCloseRequest = onCloseRequest,
         )
     }
 }
@@ -117,6 +122,7 @@ internal fun ComposeOnboardingWindow(
     automatic: Boolean,
     onFinished: () -> Unit,
     onCloseRequest: () -> Unit,
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
 ) {
     val applicationIcon = painterResource(Res.drawable.visual_agent)
     var skipRequested by remember { mutableStateOf(false) }
@@ -126,10 +132,20 @@ internal fun ComposeOnboardingWindow(
         },
         title = "$STARTUP_WINDOW_TITLE – Setup",
         icon = applicationIcon,
-        state = rememberWindowState(width = 880.dp, height = 600.dp, position = WindowPosition.Aligned(Alignment.Center)),
+        resizable = false,
+        state =
+            rememberWindowState(
+                width = DEFAULT_SPLASH_WIDTH,
+                height = DEFAULT_SPLASH_HEIGHT,
+                position = WindowPosition.Aligned(Alignment.Center),
+            ),
     ) {
-        MaterialTheme(colorScheme = visualAgentDarkColorScheme(), typography = visualAgentTypography(DEFAULT_STARTUP_FONT_SIZE)) {
-            Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        val darkTheme = startupDarkTheme(themeMode)
+        MaterialTheme(
+            colorScheme = if (darkTheme) visualAgentDarkColorScheme() else visualAgentLightColorScheme(),
+            typography = visualAgentTypography(DEFAULT_STARTUP_FONT_SIZE),
+        ) {
+            ComposeOnboardingBackground(darkTheme) {
                 ComposeOnboardingWizard(
                     onboarding = applicationPort.onboarding,
                     automatic = automatic,
@@ -243,11 +259,14 @@ internal fun ComposeStartupSplash(
     onSaveBookmarks: (DesktopServerBookmarkState) -> Unit = {},
     onStartLocal: () -> Unit = {},
     onRetry: () -> Unit,
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
+    onCloseRequest: () -> Unit = {},
 ) {
     val bookmarksState = (bookmarks as? DesktopServerBookmarkLoadResult.Loaded)?.state ?: DesktopServerBookmarkState()
     var bookmarkDialog by remember { mutableStateOf<StartupServerBookmarkDialog?>(null) }
+    val darkTheme = startupDarkTheme(themeMode)
     MaterialTheme(
-        colorScheme = visualAgentDarkColorScheme(),
+        colorScheme = if (darkTheme) visualAgentDarkColorScheme() else visualAgentLightColorScheme(),
         typography = visualAgentTypography(DEFAULT_STARTUP_FONT_SIZE),
     ) {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -258,6 +277,8 @@ internal fun ComposeStartupSplash(
                 onRetry = onRetry,
                 onCreateServer = { bookmarkDialog = StartupServerBookmarkDialog.Create },
                 onEditServer = { bookmarkDialog = StartupServerBookmarkDialog.Edit(it) },
+                darkTheme = darkTheme,
+                onCloseRequest = onCloseRequest,
             )
             ComposeStartupServerBookmarkDialog(
                 dialog = bookmarkDialog,
