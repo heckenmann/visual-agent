@@ -52,47 +52,23 @@ internal fun ConversationStartupScrollEffect(
 /**
  * Keeps the conversation list scrolled to the bottom when a new message is displayed.
  *
- * Fires when the newest persisted message changes, a temporary user message is displayed while a
- * request is in flight, or the streaming assistant row receives new content. The temporary message
- * is necessary because the panel renders it before it refreshes history from the database. In each
- * case, the coordinator follows only while the user remains at the newest end. Older history pages
- * do not change the newest persisted message and therefore preserve browsing.
+ * Observes the rendered timeline uniformly, including todo cards, grouped tool results, pending
+ * messages, and streaming output. New activity always moves to the newest end. Positioning is requested
+ * for the next measure without suspending, so another chunk or position change cannot cancel
+ * observation bookkeeping. Older history pages preserve browsing.
  */
 @Composable
 internal fun ConversationScrollOnChangeEffect(
-    history: List<Message>,
+    timeline: List<ConversationTimelineItem>,
     listState: LazyListState,
-    pendingUserMessage: String? = null,
-    streamingContent: String = "",
-    isAtLatest: Boolean = listState.conversationPosition().isAtLatest,
-    onNewContentWhileBrowsing: () -> Unit = {},
 ) {
-    var lastNewestMessage by remember { mutableStateOf(history.lastOrNull()) }
-    var lastPendingUserMessage by remember { mutableStateOf(pendingUserMessage) }
-    var lastStreamingContent by remember { mutableStateOf(streamingContent) }
-    var lastIsAtLatest by remember { mutableStateOf(isAtLatest) }
-    val newestMessage = history.lastOrNull()
-    LaunchedEffect(history.size, newestMessage?.id, newestMessage?.timelineSequence, pendingUserMessage, streamingContent, isAtLatest) {
-        val wasAtLatest = lastIsAtLatest
-        val appendedLatestHistory =
-            history.isNotEmpty() && newestMessage != lastNewestMessage
-        val displayedPendingMessage = pendingUserMessage != null && pendingUserMessage != lastPendingUserMessage
-        val updatedStreamingContent = streamingContent.isNotEmpty() && streamingContent != lastStreamingContent
-        val newContent = appendedLatestHistory || displayedPendingMessage || updatedStreamingContent
-        // In reverseLayout, inserting index 0 can make the freshly measured list report
-        // isAtLatest=false before this effect gets scheduled.  Keep following when the
-        // previous frame was already at the newest end; only a continuously browsed list
-        // should receive the New messages affordance.
-        if (newContent && (isAtLatest || wasAtLatest)) {
-            withFrameNanos { }
-            listState.scrollToBottom()
-        } else if (newContent && !isAtLatest && !wasAtLatest) {
-            onNewContentWhileBrowsing()
+    val timelineSnapshot = conversationTimelineScrollSnapshot(timeline)
+    var lastTimelineSnapshot by remember(listState) { mutableStateOf(timelineSnapshot) }
+    LaunchedEffect(listState, timelineSnapshot) {
+        if (timelineSnapshot.hasNewContentSince(lastTimelineSnapshot)) {
+            listState.requestScrollToItem(0)
         }
-        lastNewestMessage = newestMessage
-        lastPendingUserMessage = pendingUserMessage
-        lastStreamingContent = streamingContent
-        lastIsAtLatest = isAtLatest
+        lastTimelineSnapshot = timelineSnapshot
     }
 }
 

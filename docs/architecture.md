@@ -156,12 +156,25 @@ non-terminal to `COMPLETED` or `CANCELLED` transition. Position-only reorders do
 create activity entries. Retry attempts are separate structured conversation records
 and never replace the todo's stable objective description.
 
+Conversation auto-scroll observes immutable content snapshots of the rendered timeline,
+not only persisted chat rows. Messages, grouped tool results, todo cards, and streamed
+output use one always-latest policy regardless of the previous scroll position. New
+activity requests the newest position for the next Compose measurement without suspending.
+Older-page loading, index changes, and presentation regrouping do not count as new activity
+and preserve the visible anchor. Mutable todo-response holders are copied into immutable
+observations so a delta cannot mutate an already recorded comparison snapshot.
+
 Automatic worker completion uses one main-model review, with a focused task/result
 prompt and a strictly validated JSON verdict (`APPROVED` or `RETRY`) plus non-blank
 user-facing feedback. The todo remains in progress
 until the complete review approves it. Its trusted server-side transition event carries
 the approved feedback to the conversation publisher, which persists that feedback and
 emits the normal assistant-completion event without requesting a second model review.
+The Conversation panel also observes persisted assistant-completion events for an
+asynchronous latest-page refresh, independently of follow-up suggestion settings.
+Todo status notifications may precede feedback persistence and are not a substitute
+for this post-persistence notification. No synthetic tool activity is required.
+
 The feedback is persisted as conversation history, not cached global state. Manual
 completion and cancellation without a prior review keep their existing follow-up path.
 Worker stream completion and the transient reviewing phase are distinct protocol facts;
@@ -170,11 +183,6 @@ elapsed-time heuristic nor an early `COMPLETED` transition substitutes for appro
 Approved feedback retains the original worker request ID. No new conversation request
 is created during publication, so a reset between approval and publication invalidates
 all delayed writes as well.
-The Conversation panel also observes persisted assistant-completion events for an
-asynchronous latest-page refresh, independently of follow-up suggestion settings.
-Todo status notifications may precede feedback persistence and are not a substitute
-for this post-persistence notification. No synthetic tool activity is required.
-
 
 Malformed review output receives one correction of the same evaluation, not another worker
 execution. Exhausted format correction, incomplete responses and provider failures are
