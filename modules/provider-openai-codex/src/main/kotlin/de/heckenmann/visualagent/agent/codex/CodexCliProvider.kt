@@ -12,6 +12,7 @@ import de.heckenmann.visualagent.agent.RequestContextBudgeter
 import de.heckenmann.visualagent.agent.ShowResponse
 import de.heckenmann.visualagent.agent.ToolDefinition
 import de.heckenmann.visualagent.agent.ToolId
+import de.heckenmann.visualagent.agent.nativeResponseSchema
 import de.heckenmann.visualagent.agent.provider.ProfiledProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
@@ -65,6 +66,7 @@ class CodexCliProvider internal constructor(
                     selectedCallbacks,
                     request.workingDirectory(),
                     request.showReasoningSummary(),
+                    budgetPlan.request.responseSchema,
                 )
             val response =
                 chatModel
@@ -97,6 +99,7 @@ class CodexCliProvider internal constructor(
                 selectedCallbacks,
                 request.workingDirectory(),
                 request.showReasoningSummary(),
+                budgetPlan.request.responseSchema,
             ).streamReactive(budgetPlan.request.toPrompt(), request.cancellationToken)
                 .map { chunk ->
                     ChatResponse(
@@ -225,6 +228,7 @@ class CodexCliProvider internal constructor(
         callbacks: List<org.springframework.ai.tool.ToolCallback>,
         toolRuntimeGuidance: String,
     ): de.heckenmann.visualagent.agent.ContextBudgetPlan {
+        val budgetRequest = request.copy(responseSchema = request.nativeResponseSchema(protocolSupportsSchema = true))
         val definitions = callbacks.map { it.toProviderDefinition() }
         val helpDefinition = definitions.firstOrNull { it.name == TOOL_HELP_FUNCTION }
         if (helpDefinition == null) {
@@ -234,7 +238,7 @@ class CodexCliProvider internal constructor(
                 } else {
                     listOf(Message("system", "Tool timeout contract: $toolRuntimeGuidance")) + request.messages
                 }
-            val budgeted = contextBudgeter.fit(request, messages, definitions)
+            val budgeted = contextBudgeter.fit(budgetRequest, messages, definitions)
             return de.heckenmann.visualagent.agent.ContextBudgetPlan(
                 budgeted,
                 definitions.mapTo(linkedSetOf()) { it.name },
@@ -246,7 +250,7 @@ class CodexCliProvider internal constructor(
         }
         val allNames = definitions.map { it.name }.distinct().sorted()
         return contextBudgeter.fitWithToolFallback(
-            request = request,
+            request = budgetRequest,
             fallbackMessages = toolGuardMessages(listOf(TOOL_HELP_FUNCTION), toolRuntimeGuidance) + request.messages,
             fallbackTools = listOf(helpDefinition),
             fullMessages = toolGuardMessages(allNames, toolRuntimeGuidance) + request.messages,

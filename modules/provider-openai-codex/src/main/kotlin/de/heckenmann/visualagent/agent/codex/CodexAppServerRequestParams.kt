@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent.codex
 
+import de.heckenmann.visualagent.agent.ResponseSchema
 import de.heckenmann.visualagent.agent.VisionSupport
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -66,6 +67,7 @@ internal object CodexAppServerRequestParams {
         model: String,
         showReasoningSummary: Boolean,
         image: ByteArray?,
+        responseSchema: ResponseSchema? = null,
     ): JsonObject =
         buildJsonObject {
             put("threadId", JsonPrimitive(threadId))
@@ -95,6 +97,7 @@ internal object CodexAppServerRequestParams {
                 },
             )
             put("summary", JsonPrimitive(if (showReasoningSummary) "detailed" else "none"))
+            responseSchema?.let { put("outputSchema", Json.parseToJsonElement(it.json)) }
         }
 
     /** Converts completed conversation turns to role-preserving Responses API history items. */

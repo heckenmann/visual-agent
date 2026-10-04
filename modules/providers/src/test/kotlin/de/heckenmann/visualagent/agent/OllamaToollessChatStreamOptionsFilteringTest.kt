@@ -85,6 +85,7 @@ class OllamaToollessChatStreamOptionsFilteringTest {
             .verifyComplete()
 
         val optionsMap = requestSlot.captured.options()
+        assertEquals("json", requestSlot.captured.format())
         assertFalse(optionsMap.containsKey("model"), "options must not contain 'model'")
         assertFalse(optionsMap.containsKey("format"), "options must not contain 'format'")
         assertFalse(optionsMap.containsKey("keep_alive"), "options must not contain 'keep_alive'")

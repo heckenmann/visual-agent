@@ -87,7 +87,7 @@ class RequestContextBudgeter(
                 retainPrioritizedHistory(messages, mandatoryIndices(messages, leadingSystemCount, latestUser), latestUser, Int.MAX_VALUE)
             return request.copy(messages = retained)
         }
-        val toolTokens = estimateTools(toolDefinitions)
+        val toolTokens = estimateTools(toolDefinitions) + (request.responseSchema?.let { tokenEstimator.estimate(it.json) } ?: 0)
         val latestUser = messages.indexOfLast { it.role == "user" }
         val leadingSystemCount = messages.indexOfFirst { it.role != "system" }.let { index -> if (index < 0) messages.size else index }
         val mandatoryIndices = mandatoryIndices(messages, leadingSystemCount, latestUser)

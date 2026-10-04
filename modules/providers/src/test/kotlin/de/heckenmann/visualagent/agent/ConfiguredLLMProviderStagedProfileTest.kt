@@ -33,17 +33,20 @@ class ConfiguredLLMProviderStagedProfileTest {
                     apiKey = "transient-key",
                     defaultModel = "staged-model",
                 )
+            val schema = ResponseSchema("""{"type":"object"}""")
 
             ConfiguredLLMProvider(ollama, openAi, catalog)
                 .chatReactive(
                     ChatRequestContext(
                         messages = listOf(Message("user", "Reply with READY.")),
                         providerProfile = staged,
+                        responseSchema = schema,
                     ),
                 ).awaitSingle()
 
             assertEquals(staged, requestSlot.captured.providerProfile)
             assertEquals("staged-model", requestSlot.captured.model)
+            assertEquals(schema, requestSlot.captured.responseSchema)
             verify(exactly = 0) { catalog.resolve(any(), any(), any(), any()) }
         }
 }

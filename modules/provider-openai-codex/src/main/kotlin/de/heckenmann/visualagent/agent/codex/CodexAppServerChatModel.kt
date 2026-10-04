@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.agent.codex
 
 import de.heckenmann.visualagent.agent.CancellationToken
+import de.heckenmann.visualagent.agent.ResponseSchema
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.reactor.flux
 import kotlinx.coroutines.withContext
@@ -28,6 +29,7 @@ internal class CodexAppServerChatModel(
     private val toolCallbacks: List<ToolCallback>,
     private val workingDirectory: Path,
     private val showReasoningSummary: Boolean = false,
+    private val responseSchema: ResponseSchema? = null,
 ) : ChatModel {
     /** Spring AI's imperative compatibility method; the provider uses [completeReactive] reactively. */
     override fun call(prompt: Prompt): SpringChatResponse =
@@ -104,7 +106,7 @@ internal class CodexAppServerChatModel(
                     }
                     transport.request(
                         "turn/start",
-                        CodexAppServerRequestParams.turn(prompt, threadId, model, showReasoningSummary, image),
+                        CodexAppServerRequestParams.turn(prompt, threadId, model, showReasoningSummary, image, responseSchema),
                     )
                     val deltaBuffer = CodexAssistantDeltaBuffer()
                     var toolCallSequence = 0

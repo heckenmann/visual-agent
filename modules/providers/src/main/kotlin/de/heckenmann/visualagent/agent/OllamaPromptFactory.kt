@@ -6,6 +6,7 @@ import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.RequestContextBudgeter
 import de.heckenmann.visualagent.agent.ToolDefinition
 import de.heckenmann.visualagent.agent.ToolId
+import de.heckenmann.visualagent.agent.nativeResponseSchema
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
 import de.heckenmann.visualagent.agent.supportsToolCalling
 import org.springframework.ai.chat.messages.AssistantMessage
@@ -61,6 +62,8 @@ class OllamaPromptFactory(
         request: ChatRequestContext,
         selectedModel: String,
     ): Prompt {
+        val schema = request.nativeResponseSchema()
+        val budgetRequest = request.copy(responseSchema = schema)
         val supportsTools = request.supportsToolCalling()
         val toolContext =
             request.metadata +
@@ -83,7 +86,7 @@ class OllamaPromptFactory(
                 null
             } else {
                 contextBudgeter.fitWithToolFallback(
-                    request = request,
+                    request = budgetRequest,
                     fallbackMessages = toolNameGuardMessage(listOf(TOOL_HELP_FUNCTION)) + request.messages,
                     fallbackTools = listOf(helpDefinition),
                     fullMessages = toolNameGuardMessage(exactFunctionNames) + request.messages,
@@ -93,7 +96,7 @@ class OllamaPromptFactory(
         val budgetedRequest =
             plan?.request
                 ?: contextBudgeter.fit(
-                    request,
+                    budgetRequest,
                     toolNameGuardMessage(exactFunctionNames) + request.messages,
                     definitions,
                 )
@@ -109,6 +112,7 @@ class OllamaPromptFactory(
             OllamaChatOptions
                 .builder()
                 .model(selectedModel)
+        schema?.let { optionsBuilder.outputSchema(it.json) }
         if (supportsTools && selectedCallbacks.isNotEmpty()) {
             optionsBuilder
                 .toolCallbacks(selectedCallbacks)

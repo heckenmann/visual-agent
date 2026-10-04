@@ -1,5 +1,7 @@
 package de.heckenmann.visualagent.agent.codex
 
+import de.heckenmann.visualagent.agent.ResponseSchema
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -17,6 +19,16 @@ import kotlin.test.assertTrue
 
 /** Verifies role-preserving request mapping for the Codex app-server protocol. */
 class CodexAppServerRequestParamsTest {
+    @Test
+    fun `output schema is a native turn parameter and absent from ordinary turns`() {
+        val schema = ResponseSchema("""{"type":"object","properties":{"verdict":{"type":"string"}},"required":["verdict"]}""")
+        val prompt = Prompt(UserMessage("review"))
+        val turn = CodexAppServerRequestParams.turn(prompt, "thread", "model", false, null, schema)
+        assertEquals(Json.parseToJsonElement(schema.json), turn["outputSchema"])
+        assertFalse("outputSchema" in CodexAppServerRequestParams.turn(prompt, "thread", "model", false, null))
+        assertFalse("outputSchema" in CodexAppServerRequestParams.thread(prompt, "model", Path.of("."), emptyList()))
+    }
+
     @Test
     fun `completed conversation turns retain native message roles`() {
         val prompt =

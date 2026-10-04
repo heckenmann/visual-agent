@@ -10,6 +10,7 @@ import de.heckenmann.visualagent.agent.ProviderTurnResponseMapper
 import de.heckenmann.visualagent.agent.ShowResponse
 import de.heckenmann.visualagent.agent.ToolCallingLoop
 import de.heckenmann.visualagent.agent.VisionSupport
+import de.heckenmann.visualagent.agent.nativeResponseSchema
 import de.heckenmann.visualagent.agent.provider.DefaultProviderRuntimeConfig
 import de.heckenmann.visualagent.agent.provider.ProviderEnvironmentCredentials
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
@@ -51,7 +52,7 @@ class OpenAiClient(
         val prompt = promptFactory.buildPrompt(request, selectedModel)
         val model = chatModel(request.providerProfile, selectedModel)
         val callbacks = promptFactory.callbacks(prompt)
-        return ToolCallingLoop(outputLimitUpdater = promptFactory::updateOutputLimit)
+        return ToolCallingLoop(outputLimitUpdater = promptFactory::updateOutputLimit, responseSchema = request.nativeResponseSchema())
             .runReactive(
                 model,
                 prompt,
@@ -82,7 +83,7 @@ class OpenAiClient(
                             .let(ProviderTurnResponseMapper::toChatResponse)
                     }
                 } else {
-                    ToolCallingLoop(outputLimitUpdater = promptFactory::updateOutputLimit)
+                    ToolCallingLoop(outputLimitUpdater = promptFactory::updateOutputLimit, responseSchema = request.nativeResponseSchema())
                         .runStreamReactive(
                             model,
                             prompt,
