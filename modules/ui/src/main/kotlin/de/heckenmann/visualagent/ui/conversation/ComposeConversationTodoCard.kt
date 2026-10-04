@@ -63,7 +63,11 @@ internal fun ConversationTodoCard(
             if (!deleted && todo.status == TodoState.IN_PROGRESS) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     TodoWorkingIndicator()
-                    Text("Working…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        if (responseState.isReviewing) "Reviewing result…" else "Working…",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
             ConversationTodoResponsePreview(responseState = responseState, onOpen = onOpenResponse)

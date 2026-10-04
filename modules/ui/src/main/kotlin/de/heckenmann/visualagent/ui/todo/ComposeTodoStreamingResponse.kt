@@ -61,6 +61,13 @@ internal fun TodoStreamingResponse(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (working) TodoWorkingIndicator()
+                if (responseState.isReviewing) {
+                    Text(
+                        "Reviewing result…",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 if (responseState.text.isBlank()) {
                     Text(
                         text = "Waiting for response…",

@@ -23,6 +23,21 @@ class ConversationTodoCardTest {
     val composeTestRule = createComposeRule()
 
     @Test
+    fun `reviewing todo shows its phase without discarding the response`() {
+        val state =
+            TodoResponseState().also {
+                it.apply("execution", "worker", "Finished output", completed = true, reviewing = true)
+            }
+        composeTestRule.setContent {
+            MaterialTheme {
+                ConversationTodoCard(TodoItem("todo", "Write output", TodoState.IN_PROGRESS), state, false, {})
+            }
+        }
+        composeTestRule.onNodeWithText("Reviewing result…").assertExists()
+        composeTestRule.onNodeWithText("Finished output").assertExists()
+    }
+
+    @Test
     fun `each todo status displays its matching icon and readable label`() {
         val states = TodoState.entries
         composeTestRule.setContent {

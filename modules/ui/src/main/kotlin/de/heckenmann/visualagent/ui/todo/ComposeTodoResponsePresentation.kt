@@ -58,6 +58,8 @@ internal class TodoResponseState {
         private set
     var isStreaming: Boolean by mutableStateOf(false)
         private set
+    var isReviewing: Boolean by mutableStateOf(false)
+        private set
 
     /** Applies one server progress event, replacing stale output from an older execution. */
     fun apply(
@@ -65,6 +67,7 @@ internal class TodoResponseState {
         agentId: String?,
         delta: String,
         completed: Boolean,
+        reviewing: Boolean = false,
     ) {
         if (executionId != null && executionId != this.executionId) {
             this.executionId = executionId
@@ -72,7 +75,8 @@ internal class TodoResponseState {
         }
         if (agentId != null) this.agentId = agentId
         if (delta.isNotEmpty()) text += delta
-        isStreaming = !completed && this.executionId != null
+        isReviewing = reviewing
+        isStreaming = !completed && !reviewing && this.executionId != null
         if (completed) this.executionId = executionId ?: this.executionId
     }
 
@@ -82,6 +86,7 @@ internal class TodoResponseState {
         agentId = null
         text = ""
         isStreaming = false
+        isReviewing = false
     }
 
     /** Restores persisted output when a conversation panel is opened. */
@@ -93,6 +98,7 @@ internal class TodoResponseState {
         agentId = restoredAgentId
         text = response
         isStreaming = false
+        isReviewing = false
     }
 }
 
@@ -185,6 +191,7 @@ internal fun TodoResponseOverlay(
     ModalDialogLayout(
         body = {
             Text(todo.description, style = MaterialTheme.typography.titleMedium)
+            if (responseState.isReviewing) Text("Reviewing result…", style = MaterialTheme.typography.bodySmall)
             Text(
                 text = "${todo.status.name.labelizeEnumName()}${responseState.agentId?.let { " · $it" } ?: ""}",
                 style = MaterialTheme.typography.bodySmall,

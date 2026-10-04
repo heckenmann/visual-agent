@@ -28,6 +28,7 @@ Keep the user aware of autonomous todo work by showing each todo as a compact ca
 
 - If no response has arrived yet, an in-progress card shows a compact working indicator.
 - If a retry starts with a new execution identifier, stale output is replaced by the current execution output.
+- When worker output finishes, the same progress channel ends streaming and signals `Reviewing result…`. The full response remains visible as static Markdown while approval is pending; the todo is not marked completed early.
 - If the full response is clicked, an internal scrollable overlay shows the complete Markdown response and continues observing live updates.
 - If the server is unavailable, the existing application error handling remains responsible for reporting the failure.
 
@@ -59,9 +60,11 @@ Keep the user aware of autonomous todo work by showing each todo as a compact ca
 - Compact previews are bounded; the canonical full response is not truncated.
 - Every canonical todo state is represented by both a readable status label and its corresponding accessible status icon; deleted snapshots use the unavailable state.
 - Deleting a todo never removes unrelated conversation content, and its retained snapshot survives panel reloads and application restarts.
+- Review formatting corrections keep the card in `Reviewing result…`; they do not restart worker streaming. Exhausted evaluation cancels the todo with `REVIEW_FAILED`, preserving its stored worker result. Only a valid reviewer `RETRY` requests new worker work (UC-0000057).
 
 ## Related Issues
 
 - #253 — Live todo execution cards in conversation with shared response overlay.
 - #162 — Todo progress and open behavior in conversation.
 - #178 — UI/application protocol boundary.
+- #444 — Separate worker streaming from review and reuse the approved main-agent response.

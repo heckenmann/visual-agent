@@ -91,7 +91,7 @@ internal fun TodoPanel(
     LaunchedEffect(progressUpdates) {
         for (update in progressUpdates) {
             val state = responseStates[update.todoId] ?: TodoResponseState()
-            state.apply(update.executionId, update.agentId, update.delta, update.completed)
+            state.apply(update.executionId, update.agentId, update.delta, update.completed, update.reviewing)
             responseStates = responseStates + (update.todoId to state)
         }
     }
