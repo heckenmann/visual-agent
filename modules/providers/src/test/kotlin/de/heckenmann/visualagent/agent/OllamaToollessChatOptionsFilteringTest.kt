@@ -22,6 +22,33 @@ import org.springframework.ai.ollama.api.OllamaChatOptions
  */
 class OllamaToollessChatOptionsFilteringTest {
     @Test
+    fun `native schema survives the actual toolless request construction`() {
+        val api = mockk<OllamaApi>()
+        val captured = slot<OllamaApi.ChatRequest>()
+        every { api.chat(capture(captured)) } returns response()
+        val schema = ResponseSchema("""{"type":"object","required":["verdict"],"properties":{"verdict":{"type":"string"}}}""")
+        OllamaToollessChat.execute(
+            api,
+            OllamaPromptFactory(TestToolRegistry()),
+            ChatRequestContext(
+                messages = listOf(Message("user", "review")),
+                responseSchema = schema,
+                options = mapOf("structuredOutput.native" to "true"),
+            ),
+            "any-model",
+        )
+        assertTrue(captured.captured.format() is Map<*, *>)
+        assertEquals("object", (captured.captured.format() as Map<*, *>)["type"])
+        assertEquals(null, captured.captured.tools())
+        assertFalse(
+            captured.captured
+                .options()
+                .orEmpty()
+                .containsKey("format"),
+        )
+    }
+
+    @Test
     fun `execute strips model format keep_alive and truncate from options map`() =
         runTest {
             val ollamaApi = mockk<OllamaApi>()
@@ -83,6 +110,7 @@ class OllamaToollessChatOptionsFilteringTest {
                 )
 
             val optionsMap = requestSlot.captured.options()
+            assertEquals("json", requestSlot.captured.format())
             assertFalse(optionsMap.containsKey("model"), "options must not contain 'model'")
             assertFalse(optionsMap.containsKey("format"), "options must not contain 'format'")
             assertFalse(optionsMap.containsKey("keep_alive"), "options must not contain 'keep_alive'")

@@ -115,7 +115,7 @@ internal object OllamaToollessChat {
             selectedModel,
             messages,
             stream,
-            null,
+            options.format,
             null,
             null,
             optionsArg,

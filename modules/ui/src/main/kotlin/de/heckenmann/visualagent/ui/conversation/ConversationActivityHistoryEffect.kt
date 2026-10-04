@@ -5,20 +5,22 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import de.heckenmann.visualagent.protocol.ActivityPort
 import de.heckenmann.visualagent.protocol.ConversationPort
+import de.heckenmann.visualagent.protocol.ConversationSuggestionPort
 import de.heckenmann.visualagent.protocol.ToolActivityPhase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Refreshes conversation history after server-side tool and workspace download activity. */
+/** Refreshes history after persisted assistant completions, tool activity and workspace downloads. */
 @Composable
 internal fun ConversationActivityHistoryEffect(
     activityPort: ActivityPort,
     conversationPort: ConversationPort,
     conversationState: ConversationUiState,
+    suggestionPort: ConversationSuggestionPort,
 ) {
     val scope = rememberCoroutineScope()
-    DisposableEffect(activityPort) {
+    DisposableEffect(activityPort, conversationPort, conversationState, suggestionPort) {
         /** Reloads the newest complete page while preserving older pages and live stream deltas. */
         fun refreshHistory() {
             scope.launch {
@@ -34,9 +36,11 @@ internal fun ConversationActivityHistoryEffect(
                 }
             }
         val downloadHandle = activityPort.addDownloadListener { refreshHistory() }
+        val completionHandle = suggestionPort.addCompletionListener { refreshHistory() }
         onDispose {
             toolHandle.close()
             downloadHandle.close()
+            completionHandle.close()
         }
     }
 }

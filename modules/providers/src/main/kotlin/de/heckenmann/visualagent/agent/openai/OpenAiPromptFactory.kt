@@ -6,6 +6,7 @@ import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.RequestContextBudgeter
 import de.heckenmann.visualagent.agent.ToolDefinition
 import de.heckenmann.visualagent.agent.ToolId
+import de.heckenmann.visualagent.agent.nativeResponseSchema
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
 import de.heckenmann.visualagent.agent.supportsToolCalling
 import org.springframework.ai.chat.messages.AssistantMessage
@@ -64,6 +65,8 @@ class OpenAiPromptFactory(
         request: ChatRequestContext,
         selectedModel: String,
     ): Prompt {
+        val schema = request.nativeResponseSchema()
+        val budgetRequest = request.copy(responseSchema = schema)
         val toolContext =
             request.metadata +
                 mapOf("model" to selectedModel, "provider" to "openai") +
@@ -85,7 +88,7 @@ class OpenAiPromptFactory(
                 null
             } else {
                 contextBudgeter.fitWithToolFallback(
-                    request = request,
+                    request = budgetRequest,
                     fallbackMessages = toolNameGuardMessage(listOf(TOOL_HELP_FUNCTION)) + request.messages,
                     fallbackTools = listOf(helpDefinition),
                     fullMessages = toolNameGuardMessage(exactFunctionNames) + request.messages,
@@ -95,7 +98,7 @@ class OpenAiPromptFactory(
         val budgetedRequest =
             plan?.request
                 ?: contextBudgeter.fit(
-                    request,
+                    budgetRequest,
                     toolNameGuardMessage(exactFunctionNames) + request.messages,
                     definitions,
                 )
@@ -108,6 +111,7 @@ class OpenAiPromptFactory(
                 toolNameGuardMessage(selectedNames) + budgetedRequest.messages.filterNot { it.id == TOOL_GUARD_MESSAGE_ID }
             }
         val optionsBuilder = OpenAiChatOptions.builder().model(selectedModel)
+        schema?.let { optionsBuilder.outputSchema(it.json) }
         if (selectedCallbacks.isNotEmpty()) {
             optionsBuilder
                 .toolCallbacks(selectedCallbacks)

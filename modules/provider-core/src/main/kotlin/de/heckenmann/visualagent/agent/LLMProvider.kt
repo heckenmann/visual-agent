@@ -192,6 +192,7 @@ interface LLMProvider {
  * @property metadata Additional provider-neutral execution context
  * @property cancellationToken Optional token the provider can consult to honour user cancellation
  * @property onContextBudgeted Optional request-scoped notification when history or tools are reduced
+ * @property responseSchema Optional JSON Schema for a complete, server-validated response
  * @see docs/usecases/uc_0000002_send_main_agent_message.md
  * @see docs/usecases/uc_0000007_configure_session_provider_and_model.md
  * @see docs/usecases/uc_0000020_execute_tool_call.md
@@ -212,6 +213,7 @@ data class ChatRequestContext(
     val modelCapabilitiesComplete: Boolean = false,
     val contextWindow: ContextWindow = ContextWindow(),
     val onContextBudgeted: ((ContextBudgetStatus) -> Unit)? = null,
+    val responseSchema: ResponseSchema? = null,
 )
 
 /** Describes whether assembling a request omitted conversation history or ordinary tool schemas. */

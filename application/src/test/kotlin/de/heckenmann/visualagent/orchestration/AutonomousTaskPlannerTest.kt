@@ -106,7 +106,7 @@ class AutonomousTaskPlannerTest {
         runTest {
             val provider = mockk<LLMProvider>()
             every { provider.chatReactive(any<ChatRequestContext>()) } returns
-                Mono.just(response("APPROVED\nLooks good."))
+                Mono.just(response("""{"verdict":"APPROVED","feedback":"Looks good."}"""))
             val planner =
                 planner(
                     todoManager = TodoManager(),
@@ -114,8 +114,8 @@ class AutonomousTaskPlannerTest {
                     provider = provider,
                 )
 
-            assertTrue(planner.reviewWorkerResult("todo-1", "Implement", "Done", "You are the main orchestrator agent."))
-            assertTrue(planner.reviewWorkerResult("todo-1", "Implement", "", "You are the main orchestrator agent."))
+            assertTrue(planner.reviewWorkerResult("todo-1", "Implement", "Done").approved)
+            assertTrue(planner.reviewWorkerResult("todo-1", "Implement", "").approved)
             val instruction =
                 planner.buildWorkerInstruction(
                     TodoManager().add("Implement persistence"),

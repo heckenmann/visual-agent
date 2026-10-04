@@ -9,6 +9,7 @@ import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.protocol.ConversationCompletionEvent
 import de.heckenmann.visualagent.protocol.LifecyclePort
 import de.heckenmann.visualagent.todo.Todo
+import de.heckenmann.visualagent.todo.TodoApproval
 import de.heckenmann.visualagent.todo.TodoStatus
 import de.heckenmann.visualagent.todo.TodoTerminalReason
 import kotlinx.coroutines.CancellationException
@@ -40,6 +41,39 @@ internal class AgentTodoTrigger(
 ) {
     private val logger = KotlinLogging.logger {}
     private val terminalReviewMutex = Mutex()
+
+    /** Publishes the completed main-model review without scheduling another provider request. */
+    fun publishApprovedResult(
+        todo: Todo,
+        approval: TodoApproval,
+    ) {
+        if (lifecycle.closing) return
+        val terminalTodo = todo.copy()
+        val requestId = approval.conversationRequestId
+        scope.launch {
+            currentCoroutineContext().ensureActive()
+            if (lifecycle.closing) return@launch
+            conversationOps.persist(
+                Message(
+                    role = "system",
+                    content = "The todo \"${terminalTodo.description}\" (id=${terminalTodo.id}) was completed after main-agent approval.",
+                    metadata =
+                        buildJsonObject {
+                            put("type", "todo_review")
+                            put("eventType", "todo_terminal_transition")
+                            put("todoId", terminalTodo.id)
+                            put("status", terminalTodo.status.name)
+                            put("terminalReason", TodoTerminalReason.COMPLETED.name)
+                        }.toString(),
+                    conversationRequestId = requestId,
+                ),
+            )
+            val assistant = conversationOps.persist(Message("assistant", approval.feedback, conversationRequestId = requestId))
+            assistant.id?.let { id ->
+                completionEvents.publish(ConversationCompletionEvent(assistantEntryId = id, timelineSequence = assistant.timelineSequence))
+            }
+        }
+    }
 
     /**
      * Triggers the main agent to process a todo change notification.

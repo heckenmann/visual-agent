@@ -29,7 +29,6 @@ import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
 import org.junit.Rule
 import org.junit.Test
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import de.heckenmann.visualagent.protocol.ConversationMessage as Message
 
@@ -41,7 +40,6 @@ class ConversationScrollOnChangeTest {
     fun `scrolls to bottom when a new message is appended`() {
         val messages: SnapshotStateList<Message> = (1..20).map { Message("user", "message $it") }.toMutableStateList()
         val listState = mutableListOf<androidx.compose.foundation.lazy.LazyListState>()
-        var browsingNotifications = 0
         composeTestRule.setContent {
             val state = rememberLazyListState()
             listState.add(state)
@@ -59,9 +57,8 @@ class ConversationScrollOnChangeTest {
                     }
                 }
                 ConversationScrollOnChangeEffect(
-                    history = messages,
+                    timeline = timeline(messages),
                     listState = state,
-                    onNewContentWhileBrowsing = { browsingNotifications++ },
                 )
             }
         }
@@ -75,10 +72,6 @@ class ConversationScrollOnChangeTest {
         assertTrue(
             !listState.single().canScrollBackward,
             "expected canScrollBackward=false after new message appended",
-        )
-        assertTrue(
-            browsingNotifications == 0,
-            "new content while following latest must not show the New messages affordance",
         )
     }
 
@@ -109,10 +102,8 @@ class ConversationScrollOnChangeTest {
                     }
                 }
                 ConversationScrollOnChangeEffect(
-                    history = messages,
-                    pendingUserMessage = pendingUserMessage.value,
+                    timeline = timeline(messages, pending = pendingUserMessage.value),
                     listState = state,
-                    isAtLatest = true,
                 )
             }
         }
@@ -164,10 +155,8 @@ class ConversationScrollOnChangeTest {
                     }
                 }
                 ConversationScrollOnChangeEffect(
-                    history = messages,
+                    timeline = timeline(messages, stream = streamingContent.value),
                     listState = state,
-                    streamingContent = streamingContent.value,
-                    isAtLatest = true,
                 )
             }
         }
@@ -199,7 +188,7 @@ class ConversationScrollOnChangeTest {
     }
 
     @Test
-    fun `does not scroll when message content changes without count increase`() {
+    fun `updated message content scrolls to latest without count increase`() {
         val messages: SnapshotStateList<Message> = (1..20).map { Message("user", "message $it") }.toMutableStateList()
         val listState = mutableListOf<androidx.compose.foundation.lazy.LazyListState>()
         composeTestRule.setContent {
@@ -218,7 +207,7 @@ class ConversationScrollOnChangeTest {
                         )
                     }
                 }
-                ConversationScrollOnChangeEffect(messages, state)
+                ConversationScrollOnChangeEffect(timeline(messages), state)
             }
         }
         composeTestRule.waitForIdle()
@@ -226,20 +215,12 @@ class ConversationScrollOnChangeTest {
         // Scroll to the end (oldest messages) to simulate user reading older messages.
         kotlinx.coroutines.runBlocking { listState.single().scrollToItem(messages.lastIndex) }
         composeTestRule.waitForIdle()
-        val firstVisibleBefore = listState.single().firstVisibleItemIndex
 
         // Update the last message content (e.g. streaming) without changing count.
         messages[messages.lastIndex] = Message("assistant", "very long streamed content that extends the last item")
         composeTestRule.waitForIdle()
 
-        // The scroll position should NOT have changed — the user's position is preserved.
-        val firstVisibleAfter = listState.single().firstVisibleItemIndex
-        assertTrue(
-            firstVisibleAfter <= firstVisibleBefore + 1,
-            "expected scroll position to be preserved when content changes without count increase, but first visible index changed from $firstVisibleBefore to $firstVisibleAfter",
-        )
-        // With reverseLayout, newest items are at index 0. The user scrolled to the end
-        // (oldest messages), so the first visible item (index 0, newest) should NOT be visible.
+        // Updated visible activity follows the same always-latest policy as inserted rows.
         val firstVisibleIndex =
             listState
                 .single()
@@ -248,9 +229,24 @@ class ConversationScrollOnChangeTest {
                 .firstOrNull()
                 ?.index
                 ?: -1
-        assertFalse(
+        assertTrue(
             firstVisibleIndex == 0,
-            "expected newest message (index 0) to NOT be visible (user should stay at their scroll position)",
+            "expected new activity to return to the newest end even from browsed history",
         )
     }
+
+    private fun timeline(
+        history: List<Message>,
+        pending: String? = null,
+        stream: String = "",
+    ) = buildConversationTimeline(
+        history = history,
+        pendingUserMessage = pending,
+        pendingUserEntryId = "pending-user",
+        streamingContent = stream,
+        streamingEntryId = "streaming-assistant",
+        requestActive = false,
+        showOlderHistoryLoading = false,
+        includeInlineComposer = false,
+    )
 }

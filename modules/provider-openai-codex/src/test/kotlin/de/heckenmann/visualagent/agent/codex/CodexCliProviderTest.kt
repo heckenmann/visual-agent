@@ -3,17 +3,21 @@ package de.heckenmann.visualagent.agent.codex
 import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ProviderFinishReason
+import de.heckenmann.visualagent.agent.ResponseSchema
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import io.mockk.mockk
 import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import org.junit.jupiter.api.Test
 import org.springframework.ai.chat.messages.AssistantMessage
 import org.springframework.ai.chat.metadata.ChatGenerationMetadata
 import org.springframework.ai.chat.metadata.ChatResponseMetadata
 import org.springframework.ai.chat.model.ChatResponse
 import org.springframework.ai.chat.model.Generation
+import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.createTempDirectory
 import kotlin.test.assertEquals
@@ -22,6 +26,63 @@ import kotlin.test.assertTrue
 
 /** Verifies provider behavior that does not require a real Codex subscription. */
 class CodexCliProviderTest {
+    @Test
+    fun `Codex provider forwards native schema and honors explicit disablement`(): Unit =
+        runBlocking {
+            val directory = createTempDirectory("codex-provider-schema-test-")
+            val fixture = CodexAppServerChatModelTest()
+            val executable = fixture.fakeServer(directory)
+            val locator =
+                CodexCliLocator(
+                    environment =
+                        object : CodexCliEnvironment {
+                            override fun pathDirectories(): List<Path> = emptyList()
+
+                            override fun homeDirectory(): Path = directory
+
+                            override fun isWindows(): Boolean = false
+                        },
+                    versionProbe =
+                        object : CodexCliVersionProbe {
+                            override suspend fun probe(executable: Path): String = "test"
+                        },
+                )
+            val provider = CodexCliProvider(locator, mockk(relaxed = true), mockk(relaxed = true))
+            val profile =
+                ProviderProfile(
+                    "codex",
+                    "Codex",
+                    ProviderAdapter.CODEX_CLI,
+                    "",
+                    defaultModel = "any-model",
+                    options = mapOf(CodexCliProvider.OPTION_EXECUTABLE_PATH to executable.toString()),
+                )
+            val schema = ResponseSchema("""{"type":"object"}""")
+            try {
+                listOf(false, true).forEach { disabled ->
+                    provider
+                        .chatReactive(
+                            ChatRequestContext(
+                                listOf(Message("user", "review")),
+                                providerProfile = profile,
+                                responseSchema = schema,
+                                options = if (disabled) mapOf("structuredOutput.native" to "false") else emptyMap(),
+                            ),
+                        ).awaitSingle()
+                    val params =
+                        Json
+                            .parseToJsonElement(
+                                Files.readString(directory.resolve("turn-start.json")),
+                            ).jsonObject
+                            .getValue("params")
+                            .jsonObject
+                    assertEquals(if (disabled) null else Json.parseToJsonElement(schema.json), params["outputSchema"])
+                }
+            } finally {
+                fixture.deleteRecursively(directory)
+            }
+        }
+
     @Test
     fun `provider boundary preserves Codex item metadata`() {
         val response =

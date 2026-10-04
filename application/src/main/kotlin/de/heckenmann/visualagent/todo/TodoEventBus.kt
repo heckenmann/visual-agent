@@ -112,6 +112,7 @@ class TodoEventBus {
  * @property todoId Todo that owns the response
  * @property delta New response text since the previous update
  * @property completed Whether the response stream has ended
+ * @property reviewing Whether the finished worker result is waiting for main-agent approval
  */
 data class TodoProgressUpdate(
     val todoId: String,
@@ -119,4 +120,5 @@ data class TodoProgressUpdate(
     val completed: Boolean = false,
     val executionId: String? = null,
     val agentId: String? = null,
+    val reviewing: Boolean = false,
 )

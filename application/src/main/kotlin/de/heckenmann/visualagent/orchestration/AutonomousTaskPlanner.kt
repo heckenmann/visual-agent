@@ -1,13 +1,13 @@
 package de.heckenmann.visualagent.orchestration
 
 import de.heckenmann.visualagent.agent.AgentStatus
+import de.heckenmann.visualagent.agent.CancellationToken
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoManager
 import de.heckenmann.visualagent.todo.TodoStatus
-import kotlinx.coroutines.reactor.awaitSingle
 
 /**
  * Decomposes complex todos, selects suitable workers, and reviews worker output.
@@ -61,24 +61,8 @@ internal class AutonomousTaskPlanner(
         todoId: String,
         taskDescription: String,
         workerResult: String,
-        systemPrompt: String,
-    ): Boolean {
-        val prompt = OrchestrationConstants.reviewPrompt(taskDescription, workerResult, systemPrompt)
-        val request =
-            de.heckenmann.visualagent.agent.ChatRequestContext(
-                messages = prompt,
-                enabledTools = emptySet(),
-                metadata = mapOf("sessionId" to "review", "todoId" to todoId),
-            )
-        val response = llmProvider.chatReactive(request).awaitSingle()
-        val verdict =
-            response
-                .message
-                .content
-                .trim()
-                .uppercase()
-        return verdict.startsWith("APPROVED")
-    }
+        cancellationToken: CancellationToken? = null,
+    ): WorkerReviewResult = evaluateWorkerResult(llmProvider, todoId, taskDescription, workerResult, cancellationToken)
 
     internal fun isComplex(description: String): Boolean {
         if (description.trim().split(Regex("\\s+")).count(String::isNotBlank) >= OrchestrationConstants.COMPLEX_WORD_COUNT) return true

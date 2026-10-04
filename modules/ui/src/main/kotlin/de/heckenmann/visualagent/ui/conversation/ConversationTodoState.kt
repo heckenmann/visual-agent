@@ -58,7 +58,7 @@ internal fun rememberConversationTodoState(
     LaunchedEffect(progressUpdates) {
         for (update in progressUpdates) {
             val response = state.responses[update.todoId] ?: TodoResponseState()
-            response.apply(update.executionId, update.agentId, update.delta, update.completed)
+            response.apply(update.executionId, update.agentId, update.delta, update.completed, update.reviewing)
             state.responses = state.responses + (update.todoId to response)
         }
     }
@@ -79,8 +79,9 @@ internal fun rememberConversationTodoState(
                         }
                     }
                     if (!conversationState.sending) {
-                        val history = withContext(Dispatchers.IO) { conversationPort.currentHistory() }
-                        conversationState.replaceHistory(history)
+                        val request = conversationState.beginLatestRequest()
+                        val page = withContext(Dispatchers.IO) { conversationPort.latest() }
+                        conversationState.applyLatest(request, page)
                     }
                 }
             }

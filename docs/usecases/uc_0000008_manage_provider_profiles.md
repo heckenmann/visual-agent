@@ -54,5 +54,6 @@ Different agents and sessions can use different providers and model parameters.
 - Changing the main-agent model does not overwrite provider endpoints or credentials.
 - At least one provider profile remains enabled.
 - Option merging is deterministic.
+- `structuredOutput.native=true` explicitly declares JSON-schema response support for an endpoint/model. Set it only after verifying support; `false` forces prompt-only output. Unknown OpenAI-compatible and Ollama endpoints remain prompt-only. Codex schema requests use its documented native protocol by default. All review results are validated server-side (UC-0000057).
 - Raw API keys are not included in tool output, model context, exported config, or logs.
 - Re-running onboarding preserves an existing credential unless the user explicitly replaces or clears it.

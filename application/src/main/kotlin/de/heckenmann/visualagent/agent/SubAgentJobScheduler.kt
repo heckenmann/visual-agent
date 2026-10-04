@@ -3,6 +3,8 @@ package de.heckenmann.visualagent.agent
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -130,19 +132,28 @@ class SubAgentJobScheduler(
      * @param onFinished Completion callback receiving success or failure
      * @return Queued job ID
      */
+    @OptIn(DelicateCoroutinesApi::class)
     fun <T> enqueue(
         agentId: String?,
         block: suspend () -> T,
         onFinished: (jobId: String, result: Result<T>) -> Unit,
     ): String {
         val jobId = UUID.randomUUID().toString()
+        val registered = CompletableDeferred<Unit>()
+        // Atomic start guarantees cancellation reporting; the barrier prevents unregistered work.
         val job =
-            scope.launch {
-                val result = runCatching { run(agentId, block) }
+            scope.launch(start = CoroutineStart.ATOMIC) {
+                val result =
+                    runCatching {
+                        registered.await()
+                        run(agentId, block)
+                    }
                 jobsById.remove(jobId)
                 onFinished(jobId, result)
             }
         jobsById[jobId] = job
+        job.invokeOnCompletion { jobsById.remove(jobId, job) }
+        registered.complete(Unit)
         return jobId
     }
 

@@ -63,7 +63,7 @@ class OllamaClient(
                 }
                 if (supportsTools && toolsEnabled) {
                     val model = chatModelFor(request)
-                    ToolCallingLoop(outputLimitUpdater = promptFactory::updateOutputLimit)
+                    ToolCallingLoop(outputLimitUpdater = promptFactory::updateOutputLimit, responseSchema = request.nativeResponseSchema())
                         .runReactive(
                             model,
                             prompt,
@@ -120,7 +120,7 @@ class OllamaClient(
                         )
                 } else {
                     val model = chatModelFor(request)
-                    ToolCallingLoop(outputLimitUpdater = promptFactory::updateOutputLimit)
+                    ToolCallingLoop(outputLimitUpdater = promptFactory::updateOutputLimit, responseSchema = request.nativeResponseSchema())
                         .runStreamReactive(
                             model,
                             prompt,

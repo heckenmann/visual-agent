@@ -38,13 +38,18 @@ data class TodoChange(
     val reordered: Boolean = false,
 )
 
-/** Incremental assistant output produced while a todo is processing. */
+/**
+ * Incremental assistant output produced while a todo is processing.
+ *
+ * @property reviewing Worker output has ended and main-agent approval is pending
+ */
 data class TodoProgress(
     val todoId: String,
     val delta: String = "",
     val completed: Boolean = false,
     val executionId: String? = null,
     val agentId: String? = null,
+    val reviewing: Boolean = false,
 )
 
 /** Persisted assistant output associated with a completed todo execution. */

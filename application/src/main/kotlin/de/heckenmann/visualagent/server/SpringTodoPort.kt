@@ -107,6 +107,7 @@ class SpringTodoPort(
                     completed = update.completed,
                     executionId = update.executionId,
                     agentId = update.agentId,
+                    reviewing = update.reviewing,
                 ),
             )
         }

@@ -14,8 +14,6 @@ import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.knowledge.MemoryStore
 import de.heckenmann.visualagent.knowledge.PreferenceStore
-import de.heckenmann.visualagent.knowledge.TodoStore
-import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoChange
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoManager
@@ -57,8 +55,11 @@ internal class CoordinatorFixture(
     val messages: MutableList<Message>,
     val executionControl: SubAgentExecutionControl,
     val scheduler: SubAgentJobScheduler,
+    val todoEventBus: TodoEventBus,
+    val providerRequests: MutableList<ChatRequestContext>,
     private val workerStarts: Channel<Unit>,
     private val workerCompletions: Channel<Unit>,
+    private val reviewStarts: Channel<Unit>,
     private val messageEvents: Channel<Message>,
     private val todoChanges: Channel<TodoChange>,
     private val todoChangeSubscription: AutoCloseable,
@@ -77,6 +78,10 @@ internal class CoordinatorFixture(
 
     suspend fun awaitWorkerCompletion() {
         workerCompletions.receive()
+    }
+
+    suspend fun awaitReviewStart() {
+        reviewStarts.receive()
     }
 
     suspend fun awaitTodoStatus(
@@ -106,11 +111,14 @@ internal fun buildFixture(
     parallelism: Int = 4,
     workerResponseGate: CompletableDeferred<Unit>? = null,
     responseContent: String = "APPROVED\nLooks good.",
-    reviewContent: String = "APPROVED",
+    reviewContent: String = """{"verdict":"APPROVED","feedback":"Looks good."}""",
     failingWorkerAttempts: Int = 0,
     onWorkerStreamStarted: (() -> Unit)? = null,
     fixtureScope: CoroutineScope? = null,
     onPersistMessage: (Message) -> Unit = {},
+    reviewResponseGate: CompletableDeferred<Unit>? = null,
+    reviewResponses: List<String> = listOf(reviewContent),
+    reviewFailure: Exception? = null,
 ): CoordinatorFixture {
     val todoStore = FakeTodoStore()
     val todoEventBus = TodoEventBus()
@@ -121,6 +129,9 @@ internal fun buildFixture(
     val workerAttempts = AtomicInteger()
     val workerStarts = Channel<Unit>(Channel.UNLIMITED)
     val workerCompletions = Channel<Unit>(Channel.UNLIMITED)
+    val reviewStarts = Channel<Unit>(Channel.UNLIMITED)
+    val reviewAttempts = AtomicInteger()
+    val providerRequests = CopyOnWriteArrayList<ChatRequestContext>()
     val messageEvents = Channel<Message>(Channel.UNLIMITED)
     val memoryStore =
         object : MemoryStore {
@@ -145,14 +156,30 @@ internal fun buildFixture(
     every { toolConfig.toolsFor(any<SubAgent>()) } returns emptySet()
     every { provider.chatReactive(any<ChatRequestContext>()) } answers {
         val ctx = it.invocation.args[0] as ChatRequestContext
-        val token = ctx.cancellationToken
         val isReview = ctx.metadata["sessionId"] == "review"
-        val content = if (isReview) reviewContent else responseContent
         mono {
+            providerRequests += ctx
+            if (isReview) {
+                reviewStarts.trySend(Unit)
+                reviewResponseGate?.await()
+                reviewFailure?.let { throw it }
+            }
             if (!isReview) workerResponseGate?.await()
             ChatResponse(
                 model = "test",
-                message = Message("assistant", content),
+                message =
+                    Message(
+                        "assistant",
+                        if (isReview) {
+                            reviewResponses[
+                                reviewAttempts.getAndIncrement().coerceAtMost(
+                                    reviewResponses.lastIndex,
+                                ),
+                            ]
+                        } else {
+                            responseContent
+                        },
+                    ),
                 done = true,
             )
         }
@@ -161,6 +188,7 @@ internal fun buildFixture(
         val ctx = it.invocation.args[0] as ChatRequestContext
         val isReview = ctx.metadata["sessionId"] == "review"
         flux {
+            providerRequests += ctx
             if (!isReview && workerAttempts.incrementAndGet() <= failingWorkerAttempts) {
                 throw IllegalStateException("transient worker failure")
             }
@@ -239,8 +267,11 @@ internal fun buildFixture(
         messages,
         executionControl,
         scheduler,
+        todoEventBus,
+        providerRequests,
         workerStarts,
         workerCompletions,
+        reviewStarts,
         messageEvents,
         todoChanges,
         todoChangeSubscription,
@@ -258,47 +289,5 @@ private class FixturePreferenceStore : PreferenceStore {
         value: String,
     ) {
         values[key] = value
-    }
-}
-
-internal class FakeTodoStore : TodoStore {
-    private val todos = mutableListOf<Todo>()
-
-    override fun saveTodo(todo: Todo) {
-        todos.removeIf { it.id == todo.id }
-        todos.add(todo)
-    }
-
-    override fun claimPendingTodo(
-        todoId: String,
-        agentId: String,
-    ): Todo? {
-        val todo = todos.firstOrNull { it.id == todoId && it.status == de.heckenmann.visualagent.todo.TodoStatus.PENDING } ?: return null
-        todo.assignedAgentId = agentId
-        todo.status = de.heckenmann.visualagent.todo.TodoStatus.IN_PROGRESS
-        todo.updatedAt = java.time.Instant.now()
-        return todo.copy()
-    }
-
-    override fun createTodoIfAbsent(todo: Todo): de.heckenmann.visualagent.knowledge.TodoCreation {
-        val existing = todos.firstOrNull { it.description.equals(todo.description, ignoreCase = true) }
-        return if (existing == null) {
-            saveTodo(todo)
-            de.heckenmann.visualagent.knowledge
-                .TodoCreation(todo, created = true)
-        } else {
-            de.heckenmann.visualagent.knowledge
-                .TodoCreation(existing, created = false)
-        }
-    }
-
-    override fun listTodos(): List<Todo> = todos.toList()
-
-    override fun deleteTodo(todoId: String) {
-        todos.removeIf { it.id == todoId }
-    }
-
-    override fun clearTodos() {
-        todos.clear()
     }
 }
