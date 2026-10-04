@@ -120,7 +120,7 @@ internal fun ConversationPanel(
         listState = listState,
         gateway = conversationGateway,
     )
-    ConversationActivityHistoryEffect(activityPort, conversationPort, conversationState)
+    ConversationActivityHistoryEffect(activityPort, conversationPort, conversationState, suggestionPort)
     val sendContent =
         conversationSendAction(
             scope = scope,

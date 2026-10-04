@@ -170,6 +170,11 @@ elapsed-time heuristic nor an early `COMPLETED` transition substitutes for appro
 Approved feedback retains the original worker request ID. No new conversation request
 is created during publication, so a reset between approval and publication invalidates
 all delayed writes as well.
+The Conversation panel also observes persisted assistant-completion events for an
+asynchronous latest-page refresh, independently of follow-up suggestion settings.
+Todo status notifications may precede feedback persistence and are not a substitute
+for this post-persistence notification. No synthetic tool activity is required.
+
 
 Malformed review output receives one correction of the same evaluation, not another worker
 execution. Exhausted format correction, incomplete responses and provider failures are

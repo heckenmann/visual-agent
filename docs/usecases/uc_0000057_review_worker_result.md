@@ -18,7 +18,7 @@ Main orchestration agent.
 1. The worker returns its result (may be blank if the work was done entirely through tool calls).
 2. The planner sends the task description and result to the main LLM via `reviewWorkerResult`.
 3. The main LLM returns one JSON object with `verdict` (`APPROVED` or `RETRY`) and non-blank user-facing `feedback`. The same JSON Schema is included in the prompt and, when supported, sent as a native provider constraint.
-4. Approved results complete the todo. The server persists the same review feedback as the main-agent response and publishes a conversation completion event; it does not invoke the model again to review approved work.
+4. Approved results complete the todo. The server persists the same review feedback as the main-agent response and publishes a conversation completion event; it does not invoke the model again to review approved work. The Conversation panel observes this event independently of suggestion settings and asynchronously reloads the latest history page after persistence.
 5. Rejected results trigger retry until the retry limit is reached.
 6. Final rejection cancels the todo.
 
@@ -54,6 +54,7 @@ Sub-agent work is reviewed by the main agent before being marked complete. Blank
 - `de.heckenmann.visualagent.orchestration.WorkerReviewResult`
 - `de.heckenmann.visualagent.agent.nativeResponseSchema`
 - `de.heckenmann.visualagent.orchestration.AutonomousCoordinator.processTodoWithLLM`
+- `de.heckenmann.visualagent.ui.conversation.ConversationActivityHistoryEffect`
 
 ## Acceptance Criteria
 
@@ -67,6 +68,8 @@ Sub-agent work is reviewed by the main agent before being marked complete. Blank
 - A format error retries only evaluation once; it never causes automatic worker side effects to run again.
 - Manual terminal transitions without a prior approval and failures retain their existing main-agent follow-up path.
 - Reset invalidation prevents delayed approved feedback from restoring cleared history.
+- Approved feedback becomes visible without another tool call or user action, even when the todo-status refresh completed before feedback was persisted. The completion refresh preserves older loaded history and live stream state, and never blocks the UI thread.
+- Todo-status and completion refreshes share the existing latest-request generation guard, so a late older page cannot overwrite newer approved feedback.
 
 ## Library Decision
 

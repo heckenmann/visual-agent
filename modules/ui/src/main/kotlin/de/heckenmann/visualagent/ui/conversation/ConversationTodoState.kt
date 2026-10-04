@@ -79,8 +79,9 @@ internal fun rememberConversationTodoState(
                         }
                     }
                     if (!conversationState.sending) {
-                        val history = withContext(Dispatchers.IO) { conversationPort.currentHistory() }
-                        conversationState.replaceHistory(history)
+                        val request = conversationState.beginLatestRequest()
+                        val page = withContext(Dispatchers.IO) { conversationPort.latest() }
+                        conversationState.applyLatest(request, page)
                     }
                 }
             }
