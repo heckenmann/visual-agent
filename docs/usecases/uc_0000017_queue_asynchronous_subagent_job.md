@@ -30,6 +30,19 @@ Assigned work remains pending until a worker is available, without exposing dire
 - `todos` with an assignment action associates work with a sub-agent.
 - The autonomous coordinator performs scheduling; no direct `agent:start` or `agent:message` tool exists.
 
+## Background Job Lifecycle
+
+The scheduler's internal background-job API registers each job before admitting its work.
+Immediate success, failure, and cancellation must not leave completed jobs in the registry.
+Cancellation before dispatch or with an already cancelled parent still reports one terminal
+result, without executing the requested work. Closing the scheduler cancels both running and
+queued background jobs and releases their capacity.
+
+The implementation uses the existing coroutine library's atomic start with a registration
+barrier. Completion handlers only remove registry entries; completion callbacks remain in
+the job body because they can perform persistence and must not block coroutine completion
+handlers. This lifecycle guarantee addresses issue #437 and does not introduce a new tool.
+
 ## Code Entry Points
 
 - `de.heckenmann.visualagent.orchestration.AutonomousCoordinator`
@@ -41,3 +54,4 @@ Assigned work remains pending until a worker is available, without exposing dire
 - Assigned work remains `PENDING` when all workers are busy.
 - A capacity-change signal retries pending assigned work without normal-path polling.
 - Completed work updates persisted todo and conversation state.
+- Background jobs report exactly one terminal result and are no longer cancellable after completion.
