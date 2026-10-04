@@ -156,6 +156,34 @@ non-terminal to `COMPLETED` or `CANCELLED` transition. Position-only reorders do
 create activity entries. Retry attempts are separate structured conversation records
 and never replace the todo's stable objective description.
 
+Automatic worker completion uses one main-model review, with a focused task/result
+prompt and a strictly validated JSON verdict (`APPROVED` or `RETRY`) plus non-blank
+user-facing feedback. The todo remains in progress
+until the complete review approves it. Its trusted server-side transition event carries
+the approved feedback to the conversation publisher, which persists that feedback and
+emits the normal assistant-completion event without requesting a second model review.
+The feedback is persisted as conversation history, not cached global state. Manual
+completion and cancellation without a prior review keep their existing follow-up path.
+Worker stream completion and the transient reviewing phase are distinct protocol facts;
+Todo, Conversation and response overlays stop streaming at that boundary. Neither an
+elapsed-time heuristic nor an early `COMPLETED` transition substitutes for approval.
+Approved feedback retains the original worker request ID. No new conversation request
+is created during publication, so a reset between approval and publication invalidates
+all delayed writes as well.
+
+Malformed review output receives one correction of the same evaluation, not another worker
+execution. Exhausted format correction, incomplete responses and provider failures are
+`REVIEW_FAILED`; only a valid business `RETRY` consumes a worker retry. Cancellation
+propagates through the review request and prevents correction or late approval.
+`ChatRequestContext.responseSchema` is a provider-neutral contract; native schema payloads
+are included in token budgeting, including subsequent Spring AI tool-loop rounds.
+Codex uses its documented turn-level `outputSchema`. OpenAI-compatible and Ollama native
+output require positive `structured_outputs` capability evidence or explicit provider/model
+option `structuredOutput.native=true`; absence is unknown, not supported or unsupported.
+An explicit `false` disables native output for every adapter. Unknown endpoints use the
+same JSON prompt and strict validation. Never infer schema support from model names,
+endpoint substrings or tool support, and never execute review JSON as a tool invocation.
+
 Workspace and download lifecycle messages are retained for audit and presentation.
 Starts, pauses, resumes, cancellations, and progress are `AUDIT_ONLY`; successful
 completions and failures are `SUMMARY_SOURCE` records with a normalized path and

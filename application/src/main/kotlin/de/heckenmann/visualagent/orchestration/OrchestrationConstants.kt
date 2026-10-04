@@ -112,10 +112,8 @@ internal object OrchestrationConstants {
     fun reviewPrompt(
         taskDescription: String,
         workerResult: String,
-        systemPrompt: String,
     ): List<Message> =
         listOf(
-            Message("system", systemPrompt),
             Message(
                 "system",
                 "You are now reviewing a sub-agent's work result. Decide whether the task was completed successfully.\n\n" +
@@ -124,7 +122,12 @@ internal object OrchestrationConstants {
                     "- Is the result concrete and actionable, not vague or evasive?\n" +
                     "- A blank result is acceptable only if the work was done entirely through tool calls.\n" +
                     "- A blank result for a task that requires producing output is a failure.\n\n" +
-                    "Respond with exactly APPROVED or RETRY as the first word.",
+                    "Return only a JSON object matching this schema, without markdown fences or surrounding prose:\n" +
+                    WorkerReviewResult.schema().json + "\n" +
+                    "Use verdict APPROVED for completed work or RETRY for work that needs another execution. " +
+                    "Provide non-blank, concise user-facing feedback in the task's language. " +
+                    "This is the only review: your explanation will be published directly after approval. " +
+                    "State limitations honestly; do not claim to have inspected artifacts not included in the result.",
             ),
             Message(
                 "user",

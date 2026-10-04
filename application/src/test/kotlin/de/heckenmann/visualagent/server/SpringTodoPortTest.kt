@@ -29,6 +29,20 @@ class SpringTodoPortTest {
     private val port = SpringTodoPort(manager, eventBus)
 
     @Test
+    fun `review phase is forwarded without restarting the worker stream`() {
+        val progress = mutableListOf<de.heckenmann.visualagent.protocol.TodoProgress>()
+        val handle = port.addProgressListener(progress::add)
+        try {
+            eventBus.publishProgress(TodoProgressUpdate("todo", completed = true, executionId = "execution", reviewing = true))
+            assertTrue(progress.single().reviewing)
+            assertTrue(progress.single().completed)
+            assertEquals("execution", progress.single().executionId)
+        } finally {
+            handle.close()
+        }
+    }
+
+    @Test
     fun `list and agents map application models to protocol models`() {
         val todo = Todo("todo-1", "Ship it", TodoStatus.COMPLETED, position = 2)
         val agent = SubAgent("agent-1", "Researcher", "research", AgentStatus.IDLE)

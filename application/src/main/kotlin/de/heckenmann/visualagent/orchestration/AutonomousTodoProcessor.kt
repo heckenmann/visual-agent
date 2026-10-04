@@ -10,6 +10,7 @@ import de.heckenmann.visualagent.agent.SubAgentOpsProvider
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.error.ErrorMessageMapper
 import de.heckenmann.visualagent.knowledge.MemoryStore
+import de.heckenmann.visualagent.todo.TodoApproval
 import de.heckenmann.visualagent.todo.TodoChange
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoManager
@@ -117,17 +118,26 @@ internal suspend fun processTodoWithLLM(
                             },
                         )
                     }
+                todoEventBus.publishProgress(
+                    TodoProgressUpdate(
+                        todoId = todoId,
+                        completed = true,
+                        executionId = executionId,
+                        agentId = agent.id,
+                        reviewing = true,
+                    ),
+                )
                 executionControl?.awaitExecutionAllowed(agent.id)
-                val approved =
+                val review =
                     jobScheduler.run(agent.id, "todo:$todoId") {
                         taskPlanner.reviewWorkerResult(
                             todoId,
                             taskDescription,
                             result,
-                            conversationOps.buildMainSystemContextPrompt(),
+                            token,
                         )
                     }
-                if (approved) {
+                if (review.approved) {
                     persistSubAgentMessage(
                         agent = agent,
                         content =
@@ -140,7 +150,13 @@ internal suspend fun processTodoWithLLM(
                         executionId = executionId,
                         todoId = todoId,
                     )
-                    todoManager.completeTodo(todoId)
+                    todoManager.completeTodo(
+                        todoId,
+                        TodoApproval(
+                            review.feedback,
+                            requestId,
+                        ),
+                    )
                     return
                 }
                 attempt++
@@ -172,6 +188,13 @@ internal suspend fun processTodoWithLLM(
             } catch (_: kotlinx.coroutines.CancellationException) {
                 cancelledByChange = true
                 break
+            } catch (_: WorkerReviewFailedException) {
+                todoManager.cancelTodo(
+                    todoId,
+                    TodoTerminalReason.REVIEW_FAILED,
+                    "The worker finished, but its result could not be reviewed. No automatic worker retry was performed.",
+                )
+                return
             } catch (error: Exception) {
                 attempt++
                 val backoff = 500L * attempt

@@ -20,6 +20,7 @@ enum class TodoChangeType {
  * @property type Kind of mutation that occurred
  * @property todo Updated or archived todo for add/update/remove style events
  * @property todoId Removed todo identifier for delete events
+ * @property approval Already reviewed feedback for a server-owned completed transition
  */
 data class TodoChange(
     val type: TodoChangeType,
@@ -28,6 +29,7 @@ data class TodoChange(
     val previousStatus: TodoStatus? = null,
     val terminalReason: TodoTerminalReason? = null,
     val terminalDetail: String? = null,
+    val approval: TodoApproval? = null,
 )
 
 /**
@@ -170,6 +172,7 @@ class TodoManager(
     internal fun update(
         command: TodoUpdateCommand,
         terminalReason: TodoTerminalReason? = null,
+        approval: TodoApproval? = null,
     ): Boolean {
         if (command.description?.isBlank() == true) return false
         if (command.assignment is TodoAssignmentChange.Set && command.assignment.agentId.isBlank()) return false
@@ -207,6 +210,7 @@ class TodoManager(
                 previousStatus = previousStatus,
                 terminalReason = effectiveTerminalReason,
                 terminalDetail = candidate.terminalDetail,
+                approval = approval,
             ),
         )
         return true
@@ -284,12 +288,16 @@ class TodoManager(
      * Completes an in-progress todo and records the completion timestamp.
      *
      * @param todoId Identifier of the in-progress todo
+     * @param approval Main-model feedback to publish without another review, or null for manual completion
      * @return true if the todo could be completed
      */
-    fun completeTodo(todoId: String): Boolean {
+    fun completeTodo(
+        todoId: String,
+        approval: TodoApproval? = null,
+    ): Boolean {
         val todo = getById(todoId) ?: return false
         if (todo.status != TodoStatus.IN_PROGRESS) return false
-        return update(TodoUpdateCommand(id = todoId, status = TodoStatus.COMPLETED), TodoTerminalReason.COMPLETED)
+        return update(TodoUpdateCommand(id = todoId, status = TodoStatus.COMPLETED), TodoTerminalReason.COMPLETED, approval)
     }
 
     /**

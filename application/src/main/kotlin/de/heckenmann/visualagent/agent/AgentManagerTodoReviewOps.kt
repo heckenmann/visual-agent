@@ -13,7 +13,11 @@ internal fun AgentManager.registerTodoTerminalReviewListener(): AutoCloseable =
         if (change.previousStatus == null || change.previousStatus == todo.status) return@addListener
         when (todo.status) {
             TodoStatus.COMPLETED, TodoStatus.CANCELLED ->
-                todoTrigger.trigger(todo, change.terminalReason ?: TodoTerminalReason.USER_CANCELLED)
+                if (todo.status == TodoStatus.COMPLETED && change.approval != null) {
+                    todoTrigger.publishApprovedResult(todo, change.approval)
+                } else {
+                    todoTrigger.trigger(todo, change.terminalReason ?: TodoTerminalReason.USER_CANCELLED)
+                }
             else -> Unit
         }
     }
