@@ -115,21 +115,30 @@ class ToolRegistry(
                     ),
                 )
             }
+            val ownedCall = (context["toolExecutionScope"] as? ToolExecutionScope)?.register(definition.id.value, options.async)
             val execution =
-                reactiveExecution.execute(
-                    tool = tool,
-                    definition = definition,
-                    functionInput = functionInput,
-                    context = context,
-                    options = options,
-                    deadlineNanos = deadlineNanos,
-                    startedAt = startedAt,
-                )
+                reactiveExecution
+                    .execute(
+                        tool = tool,
+                        definition = definition,
+                        functionInput = functionInput,
+                        context = context,
+                        options = options,
+                        deadlineNanos = deadlineNanos,
+                        startedAt = startedAt,
+                    ).doOnSuccess {
+                        ownedCall?.finish(
+                            it ?: failure(definition.id.value, "TOOL_CANCELLED: Tool returned no terminal result."),
+                        )
+                    }.doOnCancel { ownedCall?.finish(failure(definition.id.value, "TOOL_CANCELLED: Tool call was cancelled.")) }
+                    .doOnError { ownedCall?.finish(failure(definition.id.value, "TOOL_EXECUTION: Tool execution failed.")) }
             if (options.async) {
-                execution.subscribe(
-                    {},
-                    { error -> logger.warn(error) { "Asynchronous tool execution failed for toolId=${definition.id.value}." } },
-                )
+                val subscription =
+                    execution.subscribe(
+                        {},
+                        { error -> logger.warn(error) { "Asynchronous tool execution failed for toolId=${definition.id.value}." } },
+                    )
+                ownedCall?.attach(subscription)
                 Mono.just(success(definition.id.value, "scheduled async tool call (timeout=${options.timeoutSeconds}s)"))
             } else {
                 execution
@@ -175,6 +184,9 @@ class ToolRegistry(
         startedAt: Instant,
         result: ToolResult,
     ): ToolResult {
+        (context["toolExecutionScope"] as? ToolExecutionScope)
+            ?.register(definition.id.value, false)
+            ?.finish(result)
         publishEvent(
             definition,
             ToolCallPhase.STARTED,
