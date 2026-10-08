@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.conversation.appendStreamPart
+import de.heckenmann.visualagent.agent.tools.ToolExecutionScope
 import de.heckenmann.visualagent.knowledge.MemoryStore
 import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.reactor.awaitSingleOrNull
@@ -119,8 +120,9 @@ data class SubAgent(
         enabledTools: Set<ToolId> = emptySet(),
         token: CancellationToken? = null,
         requestId: String? = null,
+        executionMetadata: Map<String, Any> = emptyMap(),
     ): ChatResponse {
-        val response = provider.chatReactive(buildRequest(messages, enabledTools, token, requestId)).awaitSingle()
+        val response = provider.chatReactive(buildRequest(messages, enabledTools, token, requestId, executionMetadata)).awaitSingle()
         appendChatHistory(messages, response)
         return response
     }
@@ -150,6 +152,7 @@ data class SubAgent(
         onChunk: ((String) -> Unit)? = null,
         onStreamReset: (() -> Unit)? = null,
         requestId: String? = null,
+        toolScope: ToolExecutionScope = ToolExecutionScope(),
     ): String {
         val messages =
             listOf(
@@ -204,7 +207,25 @@ data class SubAgent(
                 Message("user", description),
             )
 
-        val resp = responseForTodo(messages, provider, enabledTools, token, onChunk, onStreamReset, requestId)
+        val executionMetadata = mapOf("toolExecutionScope" to toolScope)
+        val resp =
+            finishTodoToolWork(toolScope, token) { followUp ->
+                if (followUp == null) {
+                    responseForTodo(messages, provider, enabledTools, token, onChunk, onStreamReset, requestId, executionMetadata)
+                } else {
+                    onStreamReset?.invoke()
+                    responseForTodo(
+                        listOf(Message("user", followUp)),
+                        provider,
+                        enabledTools,
+                        token,
+                        onChunk,
+                        onStreamReset,
+                        requestId,
+                        executionMetadata,
+                    )
+                }
+            }
 
         val summary =
             resp.message.content
@@ -237,14 +258,15 @@ data class SubAgent(
         onChunk: ((String) -> Unit)?,
         onStreamReset: (() -> Unit)?,
         requestId: String?,
+        executionMetadata: Map<String, Any>,
     ): ChatResponse {
-        if (onChunk == null) return chat(messages, provider, enabledTools, token, requestId)
+        if (onChunk == null) return chat(messages, provider, enabledTools, token, requestId, executionMetadata)
         return try {
-            stream(messages, provider, enabledTools, token, onChunk, requestId)
+            stream(messages, provider, enabledTools, token, onChunk, requestId, executionMetadata)
         } catch (error: Exception) {
             if (!isStreamingUnavailable(error)) throw error
             logger.info { "Streaming is unavailable for sub-agent $id; using a complete response instead" }
-            val fallback = chat(messages, provider, enabledTools, token, requestId)
+            val fallback = chat(messages, provider, enabledTools, token, requestId, executionMetadata)
             onStreamReset?.invoke()
             fallback.message.content
                 .takeIf(String::isNotEmpty)
@@ -260,11 +282,12 @@ data class SubAgent(
         token: CancellationToken?,
         onChunk: (String) -> Unit,
         requestId: String?,
+        executionMetadata: Map<String, Any>,
     ): ChatResponse {
         val collected = StringBuilder()
         var terminalResponse: ChatResponse? = null
         provider
-            .streamReactive(buildRequest(messages, enabledTools, token, requestId))
+            .streamReactive(buildRequest(messages, enabledTools, token, requestId, executionMetadata))
             .doOnNext { chunk ->
                 token?.throwIfCancelled()
                 if (chunk.done) terminalResponse = chunk
@@ -285,6 +308,7 @@ data class SubAgent(
         enabledTools: Set<ToolId>,
         token: CancellationToken?,
         requestId: String?,
+        executionMetadata: Map<String, Any>,
     ): ChatRequestContext {
         val modelSelection = config.modelSelection()
         return ChatRequestContext(
@@ -296,7 +320,7 @@ data class SubAgent(
             options = modelSelection.options,
             enabledTools = enabledTools,
             metadata =
-                mapOf("agentId" to id, "agentName" to name, "agentRole" to role) +
+                executionMetadata + mapOf("agentId" to id, "agentName" to name, "agentRole" to role) +
                     requestId?.let { mapOf("requestId" to it, "sessionId" to AgentManagerConstants.MAIN_SESSION_ID) }.orEmpty(),
             cancellationToken = token,
         )

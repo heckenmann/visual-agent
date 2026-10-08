@@ -1,8 +1,6 @@
 package de.heckenmann.visualagent.orchestration
 
 import de.heckenmann.visualagent.agent.SubAgent
-import de.heckenmann.visualagent.todo.TodoManager
-import io.mockk.mockk
 import kotlinx.coroutines.CancellationException
 import org.junit.jupiter.api.Test
 import kotlin.test.assertFailsWith
@@ -22,7 +20,6 @@ class AutonomousTodoResetCleanupTest {
                     todoId = "deleted-todo",
                     pendingTodoChanges = mutableMapOf(),
                     currentTodo = null,
-                    todoManager = mockk<TodoManager>(relaxed = true),
                     persistMessage = { throw rejection },
                     saveAgentToDb = { error("Unexpected save") },
                     releaseAgent = { worker, _ -> released = worker },

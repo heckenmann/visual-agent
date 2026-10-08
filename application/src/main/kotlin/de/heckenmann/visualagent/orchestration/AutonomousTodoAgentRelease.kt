@@ -13,7 +13,7 @@ internal fun releaseAutonomousTodoAgent(
     agentBusySince: MutableMap<String, Long>,
     subAgentOps: SubAgentOpsProvider,
 ) {
-    if (agent.currentTodoId != todoId) return
+    if (agent.currentTodoId != todoId || subAgentOps.getSubAgent(agent.id) !== agent) return
 
     agentBusySince.remove(agent.id)
     agent.status = AgentStatus.IDLE

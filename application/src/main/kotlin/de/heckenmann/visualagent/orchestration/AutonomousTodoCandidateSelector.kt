@@ -37,6 +37,7 @@ internal class AutonomousTodoCandidateSelector(
         requestedTodoId: String?,
     ): Boolean =
         requestedTodoId == null &&
+            todo.decompositionDepth == 0 &&
             taskPlanner.isComplex(todo.description) &&
             !decompositionScheduler.hasAttemptedDecomposition(todo.id)
 }

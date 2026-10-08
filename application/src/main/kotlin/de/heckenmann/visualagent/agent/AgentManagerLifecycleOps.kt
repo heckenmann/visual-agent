@@ -19,6 +19,8 @@ import java.util.UUID
 internal class AgentManagerLifecycleOps(
     private val owner: AgentManager,
 ) {
+    private val agentPersistenceLock = Any()
+    private val deletedAgentIds = mutableSetOf<String>()
     private val logger = KotlinLogging.logger {}
 
     fun loadAgentsFromDb() {
@@ -30,6 +32,7 @@ internal class AgentManagerLifecycleOps(
                 val agent = mapAgentRecord(agentMap, resetStatusToIdle = true)
                 logger.debug { "Loading agent id=${agent.id} status=${agent.status}" }
                 owner.subAgentOpsProvider.putSubAgent(agent)
+                saveAgentToDb(agent)
             } catch (e: Exception) {
                 logger.warn(e) { "Error loading agent ${agentMap.id}" }
             }
@@ -53,7 +56,7 @@ internal class AgentManagerLifecycleOps(
             name = agentRecord.name,
             role = agentRecord.role,
             status = if (resetStatusToIdle) AgentStatus.IDLE else persistedStatus,
-            currentTask = agentRecord.currentTask?.ifBlank { null },
+            currentTask = if (resetStatusToIdle) null else agentRecord.currentTask?.ifBlank { null },
             parentAgentId = agentRecord.parentAgentId?.ifBlank { null },
             config =
                 try {
@@ -67,23 +70,24 @@ internal class AgentManagerLifecycleOps(
         )
     }
 
-    fun saveAgentToDb(agent: SubAgent) {
-        if (!owner.scope.isActive) return
-        val configJson = Json.encodeToString(agent.config)
-        owner.subAgentStore.saveAgent(
-            PersistedSubAgent(
-                id = agent.id,
-                name = agent.name,
-                role = agent.role,
-                status = agent.status.name,
-                currentTask = agent.currentTask,
-                parentAgentId = agent.parentAgentId,
-                config = configJson,
-                createdAt = Instant.ofEpochMilli(agent.createdAt),
-                updatedAt = Instant.now(),
-            ),
-        )
-    }
+    fun saveAgentToDb(agent: SubAgent): Unit =
+        synchronized(agentPersistenceLock) {
+            if (!owner.scope.isActive || agent.id in deletedAgentIds) return@synchronized
+            val configJson = Json.encodeToString(agent.config)
+            owner.subAgentStore.saveAgent(
+                PersistedSubAgent(
+                    id = agent.id,
+                    name = agent.name,
+                    role = agent.role,
+                    status = agent.status.name,
+                    currentTask = agent.currentTask,
+                    parentAgentId = agent.parentAgentId,
+                    config = configJson,
+                    createdAt = Instant.ofEpochMilli(agent.createdAt),
+                    updatedAt = Instant.now(),
+                ),
+            )
+        }
 
     fun getSubAgents(): List<SubAgent> =
         owner.subAgentOpsProvider.allSubAgents.values
@@ -150,20 +154,19 @@ internal class AgentManagerLifecycleOps(
         return true
     }
 
-    fun deleteAgent(id: String): Boolean {
-        val removed = owner.subAgentOpsProvider.removeSubAgent(id)
-        if (removed != null) {
-            if (removed.status == AgentStatus.BUSY) {
-                owner.autonomousCoordinator.cancelAgentTodo(id)
-            }
+    fun deleteAgent(id: String): Boolean =
+        synchronized(agentPersistenceLock) {
+            val agent = owner.subAgentOpsProvider.getSubAgent(id) ?: return@synchronized false
+            deletedAgentIds += id
+            // Exclude the worker from new assignments before cancelling its captured execution.
+            owner.subAgentOpsProvider.removeSubAgent(id)
+            owner.autonomousCoordinator.cancelAgentTodo(id, agent)
             owner.subAgentStore.deleteAgent(id)
             owner.subAgentExecutionControl.removeAgent(id)
-            persistTodoChangeMessage("Deleted sub-agent $id (${removed.name})")
+            persistTodoChangeMessage("Deleted sub-agent $id (${agent.name})")
             logger.info { "Deleted agent: $id" }
-            return true
+            true
         }
-        return false
-    }
 
     fun persistTodoChangeMessage(
         content: String,

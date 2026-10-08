@@ -60,6 +60,7 @@ class AgentManager
         val subAgentExecutionControl: SubAgentExecutionControl,
         internal val providerCatalog: ProviderCatalogService,
         internal val conversationCompletionEvents: ConversationCompletionEventBus,
+        internal val todoToolScopeSource: TodoToolScopeSource,
     ) : DisposableBean {
         internal constructor(
             stores: PersistenceStores,
@@ -94,6 +95,7 @@ class AgentManager
             subAgentExecutionControl,
             providerCatalog,
             conversationCompletionEvents,
+            TodoToolScopeSource(),
         )
 
         internal lateinit var autonomousCoordinator: AutonomousCoordinator
@@ -121,6 +123,7 @@ class AgentManager
         init {
             lifecycleOps.loadAgentsFromDb()
             todoManager.loadInitialTodos()
+            recoverInterruptedTodos(todoManager)
             todoPersistenceListenerHandle = todoEventBus.addListener(lifecycleOps::persistTodoChange)
             conversationOpsProvider.setBuildMainRequest(conversationOps::buildMainRequest)
             conversationOpsProvider.setBuildMainSystemContextPrompt(conversationOps::buildMainSystemContextPrompt)
@@ -147,6 +150,7 @@ class AgentManager
                     conversationOps = conversationOpsProvider,
                     subAgentOps = subAgentOpsProvider,
                     executionControl = subAgentExecutionControl,
+                    toolScopes = todoToolScopeSource::create,
                 )
             todoTrigger =
                 AgentTodoTrigger(

@@ -223,6 +223,8 @@ class AutonomousCoordinatorLifecycleTest {
                 fixture.awaitMessageContaining("Stopped because the todo was cancelled, deleted, or reassigned")
 
                 assertTrue(fixture.messages.any { it.content.contains("Stopped because the todo was cancelled, deleted, or reassigned") })
+                assertEquals("agent-2", fixture.todoManager.getById(todo.id)?.assignedAgentId)
+                assertEquals(TodoStatus.IN_PROGRESS, fixture.todoManager.getById(todo.id)?.status)
             } finally {
                 fixture.cancel()
             }

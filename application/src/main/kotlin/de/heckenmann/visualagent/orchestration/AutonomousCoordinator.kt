@@ -10,13 +10,13 @@ import de.heckenmann.visualagent.agent.SubAgentExecutionControl
 import de.heckenmann.visualagent.agent.SubAgentJobScheduler
 import de.heckenmann.visualagent.agent.SubAgentOpsProvider
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
+import de.heckenmann.visualagent.agent.tools.ToolExecutionScope
 import de.heckenmann.visualagent.knowledge.MemoryStore
 import de.heckenmann.visualagent.knowledge.TodoStore
 import de.heckenmann.visualagent.todo.TodoChange
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoManager
 import de.heckenmann.visualagent.todo.TodoStatus
-import de.heckenmann.visualagent.todo.TodoTerminalReason
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -52,6 +52,7 @@ class AutonomousCoordinator
         private val subAgentOps: SubAgentOpsProvider,
         private val executionControl: SubAgentExecutionControl? = null,
         private val retryDelay: suspend (Long) -> Unit = { delay(it) },
+        private val toolScopes: () -> ToolExecutionScope = ::ToolExecutionScope,
     ) : AutoCloseable {
         private val logger = KotlinLogging.logger {}
         private val subAgents: Map<String, SubAgent>
@@ -122,6 +123,13 @@ class AutonomousCoordinator
             }
             subscriptions +=
                 todoEventBus.addListener { change ->
+                    val snapshot = change.todo
+                    if (snapshot != null &&
+                        change.type != de.heckenmann.visualagent.todo.TodoChangeType.REMOVED &&
+                        todoManager.getById(snapshot.id)?.timelineSequence != snapshot.timelineSequence
+                    ) {
+                        return@addListener
+                    }
                     change.todo?.id?.let { pendingTodoChanges[it] = change }
                     change.todoId?.let { pendingTodoChanges[it] = change }
                     val todo = change.todo
@@ -230,19 +238,10 @@ class AutonomousCoordinator
         /**
          * Cancels the in-progress todo assigned to the given agent.
          */
-        fun cancelAgentTodo(agentId: String) {
-            val agent = subAgents[agentId] ?: return
-            val todoId = agent.currentTodoId ?: return
-            val todo = todoStore.listTodos().firstOrNull { it.id == todoId } ?: return
-            if (todo.status != TodoStatus.IN_PROGRESS) return
-            persistSubAgentMessage(
-                agent = agent,
-                content = "Cancelled todo $todoId for deleted agent $agentId.",
-                success = false,
-                persistMessage = { conversationOps.persist(it) },
-            )
-            todoManager.cancelTodo(todoId, TodoTerminalReason.AGENT_REMOVED)
-        }
+        fun cancelAgentTodo(
+            agentId: String,
+            removedAgent: SubAgent? = null,
+        ) = todoControl.cancelAgentTodo(agentId, removedAgent)
 
         private suspend fun drainWork() {
             if (executionControl?.isGloballyPaused() == true) return
@@ -322,6 +321,7 @@ class AutonomousCoordinator
                             cancellationToken = token,
                             conversationRequestId = requestId,
                             retryDelay = retryDelay,
+                            toolScopes = toolScopes,
                         )
                     }
                 activeTodoJobs[todo.id] = processingJob

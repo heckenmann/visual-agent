@@ -174,6 +174,13 @@ class AutonomousTodoReviewLifecycleTest {
                 assertEquals(2, fixture.providerRequests.count { it.metadata["sessionId"] != "review" })
                 assertEquals(2, fixture.providerRequests.count { it.metadata["sessionId"] == "review" })
                 assertTrue(fixture.messages.any { it.content.contains("Main review rejected") })
+                assertTrue(
+                    fixture.providerRequests
+                        .filter { it.metadata["sessionId"] != "review" }
+                        .last()
+                        .messages
+                        .any { it.content.contains("Review correction:") },
+                )
             } finally {
                 fixture.cancel()
             }

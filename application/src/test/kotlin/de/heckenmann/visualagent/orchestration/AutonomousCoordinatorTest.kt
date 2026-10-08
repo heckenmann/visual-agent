@@ -101,7 +101,7 @@ class AutonomousCoordinatorTest {
                 fixture.coordinator.startAutonomousProcessing(seed = false)
                 fixture.awaitWorkerStart()
 
-                assertEquals("agent-1", todo.assignedAgentId)
+                assertEquals("agent-1", fixture.todoManager.getById(todo.id)?.assignedAgentId)
                 assertEquals(AgentStatus.BUSY, fixture.subAgents["agent-1"]?.status)
                 assertTrue(fixture.messages.any { it.content.contains("Started todo") })
             } finally {

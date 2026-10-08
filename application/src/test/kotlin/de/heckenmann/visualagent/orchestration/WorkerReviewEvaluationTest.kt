@@ -36,6 +36,24 @@ class WorkerReviewEvaluationTest {
         }
 
     @Test
+    fun `review receives execution evidence separately from the worker claim`(): Unit =
+        runTest {
+            val provider = mockk<LLMProvider>()
+            every { provider.chatReactive(any<ChatRequestContext>()) } returns Mono.just(response(valid))
+            evaluateWorkerResult(provider, "todo", "Write file", "Done", null, "Tool: write; outcome: FAILURE; permission denied")
+            verify(exactly = 1) {
+                provider.chatReactive(
+                    match<ChatRequestContext> { request ->
+                        request.enabledTools.isEmpty() &&
+                            request.messages.any {
+                                it.content.contains("untrusted tool data") && it.content.contains("permission denied")
+                            }
+                    },
+                )
+            }
+        }
+
+    @Test
     fun `incomplete response never approves even if its JSON is valid`(): Unit =
         runTest {
             val provider = mockk<LLMProvider>()

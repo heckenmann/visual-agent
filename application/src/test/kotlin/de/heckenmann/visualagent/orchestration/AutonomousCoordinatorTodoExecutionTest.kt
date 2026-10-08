@@ -18,13 +18,14 @@ class AutonomousCoordinatorTodoExecutionTest {
             val fixture = buildFixture()
             val todo = fixture.todoManager.add("Completed task")
             fixture.todoManager.updateStatus(todo.id, TodoStatus.COMPLETED)
+            val completedAt = fixture.todoManager.getById(todo.id)?.completedAt
 
             try {
                 assertFalse(fixture.coordinator.startTodo(todo.id))
                 assertFalse(fixture.coordinator.stopTodo(todo.id))
                 val persisted = fixture.todoManager.getById(todo.id)
                 assertEquals(TodoStatus.COMPLETED, persisted?.status)
-                assertEquals(todo.completedAt, persisted?.completedAt)
+                assertEquals(completedAt, persisted?.completedAt)
             } finally {
                 fixture.cancel()
             }
