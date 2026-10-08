@@ -15,7 +15,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasContentDescription
-import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -44,7 +44,7 @@ import de.heckenmann.visualagent.protocol.ConversationMessage as Message
  */
 class ConversationMessageGroupRowTest {
     @get:Rule
-    val composeTestRule = createComposeRule()
+    val composeTestRule: ComposeContentTestRule = ImmediateMarkdownComposeRule()
 
     @Test
     fun `new message group fades in without animating its measured height`() {
@@ -116,6 +116,10 @@ class ConversationMessageGroupRowTest {
         composeTestRule.onNodeWithContentDescription("You avatar").assertExists()
         composeTestRule.onNodeWithText("oldest").assertExists()
         composeTestRule.onNodeWithText("newest").assertExists()
+        composeTestRule.onAllNodes(hasContentDescription("You avatar")).assertCountEquals(1)
+        val oldestBounds = composeTestRule.onNodeWithText("oldest").getUnclippedBoundsInRoot()
+        val newestBounds = composeTestRule.onNodeWithText("newest").getUnclippedBoundsInRoot()
+        assertTrue(oldestBounds.top < newestBounds.top)
     }
 
     @Test
