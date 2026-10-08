@@ -69,7 +69,7 @@ class AutonomousTodoRequestIdentityTest {
                 fixture.coordinator.startTodo(todo.id)
                 fixture.awaitTodoStatus(todo.id, TodoStatus.COMPLETED)
                 val started = fixture.messages.single { it.content.startsWith("Started todo ${todo.id}") }
-                val completed = fixture.messages.single { it.content.contains("completed todo ${todo.id}") }
+                val completed = fixture.awaitMessageContaining("completed todo ${todo.id}")
                 assertNotNull(started.conversationRequestId)
                 assertEquals(started.conversationRequestId, completed.conversationRequestId)
             } finally {
