@@ -184,7 +184,15 @@ class ComposeTodoPanelProtocolTest {
 
         current.set(reordered)
         listener!!.invoke(TodoChange(todo = reordered.first(), reordered = true))
-        composeTestRule.waitForIdle()
+        composeTestRule.waitUntil(5000) {
+            runCatching {
+                val cTop = composeTestRule.onNodeWithText("Task C").getBoundsInRoot().top
+                val aTop = composeTestRule.onNodeWithText("Task A").getBoundsInRoot().top
+                val bTop = composeTestRule.onNodeWithText("Task B").getBoundsInRoot().top
+                val nextTop = composeTestRule.onNodeWithText("NEXT").getBoundsInRoot().top
+                cTop < aTop && aTop < bTop && nextTop < aTop
+            }.getOrDefault(false)
+        }
 
         val cTop = composeTestRule.onNodeWithText("Task C").getBoundsInRoot().top
         val aTop = composeTestRule.onNodeWithText("Task A").getBoundsInRoot().top
