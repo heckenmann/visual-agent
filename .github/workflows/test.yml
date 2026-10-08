@@ -56,8 +56,11 @@ jobs:
       - name: Validate generated Gradle wrapper
         uses: gradle/actions/wrapper-validation@v6.4.0
 
-      - name: Run tests
-        run: xvfb-run -a ./gradlew ktlintCheck check test --build-cache --no-daemon --parallel --max-workers=4 -PtestMaxParallelForks=4
+      - name: Run offscreen tests without a display server
+        run: env -u DISPLAY -u WAYLAND_DISPLAY ./gradlew ktlintCheck check test --build-cache --no-daemon --parallel --max-workers=4 -PtestMaxParallelForks=4
+
+      - name: Verify offscreen and native smoke workflow contracts
+        run: python3 -m unittest discover -s scripts -p test_release_smoke.py
 
   package-smoke:
     name: Package and launch
@@ -98,7 +101,7 @@ jobs:
         uses: gradle/actions/wrapper-validation@v6.4.0
 
       - name: Verify packages
-        run: xvfb-run -a ./gradlew verifyPackages --build-cache --no-daemon --parallel --max-workers=4
+        run: env -u DISPLAY -u WAYLAND_DISPLAY ./gradlew verifyPackages --build-cache --no-daemon --parallel --max-workers=4
 
       - name: Verify executable JARs can launch
         shell: bash
@@ -112,12 +115,14 @@ jobs:
             local require_spring_startup="${2:-true}"
             local log_path
             local status=0
+            local launch_command=("$java_cmd" -Djava.awt.headless=true)
             log_path="$(mktemp)"
 
-            # The desktop JAR needs a deterministic renderer in the virtual display used by CI.
-            # Skiko's software renderer is supported by Compose Desktop and avoids relying on
-            # whichever OpenGL provider happens to be installed on the GitHub runner.
-            timeout --kill-after=10s 25s xvfb-run -a "$java_cmd" -Dskiko.renderApi=SOFTWARE -jar "$jar_path" \
+            # Only the real desktop launcher needs an X server. The standalone server does not.
+            if [[ "$require_spring_startup" == "false" ]]; then
+              launch_command=(xvfb-run -a "$java_cmd" -Dskiko.renderApi=SOFTWARE)
+            fi
+            timeout --kill-after=10s 25s "${launch_command[@]}" -jar "$jar_path" \
               --spring.main.web-application-type=none >"$log_path" 2>&1 || status=$?
 
             if [[ "$require_spring_startup" == "true" ]]; then

@@ -589,7 +589,8 @@ tasks.register("desktopApiUsageCheck") {
                 rootProject.projectDir.toPath().resolve("settings.gradle.kts"),
             )
 
-        fun isAllowedBuildConfigurationLine(line: String): Boolean = line.contains("-Djava.awt.headless=false")
+        fun isAllowedBuildConfigurationLine(line: String): Boolean =
+            line.trim() in setOf("jvmArgs(\"-Djava.awt.headless=false\")", "jvmArgs(\"-Djava.awt.headless=true\")")
 
         checkedRoots
             .filter { Files.exists(it) }

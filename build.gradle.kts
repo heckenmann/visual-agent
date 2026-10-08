@@ -162,6 +162,15 @@ val verificationModules =
     )
 val clientModules = listOf(":ui", ":protocol")
 
+subprojects {
+    tasks.withType<Test>().configureEach {
+        // Compose test rules render offscreen; native launcher smoke tests run separately.
+        jvmArgs("-Djava.awt.headless=true")
+        environment.remove("DISPLAY")
+        environment.remove("WAYLAND_DISPLAY")
+    }
+}
+
 tasks.register("verifyKtlintCompilerCompatibility") {
     group = "verification"
     description = "Ensures KtLint resolves the compiler version it was built against."
