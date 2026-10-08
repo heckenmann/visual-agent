@@ -68,6 +68,11 @@ internal fun TodoPanel(
     var todos by remember { mutableStateOf<List<TodoItem>>(emptyList()) }
     var responseStates by remember { mutableStateOf<Map<String, TodoResponseState>>(emptyMap()) }
     val scope = rememberCoroutineScope()
+    val actions = rememberTodoActions(modalRequester)
+    var agents by remember(todoPort) { mutableStateOf<List<de.heckenmann.visualagent.protocol.AgentSummary>>(emptyList()) }
+    LaunchedEffect(todoPort, todos) {
+        if (!lifecycle.closing) agents = withContext(Dispatchers.IO) { todoPort.agents() }
+    }
     val progressUpdates = remember(todoPort) { Channel<TodoProgress>(Channel.UNLIMITED) }
 
     /** Loads persisted todos without blocking the Compose dispatcher. */
@@ -143,8 +148,7 @@ internal fun TodoPanel(
                 description = "Start all todos",
                 enabled = hasStartableTodos,
                 onClick = {
-                    todoPort.startAll()
-                    refresh()
+                    actions.submit("start-all", { todoPort.startAll() }, refresh)
                 },
             )
             ActionIconButton(
@@ -152,28 +156,37 @@ internal fun TodoPanel(
                 description = "Stop all todos",
                 enabled = hasStoppableTodos,
                 onClick = {
-                    todoPort.stopAll()
-                    refresh()
+                    actions.submit("stop-all", { todoPort.stopAll() }, refresh)
                 },
             )
             ActionIconButton(
                 icon = Icons.Filled.Add,
                 description = "Add todo",
                 onClick = {
+                    var createdTodoId: String? = null
                     modalRequester.request(
                         ComposeContentModal(title = "Add todo") { dismiss ->
                             TodoEditor(
                                 todo = TodoItem(id = "", description = "", status = TodoState.PENDING),
-                                agents = todoPort.agents(),
+                                agents = agents,
                                 onCancel = dismiss,
                                 onSave = { newDescription, newStatus, newAgentId ->
-                                    val created = todoPort.add(newDescription)
-                                    todoPort.updateStatus(created.id, newStatus)
-                                    if (newAgentId != null) {
-                                        todoPort.updateAssignedAgent(created.id, newAgentId)
-                                    }
-                                    refresh()
-                                    dismiss()
+                                    actions.submit("add", {
+                                        val id = createdTodoId ?: todoPort.add(newDescription).id.also { createdTodoId = it }
+                                        check(
+                                            todoPort.update(
+                                                de.heckenmann.visualagent.protocol.TodoUpdate(
+                                                    todoId = id,
+                                                    description = newDescription,
+                                                    status = newStatus,
+                                                    assignedAgentId = newAgentId,
+                                                ),
+                                            ),
+                                        ) { "Todo was created, but its settings could not be saved. Retry to update the same todo." }
+                                    }, {
+                                        refresh()
+                                        dismiss()
+                                    })
                                 },
                             )
                         },
@@ -190,8 +203,11 @@ internal fun TodoPanel(
             list = todos,
             onSettle = { fromIndex, toIndex ->
                 val reordered = todos.toMutableList().apply { add(toIndex, removeAt(fromIndex)) }
-                todoPort.reorder(reordered.map { it.id })
-                refresh()
+                actions.submit(
+                    "reorder",
+                    { check(todoPort.reorder(reordered.map { it.id })) { "Todo order changed; please retry." } },
+                    refresh,
+                )
             },
             verticalArrangement = Arrangement.spacedBy(6.dp),
             modifier = Modifier.weight(1f).animateContentSize().verticalScroll(todoListScrollState),
@@ -203,6 +219,8 @@ internal fun TodoPanel(
                 responseState = responseStates[todo.id] ?: remember(todo.id) { TodoResponseState() },
                 currentTodo = { todos.firstOrNull { current -> current.id == todo.id } },
                 todoPort = todoPort,
+                agents = agents,
+                actions = actions,
                 modalRequester = modalRequester,
                 refresh = refresh,
             )
