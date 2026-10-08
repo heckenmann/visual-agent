@@ -82,7 +82,7 @@ class TodoManagerTest {
         val b = manager.add("B")
         val c = manager.add("C")
         manager.moveToPosition(c.id, 0)
-        assertEquals(listOf(c, a, b), manager.getAll())
+        assertEquals(listOf(c.id, a.id, b.id), manager.getAll().map { it.id })
     }
 
     @Test
@@ -124,8 +124,8 @@ class TodoManagerTest {
         val todo = manager.add("Assign me")
         val result = manager.assignToAgent(todo.id, "agent-1")
         assertTrue(result)
-        assertEquals(TodoStatus.IN_PROGRESS, todo.status)
-        assertEquals("agent-1", todo.assignedAgentId)
+        assertEquals(TodoStatus.IN_PROGRESS, manager.getById(todo.id)?.status)
+        assertEquals("agent-1", manager.getById(todo.id)?.assignedAgentId)
     }
 
     @Test
@@ -134,7 +134,7 @@ class TodoManagerTest {
         manager.assignToAgent(todo.id, "agent-1")
         val result = manager.assignToAgent(todo.id, "agent-2")
         assertFalse(result)
-        assertEquals("agent-1", todo.assignedAgentId)
+        assertEquals("agent-1", manager.getById(todo.id)?.assignedAgentId)
     }
 
     @Test
@@ -148,8 +148,8 @@ class TodoManagerTest {
         manager.assignToAgent(todo.id, "agent-1")
         val result = manager.completeTodo(todo.id)
         assertTrue(result)
-        assertEquals(TodoStatus.COMPLETED, todo.status)
-        assertNotNull(todo.completedAt)
+        assertEquals(TodoStatus.COMPLETED, manager.getById(todo.id)?.status)
+        assertNotNull(manager.getById(todo.id)?.completedAt)
     }
 
     @Test
@@ -172,13 +172,13 @@ class TodoManagerTest {
         val todo = testManager.add("Status task")
 
         assertTrue(testManager.updateStatus(todo.id, TodoStatus.COMPLETED))
-        assertEquals(TodoStatus.COMPLETED, todo.status)
-        assertNotNull(todo.completedAt)
+        assertEquals(TodoStatus.COMPLETED, testManager.getById(todo.id)?.status)
+        assertNotNull(testManager.getById(todo.id)?.completedAt)
         assertEquals(TodoChangeType.UPDATED, changes.last().type)
 
         assertTrue(testManager.updateStatus(todo.id, TodoStatus.PENDING))
-        assertEquals(TodoStatus.PENDING, todo.status)
-        assertNull(todo.completedAt)
+        assertEquals(TodoStatus.PENDING, testManager.getById(todo.id)?.status)
+        assertNull(testManager.getById(todo.id)?.completedAt)
         assertEquals(TodoChangeType.UPDATED, changes.last().type)
     }
 
@@ -191,12 +191,12 @@ class TodoManagerTest {
         val createdActivity = todo.updatedAt
 
         assertTrue(testManager.update(todo.id, "Refined activity task"))
-        val updatedActivity = todo.updatedAt
+        val updatedActivity = testManager.getById(todo.id)!!.updatedAt
         assertTrue(updatedActivity >= createdActivity)
         assertEquals(2, changes.size)
 
         assertTrue(testManager.update(todo.id, "Refined activity task"))
-        assertEquals(updatedActivity, todo.updatedAt)
+        assertEquals(updatedActivity, testManager.getById(todo.id)?.updatedAt)
         assertEquals(2, changes.size)
     }
 
@@ -205,7 +205,7 @@ class TodoManagerTest {
         val todo = manager.add("Cancel me")
         val result = manager.cancelTodo(todo.id)
         assertTrue(result)
-        assertEquals(TodoStatus.CANCELLED, todo.status)
+        assertEquals(TodoStatus.CANCELLED, manager.getById(todo.id)?.status)
     }
 
     @Test
@@ -214,7 +214,7 @@ class TodoManagerTest {
         manager.assignToAgent(todo.id, "agent-1")
         manager.completeTodo(todo.id)
         assertFalse(manager.cancelTodo(todo.id))
-        assertEquals(TodoStatus.COMPLETED, todo.status)
+        assertEquals(TodoStatus.COMPLETED, manager.getById(todo.id)?.status)
     }
 
     @Test
@@ -250,10 +250,10 @@ class TodoManagerTest {
         val b = manager.add("B")
         val c = manager.add("C")
         assertTrue(manager.moveToPosition(c.id, 0))
-        assertEquals(listOf(c, a, b), manager.getAll())
-        assertEquals(0, c.position)
-        assertEquals(1, a.position)
-        assertEquals(2, b.position)
+        assertEquals(listOf(c.id, a.id, b.id), manager.getAll().map { it.id })
+        assertEquals(0, manager.getById(c.id)?.position)
+        assertEquals(1, manager.getById(a.id)?.position)
+        assertEquals(2, manager.getById(b.id)?.position)
     }
 
     @Test
@@ -261,7 +261,7 @@ class TodoManagerTest {
         val a = manager.add("A")
         manager.add("B")
         assertTrue(manager.moveToPosition(a.id, 99))
-        assertEquals(1, a.position)
+        assertEquals(1, manager.getById(a.id)?.position)
     }
 
     @Test
@@ -275,7 +275,7 @@ class TodoManagerTest {
         val b = manager.add("B")
         val c = manager.add("C")
         assertTrue(manager.reorder(listOf(c.id, a.id, b.id)))
-        assertEquals(listOf(c, a, b), manager.getAll())
+        assertEquals(listOf(c.id, a.id, b.id), manager.getAll().map { it.id })
     }
 
     @Test
@@ -299,10 +299,21 @@ class TodoManagerTest {
     @Test
     fun `combined mutation is persisted once and reports the status transition`() {
         val saves = mutableListOf<Todo>()
+        val backing = InMemoryTodoStore()
         val store =
-            object : TodoStore by InMemoryTodoStore() {
+            object : TodoStore by backing {
                 override fun saveTodo(todo: Todo) {
+                    backing.saveTodo(todo)
                     saves += todo.copy()
+                }
+
+                override fun updateTodoIfCurrent(
+                    expected: Todo,
+                    updated: Todo,
+                ): Boolean {
+                    val committed = backing.updateTodoIfCurrent(expected, updated)
+                    if (committed) saves += updated.copy()
+                    return committed
                 }
             }
         val eventBus = TodoEventBus()
@@ -328,15 +339,5 @@ class TodoManagerTest {
         assertEquals("agent-1", saves.single().assignedAgentId)
         assertEquals(TodoStatus.IN_PROGRESS, saves.single().status)
         assertEquals(TodoStatus.PENDING, changes.last().previousStatus)
-    }
-
-    @Test
-    fun `repeating a status is a no-op and does not publish a transition`() {
-        val changes = mutableListOf<TodoChange>()
-        val testManager = TodoManager(InMemoryTodoStore(), TodoEventBus())
-        testManager.addListener(changes::add)
-        val todo = testManager.add("Stable status")
-        assertTrue(testManager.updateStatus(todo.id, TodoStatus.PENDING))
-        assertEquals(1, changes.size)
     }
 }

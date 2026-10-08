@@ -204,6 +204,16 @@ class TestPersistence internal constructor(
 
     override fun deleteWorkspaceFile(id: String): Boolean = workspaceFileStore.deleteWorkspaceFile(id)
 
+    override fun updateTodoIfCurrent(
+        expected: Todo,
+        updated: Todo,
+    ): Boolean = todoStore.updateTodoIfCurrent(expected, updated)
+
+    override fun replaceTodoWithChildren(
+        expected: Todo,
+        children: List<Todo>,
+    ): Boolean = todoStore.replaceTodoWithChildren(expected, children)
+
     override fun saveTodo(todo: Todo) = todoStore.saveTodo(todo)
 
     override fun claimPendingTodo(

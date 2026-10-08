@@ -22,9 +22,9 @@ class TodoEventBus {
      * Hot stream of persisted todo changes.
      *
      * Changes are ordered, not replayed, and retained in a bounded buffer for slow consumers.
-     * The authoritative current state remains available through [TodoManager.list].
+     * The authoritative current state remains available through [TodoManager.getAll].
      */
-    val changes: Flux<TodoChange> = changeSink.asFlux()
+    val changes: Flux<TodoChange> = changeSink.asFlux().map { it.copy(todo = it.todo?.copy()) }
 
     /**
      * Hot stream of transient todo progress updates.

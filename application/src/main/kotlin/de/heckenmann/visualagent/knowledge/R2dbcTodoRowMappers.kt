@@ -18,5 +18,6 @@ internal fun Row.toTodo(): Todo =
         timelineSequence = R2dbcPersistenceSupport.long(this, "timeline_sequence") ?: 0L,
         completedAt = R2dbcPersistenceSupport.instant(this, "completed_at"),
         dueDate = R2dbcPersistenceSupport.instant(this, "due_date"),
+        decompositionDepth = R2dbcPersistenceSupport.integer(this, "decomposition_depth") ?: 0,
         terminalDetail = R2dbcPersistenceSupport.text(this, "terminal_detail"),
     )

@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.knowledge.R2dbcPersistenceSupport.blockList
 import de.heckenmann.visualagent.knowledge.R2dbcPersistenceSupport.blockNullable
 import de.heckenmann.visualagent.knowledge.R2dbcPersistenceSupport.blockRequired
 import de.heckenmann.visualagent.todo.Todo
+import de.heckenmann.visualagent.todo.TodoStatus
 import org.springframework.context.annotation.DependsOn
 import org.springframework.r2dbc.core.DatabaseClient
 import org.springframework.stereotype.Service
@@ -51,7 +52,7 @@ internal class R2dbcTodoStore(
     }
 
     override fun saveTodoReactive(todo: Todo): Mono<Void> =
-        transactionOperator.transactional(
+        writeTransaction(
             sequenceStore.nextReactive().flatMap { sequence ->
                 todo.timelineSequence = sequence
                 mergeTodo(todo).then()
@@ -62,7 +63,7 @@ internal class R2dbcTodoStore(
         todoId: String,
         agentId: String,
     ): Mono<Todo> =
-        transactionOperator.transactional(
+        writeTransaction(
             sequenceStore.nextReactive().flatMap { sequence ->
                 databaseClient
                     .sql(
@@ -85,7 +86,7 @@ internal class R2dbcTodoStore(
 
     override fun updateTodoPositionsReactive(todos: List<Todo>): Mono<Void> {
         if (todos.isEmpty()) return Mono.empty()
-        return transactionOperator.transactional(
+        return writeTransaction(
             Flux
                 .fromIterable(todos)
                 .concatMap { todo ->
@@ -100,60 +101,113 @@ internal class R2dbcTodoStore(
     }
 
     override fun createTodoIfAbsentReactive(todo: Todo): Mono<TodoCreation> =
-        listTodosReactive()
-            .filter { normalizeDescription(it.description) == normalizeDescription(todo.description) }
-            .next()
-            .map { TodoCreation(it, created = false) }
-            .switchIfEmpty(
-                transactionOperator.transactional(
-                    sequenceStore.nextReactive().flatMap { sequence ->
-                        todo.timelineSequence = sequence
-                        mergeTodo(todo).thenReturn(TodoCreation(todo, created = true))
+        writeTransaction(
+            listTodosReactive()
+                .filter { normalizeDescription(it.description) == normalizeDescription(todo.description) }
+                .next()
+                .map { TodoCreation(it, created = false) }
+                .switchIfEmpty(
+                    Mono.defer {
+                        sequenceStore.nextReactive().flatMap { sequence ->
+                            todo.timelineSequence = sequence
+                            mergeTodo(todo).thenReturn(TodoCreation(todo, created = true))
+                        }
                     },
                 ),
-            )
+        )
+
+    override fun updateTodoIfCurrent(
+        expected: Todo,
+        updated: Todo,
+    ): Boolean =
+        writeTransaction(
+            selectTodo(expected.id)
+                .singleOrEmpty()
+                .filter { it.copy(position = expected.position) == expected }
+                .flatMap { current ->
+                    sequenceStore.nextReactive().flatMap { sequence ->
+                        updated.timelineSequence = sequence
+                        updated.position = current.position
+                        mergeTodo(updated).thenReturn(true)
+                    }
+                }.defaultIfEmpty(false),
+        ).blockRequired()
+
+    override fun replaceTodoWithChildren(
+        expected: Todo,
+        children: List<Todo>,
+    ): Boolean =
+        writeTransaction(
+            selectTodo(expected.id)
+                .singleOrEmpty()
+                .filter { it == expected && it.status == TodoStatus.PENDING }
+                .flatMap { current ->
+                    val parent = current.copy(status = TodoStatus.CANCELLED, updatedAt = Instant.now())
+                    Flux
+                        .fromIterable(listOf(parent) + children)
+                        .concatMap { todo ->
+                            sequenceStore.nextReactive().flatMap { sequence ->
+                                todo.timelineSequence = sequence
+                                mergeTodo(todo)
+                            }
+                        }.then(Mono.just(true))
+                }.defaultIfEmpty(false),
+        ).blockRequired()
+
+    private fun <T : Any> writeTransaction(work: Mono<T>): Mono<T> =
+        transactionOperator.transactional(
+            databaseClient
+                .sql("UPDATE todo_mutation_lock SET revision = revision + 1 WHERE id = 1")
+                .fetch()
+                .rowsUpdated()
+                .then(work),
+        )
 
     override fun listTodosReactive(): Flux<Todo> =
         databaseClient
             .sql(
-                "SELECT id, description, status, position, assigned_agent_id, created_at, updated_at, timeline_sequence, completed_at, due_date, terminal_detail FROM todos ORDER BY position ASC, id ASC",
+                "SELECT id, description, status, position, assigned_agent_id, created_at, updated_at, timeline_sequence, completed_at, due_date, terminal_detail, decomposition_depth FROM todos ORDER BY position ASC, id ASC",
             ).map { row, _ -> row.toTodo() }
             .all()
 
     override fun deleteTodoReactive(todoId: String): Mono<Void> =
-        databaseClient
-            .sql("DELETE FROM todos WHERE id = :id")
-            .bind("id", todoId)
-            .fetch()
-            .rowsUpdated()
-            .then()
+        writeTransaction(
+            databaseClient
+                .sql("DELETE FROM todos WHERE id = :id")
+                .bind("id", todoId)
+                .fetch()
+                .rowsUpdated()
+                .then(),
+        )
 
     override fun deleteTodoAndArchiveReactive(todo: Todo): Mono<Todo> =
-        transactionOperator.transactional(
-            sequenceStore.nextReactive().flatMap { sequence ->
-                todo.timelineSequence = sequence
-                insertDeletedTodo(todo)
-                    .then(
-                        databaseClient
-                            .sql("DELETE FROM todos WHERE id = :id")
-                            .bind("id", todo.id)
-                            .fetch()
-                            .rowsUpdated()
-                            .then(),
-                    ).thenReturn(todo)
+        writeTransaction(
+            selectTodo(todo.id).singleOrEmpty().flatMap { current ->
+                sequenceStore.nextReactive().flatMap { sequence ->
+                    current.timelineSequence = sequence
+                    insertDeletedTodo(current)
+                        .then(
+                            databaseClient
+                                .sql("DELETE FROM todos WHERE id = :id")
+                                .bind("id", todo.id)
+                                .fetch()
+                                .rowsUpdated()
+                                .then(),
+                        ).thenReturn(current)
+                }
             },
         )
 
     override fun listDeletedTodosReactive(limit: Int): Flux<Todo> =
         databaseClient
             .sql(
-                "SELECT id, description, status, position, assigned_agent_id, created_at, updated_at, timeline_sequence, completed_at, due_date, terminal_detail FROM deleted_todos ORDER BY updated_at DESC, id DESC LIMIT :limit",
+                "SELECT id, description, status, position, assigned_agent_id, created_at, updated_at, timeline_sequence, completed_at, due_date, terminal_detail, decomposition_depth FROM deleted_todos ORDER BY updated_at DESC, id DESC LIMIT :limit",
             ).bind("limit", limit.coerceIn(1, 100))
             .map { row, _ -> row.toTodo() }
             .all()
 
     override fun clearTodosReactive(): Mono<Void> =
-        transactionOperator.transactional(
+        writeTransaction(
             databaseClient.sql("DELETE FROM todos").fetch().rowsUpdated().then(
                 databaseClient
                     .sql("DELETE FROM deleted_todos")
@@ -170,13 +224,14 @@ internal class R2dbcTodoStore(
                     """
                     MERGE INTO todos
                         (id, description, status, position, assigned_agent_id, created_at, updated_at,
-                         timeline_sequence, completed_at, due_date, terminal_detail)
+                         timeline_sequence, completed_at, due_date, terminal_detail, decomposition_depth)
                     KEY (id)
                     VALUES (:id, :description, :status, :position, :assignedAgentId, :createdAt, :updatedAt,
-                            :timelineSequence, :completedAt, :dueDate, :terminalDetail)
+                            :timelineSequence, :completedAt, :dueDate, :terminalDetail, :decompositionDepth)
                     """.trimIndent(),
                 ).bind("id", todo.id)
                 .bind("description", todo.description)
+                .bind("decompositionDepth", todo.decompositionDepth)
                 .bind("status", todo.status.name)
                 .bind("position", todo.position)
         statement = R2dbcPersistenceSupport.bindText(statement, "assignedAgentId", todo.assignedAgentId)
@@ -198,13 +253,14 @@ internal class R2dbcTodoStore(
                     """
                     MERGE INTO deleted_todos
                         (id, description, status, position, assigned_agent_id, created_at, updated_at,
-                         timeline_sequence, completed_at, due_date, terminal_detail)
+                         timeline_sequence, completed_at, due_date, terminal_detail, decomposition_depth)
                     KEY (id)
                     VALUES (:id, :description, :status, :position, :assignedAgentId, :createdAt, :updatedAt,
-                            :timelineSequence, :completedAt, :dueDate, :terminalDetail)
+                            :timelineSequence, :completedAt, :dueDate, :terminalDetail, :decompositionDepth)
                     """.trimIndent(),
                 ).bind("id", todo.id)
                 .bind("description", todo.description)
+                .bind("decompositionDepth", todo.decompositionDepth)
                 .bind("status", todo.status.name)
                 .bind("position", todo.position)
         statement = R2dbcPersistenceSupport.bindText(statement, "assignedAgentId", todo.assignedAgentId)
@@ -222,7 +278,7 @@ internal class R2dbcTodoStore(
     private fun selectTodo(id: String): Flux<Todo> =
         databaseClient
             .sql(
-                "SELECT id, description, status, position, assigned_agent_id, created_at, updated_at, timeline_sequence, completed_at, due_date, terminal_detail FROM todos WHERE id = :id",
+                "SELECT id, description, status, position, assigned_agent_id, created_at, updated_at, timeline_sequence, completed_at, due_date, terminal_detail, decomposition_depth FROM todos WHERE id = :id",
             ).bind("id", id)
             .map { row, _ -> row.toTodo() }
             .all()

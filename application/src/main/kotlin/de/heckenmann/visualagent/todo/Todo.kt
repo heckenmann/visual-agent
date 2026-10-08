@@ -22,6 +22,8 @@ enum class TodoTerminalReason {
     EXECUTION_FAILED,
     AGENT_REMOVED,
     REASSIGNED,
+    INTERRUPTED,
+    DECOMPOSED,
 }
 
 /**
@@ -38,6 +40,7 @@ enum class TodoTerminalReason {
  * @property completedAt Completion timestamp, set only after completion
  * @property dueDate Optional deadline supplied by the user or planner
  * @property terminalDetail Safe explanation of a terminal failure, when applicable
+ * @property decompositionDepth Persisted decomposition generation; generated children execute as leaves
  */
 data class Todo(
     val id: String,
@@ -51,6 +54,7 @@ data class Todo(
     var completedAt: Instant? = null,
     val dueDate: Instant? = null,
     var terminalDetail: String? = null,
+    val decompositionDepth: Int = 0,
 )
 
 /** Assignment mutation requested together with a todo update. */

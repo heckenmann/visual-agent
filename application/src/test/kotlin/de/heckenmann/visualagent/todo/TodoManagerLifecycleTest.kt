@@ -15,12 +15,12 @@ class TodoManagerLifecycleTest {
         assertEquals(TodoStatus.PENDING, todo.status)
 
         manager.assignToAgent(todo.id, "agent-1")
-        assertEquals(TodoStatus.IN_PROGRESS, todo.status)
-        assertEquals("agent-1", todo.assignedAgentId)
+        assertEquals(TodoStatus.IN_PROGRESS, manager.getById(todo.id)?.status)
+        assertEquals("agent-1", manager.getById(todo.id)?.assignedAgentId)
 
         manager.completeTodo(todo.id)
-        assertEquals(TodoStatus.COMPLETED, todo.status)
-        assertNotNull(todo.completedAt)
+        assertEquals(TodoStatus.COMPLETED, manager.getById(todo.id)?.status)
+        assertNotNull(manager.getById(todo.id)?.completedAt)
     }
 
     @Test
