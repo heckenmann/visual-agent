@@ -2,6 +2,8 @@
 
 ## Goal
 
+Issue #450 ensures deletion first captures the worker, invalidates its owned execution and queued work, and tombstones the identity before allowing any late persistence. Cleanup cannot recreate a removed agent. Assigned unfinished todos are cancelled with `AGENT_REMOVED`; analyst deletion also invalidates active decomposition.
+
 Allow users and the main agent to manage sub-agent definitions, roles, templates, and persisted configuration.
 
 ## Primary Actor

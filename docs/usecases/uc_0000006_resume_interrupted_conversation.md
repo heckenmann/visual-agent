@@ -2,6 +2,8 @@
 
 ## Goal
 
+Issue #452 defines todo recovery separately from conversation recovery: startup clears persisted busy-agent reservations and cancels orphaned `IN_PROGRESS` todos with an interruption explanation. It does not automatically replay unknown external side effects. Users inspect existing work and explicitly restart the todo when appropriate. Pending and terminal todos remain unchanged.
+
 Detect and surface interrupted work so the main agent can resume instead of silently losing context.
 
 ## Primary Actor

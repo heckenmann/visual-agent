@@ -16,10 +16,10 @@ Main orchestration agent.
 ## Main Flow
 
 1. The worker returns its result (may be blank if the work was done entirely through tool calls).
-2. The planner sends the task description and result to the main LLM via `reviewWorkerResult`.
+2. After all attempt-owned tool calls finish, the planner sends the task description, final worker result, and bounded execution evidence to the main LLM via `reviewWorkerResult`. Scheduling acknowledgements are not proof of success.
 3. The main LLM returns one JSON object with `verdict` (`APPROVED` or `RETRY`) and non-blank user-facing `feedback`. The same JSON Schema is included in the prompt and, when supported, sent as a native provider constraint.
 4. Approved results complete the todo. The server persists the same review feedback as the main-agent response and publishes a conversation completion event; it does not invoke the model again to review approved work. The Conversation panel observes this event independently of suggestion settings and asynchronously reloads the latest history page after persistence.
-5. Rejected results trigger retry until the retry limit is reached.
+5. Rejected results trigger retry until the retry limit is reached. The next worker instruction includes the rejected review's feedback and asks the worker to inspect existing work rather than repeat successful side effects.
 6. Final rejection cancels the todo.
 
 ## Error Flow
@@ -78,3 +78,4 @@ Existing Spring AI native schema options and Kotlin serialization cover this two
 ## Related Issues
 
 - #444: Reuse approved review feedback and distinguish worker streaming from review.
+- #449, #455, #456: Wait for asynchronous work, pass correction feedback to retries, and review actual attempt-local tool evidence.

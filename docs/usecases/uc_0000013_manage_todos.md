@@ -2,6 +2,10 @@
 
 ## Goal
 
+Lifecycle corrections in issues #451 and #457 make persisted snapshots authoritative. Every edit or completion checks its expected execution state in the same serialized database transaction as the write. Failed or stale writes emit no success event; deleted rows cannot be recreated by worker updates. Returned todos and event payloads are detached snapshots.
+
+Todo-panel mutations, agent lookup, and reordering run off the Compose UI dispatcher. One composition-owned queue serializes actions, coalesces duplicate pending clicks, and reports failures without dismissing an unsuccessful editor. No new dependency is required: existing coroutine dispatchers and mutexes implement this UI boundary, while Spring Data R2DBC implements the persistence guarantee.
+
 Let users create, update, complete, delete, and inspect task todos that are also available to the agent context.
 
 ## Primary Actor
