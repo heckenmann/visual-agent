@@ -98,7 +98,7 @@ class AutonomousTaskPlannerTest {
             val planner = planner(todoManager, mutableMapOf())
 
             assertFalse(planner.expandComplexTodoIfNeeded(todoManager.getAll()))
-            assertSame(original, todoManager.getById(original.id))
+            assertEquals(original, todoManager.getById(original.id))
         }
 
     @Test

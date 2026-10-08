@@ -46,6 +46,13 @@ internal class AutonomousTodoDecompositionScheduler(
     }
 
     fun onTodoChanged(change: TodoChange) {
+        if (change.type == TodoChangeType.CLEARED) {
+            activeJobs.keys.toList().forEach(::cancel)
+            attemptedTodoIds.clear()
+            return
+        }
+        val changedId = change.todo?.id ?: change.todoId
+        if (changedId != null && change.type != TodoChangeType.REORDERED) cancel(changedId)
         val todo = change.todo ?: return
         if (todo.status == TodoStatus.PENDING &&
             change.previousStatus == TodoStatus.PENDING &&
@@ -63,6 +70,7 @@ internal class AutonomousTodoDecompositionScheduler(
                 .listTodos()
                 .firstOrNull {
                     it.status == TodoStatus.PENDING &&
+                        it.decompositionDepth == 0 &&
                         it.id !in attemptedTodoIds &&
                         taskPlanner.isComplex(it.description)
                 }
@@ -126,7 +134,7 @@ internal class AutonomousTodoDecompositionScheduler(
         analyst: SubAgent,
         todoId: String,
     ) {
-        if (analyst.currentTask != decompositionTask(todoId)) return
+        if (subAgentOps.getSubAgent(analyst.id) !== analyst || analyst.currentTask != decompositionTask(todoId)) return
         analyst.status = AgentStatus.IDLE
         analyst.currentTask = null
         analyst.currentTodoId = null

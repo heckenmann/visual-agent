@@ -29,7 +29,7 @@ internal class AutonomousTaskPlanner(
         candidate: Todo,
         analyst: SubAgent? = analysisAgent(),
     ): Boolean {
-        if (candidate.status != TodoStatus.PENDING || !isComplex(candidate.description)) return false
+        if (candidate.status != TodoStatus.PENDING || candidate.decompositionDepth > 0 || !isComplex(candidate.description)) return false
         analyst ?: return false
         val prompt = OrchestrationConstants.decompositionPrompt(candidate.description)
         val response = analyst.chat(prompt, llmProvider, agentToolConfigService.toolsFor(analyst)).message.content
@@ -41,10 +41,10 @@ internal class AutonomousTaskPlanner(
                 .distinct()
                 .take(OrchestrationConstants.MAX_SUBTASKS)
                 .toList()
-        if (subtasks.isEmpty()) return false
-        todoManager.cancelTodo(candidate.id)
-        subtasks.forEach(todoManager::add)
-        return true
+        if (subtasks.isEmpty() || subAgents[analyst.id] !== analyst || analyst.status == AgentStatus.OFFLINE) return false
+        val normalized = { text: String -> text.trim().replace(Regex("\\s+"), " ").lowercase() }
+        if (subtasks.size == 1 && normalized(subtasks.single()) == normalized(candidate.description)) return false
+        return todoManager.replaceWithChildren(candidate, subtasks)
     }
 
     fun selectWorkerAgentForNextTodo(): SubAgent? {
@@ -62,7 +62,8 @@ internal class AutonomousTaskPlanner(
         taskDescription: String,
         workerResult: String,
         cancellationToken: CancellationToken? = null,
-    ): WorkerReviewResult = evaluateWorkerResult(llmProvider, todoId, taskDescription, workerResult, cancellationToken)
+        executionEvidence: String = "No tool execution evidence was recorded for this attempt.",
+    ): WorkerReviewResult = evaluateWorkerResult(llmProvider, todoId, taskDescription, workerResult, cancellationToken, executionEvidence)
 
     internal fun isComplex(description: String): Boolean {
         if (description.trim().split(Regex("\\s+")).count(String::isNotBlank) >= OrchestrationConstants.COMPLEX_WORD_COUNT) return true
