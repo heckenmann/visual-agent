@@ -39,6 +39,7 @@ internal class JavaScriptToolBridge(
     private val toolsByFunctionName =
         registry
             .resolve(enabledTools.map(::ToolId).toSet())
+            .filterNot { it.definition.id.value == "tools:batch" }
             .associateBy { registry.definition(it).name }
 
     /** Returns the only host object made available to the guest context. */

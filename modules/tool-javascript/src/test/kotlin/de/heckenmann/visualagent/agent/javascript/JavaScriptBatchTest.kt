@@ -166,6 +166,50 @@ class JavaScriptBatchTest {
         }
     }
 
+    @Test
+    fun `provider batch wrapper cannot bypass JavaScript child call accounting`() {
+        val starts = AtomicInteger()
+        val child =
+            object : VisualAgentTool {
+                override val definition = ToolDefinition(ToolId("read"), "read", "Test", "{}")
+
+                override fun execute(
+                    inputJson: String,
+                    context: Map<String, Any>,
+                ): ToolResult {
+                    starts.incrementAndGet()
+                    return success("read", "unexpected")
+                }
+            }
+        val children = ToolRegistry(listOf(child), ToolEventBus())
+        val batch =
+            de.heckenmann.visualagent.agent.tools.ToolBatchTool {
+                de.heckenmann.visualagent.agent.tools
+                    .ToolBatchExecutor(children)
+            }
+        val registry = ToolRegistry(listOf(child, batch), ToolEventBus())
+        for (preferIsolate in listOf(false, true)) {
+            GraalJavaScriptExecutionService(
+                { registry },
+                JavaScriptWorkspaceWriter { _, _ -> error("Unused") },
+                preferIsolate = preferIsolate,
+            ).use { service ->
+                val error =
+                    assertFailsWith<JavaScriptExecutionException> {
+                        service.execute(
+                            JavaScriptExecutionRequest(
+                                "return tools.call('tools_batch',{calls:[{id:'one',tool:'read',arguments:{}},{id:'two',tool:'read',arguments:{}}]});",
+                                setOf("read", "tools:batch"),
+                                limits = JavaScriptExecutionLimits(maxToolCalls = 1),
+                            ),
+                        )
+                    }
+                assertEquals(JavaScriptErrorCategory.TOOL_ACCESS, error.category)
+                assertEquals(0, starts.get())
+            }
+        }
+    }
+
     private fun request(source: String) = JavaScriptExecutionRequest(source, setOf("read", "fail"))
 
     private fun withService(block: (GraalJavaScriptExecutionService, AtomicInteger) -> Unit) {

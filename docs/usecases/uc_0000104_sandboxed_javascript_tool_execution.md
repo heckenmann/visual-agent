@@ -82,3 +82,7 @@ order and preserve the canonical single-call data and error envelope. Ordinary e
 are per-item; syntax and invalid-argument errors stop the batch immediately and cancel unfinished
 work. All children inherit the parent deadline and cancellation.
 Batches are non-atomic and never automatically retry successful mutations.
+
+The provider-only `tools_batch` wrapper is unavailable to JavaScript `tools.call` and tool
+discovery. Scripts use `tools.callMany`, so every child consumes the script call budget and
+shares its admission, deadline and aggregate output limits.
