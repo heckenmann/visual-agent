@@ -70,5 +70,7 @@ Issues #449, #456 and #375 use Reactor completion sinks and native Mono composit
 See UC-0000148 and issue #289. Independent native model calls, `tools_batch`, and guest
 `tools.callMany` use one bounded Reactor executor through the registry. Only explicitly reviewed
 read-only tools overlap; unknown tools and mutations remain serialized. Results retain declaration
-order, failures are per-item, and all children inherit the parent deadline and cancellation.
+order and preserve the canonical single-call data and error envelope. Ordinary execution failures
+are per-item; syntax and invalid-argument errors stop the batch immediately and cancel unfinished
+work. All children inherit the parent deadline and cancellation.
 Batches are non-atomic and never automatically retry successful mutations.

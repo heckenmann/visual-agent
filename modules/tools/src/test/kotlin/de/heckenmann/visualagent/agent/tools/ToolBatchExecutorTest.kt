@@ -229,6 +229,51 @@ class ToolBatchExecutorTest {
         }
     }
 
+    @Test
+    fun `invalid arguments cancel a slow earlier sibling without waiting and skip queued work`() {
+        val entered = CountDownLatch(1)
+        val cancelled = CountDownLatch(1)
+        val queued = AtomicInteger()
+        val tools =
+            listOf(
+                tool("slow", ToolBatchSafety.READ_ONLY_PARALLEL) {
+                    entered.countDown()
+                    Mono.never<ToolResult>().doOnCancel { cancelled.countDown() }
+                },
+                tool("invalid", ToolBatchSafety.READ_ONLY_PARALLEL) {
+                    assertTrue(entered.await(5, TimeUnit.SECONDS))
+                    throw IllegalArgumentException("Missing required value")
+                },
+                tool("queued") {
+                    queued.incrementAndGet()
+                    Mono.just(success("queued", "unexpected"))
+                },
+            )
+        val outcomes =
+            ToolBatchExecutor(ToolRegistry(tools, ToolEventBus()))
+                .execute(request(tools))
+                .block(Duration.ofSeconds(5))!!
+        assertEquals(listOf(ToolBatchStatus.CANCELLED, ToolBatchStatus.FAILURE, ToolBatchStatus.SKIPPED), outcomes.map { it.status })
+        assertEquals(de.heckenmann.visualagent.agent.tools.api.ToolErrorCode.INVALID_ARGUMENT, outcomes[1].errorCode)
+        assertTrue(cancelled.await(5, TimeUnit.SECONDS))
+        assertEquals(0, queued.get())
+    }
+
+    @Test
+    fun `bounded batch preserves the complete canonical failed call envelope`() {
+        val tool =
+            tool("failed") {
+                Mono.just(ToolResult("failed", false, "", "TOOL_TIMEOUT: Expired", JsonObject(emptyMap())))
+            }
+        val registry = ToolRegistry(listOf(tool), ToolEventBus())
+        val single =
+            Json.decodeFromString<de.heckenmann.visualagent.agent.tools.api.ToolResultEnvelope>(
+                registry.executeBlocking(tool, "{}", emptyMap()),
+            )
+        val outcome = ToolBatchExecutor(registry).execute(request(listOf(tool))).block(Duration.ofSeconds(5))!!.single()
+        assertEquals(single, outcome.result)
+    }
+
     private fun request(tools: List<VisualAgentTool>) =
         ToolBatchRequest(
             tools.mapIndexed { index, tool ->

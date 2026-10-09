@@ -30,6 +30,8 @@ class JavaScriptBatchTest {
                 const promise = tools.callMany([{id:'one',name:'read',arguments:{}},{id:'two',name:'fail',arguments:{}}]);
                 if (!(promise instanceof Promise)) throw new Error('not a Promise');
                 const results = await promise;
+                if (results[0].toolId !== 'read' || results[0].data !== 'done' || results[0].error !== null) throw new Error('success envelope');
+                if (!results[1].error.code || !results[1].error.remediation || typeof results[1].error.retryable !== 'boolean') throw new Error('error envelope');
                 return results.map(item => ({id:item.id,success:item.success}));
             """,
                     ),
@@ -113,6 +115,54 @@ class JavaScriptBatchTest {
                 release.countDown()
                 pool.shutdownNow()
             }
+        }
+    }
+
+    @Test
+    fun `invalid child rejects promptly while an earlier guest batch call is pending`() {
+        val entered = CountDownLatch(1)
+        val cancelled = CountDownLatch(1)
+        val tools =
+            listOf("slow", "invalid").map { id ->
+                object : VisualAgentTool {
+                    override val definition = ToolDefinition(ToolId(id), id, "Test", "{}", ToolBatchSafety.READ_ONLY_PARALLEL)
+
+                    override fun execute(
+                        inputJson: String,
+                        context: Map<String, Any>,
+                    ): ToolResult = error("Reactive only")
+
+                    override fun executeReactive(
+                        inputJson: String,
+                        context: Map<String, Any>,
+                    ): reactor.core.publisher.Mono<ToolResult> =
+                        reactor.core.publisher.Mono.defer {
+                            if (id == "slow") {
+                                entered.countDown()
+                                reactor.core.publisher.Mono
+                                    .never<ToolResult>()
+                                    .doOnCancel { cancelled.countDown() }
+                            } else {
+                                assertTrue(entered.await(5, TimeUnit.SECONDS))
+                                reactor.core.publisher.Mono
+                                    .just(failure(id, "TOOL_ARGUMENTS: Missing value"))
+                            }
+                        }
+                }
+            }
+        val registry = ToolRegistry(tools, ToolEventBus())
+        GraalJavaScriptExecutionService({ registry }, JavaScriptWorkspaceWriter { _, _ -> error("Unused") }).use { service ->
+            val failure =
+                assertFailsWith<JavaScriptExecutionException> {
+                    service.execute(
+                        JavaScriptExecutionRequest(
+                            "return await tools.callMany([{id:'slow',name:'slow',arguments:{}},{id:'bad',name:'invalid',arguments:{}}]);",
+                            setOf("slow", "invalid"),
+                        ),
+                    )
+                }
+            assertEquals(JavaScriptErrorCategory.TOOL_ARGUMENTS, failure.category)
+            assertTrue(cancelled.await(5, TimeUnit.SECONDS))
         }
     }
 

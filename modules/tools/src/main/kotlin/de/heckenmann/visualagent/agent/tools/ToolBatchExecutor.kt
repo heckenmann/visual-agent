@@ -4,7 +4,6 @@ import de.heckenmann.visualagent.agent.tools.api.ToolBatchSafety
 import de.heckenmann.visualagent.agent.tools.api.ToolErrorCode
 import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResultEnvelope
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import reactor.core.publisher.Flux
@@ -36,6 +35,9 @@ class ToolBatchExecutor(
             val outcomes =
                 java.util.concurrent.atomic
                     .AtomicReferenceArray<ToolBatchOutcome>(request.items.size)
+            val started =
+                java.util.concurrent.atomic
+                    .AtomicIntegerArray(request.items.size)
             val groups = mutableListOf<MutableList<Int>>()
             tools.indices.forEach { index ->
                 if (tools[index].definition.batchSafety == ToolBatchSafety.READ_ONLY_PARALLEL &&
@@ -53,7 +55,10 @@ class ToolBatchExecutor(
                     .concatMap { group ->
                         Flux.fromIterable(group).flatMapSequential(
                             { index ->
-                                executeChild(request, tools[index], index, deadline, admission).doOnNext { outcomes.set(index, it) }
+                                executeChild(request, tools[index], index, deadline, admission, started).doOnNext {
+                                    outcomes.set(index, it)
+                                    if (it.errorCode == ToolErrorCode.INVALID_ARGUMENT) throw ToolBatchSyntaxFailure()
+                                }
                             },
                             request.limits.maxConcurrency,
                             1,
@@ -70,16 +75,26 @@ class ToolBatchExecutor(
                 .firstWithSignal(cancellation, work)
                 .timeout(Duration.ofNanos((deadline - System.nanoTime()).coerceAtLeast(1)))
                 .onErrorResume { error ->
-                    if (error is CancellationException || error is java.util.concurrent.TimeoutException) {
+                    if (error is CancellationException ||
+                        error is java.util.concurrent.TimeoutException ||
+                        error is ToolBatchSyntaxFailure
+                    ) {
                         Mono.just(
                             request.items.mapIndexed { index, item ->
-                                outcomes.get(index) ?: ToolBatchOutcome(
-                                    item.id,
-                                    tools[index].definition.name,
-                                    ToolBatchStatus.CANCELLED,
-                                    false,
-                                    error = if (error is CancellationException) "Batch cancelled" else "Batch deadline expired",
-                                    errorCode = if (error is CancellationException) ToolErrorCode.CANCELLED else ToolErrorCode.TIMEOUT,
+                                outcomes.get(index) ?: ToolBatchResults.failure(
+                                    item,
+                                    tools[index],
+                                    if (error is ToolBatchSyntaxFailure && started.get(index) == 0) {
+                                        ToolBatchStatus.SKIPPED
+                                    } else {
+                                        ToolBatchStatus.CANCELLED
+                                    },
+                                    if (error is java.util.concurrent.TimeoutException) ToolErrorCode.TIMEOUT else ToolErrorCode.CANCELLED,
+                                    when (error) {
+                                        is ToolBatchSyntaxFailure -> "Batch stopped because a child reported invalid arguments"
+                                        is CancellationException -> "Batch cancelled"
+                                        else -> "Batch deadline expired"
+                                    },
                                 )
                             },
                         )
@@ -142,7 +157,7 @@ class ToolBatchExecutor(
             }
         resolved.forEachIndexed { index, tool ->
             checkBatch(
-                resultCapacity(request) >= resultOverhead(request.items[index], tool) + 78,
+                ToolBatchResults.capacity(request) >= ToolBatchResults.overhead(request.items[index], tool) + 78,
                 "LIMIT_EXCEEDED",
                 "Batch result budget too small",
             )
@@ -156,6 +171,7 @@ class ToolBatchExecutor(
         index: Int,
         deadline: Long,
         admission: Semaphore,
+        startedChildren: java.util.concurrent.atomic.AtomicIntegerArray,
     ): Mono<ToolBatchOutcome> =
         Mono.defer {
             val item = request.items[index]
@@ -182,73 +198,33 @@ class ToolBatchExecutor(
                         Mono.using({
                             permits.acquire()
                             Unit
-                        }, { registry.executeReactive(tool, item.arguments.toString(), context) }, { permits.release() })
+                        }, {
+                            registry
+                                .executeReactive(tool, item.arguments.toString(), context)
+                                .doOnSubscribe { startedChildren.set(index, 1) }
+                        }, { permits.release() })
                     },
                     { admission.release(required) },
                 ).subscribeOn(Schedulers.boundedElastic())
                 .map { serialized ->
                     val result = Json.decodeFromString<ToolResultEnvelope>(serialized)
-                    val bound = (resultCapacity(request) - resultOverhead(item, tool)).coerceAtLeast(0) / 6
-                    ToolBatchOutcome(
-                        item.id,
-                        tool.definition.name,
-                        if (result.success) {
-                            ToolBatchStatus.SUCCESS
-                        } else if (result.error?.code?.name ==
-                            "CANCELLED"
-                        ) {
-                            ToolBatchStatus.CANCELLED
-                        } else {
-                            ToolBatchStatus.FAILURE
-                        },
-                        result.success,
-                        if (result.success) bounded(result.data.toString(), bound) else null,
-                        result.error?.message?.let { bounded(it, bound) },
-                        (System.nanoTime() - started) / 1000000,
-                        result.error?.code,
-                    )
+                    ToolBatchResults.collect(request, item, tool, result, (System.nanoTime() - started) / 1000000)
                 }.onErrorResume { error ->
                     if (error is CancellationException) {
                         Mono.error(error)
                     } else {
                         Mono.just(
-                            ToolBatchOutcome(
-                                item.id,
-                                tool.definition.name,
+                            ToolBatchResults.failure(
+                                item,
+                                tool,
                                 ToolBatchStatus.FAILURE,
-                                false,
-                                error = "Tool execution failed",
-                                errorCode = ToolErrorCode.EXECUTION_FAILED,
+                                ToolErrorCode.EXECUTION_FAILED,
+                                "Tool execution failed",
                             ),
                         )
                     }
                 }
         }
-
-    private fun resultCapacity(request: ToolBatchRequest): Int = (request.limits.maxResultCharacters - 2) / request.items.size - 1
-
-    private fun resultOverhead(
-        item: ToolBatchItem,
-        tool: VisualAgentTool,
-    ): Int =
-        Json
-            .encodeToString(
-                ToolBatchOutcome(
-                    item.id,
-                    tool.definition.name,
-                    ToolBatchStatus.CANCELLED,
-                    false,
-                    "",
-                    "",
-                    Long.MAX_VALUE,
-                    ToolErrorCode.PERMISSION_DENIED,
-                ),
-            ).length + 128
-
-    private fun bounded(
-        value: String,
-        limit: Int,
-    ): String = if (value.length <= limit) value else (value.take((limit - 13).coerceAtLeast(0)) + " [truncated]").take(limit)
 
     private fun checkBatch(
         condition: Boolean,

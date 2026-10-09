@@ -3,8 +3,7 @@ package de.heckenmann.visualagent.agent.tools
 import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import de.heckenmann.visualagent.agent.tools.api.toProviderJson
 import mu.KotlinLogging
 import reactor.core.publisher.Mono
 import java.time.Instant
@@ -211,7 +210,7 @@ class ToolRegistry(
         return result
     }
 
-    private fun serialize(result: ToolResult): String = envelopeJson.encodeToString(ToolResultNormalization.envelope(result))
+    private fun serialize(result: ToolResult): String = ToolResultNormalization.envelope(result).toProviderJson()
 
     private fun validateDefinitions() {
         val definitions = registeredTools.map(::definition)
@@ -277,12 +276,4 @@ class ToolRegistry(
         } else {
             "${TimeUnit.NANOSECONDS.toSeconds(timeoutNanos)}s"
         }
-
-    private companion object {
-        val envelopeJson =
-            Json {
-                encodeDefaults = true
-                explicitNulls = true
-            }
-    }
 }

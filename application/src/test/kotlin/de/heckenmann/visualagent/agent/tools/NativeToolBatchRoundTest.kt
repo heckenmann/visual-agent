@@ -17,6 +17,41 @@ import kotlin.test.assertTrue
 /** Proves identical tool names/arguments retain immutable distinct provider identities. */
 class NativeToolBatchRoundTest {
     @Test
+    fun `malformed batch JSON returns canonical errors before any tool starts`() {
+        var started = false
+        val tool =
+            object : VisualAgentTool {
+                override val definition = ToolDefinition(ToolId("read"), "read", "Test", "{}")
+
+                override fun execute(
+                    inputJson: String,
+                    context: Map<String, Any>,
+                ): ToolResult {
+                    started = true
+                    return success("read", "unexpected")
+                }
+            }
+        val registry = ToolRegistry(listOf(tool), ToolEventBus())
+        val results =
+            NativeToolBatchRound(registry, ToolBatchExecutor(registry))
+                .execute(
+                    listOf(ProviderToolCall("first", "function", "read", "{}"), ProviderToolCall("bad", "function", "read", "{")),
+                    0,
+                    null,
+                    setOf("read"),
+                    emptyMap(),
+                ).block(Duration.ofSeconds(5))!!
+        assertTrue(!started)
+        results.forEach {
+            val result =
+                kotlinx.serialization.json.Json.decodeFromString<
+                    de.heckenmann.visualagent.agent.tools.api.ToolResultEnvelope,
+                >(it)
+            assertEquals(de.heckenmann.visualagent.agent.tools.api.ToolErrorCode.INVALID_ARGUMENT, result.error?.code)
+        }
+    }
+
+    @Test
     fun `duplicate function names preserve call identity and parent history under overlap`() {
         val entered = CountDownLatch(2)
         val release = Sinks.empty<Void>()

@@ -33,14 +33,20 @@ child starts. Tools may reduce their timeout; they cannot extend the inherited o
    no model or script can override safety metadata. Only the pure server time query is initially
    marked parallel-safe. No database or filesystem mutation is assumed conflict-free.
 5. Each child emits its existing STARTED/FINISHED activity events. Results collect in declaration
-   order even when completion order differs. Child failure is data and does not roll back or retry
-   successful siblings.
-6. JavaScript receives a genuine Promise and ordered `{id, name, success, content, error}` items.
+   order even when completion order differs. Each model-facing result preserves the single-call
+   `{toolId, success, data, error}` envelope; explicit batches add only the opaque `id`. Error code,
+   message, remediation and retryability remain visible. Ordinary execution failure is data and
+   does not roll back or retry successful siblings.
+6. JavaScript receives a genuine Promise and ordered `{id, toolId, success, data, error}` items.
    Only the context-owner thread resolves guest callbacks; host workers queue immutable outcomes.
 
 ## Alternate and Failure Flows
 
 - Malformed, unauthorized, recursive and over-budget batches fail before tool side effects.
+- Invalid JSON is rejected before execution. A child reporting `INVALID_ARGUMENT` stops the batch
+  immediately, including when an earlier sibling is still running. In-flight siblings are cancelled,
+  queued siblings are skipped and already completed results are retained. JavaScript rejects the
+  Promise with `TOOL_ARGUMENTS` without waiting for the remaining calls.
 - Cancellation disposes queued and in-flight subscriptions; no new child is launched afterward.
 - An inherited deadline includes queue/admission time and bounds every child.
 - Result capacity is reserved across concurrent JavaScript batches. Content is bounded per item

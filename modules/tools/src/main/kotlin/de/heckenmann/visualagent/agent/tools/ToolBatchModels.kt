@@ -41,12 +41,18 @@ data class ToolBatchOutcome(
     val id: String,
     val name: String,
     val status: ToolBatchStatus,
-    val success: Boolean,
-    val content: String? = null,
-    val error: String? = null,
+    val result: de.heckenmann.visualagent.agent.tools.api.ToolResultEnvelope,
     val durationMillis: Long = 0,
-    val errorCode: de.heckenmann.visualagent.agent.tools.api.ToolErrorCode? = null,
-)
+) {
+    /** Indicates whether the canonical child result succeeded. */
+    val success: Boolean get() = result.success
+
+    /** Provides a compact diagnostic for immediate JavaScript argument-error rejection. */
+    val error: String? get() = result.error?.message
+
+    /** Identifies argument errors that must abort a batch immediately. */
+    val errorCode: de.heckenmann.visualagent.agent.tools.api.ToolErrorCode? get() = result.error?.code
+}
 
 /** Rejects an entire batch before any child starts. */
 class ToolBatchValidationException(

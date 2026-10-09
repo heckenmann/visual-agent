@@ -18,6 +18,68 @@ import kotlin.test.assertTrue
 /** Tests the model batch entry point through the real registry boundary. */
 class ToolBatchToolTest {
     @Test
+    fun `malformed JSON is an invalid argument rather than a retryable execution failure`() {
+        val registry = ToolRegistry(emptyList(), ToolEventBus())
+        val batch = ToolBatchTool { ToolBatchExecutor(registry) }
+        val result =
+            Json.decodeFromString<ToolResultEnvelope>(
+                registry.executeReactive(batch, "{", emptyMap()).block(Duration.ofSeconds(5))!!,
+            )
+        assertEquals(de.heckenmann.visualagent.agent.tools.api.ToolErrorCode.INVALID_ARGUMENT, result.error?.code)
+        assertFalse(result.error!!.retryable)
+    }
+
+    @Test
+    fun `argument failure preserves completed envelopes and skips remaining calls`() {
+        val called = mutableListOf<String>()
+        val child =
+            object : VisualAgentTool {
+                override val definition = ToolDefinition(ToolId("read"), "read", "Test", "{}")
+
+                override fun execute(
+                    inputJson: String,
+                    context: Map<String, Any>,
+                ): ToolResult {
+                    called += inputJson
+                    return if (inputJson.contains("invalid")) failure("read", "TOOL_ARGUMENTS: Missing value") else success("read", "done")
+                }
+            }
+        val children = ToolRegistry(listOf(child), ToolEventBus())
+        val batch = ToolBatchTool { ToolBatchExecutor(children) }
+        val registry = ToolRegistry(listOf(child, batch), ToolEventBus())
+        val result =
+            Json.decodeFromString<ToolResultEnvelope>(
+                registry
+                    .executeReactive(
+                        batch,
+                        """{"calls":[{"id":"ok","tool":"read","arguments":{}},{"id":"bad","tool":"read","arguments":{"invalid":true}},{"id":"skip","tool":"read","arguments":{}}]}""",
+                        mapOf("enabledTools" to setOf("read")),
+                    ).block(Duration.ofSeconds(5))!!,
+            )
+        assertFalse(result.success)
+        assertEquals(2, called.size)
+        val items = result.data.jsonArray.map { it.jsonObject }
+        val direct = Json.parseToJsonElement(children.executeBlocking(child, "{}", emptyMap())).jsonObject
+        assertEquals(direct, JsonObject(items[0].filterKeys { it != "id" }))
+        assertEquals(
+            "INVALID_ARGUMENT",
+            items[1]
+                .getValue("error")
+                .jsonObject
+                .getValue("code")
+                .jsonPrimitive.content,
+        )
+        assertEquals(
+            "CANCELLED",
+            items[2]
+                .getValue("error")
+                .jsonObject
+                .getValue("code")
+                .jsonPrimitive.content,
+        )
+    }
+
+    @Test
     fun `canonical function names dispatch only enabled children`() {
         val ids = mutableListOf<String>()
         val child =

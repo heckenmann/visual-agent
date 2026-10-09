@@ -12,7 +12,10 @@ import org.graalvm.polyglot.proxy.ProxyObject
 /** Pure result conversion; no context, scheduling or host capability is exposed. */
 internal object JavaScriptToolResults {
     /** Converts a canonical registry result to JSON-compatible guest proxies. */
-    fun envelope(result: ToolResultEnvelope): ProxyObject =
+    fun envelope(
+        result: ToolResultEnvelope,
+        id: String? = null,
+    ): ProxyObject =
         ProxyObject.fromMap(
             mapOf(
                 "toolId" to result.toolId,
@@ -29,7 +32,7 @@ internal object JavaScriptToolResults {
                             ),
                         )
                     },
-            ),
+            ) + (id?.let { mapOf("id" to it) } ?: emptyMap()),
         )
 
     private fun jsonToGuest(element: JsonElement): Any? =

@@ -1,13 +1,16 @@
 package de.heckenmann.visualagent.agent.tools
 
 import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
+import de.heckenmann.visualagent.agent.tools.api.ToolErrorCode
 import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import de.heckenmann.visualagent.agent.tools.api.toProviderElement
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import reactor.core.publisher.Mono
 
 /** Provider-neutral independent batch entry point; every child uses the shared registry executor. */
@@ -24,6 +27,7 @@ class ToolBatchTool(
                 "Avoid separate model rounds for calls that do not depend on each other's results. " +
                 "Use canonical function names in tool; results retain declaration order. " +
                 "Keep dependent calls sequential. Do not include JavaScript execution, help dispatch or another batch. " +
+                "Invalid arguments stop the batch immediately; ordinary execution errors remain per-call results. " +
                 "Batches are non-atomic: successful mutations are not rolled back. The server selects safe concurrency.",
             """{"type":"object","properties":{"calls":{"type":"array","minItems":1,"maxItems":32,"items":{"type":"object","properties":{"id":{"type":"string"},"tool":{"type":"string"},"arguments":{"type":"object"}},"required":["id","tool","arguments"],"additionalProperties":false}}},"required":["calls"],"additionalProperties":false}""",
         )
@@ -52,9 +56,31 @@ class ToolBatchTool(
                     )
                 }
             val enabled = (context["enabledTools"] as? Set<*>)?.filterIsInstance<String>()?.toSet().orEmpty()
-            executor().execute(ToolBatchRequest(items, enabled, context)).map { outcomes ->
-                val data = Json.parseToJsonElement(Json.encodeToString(outcomes))
-                ToolResult("tools:batch", true, "Batch completed; inspect each item outcome", data = data)
-            }
+            executor()
+                .execute(ToolBatchRequest(items, enabled, context))
+                .map { outcomes ->
+                    val data =
+                        buildJsonArray {
+                            outcomes.forEach { outcome ->
+                                add(
+                                    buildJsonObject {
+                                        put("id", outcome.id)
+                                        outcome.result.toProviderElement().forEach { (key, value) -> put(key, value) }
+                                    },
+                                )
+                            }
+                        }
+                    val syntaxFailure = outcomes.any { it.errorCode == ToolErrorCode.INVALID_ARGUMENT }
+                    ToolResult(
+                        "tools:batch",
+                        !syntaxFailure,
+                        "Inspect each canonical tool result",
+                        if (syntaxFailure) "TOOL_ARGUMENTS: Batch stopped immediately at invalid arguments" else null,
+                        data,
+                    )
+                }.onErrorResume(ToolBatchValidationException::class.java) { error ->
+                    val category = if (error.category == "TOOL_ACCESS") "PERMISSION_DENIED" else "TOOL_ARGUMENTS"
+                    Mono.just(failure("tools:batch", "$category: ${error.message}"))
+                }
         }
 }

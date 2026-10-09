@@ -13,7 +13,6 @@ import org.graalvm.polyglot.Context
 import org.graalvm.polyglot.Value
 import org.graalvm.polyglot.proxy.ProxyArray
 import org.graalvm.polyglot.proxy.ProxyExecutable
-import org.graalvm.polyglot.proxy.ProxyObject
 import reactor.core.Disposable
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger
@@ -132,7 +131,20 @@ internal class JavaScriptBatchBridge(
                             { results ->
                                 completions.add {
                                     val expired = (request.context["toolDeadlineNanos"] as? Long)?.let { System.nanoTime() >= it } == true
-                                    if (token.isCancelled || expired) {
+                                    val invalid =
+                                        results.firstOrNull {
+                                            it.errorCode ==
+                                                de.heckenmann.visualagent.agent.tools.api.ToolErrorCode.INVALID_ARGUMENT
+                                        }
+                                    if (invalid != null) {
+                                        val failure =
+                                            JavaScriptExecutionException(
+                                                JavaScriptErrorCategory.TOOL_ARGUMENTS,
+                                                "Tool batch stopped at invalid arguments: ${invalid.error}".take(500),
+                                            )
+                                        lastFailure.set(failure)
+                                        reject.execute(failure.message)
+                                    } else if (token.isCancelled || expired) {
                                         val category =
                                             if (token.isCancelled) {
                                                 JavaScriptErrorCategory.CANCELLED
@@ -201,15 +213,7 @@ internal class JavaScriptBatchBridge(
     private fun outcomes(results: List<ToolBatchOutcome>): ProxyArray =
         ProxyArray.fromList(
             results.map { result ->
-                ProxyObject.fromMap(
-                    mapOf(
-                        "id" to result.id,
-                        "name" to result.name,
-                        "success" to result.success,
-                        "content" to result.content,
-                        "error" to result.error,
-                    ),
-                )
+                JavaScriptToolResults.envelope(result.result, result.id)
             },
         )
 
