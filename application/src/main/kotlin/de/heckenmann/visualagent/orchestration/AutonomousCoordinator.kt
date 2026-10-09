@@ -300,8 +300,10 @@ class AutonomousCoordinator
                     Mono
                         .defer {
                             if (todoManager.getById(todo.id)?.status != TodoStatus.IN_PROGRESS) {
-                                if (activeCancellationTokens.remove(todo.id, token)) {
-                                    releaseAutonomousTodoAgent(agent, todo.id, agentBusySince, subAgentOps)
+                                withTodoLifecycleLock {
+                                    if (activeCancellationTokens.remove(todo.id, token)) {
+                                        releaseAutonomousTodoAgent(agent, todo.id, agentBusySince, subAgentOps)
+                                    }
                                 }
                                 Mono.empty()
                             } else {
@@ -330,6 +332,7 @@ class AutonomousCoordinator
                                     toolScopes = toolScopes,
                                     onRetryPending = { startTodo(it) },
                                     onCleanup = workSignal::signal,
+                                    withLifecycleLock = { action -> withTodoLifecycleLock(action) },
                                 ).execute()
                             }
                         }.doFinally {

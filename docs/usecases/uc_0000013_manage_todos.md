@@ -101,3 +101,9 @@ Compose action queues continue to use coroutines at the presentation boundary.
 
 `verifyAutonomousReactorContracts` rejects coroutine imports, suspend contracts, and blocking
 publisher waits in the autonomous execution chain and its worker/scheduler/gate implementations.
+
+Cleanup keeps the old execution token registered across its asynchronous snapshot read.
+It rechecks that token under the shared lifecycle lock immediately before releasing or
+persisting the agent. A newer claim taking ownership during the read makes the old cleanup
+inert. Conditional requeue still uses the captured database snapshot and cannot reset a
+newer execution.

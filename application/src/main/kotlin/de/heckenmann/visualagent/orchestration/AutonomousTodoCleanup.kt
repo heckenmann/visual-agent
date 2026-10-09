@@ -33,35 +33,51 @@ internal fun cleanupTodoExecution(
     conversationOps: ConversationOpsProvider,
     subAgentOps: SubAgentOpsProvider,
     onRetryPending: (String) -> Unit,
+    withLifecycleLock: (() -> Unit) -> Unit = { it() },
 ): Mono<Void> =
     Mono
         .defer {
             publishTerminal()
             watcher.close()
             registration.close()
-            if (!activeTokens.remove(todoId, token) || !isActive()) return@defer Mono.empty()
-            if (!cancelledByChange || subAgentOps.getSubAgent(agent.id) !== agent) {
-                releaseAutonomousTodoAgent(agent, todoId, busySince, subAgentOps)
-                return@defer Mono.empty()
-            }
-            todoManager.getByIdReactive(todoId).map { Optional.of(it) }.defaultIfEmpty(Optional.empty()).flatMap { latest ->
+            if (activeTokens[todoId] !== token) return@defer Mono.empty()
+            val snapshot =
+                if (cancelledByChange) {
+                    todoManager.getByIdReactive(todoId).map { Optional.of(it) }.defaultIfEmpty(Optional.empty())
+                } else {
+                    Mono.just(Optional.empty<Todo>())
+                }
+            snapshot.flatMap { latest ->
                 var retry: Todo? = null
                 Mono
                     .fromRunnable<Void> {
-                        handleTodoChangeAfterCancellation(
-                            agent = agent,
-                            todoId = todoId,
-                            pendingTodoChanges = pendingChanges,
-                            currentTodo = latest.orElse(null),
-                            persistMessage = { conversationOps.persist(it.copy(conversationRequestId = requestId)) },
-                            saveAgentToDb = subAgentOps::saveSubAgent,
-                            releaseAgent = { worker, id -> releaseAutonomousTodoAgent(worker, id, busySince, subAgentOps) },
-                            onDescriptionChanged = { worker, todo ->
-                                releaseAutonomousTodoAgent(worker, todo.id, busySince, subAgentOps)
-                                retry = todo
-                            },
-                        )
+                        withLifecycleLock {
+                            if (activeTokens[todoId] !== token) return@withLifecycleLock
+                            try {
+                                if (!isActive()) return@withLifecycleLock
+                                if (!cancelledByChange || subAgentOps.getSubAgent(agent.id) !== agent) {
+                                    releaseAutonomousTodoAgent(agent, todoId, busySince, subAgentOps)
+                                } else {
+                                    handleTodoChangeAfterCancellation(
+                                        agent = agent,
+                                        todoId = todoId,
+                                        pendingTodoChanges = pendingChanges,
+                                        currentTodo = latest.orElse(null),
+                                        persistMessage = { conversationOps.persist(it.copy(conversationRequestId = requestId)) },
+                                        saveAgentToDb = subAgentOps::saveSubAgent,
+                                        releaseAgent = { worker, id -> releaseAutonomousTodoAgent(worker, id, busySince, subAgentOps) },
+                                        onDescriptionChanged = { worker, todo ->
+                                            releaseAutonomousTodoAgent(worker, todo.id, busySince, subAgentOps)
+                                            retry = todo
+                                        },
+                                    )
+                                }
+                            } finally {
+                                activeTokens.remove(todoId, token)
+                            }
+                        }
                     }.subscribeOn(Schedulers.boundedElastic())
+                    .doFinally { activeTokens.remove(todoId, token) }
                     .onErrorResume { error ->
                         mu.KotlinLogging.logger {}.warn(error) { "Todo $todoId cleanup notification failed" }
                         Mono.empty()
@@ -77,3 +93,4 @@ internal fun cleanupTodoExecution(
                     )
             }
         }.subscribeOn(Schedulers.boundedElastic())
+        .doFinally { activeTokens.remove(todoId, token) }

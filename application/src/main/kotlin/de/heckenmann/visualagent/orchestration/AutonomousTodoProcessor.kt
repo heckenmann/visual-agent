@@ -54,6 +54,7 @@ internal class AutonomousTodoProcessor(
     private val toolScopes: () -> ToolExecutionScope = ::ToolExecutionScope,
     private val onRetryPending: (String) -> Unit = {},
     private val onCleanup: () -> Unit = {},
+    private val withLifecycleLock: (() -> Unit) -> Unit = { it() },
 ) {
     private val logger = KotlinLogging.logger {}
     private val token = cancellationToken ?: CancellationToken()
@@ -305,5 +306,6 @@ internal class AutonomousTodoProcessor(
             conversationOps,
             subAgentOps,
             onRetryPending,
+            withLifecycleLock,
         ).doFinally { onCleanup() }
 }
