@@ -244,6 +244,9 @@ class AutonomousCoordinator
             removedAgent: SubAgent? = null,
         ) = todoControl.cancelAgentTodo(agentId, removedAgent)
 
+        /** Serializes agent removal with candidate selection and todo claiming. */
+        internal fun <T> withTodoLifecycleLock(action: () -> T): T = synchronized(todoLifecycleLock, action)
+
         private suspend fun drainWork() {
             if (executionControl?.isGloballyPaused() == true) return
             candidateSelector

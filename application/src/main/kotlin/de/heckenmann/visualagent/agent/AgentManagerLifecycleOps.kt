@@ -155,17 +155,19 @@ internal class AgentManagerLifecycleOps(
     }
 
     fun deleteAgent(id: String): Boolean =
-        synchronized(agentPersistenceLock) {
-            val agent = owner.subAgentOpsProvider.getSubAgent(id) ?: return@synchronized false
-            deletedAgentIds += id
-            // Exclude the worker from new assignments before cancelling its captured execution.
-            owner.subAgentOpsProvider.removeSubAgent(id)
-            owner.autonomousCoordinator.cancelAgentTodo(id, agent)
-            owner.subAgentStore.deleteAgent(id)
-            owner.subAgentExecutionControl.removeAgent(id)
-            persistTodoChangeMessage("Deleted sub-agent $id (${agent.name})")
-            logger.info { "Deleted agent: $id" }
-            true
+        owner.autonomousCoordinator.withTodoLifecycleLock {
+            synchronized(agentPersistenceLock) {
+                val agent = owner.subAgentOpsProvider.getSubAgent(id) ?: return@synchronized false
+                deletedAgentIds += id
+                // Exclude the worker from new assignments before cancelling its captured execution.
+                owner.subAgentOpsProvider.removeSubAgent(id)
+                owner.autonomousCoordinator.cancelAgentTodo(id, agent)
+                owner.subAgentStore.deleteAgent(id)
+                owner.subAgentExecutionControl.removeAgent(id)
+                persistTodoChangeMessage("Deleted sub-agent $id (${agent.name})")
+                logger.info { "Deleted agent: $id" }
+                true
+            }
         }
 
     fun persistTodoChangeMessage(
