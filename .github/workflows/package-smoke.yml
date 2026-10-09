@@ -65,8 +65,8 @@ jobs:
             exit 1
           }
 
-      - name: Run quality gates
-        run: xvfb-run -a ./gradlew ktlintCheck check test verifyPackages --no-daemon --parallel --max-workers=4 -PtestMaxParallelForks=4
+      - name: Run offscreen quality gates without a display server
+        run: env -u DISPLAY -u WAYLAND_DISPLAY ./gradlew ktlintCheck check test verifyPackages --no-daemon --parallel --max-workers=4 -PtestMaxParallelForks=4
 
       - name: Verify package smoke runner contracts
         run: python3 -m unittest discover -s scripts -p test_release_smoke.py

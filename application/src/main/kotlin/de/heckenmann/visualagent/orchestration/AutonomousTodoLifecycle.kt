@@ -8,11 +8,37 @@ import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoChange
 import de.heckenmann.visualagent.todo.TodoChangeType
 import de.heckenmann.visualagent.todo.TodoEventBus
-import de.heckenmann.visualagent.todo.TodoManager
 import de.heckenmann.visualagent.todo.TodoStatus
-import de.heckenmann.visualagent.todo.TodoTerminalReason
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import mu.KotlinLogging
+
+/** Reports committed completion without turning a notification failure into a worker retry. */
+internal fun persistTodoCompletion(
+    agent: SubAgent,
+    todoId: String,
+    result: String,
+    requestId: String,
+    attempt: Int,
+    executionId: String,
+    persistMessage: (Message) -> Message,
+) {
+    runCatching {
+        persistSubAgentMessage(
+            agent = agent,
+            content =
+                "Agent ${agent.name} (${agent.id}) completed todo $todoId.\n\n" +
+                    "Result:\n${result.take(2000)}\n\nUse `todos` with `get-result` to read the full stored result.",
+            success = true,
+            persistMessage = { persistMessage(it.copy(conversationRequestId = requestId)) },
+            attempt = attempt,
+            executionId = executionId,
+            todoId = todoId,
+        )
+    }.onFailure {
+        KotlinLogging.logger {}.error(it) { "Could not persist completion notification for todo $todoId" }
+    }
+}
 
 /** Persists the initial todo notification with the identity shared by its worker. */
 internal fun persistTodoStart(
@@ -85,14 +111,20 @@ internal fun startTodoChangeWatcher(
     taskDescription: String,
     token: CancellationToken,
     todoEventBus: TodoEventBus,
+    executionTimelineSequence: Long = 0,
 ): AutoCloseable {
     return todoEventBus.addListener { change ->
+        if (change.type == TodoChangeType.CLEARED) {
+            token.cancel()
+            return@addListener
+        }
         if (change.todo?.id != todoId && change.todoId != todoId) return@addListener
+        if ((change.todo?.timelineSequence ?: Long.MAX_VALUE) < executionTimelineSequence) return@addListener
         when (change.type) {
             TodoChangeType.UPDATED -> {
                 val todo = change.todo ?: return@addListener
                 val reassigned = todo.assignedAgentId != assignedAgentId
-                val cancelled = todo.status == TodoStatus.CANCELLED
+                val cancelled = todo.status != TodoStatus.IN_PROGRESS
                 val descriptionChanged = todo.description != taskDescription
                 if (reassigned || cancelled || descriptionChanged) {
                     token.cancel()
@@ -113,7 +145,6 @@ internal fun startTodoChangeWatcher(
  * @param todoId Identifier of the affected todo
  * @param pendingTodoChanges Map of unprocessed changes keyed by todo id
  * @param currentTodo Current persisted state of the todo, if it still exists
- * @param todoManager Manager used to cancel or update the todo
  * @param persistMessage Callback that persists a conversation message
  * @param saveAgentToDb Callback that persists agent state changes
  * @param onDescriptionChanged Continuation invoked when the todo description changed
@@ -123,16 +154,14 @@ internal fun handleTodoChangeAfterCancellation(
     todoId: String,
     pendingTodoChanges: MutableMap<String, TodoChange>,
     currentTodo: Todo?,
-    todoManager: TodoManager,
     persistMessage: (Message) -> Unit,
     saveAgentToDb: (SubAgent) -> Unit,
     releaseAgent: (SubAgent, String) -> Unit,
     onDescriptionChanged: (SubAgent, Todo) -> Unit,
 ) {
-    val change = pendingTodoChanges.remove(todoId)
+    pendingTodoChanges.remove(todoId)
     when {
         currentTodo == null || currentTodo.status == TodoStatus.CANCELLED || currentTodo.assignedAgentId != agent.id -> {
-            todoManager.cancelTodo(todoId, TodoTerminalReason.REASSIGNED)
             val metadata =
                 buildJsonObject {
                     put("type", "sub_agent")
@@ -154,16 +183,20 @@ internal fun handleTodoChangeAfterCancellation(
                 releaseAgent(agent, todoId)
             }
         }
-        change?.todo != null && change.todo.description != agent.currentTask && agent.currentTodoId == todoId -> {
+        currentTodo.status == TodoStatus.IN_PROGRESS &&
+            agent.currentTodoId == todoId -> {
             agent.currentTask = currentTodo.description
             saveAgentToDb(agent)
-            persistMessage(
-                Message(
-                    role = "system",
-                    content = "Todo $todoId was updated; agent ${agent.id} will continue with the new description.",
-                ),
-            )
-            onDescriptionChanged(agent, currentTodo)
+            try {
+                persistMessage(
+                    Message(
+                        role = "system",
+                        content = "Todo $todoId was updated; agent ${agent.id} will continue with the new description.",
+                    ),
+                )
+            } finally {
+                onDescriptionChanged(agent, currentTodo)
+            }
         }
         else -> {
             releaseAgent(agent, todoId)

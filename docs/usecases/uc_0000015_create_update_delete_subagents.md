@@ -2,6 +2,10 @@
 
 ## Goal
 
+Issue #450 ensures deletion first captures the worker, invalidates its owned execution and queued work, and tombstones the identity before allowing any late persistence. Cleanup cannot recreate a removed agent. Assigned unfinished todos are cancelled with `AGENT_REMOVED`; analyst deletion also invalidates active decomposition.
+
+Deletion shares the coordinator's lifecycle lock with worker selection and todo claiming. A claim already using the selected worker finishes before deletion cancels its assignment; a later selection cannot use the removed worker. The lifecycle lock is acquired before the agent persistence lock to preserve a consistent lock order.
+
 Allow users and the main agent to manage sub-agent definitions, roles, templates, and persisted configuration.
 
 ## Primary Actor

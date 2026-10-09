@@ -17,7 +17,7 @@ Dependabot bot account (`dependabot[bot]`).
 ## Main Flow
 
 1. Dependabot opens a pull request targeting `master`.
-2. The `Tests` workflow triggers on the `pull_request` event and runs `gradle ktlintCheck check test` under Xvfb.
+2. The `Tests` workflow triggers on the `pull_request` event and runs `gradle ktlintCheck check test` without a display server. Compose component tests render offscreen using the native Compose test rules; all Gradle test JVMs use headless mode with display environment variables removed.
 3. The `dependabot-automerge` workflow triggers on the same `pull_request` event (only for `dependabot[bot]` author).
 4. The workflow fetches Dependabot metadata to determine the update type and package ecosystem.
 5. The workflow checks that only dependency files (`**/build.gradle*`, `**/gradle.properties`, `**/libs.versions.toml`, `.github/workflows/*.yml`) are touched.
@@ -56,4 +56,5 @@ Low-risk Dependabot PRs are merged automatically without manual intervention. Th
 - Major bumps, GitHub Actions bumps, and PRs touching non-dependency files are **not** auto-merged.
 - PRs with the `dependabot: no-auto-merge` label are **not** auto-merged.
 - The `Tests` workflow runs on `push`, `pull_request`, and `workflow_dispatch`.
+- Neither Gradle tests nor package verification require Xvfb. Linux smoke tests for actual desktop launchers retain their virtual display and do not replace component tests.
 - The `Tests` workflow is added as a required status check on `master`.

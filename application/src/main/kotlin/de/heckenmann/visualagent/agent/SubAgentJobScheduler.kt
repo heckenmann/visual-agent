@@ -1,18 +1,17 @@
 package de.heckenmann.visualagent.agent
 
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.launch
+import reactor.core.Disposable
+import reactor.core.Disposables
+import reactor.core.publisher.Mono
+import reactor.core.publisher.Sinks
+import reactor.core.scheduler.Schedulers
 import java.util.ArrayDeque
 import java.util.UUID
+import java.util.concurrent.CancellationException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Schedules sub-agent jobs against the user-configured parallelism limit.
@@ -20,18 +19,20 @@ import java.util.concurrent.CopyOnWriteArrayList
  * Waiting jobs are admitted in FIFO order and dispatched when work, capacity, or execution
  * gates change.
  *
- * @property scope Coroutine scope used for queued background jobs
  * @property parallelismProvider Current maximum number of concurrently running sub-agent jobs
  */
 class SubAgentJobScheduler(
-    private val scope: CoroutineScope,
     private val parallelismProvider: ParallelismProvider,
     private val executionControl: SubAgentExecutionControl? = null,
 ) : AutoCloseable {
+    private val closed =
+        java.util.concurrent.atomic
+            .AtomicBoolean(false)
+    private val shutdown = Sinks.one<Void>()
     private val lock = Any()
     private val waiting = ArrayDeque<WaitingJob>()
     private var activeJobs = 0
-    private val jobsById = ConcurrentHashMap<String, Job>()
+    private val jobsById = ConcurrentHashMap<String, Disposable>()
     private val subscriptions = mutableListOf<AutoCloseable>()
     private val queueListeners = CopyOnWriteArrayList<(SubAgentJobQueueSnapshot) -> Unit>()
 
@@ -44,6 +45,8 @@ class SubAgentJobScheduler(
 
     /** Releases scheduler subscriptions and cancels queued or running jobs. */
     override fun close() {
+        if (!closed.compareAndSet(false, true)) return
+        shutdown.tryEmitError(CancellationException("Scheduler closed"))
         synchronized(lock) {
             subscriptions.forEach(AutoCloseable::close)
             subscriptions.clear()
@@ -51,121 +54,104 @@ class SubAgentJobScheduler(
         cancelAllJobs()
     }
 
-    /**
-     * Runs one job after a parallel execution slot becomes available.
-     *
-     * @param block Job implementation
-     * @return Job result
-     */
-    suspend fun <T> run(block: suspend () -> T): T = run(agentId = null, requestId = null, block = block)
-
-    /**
-     * Runs one job after a slot becomes available and after its execution gates allow it.
-     *
-     * @param agentId Persistent sub-agent identity, or null for a temporary worker
-     * @param block Job implementation
-     * @return Job result
-     */
-    suspend fun <T> run(
-        agentId: String?,
-        block: suspend () -> T,
-    ): T = run(agentId, requestId = null, block = block)
-
-    /** Runs one job with a cancellation key that an owning operation can remove from the queue. */
-    suspend fun <T> run(
+    /** Runs a Reactor-native operation through the shared capacity and pause gates. */
+    fun <T : Any> runReactive(
         agentId: String?,
         requestId: String?,
-        block: suspend () -> T,
-    ): T {
-        val callerContext = currentCoroutineContext()
-        val permit = CompletableDeferred<Unit>()
-        val waitingJob = WaitingJob(agentId, requestId, permit)
-        synchronized(lock) {
-            callerContext.ensureActive()
-            waiting.addLast(waitingJob)
+        block: () -> Mono<T>,
+    ): Mono<T> =
+        Mono.defer {
+            if (closed.get()) return@defer Mono.error(CancellationException("Scheduler closed"))
+            Mono.firstWithSignal(
+                Mono.using(
+                    { WaitingJob(agentId, requestId, Sinks.one()) },
+                    { job ->
+                        val accepted =
+                            synchronized(lock) {
+                                if (closed.get()) {
+                                    false
+                                } else {
+                                    waiting.addLast(job)
+                                    true
+                                }
+                            }
+                        if (!accepted) return@using Mono.error<T>(CancellationException("Scheduler closed"))
+                        publishSnapshot()
+                        dispatchWaitingJobs()
+                        job.permit
+                            .asMono()
+                            .then(executionControl?.executionAllowed(agentId) ?: Mono.empty())
+                            .then(Mono.defer(block))
+                    },
+                    { job ->
+                        synchronized(lock) {
+                            waiting.remove(job)
+                            if (job.dispatched) activeJobs = (activeJobs - 1).coerceAtLeast(0)
+                        }
+                        publishSnapshot()
+                        dispatchWaitingJobs()
+                    },
+                ),
+                shutdown.asMono().then(Mono.error<T>(CancellationException("Scheduler closed"))),
+            )
         }
-        publishSnapshot()
-        dispatchWaitingJobs()
-        try {
-            permit.await()
-        } catch (cancelled: CancellationException) {
-            val releaseSlot =
-                synchronized(lock) {
-                    val wasWaiting = waiting.remove(waitingJob)
-                    !wasWaiting && waitingJob.dispatched
-                }
-            publishSnapshot()
-            if (releaseSlot) {
-                synchronized(lock) {
-                    activeJobs = (activeJobs - 1).coerceAtLeast(0)
-                }
-                dispatchWaitingJobs()
-            }
-            throw cancelled
-        }
-        return try {
-            executionControl?.awaitExecutionAllowed(agentId)
-            block()
-        } finally {
-            releaseActiveSlot()
-            dispatchWaitingJobs()
-        }
-    }
 
-    /**
-     * Queues a background job and returns its stable ID immediately.
-     *
-     * @param block Job implementation
-     * @param onFinished Completion callback receiving success or failure
-     * @return Queued job ID
-     */
-    fun <T> enqueue(
-        block: suspend () -> T,
-        onFinished: (jobId: String, result: Result<T>) -> Unit,
-    ): String = enqueue(agentId = null, block = block, onFinished = onFinished)
-
-    /**
-     * Queues a background job for an optional sub-agent and returns its stable ID.
-     *
-     * @param agentId Persistent sub-agent identity, or null for a temporary worker
-     * @param block Job implementation
-     * @param onFinished Completion callback receiving success or failure
-     * @return Queued job ID
-     */
-    @OptIn(DelicateCoroutinesApi::class)
-    fun <T> enqueue(
-        agentId: String?,
-        block: suspend () -> T,
+    /** Registers and subscribes one background Reactor operation, reporting cancellation once. */
+    fun <T : Any> enqueueReactive(
+        agentId: String? = null,
+        block: () -> Mono<T>,
         onFinished: (jobId: String, result: Result<T>) -> Unit,
     ): String {
         val jobId = UUID.randomUUID().toString()
-        val registered = CompletableDeferred<Unit>()
-        // Atomic start guarantees cancellation reporting; the barrier prevents unregistered work.
-        val job =
-            scope.launch(start = CoroutineStart.ATOMIC) {
-                val result =
-                    runCatching {
-                        registered.await()
-                        run(agentId, block)
-                    }
-                jobsById.remove(jobId)
+        val job = Disposables.swap()
+        val finished = AtomicBoolean(false)
+        jobsById[jobId] = job
+
+        /** Removes registration before invoking the terminal callback exactly once. */
+        fun report(result: Result<T>) {
+            if (finished.compareAndSet(false, true)) {
+                jobsById.remove(jobId, job)
                 onFinished(jobId, result)
             }
-        jobsById[jobId] = job
-        job.invokeOnCompletion { jobsById.remove(jobId, job) }
-        registered.complete(Unit)
+        }
+        val outcome =
+            AtomicReference<Result<T>>(
+                Result.failure(IllegalStateException("Background operation returned no result")),
+            )
+
+        /** Isolates synchronous completion persistence from provider and cancellation threads. */
+        fun finish(result: Result<T>): Mono<Void> =
+            Mono
+                .fromRunnable<Void> { report(result) }
+                .subscribeOn(Schedulers.boundedElastic())
+        val pipeline =
+            Mono.usingWhen(
+                Mono.just(jobId),
+                {
+                    runReactive(agentId, jobId) { Mono.defer(block).subscribeOn(Schedulers.boundedElastic()) }
+                        .doOnNext { outcome.set(Result.success(it)) }
+                },
+                { finish(outcome.get()) },
+                { _, error -> finish(Result.failure(error)) },
+                { finish(Result.failure(CancellationException("Queued operation was cancelled."))) },
+            )
+        job.update(
+            pipeline.subscribe({}, { error ->
+                mu.KotlinLogging.logger {}.warn(error) { "Background job $jobId terminated" }
+            }),
+        )
         return jobId
     }
 
     /**
      * Cancels one queued or running background job.
      *
-     * @param jobId Job identifier returned by [enqueue]
+     * @param jobId Job identifier returned by [enqueueReactive]
      * @return `true` if the job was found and cancelled, `false` otherwise
      */
     fun cancelJob(jobId: String): Boolean {
         val job = jobsById.remove(jobId) ?: return false
-        job.cancel()
+        job.dispose()
         return true
     }
 
@@ -175,7 +161,7 @@ class SubAgentJobScheduler(
             synchronized(lock) {
                 waiting.filter { it.requestId == requestId }.also { jobs -> jobs.forEach(waiting::remove) }
             }
-        cancelled.forEach { it.permit.cancel(CancellationException("Queued operation was cancelled.")) }
+        cancelled.forEach { it.permit.tryEmitError(CancellationException("Queued operation was cancelled.")) }
         if (cancelled.isNotEmpty()) publishSnapshot()
         return cancelled.size
     }
@@ -195,7 +181,7 @@ class SubAgentJobScheduler(
     fun cancelAllJobs(): Set<String> {
         val snapshot = HashMap(jobsById)
         jobsById.clear()
-        snapshot.forEach { (_, job) -> job.cancel() }
+        snapshot.forEach { (_, job) -> job.dispose() }
         return snapshot.keys
     }
 
@@ -210,7 +196,8 @@ class SubAgentJobScheduler(
         }
 
     private fun dispatchWaitingJobs() {
-        val permits = mutableListOf<CompletableDeferred<Unit>>()
+        if (closed.get()) return
+        val permits = mutableListOf<Sinks.One<Unit>>()
         synchronized(lock) {
             val limit = parallelismProvider.get().coerceAtLeast(1)
             while (activeJobs < limit && waiting.isNotEmpty()) {
@@ -223,7 +210,7 @@ class SubAgentJobScheduler(
         }
         if (permits.isNotEmpty()) {
             publishSnapshot()
-            permits.forEach { it.complete(Unit) }
+            permits.forEach { it.tryEmitValue(Unit) }
         }
     }
 
@@ -234,16 +221,10 @@ class SubAgentJobScheduler(
 
     private fun isExecutionAllowed(agentId: String?): Boolean = executionControl?.isExecutionAllowed(agentId) != false
 
-    private fun releaseActiveSlot() {
-        synchronized(lock) {
-            activeJobs = (activeJobs - 1).coerceAtLeast(0)
-        }
-    }
-
     private data class WaitingJob(
         val agentId: String?,
         val requestId: String?,
-        val permit: CompletableDeferred<Unit>,
+        val permit: Sinks.One<Unit>,
         var dispatched: Boolean = false,
     )
 }

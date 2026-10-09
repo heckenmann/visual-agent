@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.orchestration
 
+import de.heckenmann.visualagent.agent.AgentStatus
 import de.heckenmann.visualagent.agent.CancellationToken
 import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.agent.SubAgentJobScheduler
@@ -7,7 +8,8 @@ import de.heckenmann.visualagent.agent.SubAgentOpsProvider
 import de.heckenmann.visualagent.knowledge.TodoStore
 import de.heckenmann.visualagent.todo.TodoManager
 import de.heckenmann.visualagent.todo.TodoStatus
-import kotlinx.coroutines.Job
+import de.heckenmann.visualagent.todo.TodoTerminalReason
+import reactor.core.Disposable
 
 /** Applies individual and bulk todo cancellation to the todo, worker, decomposition, and queue. */
 internal class AutonomousTodoControl(
@@ -15,7 +17,7 @@ internal class AutonomousTodoControl(
     private val todoManager: TodoManager,
     private val todoStore: TodoStore,
     private val activeCancellationTokens: Map<String, CancellationToken>,
-    private val activeTodoJobs: Map<String, Job>,
+    private val activeTodoJobs: Map<String, Disposable>,
     private val jobScheduler: SubAgentJobScheduler,
     private val decompositionScheduler: AutonomousTodoDecompositionScheduler,
     private val subAgents: () -> Map<String, SubAgent>,
@@ -42,9 +44,32 @@ internal class AutonomousTodoControl(
             stoppableTodos.size
         }
 
+    /** Stops captured work before a deleted worker can be selected or persisted again. */
+    fun cancelAgentTodo(
+        agentId: String,
+        removedAgent: SubAgent?,
+    ) {
+        val agent = removedAgent ?: subAgents()[agentId]
+        agent
+            ?.currentTask
+            ?.takeIf { it.startsWith("Decomposing todo ") }
+            ?.removePrefix("Decomposing todo ")
+            ?.let(decompositionScheduler::cancel)
+        todoManager.getByAgent(agentId).forEach { todo ->
+            cancelExecution(todo.id)
+            todoManager.cancelTodo(todo.id, TodoTerminalReason.AGENT_REMOVED, expected = todo)
+        }
+        agentBusySince.remove(agentId)
+        agent?.let {
+            it.status = AgentStatus.OFFLINE
+            it.currentTodoId = null
+            it.currentTask = null
+        }
+    }
+
     private fun cancelExecution(todoId: String) {
         activeCancellationTokens[todoId]?.cancel()
-        activeTodoJobs[todoId]?.cancel()
+        activeTodoJobs[todoId]?.dispose()
         jobScheduler.cancelQueuedRequest("todo:$todoId")
         decompositionScheduler.cancel(todoId)
     }

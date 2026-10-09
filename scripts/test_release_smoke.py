@@ -82,6 +82,31 @@ class ReleaseSmokeTest(unittest.TestCase):
 
 
 class ReleaseWorkflowTest(unittest.TestCase):
+    def test_gradle_quality_gates_and_package_verification_do_not_use_a_display(self):
+        root = pathlib.Path(__file__).parents[1]
+        for name in ("test.yml", "package-smoke.yml"):
+            workflow = (root / ".github/workflows" / name).read_text()
+            commands = re.findall(r"^        run: (.*\./gradlew (?:ktlintCheck|verifyPackages).*)$", workflow, re.M)
+            self.assertTrue(commands, f"No verification command found in {name}")
+            for command in commands:
+                with self.subTest(workflow=name, command=command):
+                    self.assertNotIn("xvfb", command.lower())
+                    self.assertIn("env -u DISPLAY -u WAYLAND_DISPLAY ./gradlew", command)
+        build = (root / "build.gradle.kts").read_text()
+        self.assertIn('tasks.withType<Test>().configureEach', build)
+        self.assertIn('jvmArgs("-Djava.awt.headless=true")', build)
+        self.assertIn('environment.remove("DISPLAY")', build)
+        self.assertIn('environment.remove("WAYLAND_DISPLAY")', build)
+
+    def test_only_the_real_desktop_jar_launch_is_wrapped_in_xvfb(self):
+        workflow = (pathlib.Path(__file__).parents[1] / ".github/workflows/test.yml").read_text()
+        self.assertIn('local launch_command=("$java_cmd" -Djava.awt.headless=true)', workflow)
+        self.assertRegex(
+            workflow,
+            r'if \[\[ "\$require_spring_startup" == "false" \]\]; then\s+'
+            r'launch_command=\(xvfb-run -a "\$java_cmd" -Dskiko.renderApi=SOFTWARE\)',
+        )
+
     def metadata_script(self):
         workflow = (pathlib.Path(__file__).parents[1] / ".github/workflows/release.yml").read_text()
         block = re.search(r"      - name: Read package workflow metadata\n.*?        run: \|\n(.*?)(?=\n      - name:)", workflow, re.S)

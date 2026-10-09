@@ -20,7 +20,7 @@ Autonomous runtime.
 2. It selects a complex candidate.
 3. An existing persisted analyst agent is selected.
 4. The analyst returns concise subtasks.
-5. The original todo is cancelled and subtasks are appended after the current position.
+5. One database transaction checks the original pending snapshot, cancels it, and appends all subtasks. Any concurrent edit, claim, cancellation, or deletion rejects the stale result without creating children.
 
 ## Result
 
@@ -42,3 +42,9 @@ Large tasks become smaller units that can be assigned to workers.
 - Duplicate subtasks are removed.
 - The original complex todo is cancelled only after subtasks are produced.
 - Subtasks are appended after the decomposed todo's position; the user or model can reorder them afterwards.
+- An identical single-child result does not replace the parent. Generated children persist a leaf-generation marker and are not recursively decomposed again.
+- Removing the analyst or invalidating the parent stops queued/running analysis. Analysis-agent deletion cannot resurrect that agent through late cleanup.
+
+## Implementation Decision
+
+Issues #453, #454 and #375 use native Spring Data R2DBC transactions and the shared Reactor scheduler. The database serializes todo mutations through a guard row; no new dependency or in-memory lifecycle cache is introduced. Decomposition generation is persisted so restart cannot reset the recursion bound.

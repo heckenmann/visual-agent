@@ -111,10 +111,10 @@ class KnowledgeDbTodoTest {
         val todo = Todo(id = "todo-deleted", description = "Retain this snapshot", status = TodoStatus.COMPLETED)
 
         db.saveTodo(todo)
-        db.deleteTodoAndArchive(todo)
+        val archived = db.deleteTodoAndArchive(todo)
 
         assertTrue(db.listTodos().isEmpty())
-        assertEquals(todo, db.listDeletedTodos().single())
+        assertEquals(archived, db.listDeletedTodos().single())
         db.close()
     }
 }

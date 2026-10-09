@@ -60,6 +60,7 @@ class AgentManager
         val subAgentExecutionControl: SubAgentExecutionControl,
         internal val providerCatalog: ProviderCatalogService,
         internal val conversationCompletionEvents: ConversationCompletionEventBus,
+        internal val todoToolScopeSource: TodoToolScopeSource,
     ) : DisposableBean {
         internal constructor(
             stores: PersistenceStores,
@@ -94,13 +95,14 @@ class AgentManager
             subAgentExecutionControl,
             providerCatalog,
             conversationCompletionEvents,
+            TodoToolScopeSource(),
         )
 
         internal lateinit var autonomousCoordinator: AutonomousCoordinator
         internal lateinit var responseCoordinator: AgentResponseCoordinator
         internal var todoManager: TodoManager = TodoManager(todoStore, todoEventBus)
         internal val welcomeMessageComposer = WelcomeMessageComposer(llmProvider, appConfig, providerCatalog)
-        internal val subAgentJobScheduler = SubAgentJobScheduler(scope, parallelismProvider, subAgentExecutionControl)
+        internal val subAgentJobScheduler = SubAgentJobScheduler(parallelismProvider, subAgentExecutionControl)
         internal val conversationOpsProvider = ConversationOpsProvider(toolEventBus)
         internal val subAgentOpsProvider = SubAgentOpsProvider()
         internal val subAgents: Map<String, SubAgent> get() = subAgentOpsProvider.allSubAgents
@@ -121,6 +123,7 @@ class AgentManager
         init {
             lifecycleOps.loadAgentsFromDb()
             todoManager.loadInitialTodos()
+            recoverInterruptedTodos(todoManager)
             todoPersistenceListenerHandle = todoEventBus.addListener(lifecycleOps::persistTodoChange)
             conversationOpsProvider.setBuildMainRequest(conversationOps::buildMainRequest)
             conversationOpsProvider.setBuildMainSystemContextPrompt(conversationOps::buildMainSystemContextPrompt)
@@ -135,7 +138,6 @@ class AgentManager
                 AgentResponseCoordinator(llmProvider, conversationOpsProvider)
             autonomousCoordinator =
                 AutonomousCoordinator(
-                    scope = scope,
                     todoManager = todoManager,
                     llmProvider = llmProvider,
                     todoStore = todoStore,
@@ -147,6 +149,7 @@ class AgentManager
                     conversationOps = conversationOpsProvider,
                     subAgentOps = subAgentOpsProvider,
                     executionControl = subAgentExecutionControl,
+                    toolScopes = todoToolScopeSource::create,
                 )
             todoTrigger =
                 AgentTodoTrigger(

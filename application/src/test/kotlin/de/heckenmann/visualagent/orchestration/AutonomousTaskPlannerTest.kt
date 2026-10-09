@@ -10,6 +10,7 @@ import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.todo.TodoManager
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.test.runTest
 import reactor.core.publisher.Mono
 import kotlin.test.Test
@@ -86,7 +87,7 @@ class AutonomousTaskPlannerTest {
                     toolConfig = toolConfig,
                 )
 
-            assertTrue(planner.expandComplexTodoIfNeeded(todoManager.getAll()))
+            assertTrue(planner.expandComplexTodoIfNeeded(todoManager.getAll()).awaitSingle())
             assertEquals(listOf("Inspect modules", "Implement pipeline"), todoManager.getPending().map { it.description })
         }
 
@@ -97,8 +98,8 @@ class AutonomousTaskPlannerTest {
             val original = todoManager.add("Design the architecture and integrate the complete pipeline")
             val planner = planner(todoManager, mutableMapOf())
 
-            assertFalse(planner.expandComplexTodoIfNeeded(todoManager.getAll()))
-            assertSame(original, todoManager.getById(original.id))
+            assertFalse(planner.expandComplexTodoIfNeeded(todoManager.getAll()).awaitSingle())
+            assertEquals(original, todoManager.getById(original.id))
         }
 
     @Test
@@ -114,8 +115,8 @@ class AutonomousTaskPlannerTest {
                     provider = provider,
                 )
 
-            assertTrue(planner.reviewWorkerResult("todo-1", "Implement", "Done").approved)
-            assertTrue(planner.reviewWorkerResult("todo-1", "Implement", "").approved)
+            assertTrue(planner.reviewWorkerResult("todo-1", "Implement", "Done").awaitSingle().approved)
+            assertTrue(planner.reviewWorkerResult("todo-1", "Implement", "").awaitSingle().approved)
             val instruction =
                 planner.buildWorkerInstruction(
                     TodoManager().add("Implement persistence"),

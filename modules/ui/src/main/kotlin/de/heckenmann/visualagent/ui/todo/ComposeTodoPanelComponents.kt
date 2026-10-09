@@ -61,6 +61,8 @@ internal fun ReorderableColumnScope.TodoRow(
     responseState: TodoResponseState,
     currentTodo: () -> TodoItem? = { todo },
     todoPort: TodoPort,
+    agents: List<AgentSummary>,
+    actions: TodoActions,
     modalRequester: ComposeModalRequester,
     refresh: () -> Unit,
 ) {
@@ -71,7 +73,6 @@ internal fun ReorderableColumnScope.TodoRow(
         } else {
             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.12f)
         }
-    val agents = remember { todoPort.agents() }
     val agentName = todo.assignedAgentId?.let { id -> agents.firstOrNull { it.id == id }?.name }
     ReorderableItem {
         PanelContentCard(
@@ -107,19 +108,24 @@ internal fun ReorderableColumnScope.TodoRow(
                                 ComposeContentModal(title = "Edit todo") { dismiss ->
                                     TodoEditor(
                                         todo = todo,
-                                        agents = todoPort.agents(),
+                                        agents = agents,
                                         onCancel = dismiss,
                                         onSave = { updatedDescription, updatedStatus, updatedAgentId ->
-                                            todoPort.update(
-                                                de.heckenmann.visualagent.protocol.TodoUpdate(
-                                                    todoId = todo.id,
-                                                    description = updatedDescription,
-                                                    status = updatedStatus,
-                                                    assignedAgentId = updatedAgentId,
-                                                ),
-                                            )
-                                            refresh()
-                                            dismiss()
+                                            actions.submit("edit:${todo.id}", {
+                                                check(
+                                                    todoPort.update(
+                                                        de.heckenmann.visualagent.protocol.TodoUpdate(
+                                                            todoId = todo.id,
+                                                            description = updatedDescription,
+                                                            status = updatedStatus,
+                                                            assignedAgentId = updatedAgentId,
+                                                        ),
+                                                    ),
+                                                ) { "Todo changed while editing; reload and retry." }
+                                            }, {
+                                                refresh()
+                                                dismiss()
+                                            })
                                         },
                                     )
                                 },
@@ -131,8 +137,7 @@ internal fun ReorderableColumnScope.TodoRow(
                         description = "Start todo",
                         enabled = todo.status == TodoState.PENDING || todo.status == TodoState.CANCELLED,
                         onClick = {
-                            todoPort.start(todo.id)
-                            refresh()
+                            actions.submit("start:${todo.id}", { check(todoPort.start(todo.id)) { "Todo cannot be started." } }, refresh)
                         },
                     )
                     ActionIconButton(
@@ -140,8 +145,7 @@ internal fun ReorderableColumnScope.TodoRow(
                         description = "Stop todo",
                         enabled = todo.status == TodoState.PENDING || todo.status == TodoState.IN_PROGRESS,
                         onClick = {
-                            todoPort.stop(todo.id)
-                            refresh()
+                            actions.submit("stop:${todo.id}", { check(todoPort.stop(todo.id)) { "Todo cannot be stopped." } }, refresh)
                         },
                     )
                     ActionIconButton(
@@ -149,8 +153,9 @@ internal fun ReorderableColumnScope.TodoRow(
                         description = "Complete todo",
                         enabled = todo.status != TodoState.COMPLETED && todo.status != TodoState.CANCELLED,
                         onClick = {
-                            todoPort.updateStatus(todo.id, TodoState.COMPLETED)
-                            refresh()
+                            actions.submit("complete:${todo.id}", {
+                                check(todoPort.updateStatus(todo.id, TodoState.COMPLETED)) { "Todo changed; reload and retry." }
+                            }, refresh)
                         },
                     )
                     ActionIconButton(
@@ -163,8 +168,11 @@ internal fun ReorderableColumnScope.TodoRow(
                                     message = "Delete '${todo.description}' from the persisted todo list.",
                                     confirmDescription = "Delete todo",
                                 ) {
-                                    todoPort.remove(todo.id)
-                                    refresh()
+                                    actions.submit(
+                                        "remove:${todo.id}",
+                                        { check(todoPort.remove(todo.id)) { "Todo no longer exists." } },
+                                        refresh,
+                                    )
                                 },
                             )
                         },

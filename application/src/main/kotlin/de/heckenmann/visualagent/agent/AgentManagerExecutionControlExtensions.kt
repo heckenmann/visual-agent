@@ -1,5 +1,7 @@
 package de.heckenmann.visualagent.agent
 
+import kotlinx.coroutines.reactor.awaitSingle
+
 /** Returns the persisted global and per-agent execution state. */
 fun AgentManager.getSubAgentExecutionSnapshot(): SubAgentExecutionSnapshot = subAgentExecutionControl.snapshot()
 
@@ -10,13 +12,13 @@ fun AgentManager.getSubAgentExecutionStatus(agentId: String? = null): SubAgentEx
 fun AgentManager.pauseAllSubAgents(): SubAgentExecutionSnapshot = subAgentExecutionControl.pauseAll()
 
 /** Pauses all sub-agent execution without blocking the caller thread. */
-suspend fun AgentManager.pauseAllSubAgentsAsync(): SubAgentExecutionSnapshot = subAgentExecutionControl.pauseAllAsync()
+suspend fun AgentManager.pauseAllSubAgentsAsync(): SubAgentExecutionSnapshot = subAgentExecutionControl.pauseAllReactive().awaitSingle()
 
 /** Resumes global sub-agent execution while preserving individual pause flags. */
 fun AgentManager.resumeAllSubAgents(): SubAgentExecutionSnapshot = subAgentExecutionControl.resumeAll()
 
 /** Resumes global sub-agent execution without blocking the caller thread. */
-suspend fun AgentManager.resumeAllSubAgentsAsync(): SubAgentExecutionSnapshot = subAgentExecutionControl.resumeAllAsync()
+suspend fun AgentManager.resumeAllSubAgentsAsync(): SubAgentExecutionSnapshot = subAgentExecutionControl.resumeAllReactive().awaitSingle()
 
 /** Pauses execution for one existing sub-agent. */
 fun AgentManager.pauseSubAgent(agentId: String): SubAgentExecutionSnapshot {
@@ -27,7 +29,7 @@ fun AgentManager.pauseSubAgent(agentId: String): SubAgentExecutionSnapshot {
 /** Pauses one existing sub-agent without blocking the caller thread. */
 suspend fun AgentManager.pauseSubAgentAsync(agentId: String): SubAgentExecutionSnapshot {
     require(getSubAgent(agentId) != null) { "Agent not found: $agentId" }
-    return subAgentExecutionControl.pauseAgentAsync(agentId)
+    return subAgentExecutionControl.pauseAgentReactive(agentId).awaitSingle()
 }
 
 /** Resumes execution for one existing sub-agent. */
@@ -39,7 +41,7 @@ fun AgentManager.resumeSubAgent(agentId: String): SubAgentExecutionSnapshot {
 /** Resumes one existing sub-agent without blocking the caller thread. */
 suspend fun AgentManager.resumeSubAgentAsync(agentId: String): SubAgentExecutionSnapshot {
     require(getSubAgent(agentId) != null) { "Agent not found: $agentId" }
-    return subAgentExecutionControl.resumeAgentAsync(agentId)
+    return subAgentExecutionControl.resumeAgentReactive(agentId).awaitSingle()
 }
 
 /** Registers a listener for immediate pause/resume state refreshes. */

@@ -14,6 +14,7 @@ import de.heckenmann.visualagent.protocol.AgentPort
 import de.heckenmann.visualagent.protocol.AgentStatus
 import de.heckenmann.visualagent.protocol.ConversationMessage
 import de.heckenmann.visualagent.protocol.ToolDefinition
+import kotlinx.coroutines.reactor.awaitSingle
 import org.springframework.stereotype.Component
 import de.heckenmann.visualagent.agent.AgentConfig as ApplicationAgentConfig
 import de.heckenmann.visualagent.agent.AgentStatus as ApplicationAgentStatus
@@ -52,15 +53,29 @@ class SpringAgentPort(
 
     override fun executionSnapshot(): AgentExecutionSnapshot = agentManager.subAgentExecutionControl.snapshot().toProtocol()
 
-    override suspend fun pauseAll(): AgentExecutionSnapshot = agentManager.subAgentExecutionControl.pauseAllAsync().toProtocol()
+    override suspend fun pauseAll(): AgentExecutionSnapshot =
+        agentManager.subAgentExecutionControl
+            .pauseAllReactive()
+            .awaitSingle()
+            .toProtocol()
 
-    override suspend fun resumeAll(): AgentExecutionSnapshot = agentManager.subAgentExecutionControl.resumeAllAsync().toProtocol()
+    override suspend fun resumeAll(): AgentExecutionSnapshot =
+        agentManager.subAgentExecutionControl
+            .resumeAllReactive()
+            .awaitSingle()
+            .toProtocol()
 
     override suspend fun pause(agentId: String): AgentExecutionSnapshot =
-        agentManager.subAgentExecutionControl.pauseAgentAsync(agentId).toProtocol()
+        agentManager.subAgentExecutionControl
+            .pauseAgentReactive(agentId)
+            .awaitSingle()
+            .toProtocol()
 
     override suspend fun resume(agentId: String): AgentExecutionSnapshot =
-        agentManager.subAgentExecutionControl.resumeAgentAsync(agentId).toProtocol()
+        agentManager.subAgentExecutionControl
+            .resumeAgentReactive(agentId)
+            .awaitSingle()
+            .toProtocol()
 
     override fun toolsFor(agentId: String): Set<String> =
         agentManager

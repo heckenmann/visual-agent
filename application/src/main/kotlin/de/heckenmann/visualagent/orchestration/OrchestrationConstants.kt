@@ -120,7 +120,9 @@ internal object OrchestrationConstants {
                     "Evaluation criteria:\n" +
                     "- Does the result actually address the task description?\n" +
                     "- Is the result concrete and actionable, not vague or evasive?\n" +
-                    "- A blank result is acceptable only if the work was done entirely through tool calls.\n" +
+                    "- A blank result is acceptable only when supplied successful tool evidence establishes the deliverable.\n" +
+                    "- Scheduling acknowledgments and absent evidence do not establish completed tool work.\n" +
+                    "- Consider tool failures and missing results; do not infer artifact contents that were not supplied.\n" +
                     "- A blank result for a task that requires producing output is a failure.\n\n" +
                     "Return only a JSON object matching this schema, without markdown fences or surrounding prose:\n" +
                     WorkerReviewResult.schema().json + "\n" +

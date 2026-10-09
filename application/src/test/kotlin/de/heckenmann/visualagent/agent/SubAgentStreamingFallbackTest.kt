@@ -1,6 +1,5 @@
 package de.heckenmann.visualagent.agent
 
-import de.heckenmann.visualagent.knowledge.MemoryStore
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
@@ -19,7 +18,7 @@ class SubAgentStreamingFallbackTest {
                 Flux.just(ChatResponse("test", Message("assistant", "partial"), false))
             every { provider.chatReactive(any<ChatRequestContext>()) } returns
                 Mono.just(ChatResponse("test", Message("assistant", "complete response"), true))
-            val memoryStore = mockk<MemoryStore>(relaxed = true)
+            val memoryStore = reactiveMemoryStore()
             every { memoryStore.saveStructuredKnowledge(any(), any(), any()) } returns "memory-id"
             val events = mutableListOf<String>()
 

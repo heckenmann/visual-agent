@@ -1,10 +1,10 @@
 package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.conversation.appendStreamPart
+import de.heckenmann.visualagent.agent.tools.ToolExecutionScope
 import de.heckenmann.visualagent.knowledge.MemoryStore
-import kotlinx.coroutines.reactor.awaitSingle
-import kotlinx.coroutines.reactor.awaitSingleOrNull
 import mu.KotlinLogging
+import reactor.core.publisher.Mono
 
 /**
  * Runtime availability shown in the sub-agent list and used for scheduling.
@@ -113,17 +113,19 @@ data class SubAgent(
      * @param enabledTools Tool IDs exposed to this sub-agent
      * @return Assistant response
      */
-    suspend fun chat(
+    fun chatReactive(
         messages: List<Message>,
         provider: LLMProvider,
         enabledTools: Set<ToolId> = emptySet(),
         token: CancellationToken? = null,
         requestId: String? = null,
-    ): ChatResponse {
-        val response = provider.chatReactive(buildRequest(messages, enabledTools, token, requestId)).awaitSingle()
-        appendChatHistory(messages, response)
-        return response
-    }
+        executionMetadata: Map<String, Any> = emptyMap(),
+    ): Mono<ChatResponse> =
+        Mono.defer {
+            provider
+                .chatReactive(buildRequest(messages, enabledTools, token, requestId, executionMetadata))
+                .doOnNext { appendChatHistory(messages, it) }
+        }
 
     /**
      * Perform a todo autonomously: call the LLM and persist its result in the knowledge DB.
@@ -140,7 +142,7 @@ data class SubAgent(
      * @param onChunk Optional callback for streamed response deltas
      * @return Assistant response content
      */
-    suspend fun performTodo(
+    fun performTodoReactive(
         todoId: String,
         description: String,
         provider: LLMProvider,
@@ -150,86 +152,53 @@ data class SubAgent(
         onChunk: ((String) -> Unit)? = null,
         onStreamReset: (() -> Unit)? = null,
         requestId: String? = null,
-    ): String {
-        val messages =
-            listOf(
-                Message(
-                    "system",
-                    buildString {
-                        append("You are $name. Your role is $role.")
-                        append(" The main agent and orchestrator control the todo lifecycle.")
-                        append(
-                            " You may inspect todos and stored results, but do not add, update, complete, " +
-                                "cancel, start, stop, remove, or reorder todos.",
-                        )
-                        append(" If the task becomes unclear, use the read-only `todos` actions to re-read the current description.")
-                        append(
-                            " Report a concise result and next steps; the orchestrator persists the result " +
-                                "and decides the final status.",
-                        )
-                        if (enabledTools.any { it.value == "javascript:execute" }) {
-                            append(
-                                " Use the available JavaScript function for complex deterministic logic and bulk processing " +
-                                    "of many elements " +
-                                    "(mapping, filtering, transforming, deduplicating, sorting, or aggregating records), " +
-                                    "or large CSV/Markdown assembly; call only enabled tools through " +
-                                    "await tools.call(name, arguments), use workspace.write({path, content}) " +
-                                    "for generated text that must be persisted, workspace.read({path}) to read " +
-                                    "text, and workspace.delete({path}) to remove a file. Existing JavaScript files " +
-                                    "can be executed by passing their relative path to that function; " +
-                                    "return the complete final value. " +
-                                    "If execution returns an error, inspect it, correct the source or arguments, " +
-                                    "and retry without repeating the unchanged failure. The sandbox has no direct " +
-                                    "host, filesystem, network, process, or credential access.",
-                            )
-                        }
-                        if (enabledTools.any { it.value == "skills" }) {
-                            append(
-                                " Search the skills catalog before expensive or repetitive work with skills search, " +
-                                    "read a matching skill before relying on it, and save only stable reusable Markdown " +
-                                    "results with skills create or update. Never store secrets, PII, transient progress, " +
-                                    "or raw provider responses. Skills are database records, never workspace files: " +
-                                    "do not create SKILL.md or another skill document with file-editing, JavaScript, " +
-                                    "or terminal functions. Use only the supplied function schemas for nested calls.",
-                            )
-                        } else {
-                            append(
-                                " Skill requests are handled by the main agent's skills tool. Do not create, write, " +
-                                    "or modify SKILL.md or any other skill document in the workspace; report the " +
-                                    "request to the orchestrator instead.",
-                            )
-                        }
-                    },
-                ),
-                Message("user", description),
-            )
+        toolScope: ToolExecutionScope = ToolExecutionScope(),
+    ): Mono<String> =
+        Mono.defer {
+            val messages = todoWorkerMessages(this, description, enabledTools)
 
-        val resp = responseForTodo(messages, provider, enabledTools, token, onChunk, onStreamReset, requestId)
-
-        val summary =
-            resp.message.content
-                .trim()
-                .ifBlank { "(No text response; inspect the persisted tool results.)" }
-        try {
-            val nextSteps = "Review and implement improvements as needed."
-            memoryStore.saveStructuredKnowledge(subject = "todo:$todoId", summary = summary, nextSteps = nextSteps)
-        } catch (error: Exception) {
-            logger.error(error) { "Failed to persist result for todo $todoId" }
-            throw IllegalStateException("Failed to persist result for todo $todoId", error)
+            val executionMetadata = mapOf("toolExecutionScope" to toolScope)
+            finishTodoToolWork(toolScope, token) { followUp ->
+                if (followUp == null) {
+                    responseForTodo(messages, provider, enabledTools, token, onChunk, onStreamReset, requestId, executionMetadata)
+                } else {
+                    onStreamReset?.invoke()
+                    responseForTodo(
+                        listOf(Message("user", followUp)),
+                        provider,
+                        enabledTools,
+                        token,
+                        onChunk,
+                        onStreamReset,
+                        requestId,
+                        executionMetadata,
+                    )
+                }
+            }.flatMap { resp ->
+                val summary =
+                    resp.message.content
+                        .trim()
+                        .ifBlank { "(No text response; inspect the persisted tool results.)" }
+                memoryStore
+                    .saveStructuredKnowledgeReactive("todo:$todoId", summary, "Review and implement improvements as needed.")
+                    .onErrorMap { error ->
+                        logger.error(error) { "Failed to persist result for todo $todoId" }
+                        IllegalStateException("Failed to persist result for todo $todoId", error)
+                    }.then(
+                        memoryStore
+                            .saveStructuredKnowledgeReactive(
+                                "agent:$id:log",
+                                "Worked on todo $todoId: ${description.take(120)}",
+                                summary,
+                            ).onErrorResume { error ->
+                                logger.warn(error) { "Failed to persist agent log for todo $todoId" }
+                                Mono.empty()
+                            },
+                    ).thenReturn(resp.message.content)
+            }
         }
-        runCatching {
-            memoryStore.saveStructuredKnowledge(
-                subject = "agent:$id:log",
-                summary = "Worked on todo $todoId: ${description.take(120)}",
-                nextSteps = summary,
-            )
-        }.onFailure { error ->
-            logger.warn(error) { "Failed to persist agent log for todo $todoId" }
-        }
-        return resp.message.content
-    }
 
-    private suspend fun responseForTodo(
+    private fun responseForTodo(
         messages: List<Message>,
         provider: LLMProvider,
         enabledTools: Set<ToolId>,
@@ -237,54 +206,62 @@ data class SubAgent(
         onChunk: ((String) -> Unit)?,
         onStreamReset: (() -> Unit)?,
         requestId: String?,
-    ): ChatResponse {
-        if (onChunk == null) return chat(messages, provider, enabledTools, token, requestId)
-        return try {
-            stream(messages, provider, enabledTools, token, onChunk, requestId)
-        } catch (error: Exception) {
-            if (!isStreamingUnavailable(error)) throw error
-            logger.info { "Streaming is unavailable for sub-agent $id; using a complete response instead" }
-            val fallback = chat(messages, provider, enabledTools, token, requestId)
-            onStreamReset?.invoke()
-            fallback.message.content
-                .takeIf(String::isNotEmpty)
-                ?.let(onChunk)
-            fallback
-        }
+        executionMetadata: Map<String, Any>,
+    ): Mono<ChatResponse> {
+        if (onChunk == null) return chatReactive(messages, provider, enabledTools, token, requestId, executionMetadata)
+        return stream(messages, provider, enabledTools, token, onChunk, requestId, executionMetadata)
+            .onErrorResume { error ->
+                if (!isStreamingUnavailable(error)) {
+                    Mono.error(error)
+                } else {
+                    logger.info { "Streaming is unavailable for sub-agent $id; using a complete response instead" }
+                    chatReactive(messages, provider, enabledTools, token, requestId, executionMetadata).doOnNext { fallback ->
+                        onStreamReset?.invoke()
+                        fallback.message.content
+                            .takeIf(String::isNotEmpty)
+                            ?.let(onChunk)
+                    }
+                }
+            }
     }
 
-    private suspend fun stream(
+    private fun stream(
         messages: List<Message>,
         provider: LLMProvider,
         enabledTools: Set<ToolId>,
         token: CancellationToken?,
         onChunk: (String) -> Unit,
         requestId: String?,
-    ): ChatResponse {
-        val collected = StringBuilder()
-        var terminalResponse: ChatResponse? = null
-        provider
-            .streamReactive(buildRequest(messages, enabledTools, token, requestId))
-            .doOnNext { chunk ->
-                token?.throwIfCancelled()
-                if (chunk.done) terminalResponse = chunk
-                val part = chunk.message.content
-                if (part.isNotEmpty()) {
-                    onChunk(appendStreamPart(collected, part))
-                }
-            }.then()
-            .awaitSingleOrNull()
-        val response = terminalResponse ?: throw IllegalStateException("stream returned no terminal response")
-        val completeResponse = response.copy(message = Message("assistant", collected.toString()), done = true)
-        appendChatHistory(messages, completeResponse)
-        return completeResponse
-    }
+        executionMetadata: Map<String, Any>,
+    ): Mono<ChatResponse> =
+        Mono.defer {
+            val collected = StringBuilder()
+            var terminalResponse: ChatResponse? = null
+            provider
+                .streamReactive(buildRequest(messages, enabledTools, token, requestId, executionMetadata))
+                .doOnNext { chunk ->
+                    token?.throwIfCancelled()
+                    if (chunk.done) terminalResponse = chunk
+                    val part = chunk.message.content
+                    if (part.isNotEmpty()) {
+                        onChunk(appendStreamPart(collected, part))
+                    }
+                }.then(
+                    Mono.fromCallable {
+                        val response = terminalResponse ?: throw IllegalStateException("stream returned no terminal response")
+                        val completeResponse = response.copy(message = Message("assistant", collected.toString()), done = true)
+                        appendChatHistory(messages, completeResponse)
+                        completeResponse
+                    },
+                )
+        }
 
     private fun buildRequest(
         messages: List<Message>,
         enabledTools: Set<ToolId>,
         token: CancellationToken?,
         requestId: String?,
+        executionMetadata: Map<String, Any>,
     ): ChatRequestContext {
         val modelSelection = config.modelSelection()
         return ChatRequestContext(
@@ -296,7 +273,7 @@ data class SubAgent(
             options = modelSelection.options,
             enabledTools = enabledTools,
             metadata =
-                mapOf("agentId" to id, "agentName" to name, "agentRole" to role) +
+                executionMetadata + mapOf("agentId" to id, "agentName" to name, "agentRole" to role) +
                     requestId?.let { mapOf("requestId" to it, "sessionId" to AgentManagerConstants.MAIN_SESSION_ID) }.orEmpty(),
             cancellationToken = token,
         )
@@ -310,7 +287,7 @@ data class SubAgent(
         chatHistory.add(response.message)
     }
 
-    private fun isStreamingUnavailable(error: Exception): Boolean =
+    private fun isStreamingUnavailable(error: Throwable): Boolean =
         error is UnsupportedOperationException ||
             (error is IllegalStateException && error.message?.contains("stream", ignoreCase = true) == true)
 }

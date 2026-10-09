@@ -1,6 +1,5 @@
 package de.heckenmann.visualagent.agent
 
-import de.heckenmann.visualagent.knowledge.MemoryStore
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
@@ -36,7 +35,7 @@ class SubAgentRequestIdentityTest {
                     "todo-1",
                     "work",
                     provider,
-                    mockk<MemoryStore>(relaxed = true),
+                    reactiveMemoryStore(),
                     onChunk = if (mode == "todo") null else { _: String -> },
                     requestId = "registered-request",
                 )

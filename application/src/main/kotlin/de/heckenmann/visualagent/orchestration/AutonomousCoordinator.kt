@@ -10,23 +10,20 @@ import de.heckenmann.visualagent.agent.SubAgentExecutionControl
 import de.heckenmann.visualagent.agent.SubAgentJobScheduler
 import de.heckenmann.visualagent.agent.SubAgentOpsProvider
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
+import de.heckenmann.visualagent.agent.tools.ToolExecutionScope
 import de.heckenmann.visualagent.knowledge.MemoryStore
 import de.heckenmann.visualagent.knowledge.TodoStore
 import de.heckenmann.visualagent.todo.TodoChange
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoManager
 import de.heckenmann.visualagent.todo.TodoStatus
-import de.heckenmann.visualagent.todo.TodoTerminalReason
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
+import de.heckenmann.visualagent.todo.TodoUpdateCommand
 import mu.KotlinLogging
+import reactor.core.Disposable
+import reactor.core.Disposables
+import reactor.core.publisher.Mono
+import reactor.core.scheduler.Schedulers
+import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
@@ -39,7 +36,6 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 class AutonomousCoordinator
     constructor(
-        private val scope: CoroutineScope,
         private val todoManager: TodoManager,
         private val llmProvider: LLMProvider,
         private val todoStore: TodoStore,
@@ -51,7 +47,8 @@ class AutonomousCoordinator
         private val conversationOps: ConversationOpsProvider,
         private val subAgentOps: SubAgentOpsProvider,
         private val executionControl: SubAgentExecutionControl? = null,
-        private val retryDelay: suspend (Long) -> Unit = { delay(it) },
+        private val retryDelay: (Long) -> Mono<Void> = { Mono.delay(Duration.ofMillis(it)).then() },
+        private val toolScopes: () -> ToolExecutionScope = ::ToolExecutionScope,
     ) : AutoCloseable {
         private val logger = KotlinLogging.logger {}
         private val subAgents: Map<String, SubAgent>
@@ -59,11 +56,12 @@ class AutonomousCoordinator
         private val pendingTodoChanges = ConcurrentHashMap<String, TodoChange>()
         private val todoLifecycleLock = Any()
         private val activeCancellationTokens = ConcurrentHashMap<String, CancellationToken>()
-        private val activeTodoJobs = ConcurrentHashMap<String, Job>()
+        private val activeTodoJobs = ConcurrentHashMap<String, Disposable>()
         private val agentBusySince = ConcurrentHashMap<String, Long>()
         private val requestedTodoIds = ConcurrentLinkedQueue<String>()
         private val requestedTodoIdSet = ConcurrentHashMap.newKeySet<String>()
         private val workSignal = AutonomousWorkSignal()
+        private val closed = AtomicBoolean(false)
         private val autonomousProcessingEnabled = AtomicBoolean(false)
         private val subscriptions = mutableListOf<AutoCloseable>()
         private val taskPlanner =
@@ -75,7 +73,6 @@ class AutonomousCoordinator
             )
         private val decompositionScheduler =
             AutonomousTodoDecompositionScheduler(
-                scope = scope,
                 todoStore = todoStore,
                 taskPlanner = taskPlanner,
                 jobScheduler = jobScheduler,
@@ -107,21 +104,29 @@ class AutonomousCoordinator
 
         init {
             logger.info { "AutonomousCoordinator initialized" }
-            scope.launch(Dispatchers.IO) {
-                while (true) {
-                    workSignal.await()
-                    try {
-                        drainWork()
-                    } catch (error: Throwable) {
-                        if (error !is kotlinx.coroutines.CancellationException) {
-                            logger.warn(error) { "Autonomous work pickup failed; waiting for the next signal" }
-                        }
-                        if (error is kotlinx.coroutines.CancellationException) currentCoroutineContext().ensureActive()
-                    }
-                }
-            }
+            val pickup =
+                workSignal
+                    .events()
+                    .concatMap({
+                        Mono
+                            .fromRunnable<Void> { drainWork() }
+                            .subscribeOn(Schedulers.boundedElastic())
+                            .onErrorResume { error ->
+                                logger.warn(error) { "Autonomous work pickup failed; waiting for the next signal" }
+                                Mono.empty()
+                            }
+                    }, 1)
+                    .subscribe({}, { error -> logger.error(error) { "Autonomous pickup terminated" } })
+            subscriptions += AutoCloseable(pickup::dispose)
             subscriptions +=
                 todoEventBus.addListener { change ->
+                    val snapshot = change.todo
+                    if (snapshot != null &&
+                        change.type != de.heckenmann.visualagent.todo.TodoChangeType.REMOVED &&
+                        todoManager.getById(snapshot.id)?.timelineSequence != snapshot.timelineSequence
+                    ) {
+                        return@addListener
+                    }
                     change.todo?.id?.let { pendingTodoChanges[it] = change }
                     change.todoId?.let { pendingTodoChanges[it] = change }
                     val todo = change.todo
@@ -139,10 +144,12 @@ class AutonomousCoordinator
 
         /** Releases event subscriptions and cancels active autonomous work. */
         override fun close() {
+            closed.set(true)
             subscriptions.forEach(AutoCloseable::close)
             subscriptions.clear()
             activeCancellationTokens.values.forEach(CancellationToken::cancel)
-            activeTodoJobs.values.forEach(Job::cancel)
+            activeTodoJobs.values.forEach(Disposable::dispose)
+            decompositionScheduler.close()
         }
 
         /**
@@ -230,28 +237,22 @@ class AutonomousCoordinator
         /**
          * Cancels the in-progress todo assigned to the given agent.
          */
-        fun cancelAgentTodo(agentId: String) {
-            val agent = subAgents[agentId] ?: return
-            val todoId = agent.currentTodoId ?: return
-            val todo = todoStore.listTodos().firstOrNull { it.id == todoId } ?: return
-            if (todo.status != TodoStatus.IN_PROGRESS) return
-            persistSubAgentMessage(
-                agent = agent,
-                content = "Cancelled todo $todoId for deleted agent $agentId.",
-                success = false,
-                persistMessage = { conversationOps.persist(it) },
-            )
-            todoManager.cancelTodo(todoId, TodoTerminalReason.AGENT_REMOVED)
-        }
+        fun cancelAgentTodo(
+            agentId: String,
+            removedAgent: SubAgent? = null,
+        ) = todoControl.cancelAgentTodo(agentId, removedAgent)
 
-        private suspend fun drainWork() {
+        /** Serializes agent removal with candidate selection and todo claiming. */
+        internal fun <T> withTodoLifecycleLock(action: () -> T): T = synchronized(todoLifecycleLock, action)
+
+        private fun drainWork() {
             if (executionControl?.isGloballyPaused() == true) return
             candidateSelector
                 .orderRequested(requestedTodoIds.toList())
                 .forEach { requestedTodoId ->
                     val claimed = claimAndProcessOneTodo(requestedTodoId)
                     val current = todoStore.listTodos().firstOrNull { it.id == requestedTodoId }
-                    if (claimed || current?.status != TodoStatus.PENDING) {
+                    if (!claimed && current?.status != TodoStatus.PENDING) {
                         requestedTodoIds.remove(requestedTodoId)
                         requestedTodoIdSet.remove(requestedTodoId)
                     }
@@ -260,7 +261,9 @@ class AutonomousCoordinator
                 while (claimAndProcessOneTodo()) {
                     // Continue claiming while capacity is available.
                 }
-                decompositionScheduler.scheduleIfNeeded(autonomousProcessingEnabled.get())
+                synchronized(todoLifecycleLock) {
+                    decompositionScheduler.scheduleIfNeeded(autonomousProcessingEnabled.get())
+                }
             }
         }
 
@@ -279,6 +282,8 @@ class AutonomousCoordinator
             val agent = candidate.agent
             val requestId = conversationOps.beginConversationRequest()
             val todo = todoManager.claimPendingTodo(candidate.todo.id, agent.id) ?: return false
+            requestedTodoIds.remove(todo.id)
+            requestedTodoIdSet.remove(todo.id)
             try {
                 agent.status = AgentStatus.BUSY
                 agent.currentTodoId = todo.id
@@ -289,63 +294,61 @@ class AutonomousCoordinator
                 subAgentOps.notifyAgent(agent.id, "STATUS:${agent.status.name}")
 
                 val token = CancellationToken().also { activeCancellationTokens[todo.id] = it }
-                val processingJob =
-                    scope.launch(start = CoroutineStart.LAZY) {
-                        if (todoManager.getById(todo.id)?.status != TodoStatus.IN_PROGRESS) {
-                            activeCancellationTokens.remove(todo.id, token)
-                            releaseAutonomousTodoAgent(
-                                agent = agent,
-                                todoId = todo.id,
-                                agentBusySince = agentBusySince,
-                                subAgentOps = subAgentOps,
-                            )
-                            return@launch
-                        }
-                        processTodoWithLLM(
-                            agent = agent,
-                            todoId = todo.id,
-                            taskDescription = taskPlanner.buildWorkerInstruction(todo),
-                            llmProvider = llmProvider,
-                            memoryStore = memoryStore,
-                            agentToolConfigService = agentToolConfigService,
-                            taskPlanner = taskPlanner,
-                            conversationOps = conversationOps,
-                            todoManager = todoManager,
-                            subAgentOps = subAgentOps,
-                            activeCancellationTokens = activeCancellationTokens,
-                            agentBusySince = agentBusySince,
-                            pendingTodoChanges = pendingTodoChanges,
-                            todoEventBus = todoEventBus,
-                            scope = scope,
-                            jobScheduler = jobScheduler,
-                            executionControl = executionControl,
-                            cancellationToken = token,
-                            conversationRequestId = requestId,
-                            retryDelay = retryDelay,
-                        )
-                    }
+                val processingJob = Disposables.swap()
                 activeTodoJobs[todo.id] = processingJob
-                processingJob.invokeOnCompletion {
-                    activeTodoJobs.remove(todo.id, processingJob)
-                    if (scope.isActive && todoManager.getById(todo.id)?.status != TodoStatus.IN_PROGRESS) {
-                        releaseAutonomousTodoAgent(
-                            agent = agent,
-                            todoId = todo.id,
-                            agentBusySince = agentBusySince,
-                            subAgentOps = subAgentOps,
-                        )
-                    }
-                    workSignal.signal()
-                }
-                processingJob.start()
+                val pipeline =
+                    Mono
+                        .defer {
+                            if (todoManager.getById(todo.id)?.status != TodoStatus.IN_PROGRESS) {
+                                withTodoLifecycleLock {
+                                    if (activeCancellationTokens.remove(todo.id, token)) {
+                                        releaseAutonomousTodoAgent(agent, todo.id, agentBusySince, subAgentOps)
+                                    }
+                                }
+                                Mono.empty()
+                            } else {
+                                AutonomousTodoProcessor(
+                                    agent = agent,
+                                    todoId = todo.id,
+                                    taskDescription = taskPlanner.buildWorkerInstruction(todo),
+                                    claimedTodo = todo,
+                                    llmProvider = llmProvider,
+                                    memoryStore = memoryStore,
+                                    agentToolConfigService = agentToolConfigService,
+                                    taskPlanner = taskPlanner,
+                                    conversationOps = conversationOps,
+                                    todoManager = todoManager,
+                                    subAgentOps = subAgentOps,
+                                    activeCancellationTokens = activeCancellationTokens,
+                                    agentBusySince = agentBusySince,
+                                    pendingTodoChanges = pendingTodoChanges,
+                                    todoEventBus = todoEventBus,
+                                    isActive = { !closed.get() },
+                                    jobScheduler = jobScheduler,
+                                    executionControl = executionControl,
+                                    cancellationToken = token,
+                                    conversationRequestId = requestId,
+                                    retryDelay = retryDelay,
+                                    toolScopes = toolScopes,
+                                    onRetryPending = { startTodo(it) },
+                                    onCleanup = workSignal::signal,
+                                    withLifecycleLock = { action -> withTodoLifecycleLock(action) },
+                                ).execute()
+                            }
+                        }.doFinally {
+                            activeTodoJobs.remove(todo.id, processingJob)
+                            workSignal.signal()
+                        }
+                processingJob.update(
+                    pipeline.subscribeOn(Schedulers.boundedElastic()).subscribe(
+                        {},
+                        { error -> logger.warn(error) { "Autonomous todo ${todo.id} terminated" } },
+                    ),
+                )
                 return true
             } catch (error: Throwable) {
-                agentBusySince.remove(agent.id)
-                agent.status = AgentStatus.IDLE
-                agent.currentTodoId = null
-                agent.currentTask = null
-                subAgentOps.saveSubAgent(agent)
-                todoManager.updateStatus(todo.id, TodoStatus.PENDING)
+                releaseAutonomousTodoAgent(agent, todo.id, agentBusySince, subAgentOps)
+                if (todoManager.update(TodoUpdateCommand(todo.id, status = TodoStatus.PENDING), expected = todo)) startTodo(todo.id)
                 throw error
             }
         }

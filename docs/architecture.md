@@ -506,7 +506,17 @@ it must not silence it.
 
 The build includes automated `locAndPackageSizeCheck` during `check` and blocks files above the
 300 effective-LOC limit. `desktopApiUsageCheck` blocks any new `java.awt`/`javax.swing`/
-JavaFX/AWT image I/O source references. The single
-`-Djava.awt.headless=false` JVM arg in `build.gradle.kts` is
-whitelisted; it is required for Compose Desktop to discover screen
-density in non-headless desktop mode.
+JavaFX/AWT image I/O source references. Exact `jvmArgs` lines setting
+`java.awt.headless` are allowed only as build configuration, not as permission
+to use toolkit APIs. Gradle test JVMs run headless with display environment
+variables removed; Compose test rules render offscreen. Native desktop launch
+tasks use non-headless mode for screen discovery. Linux packaged desktop smoke
+tests retain a virtual display because they exercise real operating-system windows.
+
+Autonomous todo execution is Reactor-native end to end through worker calls, tool continuation,
+review, capacity admission, pause gates, decomposition and retry timers (issue #375).
+`verifyAutonomousReactorContracts` checks these implementation contracts in addition to the
+existing client dependency checks. Imperative lifecycle lock sections and synchronous agent/
+conversation callbacks remain isolated on bounded-elastic; native R2DBC conditional transitions
+and provider streams remain composed without blocking. Coroutine adaptation belongs to the
+existing transport-facing facades and test harness, not the autonomous pipeline.

@@ -1,12 +1,16 @@
 package de.heckenmann.visualagent.agent
 
+import kotlinx.coroutines.reactor.awaitSingle
+import kotlinx.coroutines.reactor.awaitSingleOrNull
+import reactor.core.publisher.Mono
+
 /** Sends a message to a sub-agent after waiting for its execution gate. */
 internal suspend fun AgentManager.sendMessageToAgent(
     agentId: String,
     content: String,
 ): String {
     val requestId = conversationOps.beginConversationRequest()
-    subAgentExecutionControl.awaitExecutionAllowed(agentId)
+    subAgentExecutionControl.executionAllowed(agentId).awaitSingleOrNull()
     return conversationOps.sendMessageToAgent(agentId, content, requestId)
 }
 
@@ -16,9 +20,10 @@ internal suspend fun AgentManager.runAgentJob(
     content: String,
 ): AgentJobResult {
     val requestId = conversationOps.beginConversationRequest()
-    return subAgentJobScheduler.run(agentId) {
-        conversationOps.runAgentJob(agentId, content, requestId)
-    }
+    return subAgentJobScheduler
+        .runReactive(agentId, requestId) {
+            conversationOps.runAgentJobReactive(agentId, content, requestId)
+        }.awaitSingle()
 }
 
 /** Enqueues a job for an existing sub-agent. */
@@ -28,7 +33,7 @@ internal fun AgentManager.enqueueAgentJob(
 ): String =
     enqueueConversationJob(
         agentId = agentId,
-        block = { requestId -> conversationOps.runAgentJob(agentId, content, requestId) },
+        block = { requestId -> conversationOps.runAgentJobReactive(agentId, content, requestId) },
     )
 
 /** Runs a temporary sub-agent job synchronously. */
@@ -39,9 +44,10 @@ internal suspend fun AgentManager.startAgentJob(
     content: String,
 ): AgentJobResult {
     val requestId = conversationOps.beginConversationRequest()
-    return subAgentJobScheduler.run {
-        conversationOps.startAgentJob(name, role, templateName, content, requestId)
-    }
+    return subAgentJobScheduler
+        .runReactive(null, requestId) {
+            conversationOps.startAgentJobReactive(name, role, templateName, content, requestId)
+        }.awaitSingle()
 }
 
 /** Enqueues a temporary sub-agent job. */
@@ -53,15 +59,15 @@ internal fun AgentManager.enqueueAgentJob(
 ): String =
     enqueueConversationJob(
         agentId = null,
-        block = { requestId -> conversationOps.startAgentJob(name, role, templateName, content, requestId) },
+        block = { requestId -> conversationOps.startAgentJobReactive(name, role, templateName, content, requestId) },
     )
 
 private fun AgentManager.enqueueConversationJob(
     agentId: String?,
-    block: suspend (String) -> AgentJobResult,
+    block: (String) -> Mono<AgentJobResult>,
 ): String {
     val requestId = conversationOps.beginConversationRequest()
-    return subAgentJobScheduler.enqueue(
+    return subAgentJobScheduler.enqueueReactive(
         agentId = agentId,
         block = { block(requestId) },
         onFinished = { jobId, result -> conversationOps.notifyMainAgentOfJobCompletion(jobId, result, requestId) },

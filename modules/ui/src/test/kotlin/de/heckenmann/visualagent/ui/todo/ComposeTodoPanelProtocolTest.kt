@@ -21,6 +21,8 @@ import io.mockk.mockk
 import io.mockk.verify
 import org.junit.Rule
 import org.junit.Test
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -29,6 +31,33 @@ import kotlin.test.assertTrue
 class ComposeTodoPanelProtocolTest {
     @get:Rule
     val composeTestRule = createComposeRule()
+
+    @Test
+    fun `blocked start leaves offscreen UI controls responsive and rejects duplicates`() {
+        val port = protocolPort(listOf(TodoItem("todo", "Task")))
+        val started = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val requested = AtomicReference<Any?>()
+        every { port.start("todo") } answers {
+            started.countDown()
+            check(release.await(10, TimeUnit.SECONDS)) { "Test did not release the blocked port" }
+            true
+        }
+        composeTestRule.setContent {
+            MaterialTheme { TodoPanel(port, ComposeModalRequester { requested.set(it) }, LifecycleState()) }
+        }
+        composeTestRule.waitForIdle()
+        try {
+            composeTestRule.onNodeWithContentDescription("Start todo").performClick()
+            composeTestRule.waitUntil(5000) { started.count == 0L }
+            composeTestRule.onNodeWithContentDescription("Start todo").performClick()
+            composeTestRule.onNodeWithContentDescription("Add todo").performClick()
+            assertEquals("Add todo", (requested.get() as ComposeContentModal).title)
+            verify(exactly = 1) { port.start("todo") }
+        } finally {
+            release.countDown()
+        }
+    }
 
     @Test
     fun `panel renders item statuses and per-item controls`() {
@@ -59,8 +88,12 @@ class ComposeTodoPanelProtocolTest {
         composeTestRule.onNodeWithContentDescription("Start all todos").performClick()
         composeTestRule.onNodeWithContentDescription("Stop all todos").performClick()
 
-        io.mockk.verify(exactly = 1) { port.startAll() }
-        io.mockk.verify(exactly = 1) { port.stopAll() }
+        composeTestRule.waitUntil(5000) {
+            runCatching {
+                verify(exactly = 1) { port.startAll() }
+                verify(exactly = 1) { port.stopAll() }
+            }.isSuccess
+        }
     }
 
     @Test
@@ -85,10 +118,14 @@ class ComposeTodoPanelProtocolTest {
         assertEquals("Delete todo?", confirmation.title)
         confirmation.onConfirm()
 
-        io.mockk.verify(exactly = 1) { port.start("todo") }
-        io.mockk.verify(exactly = 1) { port.stop("todo") }
-        io.mockk.verify(exactly = 1) { port.updateStatus("todo", TodoState.COMPLETED) }
-        io.mockk.verify(exactly = 1) { port.remove("todo") }
+        composeTestRule.waitUntil(5000) {
+            runCatching {
+                verify(exactly = 1) { port.start("todo") }
+                verify(exactly = 1) { port.stop("todo") }
+                verify(exactly = 1) { port.updateStatus("todo", TodoState.COMPLETED) }
+                verify(exactly = 1) { port.remove("todo") }
+            }.isSuccess
+        }
     }
 
     @Test
@@ -147,7 +184,15 @@ class ComposeTodoPanelProtocolTest {
 
         current.set(reordered)
         listener!!.invoke(TodoChange(todo = reordered.first(), reordered = true))
-        composeTestRule.waitForIdle()
+        composeTestRule.waitUntil(5000) {
+            runCatching {
+                val cTop = composeTestRule.onNodeWithText("Task C").getBoundsInRoot().top
+                val aTop = composeTestRule.onNodeWithText("Task A").getBoundsInRoot().top
+                val bTop = composeTestRule.onNodeWithText("Task B").getBoundsInRoot().top
+                val nextTop = composeTestRule.onNodeWithText("NEXT").getBoundsInRoot().top
+                cTop < aTop && aTop < bTop && nextTop < aTop
+            }.getOrDefault(false)
+        }
 
         val cTop = composeTestRule.onNodeWithText("Task C").getBoundsInRoot().top
         val aTop = composeTestRule.onNodeWithText("Task A").getBoundsInRoot().top
@@ -167,6 +212,7 @@ class ComposeTodoPanelProtocolTest {
         composeTestRule.waitForIdle()
 
         io.mockk.verify(exactly = 0) { port.list() }
+        io.mockk.verify(exactly = 0) { port.agents() }
     }
 
     private fun protocolPort(initial: List<TodoItem>): TodoPort {
@@ -177,6 +223,8 @@ class ComposeTodoPanelProtocolTest {
         every { port.addProgressListener(any()) } returns AutoCloseable { }
         every { port.start(any()) } returns true
         every { port.stop(any()) } returns true
+        every { port.updateStatus(any(), any()) } returns true
+        every { port.remove(any()) } returns true
         return port
     }
 }

@@ -7,7 +7,7 @@ import de.heckenmann.visualagent.todo.TodoTerminalReason
 /** Registers main-agent reviews for terminal todo transitions. */
 internal fun AgentManager.registerTodoTerminalReviewListener(): AutoCloseable =
     todoEventBus.addListener { change ->
-        if (lifecycle.closing) return@addListener
+        if (lifecycle.closing || change.terminalReason == TodoTerminalReason.DECOMPOSED) return@addListener
         val todo = change.todo ?: return@addListener
         if (change.type != TodoChangeType.UPDATED) return@addListener
         if (change.previousStatus == null || change.previousStatus == todo.status) return@addListener

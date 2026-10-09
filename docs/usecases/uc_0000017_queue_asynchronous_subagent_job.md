@@ -34,14 +34,15 @@ Assigned work remains pending until a worker is available, without exposing dire
 
 The scheduler's internal background-job API registers each job before admitting its work.
 Immediate success, failure, and cancellation must not leave completed jobs in the registry.
-Cancellation before dispatch or with an already cancelled parent still reports one terminal
+Cancellation before dispatch or with an already closed scheduler still reports one terminal
 result, without executing the requested work. Closing the scheduler cancels both running and
 queued background jobs and releases their capacity.
 
-The implementation uses the existing coroutine library's atomic start with a registration
-barrier. Completion handlers only remove registry entries; completion callbacks remain in
-the job body because they can perform persistence and must not block coroutine completion
-handlers. This lifecycle guarantee addresses issue #437 and does not introduce a new tool.
+The Reactor scheduler registers a disposable before subscribing and admits work through
+shared one-shot permit sinks. `Mono.usingWhen` reports exactly one success, failure, or
+cancellation and runs synchronous completion callbacks through the bounded-elastic
+lifecycle adapter. Shutdown cancels native subscriptions and rejects later work.
+This lifecycle guarantee addresses issues #437 and #375 without introducing a new tool.
 
 ## Code Entry Points
 

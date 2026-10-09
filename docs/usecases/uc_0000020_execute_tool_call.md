@@ -46,6 +46,15 @@ Tool behavior is centralized and auditable. Each tool call is shown beneath the 
 
 ## Acceptance Criteria
 
+- Autonomous todo attempts own their asynchronous subscriptions. Scheduling acknowledgements are not completion evidence.
+- When two background calls run, completing only one does not release the worker or start main-agent review. All registered calls must reach a terminal result.
+- Actual background results are returned to the worker for a bounded follow-up turn before review. Cancellation disposes attempt-owned work and ignores late terminal results.
+- Review receives bounded, attempt-local execution evidence, including failures, separately from worker claims.
+
+## Implementation Decision
+
+Issues #449, #456 and #375 use Reactor completion sinks and native Mono composition through worker continuation and review; no coroutine bridge or additional task library is introduced. The registry registers work before scheduling it, and the per-attempt scope records one terminal result per invocation. Existing cancellation tokens remain the parent cancellation mechanism.
+
 - Only request-enabled tools are callable.
 - Tool events are persisted and rendered.
 - A tool's stable child ID, declaration order, and explicit parent assistant-turn ID survive restart and history paging.

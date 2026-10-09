@@ -32,151 +32,87 @@ data class TodoChange(
     val approval: TodoApproval? = null,
 )
 
-/**
- * Manages an in-memory list of [Todo] items with CRUD operations,
- * agent assignment support, and position-based ordering.
- *
- * New todos are persisted through [todoStore] immediately so background consumers
- * such as the autonomous coordinator can observe them.
- */
+/** Owns todo mutations; persisted snapshots are authoritative and events follow successful commits. */
 class TodoManager(
-    private val todoStore: TodoStore,
+    internal val todoStore: TodoStore,
     private val eventBus: TodoEventBus,
 ) {
-    /**
-     * Test-only constructor that creates a manager without persistence.
-     */
+    /** Test-only constructor backed by an isolated transient store. */
     internal constructor() : this(NoOpTodoStore(), TodoEventBus())
 
-    private val todos = mutableListOf<Todo>()
-
-    /**
-     * Loads initial todos from the store after Spring wiring is complete.
-     */
+    /** Reads startup state; all later queries also read persistence. */
     fun loadInitialTodos() {
-        todos.clear()
-        todos.addAll(todoStore.listTodos())
+        todoStore.listTodos()
     }
 
-    /**
-     * Register a listener that receives all todo change events.
-     *
-     * @param listener Callback invoked after each state mutation
-     * @return Handle that removes the listener when closed
-     */
+    /** Observes committed state changes. */
     fun addListener(listener: (TodoChange) -> Unit): AutoCloseable = eventBus.addListener(listener)
 
-    /**
-     * Returns a defensive snapshot of all todos ordered by position.
-     */
-    fun getAll(): List<Todo> = todos.sortedBy { it.position }
+    /** Returns detached persisted snapshots in display order. */
+    fun getAll(): List<Todo> = todoStore.listTodos().map { it.copy() }.sortedBy { it.position }
 
-    /** Returns deleted snapshots retained for conversation reconstruction. */
+    /** Returns archived deletion snapshots. */
     fun getDeletedTodos(limit: Int = 100): List<Todo> = todoStore.listDeletedTodos(limit)
 
-    /**
-     * Returns todos that are ready to be assigned to an agent, ordered by position.
-     */
-    fun getPending(): List<Todo> = todos.filter { it.status == TodoStatus.PENDING }.sortedBy { it.position }
+    /** Returns pending work in display order. */
+    fun getPending(): List<Todo> = getAll().filter { it.status == TodoStatus.PENDING }
 
-    /**
-     * Finds one todo by stable identifier.
-     *
-     * @param id Todo identifier
-     * @return Matching todo or null
-     */
-    fun getById(id: String): Todo? = todos.find { it.id == id }
+    /** Returns a detached snapshot, or null for a missing todo. */
+    fun getById(id: String): Todo? = getAll().find { it.id == id }
 
-    /**
-     * Returns todos assigned to a specific sub-agent.
-     *
-     * @param agentId Sub-agent identifier
-     */
-    fun getByAgent(agentId: String): List<Todo> = todos.filter { it.assignedAgentId == agentId }
+    /** Returns work assigned to an agent. */
+    fun getByAgent(agentId: String): List<Todo> = getAll().filter { it.assignedAgentId == agentId }
 
-    /**
-     * Creates a pending todo appended at the end of the list and publishes an add event.
-     *
-     * @param description User-facing task description
-     * @return Created todo with generated identifier and max position
-     */
-    fun add(description: String): Todo {
-        val todo =
-            Todo(
-                id = UUID.randomUUID().toString(),
-                description = description,
-                status = TodoStatus.PENDING,
-                position = nextPosition(),
-            )
-        persistAndPublish(todo, TodoChangeType.ADDED)
-        return todo
-    }
+    /** Creates an unassigned pending task. */
+    fun add(description: String): Todo = create(description, null)
 
-    /**
-     * Creates a pending todo assigned to a sub-agent and publishes an add event.
-     *
-     * @param description User-facing task description
-     * @param assignedAgentId Sub-agent that should execute the todo
-     * @return Created todo with generated identifier, max position, and assignment
-     */
+    /** Creates a pending task assigned to the requested worker. */
     fun add(
         description: String,
         assignedAgentId: String,
+    ): Todo = create(description, assignedAgentId)
+
+    private fun create(
+        description: String,
+        agentId: String?,
     ): Todo {
-        val todo =
-            Todo(
-                id = UUID.randomUUID().toString(),
-                description = description,
-                status = TodoStatus.PENDING,
-                position = nextPosition(),
-                assignedAgentId = assignedAgentId,
-            )
-        persistAndPublish(todo, TodoChangeType.ADDED)
-        return todo
+        require(description.isNotBlank()) { "Todo description must not be blank" }
+        val todo = Todo(UUID.randomUUID().toString(), description, position = nextPosition(), assignedAgentId = agentId)
+        todoStore.saveTodo(todo)
+        publish(TodoChange(TodoChangeType.ADDED, todo.copy()))
+        return todo.copy()
     }
 
-    /** Creates a uniquely described todo or returns the persisted matching todo. */
+    /** Creates work once under the store's atomic description guard. */
     fun addIfAbsent(
         description: String,
         assignedAgentId: String,
     ): de.heckenmann.visualagent.knowledge.TodoCreation {
-        val todo =
-            Todo(
-                id = UUID.randomUUID().toString(),
-                description = description,
-                status = TodoStatus.PENDING,
-                position = nextPosition(),
-                assignedAgentId = assignedAgentId,
+        require(description.isNotBlank()) { "Todo description must not be blank" }
+        val creation =
+            todoStore.createTodoIfAbsent(
+                Todo(UUID.randomUUID().toString(), description, position = nextPosition(), assignedAgentId = assignedAgentId),
             )
-        val creation = todoStore.createTodoIfAbsent(todo)
-        if (creation.created) {
-            todos += creation.todo
-            publishChange(TodoChange(TodoChangeType.ADDED, todo = creation.todo))
-        }
-        return creation
+        if (creation.created) publish(TodoChange(TodoChangeType.ADDED, creation.todo.copy()))
+        return creation.copy(todo = creation.todo.copy())
     }
 
-    /**
-     * Updates the description of a todo and publishes an update event.
-     *
-     * @param todoId Identifier of the todo to update
-     * @param description New task description
-     * @return true if the todo exists and was updated
-     */
+    /** Updates a description without overwriting concurrent changes. */
     fun update(
         todoId: String,
         description: String,
-    ): Boolean = update(TodoUpdateCommand(id = todoId, description = description))
+    ): Boolean = update(TodoUpdateCommand(todoId, description))
 
-    /** Applies all supplied fields and persists one atomic todo mutation. */
+    /** Applies one conditional persisted mutation and emits its committed snapshot. */
     internal fun update(
         command: TodoUpdateCommand,
         terminalReason: TodoTerminalReason? = null,
         approval: TodoApproval? = null,
+        expected: Todo? = null,
     ): Boolean {
         if (command.description?.isBlank() == true) return false
         if (command.assignment is TodoAssignmentChange.Set && command.assignment.agentId.isBlank()) return false
-        val original = getById(command.id) ?: return false
+        val original = expected ?: getById(command.id) ?: return false
         val candidate = original.copy()
         command.description?.let { candidate.description = it }
         when (val assignment = command.assignment) {
@@ -192,23 +128,21 @@ class TodoManager(
             }
         }
         command.terminalDetail?.let { candidate.terminalDetail = it }
-        if (candidate == original) return true
-        val previousStatus = original.status
-        val effectiveTerminalReason =
+        if (candidate == original) return getById(original.id) == original
+        candidate.updatedAt = java.time.Instant.now()
+        if (!todoStore.updateTodoIfCurrent(original, candidate)) return false
+        val reason =
             terminalReason ?: when (candidate.status) {
                 TodoStatus.COMPLETED -> TodoTerminalReason.COMPLETED
                 TodoStatus.CANCELLED -> TodoTerminalReason.USER_CANCELLED
                 else -> null
             }
-        touch(candidate)
-        todoStore.saveTodo(candidate)
-        copyMutableFields(candidate, original)
-        publishChange(
+        publish(
             TodoChange(
                 TodoChangeType.UPDATED,
-                todo = original,
-                previousStatus = previousStatus,
-                terminalReason = effectiveTerminalReason,
+                candidate.copy(),
+                previousStatus = original.status,
+                terminalReason = reason,
                 terminalDetail = candidate.terminalDetail,
                 approval = approval,
             ),
@@ -216,234 +150,124 @@ class TodoManager(
         return true
     }
 
-    /**
-     * Updates a todo status and publishes the change for persistence and UI observers.
-     *
-     * @param todoId Identifier of the todo to update
-     * @param status New lifecycle status
-     * @return true if the todo exists and was updated
-     */
+    /** Updates the user-selected status with optimistic conflict detection. */
     fun updateStatus(
         todoId: String,
         status: TodoStatus,
-    ): Boolean = update(TodoUpdateCommand(id = todoId, status = status))
+    ): Boolean = update(TodoUpdateCommand(todoId, status = status))
 
-    /**
-     * Updates only the assigned agent identifier and publishes an update event.
-     *
-     * @param todoId Identifier of the todo to update
-     * @param agentId New sub-agent identifier, or null to clear the assignment
-     * @return true if the todo exists and was updated
-     */
+    /** Changes assignment while preserving all other current fields. */
     fun updateAssignedAgent(
         todoId: String,
         agentId: String?,
     ): Boolean =
         update(
-            TodoUpdateCommand(
-                id = todoId,
-                assignment = agentId?.let(TodoAssignmentChange::Set) ?: TodoAssignmentChange.Clear,
-            ),
+            TodoUpdateCommand(todoId, assignment = agentId?.let(TodoAssignmentChange::Set) ?: TodoAssignmentChange.Clear),
         )
 
-    /**
-     * Assigns a pending todo to an agent and moves it to in-progress.
-     *
-     * @param todoId Identifier of the pending todo
-     * @param agentId Sub-agent that should execute the todo
-     * @return true if the todo was pending and is now assigned
-     */
+    /** Claims pending work atomically in persistence. */
     fun assignToAgent(
         todoId: String,
         agentId: String,
-    ): Boolean {
-        val todo = getById(todoId) ?: return false
-        if (todo.status != TodoStatus.PENDING) return false
-        return update(
-            TodoUpdateCommand(
-                id = todoId,
-                assignment = TodoAssignmentChange.Set(agentId),
-                status = TodoStatus.IN_PROGRESS,
-            ),
-        )
-    }
+    ): Boolean = claimPendingTodo(todoId, agentId) != null
 
-    /**
-     * Atomically assigns a pending todo and marks it as in progress.
-     *
-     * @return The claimed todo, or `null` when another mutation won the claim race
-     */
+    /** Claims pending work and emits a detached snapshot. */
     internal fun claimPendingTodo(
         todoId: String,
         agentId: String,
     ): Todo? {
-        val original = getById(todoId) ?: return null
         val claimed = todoStore.claimPendingTodo(todoId, agentId) ?: return null
-        copyMutableFields(claimed, original)
-        publishChange(TodoChange(TodoChangeType.UPDATED, todo = original, previousStatus = TodoStatus.PENDING))
-        return original
+        publish(TodoChange(TodoChangeType.UPDATED, claimed.copy(), previousStatus = TodoStatus.PENDING))
+        return claimed.copy()
     }
 
-    /**
-     * Completes an in-progress todo and records the completion timestamp.
-     *
-     * @param todoId Identifier of the in-progress todo
-     * @param approval Main-model feedback to publish without another review, or null for manual completion
-     * @return true if the todo could be completed
-     */
+    /** Completes only the execution snapshot that was actually reviewed. */
     fun completeTodo(
         todoId: String,
         approval: TodoApproval? = null,
+        expected: Todo? = null,
     ): Boolean {
-        val todo = getById(todoId) ?: return false
+        val todo = expected ?: getById(todoId) ?: return false
         if (todo.status != TodoStatus.IN_PROGRESS) return false
-        return update(TodoUpdateCommand(id = todoId, status = TodoStatus.COMPLETED), TodoTerminalReason.COMPLETED, approval)
+        return update(TodoUpdateCommand(todoId, status = TodoStatus.COMPLETED), TodoTerminalReason.COMPLETED, approval, todo)
     }
 
-    /**
-     * Cancels an unfinished todo.
-     *
-     * @param todoId Identifier of the todo to cancel
-     * @return true if the todo existed and was not already terminal
-     */
+    /** Cancels unfinished work without overwriting a competing transition. */
     fun cancelTodo(
         todoId: String,
         reason: TodoTerminalReason = TodoTerminalReason.USER_CANCELLED,
         detail: String? = null,
+        expected: Todo? = null,
     ): Boolean {
-        val todo = getById(todoId) ?: return false
+        val todo = expected ?: getById(todoId) ?: return false
         if (todo.status == TodoStatus.COMPLETED || todo.status == TodoStatus.CANCELLED) return false
-        return update(TodoUpdateCommand(id = todoId, status = TodoStatus.CANCELLED, terminalDetail = detail), reason)
+        return update(TodoUpdateCommand(todoId, status = TodoStatus.CANCELLED, terminalDetail = detail), reason, expected = todo)
     }
 
-    /**
-     * Moves a todo to a new list position and shifts surrounding todos.
-     *
-     * @param todoId Identifier of the todo to move
-     * @param targetPosition Desired 0-based position within the ordered list
-     * @return true if the todo exists and was moved
-     */
+    /** Replaces an unchanged parent atomically; children are executable leaves. */
+    internal fun replaceWithChildren(
+        expected: Todo,
+        descriptions: List<String>,
+    ): Boolean {
+        val children =
+            descriptions.mapIndexed { index, description ->
+                Todo(
+                    UUID.randomUUID().toString(),
+                    description,
+                    position = nextPosition() + index,
+                    decompositionDepth = expected.decompositionDepth + 1,
+                )
+            }
+        if (!todoStore.replaceTodoWithChildren(expected, children)) return false
+        val parent = getById(expected.id) ?: return true
+        publish(
+            TodoChange(TodoChangeType.UPDATED, parent, previousStatus = expected.status, terminalReason = TodoTerminalReason.DECOMPOSED),
+        )
+        children.forEach { publish(TodoChange(TodoChangeType.ADDED, it.copy())) }
+        return true
+    }
+
+    /** Moves a todo to a bounded display position. */
     fun moveToPosition(
         todoId: String,
         targetPosition: Int,
     ): Boolean {
         val ordered = getAll().toMutableList()
-        val fromIndex = ordered.indexOfFirst { it.id == todoId }
-        if (fromIndex == -1) return false
-        val safeTarget = targetPosition.coerceIn(0, ordered.lastIndex)
-        if (fromIndex == safeTarget) return true
-        val moved = ordered.removeAt(fromIndex)
-        ordered.add(safeTarget, moved)
-        renumberPositions(ordered)
-        todoStore.updateTodoPositions(ordered)
-        publishChange(TodoChange(TodoChangeType.REORDERED, todo = moved))
-        return true
+        val from = ordered.indexOfFirst { it.id == todoId }
+        if (from < 0) return false
+        val target = targetPosition.coerceIn(0, ordered.lastIndex)
+        if (from == target) return true
+        ordered.add(target, ordered.removeAt(from))
+        return reorder(ordered.map { it.id })
     }
 
-    /**
-     * Reorders the full todo list to match the given ordered ids.
-     *
-     * @param orderedIds Todo identifiers in the desired order
-     * @return true if all ids were found and the list was reordered
-     */
+    /** Persists a complete ordering without changing lifecycle state. */
     fun reorder(orderedIds: List<String>): Boolean {
-        if (orderedIds.size != todos.size) return false
-        val ordered = orderedIds.map { id -> todos.find { it.id == id } ?: return false }.toMutableList()
-        renumberPositions(ordered)
+        val current = getAll().associateBy { it.id }
+        if (orderedIds.size != current.size || orderedIds.toSet() != current.keys) return false
+        val ordered = orderedIds.mapIndexed { index, id -> current.getValue(id).copy(position = index) }
         todoStore.updateTodoPositions(ordered)
-        publishChange(TodoChange(TodoChangeType.REORDERED))
+        publish(TodoChange(TodoChangeType.REORDERED))
         return true
     }
 
-    /**
-     * Removes one todo and publishes a remove event.
-     *
-     * @param todoId Identifier of the todo to delete
-     * @return true if a todo was removed
-     */
+    /** Archives and removes one todo before notifying active workers. */
     fun remove(todoId: String): Boolean {
-        val todo = todos.firstOrNull { it.id == todoId } ?: return false
-        val archivedTodo = todoStore.deleteTodoAndArchive(todo)
-        todos.removeIf { it.id == todoId }
-        publishChange(TodoChange(TodoChangeType.REMOVED, todo = archivedTodo, todoId = todoId))
+        val todo = getById(todoId) ?: return false
+        val archived = todoStore.deleteTodoAndArchive(todo)
+        publish(TodoChange(TodoChangeType.REMOVED, archived.copy(), todoId))
         return true
     }
 
-    /**
-     * Removes all todos and publishes one clear event.
-     */
+    /** Removes all persisted todos and invalidates every active worker. */
     fun clear() {
-        todos.clear()
         todoStore.clearTodos()
-        publishChange(TodoChange(TodoChangeType.CLEARED))
+        publish(TodoChange(TodoChangeType.CLEARED))
     }
 
-    /** Publishes one change event to the shared reactive todo bus. */
-    private fun publishChange(change: TodoChange) {
+    private fun nextPosition(): Int = (getAll().maxOfOrNull { it.position } ?: -1) + 1
+
+    internal fun publish(change: TodoChange) {
         eventBus.publish(change)
     }
-
-    private fun persistAndPublish(
-        todo: Todo,
-        type: TodoChangeType,
-    ) {
-        todos.add(todo)
-        todoStore.saveTodo(todo)
-        publishChange(TodoChange(type, todo = todo))
-    }
-
-    /**
-     * Assigns sequential positions starting at 0 to the given ordered list
-     * and applies them to the underlying todos.
-     */
-    private fun renumberPositions(ordered: MutableList<Todo>) {
-        ordered.forEachIndexed { index, todo ->
-            val existing = todos.find { it.id == todo.id }
-            existing?.position = index
-        }
-    }
-
-    /**
-     * Returns the next position value that appends a todo at the end of the list.
-     */
-    private fun nextPosition(): Int = if (todos.isEmpty()) 0 else todos.maxOf { it.position } + 1
-
-    /** Marks a todo mutation for activity-based conversation ordering. */
-    private fun touch(todo: Todo) {
-        todo.updatedAt = java.time.Instant.now()
-    }
-
-    private fun copyMutableFields(
-        source: Todo,
-        target: Todo,
-    ) {
-        target.description = source.description
-        target.status = source.status
-        target.position = source.position
-        target.assignedAgentId = source.assignedAgentId
-        target.updatedAt = source.updatedAt
-        target.timelineSequence = source.timelineSequence
-        target.completedAt = source.completedAt
-        target.terminalDetail = source.terminalDetail
-    }
-}
-
-/** In-memory no-op store used by the test-only [TodoManager] constructor. */
-internal class NoOpTodoStore : TodoStore {
-    override fun saveTodo(todo: Todo) {}
-
-    override fun claimPendingTodo(
-        todoId: String,
-        agentId: String,
-    ): Todo? = null
-
-    override fun createTodoIfAbsent(todo: Todo): de.heckenmann.visualagent.knowledge.TodoCreation =
-        de.heckenmann.visualagent.knowledge
-            .TodoCreation(todo, created = true)
-
-    override fun listTodos(): List<Todo> = emptyList()
-
-    override fun deleteTodo(todoId: String) {}
-
-    override fun clearTodos() {}
 }

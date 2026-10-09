@@ -2,6 +2,12 @@
 
 ## Goal
 
+Lifecycle corrections in issues #451 and #457 make persisted snapshots authoritative. Every edit or completion checks its expected execution state in the same serialized database transaction as the write. Failed or stale writes emit no success event; deleted rows cannot be recreated by worker updates. Returned todos and event payloads are detached snapshots.
+
+The worker retains the original claimed snapshot through execution and approval. An edit between claim and worker startup invalidates the old instruction. If a completion conflicts with an edit, the latest still-owned in-progress task returns to pending and is queued again, including individually started tasks. Deleted, cancelled, completed, or reassigned tasks are not restarted by that worker.
+
+Todo-panel mutations, agent lookup, and reordering run off the Compose UI dispatcher. One composition-owned queue serializes actions, coalesces duplicate pending clicks, and reports failures without dismissing an unsuccessful editor. No new dependency is required: existing coroutine dispatchers and mutexes implement this UI boundary, while Spring Data R2DBC implements the persistence guarantee.
+
 Let users create, update, complete, delete, and inspect task todos that are also available to the agent context.
 
 ## Primary Actor
@@ -78,3 +84,26 @@ Todos stay synchronized between UI, database, and agent context.
 - Sub-agents can read todo state and stored results, but only the main agent and orchestrator can change todo lifecycle state.
 - Autonomous terminal-status reviews always end with an explicit user instruction accepted by every configured provider.
 - Terminal todos are cleaned up after their history and result are no longer needed or have been incorporated into the final answer, unless they remain useful for follow-up, reporting, or a user-requested record.
+
+### Reactor-native server execution (#375)
+
+The coordinator consumes conflated Reactor pickup signals and owns each execution subscription.
+Workers, background-tool continuations, capacity permits, pause gates, decomposition, review,
+and retry timers compose `Mono`/`Flux` without a coroutine bridge. Cancellation disposes provider
+subscriptions and uses `Mono.usingWhen` for ownership-checked cleanup. Completion and recovery
+retain the original conditional H2 snapshot and use native reactive store transitions.
+
+The existing imperative candidate-selection/claim/deletion critical section and synchronous
+conversation/agent persistence callbacks form explicit blocking lifecycle boundaries on Reactor's
+standard bounded-elastic scheduler. They preserve the lifecycle-to-persistence lock order; provider
+calls and R2DBC conditional mutations are not blocked or converted to coroutine publishers.
+Compose action queues continue to use coroutines at the presentation boundary.
+
+`verifyAutonomousReactorContracts` rejects coroutine imports, suspend contracts, and blocking
+publisher waits in the autonomous execution chain and its worker/scheduler/gate implementations.
+
+Cleanup keeps the old execution token registered across its asynchronous snapshot read.
+It rechecks that token under the shared lifecycle lock immediately before releasing or
+persisting the agent. A newer claim taking ownership during the read makes the old cleanup
+inert. Conditional requeue still uses the captured database snapshot and cannot reset a
+newer execution.

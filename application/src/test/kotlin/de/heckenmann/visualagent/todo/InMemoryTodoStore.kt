@@ -7,11 +7,13 @@ import de.heckenmann.visualagent.knowledge.TodoStore
 internal class InMemoryTodoStore : TodoStore {
     private val todos = mutableListOf<Todo>()
 
+    @Synchronized
     override fun saveTodo(todo: Todo) {
         todos.removeIf { it.id == todo.id }
-        todos.add(todo)
+        todos.add(todo.copy())
     }
 
+    @Synchronized
     override fun claimPendingTodo(
         todoId: String,
         agentId: String,
@@ -23,6 +25,7 @@ internal class InMemoryTodoStore : TodoStore {
         return todo.copy()
     }
 
+    @Synchronized
     override fun createTodoIfAbsent(todo: Todo): TodoCreation {
         val normalized =
             todo.description
@@ -44,12 +47,15 @@ internal class InMemoryTodoStore : TodoStore {
         }
     }
 
-    override fun listTodos(): List<Todo> = todos.toList()
+    @Synchronized
+    override fun listTodos(): List<Todo> = todos.map { it.copy() }
 
+    @Synchronized
     override fun deleteTodo(todoId: String) {
         todos.removeIf { it.id == todoId }
     }
 
+    @Synchronized
     override fun clearTodos() {
         todos.clear()
     }
