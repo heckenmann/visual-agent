@@ -97,10 +97,8 @@ Provider tests cover streaming/non-streaming rounds and immutable call identitie
 
 JavaScript helper discovery and delegation exclude `tools_batch` and `javascript_execute`, including
 indirect `tool_help` calls. Scripts use `callMany` so each child consumes the script allowance.
-Regression tests cover helper delegation in both Graal sandbox modes.
-
-Manual Spring-bean smoke verification executes two real `system_time` children through the shared
-batch executor and denies indirect helper batch dispatch in both Graal sandbox modes.
+Rejected batch Promises settle their output reservation before guest callbacks run, allowing
+an explicit corrected retry within the remaining budget.
 
 Cancellation returns promptly but synchronous work that ignores interruption retains its global
 and request admission until its callable returns. The subscription and synchronous callable share
@@ -108,4 +106,9 @@ a small reference-counted lease; work cancelled before it starts cannot retain t
 Reactor `using` remains the subscription owner. Reactor's cancellation cleanup and reactor-pool
 release APIs do not track an independently running synchronous callable, so no additional library
 is introduced for this ownership bookkeeping (Reactor 3.8.7 API and reactor-pool researched).
-Regression tests cover cancellation and timeout of a non-cooperative callable followed by a second request.
+
+Regression tests cover helper delegation, catch-and-retry with a 65536-character result budget,
+and cancellation of a held non-cooperative callable followed by a second request.
+
+Manual Spring-bean smoke verification executes two real `system_time` children through the shared
+batch executor and denies indirect helper batch dispatch in both Graal sandbox modes.

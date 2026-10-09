@@ -143,6 +143,7 @@ internal class JavaScriptBatchBridge(
                                                 "Tool batch stopped at invalid arguments: ${invalid.error}".take(500),
                                             )
                                         lastFailure.set(failure)
+                                        resultCharacters -= (remainingResults - failure.message.orEmpty().length).coerceAtLeast(0)
                                         reject.execute(failure.message)
                                     } else if (token.isCancelled || expired) {
                                         val category =
@@ -153,6 +154,7 @@ internal class JavaScriptBatchBridge(
                                             }
                                         val failure = JavaScriptExecutionException(category, "Tool batch did not complete")
                                         lastFailure.set(failure)
+                                        resultCharacters -= (remainingResults - failure.message.orEmpty().length).coerceAtLeast(0)
                                         reject.execute(failure.message)
                                     } else {
                                         val actual =
@@ -178,6 +180,7 @@ internal class JavaScriptBatchBridge(
                                         }
                                     val failure = JavaScriptExecutionException(category, "Tool batch did not complete")
                                     lastFailure.set(failure)
+                                    resultCharacters -= (remainingResults - failure.message.orEmpty().length).coerceAtLeast(0)
                                     reject.execute(failure.message)
                                 }
                             },
