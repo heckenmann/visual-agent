@@ -34,6 +34,8 @@ class SpringActivityPort(
                     providerToolCallId = event.providerToolCallId,
                     parentAssistantTurnId = event.parentAssistantTurnId,
                     sequence = event.sequence,
+                    batchId = event.context["batchId"] as? String,
+                    batchSequence = event.context["batchSequence"] as? Int,
                 ),
             )
         }

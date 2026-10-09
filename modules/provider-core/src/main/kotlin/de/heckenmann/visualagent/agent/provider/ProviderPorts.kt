@@ -120,6 +120,15 @@ interface ProviderToolCallbacks {
         parentAssistantTurnId: String? = null,
     ): AutoCloseable = AutoCloseable {}
 
+    /** Executes an ordered native call group with immutable child correlation, when supported. */
+    fun executeToolCallRound(
+        toolCalls: List<de.heckenmann.visualagent.agent.ProviderToolCall>,
+        round: Int,
+        parentAssistantTurnId: String?,
+        enabledFunctionNames: Set<String>,
+        context: Map<String, Any>,
+    ): Mono<List<String>>? = null
+
     /** Persists visible assistant prose for a tool-calling turn before its tools execute. */
     fun recordAssistantToolTurn(
         turn: de.heckenmann.visualagent.agent.ProviderTurnResponse,

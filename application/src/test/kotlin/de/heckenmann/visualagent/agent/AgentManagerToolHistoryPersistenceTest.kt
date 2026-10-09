@@ -109,7 +109,7 @@ class AgentManagerToolHistoryPersistenceTest {
                 sequence = 2,
                 phase = ToolCallPhase.FINISHED,
                 inputJson = """{"action":"list"}""",
-                context = mapOf("sessionId" to "main"),
+                context = mapOf("sessionId" to "main", "batchId" to "batch-42", "batchSequence" to 2),
                 result =
                     de.heckenmann.visualagent.agent.tools.api
                         .ToolResult(toolId = "todos", success = true, content = "- [PENDING] A"),
@@ -123,7 +123,9 @@ class AgentManagerToolHistoryPersistenceTest {
         val historyRows = db.getConversationMessages("main", 50)
         val last = historyRows.last()
         assertEquals("tool", last.role)
-        assertTrue(last.content.startsWith("Tool todos"))
+        assertEquals("Tool todos · ok", last.content)
+        assertTrue(last.metadata.orEmpty().contains("\"batchId\":\"batch-42\""))
+        assertTrue(last.metadata.orEmpty().contains("\"batchSequence\":2"))
         assertTrue(last.metadata.orEmpty().contains("\"type\":\"tool_call\""))
         assertTrue(last.metadata.orEmpty().contains("\"providerToolCallId\":\"call-42\""))
         assertTrue(last.metadata.orEmpty().contains("\"requestId\":\"request-7\""))

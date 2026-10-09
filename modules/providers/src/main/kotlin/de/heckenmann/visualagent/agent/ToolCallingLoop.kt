@@ -2,15 +2,11 @@ package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
 import mu.KotlinLogging
-import org.springframework.ai.chat.messages.AssistantMessage
 import org.springframework.ai.chat.messages.Message
-import org.springframework.ai.chat.metadata.ChatGenerationMetadata
 import org.springframework.ai.chat.model.ChatModel
-import org.springframework.ai.chat.model.Generation
 import org.springframework.ai.chat.prompt.ChatOptions
 import org.springframework.ai.chat.prompt.Prompt
 import org.springframework.ai.model.tool.ToolCallingManager
-import org.springframework.ai.model.tool.ToolExecutionResult
 import org.springframework.ai.tool.ToolCallback
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
@@ -81,7 +77,17 @@ internal class ToolCallingLoop(
             val parentTurnId = callCorrelation?.recordAssistantToolTurn(turn, requestMetadata)
             val toolExecutionResult =
                 (callCorrelation?.bindToolCallRound(turn.toolCalls, round, parentTurnId) ?: AutoCloseable {}).use {
-                    toolCallingManager.executeToolCalls(boundedPrompt, response)
+                    executeCorrelatedTools(
+                        toolCallingManager,
+                        boundedPrompt,
+                        response,
+                        callCorrelation,
+                        turn,
+                        round,
+                        parentTurnId,
+                        toolCallbacks,
+                        requestMetadata + (token?.let { mapOf("cancellationToken" to it) } ?: emptyMap()),
+                    )
                 }
             if (toolExecutionResult.returnDirect()) return buildDirectResponse(response, toolExecutionResult)
             prompt = appendToolConversationHistory(boundedPrompt, toolExecutionResult)
@@ -211,7 +217,17 @@ internal class ToolCallingLoop(
         val parentTurnId = callCorrelation?.recordAssistantToolTurn(initialTurn, requestMetadata)
         val toolExecutionResult =
             (callCorrelation?.bindToolCallRound(initialTurn.toolCalls, 0, parentTurnId) ?: AutoCloseable {}).use {
-                toolCallingManager.executeToolCalls(initialPrompt, aggregated)
+                executeCorrelatedTools(
+                    toolCallingManager,
+                    initialPrompt,
+                    aggregated,
+                    callCorrelation,
+                    initialTurn,
+                    0,
+                    parentTurnId,
+                    toolCallbacks,
+                    requestMetadata + (token?.let { mapOf("cancellationToken" to it) } ?: emptyMap()),
+                )
             }
         val initialVisibleText =
             aggregated.result
@@ -249,7 +265,17 @@ internal class ToolCallingLoop(
             val nextParentTurnId = callCorrelation?.recordAssistantToolTurn(turn, requestMetadata)
             val nextToolResult =
                 (callCorrelation?.bindToolCallRound(turn.toolCalls, round, nextParentTurnId) ?: AutoCloseable {}).use {
-                    toolCallingManager.executeToolCalls(boundedPrompt, finalResponse)
+                    executeCorrelatedTools(
+                        toolCallingManager,
+                        boundedPrompt,
+                        finalResponse,
+                        callCorrelation,
+                        turn,
+                        round,
+                        nextParentTurnId,
+                        toolCallbacks,
+                        requestMetadata + (token?.let { mapOf("cancellationToken" to it) } ?: emptyMap()),
+                    )
                 }
             if (nextToolResult.returnDirect()) {
                 return StreamSectionBoundary.separateResponse(initialVisibleText, buildDirectResponse(finalResponse, nextToolResult))
@@ -273,69 +299,6 @@ internal class ToolCallingLoop(
         prompt: Prompt,
         toolCallbacks: List<ToolCallback> = emptyList(),
     ): Prompt = contextBudgeter.fitPrompt(request, prompt, toolCallbacks, outputLimitUpdater)
-
-    private fun buildDirectResponse(
-        originalResponse: SpringChatResponse,
-        toolExecutionResult: ToolExecutionResult,
-    ): ChatResponse {
-        val directGenerations = ToolExecutionResult.buildGenerations(toolExecutionResult)
-        val directContent = directGenerations.firstOrNull()?.let { it.output.text.orEmpty() }.orEmpty()
-        return ChatResponse(
-            model = originalResponse.metadata.model,
-            message = Message(role = "assistant", content = directContent),
-            done = true,
-        )
-    }
-
-    private fun aggregateStreamingResponse(chunks: List<SpringChatResponse>): SpringChatResponse? {
-        if (chunks.isEmpty()) return null
-        val lastChunk = chunks.last()
-        val content =
-            chunks.joinToString("") {
-                it.result
-                    ?.output
-                    ?.text
-                    ?.orEmpty() ?: ""
-            }
-        val toolCalls =
-            chunks.flatMap {
-                it.result
-                    ?.output
-                    ?.toolCalls
-                    .orEmpty()
-            }
-        val assistantMessage =
-            AssistantMessage
-                .builder()
-                .content(content)
-                .toolCalls(toolCalls)
-                .build()
-        val generation =
-            Generation(
-                assistantMessage,
-                ChatGenerationMetadata
-                    .builder()
-                    .finishReason(lastChunk.result?.metadata?.finishReason ?: if (lastChunk.result != null) "stop" else null)
-                    .build(),
-            )
-        return SpringChatResponse(listOf(generation))
-    }
-
-    private fun SpringChatResponse.toVisualAgentResponse(
-        requestId: String? = null,
-        round: Int? = null,
-        sequence: Int? = null,
-        normalizeContent: Boolean = true,
-    ): ChatResponse =
-        ProviderTurnResponseMapper.toChatResponse(
-            ProviderTurnResponseMapper.fromSpring(
-                this,
-                requestId = requestId,
-                round = round,
-                sequence = sequence,
-            ),
-            normalizeContent = normalizeContent,
-        )
 
     companion object {
         private const val DEFAULT_MAX_ROUNDS = 5

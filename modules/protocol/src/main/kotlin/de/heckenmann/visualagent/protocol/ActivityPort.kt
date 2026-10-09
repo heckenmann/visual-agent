@@ -21,6 +21,8 @@ data class ToolActivity(
     val providerToolCallId: String? = null,
     val parentAssistantTurnId: String? = null,
     val sequence: Int? = null,
+    val batchId: String? = null,
+    val batchSequence: Int? = null,
 )
 
 /** Tool execution phase. */

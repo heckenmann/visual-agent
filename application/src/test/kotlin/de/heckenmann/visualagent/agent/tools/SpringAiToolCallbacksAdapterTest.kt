@@ -32,6 +32,32 @@ class SpringAiToolCallbacksAdapterTest {
     }
 
     @Test
+    fun `batch callback requires an eligible enabled sibling and respects disabled policy`() {
+        val read =
+            object : VisualAgentTool {
+                override val definition = ToolDefinition(ToolId("read"), "read", "Read", "{}")
+
+                override fun execute(
+                    inputJson: String,
+                    context: Map<String, Any>,
+                ): ToolResult = ToolResult("read", true, "done")
+            }
+        val batch = ToolBatchTool { error("Discovery must not execute") }
+        val adapter = SpringAiToolCallbacksAdapter(ToolRegistry(listOf(read, batch), ToolEventBus()))
+        assertEquals(emptyList(), adapter.functionCallbacks(setOf(ProviderToolId("tools:batch"))))
+        assertEquals(listOf("read"), adapter.functionCallbacks(setOf(ProviderToolId("read"))).map { it.toolDefinition.name() })
+        assertEquals(
+            listOf(
+                "read",
+                "tools_batch",
+            ),
+            adapter.functionCallbacks(setOf(ProviderToolId("read"), ProviderToolId("tools:batch"))).map {
+                it.toolDefinition.name()
+            },
+        )
+    }
+
+    @Test
     fun `structured agent list callback executes the matching internal tool`() {
         var executions = 0
         val tool =
