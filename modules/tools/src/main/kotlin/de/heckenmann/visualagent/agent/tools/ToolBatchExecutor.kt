@@ -192,19 +192,23 @@ class ToolBatchExecutor(
                 .using(
                     {
                         admission.acquire(required)
-                        Unit
-                    },
-                    {
-                        Mono.using({
+                        try {
                             permits.acquire()
-                            Unit
-                        }, {
-                            registry
-                                .executeReactive(tool, item.arguments.toString(), context)
-                                .doOnSubscribe { startedChildren.set(index, 1) }
-                        }, { permits.release() })
+                        } catch (error: Throwable) {
+                            admission.release(required)
+                            throw error
+                        }
+                        ToolWorkLease {
+                            permits.release()
+                            admission.release(required)
+                        }
                     },
-                    { admission.release(required) },
+                    { lease ->
+                        registry
+                            .executeReactive(tool, item.arguments.toString(), context + ("toolWorkLease" to lease))
+                            .doOnSubscribe { startedChildren.set(index, 1) }
+                    },
+                    ToolWorkLease::close,
                 ).subscribeOn(Schedulers.boundedElastic())
                 .map { serialized ->
                     val result = Json.decodeFromString<ToolResultEnvelope>(serialized)

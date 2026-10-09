@@ -53,7 +53,7 @@ interface VisualAgentTool {
     fun executeReactive(
         inputJson: String,
         context: Map<String, Any> = emptyMap(),
-    ): Mono<ToolResult> = Mono.fromCallable { execute(inputJson, context) }
+    ): Mono<ToolResult> = Mono.fromCallable { trackedToolWork(context) { execute(inputJson, context) } }
 }
 
 /**

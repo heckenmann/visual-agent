@@ -175,9 +175,17 @@ internal class JavaScriptToolBridge(
         ) {
             throw failure(JavaScriptErrorCategory.LIMIT_EXCEEDED, "Concurrent JavaScript tool-call limit exceeded")
         }
+        val lease =
+            de.heckenmann.visualagent.agent.tools
+                .ToolWorkLease { permits.release(required) }
         return try {
             cancellationToken.throwIfCancelled()
-            val resultJson = registry.executeBlocking(tool, input.toString(), requestContext + mapOf("javascript" to true))
+            val resultJson =
+                registry.executeBlocking(
+                    tool,
+                    input.toString(),
+                    requestContext + mapOf("javascript" to true, "toolWorkLease" to lease),
+                )
             cancellationToken.throwIfCancelled()
             val result = Json.decodeFromString<ToolResultEnvelope>(resultJson)
             JavaScriptToolResults.envelope(result)
@@ -186,7 +194,7 @@ internal class JavaScriptToolBridge(
         } catch (error: Exception) {
             throw failure(JavaScriptErrorCategory.TOOL_FAILURE, "Tool '$name' failed: ${safeMessage(error)}")
         } finally {
-            permits.release(required)
+            lease.close()
         }
     }
 

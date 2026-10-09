@@ -17,8 +17,11 @@ internal class WorkspaceFileToolReactiveActions(
         val input = parseObject(inputJson)
         if (input.string("action") != "analyzeImage") return null
         return Mono
-            .fromCallable { workspaceFiles.requireFile(input.string("id"), input.string("path")) to input.requiredString("prompt") }
-            .flatMap { (record, prompt) -> mediaActions.analyzeImageReactive(record, prompt) }
+            .fromCallable {
+                trackedToolWork(context) {
+                    workspaceFiles.requireFile(input.string("id"), input.string("path")) to input.requiredString("prompt")
+                }
+            }.flatMap { (record, prompt) -> mediaActions.analyzeImageReactive(record, prompt) }
             .map { result -> success(TOOL_ID, result.toString()) }
             .onErrorResume { error -> Mono.just(failure(TOOL_ID, error.message ?: error::class.simpleName.orEmpty())) }
     }

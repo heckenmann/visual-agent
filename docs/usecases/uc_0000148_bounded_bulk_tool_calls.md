@@ -101,3 +101,11 @@ Regression tests cover helper delegation in both Graal sandbox modes.
 
 Manual Spring-bean smoke verification executes two real `system_time` children through the shared
 batch executor and denies indirect helper batch dispatch in both Graal sandbox modes.
+
+Cancellation returns promptly but synchronous work that ignores interruption retains its global
+and request admission until its callable returns. The subscription and synchronous callable share
+a small reference-counted lease; work cancelled before it starts cannot retain that lease.
+Reactor `using` remains the subscription owner. Reactor's cancellation cleanup and reactor-pool
+release APIs do not track an independently running synchronous callable, so no additional library
+is introduced for this ownership bookkeeping (Reactor 3.8.7 API and reactor-pool researched).
+Regression tests cover cancellation and timeout of a non-cooperative callable followed by a second request.
