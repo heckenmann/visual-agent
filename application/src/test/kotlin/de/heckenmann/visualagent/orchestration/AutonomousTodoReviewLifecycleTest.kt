@@ -63,12 +63,17 @@ class AutonomousTodoReviewLifecycleTest {
             fixture.putSubAgent(SubAgent("worker", "Worker", "Implementation"))
             val todo = fixture.todoManager.add("Write a short result", "worker")
             val changes = CopyOnWriteArrayList<TodoChange>()
-            val handle = fixture.todoEventBus.addListener(changes::add)
+            val cancelledChange = CompletableDeferred<TodoChange>()
+            val handle =
+                fixture.todoEventBus.addListener { change ->
+                    changes += change
+                    if (change.todo?.id == todo.id && change.todo.status == TodoStatus.CANCELLED) cancelledChange.complete(change)
+                }
             try {
                 fixture.coordinator.startTodo(todo.id)
-                fixture.awaitTodoStatus(todo.id, TodoStatus.CANCELLED)
+                val cancelled = cancelledChange.await()
                 assertFalse(changes.any { it.approval != null })
-                assertEquals(TodoTerminalReason.REVIEW_FAILED, changes.last().terminalReason)
+                assertEquals(TodoTerminalReason.REVIEW_FAILED, cancelled.terminalReason)
                 assertFalse(fixture.messages.any { it.content.contains("Main review rejected") })
                 assertEquals(2, fixture.providerRequests.count { it.metadata["sessionId"] == "review" })
                 assertEquals(1, fixture.providerRequests.count { it.metadata["sessionId"] != "review" })
