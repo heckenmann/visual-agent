@@ -20,6 +20,7 @@ dependencies {
     api(project(":tool-standard"))
     implementation(libs.kotlin.stdlib)
     implementation(libs.serialization.json)
+    implementation(libs.reactor.core)
     implementation(libs.graal.polyglot)
     implementation(libs.graal.js)
     val platformIsolate =
@@ -37,7 +38,7 @@ dependencies {
     platformIsolate?.let { classifier ->
         runtimeOnly("org.graalvm.polyglot:js-isolate-$classifier:${libs.versions.graaljs.get()}")
     }
-    compileOnly(platform(libs.spring.boot.bom))
+    implementation(platform(libs.spring.boot.bom))
     compileOnly(libs.spring.context)
 
     testImplementation(libs.kotlin.test)

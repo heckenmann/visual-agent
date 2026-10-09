@@ -9,7 +9,9 @@ import java.io.ByteArrayOutputStream
 import java.util.concurrent.atomic.AtomicReference
 
 /** Creates Graal contexts with the strictest sandbox supported by the runtime. */
-internal class JavaScriptContextFactory {
+internal class JavaScriptContextFactory(
+    private val preferIsolate: Boolean = true,
+) {
     private val untrustedSandboxSupported = AtomicReference<Boolean?>(null)
 
     /** Create a context and expose only the request-scoped bridge objects. */
@@ -17,7 +19,7 @@ internal class JavaScriptContextFactory {
         bridge: JavaScriptToolBridge,
         limits: JavaScriptExecutionLimits,
     ): Context {
-        if (untrustedSandboxSupported.get() != false) {
+        if (preferIsolate && untrustedSandboxSupported.get() != false) {
             runCatching { newUntrustedContext(bridge, limits) }
                 .onSuccess {
                     untrustedSandboxSupported.set(true)
@@ -76,6 +78,7 @@ internal class JavaScriptContextFactory {
         context: Context,
         bridge: JavaScriptToolBridge,
     ) {
+        bridge.installPromiseFactory(context)
         context.getBindings("js").putMember("tools", bridge.toolsObject())
         context.getBindings("js").putMember("workspace", bridge.workspaceObject())
         context.getBindings("js").putMember("console", bridge.consoleObject())
