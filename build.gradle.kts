@@ -400,7 +400,28 @@ tasks.register("verifyModuleDependencies") {
     }
 }
 
+tasks.register("verifyAutonomousReactorContracts") {
+    group = "verification"
+    description = "Keeps autonomous server execution Reactor-native."
+    doLast {
+        val base = file("application/src/main/kotlin/de/heckenmann/visualagent")
+        val sources = fileTree(base.resolve("orchestration")).matching { include("**/*.kt") }.files +
+            listOf("SubAgent.kt", "TodoToolCompletion.kt", "SubAgentJobScheduler.kt", "SubAgentExecutionControl.kt")
+                .map { base.resolve("agent/$it") }
+        val forbidden = Regex("kotlinx\\.coroutines|\\bsuspend\\s+fun\\b|\\.block(?:Required)?\\s*\\(|\\brunBlocking\\b")
+        val violations = sources.flatMap { source ->
+            source.readLines().mapIndexedNotNull { index, line ->
+                if (forbidden.containsMatchIn(line)) "$source:${index + 1}: $line" else null
+            }
+        }
+        check(violations.isEmpty()) {
+            "Autonomous server execution must retain Reactor contracts:\n" + violations.joinToString("\n")
+        }
+    }
+}
+
 tasks.register("verifyReactorBoundaries") {
+    dependsOn("verifyAutonomousReactorContracts")
     group = "verification"
     description = "Prevents Project Reactor from leaking into UI-facing modules."
     dependsOn(

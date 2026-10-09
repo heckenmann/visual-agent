@@ -512,3 +512,11 @@ to use toolkit APIs. Gradle test JVMs run headless with display environment
 variables removed; Compose test rules render offscreen. Native desktop launch
 tasks use non-headless mode for screen discovery. Linux packaged desktop smoke
 tests retain a virtual display because they exercise real operating-system windows.
+
+Autonomous todo execution is Reactor-native end to end through worker calls, tool continuation,
+review, capacity admission, pause gates, decomposition and retry timers (issue #375).
+`verifyAutonomousReactorContracts` checks these implementation contracts in addition to the
+existing client dependency checks. Imperative lifecycle lock sections and synchronous agent/
+conversation callbacks remain isolated on bounded-elastic; native R2DBC conditional transitions
+and provider streams remain composed without blocking. Coroutine adaptation belongs to the
+existing transport-facing facades and test harness, not the autonomous pipeline.
