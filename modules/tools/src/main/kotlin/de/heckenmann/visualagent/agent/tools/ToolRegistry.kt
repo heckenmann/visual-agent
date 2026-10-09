@@ -88,21 +88,24 @@ class ToolRegistry(
         return Mono.defer {
             val startedAt = Instant.now()
             val options =
-                runCatching { runtimeOptions(inputObject, defaultTimeoutSeconds()) }
-                    .getOrElse { error ->
-                        return@defer Mono.just(
-                            completeImmediately(
-                                definition,
-                                functionInput,
-                                context + mapOf("toolTimeoutSeconds" to defaultTimeoutSeconds()),
-                                startedAt,
-                                failure(
-                                    definition.id.value,
-                                    "TOOL_ARGUMENTS: ${error.message ?: "Invalid tool runtime arguments."}",
-                                ),
-                            ),
-                        )
+                runCatching {
+                    runtimeOptions(inputObject, defaultTimeoutSeconds()).also { options ->
+                        require(!options.async || tool.allowsDetachedExecution) { "This tool must be awaited." }
                     }
+                }.getOrElse { error ->
+                    return@defer Mono.just(
+                        completeImmediately(
+                            definition,
+                            functionInput,
+                            context + mapOf("toolTimeoutSeconds" to defaultTimeoutSeconds()),
+                            startedAt,
+                            failure(
+                                definition.id.value,
+                                "TOOL_ARGUMENTS: ${error.message ?: "Invalid tool runtime arguments."}",
+                            ),
+                        ),
+                    )
+                }
             val deadlineNanos = deadlineNanos(context, options.timeoutSeconds)
             if (remainingNanos(deadlineNanos) <= 0L) {
                 return@defer Mono.just(

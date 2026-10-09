@@ -31,6 +31,8 @@ data class ToolDefinition(
     val name: String,
     val description: String,
     val inputSchema: String,
+    /** Conservative scheduling policy for independent bulk calls. */
+    val batchSafety: ToolBatchSafety = ToolBatchSafety.SEQUENTIAL_ONLY,
 )
 
 /**
@@ -177,4 +179,11 @@ class ToolEventBus {
     private companion object {
         const val EVENT_BUFFER_CAPACITY = 256
     }
+}
+
+/** Explicit scheduling policy; unknown tools never run concurrently. */
+enum class ToolBatchSafety {
+    SEQUENTIAL_ONLY,
+    READ_ONLY_PARALLEL,
+    EXCLUSIVE,
 }
