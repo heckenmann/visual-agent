@@ -48,7 +48,8 @@ child starts. Tools may reduce their timeout; they cannot extend the inherited o
   queued siblings are skipped and already completed results are retained. JavaScript rejects the
   Promise with `TOOL_ARGUMENTS` without waiting for the remaining calls.
 - Cancellation disposes queued and in-flight subscriptions; no new child is launched afterward.
-- An inherited deadline includes queue/admission time and bounds every child.
+- An inherited deadline includes queue/admission time and bounds every child. Cancellation after
+  that deadline retains the canonical `TIMEOUT` code even if it wins the timer fallback race.
 - Result capacity is reserved across concurrent JavaScript batches. Content is bounded per item
   and as a batch, including JSON escaping and identity metadata; omitted content is not proof of
   complete artifact inspection. Every JavaScript child consumes the existing call allowance.
