@@ -27,7 +27,9 @@ class JavaScriptExecuteTool(
             name = "javascript_execute",
             description =
                 "Execute a sandboxed JavaScript program for complex deterministic logic or large " +
-                    "CSV/Markdown generation. Use await tools.callMany([{id,name,arguments}]) for independent ordered calls. " +
+                    "CSV/Markdown generation. Prefer bundling independent enabled tool calls whenever possible with " +
+                    "await tools.callMany([{id,name,arguments}]); results retain declaration order. " +
+                    "Use sequential tools.call invocations when a call depends on an earlier result. " +
                     "Batches are non-atomic; the server selects safe concurrency. " +
                     "Use tools.call(name, arguments) for enabled Visual Agent " +
                     "tools, or workspace.write({path, content}), workspace.read({path}), and workspace.delete({path}) " +

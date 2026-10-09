@@ -19,7 +19,9 @@ child starts. Tools may reduce their timeout; they cannot extend the inherited o
 
 ## Main Flow
 
-1. A model requests multiple native function calls, selects `tools_batch`, or a script calls
+1. The `tools_batch` and `javascript_execute` descriptions instruct the model to prefer bundling
+   independent enabled calls whenever possible, while keeping calls with result dependencies sequential.
+   A model requests multiple native function calls, selects `tools_batch`, or a script calls
    `await tools.callMany([{id: "time", name: "system_time", arguments: {}}])`.
 2. The native provider adapter resolves names against the actual request callbacks. Explicit
    batch inputs accept canonical tool IDs or registered function names; JavaScript uses the same

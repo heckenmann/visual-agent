@@ -20,7 +20,11 @@ class ToolBatchTool(
         ToolDefinition(
             ToolId("tools:batch"),
             "tools_batch",
-            "Run independent enabled tools using their canonical function names in tool, with ordered per-item outcomes. Non-atomic: successful mutations are not rolled back. Use sequential calls for dependencies. The server selects safe concurrency.",
+            "Prefer bundling independent enabled tool calls into one native tool-call group or this batch whenever possible. " +
+                "Avoid separate model rounds for calls that do not depend on each other's results. " +
+                "Use canonical function names in tool; results retain declaration order. " +
+                "Keep dependent calls sequential. Do not include JavaScript execution, help dispatch or another batch. " +
+                "Batches are non-atomic: successful mutations are not rolled back. The server selects safe concurrency.",
             """{"type":"object","properties":{"calls":{"type":"array","minItems":1,"maxItems":32,"items":{"type":"object","properties":{"id":{"type":"string"},"tool":{"type":"string"},"arguments":{"type":"object"}},"required":["id","tool","arguments"],"additionalProperties":false}}},"required":["calls"],"additionalProperties":false}""",
         )
 
