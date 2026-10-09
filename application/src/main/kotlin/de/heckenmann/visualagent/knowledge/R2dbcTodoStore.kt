@@ -119,7 +119,12 @@ internal class R2dbcTodoStore(
     override fun updateTodoIfCurrent(
         expected: Todo,
         updated: Todo,
-    ): Boolean =
+    ): Boolean = updateTodoIfCurrentReactive(expected, updated).blockRequired()
+
+    override fun updateTodoIfCurrentReactive(
+        expected: Todo,
+        updated: Todo,
+    ): Mono<Boolean> =
         writeTransaction(
             selectTodo(expected.id)
                 .singleOrEmpty()
@@ -131,12 +136,17 @@ internal class R2dbcTodoStore(
                         mergeTodo(updated).thenReturn(true)
                     }
                 }.defaultIfEmpty(false),
-        ).blockRequired()
+        )
 
     override fun replaceTodoWithChildren(
         expected: Todo,
         children: List<Todo>,
-    ): Boolean =
+    ): Boolean = replaceTodoWithChildrenReactive(expected, children).blockRequired()
+
+    override fun replaceTodoWithChildrenReactive(
+        expected: Todo,
+        children: List<Todo>,
+    ): Mono<Boolean> =
         writeTransaction(
             selectTodo(expected.id)
                 .singleOrEmpty()
@@ -152,7 +162,7 @@ internal class R2dbcTodoStore(
                             }
                         }.then(Mono.just(true))
                 }.defaultIfEmpty(false),
-        ).blockRequired()
+        )
 
     private fun <T : Any> writeTransaction(work: Mono<T>): Mono<T> =
         transactionOperator.transactional(

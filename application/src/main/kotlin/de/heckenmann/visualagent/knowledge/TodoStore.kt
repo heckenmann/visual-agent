@@ -31,6 +31,18 @@ interface TodoStore {
             true
         }
 
+    /** Applies a conditional execution transition without blocking the caller. */
+    fun updateTodoIfCurrentReactive(
+        expected: Todo,
+        updated: Todo,
+    ): Mono<Boolean> = Mono.fromCallable { updateTodoIfCurrent(expected, updated) }
+
+    /** Replaces a pending parent and creates its children within one reactive transaction. */
+    fun replaceTodoWithChildrenReactive(
+        expected: Todo,
+        children: List<Todo>,
+    ): Mono<Boolean> = Mono.fromCallable { replaceTodoWithChildren(expected, children) }
+
     /** Inserts or replaces a todo. */
     fun saveTodo(todo: Todo)
 
