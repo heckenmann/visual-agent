@@ -92,3 +92,12 @@ Provider tests cover streaming/non-streaming rounds and immutable call identitie
 ## Related
 
 - Issue #289; UC-0000020; UC-0000104.
+
+## Review Regression Guarantees
+
+JavaScript helper discovery and delegation exclude `tools_batch` and `javascript_execute`, including
+indirect `tool_help` calls. Scripts use `callMany` so each child consumes the script allowance.
+Regression tests cover helper delegation in both Graal sandbox modes.
+
+Manual Spring-bean smoke verification executes two real `system_time` children through the shared
+batch executor and denies indirect helper batch dispatch in both Graal sandbox modes.
