@@ -7,6 +7,7 @@ import de.heckenmann.visualagent.agent.ChatResponse
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ToolId
+import de.heckenmann.visualagent.agent.chat
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.provider.ModelStatus
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter

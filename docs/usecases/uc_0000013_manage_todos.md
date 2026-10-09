@@ -84,3 +84,20 @@ Todos stay synchronized between UI, database, and agent context.
 - Sub-agents can read todo state and stored results, but only the main agent and orchestrator can change todo lifecycle state.
 - Autonomous terminal-status reviews always end with an explicit user instruction accepted by every configured provider.
 - Terminal todos are cleaned up after their history and result are no longer needed or have been incorporated into the final answer, unless they remain useful for follow-up, reporting, or a user-requested record.
+
+### Reactor-native server execution (#375)
+
+The coordinator consumes conflated Reactor pickup signals and owns each execution subscription.
+Workers, background-tool continuations, capacity permits, pause gates, decomposition, review,
+and retry timers compose `Mono`/`Flux` without a coroutine bridge. Cancellation disposes provider
+subscriptions and uses `Mono.usingWhen` for ownership-checked cleanup. Completion and recovery
+retain the original conditional H2 snapshot and use native reactive store transitions.
+
+The existing imperative candidate-selection/claim/deletion critical section and synchronous
+conversation/agent persistence callbacks form explicit blocking lifecycle boundaries on Reactor's
+standard bounded-elastic scheduler. They preserve the lifecycle-to-persistence lock order; provider
+calls and R2DBC conditional mutations are not blocked or converted to coroutine publishers.
+Compose action queues continue to use coroutines at the presentation boundary.
+
+`verifyAutonomousReactorContracts` rejects coroutine imports, suspend contracts, and blocking
+publisher waits in the autonomous execution chain and its worker/scheduler/gate implementations.

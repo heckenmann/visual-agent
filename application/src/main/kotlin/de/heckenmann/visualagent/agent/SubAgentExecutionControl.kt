@@ -1,13 +1,12 @@
 package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.knowledge.PreferenceStore
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
 import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import reactor.core.publisher.Sinks
+import reactor.core.scheduler.Schedulers
 
 /** Execution state of the autonomous sub-agent workers. */
 enum class SubAgentExecutionState {
@@ -59,7 +58,7 @@ class SubAgentExecutionControl(
     private val lock = Any()
     private val emissionLock = Any()
     private val stateSink = Sinks.many().multicast().directBestEffort<SubAgentExecutionSnapshot>()
-    private var stateChanged = CompletableDeferred<Unit>()
+    private var stateChanged = Sinks.one<Unit>()
     private var globalPaused: Boolean = loadGlobalPaused()
     private val pausedAgentIds: MutableSet<String> = loadPausedAgentIds().toMutableSet()
 
@@ -89,38 +88,27 @@ class SubAgentExecutionControl(
             !globalPaused && (agentId == null || agentId !in pausedAgentIds)
         }
 
-    /**
-     * Suspends until both the global and optional individual gate allow execution.
-     *
-     * @param agentId Worker identity, or null for a temporary/global-only job
-     */
-    suspend fun awaitExecutionAllowed(agentId: String? = null) {
-        while (true) {
+    /** Completes at the next boundary where both execution gates allow the worker. */
+    fun executionAllowed(agentId: String? = null): Mono<Void> =
+        Mono.defer {
             val signal =
                 synchronized(lock) {
-                    if (!globalPaused && (agentId == null || agentId !in pausedAgentIds)) return
-                    stateChanged
+                    if (!globalPaused && (agentId == null || agentId !in pausedAgentIds)) null else stateChanged
                 }
-            signal.await()
+            signal?.asMono()?.then(Mono.defer { executionAllowed(agentId) }) ?: Mono.empty()
         }
-    }
 
     /** Pauses all sub-agent execution without changing individual pause flags. */
     fun pauseAll(): SubAgentExecutionSnapshot = mutate { globalPaused = true }
 
-    /**
-     * Pauses all sub-agent execution on the I/O dispatcher.
-     *
-     * This variant is intended for UI callers because the mutation persists two
-     * preferences and notifies listeners synchronously.
-     */
-    suspend fun pauseAllAsync(): SubAgentExecutionSnapshot = withContext(Dispatchers.IO) { pauseAll() }
+    /** Persists a global pause through the explicit blocking preference adapter. */
+    fun pauseAllReactive(): Mono<SubAgentExecutionSnapshot> = persistReactive { pauseAll() }
 
     /** Resumes the global gate while preserving individual pause flags. */
     fun resumeAll(): SubAgentExecutionSnapshot = mutate { globalPaused = false }
 
     /** Resumes global sub-agent execution on the I/O dispatcher. */
-    suspend fun resumeAllAsync(): SubAgentExecutionSnapshot = withContext(Dispatchers.IO) { resumeAll() }
+    fun resumeAllReactive(): Mono<SubAgentExecutionSnapshot> = persistReactive { resumeAll() }
 
     /** Pauses one sub-agent execution gate. */
     fun pauseAgent(agentId: String): SubAgentExecutionSnapshot =
@@ -130,10 +118,7 @@ class SubAgentExecutionControl(
         }
 
     /** Pauses one sub-agent execution gate on the I/O dispatcher. */
-    suspend fun pauseAgentAsync(agentId: String): SubAgentExecutionSnapshot =
-        withContext(Dispatchers.IO) {
-            pauseAgent(agentId)
-        }
+    fun pauseAgentReactive(agentId: String): Mono<SubAgentExecutionSnapshot> = persistReactive { pauseAgent(agentId) }
 
     /** Resumes one sub-agent execution gate. */
     fun resumeAgent(agentId: String): SubAgentExecutionSnapshot =
@@ -143,10 +128,10 @@ class SubAgentExecutionControl(
         }
 
     /** Resumes one sub-agent execution gate on the I/O dispatcher. */
-    suspend fun resumeAgentAsync(agentId: String): SubAgentExecutionSnapshot =
-        withContext(Dispatchers.IO) {
-            resumeAgent(agentId)
-        }
+    fun resumeAgentReactive(agentId: String): Mono<SubAgentExecutionSnapshot> = persistReactive { resumeAgent(agentId) }
+
+    private fun persistReactive(change: () -> SubAgentExecutionSnapshot): Mono<SubAgentExecutionSnapshot> =
+        Mono.fromCallable(change).subscribeOn(Schedulers.boundedElastic())
 
     /** Removes an agent's persisted pause state after the agent is deleted. */
     fun removeAgent(agentId: String): SubAgentExecutionSnapshot =
@@ -189,7 +174,7 @@ class SubAgentExecutionControl(
     }
 
     private fun mutate(change: () -> Unit): SubAgentExecutionSnapshot {
-        val next =
+        val (next, previousSignal) =
             synchronized(lock) {
                 val previousGlobalPaused = globalPaused
                 val previousPausedAgentIds = pausedAgentIds.toSet()
@@ -204,10 +189,10 @@ class SubAgentExecutionControl(
                     throw error
                 }
                 val previousSignal = stateChanged
-                stateChanged = CompletableDeferred()
-                previousSignal.complete(Unit)
-                currentSnapshot()
+                stateChanged = Sinks.one()
+                currentSnapshot() to previousSignal
             }
+        previousSignal.tryEmitValue(Unit)
         synchronized(emissionLock) {
             val result = stateSink.tryEmitNext(next)
             if (result != Sinks.EmitResult.OK) logger.warn { "Unable to emit sub-agent execution state: $result" }

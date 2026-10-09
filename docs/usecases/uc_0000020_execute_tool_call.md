@@ -53,7 +53,7 @@ Tool behavior is centralized and auditable. Each tool call is shown beneath the 
 
 ## Implementation Decision
 
-Issues #449 and #456 reuse the existing Reactor completion sinks and coroutine Reactor bridge rather than introducing another task library. The registry registers work before scheduling it, and the per-attempt scope records one terminal result per invocation. Existing cancellation tokens remain the parent cancellation mechanism.
+Issues #449, #456 and #375 use Reactor completion sinks and native Mono composition through worker continuation and review; no coroutine bridge or additional task library is introduced. The registry registers work before scheduling it, and the per-attempt scope records one terminal result per invocation. Existing cancellation tokens remain the parent cancellation mechanism.
 
 - Only request-enabled tools are callable.
 - Tool events are persisted and rendered.

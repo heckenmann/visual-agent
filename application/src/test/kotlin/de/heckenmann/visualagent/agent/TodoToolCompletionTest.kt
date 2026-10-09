@@ -5,8 +5,10 @@ import de.heckenmann.visualagent.agent.tools.success
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import reactor.core.publisher.Mono
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -27,8 +29,8 @@ class TodoToolCompletionTest {
                 async {
                     finishTodoToolWork(scope, null) { prompt ->
                         prompts += prompt
-                        ChatResponse("test", Message("assistant", if (prompt == null) "Scheduled" else "Finished"), true)
-                    }
+                        Mono.just(ChatResponse("test", Message("assistant", if (prompt == null) "Scheduled" else "Finished"), true))
+                    }.awaitSingle()
                 }
             runCurrent()
             first.finish(success("first", "First actual result"))
@@ -49,7 +51,10 @@ class TodoToolCompletionTest {
             val token = CancellationToken()
             val work =
                 async {
-                    finishTodoToolWork(scope, token) { ChatResponse("test", Message("assistant", "Scheduled"), true) }
+                    finishTodoToolWork(
+                        scope,
+                        token,
+                    ) { Mono.just(ChatResponse("test", Message("assistant", "Scheduled"), true)) }.awaitSingle()
                 }
             runCurrent()
             token.cancel()

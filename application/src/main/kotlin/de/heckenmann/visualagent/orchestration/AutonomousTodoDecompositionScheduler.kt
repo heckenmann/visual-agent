@@ -9,28 +9,26 @@ import de.heckenmann.visualagent.knowledge.TodoStore
 import de.heckenmann.visualagent.todo.TodoChange
 import de.heckenmann.visualagent.todo.TodoChangeType
 import de.heckenmann.visualagent.todo.TodoStatus
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 import mu.KotlinLogging
+import reactor.core.Disposable
+import reactor.core.Disposables
+import reactor.core.publisher.Mono
+import reactor.core.scheduler.Schedulers
+import java.util.concurrent.CancellationException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
 /** Schedules complex-todo decomposition without bypassing worker capacity limits. */
 internal class AutonomousTodoDecompositionScheduler(
-    private val scope: CoroutineScope,
     private val todoStore: TodoStore,
     private val taskPlanner: AutonomousTaskPlanner,
     private val jobScheduler: SubAgentJobScheduler,
     private val subAgentOps: SubAgentOpsProvider,
     private val executionControl: SubAgentExecutionControl?,
     private val signalWork: () -> Unit,
-) {
+) : AutoCloseable {
     private val logger = KotlinLogging.logger {}
-    private val activeJobs = ConcurrentHashMap<String, Job>()
+    private val activeJobs = ConcurrentHashMap<String, Disposable>()
     private val decomposingTodoIds = ConcurrentHashMap.newKeySet<String>()
     private val attemptedTodoIds = ConcurrentHashMap.newKeySet<String>()
     private val decompositionActive = AtomicBoolean(false)
@@ -42,7 +40,7 @@ internal class AutonomousTodoDecompositionScheduler(
 
     fun cancel(todoId: String) {
         jobScheduler.cancelQueuedRequest("decomposition:$todoId")
-        activeJobs[todoId]?.cancel()
+        activeJobs[todoId]?.dispose()
     }
 
     fun onTodoChanged(change: TodoChange) {
@@ -98,25 +96,45 @@ internal class AutonomousTodoDecompositionScheduler(
         }
         decomposingTodoIds += todo.id
         attemptedTodoIds += todo.id
-        val job =
-            scope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
-                try {
-                    jobScheduler.run(analyst.id, "decomposition:${todo.id}") { taskPlanner.expandComplexTodo(todo, analyst) }
-                } catch (error: Throwable) {
-                    if (error !is CancellationException) {
-                        logger.warn(error) { "Could not decompose todo ${todo.id}; leaving it available for execution" }
-                    }
-                }
-            }
-        job.invokeOnCompletion {
-            activeJobs.remove(todo.id, job)
-            decomposingTodoIds.remove(todo.id)
-            decompositionActive.set(false)
-            releaseAnalyst(analyst, todo.id)
-            signalWork()
-        }
+        val job = Disposables.swap()
         activeJobs[todo.id] = job
-        job.start()
+
+        fun cleanup(): Mono<Void> =
+            Mono
+                .fromRunnable<Void> {
+                    activeJobs.remove(todo.id, job)
+                    decomposingTodoIds.remove(todo.id)
+                    releaseAnalyst(analyst, todo.id)
+                    decompositionActive.set(false)
+                    signalWork()
+                }.subscribeOn(Schedulers.boundedElastic())
+        val pipeline =
+            Mono.usingWhen(
+                Mono.just(todo),
+                {
+                    jobScheduler
+                        .runReactive(analyst.id, "decomposition:${todo.id}") {
+                            taskPlanner.expandComplexTodo(todo, analyst)
+                        }.subscribeOn(Schedulers.boundedElastic())
+                },
+                { cleanup() },
+                { _, _ -> cleanup() },
+                { cleanup() },
+            )
+        job.update(
+            pipeline.subscribe({}, { error ->
+                if (error !is CancellationException) {
+                    logger.warn(
+                        error,
+                    ) { "Could not decompose todo ${todo.id}; leaving it available for execution" }
+                }
+            }),
+        )
+    }
+
+    /** Cancels every registered decomposition and releases its analyst reservation. */
+    override fun close() {
+        activeJobs.values.forEach(Disposable::dispose)
     }
 
     private fun reserveAnalyst(

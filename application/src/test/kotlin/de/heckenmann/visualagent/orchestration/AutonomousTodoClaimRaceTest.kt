@@ -7,6 +7,7 @@ import de.heckenmann.visualagent.todo.TodoStatus
 import de.heckenmann.visualagent.todo.TodoUpdateCommand
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import reactor.core.publisher.Mono
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -52,6 +53,11 @@ class AutonomousTodoClaimRaceTest {
                 lateinit var fixture: CoordinatorFixture
                 val store =
                     object : TodoStore by backing {
+                        override fun updateTodoIfCurrentReactive(
+                            expected: Todo,
+                            updated: Todo,
+                        ): Mono<Boolean> = Mono.fromCallable { updateTodoIfCurrent(expected, updated) }
+
                         override fun updateTodoIfCurrent(
                             expected: Todo,
                             updated: Todo,

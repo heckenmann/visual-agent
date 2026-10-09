@@ -1,18 +1,19 @@
 package de.heckenmann.visualagent.orchestration
 
-import kotlinx.coroutines.channels.Channel
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Sinks
 
 /** Conflates state changes that may make autonomous work executable. */
 internal class AutonomousWorkSignal {
-    private val signals = Channel<Unit>(Channel.CONFLATED)
+    private val signals = Sinks.many().replay().latest<Long>()
+    private var sequence = 0L
 
-    /** Requests a non-blocking pickup pass. */
+    /** Serializes emissions and retains the latest signal until pickup subscribes. */
+    @Synchronized
     fun signal() {
-        signals.trySend(Unit)
+        signals.tryEmitNext(++sequence)
     }
 
-    /** Waits until at least one pickup pass was requested. */
-    suspend fun await() {
-        signals.receive()
-    }
+    /** Supplies pickup requests with one pending value under backpressure. */
+    fun events(): Flux<Long> = signals.asFlux().onBackpressureLatest()
 }

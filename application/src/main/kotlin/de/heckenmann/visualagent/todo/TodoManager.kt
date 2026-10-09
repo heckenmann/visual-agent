@@ -34,7 +34,7 @@ data class TodoChange(
 
 /** Owns todo mutations; persisted snapshots are authoritative and events follow successful commits. */
 class TodoManager(
-    private val todoStore: TodoStore,
+    internal val todoStore: TodoStore,
     private val eventBus: TodoEventBus,
 ) {
     /** Test-only constructor backed by an isolated transient store. */
@@ -267,7 +267,7 @@ class TodoManager(
 
     private fun nextPosition(): Int = (getAll().maxOfOrNull { it.position } ?: -1) + 1
 
-    private fun publish(change: TodoChange) {
+    internal fun publish(change: TodoChange) {
         eventBus.publish(change)
     }
 }

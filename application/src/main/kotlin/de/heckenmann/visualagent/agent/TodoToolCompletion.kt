@@ -1,34 +1,54 @@
 package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.tools.ToolExecutionScope
-import kotlinx.coroutines.reactor.awaitSingleOrNull
+import reactor.core.publisher.Mono
 
-/** Returns background results to the worker before review, with a bounded number of continuations. */
-internal suspend fun finishTodoToolWork(
+/** Returns background results before review, with a bounded number of continuations. */
+internal fun finishTodoToolWork(
     tools: ToolExecutionScope,
     token: CancellationToken?,
-    respond: suspend (String?) -> ChatResponse,
-): ChatResponse {
-    val cancellation = token?.onCancelled(tools::close)
-    try {
-        var followUp: String? = null
-        var delivered = 0
-        repeat(8) {
-            token?.throwIfCancelled()
-            val response = respond(followUp)
-            check(response.done) { "Worker returned no terminal response" }
-            tools.awaitCompletion().awaitSingleOrNull()
-            token?.throwIfCancelled()
-            val completed = tools.asynchronousCount()
-            if (completed == delivered) return response
-            delivered = completed
-            followUp = "The background tools for this attempt have finished. Evaluate their actual results, " +
-                "complete any remaining work, and provide the final task result. Do not repeat successful side effects.\n\n" +
-                tools.evidence()
+    respond: (String?) -> Mono<ChatResponse>,
+): Mono<ChatResponse> =
+    Mono.defer {
+        val cancellation = token?.onCancelled(tools::close)
+
+        /** Composes the next bounded worker continuation after tool completion. */
+        fun continueWork(
+            followUp: String?,
+            delivered: Int,
+            attempt: Int,
+        ): Mono<ChatResponse> =
+            Mono.defer {
+                token?.throwIfCancelled()
+                if (attempt >=
+                    8
+                ) {
+                    return@defer Mono.error(IllegalStateException("Background tool continuation limit reached; task was not completed."))
+                }
+                respond(followUp).flatMap { response ->
+                    check(response.done) { "Worker returned no terminal response" }
+                    tools.awaitCompletion().then(
+                        Mono.defer {
+                            token?.throwIfCancelled()
+                            val completed = tools.asynchronousCount()
+                            if (completed == delivered) {
+                                Mono.just(response)
+                            } else {
+                                continueWork(
+                                    "The background tools for this attempt have finished. Evaluate their actual results, " +
+                                        "complete any remaining work, and provide the final task result. " +
+                                        "Do not repeat successful side effects.\n\n" +
+                                        tools.evidence(),
+                                    completed,
+                                    attempt + 1,
+                                )
+                            }
+                        },
+                    )
+                }
+            }
+        continueWork(null, 0, 0).doFinally {
+            cancellation?.close()
+            tools.close()
         }
-        error("Background tool continuation limit reached; task was not completed.")
-    } finally {
-        cancellation?.close()
-        tools.close()
     }
-}

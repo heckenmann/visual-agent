@@ -9,7 +9,7 @@ import de.heckenmann.visualagent.knowledge.TodoStore
 import de.heckenmann.visualagent.todo.TodoManager
 import de.heckenmann.visualagent.todo.TodoStatus
 import de.heckenmann.visualagent.todo.TodoTerminalReason
-import kotlinx.coroutines.Job
+import reactor.core.Disposable
 
 /** Applies individual and bulk todo cancellation to the todo, worker, decomposition, and queue. */
 internal class AutonomousTodoControl(
@@ -17,7 +17,7 @@ internal class AutonomousTodoControl(
     private val todoManager: TodoManager,
     private val todoStore: TodoStore,
     private val activeCancellationTokens: Map<String, CancellationToken>,
-    private val activeTodoJobs: Map<String, Job>,
+    private val activeTodoJobs: Map<String, Disposable>,
     private val jobScheduler: SubAgentJobScheduler,
     private val decompositionScheduler: AutonomousTodoDecompositionScheduler,
     private val subAgents: () -> Map<String, SubAgent>,
@@ -69,7 +69,7 @@ internal class AutonomousTodoControl(
 
     private fun cancelExecution(todoId: String) {
         activeCancellationTokens[todoId]?.cancel()
-        activeTodoJobs[todoId]?.cancel()
+        activeTodoJobs[todoId]?.dispose()
         jobScheduler.cancelQueuedRequest("todo:$todoId")
         decompositionScheduler.cancel(todoId)
     }

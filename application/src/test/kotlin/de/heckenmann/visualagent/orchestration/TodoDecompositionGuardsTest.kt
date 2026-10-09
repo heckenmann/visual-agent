@@ -11,6 +11,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import reactor.core.publisher.Mono
@@ -32,7 +33,7 @@ class TodoDecompositionGuardsTest {
             manager.replaceWithChildren(parent, listOf(description))
             val leaf = manager.getPending().single()
             val planner = planner(manager, Mono.error(IllegalStateException("Leaf must not call the analyst")))
-            assertFalse(planner.expandComplexTodo(leaf))
+            assertFalse(planner.expandComplexTodo(leaf).awaitSingle())
             assertEquals(1, leaf.decompositionDepth)
             assertEquals(listOf(leaf), manager.getPending())
         }
@@ -43,7 +44,7 @@ class TodoDecompositionGuardsTest {
             val manager = TodoManager()
             val parent = manager.add(description)
             val response = Mono.just(response("- Design   the architecture and integrate the complete pipeline"))
-            assertFalse(planner(manager, response).expandComplexTodo(parent))
+            assertFalse(planner(manager, response).expandComplexTodo(parent).awaitSingle())
             assertEquals(listOf(parent), manager.getAll())
         }
 
@@ -59,7 +60,7 @@ class TodoDecompositionGuardsTest {
                 val parent = manager.add(description)
                 val gate = Sinks.one<ChatResponse>()
                 val planner = planner(manager, gate.asMono())
-                val work = async { planner.expandComplexTodo(parent) }
+                val work = async { planner.expandComplexTodo(parent).awaitSingle() }
                 runCurrent()
                 mutation(manager, parent.id)
                 val expected = manager.getAll()

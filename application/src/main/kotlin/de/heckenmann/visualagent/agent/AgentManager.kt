@@ -102,7 +102,7 @@ class AgentManager
         internal lateinit var responseCoordinator: AgentResponseCoordinator
         internal var todoManager: TodoManager = TodoManager(todoStore, todoEventBus)
         internal val welcomeMessageComposer = WelcomeMessageComposer(llmProvider, appConfig, providerCatalog)
-        internal val subAgentJobScheduler = SubAgentJobScheduler(scope, parallelismProvider, subAgentExecutionControl)
+        internal val subAgentJobScheduler = SubAgentJobScheduler(parallelismProvider, subAgentExecutionControl)
         internal val conversationOpsProvider = ConversationOpsProvider(toolEventBus)
         internal val subAgentOpsProvider = SubAgentOpsProvider()
         internal val subAgents: Map<String, SubAgent> get() = subAgentOpsProvider.allSubAgents
@@ -138,7 +138,6 @@ class AgentManager
                 AgentResponseCoordinator(llmProvider, conversationOpsProvider)
             autonomousCoordinator =
                 AutonomousCoordinator(
-                    scope = scope,
                     todoManager = todoManager,
                     llmProvider = llmProvider,
                     todoStore = todoStore,

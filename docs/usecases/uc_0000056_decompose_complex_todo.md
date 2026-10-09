@@ -47,4 +47,4 @@ Large tasks become smaller units that can be assigned to workers.
 
 ## Implementation Decision
 
-Issues #453 and #454 reuse Spring Data R2DBC transactions and the existing coroutine scheduler. The database serializes todo mutations through a guard row; no new dependency or in-memory lifecycle cache is introduced. Decomposition generation is persisted so restart cannot reset the recursion bound.
+Issues #453, #454 and #375 use native Spring Data R2DBC transactions and the shared Reactor scheduler. The database serializes todo mutations through a guard row; no new dependency or in-memory lifecycle cache is introduced. Decomposition generation is persisted so restart cannot reset the recursion bound.

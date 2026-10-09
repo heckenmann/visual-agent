@@ -9,6 +9,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.test.runTest
 import reactor.core.publisher.Mono
 import kotlin.test.Test
@@ -25,7 +26,10 @@ class WorkerReviewEvaluationTest {
             val provider = mockk<LLMProvider>()
             val token = CancellationToken()
             every { provider.chatReactive(any<ChatRequestContext>()) } returns Mono.just(response(valid))
-            assertEquals(WorkerReviewVerdict.APPROVED, evaluateWorkerResult(provider, "todo", "Task", "Result", token).verdict)
+            assertEquals(
+                WorkerReviewVerdict.APPROVED,
+                evaluateWorkerResult(provider, "todo", "Task", "Result", token).awaitSingle().verdict,
+            )
             verify(exactly = 1) {
                 provider.chatReactive(
                     match<ChatRequestContext> {
@@ -40,7 +44,14 @@ class WorkerReviewEvaluationTest {
         runTest {
             val provider = mockk<LLMProvider>()
             every { provider.chatReactive(any<ChatRequestContext>()) } returns Mono.just(response(valid))
-            evaluateWorkerResult(provider, "todo", "Write file", "Done", null, "Tool: write; outcome: FAILURE; permission denied")
+            evaluateWorkerResult(
+                provider,
+                "todo",
+                "Write file",
+                "Done",
+                null,
+                "Tool: write; outcome: FAILURE; permission denied",
+            ).awaitSingle()
             verify(exactly = 1) {
                 provider.chatReactive(
                     match<ChatRequestContext> { request ->
@@ -58,7 +69,7 @@ class WorkerReviewEvaluationTest {
         runTest {
             val provider = mockk<LLMProvider>()
             every { provider.chatReactive(any<ChatRequestContext>()) } returns Mono.just(response(valid).copy(done = false))
-            assertFailsWith<WorkerReviewFailedException> { evaluateWorkerResult(provider, "todo", "Task", "Result", null) }
+            assertFailsWith<WorkerReviewFailedException> { evaluateWorkerResult(provider, "todo", "Task", "Result", null).awaitSingle() }
             verify(exactly = 1) { provider.chatReactive(any<ChatRequestContext>()) }
         }
 
@@ -72,7 +83,7 @@ class WorkerReviewEvaluationTest {
                     token.cancel()
                     response("invalid")
                 }
-            assertFailsWith<CancellationException> { evaluateWorkerResult(provider, "todo", "Task", "Result", token) }
+            assertFailsWith<CancellationException> { evaluateWorkerResult(provider, "todo", "Task", "Result", token).awaitSingle() }
             verify(exactly = 1) { provider.chatReactive(any<ChatRequestContext>()) }
         }
 

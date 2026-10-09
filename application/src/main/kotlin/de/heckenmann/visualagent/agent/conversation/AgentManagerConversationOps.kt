@@ -12,8 +12,10 @@ import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.error.ErrorMessageMapper
 import de.heckenmann.visualagent.protocol.ConversationCompletionEvent
 import de.heckenmann.visualagent.protocol.ConversationStreamUpdate
+import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import reactor.core.publisher.Mono
 
 /** Handles conversation orchestration and delegates persistence and streaming details. */
 internal class AgentManagerConversationOps(
@@ -54,32 +56,50 @@ internal class AgentManagerConversationOps(
     ): String {
         val agent = owner.subAgentOpsProvider.getSubAgent(agentId) ?: return "Error: Agent not found"
         return agent
-            .chat(
+            .chatReactive(
                 listOf(Message("user", content)),
                 owner.llmProvider,
                 owner.agentToolConfigService.toolsFor(agent),
                 requestId = requestId,
-            ).message.content
+            ).awaitSingle()
+            .message.content
     }
 
     /** Executes one scheduled sub-agent job. */
+    fun runAgentJobReactive(
+        agentId: String,
+        content: String,
+        requestId: String? = null,
+    ): Mono<AgentJobResult> =
+        Mono.defer {
+            val agent = owner.subAgentOpsProvider.getSubAgent(agentId) ?: throw IllegalArgumentException("Agent not found: $agentId")
+            owner.executeSubAgentJob(agent, content, requestId)
+        }
+
+    /** Creates a sub-agent from a template and executes its first job. */
+    fun startAgentJobReactive(
+        name: String,
+        role: String,
+        templateName: String,
+        content: String,
+        requestId: String? = null,
+    ): Mono<AgentJobResult> = Mono.defer { owner.executeSubAgentJob(owner.createAgent(name, role, templateName), content, requestId) }
+
+    /** Adapts native job execution for the existing transport-facing facade. */
     suspend fun runAgentJob(
         agentId: String,
         content: String,
         requestId: String? = null,
-    ): AgentJobResult {
-        val agent = owner.subAgentOpsProvider.getSubAgent(agentId) ?: throw IllegalArgumentException("Agent not found: $agentId")
-        return owner.executeSubAgentJob(agent, content, requestId)
-    }
+    ): AgentJobResult = runAgentJobReactive(agentId, content, requestId).awaitSingle()
 
-    /** Creates a sub-agent from a template and executes its first job. */
+    /** Adapts native job creation for the existing transport-facing facade. */
     suspend fun startAgentJob(
         name: String,
         role: String,
         templateName: String,
         content: String,
         requestId: String? = null,
-    ): AgentJobResult = owner.executeSubAgentJob(owner.createAgent(name, role, templateName), content, requestId)
+    ): AgentJobResult = startAgentJobReactive(name, role, templateName, content, requestId).awaitSingle()
 
     /** Persists a sub-agent completion notification and reports it to the agent status observer. */
     fun notifyMainAgentOfJobCompletion(

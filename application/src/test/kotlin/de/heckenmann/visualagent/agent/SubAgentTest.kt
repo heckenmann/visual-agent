@@ -1,6 +1,5 @@
 package de.heckenmann.visualagent.agent
 
-import de.heckenmann.visualagent.knowledge.MemoryStore
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -25,7 +24,7 @@ class SubAgentTest {
                     ChatResponse("test", Message("assistant", "new "), false),
                     ChatResponse("test", Message("assistant", "text"), true),
                 )
-            val memoryStore = mockk<MemoryStore>(relaxed = true)
+            val memoryStore = reactiveMemoryStore()
             val chunks = mutableListOf<String>()
 
             val result =
@@ -50,7 +49,7 @@ class SubAgentTest {
                     ChatResponse("test", Message("assistant", "First."), false),
                     ChatResponse("test", Message("assistant", "Second."), true),
                 )
-            val memoryStore = mockk<MemoryStore>(relaxed = true)
+            val memoryStore = reactiveMemoryStore()
             val chunks = mutableListOf<String>()
 
             val result =
@@ -75,7 +74,7 @@ class SubAgentTest {
                     ChatResponse("test", Message("assistant", "archive."), false),
                     ChatResponse("test", Message("assistant", "iso"), true),
                 )
-            val memoryStore = mockk<MemoryStore>(relaxed = true)
+            val memoryStore = reactiveMemoryStore()
 
             val result =
                 SubAgent("agent-1", "Coder", "Implementation").performTodo(
@@ -97,7 +96,7 @@ class SubAgentTest {
                 Flux.error(UnsupportedOperationException("stream unsupported"))
             every { provider.chatReactive(any<ChatRequestContext>()) } returns
                 Mono.just(ChatResponse("test", Message("assistant", "complete response"), true))
-            val memoryStore = mockk<MemoryStore>(relaxed = true)
+            val memoryStore = reactiveMemoryStore()
             val chunks = mutableListOf<String>()
 
             val result =
@@ -121,7 +120,7 @@ class SubAgentTest {
                 Flux.just(ChatResponse("test", Message("assistant", "partial"), false))
             every { provider.chatReactive(any<ChatRequestContext>()) } returns
                 Mono.just(ChatResponse("test", Message("assistant", "complete response"), true))
-            val memoryStore = mockk<MemoryStore>(relaxed = true)
+            val memoryStore = reactiveMemoryStore()
             val chunks = mutableListOf<String>()
 
             val result =
@@ -150,7 +149,7 @@ class SubAgentTest {
                         done = true,
                     ),
                 )
-            val memoryStore = mockk<MemoryStore>(relaxed = true)
+            val memoryStore = reactiveMemoryStore()
 
             SubAgent("agent-1", "Coder", "Implementation").performTodo(
                 todoId = "todo-1",
@@ -180,7 +179,7 @@ class SubAgentTest {
                         done = true,
                     ),
                 )
-            val memoryStore = mockk<MemoryStore>(relaxed = true)
+            val memoryStore = reactiveMemoryStore()
             every { memoryStore.saveStructuredKnowledge(any(), any(), any()) } throws IllegalStateException("database unavailable")
 
             val error =

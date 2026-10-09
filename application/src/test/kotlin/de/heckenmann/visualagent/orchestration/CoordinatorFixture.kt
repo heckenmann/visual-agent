@@ -120,6 +120,7 @@ internal fun buildFixture(
     reviewResponses: List<String> = listOf(reviewContent),
     reviewFailure: Exception? = null,
     todoStore: de.heckenmann.visualagent.knowledge.TodoStore = FakeTodoStore(),
+    providerSignalsOn: reactor.core.scheduler.Scheduler? = null,
 ): CoordinatorFixture {
     val todoEventBus = TodoEventBus()
     val todoChanges = Channel<TodoChange>(Channel.UNLIMITED)
@@ -182,7 +183,7 @@ internal fun buildFixture(
                     ),
                 done = true,
             )
-        }
+        }.transform { source -> providerSignalsOn?.let { source.publishOn(it) } ?: source }
     }
     every { provider.streamReactive(any<ChatRequestContext>()) } answers {
         val ctx = it.invocation.args[0] as ChatRequestContext
@@ -205,7 +206,7 @@ internal fun buildFixture(
                 ),
             )
             if (!isReview) workerCompletions.trySend(Unit)
-        }
+        }.transform { source -> providerSignalsOn?.let { source.publishOn(it) } ?: source }
     }
     val notifications = CopyOnWriteArrayList<String>()
     val savedAgents = CopyOnWriteArrayList<SubAgent>()
@@ -216,7 +217,7 @@ internal fun buildFixture(
         object : ParallelismProvider() {
             override fun get(): Int = parallelism
         }
-    val scheduler = SubAgentJobScheduler(scope, parallelismProvider, executionControl)
+    val scheduler = SubAgentJobScheduler(parallelismProvider, executionControl)
     val conversationOps =
         ConversationOpsProvider(mockk<ToolEventBus>(relaxed = true)).apply {
             setBeginConversationRequest {
@@ -243,7 +244,6 @@ internal fun buildFixture(
     val subAgents = subAgentOps.allSubAgents
     val coordinator =
         AutonomousCoordinator(
-            scope = scope,
             todoManager = todoManager,
             llmProvider = provider,
             todoStore = todoStore,
@@ -255,7 +255,10 @@ internal fun buildFixture(
             conversationOps = conversationOps,
             subAgentOps = subAgentOps,
             executionControl = executionControl,
-            retryDelay = {},
+            retryDelay = {
+                reactor.core.publisher.Mono
+                    .empty()
+            },
         )
     return CoordinatorFixture(
         coordinator,

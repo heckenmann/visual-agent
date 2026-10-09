@@ -39,12 +39,12 @@ Main components:
     `orchestration/AutonomousCoordinator`.
 - `agent/SubAgent`: execution unit with role, config, mutable
   `status`, `currentTask`, `currentTodoId`, and per-agent
-  `chatHistory`. Exposes `chat(messages, provider, enabledTools)` and
-  `performTodo(...)` for the autonomous loop.
+  `chatHistory`. Exposes `chatReactive(messages, provider, enabledTools)` and
+  `performTodoReactive(...)` for the autonomous loop.
 - `agent/SubAgentJobScheduler`: FIFO concurrency gate keyed off
-  `AppConfig.maxParallelSubAgents`. `enqueue { block, onFinished }`
+  `AppConfig.maxParallelSubAgents`. `enqueueReactive { block, onFinished }`
   returns a job id immediately and fires the callback when the
-  coroutine completes.
+  Reactor operation reaches a terminal signal.
 - `ui/compose/SubAgentsPanel`: UI controls, status rendering, and
   detail editor for provider/model/parameter/option/runtime/tool
   overrides.
