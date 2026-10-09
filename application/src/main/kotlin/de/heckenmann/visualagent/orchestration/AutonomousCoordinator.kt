@@ -17,6 +17,7 @@ import de.heckenmann.visualagent.todo.TodoChange
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoManager
 import de.heckenmann.visualagent.todo.TodoStatus
+import de.heckenmann.visualagent.todo.TodoUpdateCommand
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -250,7 +251,7 @@ class AutonomousCoordinator
                 .forEach { requestedTodoId ->
                     val claimed = claimAndProcessOneTodo(requestedTodoId)
                     val current = todoStore.listTodos().firstOrNull { it.id == requestedTodoId }
-                    if (claimed || current?.status != TodoStatus.PENDING) {
+                    if (!claimed && current?.status != TodoStatus.PENDING) {
                         requestedTodoIds.remove(requestedTodoId)
                         requestedTodoIdSet.remove(requestedTodoId)
                     }
@@ -278,6 +279,8 @@ class AutonomousCoordinator
             val agent = candidate.agent
             val requestId = conversationOps.beginConversationRequest()
             val todo = todoManager.claimPendingTodo(candidate.todo.id, agent.id) ?: return false
+            requestedTodoIds.remove(todo.id)
+            requestedTodoIdSet.remove(todo.id)
             try {
                 agent.status = AgentStatus.BUSY
                 agent.currentTodoId = todo.id
@@ -291,19 +294,16 @@ class AutonomousCoordinator
                 val processingJob =
                     scope.launch(start = CoroutineStart.LAZY) {
                         if (todoManager.getById(todo.id)?.status != TodoStatus.IN_PROGRESS) {
-                            activeCancellationTokens.remove(todo.id, token)
-                            releaseAutonomousTodoAgent(
-                                agent = agent,
-                                todoId = todo.id,
-                                agentBusySince = agentBusySince,
-                                subAgentOps = subAgentOps,
-                            )
+                            if (activeCancellationTokens.remove(todo.id, token)) {
+                                releaseAutonomousTodoAgent(agent, todo.id, agentBusySince, subAgentOps)
+                            }
                             return@launch
                         }
                         processTodoWithLLM(
                             agent = agent,
                             todoId = todo.id,
                             taskDescription = taskPlanner.buildWorkerInstruction(todo),
+                            claimedTodo = todo,
                             llmProvider = llmProvider,
                             memoryStore = memoryStore,
                             agentToolConfigService = agentToolConfigService,
@@ -322,12 +322,16 @@ class AutonomousCoordinator
                             conversationRequestId = requestId,
                             retryDelay = retryDelay,
                             toolScopes = toolScopes,
+                            onRetryPending = { startTodo(it) },
                         )
                     }
                 activeTodoJobs[todo.id] = processingJob
                 processingJob.invokeOnCompletion {
                     activeTodoJobs.remove(todo.id, processingJob)
-                    if (scope.isActive && todoManager.getById(todo.id)?.status != TodoStatus.IN_PROGRESS) {
+                    if (activeCancellationTokens.remove(todo.id, token) &&
+                        scope.isActive &&
+                        todoManager.getById(todo.id)?.status != TodoStatus.IN_PROGRESS
+                    ) {
                         releaseAutonomousTodoAgent(
                             agent = agent,
                             todoId = todo.id,
@@ -340,12 +344,8 @@ class AutonomousCoordinator
                 processingJob.start()
                 return true
             } catch (error: Throwable) {
-                agentBusySince.remove(agent.id)
-                agent.status = AgentStatus.IDLE
-                agent.currentTodoId = null
-                agent.currentTask = null
-                subAgentOps.saveSubAgent(agent)
-                todoManager.updateStatus(todo.id, TodoStatus.PENDING)
+                releaseAutonomousTodoAgent(agent, todo.id, agentBusySince, subAgentOps)
+                if (todoManager.update(TodoUpdateCommand(todo.id, status = TodoStatus.PENDING), expected = todo)) startTodo(todo.id)
                 throw error
             }
         }

@@ -11,6 +11,7 @@ import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolExecutionScope
 import de.heckenmann.visualagent.error.ErrorMessageMapper
 import de.heckenmann.visualagent.knowledge.MemoryStore
+import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoApproval
 import de.heckenmann.visualagent.todo.TodoChange
 import de.heckenmann.visualagent.todo.TodoEventBus
@@ -36,6 +37,7 @@ internal suspend fun processTodoWithLLM(
     agent: SubAgent,
     todoId: String,
     taskDescription: String,
+    claimedTodo: Todo,
     llmProvider: LLMProvider,
     memoryStore: MemoryStore,
     agentToolConfigService: AgentToolConfigService,
@@ -54,14 +56,13 @@ internal suspend fun processTodoWithLLM(
     conversationRequestId: String? = null,
     retryDelay: suspend (Long) -> Unit,
     toolScopes: () -> ToolExecutionScope = ::ToolExecutionScope,
+    onRetryPending: (String) -> Unit = {},
 ) {
     val logger = KotlinLogging.logger {}
     val token = cancellationToken ?: CancellationToken()
     token.throwIfCancelled()
-    val claimedTodo = todoManager.getById(todoId) ?: return
-    if (claimedTodo.status != TodoStatus.IN_PROGRESS || claimedTodo.assignedAgentId != agent.id) return
     val requestId = conversationRequestId ?: conversationOps.beginConversationRequest()
-    activeCancellationTokens[todoId] = token
+    if (activeCancellationTokens[todoId] !== token) return
     val processingJob = currentCoroutineContext()[Job]
     var executionId = ""
     val cancellationRegistration = token.onCancelled { processingJob?.cancel() }
@@ -72,7 +73,10 @@ internal suspend fun processTodoWithLLM(
     var cancelledByChange = false
     try {
         token.throwIfCancelled()
-        if (todoManager.getById(todoId)?.copy(position = claimedTodo.position) != claimedTodo) return
+        if (todoManager.getById(todoId)?.copy(position = claimedTodo.position) != claimedTodo) {
+            cancelledByChange = true
+            return
+        }
         executionControl?.awaitExecutionAllowed(agent.id)
         while (attempt < maxRetries) {
             val toolScope = toolScopes()
@@ -152,22 +156,11 @@ internal suspend fun processTodoWithLLM(
                 if (review.approved) {
                     token.throwIfCancelled()
                     watcher.close()
-                    if (!todoManager.completeTodo(todoId, TodoApproval(review.feedback, requestId), claimedTodo)) return
-                    runCatching {
-                        persistSubAgentMessage(
-                            agent = agent,
-                            content =
-                                "Agent ${agent.name} (${agent.id}) completed todo $todoId.\n\n" +
-                                    "Result:\n${result.take(2000)}\n\nUse `todos` with `get-result` to read the full stored result.",
-                            success = true,
-                            persistMessage = { conversationOps.persist(it.copy(conversationRequestId = requestId)) },
-                            attempt = attempt + 1,
-                            executionId = executionId,
-                            todoId = todoId,
-                        )
-                    }.onFailure {
-                        logger.error(it) { "Could not persist completion notification for todo $todoId" }
+                    if (!todoManager.completeTodo(todoId, TodoApproval(review.feedback, requestId), claimedTodo)) {
+                        cancelledByChange = true
+                        return
                     }
+                    persistTodoCompletion(agent, todoId, result, requestId, attempt + 1, executionId, conversationOps::persist)
                     return
                 }
                 retryFeedback = review.feedback
@@ -282,8 +275,8 @@ internal suspend fun processTodoWithLLM(
         )
         watcher.close()
         cancellationRegistration.close()
-        activeCancellationTokens.remove(todoId, token)
-        if (cancelledByChange && scope.isActive && subAgentOps.getSubAgent(agent.id) === agent) {
+        val ownsExecution = activeCancellationTokens.remove(todoId, token)
+        if (ownsExecution && cancelledByChange && scope.isActive && subAgentOps.getSubAgent(agent.id) === agent) {
             handleTodoChangeAfterCancellation(
                 agent = agent,
                 todoId = todoId,
@@ -296,10 +289,12 @@ internal suspend fun processTodoWithLLM(
                 },
                 onDescriptionChanged = { changedAgent, todo ->
                     releaseAutonomousTodoAgent(changedAgent, todo.id, agentBusySince, subAgentOps)
-                    todoManager.update(TodoUpdateCommand(todo.id, status = TodoStatus.PENDING), expected = todo)
+                    if (todoManager.update(TodoUpdateCommand(todo.id, status = TodoStatus.PENDING), expected = todo)) {
+                        onRetryPending(todo.id)
+                    }
                 },
             )
-        } else if (scope.isActive) {
+        } else if (ownsExecution && scope.isActive) {
             releaseAutonomousTodoAgent(agent, todoId, agentBusySince, subAgentOps)
         }
     }

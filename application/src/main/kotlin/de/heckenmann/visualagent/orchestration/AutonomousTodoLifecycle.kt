@@ -11,6 +11,34 @@ import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoStatus
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import mu.KotlinLogging
+
+/** Reports committed completion without turning a notification failure into a worker retry. */
+internal fun persistTodoCompletion(
+    agent: SubAgent,
+    todoId: String,
+    result: String,
+    requestId: String,
+    attempt: Int,
+    executionId: String,
+    persistMessage: (Message) -> Message,
+) {
+    runCatching {
+        persistSubAgentMessage(
+            agent = agent,
+            content =
+                "Agent ${agent.name} (${agent.id}) completed todo $todoId.\n\n" +
+                    "Result:\n${result.take(2000)}\n\nUse `todos` with `get-result` to read the full stored result.",
+            success = true,
+            persistMessage = { persistMessage(it.copy(conversationRequestId = requestId)) },
+            attempt = attempt,
+            executionId = executionId,
+            todoId = todoId,
+        )
+    }.onFailure {
+        KotlinLogging.logger {}.error(it) { "Could not persist completion notification for todo $todoId" }
+    }
+}
 
 /** Persists the initial todo notification with the identity shared by its worker. */
 internal fun persistTodoStart(
@@ -131,7 +159,7 @@ internal fun handleTodoChangeAfterCancellation(
     releaseAgent: (SubAgent, String) -> Unit,
     onDescriptionChanged: (SubAgent, Todo) -> Unit,
 ) {
-    val change = pendingTodoChanges.remove(todoId)
+    pendingTodoChanges.remove(todoId)
     when {
         currentTodo == null || currentTodo.status == TodoStatus.CANCELLED || currentTodo.assignedAgentId != agent.id -> {
             val metadata =
@@ -156,18 +184,19 @@ internal fun handleTodoChangeAfterCancellation(
             }
         }
         currentTodo.status == TodoStatus.IN_PROGRESS &&
-            change?.todo != null &&
-            change.todo.description != agent.currentTask &&
             agent.currentTodoId == todoId -> {
             agent.currentTask = currentTodo.description
             saveAgentToDb(agent)
-            persistMessage(
-                Message(
-                    role = "system",
-                    content = "Todo $todoId was updated; agent ${agent.id} will continue with the new description.",
-                ),
-            )
-            onDescriptionChanged(agent, currentTodo)
+            try {
+                persistMessage(
+                    Message(
+                        role = "system",
+                        content = "Todo $todoId was updated; agent ${agent.id} will continue with the new description.",
+                    ),
+                )
+            } finally {
+                onDescriptionChanged(agent, currentTodo)
+            }
         }
         else -> {
             releaseAgent(agent, todoId)

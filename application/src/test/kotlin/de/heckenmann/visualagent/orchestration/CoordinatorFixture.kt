@@ -119,8 +119,8 @@ internal fun buildFixture(
     reviewResponseGate: CompletableDeferred<Unit>? = null,
     reviewResponses: List<String> = listOf(reviewContent),
     reviewFailure: Exception? = null,
+    todoStore: de.heckenmann.visualagent.knowledge.TodoStore = FakeTodoStore(),
 ): CoordinatorFixture {
-    val todoStore = FakeTodoStore()
     val todoEventBus = TodoEventBus()
     val todoChanges = Channel<TodoChange>(Channel.UNLIMITED)
     val todoChangeSubscription = todoEventBus.addListener { change -> todoChanges.trySend(change) }
