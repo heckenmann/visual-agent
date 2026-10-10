@@ -72,3 +72,7 @@ Main-agent requests use the user-selected provider and model unless an agent-spe
   and question-count settings; they remain ghost text and are never sent
   automatically.
 - Re-running onboarding never downloads a stored credential into the desktop client.
+
+- Concurrent catalog mutations use database compare-and-set and rebase on the latest persisted state, with at most 16 attempts before an actionable retry error.
+- Discovery/capability updates preserve concurrent provider edits and active selection. Explicit profile or complete-catalog replacements intentionally replace their declared scope; the last successful replacement wins within that scope.
+- Runtime selection and refresh hints are published only after a successful commit; failed or rolled-back writes emit no change.
