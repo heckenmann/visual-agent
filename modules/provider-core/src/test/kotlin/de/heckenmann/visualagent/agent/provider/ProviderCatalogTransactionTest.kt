@@ -7,6 +7,22 @@ import kotlin.test.assertEquals
 /** Verifies that runtime-provider publication follows a successful transaction commit. */
 class ProviderCatalogTransactionTest {
     @Test
+    fun `delayed publication cannot roll runtime selection back to an older committed value`() {
+        val runtime = DefaultProviderRuntimeConfig()
+        val catalog = ProviderCatalogService(InMemoryProviderPreferences(), runtime)
+        TransactionSynchronizationManager.initSynchronization()
+        try {
+            catalog.setActiveProvider("openai")
+            catalog.setActiveProvider("ollama")
+            val callbacks = TransactionSynchronizationManager.getSynchronizations()
+            callbacks.reversed().forEach { it.afterCommit() }
+            assertEquals("ollama", runtime.llmProvider)
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization()
+        }
+    }
+
+    @Test
     fun `catalog changes publish runtime state and listeners after commit`() {
         val runtime = DefaultProviderRuntimeConfig()
         val catalog = ProviderCatalogService(InMemoryProviderPreferences(), runtime)

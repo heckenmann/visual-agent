@@ -1,17 +1,10 @@
 package de.heckenmann.visualagent.agent.provider
 
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import mu.KotlinLogging
 import org.springframework.context.annotation.DependsOn
 import org.springframework.stereotype.Service
-import org.springframework.transaction.support.TransactionSynchronization
-import org.springframework.transaction.support.TransactionSynchronizationManager
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
-import reactor.core.publisher.Sinks
 
 /**
  * Stores provider profiles, model catalogs, and active selection in the database.
@@ -25,11 +18,10 @@ import reactor.core.publisher.Sinks
 class ProviderCatalogService(
     private val preferenceStore: ProviderPreferenceStore,
     private val appConfig: ProviderRuntimeConfig = DefaultProviderRuntimeConfig(),
+    private val persistence: ProviderCatalogPersistence = ProviderCatalogPersistence(preferenceStore),
+    private val notifications: ProviderCatalogNotifications = ProviderCatalogNotifications(persistence, appConfig),
 ) {
     private val logger = KotlinLogging.logger {}
-    private val json = Json { ignoreUnknownKeys = true }
-    private val changeSink = Sinks.many().multicast().directBestEffort<Unit>()
-    private val emissionLock = Any()
 
     /**
      * Hot stream of provider catalog refresh hints.
@@ -37,7 +29,7 @@ class ProviderCatalogService(
      * Hints are not replayed and may be dropped for slow consumers. Provider queries remain the
      * authoritative source of the current catalog and active selection.
      */
-    val changes: Flux<Unit> = changeSink.asFlux()
+    val changes: Flux<Unit> = notifications.changes
 
     init {
         migrateLegacyConfiguration()
@@ -73,21 +65,22 @@ class ProviderCatalogService(
      * Use cases: UC-0000008.
      */
     fun saveProvider(profile: ProviderProfile) {
-        val state = load()
-        val normalizedProfile = profile.withSelectableCodexDefault()
-        val providers = state.providers.filterNot { it.id == normalizedProfile.id } + normalizedProfile
-        require(providers.any(ProviderProfile::enabled)) { "At least one provider profile must remain enabled" }
-        val nextActiveProviderId =
-            state.activeProviderId
-                .takeIf { activeId -> providers.any { it.id == activeId && it.enabled } }
-                ?: providers.first(ProviderProfile::enabled).id
-        val nextActiveModelId =
-            if (nextActiveProviderId == state.activeProviderId) {
-                state.activeModelId
-            } else {
-                providers.first { it.id == nextActiveProviderId }.defaultModel
-            }
-        save(state.copy(activeProviderId = nextActiveProviderId, activeModelId = nextActiveModelId, providers = providers))
+        mutate { state ->
+            val normalizedProfile = profile.withSelectableCodexDefault()
+            val providers = state.providers.filterNot { it.id == normalizedProfile.id } + normalizedProfile
+            require(providers.any(ProviderProfile::enabled)) { "At least one provider profile must remain enabled" }
+            val nextActiveProviderId =
+                state.activeProviderId
+                    .takeIf { activeId -> providers.any { it.id == activeId && it.enabled } }
+                    ?: providers.first(ProviderProfile::enabled).id
+            val nextActiveModelId =
+                if (nextActiveProviderId == state.activeProviderId) {
+                    state.activeModelId
+                } else {
+                    providers.first { it.id == nextActiveProviderId }.defaultModel
+                }
+            state.copy(activeProviderId = nextActiveProviderId, activeModelId = nextActiveModelId, providers = providers)
+        }
     }
 
     /**
@@ -105,9 +98,9 @@ class ProviderCatalogService(
     /** Reactively replaces the complete provider catalog and active selection. */
     fun replaceConfigurationReactive(configuration: ProviderConfiguration): Mono<Void> {
         val state = validatedCatalogState(configuration)
-        return preferenceStore
-            .setPreferenceReactive(KEY_CATALOG, json.encodeToString(state))
-            .doOnSuccess { publishProviderChange(state.activeProviderId) }
+        return persistence
+            .mutateReactive { state }
+            .flatMap { notifications.publishReactive() }
     }
 
     private fun validatedCatalogState(configuration: ProviderConfiguration): CatalogState {
@@ -136,19 +129,23 @@ class ProviderCatalogService(
      * @see docs/usecases/uc_0000008_manage_provider_profiles.md
      */
     fun deleteProvider(providerId: String): Boolean {
-        val state = load()
-        if (state.providers.none { it.id == providerId }) return false
-        val remaining = state.providers.filterNot { it.id == providerId }
-        val nextActive =
-            if (state.activeProviderId == providerId) {
-                remaining.firstOrNull(ProviderProfile::enabled)?.id ?: return false
-            } else {
-                state.activeProviderId
-            }
-        val nextActiveModel =
-            if (nextActive == state.activeProviderId) state.activeModelId else remaining.first { it.id == nextActive }.defaultModel
-        save(state.copy(activeProviderId = nextActive, activeModelId = nextActiveModel, providers = remaining))
-        return true
+        var removed = false
+        mutate { state ->
+            removed = false
+            if (state.providers.none { it.id == providerId }) return@mutate state
+            val remaining = state.providers.filterNot { it.id == providerId }
+            val nextActive =
+                if (state.activeProviderId == providerId) {
+                    remaining.firstOrNull(ProviderProfile::enabled)?.id ?: return@mutate state
+                } else {
+                    state.activeProviderId
+                }
+            val nextActiveModel =
+                if (nextActive == state.activeProviderId) state.activeModelId else remaining.first { it.id == nextActive }.defaultModel
+            removed = true
+            state.copy(activeProviderId = nextActive, activeModelId = nextActiveModel, providers = remaining)
+        }
+        return removed
     }
 
     /** Registers a listener invoked after the persisted provider catalog changes. */
@@ -173,13 +170,14 @@ class ProviderCatalogService(
         providerId: String,
         modelIds: List<String>,
     ) {
-        val profile = getProvider(providerId) ?: return
-        val existing = profile.models.associateBy(ProviderModelConfig::id)
-        val models =
-            modelIds
-                .distinct()
-                .map { id -> existing[id] ?: ProviderModelConfig(id = id) }
-        saveProvider(profile.copy(models = models))
+        mutateProfile(providerId) { profile ->
+            val existing = profile.models.associateBy(ProviderModelConfig::id)
+            val models =
+                modelIds
+                    .distinct()
+                    .map { id -> existing[id] ?: ProviderModelConfig(id = id) }
+            profile.copy(models = models)
+        }
     }
 
     /** Replaces discovered models while preserving provider-supplied display names. */
@@ -187,10 +185,11 @@ class ProviderCatalogService(
         providerId: String,
         discoveredModels: List<ProviderModelConfig>,
     ) {
-        val profile = getProvider(providerId) ?: return
-        val existing = profile.models.associateBy(ProviderModelConfig::id)
-        val models = discoveredModels.mergeWithExisting(existing)
-        saveProvider(profile.copy(models = models))
+        mutateProfile(providerId) { profile ->
+            val existing = profile.models.associateBy(ProviderModelConfig::id)
+            val models = discoveredModels.mergeWithExisting(existing)
+            profile.copy(models = models)
+        }
     }
 
     /**
@@ -203,18 +202,19 @@ class ProviderCatalogService(
         providerId: String,
         capabilities: Map<String, Set<String>>,
     ) {
-        val profile = getProvider(providerId) ?: return
-        val models =
-            profile.models.map { model ->
-                capabilities[model.id]?.let { caps ->
-                    if (caps != model.capabilities || !model.capabilitiesComplete) {
-                        model.copy(capabilities = caps, capabilitiesComplete = true)
-                    } else {
-                        model
-                    }
-                } ?: model
-            }
-        saveProvider(profile.copy(models = models))
+        mutateProfile(providerId) { profile ->
+            val models =
+                profile.models.map { model ->
+                    capabilities[model.id]?.let { caps ->
+                        if (caps != model.capabilities || !model.capabilitiesComplete) {
+                            model.copy(capabilities = caps, capabilitiesComplete = true)
+                        } else {
+                            model
+                        }
+                    } ?: model
+                }
+            profile.copy(models = models)
+        }
     }
 
     /**
@@ -241,7 +241,12 @@ class ProviderCatalogService(
      */
     fun activeModelId(): String {
         val state = load()
-        return state.activeModelId.ifBlank { getProvider(state.activeProviderId)?.defaultModel.orEmpty() }
+        return state.activeModelId.ifBlank {
+            state.providers
+                .firstOrNull { it.id == state.activeProviderId }
+                ?.defaultModel
+                .orEmpty()
+        }
     }
 
     /**
@@ -262,10 +267,11 @@ class ProviderCatalogService(
      * Use cases: UC-0000007.
      */
     fun setActiveProvider(providerId: String) {
-        val provider = getProvider(providerId)?.takeIf(ProviderProfile::enabled)
-        require(provider != null) { "Provider is missing or disabled: $providerId" }
-        val state = load()
-        save(state.copy(activeProviderId = providerId, activeModelId = provider.defaultModel))
+        mutate { state ->
+            val provider = state.providers.firstOrNull { it.id == providerId && it.enabled }
+            require(provider != null) { "Provider is missing or disabled: $providerId" }
+            state.copy(activeProviderId = providerId, activeModelId = provider.defaultModel)
+        }
     }
 
     /**
@@ -278,9 +284,18 @@ class ProviderCatalogService(
         modelId: String,
     ) {
         require(modelId.isNotBlank()) { "Model is required" }
-        resolve(providerId, modelId)
-        val state = load()
-        save(state.copy(activeProviderId = providerId, activeModelId = modelId))
+        mutate { state ->
+            val provider =
+                state.providers.firstOrNull { it.id == providerId && it.enabled }
+                    ?: error("Provider is missing or disabled: $providerId")
+            require(
+                modelId !in provider.modelBlacklist &&
+                    (provider.modelWhitelist.isEmpty() || modelId in provider.modelWhitelist),
+            ) {
+                "Model is missing, disabled, or filtered: $providerId/$modelId"
+            }
+            state.copy(activeProviderId = providerId, activeModelId = modelId)
+        }
     }
 
     /**
@@ -298,9 +313,9 @@ class ProviderCatalogService(
         val explicitProviderId = providerId?.takeIf(String::isNotBlank)
         val selectedProviderId = explicitProviderId ?: state.activeProviderId
         val provider =
-            getProvider(selectedProviderId)?.takeIf(ProviderProfile::enabled)
+            state.providers.firstOrNull { it.id == selectedProviderId && it.enabled }
                 ?: error("Provider is missing or disabled: $selectedProviderId")
-        val selectable = selectableModels(provider.id)
+        val selectable = provider.selectableModels()
         val explicitModelId =
             modelId?.takeIf(String::isNotBlank)
                 ?: state.activeModelId.takeIf { explicitProviderId == null && it.isNotBlank() }
@@ -335,152 +350,51 @@ class ProviderCatalogService(
 
     private fun migrateLegacyConfiguration() {
         if (preferenceStore.getPreference(KEY_CATALOG) != null) return
-        val config = appConfig
-        val profiles =
-            listOf(
-                ProviderProfile(
-                    id = "ollama",
-                    name = "Ollama",
-                    adapter = ProviderAdapter.OLLAMA,
-                    baseUrl = config.ollamaLocalUrl,
-                    apiKey = config.ollamaApiKey,
-                    defaultModel = config.ollamaModel,
-                    models = config.ollamaModel.toModelConfigs(),
-                ),
-                ProviderProfile(
-                    id = "openai",
-                    name = "OpenAI",
-                    adapter = ProviderAdapter.OPENAI_COMPATIBLE,
-                    baseUrl = config.openAiBaseUrl,
-                    apiKey = config.openAiApiKey,
-                    defaultModel = config.openAiModel,
-                    models = config.openAiModel.toModelConfigs(),
-                ),
-                builtInCodexProfile(),
-            )
-        val activeProviderId = config.normalizedProvider()
-        val activeModelId = if (activeProviderId == "openai") config.openAiModel else config.ollamaModel
-        save(CatalogState(activeProviderId = activeProviderId, activeModelId = activeModelId, providers = profiles))
+        mutate { state -> if (state.providers.isEmpty()) legacyProviderCatalog(appConfig) else state }
     }
 
     private fun ensureBuiltInProfiles() {
         if (preferenceStore.getPreference(KEY_CODEX_INITIALIZED) == "true") return
-        val state = load()
-        if (state.providers.none { it.id == ProviderEnvironmentCredentials.CODEX_PROFILE_ID }) {
-            save(state.copy(providers = state.providers + builtInCodexProfile()))
+        mutate { state ->
+            if (state.providers.none { it.id == ProviderEnvironmentCredentials.CODEX_PROFILE_ID }) {
+                state.copy(providers = state.providers + builtInCodexProfile())
+            } else {
+                state
+            }
         }
         preferenceStore.setPreference(KEY_CODEX_INITIALIZED, "true")
     }
 
-    private fun builtInCodexProfile(): ProviderProfile =
-        ProviderProfile(
-            id = ProviderEnvironmentCredentials.CODEX_PROFILE_ID,
-            name = "Codex CLI",
-            adapter = ProviderAdapter.CODEX_CLI,
-            baseUrl = "",
-        )
-
-    private fun String.toModelConfigs(): List<ProviderModelConfig> =
-        takeIf(String::isNotBlank)?.let(::ProviderModelConfig)?.let(::listOf).orEmpty()
-
     private fun migrateBuiltInCodexProfile() {
-        val state = load()
-        val providers =
-            state.providers.map { profile ->
-                if (profile.id == ProviderEnvironmentCredentials.CODEX_PROFILE_ID) {
-                    profile.copy(
-                        name = "Codex CLI",
-                        adapter = ProviderAdapter.CODEX_CLI,
-                        baseUrl = "",
-                        apiKey = "",
-                    )
-                } else {
-                    profile
-                }
-            }
-        if (providers != state.providers) save(state.copy(providers = providers))
+        mutate { it.migrateCodexProfile() }
     }
 
-    /** Makes the already selected Codex model selectable without inventing a model identifier. */
     private fun normalizeActiveCodexSelection() {
-        val state = load()
-        val activeModel = state.activeModelId.takeIf(String::isNotBlank) ?: return
-        val providers =
-            state.providers.map { profile ->
-                if (
-                    profile.id == state.activeProviderId &&
-                    profile.adapter == ProviderAdapter.CODEX_CLI &&
-                    profile.defaultModel.isBlank() &&
-                    profile.models.none { it.id == activeModel }
-                ) {
-                    profile.copy(
-                        defaultModel = activeModel,
-                        models = listOf(ProviderModelConfig(activeModel, capabilities = setOf("vision"))),
-                    )
-                } else {
-                    profile
-                }
-            }
-        if (providers != state.providers) save(state.copy(providers = providers))
+        mutate { it.withSelectableActiveCodexModel() }
     }
 
-    private fun ProviderProfile.withSelectableCodexDefault(): ProviderProfile =
-        if (
-            adapter == ProviderAdapter.CODEX_CLI &&
-            defaultModel.isNotBlank() &&
-            models.none { it.id == defaultModel }
-        ) {
-            copy(models = models + ProviderModelConfig(defaultModel, capabilities = setOf("vision")))
-        } else {
-            this
-        }
-
-    private fun ProviderProfile.selectableModels(): List<ProviderModelConfig> =
-        models.filter { model ->
-            model.status !in setOf(ModelStatus.DEPRECATED, ModelStatus.DISABLED) &&
-                model.id !in modelBlacklist &&
-                (modelWhitelist.isEmpty() || model.id in modelWhitelist)
-        }
-
-    private fun load(): CatalogState =
-        preferenceStore
-            .getPreference(KEY_CATALOG)
-            ?.let { encoded -> runCatching { json.decodeFromString<CatalogState>(encoded) }.getOrNull() }
-            ?: CatalogState()
+    private fun load(): CatalogState = persistence.load()
 
     private fun save(state: CatalogState) {
-        preferenceStore.setPreference(KEY_CATALOG, json.encodeToString(state))
-        publishProviderChange(state.activeProviderId)
+        mutate { state }
     }
 
-    private fun publishProviderChange(providerId: String) {
-        val publish = {
-            appConfig.llmProvider = providerId
-            synchronized(emissionLock) {
-                val result = changeSink.tryEmitNext(Unit)
-                if (result != Sinks.EmitResult.OK) logger.warn { "Unable to emit provider catalog change: $result" }
-            }
+    private fun mutate(transform: (CatalogState) -> CatalogState) {
+        var changed = false
+        persistence.mutate { current ->
+            transform(current).also { changed = it != current }
         }
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(
-                object : TransactionSynchronization {
-                    override fun afterCommit() {
-                        publish()
-                    }
-                },
-            )
-        } else {
-            publish()
-        }
+        if (changed) notifications.publish()
     }
 
-    @Serializable
-    private data class CatalogState(
-        val version: Int = 1,
-        val activeProviderId: String = "ollama",
-        val activeModelId: String = "",
-        val providers: List<ProviderProfile> = emptyList(),
-    )
+    private fun mutateProfile(
+        providerId: String,
+        transform: (ProviderProfile) -> ProviderProfile,
+    ) {
+        mutate { state ->
+            state.copy(providers = state.providers.map { if (it.id == providerId) transform(it) else it })
+        }
+    }
 
     private companion object {
         private const val KEY_CATALOG = "llm.provider.catalog.v1"

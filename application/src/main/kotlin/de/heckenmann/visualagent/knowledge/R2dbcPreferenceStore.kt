@@ -39,6 +39,43 @@ internal class R2dbcPreferenceStore(
             .map { row, _ -> R2dbcPersistenceSupport.text(row, "preference_value").orEmpty() }
             .one()
 
+    override fun compareAndSetPreferenceReactive(
+        key: String,
+        expected: String?,
+        value: String,
+    ): Mono<Boolean> =
+        Mono.defer {
+            val statement =
+                if (expected == null) {
+                    databaseClient.sql(
+                        """
+                        INSERT INTO user_preferences (preference_key, preference_value, preference_type, updated_at)
+                        SELECT :key, :value, 'string', :updatedAt
+                        WHERE NOT EXISTS (SELECT 1 FROM user_preferences WHERE preference_key = :key)
+                        """.trimIndent(),
+                    )
+                } else {
+                    databaseClient
+                        .sql(
+                            """
+                            UPDATE user_preferences SET preference_value = :value, updated_at = :updatedAt
+                            WHERE preference_key = :key AND preference_value = :expected
+                            """.trimIndent(),
+                        ).bind("expected", expected)
+                }
+            transactionOperator
+                .execute {
+                    statement
+                        .bind("key", key)
+                        .bind("value", value)
+                        .bind("updatedAt", Instant.now().toString())
+                        .fetch()
+                        .rowsUpdated()
+                }.collectList()
+                .map { counts -> counts.single() == 1L }
+                .onErrorResume(org.springframework.dao.DuplicateKeyException::class.java) { Mono.just(false) }
+        }
+
     override fun setPreferenceReactive(
         key: String,
         value: String,
