@@ -132,7 +132,7 @@ class CodexAppServerChatModelTest {
         }
 
     @Test
-    fun `failed turns are propagated instead of marked complete`() =
+    fun `failed turns are propagated instead of marked complete`(): Unit =
         runBlocking {
             val directory = createTempDirectory("codex-app-server-failed-turn-test-")
             val executable = fakeServer(directory, turnStatus = "failed")
