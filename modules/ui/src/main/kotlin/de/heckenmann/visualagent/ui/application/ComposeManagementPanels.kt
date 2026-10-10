@@ -2,7 +2,6 @@ package de.heckenmann.visualagent.ui.application
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -18,7 +17,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.ActivityPort
@@ -84,7 +82,7 @@ internal fun SubAgentsPanel(
     val agentListScrollState = rememberScrollState()
     RegisterPanelVerticalScrollbar(agentListScrollState)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        PanelActionRow {
             ActionIconButton(
                 icon = if (executionSnapshot.globallyPaused) Icons.Filled.PlayArrow else Icons.Filled.Pause,
                 description =
@@ -103,14 +101,6 @@ internal fun SubAgentsPanel(
                         executionSnapshot = agentPort.executionSnapshot()
                     }
                 },
-            )
-            Text(
-                if (executionSnapshot.globallyPaused) {
-                    "All sub-agents paused"
-                } else {
-                    "Sub-agents running"
-                },
-                style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
             )
             ActionIconButton(
                 icon = Icons.Filled.Add,
@@ -132,6 +122,14 @@ internal fun SubAgentsPanel(
                 },
             )
         }
+        Text(
+            if (executionSnapshot.globallyPaused) {
+                "All sub-agents paused"
+            } else {
+                "Sub-agents running"
+            },
+            style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+        )
         Column(modifier = Modifier.weight(1f).verticalScroll(agentListScrollState)) {
             if (agents.isEmpty()) {
                 PanelEmptyState(
