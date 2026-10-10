@@ -176,7 +176,7 @@ class ProviderCatalogService(
                 modelIds
                     .distinct()
                     .map { id -> existing[id] ?: ProviderModelConfig(id = id) }
-            profile.copy(models = models)
+            profile.copy(models = models).withSelectableCodexDefault()
         }
     }
 
@@ -188,7 +188,7 @@ class ProviderCatalogService(
         mutateProfile(providerId) { profile ->
             val existing = profile.models.associateBy(ProviderModelConfig::id)
             val models = discoveredModels.mergeWithExisting(existing)
-            profile.copy(models = models)
+            profile.copy(models = models).withSelectableCodexDefault()
         }
     }
 
