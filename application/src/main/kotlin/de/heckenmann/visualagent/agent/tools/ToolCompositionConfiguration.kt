@@ -1,26 +1,18 @@
 package de.heckenmann.visualagent.agent.tools
 
 import de.heckenmann.visualagent.agent.AgentManager
-import de.heckenmann.visualagent.agent.AssistantTurnIdentity
-import de.heckenmann.visualagent.agent.CancellationToken
-import de.heckenmann.visualagent.agent.ProviderToolCall
 import de.heckenmann.visualagent.agent.javascript.GraalJavaScriptExecutionService
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
 import de.heckenmann.visualagent.agent.tools.api.TodoToolPort
-import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolSettingsPort
 import de.heckenmann.visualagent.knowledge.MemoryStore
 import de.heckenmann.visualagent.knowledge.TodoStore
 import de.heckenmann.visualagent.todo.TodoManager
 import de.heckenmann.visualagent.workspace.WorkspaceJavaScriptWriter
-import org.springframework.ai.chat.model.ToolContext
-import org.springframework.ai.tool.ToolCallback
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import java.time.Clock
-import de.heckenmann.visualagent.agent.ToolId as ProviderToolId
-import org.springframework.ai.tool.definition.ToolDefinition as SpringToolDefinition
 
 /** Composes tool implementations with application adapters and the provider boundary. */
 @Configuration
@@ -56,6 +48,17 @@ class ToolCompositionConfiguration {
         settings: ToolSettingsPort,
     ) = ToolRegistry(tools, toolEventBus) { settings.read().timeoutSeconds }
 
+    /** Shared resource-limited executor used by models, the batch tool and JavaScript. */
+    @Bean
+    fun toolBatchExecutor(
+        registry: ToolRegistry,
+        @org.springframework.beans.factory.annotation.Value("\${visual-agent.tools.batch.global-concurrency:16}") concurrency: Int,
+    ): ToolBatchExecutor = ToolBatchExecutor(registry, concurrency)
+
+    /** Creates the lazy batch entry point without introducing a registry cycle. */
+    @Bean
+    fun toolBatchTool(executor: ObjectProvider<ToolBatchExecutor>): ToolBatchTool = ToolBatchTool(executor::getObject)
+
     /** Creates the lazy tool-help dispatcher without creating a registry dependency cycle. */
     @Bean
     fun toolHelpTool(registry: ObjectProvider<ToolRegistry>): ToolHelpTool = ToolHelpTool(registry::getObject)
@@ -65,126 +68,14 @@ class ToolCompositionConfiguration {
     fun javaScriptExecutionService(
         registry: ObjectProvider<ToolRegistry>,
         workspaceWriter: WorkspaceJavaScriptWriter,
-    ): GraalJavaScriptExecutionService = GraalJavaScriptExecutionService({ registry.getObject() }, workspaceWriter)
+        batches: ObjectProvider<ToolBatchExecutor>,
+    ): GraalJavaScriptExecutionService = GraalJavaScriptExecutionService({ registry.getObject() }, workspaceWriter, batches::getObject)
 
     /** Exposes the Spring AI/provider callback adapter. */
     @Bean
     fun providerToolCallbacks(
         registry: ToolRegistry,
         agentManager: ObjectProvider<AgentManager>,
-    ): ProviderToolCallbacks = SpringAiToolCallbacksAdapter(registry) { agentManager.getObject() }
-}
-
-/** Spring AI adaptation kept at the application composition boundary. */
-class SpringAiToolCallbacksAdapter(
-    private val registry: ToolRegistry,
-    private val agentManager: (() -> AgentManager)? = null,
-) : ProviderToolCallbacks {
-    private val callCorrelation = ThreadLocal<List<CorrelatedToolCall>?>()
-
-    override fun functionCallbacks(
-        enabledTools: Set<ProviderToolId>,
-        context: Map<String, Any>,
-    ): List<ToolCallback> {
-        val requestToolIds =
-            if (ToolId(TOOL_HELP_ID) in registry.allToolIds() && ProviderToolId(TOOL_HELP_ID) in enabledTools) {
-                enabledTools + ProviderToolId(TOOL_HELP_ID)
-            } else {
-                enabledTools
-            }
-        val requestContext =
-            context +
-                ("enabledTools" to enabledTools.map { it.value }.toSet()) +
-                toolCancellationRegistrar(context)
-        return registry.resolve(requestToolIds.mapTo(mutableSetOf()) { ToolId(it.value) }).map { tool ->
-            /** Provider callback delegating one resolved tool to the provider-neutral registry. */
-            object : ToolCallback {
-                override fun getToolDefinition(): SpringToolDefinition =
-                    SpringToolDefinition
-                        .builder()
-                        .name(registry.definition(tool).name)
-                        .description(registry.definition(tool).description)
-                        .inputSchema(registry.definition(tool).inputSchema)
-                        .build()
-
-                override fun call(functionInput: String): String =
-                    registry.executeBlocking(
-                        tool,
-                        functionInput,
-                        correlatedContext(tool.definition.name, functionInput, requestContext),
-                    )
-
-                override fun call(
-                    functionInput: String,
-                    toolContext: ToolContext?,
-                ): String =
-                    registry.executeBlocking(
-                        tool,
-                        functionInput,
-                        correlatedContext(tool.definition.name, functionInput, requestContext + (toolContext?.context ?: emptyMap())),
-                    )
-            }
-        }
-    }
-
-    override fun toolRuntimeGuidance(): String = registry.runtimeGuidance()
-
-    private fun toolCancellationRegistrar(context: Map<String, Any>): Map<String, Any> {
-        val parent = context["cancellationToken"] as? CancellationToken ?: return emptyMap()
-        return mapOf("toolCancellationRegistrar" to ToolCancellationRegistrar(parent::onCancelled))
-    }
-
-    override fun bindToolCallRound(
-        toolCalls: List<ProviderToolCall>,
-        round: Int,
-        parentAssistantTurnId: String?,
-    ): AutoCloseable {
-        check(callCorrelation.get() == null) { "Tool-call correlation scope is already active" }
-        callCorrelation.set(toolCalls.mapIndexed { sequence, call -> CorrelatedToolCall(call, round, sequence, parentAssistantTurnId) })
-        return AutoCloseable { callCorrelation.remove() }
-    }
-
-    override fun recordAssistantToolTurn(
-        turn: de.heckenmann.visualagent.agent.ProviderTurnResponse,
-        context: Map<String, Any>,
-    ): String? {
-        if (context["agent"] != "main") return null
-        val requestId = context["requestId"]?.toString()?.takeIf(String::isNotBlank) ?: return null
-        val manager = agentManager?.invoke() ?: return null
-        val round = turn.metadata.round ?: 0
-        val turnId = AssistantTurnIdentity.forRound(requestId, round)
-        manager.recordProviderAssistantTurn(turn, turnId, requestId)
-        return turnId
-    }
-
-    private fun correlatedContext(
-        functionName: String,
-        input: String,
-        context: Map<String, Any>,
-    ): Map<String, Any> {
-        val calls = callCorrelation.get() ?: return context
-        val index = calls.indexOfFirst { it.call.functionName == functionName && it.call.argumentsJson == input }
-        if (index < 0) return context
-        val correlated = calls[index]
-        callCorrelation.set(calls.toMutableList().also { it.removeAt(index) })
-        return context +
-            mapOf(
-                "providerToolCallId" to correlated.call.id,
-                "toolCallRound" to correlated.round,
-                "toolCallSequence" to correlated.sequence,
-            ) +
-            (correlated.parentAssistantTurnId?.let { mapOf("parentAssistantTurnId" to it) } ?: emptyMap())
-    }
-
-    /** Provider call identity awaiting callback execution in one loop round. */
-    private data class CorrelatedToolCall(
-        val call: ProviderToolCall,
-        val round: Int,
-        val sequence: Int,
-        val parentAssistantTurnId: String?,
-    )
-
-    private companion object {
-        const val TOOL_HELP_ID = "tool:help"
-    }
+        batches: ToolBatchExecutor,
+    ): ProviderToolCallbacks = SpringAiToolCallbacksAdapter(registry, { agentManager.getObject() }, batches)
 }

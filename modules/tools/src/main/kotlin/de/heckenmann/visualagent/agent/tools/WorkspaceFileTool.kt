@@ -37,7 +37,7 @@ class WorkspaceFileTool(
     override fun executeReactive(
         inputJson: String,
         context: Map<String, Any>,
-    ): Mono<ToolResult> = reactiveActions.execute(inputJson, context) ?: Mono.fromCallable { execute(inputJson, context) }
+    ): Mono<ToolResult> = reactiveActions.execute(inputJson, context) ?: super<VisualAgentTool>.executeReactive(inputJson, context)
 
     override fun execute(
         inputJson: String,

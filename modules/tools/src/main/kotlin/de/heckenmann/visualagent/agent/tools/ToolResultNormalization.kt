@@ -81,6 +81,7 @@ internal object ToolResultNormalization {
 
     private fun errorCode(error: String?): ToolErrorCode {
         val prefix = error?.substringBefore(':')?.trim()?.uppercase()
+        ToolErrorCode.entries.firstOrNull { it.name == prefix }?.let { return it }
         return when {
             prefix == "TOOL_ARGUMENTS" -> ToolErrorCode.INVALID_ARGUMENT
             prefix == "TOOL_TIMEOUT" -> ToolErrorCode.TIMEOUT

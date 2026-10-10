@@ -76,7 +76,7 @@ internal class ReactiveToolExecution(
                     ToolCallPhase.FINISHED,
                     functionInput,
                     effectiveContext,
-                    failure(definition.id.value, "TOOL_CANCELLED: Tool call was cancelled."),
+                    cancellationFailure(definition.id.value, deadlineNanos),
                     startedAt,
                     Instant.now(),
                 )
@@ -106,7 +106,7 @@ internal class ReactiveToolExecution(
                                     sink::success,
                                     { error ->
                                         if (cancellationToken.isCancelled) {
-                                            sink.success(failure(toolId, "TOOL_CANCELLED: Tool call was cancelled."))
+                                            sink.success(cancellationFailure(toolId, deadlineNanos))
                                         } else {
                                             sink.error(error)
                                         }
@@ -115,7 +115,7 @@ internal class ReactiveToolExecution(
                         val cancellationRegistration =
                             cancellationToken.onCancelled {
                                 execution.dispose()
-                                sink.success(failure(toolId, "TOOL_CANCELLED: Tool call was cancelled."))
+                                sink.success(cancellationFailure(toolId, deadlineNanos))
                             }
                         sink.onCancel {
                             execution.dispose()
@@ -130,7 +130,7 @@ internal class ReactiveToolExecution(
                     ).onErrorResume { error ->
                         when {
                             cancellationToken.isCancelled || error is CancellationException ->
-                                Mono.just(failure(toolId, "TOOL_CANCELLED: Tool call was cancelled."))
+                                Mono.just(cancellationFailure(toolId, deadlineNanos))
 
                             else -> {
                                 val safeError = ToolResultNormalization.executionError(error)
@@ -170,6 +170,20 @@ internal class ReactiveToolExecution(
             ),
         )
     }
+
+    // Deadline expiry must retain its timeout code even when cancellation wins the timer race.
+    private fun cancellationFailure(
+        toolId: String,
+        deadlineNanos: Long,
+    ): ToolResult =
+        failure(
+            toolId,
+            if (remainingNanos(deadlineNanos) == 0L) {
+                "TOOL_TIMEOUT: Tool call deadline expired."
+            } else {
+                "TOOL_CANCELLED: Tool call was cancelled."
+            },
+        )
 
     private fun remainingNanos(deadlineNanos: Long): Long = (deadlineNanos - System.nanoTime()).coerceAtLeast(0L)
 

@@ -64,6 +64,7 @@ internal class AgentConversationHistoryOps(
                     .take(140)
             val compactText =
                 when {
+                    event.context["batchId"] != null || event.toolId == "tools:batch" -> "Tool ${event.toolId} · $status"
                     status == "running" -> "Tool ${event.toolId} · running…"
                     firstDetailLine.isNotBlank() -> "Tool ${event.toolId} · $status · $firstDetailLine"
                     !event.result.error.isNullOrBlank() -> "Tool ${event.toolId} · $status · ${event.result.error}"
@@ -78,6 +79,8 @@ internal class AgentConversationHistoryOps(
                     event.requestId?.let { put("requestId", it) }
                     event.round?.let { put("round", it) }
                     event.sequence?.let { put("sequence", it) }
+                    (event.context["batchId"] as? String)?.let { put("batchId", it) }
+                    (event.context["batchSequence"] as? Int)?.let { put("batchSequence", it) }
                     put("status", status)
                     put("durationMillis", event.durationMillis)
                     put("inputJson", event.inputJson)

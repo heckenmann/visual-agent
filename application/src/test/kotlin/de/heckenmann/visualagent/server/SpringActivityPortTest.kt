@@ -28,7 +28,7 @@ class SpringActivityPortTest {
                 functionName = "todos",
                 phase = ToolCallPhase.STARTED,
                 inputJson = "{}",
-                context = mapOf("requestId" to "request-1"),
+                context = mapOf("requestId" to "request-1", "batchId" to "batch-1", "batchSequence" to 2),
                 result = ToolResult("todos", success = true, content = "started"),
                 startedAtUtc = now,
                 finishedAtUtc = now,
@@ -52,6 +52,9 @@ class SpringActivityPortTest {
 
         assertEquals(2, activities.size)
         assertEquals("request-1", activities[0].requestId)
+        assertEquals("batch-1", activities[0].batchId)
+        assertEquals(2, activities[0].batchSequence)
+        assertEquals(null, activities[1].batchId)
         assertEquals(de.heckenmann.visualagent.protocol.ToolActivityPhase.STARTED, activities[0].phase)
         assertEquals(true, activities[0].success)
         assertEquals(null, activities[1].requestId)

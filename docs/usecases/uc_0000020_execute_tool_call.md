@@ -64,3 +64,13 @@ Issues #449, #456 and #375 use Reactor completion sinks and native Mono composit
 - Timeouts, invalid timeout arguments, and cancellation return sanitized actionable result categories.
 - Provider callbacks never receive raw text, stack traces, or non-JSON tool results.
 - Streaming preserves token chunks within each assistant section and inserts a boundary only between visible initial text and a separate final tool-informed response.
+
+## Independent Bulk Calls
+
+See UC-0000148 and issue #289. Independent native model calls, `tools_batch`, and guest
+`tools.callMany` use one bounded Reactor executor through the registry. Only explicitly reviewed
+read-only tools overlap; unknown tools and mutations remain serialized. Results retain declaration
+order and preserve the canonical single-call data and error envelope. Ordinary execution failures
+are per-item; syntax and invalid-argument errors stop the batch immediately and cancel unfinished
+work. All children inherit the parent deadline and cancellation.
+Batches are non-atomic and never automatically retry successful mutations.

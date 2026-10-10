@@ -3,8 +3,7 @@ package de.heckenmann.visualagent.agent.tools
 import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import de.heckenmann.visualagent.agent.tools.api.toProviderJson
 import mu.KotlinLogging
 import reactor.core.publisher.Mono
 import java.time.Instant
@@ -88,21 +87,24 @@ class ToolRegistry(
         return Mono.defer {
             val startedAt = Instant.now()
             val options =
-                runCatching { runtimeOptions(inputObject, defaultTimeoutSeconds()) }
-                    .getOrElse { error ->
-                        return@defer Mono.just(
-                            completeImmediately(
-                                definition,
-                                functionInput,
-                                context + mapOf("toolTimeoutSeconds" to defaultTimeoutSeconds()),
-                                startedAt,
-                                failure(
-                                    definition.id.value,
-                                    "TOOL_ARGUMENTS: ${error.message ?: "Invalid tool runtime arguments."}",
-                                ),
-                            ),
-                        )
+                runCatching {
+                    runtimeOptions(inputObject, defaultTimeoutSeconds()).also { options ->
+                        require(!options.async || tool.allowsDetachedExecution) { "This tool must be awaited." }
                     }
+                }.getOrElse { error ->
+                    return@defer Mono.just(
+                        completeImmediately(
+                            definition,
+                            functionInput,
+                            context + mapOf("toolTimeoutSeconds" to defaultTimeoutSeconds()),
+                            startedAt,
+                            failure(
+                                definition.id.value,
+                                "TOOL_ARGUMENTS: ${error.message ?: "Invalid tool runtime arguments."}",
+                            ),
+                        ),
+                    )
+                }
             val deadlineNanos = deadlineNanos(context, options.timeoutSeconds)
             if (remainingNanos(deadlineNanos) <= 0L) {
                 return@defer Mono.just(
@@ -208,7 +210,7 @@ class ToolRegistry(
         return result
     }
 
-    private fun serialize(result: ToolResult): String = envelopeJson.encodeToString(ToolResultNormalization.envelope(result))
+    private fun serialize(result: ToolResult): String = ToolResultNormalization.envelope(result).toProviderJson()
 
     private fun validateDefinitions() {
         val definitions = registeredTools.map(::definition)
@@ -274,12 +276,4 @@ class ToolRegistry(
         } else {
             "${TimeUnit.NANOSECONDS.toSeconds(timeoutNanos)}s"
         }
-
-    private companion object {
-        val envelopeJson =
-            Json {
-                encodeDefaults = true
-                explicitNulls = true
-            }
-    }
 }

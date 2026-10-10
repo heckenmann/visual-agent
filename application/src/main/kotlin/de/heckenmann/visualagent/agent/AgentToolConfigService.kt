@@ -60,6 +60,7 @@ class AgentToolConfigService(
             "memory",
             "skills",
             TOOL_HELP_ID,
+            "tools:batch",
         ).let(::filterEnabledTools).map(::ToolId).toSet()
 
     /**
@@ -75,11 +76,11 @@ class AgentToolConfigService(
      */
     fun toolsFor(agent: SubAgent): Set<ToolId> {
         agent.config.tools?.let { configured ->
-            return filterSubAgentTools(configured + TOOL_HELP_ID).map(::ToolId).toSet()
+            return filterSubAgentTools(configured + listOf(TOOL_HELP_ID, "tools:batch")).map(::ToolId).toSet()
         }
         val key = resolveTemplateName(agent)
         val configured = configStore.getSubAgentConfig(key)?.tools ?: defaultConfigs().firstOrNull { it.id == key }?.tools
-        return filterSubAgentTools((configured ?: emptyList()) + TOOL_HELP_ID).map(::ToolId).toSet()
+        return filterSubAgentTools((configured ?: emptyList()) + listOf(TOOL_HELP_ID, "tools:batch")).map(::ToolId).toSet()
     }
 
     private fun resolveTemplateName(agent: SubAgent): String {

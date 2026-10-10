@@ -16,9 +16,15 @@ import java.util.concurrent.atomic.AtomicReference
 class GraalJavaScriptExecutionService(
     private val registryProvider: () -> ToolRegistry,
     private val workspaceWriter: JavaScriptWorkspaceWriter,
+    private val batchExecutorProvider: () -> de.heckenmann.visualagent.agent.tools.ToolBatchExecutor = {
+        de.heckenmann.visualagent.agent.tools
+            .ToolBatchExecutor(registryProvider())
+    },
+    /** Retains the hardened constrained fallback when native isolates are deliberately unavailable. */
+    preferIsolate: Boolean = true,
 ) : AutoCloseable {
     private val executor = Executors.newCachedThreadPool()
-    private val contextFactory = JavaScriptContextFactory()
+    private val contextFactory = JavaScriptContextFactory(preferIsolate)
 
     /** Execute one script and return only its final value plus bounded diagnostics. */
     fun execute(request: JavaScriptExecutionRequest): JavaScriptExecutionResult {
@@ -90,10 +96,19 @@ class GraalJavaScriptExecutionService(
                 registry = registryProvider(),
                 workspaceWriter = workspaceWriter,
                 enabledTools = request.enabledTools,
-                requestContext = request.requestContext,
+                requestContext =
+                    request.requestContext +
+                        mapOf(
+                            "toolDeadlineNanos" to
+                                minOf(
+                                    request.requestContext["toolDeadlineNanos"] as? Long ?: Long.MAX_VALUE,
+                                    System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(request.limits.timeoutMillis),
+                                ),
+                        ),
                 cancellationToken = token,
                 limits = request.limits,
                 logs = logs,
+                batchExecutor = batchExecutorProvider(),
             )
         val context = contextFactory.create(bridge, request.limits)
         contextReference.set(context)
@@ -108,6 +123,7 @@ class GraalJavaScriptExecutionService(
         } catch (error: PolyglotException) {
             throw mapPolyglotFailure(error, bridge)
         } finally {
+            bridge.closePromises()
             context.close(true)
             contextReference.set(null)
         }
@@ -139,7 +155,11 @@ class GraalJavaScriptExecutionService(
                 null
             }
         value.invokeMember("then", resolve, reject)
-        while (!latch.await(25, TimeUnit.MILLISECONDS)) token.throwIfCancelled()
+        while (latch.count > 0) {
+            token.throwIfCancelled()
+            bridge.drainPromises()
+            if (latch.count > 0) latch.await(10, TimeUnit.MILLISECONDS)
+        }
         failure[0]?.let { rejected ->
             val bridgeFailure = bridge.lastFailure.getAndSet(null)
             val rejectedMessage = rejected.message.orEmpty()
@@ -198,7 +218,11 @@ class GraalJavaScriptExecutionService(
                 "JavaScript source must not be blank",
             )
         }
-        if (request.limits.timeoutMillis <= 0 || request.limits.maxToolCalls <= 0 || request.limits.maxConcurrentToolCalls <= 0) {
+        if (request.limits.timeoutMillis <= 0 ||
+            request.limits.maxToolCalls <= 0 ||
+            request.limits.maxConcurrentToolCalls <= 0 ||
+            request.limits.maxBatchItems !in 1..32
+        ) {
             throw JavaScriptExecutionException(JavaScriptErrorCategory.INTERNAL, "Invalid JavaScript execution limits")
         }
         if (request.limits.maxGuestHeapBytes <= 0 || request.limits.maxIsolateMemoryBytes < request.limits.maxGuestHeapBytes) {

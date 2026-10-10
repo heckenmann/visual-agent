@@ -94,7 +94,7 @@ class ToolHelpTool(
         (this["enabledTools"] as? Set<*>)
             .orEmpty()
             .filterIsInstance<String>()
-            .filterNot { it == TOOL_ID }
+            .filterNot { it == TOOL_ID || (this["javascript"] == true && it in setOf("tools:batch", "javascript:execute")) }
             .mapTo(linkedSetOf(), ::ToolId)
 
     private fun JsonObject.string(key: String): String? = this[key]?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }

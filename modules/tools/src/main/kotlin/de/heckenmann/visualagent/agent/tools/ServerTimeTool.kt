@@ -16,6 +16,7 @@ class ServerTimeTool(
 ) : VisualAgentTool {
     override val definition =
         ToolDefinition(
+            batchSafety = de.heckenmann.visualagent.agent.tools.api.ToolBatchSafety.READ_ONLY_PARALLEL,
             id = TOOL_ID,
             name = TOOL_ID.toFunctionName(),
             description =

@@ -72,3 +72,17 @@ Execution exceptions are returned to the model as actionable tool errors (for ex
 
 - `GraalJavaScriptExecutionServiceTest` covers values, Markdown, console diagnostics, async tool calls, local transformations, access denial, sandbox boundaries, and parent cancellation.
 - The complete project quality gate must pass before release.
+
+## Independent Bulk Calls
+
+See UC-0000148 and issue #289. Independent native model calls, `tools_batch`, and guest
+`tools.callMany` use one bounded Reactor executor through the registry. Only explicitly reviewed
+read-only tools overlap; unknown tools and mutations remain serialized. Results retain declaration
+order and preserve the canonical single-call data and error envelope. Ordinary execution failures
+are per-item; syntax and invalid-argument errors stop the batch immediately and cancel unfinished
+work. All children inherit the parent deadline and cancellation.
+Batches are non-atomic and never automatically retry successful mutations.
+
+The provider-only `tools_batch` wrapper is unavailable to JavaScript `tools.call` and tool
+discovery. Scripts use `tools.callMany`, so every child consumes the script call budget and
+shares its admission, deadline and aggregate output limits.

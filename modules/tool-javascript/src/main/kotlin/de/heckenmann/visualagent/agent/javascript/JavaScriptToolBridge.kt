@@ -5,9 +5,6 @@ import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResultEnvelope
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.graalvm.polyglot.Value
@@ -28,17 +25,21 @@ internal class JavaScriptToolBridge(
     private val cancellationToken: CancellationToken,
     private val limits: JavaScriptExecutionLimits,
     private val logs: MutableList<JavaScriptLogEntry>,
+    private val batchExecutor: de.heckenmann.visualagent.agent.tools.ToolBatchExecutor,
 ) {
     /** Last bridge error, retained because Graal may erase host exception details in a Promise. */
     val lastFailure = AtomicReference<JavaScriptExecutionException?>()
     private val calls = AtomicInteger()
+    private val permits = Semaphore(limits.maxConcurrentToolCalls, true)
+    private val batchBridge =
+        JavaScriptBatchBridge(registry, batchExecutor, enabledTools, requestContext, cancellationToken, limits, calls, lastFailure, permits)
     private val workspaceReadBytes = AtomicLong()
     private val workspaceBytes = AtomicLong()
-    private val permits = Semaphore(limits.maxConcurrentToolCalls)
     private val valueConverter = JavaScriptGuestValueConverter(limits)
     private val toolsByFunctionName =
         registry
             .resolve(enabledTools.map(::ToolId).toSet())
+            .filterNot { it.definition.id.value == "tools:batch" }
             .associateBy { registry.definition(it).name }
 
     /** Returns the only host object made available to the guest context. */
@@ -54,11 +55,27 @@ internal class JavaScriptToolBridge(
                             throw error
                         }
                     },
+                "callMany" to executable(batchBridge::callMany),
                 "list" to executable { listTools() },
                 "describe" to executable(::describe),
                 "workspace" to workspaceObject(),
             ),
         )
+
+    /** Installs the Promise factory without exposing a host context to scripts. */
+    fun installPromiseFactory(context: org.graalvm.polyglot.Context) {
+        batchBridge.install(context)
+    }
+
+    /** Resolves guest Promises only on the owning context thread. */
+    fun drainPromises() {
+        batchBridge.drain()
+    }
+
+    /** Disposes all pending batch subscriptions before the context is closed. */
+    fun closePromises() {
+        batchBridge.close()
+    }
 
     /** Returns the hardened workspace write API exposed to the guest runtime. */
     fun workspaceObject(): ProxyObject =
@@ -146,19 +163,38 @@ internal class JavaScriptToolBridge(
             throw failure(JavaScriptErrorCategory.TOOL_ARGUMENTS, "Nested JavaScript tool calls must be awaited")
         }
         consumeCall()
-        if (!permits.tryAcquire()) throw failure(JavaScriptErrorCategory.LIMIT_EXCEEDED, "Concurrent JavaScript tool-call limit exceeded")
+        val required =
+            if (tool.definition.batchSafety == de.heckenmann.visualagent.agent.tools.api.ToolBatchSafety.READ_ONLY_PARALLEL) {
+                1
+            } else {
+                limits.maxConcurrentToolCalls
+            }
+        if (!permits.tryAcquire(
+                required,
+            )
+        ) {
+            throw failure(JavaScriptErrorCategory.LIMIT_EXCEEDED, "Concurrent JavaScript tool-call limit exceeded")
+        }
+        val lease =
+            de.heckenmann.visualagent.agent.tools
+                .ToolWorkLease { permits.release(required) }
         return try {
             cancellationToken.throwIfCancelled()
-            val resultJson = registry.executeBlocking(tool, input.toString(), requestContext + mapOf("javascript" to true))
+            val resultJson =
+                registry.executeBlocking(
+                    tool,
+                    input.toString(),
+                    requestContext + mapOf("javascript" to true, "toolWorkLease" to lease),
+                )
             cancellationToken.throwIfCancelled()
             val result = Json.decodeFromString<ToolResultEnvelope>(resultJson)
-            envelopeToGuest(result)
+            JavaScriptToolResults.envelope(result)
         } catch (error: JavaScriptExecutionException) {
             throw error
         } catch (error: Exception) {
             throw failure(JavaScriptErrorCategory.TOOL_FAILURE, "Tool '$name' failed: ${safeMessage(error)}")
         } finally {
-            permits.release()
+            lease.close()
         }
     }
 
@@ -249,34 +285,6 @@ internal class JavaScriptToolBridge(
         return null
     }
 
-    private fun envelopeToGuest(result: ToolResultEnvelope): ProxyObject =
-        ProxyObject.fromMap(
-            mapOf(
-                "toolId" to result.toolId,
-                "success" to result.success,
-                "data" to jsonToGuest(result.data),
-                "error" to
-                    result.error?.let { error ->
-                        ProxyObject.fromMap(
-                            mapOf(
-                                "code" to error.code.name,
-                                "message" to error.message,
-                                "remediation" to error.remediation,
-                                "retryable" to error.retryable,
-                            ),
-                        )
-                    },
-            ),
-        )
-
-    private fun jsonToGuest(element: JsonElement): Any? =
-        when (element) {
-            JsonNull -> null
-            is JsonPrimitive -> if (element.isString) element.content else element.booleanOrNumber()
-            is JsonArray -> ProxyArray.fromList(element.map(::jsonToGuest))
-            is JsonObject -> ProxyObject.fromMap(element.mapValues { (_, value) -> jsonToGuest(value) })
-        }
-
     private fun executable(action: (Array<out Value>) -> Any?): ProxyExecutable = ProxyExecutable { arguments -> action(arguments) }
 
     private fun failure(
@@ -329,13 +337,6 @@ internal class JavaScriptToolBridge(
             ?.take(MAX_ERROR_CHARACTERS)
             .orEmpty()
             .ifBlank { "unknown error" }
-
-    private fun JsonPrimitive.booleanOrNumber(): Any =
-        when {
-            content.equals("true", ignoreCase = true) -> true
-            content.equals("false", ignoreCase = true) -> false
-            else -> content.toDoubleOrNull() ?: content
-        }
 
     private companion object {
         const val JAVASCRIPT_TOOL_FUNCTION_NAME = "javascript_execute"
