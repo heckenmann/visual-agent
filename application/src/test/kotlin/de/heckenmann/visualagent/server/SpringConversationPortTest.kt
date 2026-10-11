@@ -33,7 +33,7 @@ import kotlin.test.assertNotNull
 class SpringConversationPortTest {
     private val manager = mockk<AgentManager>()
     private val mediaResolver = mockk<ConversationMediaResolver>(relaxed = true)
-    private val port = SpringConversationPort(manager, AppConfigBean(), mediaResolver)
+    private val port = SpringConversationPort(manager, AppConfigBean(), mediaResolver, mockk())
 
     @Test
     fun `latest page maps application messages to protocol messages`() =
@@ -209,7 +209,7 @@ class SpringConversationPortTest {
         val config = AppConfigBean()
         config.conversationInputPlacement = de.heckenmann.visualagent.config.ConversationInputPlacement.FIXED
         config.queueFlushMode = "ALL"
-        val configPort = SpringConversationPort(manager, config, mediaResolver)
+        val configPort = SpringConversationPort(manager, config, mediaResolver, mockk())
 
         assertEquals(ConversationInputPlacement.FIXED, configPort.preferences().inputPlacement)
         assertEquals("ALL", configPort.preferences().queueFlushMode)

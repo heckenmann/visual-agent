@@ -26,6 +26,10 @@ internal object AppConfigProperties {
             setProperty(AppConfig.KEY_SESSION_TIMEOUT_SECONDS, config.timeoutSeconds.toString())
             setProperty(AppConfig.KEY_SESSION_USER_MODEL_INSTRUCTION, config.userModelInstruction)
             setProperty(AppConfig.KEY_SESSION_QUEUE_FLUSH_MODE, config.queueFlushMode)
+            setProperty(AppConfig.KEY_PROMPT_INTERPOLATION_PROVIDER, config.promptInterpolationProviderId)
+            setProperty(AppConfig.KEY_PROMPT_INTERPOLATION_MODEL, config.promptInterpolationModelId)
+            setProperty(AppConfig.KEY_AUTOMATIC_PROMPT_INTERPOLATION, config.automaticPromptInterpolation.toString())
+            setProperty(AppConfig.KEY_PROMPT_INTERPOLATION_CONTEXT_MESSAGES, config.promptInterpolationContextMessages.toString())
             setProperty(AppConfig.KEY_FOLLOW_UP_SUGGESTIONS_ENABLED, config.followUpSuggestionsEnabled.toString())
             setProperty(AppConfig.KEY_FOLLOW_UP_SUGGESTION_DELAY_SECONDS, config.followUpSuggestionIdleDelaySeconds.toString())
             setProperty(AppConfig.KEY_FOLLOW_UP_SUGGESTION_COUNT, config.followUpSuggestionCount.toString())
@@ -59,6 +63,10 @@ internal object AppConfigProperties {
             properties.string(AppConfig.KEY_SESSION_USER_MODEL_INSTRUCTION, config.userModelInstruction)
         config.favoriteModels = properties.string(AppConfig.KEY_SESSION_FAVORITE_MODELS, config.favoriteModels)
         config.queueFlushMode = properties.string(AppConfig.KEY_SESSION_QUEUE_FLUSH_MODE, config.queueFlushMode)
+        config.promptInterpolationProviderId = properties.getProperty(AppConfig.KEY_PROMPT_INTERPOLATION_PROVIDER).orEmpty()
+        config.promptInterpolationModelId = properties.getProperty(AppConfig.KEY_PROMPT_INTERPOLATION_MODEL).orEmpty()
+        config.automaticPromptInterpolation = properties.boolean(AppConfig.KEY_AUTOMATIC_PROMPT_INTERPOLATION, false)
+        config.promptInterpolationContextMessages = properties.int(AppConfig.KEY_PROMPT_INTERPOLATION_CONTEXT_MESSAGES, 8, 5..10)
         config.followUpSuggestionsEnabled =
             properties.boolean(AppConfig.KEY_FOLLOW_UP_SUGGESTIONS_ENABLED, config.followUpSuggestionsEnabled)
         config.followUpSuggestionIdleDelaySeconds =
