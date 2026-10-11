@@ -16,11 +16,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandCircleDown
 import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -91,6 +89,10 @@ internal fun ConversationInputArea(
     input: String,
     sending: Boolean,
     contextReduced: Boolean = false,
+    interpolationNotice: String = "",
+    interpolationBusy: Boolean = false,
+    interpolating: Boolean = false,
+    onInterpolate: () -> Unit = {},
     onInputChange: (String) -> Unit,
     onSend: () -> Unit,
     onCancel: () -> Unit,
@@ -148,6 +150,10 @@ internal fun ConversationInputArea(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
             )
         }
+        if (interpolating) PromptInterpolationMagic()
+        if (interpolationNotice.isNotBlank()) {
+            Text(interpolationNotice, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 12.dp))
+        }
         OutlinedTextField(
             value = input,
             onValueChange = onInputChange,
@@ -173,23 +179,7 @@ internal fun ConversationInputArea(
             minLines = 1,
             maxLines = 5,
             trailingIcon = {
-                if (sending) {
-                    ActionIconButton(
-                        icon = Icons.Filled.Stop,
-                        description = "Cancel response",
-                        onClick = onCancel,
-                        modifier = Modifier.size(40.dp),
-                    )
-                } else {
-                    ActionIconButton(
-                        icon = Icons.AutoMirrored.Filled.Send,
-                        description = if (contextReduced) "Send message; context was reduced" else "Send message",
-                        onClick = onSend,
-                        enabled = input.isNotBlank(),
-                        modifier = Modifier.size(40.dp),
-                        tint = if (contextReduced) MaterialTheme.colorScheme.error else null,
-                    )
-                }
+                ComposerActions(input, sending, interpolationBusy, contextReduced, onInterpolate, onSend, onCancel)
             },
             modifier =
                 Modifier
@@ -199,7 +189,7 @@ internal fun ConversationInputArea(
                     .onFocusChanged { onFocusChanged(it.isFocused) }
                     .onPreviewKeyEvent { event ->
                         if (event.type == KeyEventType.KeyDown && event.key == Key.Enter && !event.isShiftPressed) {
-                            onSend()
+                            if (!interpolationBusy) onSend()
                             true
                         } else {
                             false
