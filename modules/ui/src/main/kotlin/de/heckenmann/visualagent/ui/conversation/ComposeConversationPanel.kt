@@ -34,14 +34,10 @@ import de.heckenmann.visualagent.protocol.ConversationPort
 import de.heckenmann.visualagent.protocol.ConversationSuggestionPort
 import de.heckenmann.visualagent.protocol.SettingsPort
 import de.heckenmann.visualagent.protocol.TodoPort
-import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
-import de.heckenmann.visualagent.ui.canvas.*
 import de.heckenmann.visualagent.ui.components.*
 import de.heckenmann.visualagent.ui.conversation.*
-import de.heckenmann.visualagent.ui.files.*
 import de.heckenmann.visualagent.ui.modal.*
-import de.heckenmann.visualagent.ui.settings.*
 import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
@@ -131,7 +127,13 @@ internal fun ConversationPanel(
             contextReducedFlow = conversationState.contextReduced,
             onActiveTokenChange = { activeToken = it },
         )
+    val interpolation =
+        rememberPromptInterpolationController(conversationPort, settingsPort, conversationState, suggestionController, sendContent)
+    val interpolationBusy by interpolation.busy.collectAsState()
+    val interpolating by interpolation.interpolating.collectAsState()
+    val interpolationNotice by interpolation.notice.collectAsState()
     val clearConversation = {
+        interpolation.cancel(report = false)
         suggestionController.onUserInteraction()
         handleClearConversation(
             scope = scope,
@@ -184,13 +186,14 @@ internal fun ConversationPanel(
     val onInputPlacementChange =
         conversationInputPlacementChange(scope, conversationPort, listState) { placement -> inputPlacement = placement }
     val onComposerInputChange: (String) -> Unit = { value ->
+        interpolation.edited()
         conversationState.input = value
         suggestionController.onInputChanged(value)
     }
-    val onComposerSend: () -> Unit = { sendContent(conversationState.input) }
+    val onComposerSend: () -> Unit = interpolation::submit
     val onComposerCancel: () -> Unit = {
         suggestionController.onUserInteraction()
-        activeToken?.cancel()
+        if (interpolation.busy.value) interpolation.cancel() else activeToken?.cancel()
     }
     CompositionLocalProvider(
         LocalConversationPort provides conversationPort,
@@ -214,6 +217,10 @@ internal fun ConversationPanel(
                                 sending = conversationState.sending,
                                 isRequestActive = isRequestActive,
                                 contextReduced = contextReduced,
+                                interpolationNotice = interpolationNotice,
+                                interpolationBusy = interpolationBusy,
+                                interpolating = interpolating,
+                                onInterpolate = interpolation::manual,
                                 onInputChange = onComposerInputChange,
                                 onSend = onComposerSend,
                                 onCancel = onComposerCancel,
@@ -238,6 +245,10 @@ internal fun ConversationPanel(
                         sending = conversationState.sending,
                         isRequestActive = isRequestActive,
                         contextReduced = contextReduced,
+                        interpolationNotice = interpolationNotice,
+                        interpolationBusy = interpolationBusy,
+                        interpolating = interpolating,
+                        onInterpolate = interpolation::manual,
                         onInputChange = onComposerInputChange,
                         onSend = onComposerSend,
                         onCancel = onComposerCancel,

@@ -234,6 +234,7 @@ internal fun providerSettingsOverlay(
             ) {
                 conversationSettingsSection(
                     settings = draft.conversationSettings,
+                    providers = draft.providers,
                     onChange = { conversationSettings -> draft = draft.copy(conversationSettings = conversationSettings) },
                 )
                 mainAgentMemorySection(
