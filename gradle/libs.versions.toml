@@ -1,6 +1,6 @@
 [versions]
 visual-agent = "1.0.0"
-kotlin = "2.4.20"
+kotlin = "2.4.21"
 ktlint = "14.2.0"
 ktlint-core = "1.5.0"
 ktlint-kotlin = "2.1.0"
