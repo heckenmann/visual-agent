@@ -86,3 +86,7 @@ Batches are non-atomic and never automatically retry successful mutations.
 The provider-only `tools_batch` wrapper is unavailable to JavaScript `tools.call` and tool
 discovery. Scripts use `tools.callMany`, so every child consumes the script call budget and
 shares its admission, deadline and aggregate output limits.
+
+## Task-contract integration
+
+Optional persisted task contracts, capability routing, scoped execution and evidence-backed acceptance are specified in [UC-0000149](uc_0000149_execute_task_contracts.md). Legacy description-only tasks retain their existing behavior. Contracted tasks carry the immutable revision through worker/reviewer requests and durable attempt records; editing scope invalidates stale completion. Existing Todo/Conversation details distinguish attempts, unchecked evidence and accepted output. No implicit agent creation or dependency scheduling is added.

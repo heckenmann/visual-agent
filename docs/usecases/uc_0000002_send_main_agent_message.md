@@ -65,3 +65,7 @@ The user receives a complete response and the conversation survives application 
 - Provider failures are persisted as an assistant message without exposing provider payloads or credentials.
 - Provider-neutral framing markers are removed before an assistant response is rendered, persisted, or reused as model context.
 - The composer remains usable for multiline editing, cancellation, and keyboard submission in both input placement modes.
+
+## Task-contract integration
+
+Optional persisted task contracts, capability routing, scoped execution and evidence-backed acceptance are specified in [UC-0000149](uc_0000149_execute_task_contracts.md). Legacy description-only tasks retain their existing behavior. Contracted tasks carry the immutable revision through worker/reviewer requests and durable attempt records; editing scope invalidates stale completion. Existing Todo/Conversation details distinguish attempts, unchecked evidence and accepted output. No implicit agent creation or dependency scheduling is added.

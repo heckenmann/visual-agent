@@ -9,10 +9,7 @@ orchestration, and accessible from the main agent through the
 Implemented:
 
 - DB-backed sub-agent loading at startup
-- default-agent seeding if the DB has fewer than three agents
-  (`AgentManagerLifecycleOps` calls `SubAgent.fromTemplate` for each
-  `AgentConfig.TEMPLATES` entry: `researcher`, `coder`, `documenter`,
-  `reviewer`, `tester`)
+- no implicit startup/planner agent creation; users or authorized main-agent actions explicitly create agents
 - create / update / delete from UI and from the main agent through
   `AgentManager` and the `agent:create` / `agent:update` /
   `agent:delete` tools
@@ -163,3 +160,7 @@ dots for the duration of the run.
   paths.
 - Improved UI polish for the SubAgents panel (cards, quick actions,
   logs preview, creation wizard) tracked in #26.
+
+## Task contracts and evidence
+
+[UC-0000149](usecases/uc_0000149_execute_task_contracts.md) defines optional persisted contracts and task-specific narrowing of current agent permissions. Contracted jobs exclude unrelated agent history by default, use versioned worker/main/reviewer policies, and preserve custom role text. Routing checks configured, registered operations rather than agent names. Worker claims and actual verification are stored separately; only evidence-backed acceptance completes a contracted task. Explicit assignments are never silently rerouted. Independent reviewer configuration reuses an existing agent. Offline and opt-in model evaluations are documented in [Task evaluations](task-evaluations.md).
