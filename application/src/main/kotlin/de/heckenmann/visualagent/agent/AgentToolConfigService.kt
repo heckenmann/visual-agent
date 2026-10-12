@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.knowledge.PreferenceStore
 import de.heckenmann.visualagent.knowledge.SubAgentConfigStore
 import org.springframework.stereotype.Service
+import de.heckenmann.visualagent.agent.tools.api.ToolId as RegistryToolId
 
 /**
  * Resolves the tool set exposed to the main agent and each sub-agent role.
@@ -15,6 +16,8 @@ import org.springframework.stereotype.Service
 class AgentToolConfigService(
     private val configStore: SubAgentConfigStore,
     private val preferenceStore: PreferenceStore? = configStore as? PreferenceStore,
+    private val registry: org.springframework.beans.factory.ObjectProvider<de.heckenmann.visualagent.agent.tools.ToolRegistry>? = null,
+    private val modelCapabilities: de.heckenmann.visualagent.task.TaskModelCapabilities? = null,
 ) {
     init {
         ensureDefaultConfigs()
@@ -83,14 +86,22 @@ class AgentToolConfigService(
         return filterSubAgentTools((configured ?: emptyList()) + listOf(TOOL_HELP_ID, "tools:batch")).map(::ToolId).toSet()
     }
 
-    private fun resolveTemplateName(agent: SubAgent): String {
-        val template = agent.config.templateName?.ifBlank { null }
-        if (template != null) return template
-        val tools = agent.config.tools
-        return defaultConfigs()
-            .firstOrNull { cfg ->
-                tools != null && tools.toSet() == cfg.tools.toSet()
-            }?.id ?: "researcher"
+    /** Returns executable registry identities without treating template placeholders as capabilities. */
+    fun registeredTools(): Set<ToolId>? =
+        registry
+            ?.ifAvailable
+            ?.allToolIds()
+            ?.map { ToolId(it.value) }
+            ?.toSet()
+
+    /** Matches declared actions against executable implementations, rather than prompt prose. */
+    fun supportsOperation(
+        agent: SubAgent,
+        operation: de.heckenmann.visualagent.task.TaskOperation,
+    ): Boolean {
+        if (modelCapabilities?.supportsTools(agent) == false) return false
+        val tool = registry?.ifAvailable?.resolve(setOf(RegistryToolId(operation.tool)))?.singleOrNull() ?: return false
+        return operation.action == null || tool.supportedActions?.contains(operation.action) == true
     }
 
     /**

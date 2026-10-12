@@ -112,6 +112,7 @@ internal fun startTodoChangeWatcher(
     token: CancellationToken,
     todoEventBus: TodoEventBus,
     executionTimelineSequence: Long = 0,
+    executionContract: de.heckenmann.visualagent.task.TaskContract? = null,
 ): AutoCloseable {
     return todoEventBus.addListener { change ->
         if (change.type == TodoChangeType.CLEARED) {
@@ -126,7 +127,7 @@ internal fun startTodoChangeWatcher(
                 val reassigned = todo.assignedAgentId != assignedAgentId
                 val cancelled = todo.status != TodoStatus.IN_PROGRESS
                 val descriptionChanged = todo.description != taskDescription
-                if (reassigned || cancelled || descriptionChanged) {
+                if (reassigned || cancelled || descriptionChanged || todo.contract != executionContract) {
                     token.cancel()
                 }
             }

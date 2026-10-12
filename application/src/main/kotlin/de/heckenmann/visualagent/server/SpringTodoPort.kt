@@ -28,20 +28,44 @@ class SpringTodoPort(
     private val agentManager: AgentManager,
     private val todoEventBus: TodoEventBus,
 ) : TodoPort {
-    override fun list(): List<TodoItem> = agentManager.getTodosFromDb().map(Todo::toTodoItem)
+    override fun list(): List<TodoItem> =
+        agentManager.getTodosFromDb().map {
+            it.toTodoItem().copy(executionGap = if (it.contract == null) null else agentManager.autonomousCoordinator.executionGap(it))
+        }
 
     override fun deletedSnapshots(limit: Int): List<TodoItem> = agentManager.todoManager.getDeletedTodos(limit).map(Todo::toTodoItem)
 
     override fun responseSnapshots(todoIds: Set<String>): List<TodoResponseSnapshot> =
         todoIds.mapNotNull { todoId ->
-            agentManager.memoryStore.searchMemories("todo:$todoId", limit = 1).firstOrNull()?.let { memory ->
-                TodoResponseSnapshot(todoId = todoId, text = memory.todoResponseText())
+            val memory = agentManager.memoryStore.searchMemories("todo:$todoId", limit = 1).firstOrNull()
+            val attempts =
+                agentManager.taskExecutionService
+                    ?.attempts(todoId, 0, 10, agentManager.todoManager.getById(todoId)?.acceptedResult)
+                    .orEmpty()
+            if (memory == null && attempts.isEmpty()) {
+                null
+            } else {
+                TodoResponseSnapshot(
+                    todoId = todoId,
+                    text = memory?.todoResponseText().orEmpty(),
+                    attempts = attempts,
+                )
             }
         }
 
     override fun agents(): List<AgentSummary> = agentManager.getSubAgents().map(SubAgent::toAgentSummary)
 
     override fun add(description: String): TodoItem = agentManager.todoManager.add(description).toTodoItem()
+
+    override fun addContract(
+        description: String,
+        contract: de.heckenmann.visualagent.task.TaskContract,
+        assignedAgentId: String?,
+    ): TodoItem =
+        agentManager.todoManager
+            .addIfAbsent(description, assignedAgentId, contract)
+            .todo
+            .toTodoItem()
 
     override fun updateDescription(
         todoId: String,
@@ -57,6 +81,8 @@ class SpringTodoPort(
                     update.assignedAgentId?.let(de.heckenmann.visualagent.todo.TodoAssignmentChange::Set)
                         ?: de.heckenmann.visualagent.todo.TodoAssignmentChange.Clear,
                 status = update.status.toTodoStatus(),
+                contract = update.contract,
+                replaceContract = update.replaceContract,
             ),
         )
 
@@ -125,6 +151,7 @@ private fun Todo.toTodoItem(): TodoItem =
         timelineSequence = timelineSequence,
         completedAt = completedAt,
         dueDate = dueDate,
+        contract = contract,
     )
 
 private fun SubAgent.toAgentSummary(): AgentSummary = AgentSummary(id = id, name = name)
