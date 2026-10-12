@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import de.heckenmann.visualagent.protocol.ConversationPort
+import de.heckenmann.visualagent.protocol.TodoChange
 import de.heckenmann.visualagent.protocol.TodoItem
 import de.heckenmann.visualagent.protocol.TodoPort
 import de.heckenmann.visualagent.protocol.TodoProgress
@@ -26,13 +27,75 @@ internal class ConversationTodoState {
     var todos: List<TodoItem> by mutableStateOf(emptyList())
     var deletedSnapshots: Map<String, TodoItem> by mutableStateOf(emptyMap())
     var responses: Map<String, TodoResponseState> by mutableStateOf(emptyMap())
+    private var generation = 0L
+    private var initialLoadPending = true
+    private val changedDuringLoad = mutableSetOf<String>()
+    private val removedDuringLoad = mutableSetOf<String>()
+    private val progressedDuringLoad = mutableSetOf<String>()
 
     /** Retains the same response holder when details open before the first progress event. */
     fun responseFor(todoId: String): TodoResponseState =
         responses[todoId] ?: TodoResponseState().also { responses = responses + (todoId to it) }
 
+    /** Captures the current presentation lifetime before beginning initial I/O. */
+    fun initialLoadToken(): Long = generation
+
+    /** Hydrates existing holders while retaining lifecycle and progress events received during I/O. */
+    fun restoreInitialSnapshots(
+        token: Long,
+        loadedTodos: List<TodoItem>,
+        loadedDeleted: List<TodoItem>,
+        loadedResponses: List<TodoResponseSnapshot>,
+    ) {
+        if (token != generation || !initialLoadPending) return
+        loadedResponses.forEach { snapshot ->
+            if (snapshot.todoId !in progressedDuringLoad) responseFor(snapshot.todoId).restore(snapshot.text, snapshot.agentId)
+        }
+        todos =
+            (loadedTodos.filterNot { it.id in changedDuringLoad } + todos.filter { it.id in changedDuringLoad })
+                .distinctBy { it.id }
+                .sortedBy { it.position }
+        deletedSnapshots =
+            loadedDeleted.filterNot { it.id in changedDuringLoad }.associateBy { it.id } +
+            (loadedTodos + loadedDeleted).filter { it.id in removedDuringLoad }.associateBy { it.id } +
+            deletedSnapshots.filterKeys { it in changedDuringLoad }
+        initialLoadPending = false
+        changedDuringLoad.clear()
+        removedDuringLoad.clear()
+        progressedDuringLoad.clear()
+    }
+
+    /** Applies a lifecycle event on Main and remembers its precedence over the initial snapshot. */
+    fun applyChange(change: TodoChange) {
+        val id = change.todoId ?: change.todo?.id ?: return
+        if (initialLoadPending) changedDuringLoad += id
+        if (change.removed) {
+            if (initialLoadPending) removedDuringLoad += id
+            val archivedTodo = change.todo ?: todos.firstOrNull { it.id == id }
+            archivedTodo?.let { deletedSnapshots = deletedSnapshots + (id to it) }
+            todos = todos.filterNot { it.id == id }
+        } else {
+            change.todo?.let { todo ->
+                removedDuringLoad -= todo.id
+                todos = (todos.filterNot { it.id == todo.id } + todo).sortedBy { it.position }
+                deletedSnapshots = deletedSnapshots - todo.id
+            }
+        }
+    }
+
+    /** Preserves live execution state when an older persisted response finishes loading. */
+    fun applyProgress(update: TodoProgress) {
+        if (initialLoadPending) progressedDuringLoad += update.todoId
+        responseFor(update.todoId).apply(update.executionId, update.agentId, update.delta, update.completed, update.reviewing)
+    }
+
     /** Clears the rendered todo state after the server removes all todo records. */
     fun clear() {
+        generation++
+        initialLoadPending = false
+        changedDuringLoad.clear()
+        removedDuringLoad.clear()
+        progressedDuringLoad.clear()
         todos = emptyList()
         deletedSnapshots = emptyMap()
         responses = emptyMap()
@@ -50,39 +113,25 @@ internal fun rememberConversationTodoState(
     val scope = rememberCoroutineScope()
     val progressUpdates = remember(todoPort) { Channel<TodoProgress>(Channel.UNLIMITED) }
     LaunchedEffect(todoPort) {
+        val token = state.initialLoadToken()
         val loadedTodos = withContext(Dispatchers.IO) { todoPort.list() }
         val loadedDeleted = withContext(Dispatchers.IO) { todoPort.deletedSnapshots() }
         val loadedResponses =
             withContext(Dispatchers.IO) {
                 todoPort.responseSnapshots((loadedTodos + loadedDeleted).map { it.id }.toSet())
-            }.associate(TodoResponseSnapshot::toResponseEntry)
-        state.responses = loadedResponses + state.responses
-        state.todos = loadedTodos
-        state.deletedSnapshots = loadedDeleted.associateBy { it.id }
+            }
+        state.restoreInitialSnapshots(token, loadedTodos, loadedDeleted, loadedResponses)
     }
     LaunchedEffect(progressUpdates) {
         for (update in progressUpdates) {
-            val response = state.responseFor(update.todoId)
-            response.apply(update.executionId, update.agentId, update.delta, update.completed, update.reviewing)
-            state.responses = state.responses + (update.todoId to response)
+            state.applyProgress(update)
         }
     }
     DisposableEffect(todoPort, progressUpdates) {
         val todoHandle =
             todoPort.addListener { change ->
-                val removedSnapshot = change.todoId?.let { id -> state.todos.firstOrNull { todo -> todo.id == id } }
                 scope.launch {
-                    if (change.removed) {
-                        change.todoId?.let { removedId ->
-                            val archivedTodo = change.todo ?: removedSnapshot
-                            archivedTodo?.let { state.deletedSnapshots = state.deletedSnapshots + (removedId to it) }
-                            state.todos = state.todos.filterNot { it.id == removedId }
-                        }
-                    } else {
-                        change.todo?.let { changedTodo ->
-                            state.todos = (state.todos.filterNot { it.id == changedTodo.id } + changedTodo).sortedBy { it.position }
-                        }
-                    }
+                    state.applyChange(change)
                     if (!conversationState.sending) {
                         val request = conversationState.beginLatestRequest()
                         val page = withContext(Dispatchers.IO) { conversationPort.latest() }
@@ -102,6 +151,3 @@ internal fun rememberConversationTodoState(
     }
     return state
 }
-
-private fun TodoResponseSnapshot.toResponseEntry(): Pair<String, TodoResponseState> =
-    todoId to TodoResponseState().also { it.restore(text, agentId) }
