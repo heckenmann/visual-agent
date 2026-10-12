@@ -54,3 +54,7 @@ The main agent reliably delegates work that requires tools it does not have, sea
 - The prompt contains todo-driven execution guidance (create todos for non-trivial requests, assign to sub-agents).
 - The role-based tool sets documented in the prompt match the actual tool sets configured in `AgentToolConfigService`.
 - The main agent no longer aborts with generic "I cannot do this" when the task requires sub-agent delegation.
+
+## Task-contract integration
+
+Optional persisted task contracts, capability routing, scoped execution and evidence-backed acceptance are specified in [UC-0000149](uc_0000149_execute_task_contracts.md). Legacy description-only tasks retain their existing behavior. Contracted tasks carry the immutable revision through worker/reviewer requests and durable attempt records; editing scope invalidates stale completion. Existing Todo/Conversation details distinguish attempts, unchecked evidence and accepted output. No implicit agent creation or dependency scheduling is added.

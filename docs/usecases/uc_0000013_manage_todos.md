@@ -107,3 +107,7 @@ It rechecks that token under the shared lifecycle lock immediately before releas
 persisting the agent. A newer claim taking ownership during the read makes the old cleanup
 inert. Conditional requeue still uses the captured database snapshot and cannot reset a
 newer execution.
+
+## Task-contract integration
+
+Optional persisted task contracts, capability routing, scoped execution and evidence-backed acceptance are specified in [UC-0000149](uc_0000149_execute_task_contracts.md). Legacy description-only tasks retain their existing behavior. Contracted tasks carry the immutable revision through worker/reviewer requests and durable attempt records; editing scope invalidates stale completion. Existing Todo/Conversation details distinguish attempts, unchecked evidence and accepted output. No implicit agent creation or dependency scheduling is added.
