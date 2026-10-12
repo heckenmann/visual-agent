@@ -7,9 +7,15 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performSemanticsAction
 import de.heckenmann.visualagent.protocol.TodoItem
 import de.heckenmann.visualagent.protocol.TodoState
 import de.heckenmann.visualagent.ui.todo.TodoResponseState
@@ -21,6 +27,63 @@ import kotlin.test.assertEquals
 class ConversationTodoCardTest {
     @get:Rule
     val composeTestRule = createComposeRule()
+
+    @Test
+    fun `every available state opens details without requiring response output`() {
+        val opened = mutableListOf<String>()
+        composeTestRule.setContent {
+            MaterialTheme {
+                Column {
+                    TodoState.entries.forEach { status ->
+                        ConversationTodoCard(
+                            TodoItem(status.name, status.name, status),
+                            TodoResponseState(),
+                            false,
+                            { opened += status.name },
+                        )
+                    }
+                }
+            }
+        }
+        TodoState.entries.forEach { status ->
+            composeTestRule.onNodeWithText(status.name).performClick()
+        }
+        assertEquals(TodoState.entries.map { it.name }, opened)
+    }
+
+    @Test
+    fun `focused card opens with Enter and Space`() {
+        var opened = 0
+        composeTestRule.setContent {
+            MaterialTheme {
+                ConversationTodoCard(TodoItem("keyboard", "Keyboard task"), TodoResponseState(), false, { opened++ })
+            }
+        }
+        val card = composeTestRule.onNodeWithContentDescription("Todo: Keyboard task")
+        card.performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        card.performKeyInput {
+            keyDown(Key.Enter)
+            keyUp(Key.Enter)
+        }
+        card.performKeyInput {
+            keyDown(Key.Spacebar)
+            keyUp(Key.Spacebar)
+        }
+        assertEquals(2, opened)
+    }
+
+    @Test
+    fun `deleted card retains its snapshot without opening missing details`() {
+        var opened = 0
+        composeTestRule.setContent {
+            MaterialTheme {
+                ConversationTodoCard(TodoItem("deleted", "Deleted task"), TodoResponseState(), true, { opened++ })
+            }
+        }
+        composeTestRule.onNodeWithContentDescription("Todo: Deleted task").assertIsNotEnabled().performClick()
+        composeTestRule.onNodeWithText("Unavailable").assertExists()
+        assertEquals(0, opened)
+    }
 
     @Test
     fun `reviewing todo shows its phase without discarding the response`() {

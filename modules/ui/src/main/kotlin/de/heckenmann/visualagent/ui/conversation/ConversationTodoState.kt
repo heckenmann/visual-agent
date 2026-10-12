@@ -27,6 +27,10 @@ internal class ConversationTodoState {
     var deletedSnapshots: Map<String, TodoItem> by mutableStateOf(emptyMap())
     var responses: Map<String, TodoResponseState> by mutableStateOf(emptyMap())
 
+    /** Retains the same response holder when details open before the first progress event. */
+    fun responseFor(todoId: String): TodoResponseState =
+        responses[todoId] ?: TodoResponseState().also { responses = responses + (todoId to it) }
+
     /** Clears the rendered todo state after the server removes all todo records. */
     fun clear() {
         todos = emptyList()
@@ -48,16 +52,17 @@ internal fun rememberConversationTodoState(
     LaunchedEffect(todoPort) {
         val loadedTodos = withContext(Dispatchers.IO) { todoPort.list() }
         val loadedDeleted = withContext(Dispatchers.IO) { todoPort.deletedSnapshots() }
-        state.todos = loadedTodos
-        state.deletedSnapshots = loadedDeleted.associateBy { it.id }
-        state.responses =
+        val loadedResponses =
             withContext(Dispatchers.IO) {
                 todoPort.responseSnapshots((loadedTodos + loadedDeleted).map { it.id }.toSet())
             }.associate(TodoResponseSnapshot::toResponseEntry)
+        state.responses = loadedResponses + state.responses
+        state.todos = loadedTodos
+        state.deletedSnapshots = loadedDeleted.associateBy { it.id }
     }
     LaunchedEffect(progressUpdates) {
         for (update in progressUpdates) {
-            val response = state.responses[update.todoId] ?: TodoResponseState()
+            val response = state.responseFor(update.todoId)
             response.apply(update.executionId, update.agentId, update.delta, update.completed, update.reviewing)
             state.responses = state.responses + (update.todoId to response)
         }

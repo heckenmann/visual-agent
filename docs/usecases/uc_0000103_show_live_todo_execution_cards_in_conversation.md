@@ -30,7 +30,9 @@ Keep the user aware of autonomous todo work by showing each todo as a compact ca
 - If no response has arrived yet, an in-progress card shows a compact working indicator.
 - If a retry starts with a new execution identifier, stale output is replaced by the current execution output.
 - When worker output finishes, the same progress channel ends streaming and signals `Reviewing result…`. The full response remains visible as static Markdown while approval is pending; the todo is not marked completed early.
-- If the full response is clicked, an internal scrollable overlay shows the complete Markdown response and continues observing live updates.
+- Clicking anywhere on an available todo card, including a pending card without output, opens the shared internal todo details/response overlay. The visible “Open todo details” hint and button semantics identify the action; hover, keyboard focus and press emphasize the card. Enter/Space activate the focused card.
+- Details opened before the first response show “No response output yet.” and retain the canonical response holder, so subsequent streaming and review updates appear without reopening. Status is read from the current todo snapshot.
+- Deleted/unavailable cards retain their readable snapshot and output but disable opening; they never navigate to a missing todo.
 - If the server is unavailable, the existing application error handling remains responsible for reporting the failure.
 
 ## Tool Calls
@@ -66,6 +68,8 @@ Keep the user aware of autonomous todo work by showing each todo as a compact ca
 - Review formatting corrections keep the card in `Reviewing result…`; they do not restart worker streaming. Exhausted evaluation cancels the todo with `REVIEW_FAILED`, preserving its stored worker result. Only a valid reviewer `RETRY` requests new worker work (UC-0000057).
 
 ## Related Issues
+
+Library decision for #162: reuse the existing Compose Foundation `clickable`, interaction source and Material indication. These provide accessible click/keyboard behavior and interaction tracking; no additional library is needed (reviewed klibs.io and the AndroidX Foundation implementation).
 
 - #253 — Live todo execution cards in conversation with shared response overlay.
 - #162 — Todo progress and open behavior in conversation.
