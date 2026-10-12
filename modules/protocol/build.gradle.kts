@@ -16,6 +16,7 @@ repositories {
 }
 
 dependencies {
+    api(project(":task-core"))
     api(platform(libs.grpc.bom))
     api(platform(libs.protobuf.bom))
     api(libs.grpc.stub)

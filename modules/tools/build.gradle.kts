@@ -15,6 +15,7 @@ repositories {
 }
 
 dependencies {
+    api(project(":task-core"))
     implementation(libs.kotlin.stdlib)
     implementation(libs.kotlin.logging)
     implementation(platform(libs.spring.boot.bom))
