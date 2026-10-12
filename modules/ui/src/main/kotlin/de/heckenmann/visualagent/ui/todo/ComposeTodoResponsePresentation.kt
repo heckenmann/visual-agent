@@ -58,6 +58,8 @@ internal class TodoResponseState {
         private set
     var isStreaming: Boolean by mutableStateOf(false)
         private set
+    var attempts: List<de.heckenmann.visualagent.task.TaskAttemptResult> by mutableStateOf(emptyList())
+        private set
     var isReviewing: Boolean by mutableStateOf(false)
         private set
 
@@ -72,6 +74,7 @@ internal class TodoResponseState {
         if (executionId != null && executionId != this.executionId) {
             this.executionId = executionId
             text = ""
+            if (!completed) invalidateAcceptance()
         }
         if (agentId != null) this.agentId = agentId
         if (delta.isNotEmpty()) text += delta
@@ -80,11 +83,17 @@ internal class TodoResponseState {
         if (completed) this.executionId = executionId ?: this.executionId
     }
 
+    /** Demotes old acceptance while a new execution or contract refresh is in flight. */
+    fun invalidateAcceptance() {
+        attempts = attempts.map { it.copy(currentAccepted = false) }
+    }
+
     /** Clears the current execution while retaining the state object for open overlays. */
     fun clear() {
         executionId = null
         agentId = null
         text = ""
+        attempts = emptyList()
         isStreaming = false
         isReviewing = false
     }
@@ -93,10 +102,12 @@ internal class TodoResponseState {
     fun restore(
         response: String,
         restoredAgentId: String? = null,
+        restoredAttempts: List<de.heckenmann.visualagent.task.TaskAttemptResult> = emptyList(),
     ) {
         executionId = null
         agentId = restoredAgentId
         text = response
+        attempts = restoredAttempts
         isStreaming = false
         isReviewing = false
     }
@@ -188,6 +199,7 @@ internal fun TodoResponseOverlay(
     responseState: TodoResponseState,
     onDismiss: () -> Unit,
 ) {
+    val openArtifact = de.heckenmann.visualagent.ui.files.LocalOpenWorkspaceArtifact.current
     ModalDialogLayout(
         body = {
             Text(todo.description, style = MaterialTheme.typography.titleMedium)
@@ -196,6 +208,16 @@ internal fun TodoResponseOverlay(
                 text = "${todo.status.name.labelizeEnumName()}${responseState.agentId?.let { " · $it" } ?: ""}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TodoTaskDetails(
+                todo.contract,
+                responseState.attempts,
+                openArtifact?.let { open ->
+                    { path ->
+                        open(path)
+                        onDismiss()
+                    }
+                },
             )
             SelectionContainer {
                 if (responseState.isStreaming) {

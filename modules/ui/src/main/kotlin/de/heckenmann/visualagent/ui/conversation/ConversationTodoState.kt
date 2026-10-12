@@ -78,6 +78,15 @@ internal fun rememberConversationTodoState(
                             state.todos = (state.todos.filterNot { it.id == changedTodo.id } + changedTodo).sortedBy { it.position }
                         }
                     }
+                    val contracted =
+                        change.todo?.takeIf {
+                            it.contract != null &&
+                                it.status != de.heckenmann.visualagent.protocol.TodoState.IN_PROGRESS
+                        }
+                    if (contracted != null) {
+                        val snapshot = withContext(Dispatchers.IO) { todoPort.responseSnapshots(setOf(contracted.id)) }.firstOrNull()
+                        snapshot?.let { state.responses = state.responses + it.toResponseEntry() }
+                    }
                     if (!conversationState.sending) {
                         val request = conversationState.beginLatestRequest()
                         val page = withContext(Dispatchers.IO) { conversationPort.latest() }
@@ -99,4 +108,4 @@ internal fun rememberConversationTodoState(
 }
 
 private fun TodoResponseSnapshot.toResponseEntry(): Pair<String, TodoResponseState> =
-    todoId to TodoResponseState().also { it.restore(text, agentId) }
+    todoId to TodoResponseState().also { it.restore(text, agentId, attempts) }

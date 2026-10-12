@@ -94,6 +94,15 @@ internal fun FilesPanel(
     val refresh: () -> Unit = {
         scope.launch { refreshWorkspace() }
     }
+    val requestedArtifact = LocalWorkspaceArtifactPath.current?.value
+    LaunchedEffect(requestedArtifact) {
+        requestedArtifact?.let { path ->
+            currentDirectory = path.substringBeforeLast('/', "")
+            query = path.substringAfterLast('/')
+            typeFilter = ALL_FILE_TYPES
+            refreshWorkspace()
+        }
+    }
     LaunchedEffect(workspaceFileService) { refreshWorkspace() }
     DisposableEffect(workspaceFileService) {
         val downloadHandle =
