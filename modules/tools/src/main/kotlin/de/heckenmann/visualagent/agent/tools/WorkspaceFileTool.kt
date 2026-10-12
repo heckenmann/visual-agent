@@ -22,6 +22,8 @@ class WorkspaceFileTool(
     private val workspaceFiles: WorkspaceFileToolPort,
     directories: DirectoryToolPort = UnsupportedDirectoryToolPort,
 ) : VisualAgentTool {
+    override val supportedActions = workspaceFileActions
+
     private val grantedDirectories = WorkspaceGrantedDirectoryActions(directories)
     private val mediaActions = WorkspaceFileToolMediaActions(workspaceFiles)
     private val mutations = WorkspaceFileToolMutationActions(workspaceFiles, grantedDirectories)

@@ -65,6 +65,15 @@ class JavaScriptExecuteTool(
             source
                 ?: path?.let {
                     try {
+                        (context["taskToolAccess"] as? de.heckenmann.visualagent.agent.tools.TaskToolAccess)?.requireAllowed(
+                            "workspace:file",
+                            kotlinx.serialization.json.JsonObject(
+                                mapOf(
+                                    "action" to JsonPrimitive("readText"),
+                                    "path" to JsonPrimitive(it),
+                                ),
+                            ),
+                        )
                         executionService.readWorkspaceSource(it, limits.maxWorkspaceReadBytes)
                     } catch (_: JavaScriptWorkspaceReadLimitExceededException) {
                         return limitExceeded("Workspace script size limit exceeded")

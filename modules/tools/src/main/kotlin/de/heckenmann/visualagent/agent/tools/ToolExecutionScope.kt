@@ -58,6 +58,18 @@ class ToolExecutionScope : AutoCloseable {
             (if (calls.size > 32) "Earlier tool evidence omitted; ${calls.size} calls total.\n" else "") + entries.joinToString("\n\n")
         }
 
+    /** Safe terminal observations for durable handoffs without raw output. */
+    fun observations(): List<de.heckenmann.visualagent.task.TaskToolObservation> =
+        synchronized(lock) {
+            calls
+                .takeLast(
+                    32,
+                ).map {
+                    de.heckenmann.visualagent.task
+                        .TaskToolObservation(it.toolId, it.result?.success == true, it.asynchronous)
+                }
+        }
+
     /** Cancels work still owned by an unsuccessful or cancelled worker attempt. */
     override fun close() {
         val snapshot =
