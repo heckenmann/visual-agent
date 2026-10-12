@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -181,7 +180,7 @@ fun VisualAgentComposeApp(
             colorScheme = if (darkTheme) visualAgentDarkColorScheme() else visualAgentLightColorScheme(),
             typography = visualAgentTypography(settings.fontSize),
         ) {
-            CompositionLocalProvider(LocalSemanticActionColors provides semanticActionColors(darkTheme)) {
+            WorkspaceArtifactNavigation(activateWindow, darkTheme) {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     Box(modifier = Modifier.fillMaxSize()) {
                         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
