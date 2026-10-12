@@ -20,7 +20,7 @@ class WorkspaceDownloadTransportTest {
     @Test
     fun `rejects unsupported protocol before transfer`() {
         assertFailsWith<IOException> {
-            transport.download(URI("gopher://example.org/file"), destination, control)
+            transport.download(URI("gopher://8.8.8.8/file"), destination, control)
         }
     }
 
