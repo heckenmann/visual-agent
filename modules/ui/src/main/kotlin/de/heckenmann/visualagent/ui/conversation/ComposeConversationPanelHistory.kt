@@ -104,8 +104,8 @@ internal fun ConversationPanelHistory(
             sendContent = sendContent,
             inlineComposer = inlineComposer,
             emptyStateTopInset = emptyStateTopInset,
-            onOpenTodoResponse = { todo, responseState ->
-                modalRequester.requestTodoResponse(todo, responseState) {
+            onOpenTodoResponse = { todo, _ ->
+                modalRequester.requestTodoResponse(todo, todoState.responseFor(todo.id)) {
                     todoState.todos.firstOrNull { current -> current.id == todo.id }
                         ?: todoState.deletedSnapshots[todo.id]
                 }
