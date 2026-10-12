@@ -19,10 +19,18 @@ internal fun TodoManager.transitionReactive(
     reason: TodoTerminalReason? = null,
     detail: String? = null,
     approval: TodoApproval? = null,
+    acceptedResult: de.heckenmann.visualagent.task.TaskAttemptResult? = null,
 ): Mono<Boolean> =
     Mono.defer {
+        if (status == TodoStatus.COMPLETED &&
+            expected.contract != null &&
+            (acceptedResult?.accepted != true || acceptedResult.contractRevision != expected.contract.revision)
+        ) {
+            return@defer Mono.just(false)
+        }
         val candidate =
             expected.copy(
+                acceptedResult = acceptedResult ?: expected.acceptedResult,
                 status = status,
                 updatedAt = Instant.now(),
                 completedAt = if (status == TodoStatus.COMPLETED) Instant.now() else null,
@@ -48,6 +56,7 @@ internal fun TodoManager.transitionReactive(
 internal fun TodoManager.replaceWithChildrenReactive(
     expected: Todo,
     descriptions: List<String>,
+    contracts: List<de.heckenmann.visualagent.task.TaskContract>? = null,
 ): Mono<Boolean> =
     todoStore.listTodosReactive().collectList().flatMap { todos ->
         val position = (todos.maxOfOrNull { it.position } ?: -1) + 1
@@ -58,6 +67,7 @@ internal fun TodoManager.replaceWithChildrenReactive(
                     description,
                     position = position + index,
                     decompositionDepth = expected.decompositionDepth + 1,
+                    contract = contracts?.get(index),
                 )
             }
         todoStore.replaceTodoWithChildrenReactive(expected, children).flatMap { replaced ->

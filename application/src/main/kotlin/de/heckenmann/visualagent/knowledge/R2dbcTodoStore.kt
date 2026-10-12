@@ -4,6 +4,7 @@ import de.heckenmann.visualagent.knowledge.R2dbcPersistenceSupport.blockCompleti
 import de.heckenmann.visualagent.knowledge.R2dbcPersistenceSupport.blockList
 import de.heckenmann.visualagent.knowledge.R2dbcPersistenceSupport.blockNullable
 import de.heckenmann.visualagent.knowledge.R2dbcPersistenceSupport.blockRequired
+import de.heckenmann.visualagent.task.TaskContractCodec
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoStatus
 import org.springframework.context.annotation.DependsOn
@@ -133,7 +134,7 @@ internal class R2dbcTodoStore(
                     sequenceStore.nextReactive().flatMap { sequence ->
                         updated.timelineSequence = sequence
                         updated.position = current.position
-                        mergeTodo(updated).thenReturn(true)
+                        mergeTodo(updated).then(recordAcceptance(updated)).thenReturn(true)
                     }
                 }.defaultIfEmpty(false),
         )
@@ -176,7 +177,7 @@ internal class R2dbcTodoStore(
     override fun listTodosReactive(): Flux<Todo> =
         databaseClient
             .sql(
-                "SELECT id, description, status, position, assigned_agent_id, created_at, updated_at, timeline_sequence, completed_at, due_date, terminal_detail, decomposition_depth FROM todos ORDER BY position ASC, id ASC",
+                "SELECT id, description, status, position, assigned_agent_id, created_at, updated_at, timeline_sequence, completed_at, due_date, terminal_detail, decomposition_depth, task_contract, accepted_result FROM todos ORDER BY position ASC, id ASC",
             ).map { row, _ -> row.toTodo() }
             .all()
 
@@ -211,7 +212,7 @@ internal class R2dbcTodoStore(
     override fun listDeletedTodosReactive(limit: Int): Flux<Todo> =
         databaseClient
             .sql(
-                "SELECT id, description, status, position, assigned_agent_id, created_at, updated_at, timeline_sequence, completed_at, due_date, terminal_detail, decomposition_depth FROM deleted_todos ORDER BY updated_at DESC, id DESC LIMIT :limit",
+                "SELECT id, description, status, position, assigned_agent_id, created_at, updated_at, timeline_sequence, completed_at, due_date, terminal_detail, decomposition_depth, task_contract, accepted_result FROM deleted_todos ORDER BY updated_at DESC, id DESC LIMIT :limit",
             ).bind("limit", limit.coerceIn(1, 100))
             .map { row, _ -> row.toTodo() }
             .all()
@@ -227,6 +228,19 @@ internal class R2dbcTodoStore(
             ),
         )
 
+    private fun recordAcceptance(todo: Todo): Mono<Void> {
+        val result = todo.acceptedResult ?: return Mono.empty()
+        return databaseClient
+            .sql(
+                "UPDATE task_attempts SET result_json = :result, accepted = TRUE WHERE execution_id = :execution AND todo_id = :todo",
+            ).bind("result", result.encode())
+            .bind("execution", result.executionId)
+            .bind("todo", todo.id)
+            .fetch()
+            .rowsUpdated()
+            .then()
+    }
+
     private fun mergeTodo(todo: Todo): Mono<Long> {
         var statement =
             databaseClient
@@ -234,10 +248,10 @@ internal class R2dbcTodoStore(
                     """
                     MERGE INTO todos
                         (id, description, status, position, assigned_agent_id, created_at, updated_at,
-                         timeline_sequence, completed_at, due_date, terminal_detail, decomposition_depth)
+                         timeline_sequence, completed_at, due_date, terminal_detail, decomposition_depth, task_contract, accepted_result)
                     KEY (id)
                     VALUES (:id, :description, :status, :position, :assignedAgentId, :createdAt, :updatedAt,
-                            :timelineSequence, :completedAt, :dueDate, :terminalDetail, :decompositionDepth)
+                            :timelineSequence, :completedAt, :dueDate, :terminalDetail, :decompositionDepth, :taskContract, :acceptedResult)
                     """.trimIndent(),
                 ).bind("id", todo.id)
                 .bind("description", todo.description)
@@ -248,6 +262,8 @@ internal class R2dbcTodoStore(
         statement = R2dbcPersistenceSupport.bindText(statement, "completedAt", todo.completedAt?.toString())
         statement = R2dbcPersistenceSupport.bindText(statement, "dueDate", todo.dueDate?.toString())
         statement = R2dbcPersistenceSupport.bindText(statement, "terminalDetail", todo.terminalDetail)
+        statement = R2dbcPersistenceSupport.bindText(statement, "taskContract", todo.contract?.let(TaskContractCodec::encode))
+        statement = R2dbcPersistenceSupport.bindText(statement, "acceptedResult", todo.acceptedResult?.encode())
         return statement
             .bind("createdAt", todo.createdAt.toString())
             .bind("updatedAt", todo.updatedAt.toString())
@@ -263,10 +279,10 @@ internal class R2dbcTodoStore(
                     """
                     MERGE INTO deleted_todos
                         (id, description, status, position, assigned_agent_id, created_at, updated_at,
-                         timeline_sequence, completed_at, due_date, terminal_detail, decomposition_depth)
+                         timeline_sequence, completed_at, due_date, terminal_detail, decomposition_depth, task_contract, accepted_result)
                     KEY (id)
                     VALUES (:id, :description, :status, :position, :assignedAgentId, :createdAt, :updatedAt,
-                            :timelineSequence, :completedAt, :dueDate, :terminalDetail, :decompositionDepth)
+                            :timelineSequence, :completedAt, :dueDate, :terminalDetail, :decompositionDepth, :taskContract, :acceptedResult)
                     """.trimIndent(),
                 ).bind("id", todo.id)
                 .bind("description", todo.description)
@@ -277,6 +293,8 @@ internal class R2dbcTodoStore(
         statement = R2dbcPersistenceSupport.bindText(statement, "completedAt", todo.completedAt?.toString())
         statement = R2dbcPersistenceSupport.bindText(statement, "dueDate", todo.dueDate?.toString())
         statement = R2dbcPersistenceSupport.bindText(statement, "terminalDetail", todo.terminalDetail)
+        statement = R2dbcPersistenceSupport.bindText(statement, "taskContract", todo.contract?.let(TaskContractCodec::encode))
+        statement = R2dbcPersistenceSupport.bindText(statement, "acceptedResult", todo.acceptedResult?.encode())
         return statement
             .bind("createdAt", todo.createdAt.toString())
             .bind("updatedAt", todo.updatedAt.toString())
@@ -288,7 +306,7 @@ internal class R2dbcTodoStore(
     private fun selectTodo(id: String): Flux<Todo> =
         databaseClient
             .sql(
-                "SELECT id, description, status, position, assigned_agent_id, created_at, updated_at, timeline_sequence, completed_at, due_date, terminal_detail, decomposition_depth FROM todos WHERE id = :id",
+                "SELECT id, description, status, position, assigned_agent_id, created_at, updated_at, timeline_sequence, completed_at, due_date, terminal_detail, decomposition_depth, task_contract, accepted_result FROM todos WHERE id = :id",
             ).bind("id", id)
             .map { row, _ -> row.toTodo() }
             .all()
