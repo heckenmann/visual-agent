@@ -120,6 +120,8 @@ internal fun buildFixture(
     reviewResponses: List<String> = listOf(reviewContent),
     reviewFailure: Exception? = null,
     todoStore: de.heckenmann.visualagent.knowledge.TodoStore = FakeTodoStore(),
+    enabledWorkerTools: Set<de.heckenmann.visualagent.agent.ToolId> = emptySet(),
+    taskExecutionService: de.heckenmann.visualagent.task.TaskExecutionService? = null,
     providerSignalsOn: reactor.core.scheduler.Scheduler? = null,
 ): CoordinatorFixture {
     val todoEventBus = TodoEventBus()
@@ -154,7 +156,8 @@ internal fun buildFixture(
         }
     val toolConfig = mockk<AgentToolConfigService>()
     every { toolConfig.mainAgentTools() } returns emptySet()
-    every { toolConfig.toolsFor(any<SubAgent>()) } returns emptySet()
+    every { toolConfig.toolsFor(any<SubAgent>()) } returns enabledWorkerTools
+    every { toolConfig.registeredTools() } returns enabledWorkerTools
     every { provider.chatReactive(any<ChatRequestContext>()) } answers {
         val ctx = it.invocation.args[0] as ChatRequestContext
         val isReview = ctx.metadata["sessionId"] == "review"
@@ -255,6 +258,7 @@ internal fun buildFixture(
             conversationOps = conversationOps,
             subAgentOps = subAgentOps,
             executionControl = executionControl,
+            taskExecutionService = taskExecutionService,
             retryDelay = {
                 reactor.core.publisher.Mono
                     .empty()

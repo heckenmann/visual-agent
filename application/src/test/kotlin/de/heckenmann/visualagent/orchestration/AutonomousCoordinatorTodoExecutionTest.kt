@@ -165,7 +165,17 @@ class AutonomousCoordinatorTodoExecutionTest {
     fun `complex todo with empty decomposition falls back to direct execution`() =
         runBlocking {
             val fixture = buildFixture(responseContent = "")
-            fixture.putSubAgent(SubAgent(id = "analyst", name = "Analyst", role = "Analysis", status = AgentStatus.IDLE))
+            fixture.putSubAgent(
+                SubAgent(
+                    id = "analyst",
+                    name = "Analyst",
+                    role = "Analysis",
+                    config =
+                        de.heckenmann.visualagent.agent
+                            .AgentConfig(templateName = "analyst"),
+                    status = AgentStatus.IDLE,
+                ),
+            )
             val todo =
                 fixture.todoManager.add(
                     "Analyze and integrate a multi-service architecture pipeline, then plan migration, tests, and documentation",

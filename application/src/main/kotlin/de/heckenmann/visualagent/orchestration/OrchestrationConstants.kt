@@ -3,79 +3,12 @@ package de.heckenmann.visualagent.orchestration
 import de.heckenmann.visualagent.agent.Message
 
 /**
- * Central, versioned orchestration prompts and heuristic constants.
+ * Central, versioned orchestration prompts.
  *
  * Keeping prompts in one place makes the agent behaviour inspectable and avoids
  * scattering hard-coded strings across planner code. Use cases: UC-0000056, UC-0000057.
  */
 internal object OrchestrationConstants {
-    /** Fallback subtask prefix characters stripped during decomposition parsing. */
-    val SUBTASK_PREFIX_CHARS = charArrayOf('-', '*', '•')
-
-    /** Minimum meaningful subtask length (in characters) accepted by the planner. */
-    const val MIN_SUBTASK_LENGTH = 3
-
-    /** Maximum number of subtasks produced when decomposing a complex todo. */
-    const val MAX_SUBTASKS = 8
-
-    /** Minimum word count used as a complexity signal for automatic decomposition. */
-    const val COMPLEX_WORD_COUNT = 16
-
-    /** Lexical hints that suggest a todo is complex and should be decomposed. */
-    val COMPLEXITY_HINTS = listOf("and", "then", "integrate", "architecture", "pipeline", "multi", "parallel")
-
-    /** Lexical hints that suggest a code-related task. */
-    val CODE_HINTS = listOf("code", "implement", "fix")
-
-    /** Lexical hints that suggest a research-related task. */
-    val RESEARCH_HINTS = listOf("research", "docs", "issue")
-
-    /**
-     * Builds the analysis prompt that decomposes a complex todo into subtasks.
-     *
-     * @param description Original todo description shown to the analysis agent
-     * @return System and user messages for the analysis agent
-     */
-    fun decompositionPrompt(description: String): List<Message> =
-        listOf(
-            Message(
-                "system",
-                "You are a task decomposition agent. Your sole responsibility is to break a single " +
-                    "high-level task into smaller, self-contained work steps.\n\n" +
-                    "Context:\n" +
-                    "- You receive one task description from a todo list.\n" +
-                    "- Your output will be executed by worker agents, one step at a time, in order.\n" +
-                    "- Each subtask becomes a separate todo that a worker picks up and completes.\n" +
-                    "- A worker can only perform actions: research, implement, write, edit, analyze, test, review, document.\n" +
-                    "- A worker cannot \"be\" the final result. They produce it through actions.\n\n" +
-                    "Critical distinction — action vs. content:\n" +
-                    "- An ACTION tells a worker what to DO " +
-                    "(\"Research the topic\", \"Draft the structure\", \"Write the first section\").\n" +
-                    "- CONTENT is the thing being produced (a poem line, a code snippet, a paragraph, a data value).\n" +
-                    "- NEVER return content as a subtask. If the task is to create something, describe the creation steps.\n\n" +
-                    "Rules:\n" +
-                    "1. Produce 2-6 subtasks. Fewer is better if the task is simple.\n" +
-                    "2. Every subtask must start with or imply an action verb.\n" +
-                    "3. Do not include any content that belongs in the final deliverable.\n" +
-                    "4. Each subtask must be understandable in isolation.\n" +
-                    "5. If the task spans multiple concerns, split by concern.\n" +
-                    "6. If the task is already simple and cannot be meaningfully split, return it as a single subtask.\n\n" +
-                    "Self-check before output:\n" +
-                    "Read each subtask and ask: \"Would a worker know what ACTION to take, " +
-                    "or would they just see a piece of the final result?\" " +
-                    "If a subtask looks like a fragment of the deliverable, " +
-                    "rewrite it as the action that produces that fragment.\n\n" +
-                    "Output format:\n" +
-                    "- One subtask per line.\n" +
-                    "- No numbering, no prefixes, no bullet points.\n" +
-                    "- No additional commentary or explanation.",
-            ),
-            Message(
-                "user",
-                "Task: $description\nReturn each subtask on its own line without numbering.",
-            ),
-        )
-
     /**
      * Builds the instruction shown to a worker sub-agent for a given todo.
      *

@@ -43,7 +43,7 @@ class AutonomousTaskPlannerTest {
     }
 
     @Test
-    fun `selects an idle specialist before a general worker`() {
+    fun `legacy work selects deterministically without inferring capabilities from names`() {
         val todoManager = TodoManager()
         todoManager.add("Research the API docs")
         val general = SubAgent(id = "worker", name = "Worker", role = "General")
@@ -51,34 +51,44 @@ class AutonomousTaskPlannerTest {
         val agents = linkedMapOf(general.id to general, researcher.id to researcher)
         val planner = planner(todoManager, agents)
 
-        assertSame(researcher, planner.selectWorkerAgentForNextTodo())
+        assertSame(general, planner.selectWorkerAgentForNextTodo())
     }
 
     @Test
-    fun `detects complex descriptions`() {
-        val planner = planner(TodoManager(), mutableMapOf())
-
-        assertTrue(planner.isComplex("Design the architecture and integrate the complete pipeline"))
-        assertTrue(
-            planner.isComplex(
-                "Create a detailed implementation plan that covers validation persistence retries observability " +
-                    "documentation migration compatibility rollout monitoring and recovery behavior",
-            ),
-        )
-        assertFalse(planner.isComplex("Fix typo"))
-    }
+    fun `long multilingual descriptions remain one task without an explicit decomposable contract`() =
+        runTest {
+            for (description in listOf(
+                "Design the architecture and integrate the complete pipeline",
+                "Entwirf die Architektur und integriere die gesamte Verarbeitung",
+                "Concevez l’architecture et intégrez le pipeline complet",
+            )) {
+                val manager = TodoManager()
+                val todo = manager.add(description)
+                assertFalse(planner(manager, mutableMapOf()).expandComplexTodoIfNeeded(manager.getAll()).awaitSingle())
+                assertEquals(listOf(todo), manager.getAll())
+            }
+        }
 
     @Test
     fun `expands a complex todo into actionable subtasks`() =
         runTest {
             val todoManager = TodoManager()
-            todoManager.add("Design the architecture and integrate the complete pipeline")
-            val analyst = SubAgent(id = "analyst", name = "Analyst", role = "Analysis")
+            val objective = "Design the architecture and integrate the complete pipeline"
+            todoManager.addIfAbsent(objective, "worker", planningContract(objective))
+            val analyst =
+                SubAgent(
+                    id = "analyst",
+                    name = "Analyst",
+                    role = "Analysis",
+                    config =
+                        de.heckenmann.visualagent.agent
+                            .AgentConfig(templateName = "analyst"),
+                )
             val provider = mockk<LLMProvider>()
             val toolConfig = mockk<AgentToolConfigService>()
             every { toolConfig.toolsFor(analyst) } returns emptySet()
             every { provider.chatReactive(any<ChatRequestContext>()) } returns
-                Mono.just(response("- Inspect modules\n- Implement pipeline"))
+                Mono.just(response(independentPlan))
             val planner =
                 planner(
                     todoManager = todoManager,
