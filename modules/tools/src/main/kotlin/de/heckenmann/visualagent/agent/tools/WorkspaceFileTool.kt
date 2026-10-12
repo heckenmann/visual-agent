@@ -22,6 +22,8 @@ class WorkspaceFileTool(
     private val workspaceFiles: WorkspaceFileToolPort,
     directories: DirectoryToolPort = UnsupportedDirectoryToolPort,
 ) : VisualAgentTool {
+    override val supportedActions = workspaceFileActions
+
     private val grantedDirectories = WorkspaceGrantedDirectoryActions(directories)
     private val mediaActions = WorkspaceFileToolMediaActions(workspaceFiles)
     private val mutations = WorkspaceFileToolMutationActions(workspaceFiles, grantedDirectories)
@@ -295,18 +297,7 @@ class WorkspaceFileTool(
         )
     }
 
-    private fun extractPdfText(record: ToolWorkspaceFile): ToolResult {
-        val text = workspaceFiles.extractPdfText(record)
-        return success(
-            TOOL_ID,
-            buildJsonObject {
-                put("id", record.id)
-                put("path", record.relativePath)
-                put("cached", text.cached)
-                put("content", text.text)
-            }.toString(),
-        )
-    }
+    private fun extractPdfText(record: ToolWorkspaceFile): ToolResult = success(TOOL_ID, mediaActions.extractPdfText(record).toString())
 
     private fun renderPdfPage(
         record: ToolWorkspaceFile,

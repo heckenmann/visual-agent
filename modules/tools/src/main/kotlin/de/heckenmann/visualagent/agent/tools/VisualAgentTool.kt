@@ -14,6 +14,10 @@ interface VisualAgentTool {
      */
     val definition: ToolDefinition
 
+    /** Executable action identities for capability matching; null means no declared action catalog. */
+    val supportedActions: Set<String>?
+        get() = null
+
     /**
      * Whether this tool manages asynchronous execution and waiting internally.
      *

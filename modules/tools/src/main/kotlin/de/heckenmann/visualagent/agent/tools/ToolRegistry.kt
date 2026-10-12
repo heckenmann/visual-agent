@@ -86,6 +86,25 @@ class ToolRegistry(
         val inputObject = parseObject(functionInput)
         return Mono.defer {
             val startedAt = Instant.now()
+            runCatching {
+                (context["taskToolAccess"] as? TaskToolAccess)?.requireAllowed(
+                    definition.id.value,
+                    inputObject,
+                )
+            }.exceptionOrNull()?.let { error ->
+                return@defer Mono.just(
+                    completeImmediately(
+                        definition,
+                        functionInput,
+                        context,
+                        startedAt,
+                        failure(
+                            definition.id.value,
+                            error.message ?: "TASK_SCOPE_DENIED",
+                        ),
+                    ),
+                )
+            }
             val options =
                 runCatching {
                     runtimeOptions(inputObject, defaultTimeoutSeconds()).also { options ->
@@ -119,16 +138,19 @@ class ToolRegistry(
             }
             val ownedCall = (context["toolExecutionScope"] as? ToolExecutionScope)?.register(definition.id.value, options.async)
             val execution =
-                reactiveExecution
-                    .execute(
-                        tool = tool,
-                        definition = definition,
-                        functionInput = functionInput,
-                        context = context,
-                        options = options,
-                        deadlineNanos = deadlineNanos,
-                        startedAt = startedAt,
-                    ).doOnSuccess {
+                Mono
+                    .defer {
+                        (context["taskToolAccess"] as? TaskToolAccess)?.requireAllowed(definition.id.value, inputObject)
+                        reactiveExecution.execute(
+                            tool = tool,
+                            definition = definition,
+                            functionInput = functionInput,
+                            context = context,
+                            options = options,
+                            deadlineNanos = deadlineNanos,
+                            startedAt = startedAt,
+                        )
+                    }.doOnSuccess {
                         ownedCall?.finish(
                             it ?: failure(definition.id.value, "TOOL_CANCELLED: Tool returned no terminal result."),
                         )

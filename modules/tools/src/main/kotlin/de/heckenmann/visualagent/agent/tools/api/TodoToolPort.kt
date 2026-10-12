@@ -20,6 +20,23 @@ interface TodoToolPort {
         assignedAgentId: String,
     ): ToolTodoCreation
 
+    /** Creates a contracted task atomically; legacy adapters cannot silently discard it. */
+    fun addIfAbsent(
+        description: String,
+        assignedAgentId: String,
+        contract: de.heckenmann.visualagent.task.TaskContract?,
+    ): ToolTodoCreation {
+        require(contract == null) { "Task contracts are unsupported by this adapter" }
+        return addIfAbsent(description, assignedAgentId)
+    }
+
+    /** Reads bounded attempt details; the accepted record is distinct from failed attempts. */
+    fun attempts(
+        id: String,
+        offset: Int = 0,
+        limit: Int = 10,
+    ): List<de.heckenmann.visualagent.task.TaskAttemptResult> = emptyList()
+
     /** Applies supplied todo fields as one mutation. */
     fun update(request: TodoUpdateRequest): Boolean
 
@@ -61,6 +78,8 @@ data class ToolTodo(
     val status: String,
     val position: Int,
     val assignedAgentId: String?,
+    val contract: de.heckenmann.visualagent.task.TaskContract? = null,
+    val executionGap: String? = null,
 )
 
 /** Result of an atomic todo creation attempt. */
@@ -83,4 +102,6 @@ data class TodoUpdateRequest(
     val assignmentMode: TodoAssignmentMode = TodoAssignmentMode.UNCHANGED,
     val assignedAgentId: String? = null,
     val status: String? = null,
+    val contract: de.heckenmann.visualagent.task.TaskContract? = null,
+    val replaceContract: Boolean = false,
 )

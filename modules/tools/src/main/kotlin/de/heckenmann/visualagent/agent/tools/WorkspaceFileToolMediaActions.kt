@@ -59,6 +59,17 @@ internal class WorkspaceFileToolMediaActions(
             }
         }
 
+    /** Serializes actual PDF extraction without growing the command dispatcher. */
+    fun extractPdfText(record: ToolWorkspaceFile) =
+        workspaceFiles.extractPdfText(record).let { text ->
+            buildJsonObject {
+                put("id", record.id)
+                put("path", record.relativePath)
+                put("cached", text.cached)
+                put("content", text.text)
+            }
+        }
+
     fun imageBytes(record: ToolWorkspaceFile) =
         workspaceFiles.imageBytes(record).let { bytes ->
             buildJsonObject {
