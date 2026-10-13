@@ -13,13 +13,13 @@ A persisted agent exists. Its actual registered and enabled tools satisfy the re
 1. The main agent or user attaches a validated version-1 contract to a todo. Server revisions are monotonic. Legacy todos retain the existing text workflow.
 2. The coordinator claims an immutable snapshot and intersects task restrictions with current agent tools, global toggles and existing resource grants. Null restrictions inherit; empty restrictions deny.
 3. The worker receives versioned role instructions, selected input references and the contract. Unrelated agent history is excluded by default. Function schemas provide the authoritative enabled function names.
-4. Tool access is checked again at execution time. Direct calls, JavaScript workspace helpers, script loading, nested tools, batches and detached calls inherit the same trusted authority. Workspace-scoped tasks cannot use an opaque file ID, external grant or unbounded download destination.
+4. Tool access is checked again at execution time. Direct calls, nested tools, batches and detached calls inherit the same trusted authority. With an explicit resource scope, only path-checked `workspace:file` operations and audited filesystem-independent tools are available. Unsandboxed terminal, JavaScript execution, downloads and unknown tools are rejected before dispatch and treated as incompatible required operations. Without a resource scope, JavaScript workspace helpers and script loading retain their inherited task authority. Workspace-scoped tasks cannot use an opaque file ID or external grant.
 5. The worker returns a strict worker-only JSON handoff. Server-assigned todo, agent, execution and attempt identities cannot be set by worker JSON. Each attempt is saved durably before review; tool observations exclude raw outputs.
 6. The server reads current artifact bytes (maximum 1 MiB per artifact), captures digest/MIME/size and evaluates existence, expected text, JSON validity or a quote against a captured source file. A digest proves identity, not correctness.
 7. A separate reviewer request sees bounded actual artifact and input content with no tools or agent history. An explicitly configured reviewer must exist and differ from the worker; its model overrides are honored. Missing or unsupported evidence is NOT_CHECKED.
 8. Completion requires all required checks to pass, a PRODUCED outcome without blockers, unchanged artifact versions and an unchanged todo snapshot. The accepted result and completion state are committed together. Attempts remain separate from the accepted result.
 9. Review feedback corrects the same task on retry. Unsupported required checks and explicit blockers stop for intervention. Contract edits, cancellation, removal or reassignment revoke the old execution and prevent stale completion.
-10. Verification criteria can require a successful tool observation via `executionTool`; worker prose never establishes execution. Unreadable or truncated manual evidence remains NOT_CHECKED. Source-quote predicates are rechecked immediately before acceptance.
+10. Verification criteria can require a successful tool observation via `executionTool`; worker prose never establishes execution. MANUAL criteria must reference a declared artifact, because independent review requires content captured from that deliverable. Artifact-free manual criteria fail validation rather than remain permanently NOT_CHECKED. Unreadable or truncated manual evidence remains NOT_CHECKED. Source-quote predicates are rechecked immediately before acceptance.
 11. The user can edit objective, inputs, outputs, criteria, constraints, stop conditions and workspace paths, and inspect attempts and observations in the todo response overlay.
 
 ## Decomposition
@@ -29,7 +29,7 @@ A bounded structured proposal maps existing parent criterion IDs onto two to eig
 
 - `todos`: add/update with optional contract; read `get-contract`, `get-attempts` (one bounded record per page, offset and nextOffset), and legacy summary `get-result`.
 - `workspace_file`: only enabled actions and scoped normalized workspace paths.
-- `javascript_execute` and `tools_batch`: inherited task authority for nested operations.
+- `javascript_execute` and `tools_batch`: inherited task authority for nested operations when no explicit resource scope is present. Resource-scoped execution denies JavaScript entry points that cannot enforce the filesystem boundary.
 
 ## Code Entry Points
 - `TaskContractCodec`, `TaskDecomposition`, `WorkerHandoff`
