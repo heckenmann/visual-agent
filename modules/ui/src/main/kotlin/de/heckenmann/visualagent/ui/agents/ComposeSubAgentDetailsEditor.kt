@@ -34,9 +34,7 @@ import de.heckenmann.visualagent.ui.settings.*
 import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 @Composable
 internal fun SubAgentDetailsEditor(
@@ -87,35 +85,9 @@ internal fun SubAgentDetailsEditor(
         )
     }
     val toolDefinitions = remember(agentPort) { agentPort.toolDefinitions() }
-    val providerOptions =
-        remember(providerPort) {
-            listOf(PanelSelectOption(INHERIT_SELECTION, "Inherit session provider")) +
-                providerPort.enabledProviders().map { PanelSelectOption(it.id, "${it.name} (${it.id})") }
-        }
+    val providerOptions = remember(providerPort) { subAgentProviderOptions(providerPort) }
     val modelOptions =
-        remember(provider, model, providerPort) {
-            if (provider.isBlank()) {
-                listOf(PanelSelectOption(INHERIT_SELECTION, "Inherit session model"))
-            } else {
-                val catalogModels =
-                    providerPort
-                        .selectableModels(provider)
-                        .filter { config ->
-                            !config.capabilitiesComplete ||
-                                config.capabilities.any { capability ->
-                                    capability.equals("chat", ignoreCase = true) ||
-                                        capability.equals("completion", ignoreCase = true)
-                                }
-                        }.map { config ->
-                            PanelSelectOption(config.id, "${config.name} [${config.capabilities.sorted().joinToString(", ")}]")
-                        }
-                val customModel =
-                    model
-                        .takeIf { current -> current.isNotBlank() && catalogModels.none { it.value == current } }
-                        ?.let { PanelSelectOption(it, "Custom: $it") }
-                listOf(PanelSelectOption(INHERIT_SELECTION, "Inherit provider default")) + catalogModels + listOfNotNull(customModel)
-            }
-        }
+        remember(provider, model, providerPort) { subAgentModelOptions(providerPort, provider, model) }
     val numericFieldsAreValid =
         timeout.toIntOrNull()?.let { it > 0 } == true &&
             maxRetries.toIntOrNull()?.let { it >= 0 } == true &&
@@ -250,17 +222,7 @@ internal fun SubAgentDetailsEditor(
                 onModelsChanged = { capabilityModels = it },
                 onTest = { capability, selected ->
                     scope.launch {
-                        val providerId = selected.substringBefore("::")
-                        val modelId = selected.substringAfter("::")
-                        runCatching {
-                            withContext(Dispatchers.IO) {
-                                providerPort.probeModelCapability(providerId, modelId, capability)
-                            }
-                        }.onSuccess { message ->
-                            capabilityStatus = message
-                        }.onFailure { error ->
-                            capabilityStatus = "$capability model probe failed: ${error.message}"
-                        }
+                        capabilityStatus = probeSubAgentCapability(providerPort, capability, selected)
                     }
                 },
             )
