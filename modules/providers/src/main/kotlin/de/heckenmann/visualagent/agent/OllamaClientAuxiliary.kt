@@ -32,11 +32,12 @@ internal class OllamaClientAuxiliary(
         image: ByteArray,
         prompt: String,
         modelId: String = appConfig.ollamaModel,
+        selectedChatModel: ChatModel = chatModel,
     ): Mono<ChatResponse> =
         Mono
             .fromCallable {
                 val response =
-                    chatModel.call(
+                    selectedChatModel.call(
                         Prompt(
                             listOf(
                                 UserMessage
