@@ -11,10 +11,10 @@ class AgentCapabilityToolInputTest {
     @Test
     fun `agent capability tool input accepts provider-qualified model assignments`() {
         val input =
-            Json.parseToJsonElement(
-                """{"enabledCapabilities":["CHAT","VISION"],"capabilityModels":{"VISION":"openai::gpt-4o"}}""",
-            )
-                .jsonObject
+            Json
+                .parseToJsonElement(
+                    """{"enabledCapabilities":["CHAT","VISION"],"capabilityModels":{"VISION":"openai::gpt-4o"}}""",
+                ).jsonObject
 
         val config = applyCapabilityToolInput(ToolAgentConfig(), input)
 
