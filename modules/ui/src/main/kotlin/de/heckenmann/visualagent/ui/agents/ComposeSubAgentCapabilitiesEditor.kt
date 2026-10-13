@@ -94,7 +94,11 @@ internal fun validCapabilityAssignments(
                 .firstOrNull { it.id == providerId && it.enabled }
                 ?.models
                 ?.any { model ->
-                    model.id == modelId && model.status.name !in setOf("DEPRECATED", "DISABLED") &&
+                    val profile = providers.first { it.id == providerId }
+                    model.id == modelId &&
+                        model.id !in profile.modelBlacklist &&
+                        (profile.modelWhitelist.isEmpty() || model.id in profile.modelWhitelist) &&
+                        model.status.name !in setOf("DEPRECATED", "DISABLED") &&
                         model.capabilities.any { it.equals(capability, ignoreCase = true) }
                 } == true
         }
