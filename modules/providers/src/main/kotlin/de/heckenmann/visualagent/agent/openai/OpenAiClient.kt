@@ -316,5 +316,4 @@ class OpenAiClient(
     private fun modelsUri(): URI = URI.create("${apiBaseUrl()}/models")
 
     private fun modelsUri(profile: ProviderProfile): URI = URI.create("${OpenAiEndpointNormalizer.apiBaseUrl(profile.baseUrl)}/models")
-
 }
