@@ -4,8 +4,8 @@ import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.ChatResponse
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
-import de.heckenmann.visualagent.agent.ModelSelection
 import de.heckenmann.visualagent.agent.ModelDetails
+import de.heckenmann.visualagent.agent.ModelSelection
 import de.heckenmann.visualagent.agent.ShowResponse
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
@@ -13,8 +13,8 @@ import de.heckenmann.visualagent.protocol.ModelStatus
 import de.heckenmann.visualagent.protocol.ProviderAdapter
 import de.heckenmann.visualagent.protocol.ProviderProfile
 import io.mockk.every
-import io.mockk.slot
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import reactor.core.publisher.Mono
@@ -242,7 +242,8 @@ class SpringProviderPortTest {
             val result = runCatching { port.probeModelCapability("ollama", "audio", "AUDIO_INPUT") }
 
             assertTrue(result.isFailure)
-            assertTrue(result.exceptionOrNull()?.message.orEmpty().contains("not yet supported"))
+            val message = result.exceptionOrNull()?.message.orEmpty()
+            assertTrue(message.contains("not yet supported"))
         }
 
     @Test
