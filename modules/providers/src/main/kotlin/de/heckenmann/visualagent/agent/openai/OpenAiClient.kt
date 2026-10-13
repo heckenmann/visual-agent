@@ -13,8 +13,8 @@ import de.heckenmann.visualagent.agent.VisionSupport
 import de.heckenmann.visualagent.agent.nativeResponseSchema
 import de.heckenmann.visualagent.agent.provider.DefaultProviderRuntimeConfig
 import de.heckenmann.visualagent.agent.provider.OpenAiModelCapabilities
-import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderEnvironmentCredentials
+import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.agent.provider.ProviderRuntimeConfig
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
