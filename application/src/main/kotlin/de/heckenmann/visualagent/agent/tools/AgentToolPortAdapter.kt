@@ -8,6 +8,7 @@ import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.getSubAgentExecutionStatus
 import de.heckenmann.visualagent.agent.pauseAllSubAgents
 import de.heckenmann.visualagent.agent.pauseSubAgent
+import de.heckenmann.visualagent.agent.provider.ModelCapability
 import de.heckenmann.visualagent.agent.resumeAllSubAgents
 import de.heckenmann.visualagent.agent.resumeSubAgent
 import de.heckenmann.visualagent.agent.tools.api.AgentToolPort
@@ -16,7 +17,6 @@ import de.heckenmann.visualagent.agent.tools.api.ToolAgentConfig
 import de.heckenmann.visualagent.agent.tools.api.ToolAgentExecutionStatus
 import de.heckenmann.visualagent.agent.tools.api.ToolAgentLog
 import de.heckenmann.visualagent.agent.tools.api.ToolAgentQueue
-import de.heckenmann.visualagent.agent.provider.ModelCapability
 import de.heckenmann.visualagent.knowledge.MemoryStore
 import org.springframework.context.annotation.Lazy
 import org.springframework.stereotype.Component
@@ -144,7 +144,18 @@ private fun AgentConfig.toToolConfig() =
 
 private fun ToolAgentConfig.toApplication() =
     AgentConfig(
-        timeout, maxRetries, memoryLimitMb, provider, model, temperature, topP, maxTokens, variant, options, tools, templateName,
+        timeout,
+        maxRetries,
+        memoryLimitMb,
+        provider,
+        model,
+        temperature,
+        topP,
+        maxTokens,
+        variant,
+        options,
+        tools,
+        templateName,
         enabledCapabilities.map(ModelCapability::valueOf).toSet(),
         capabilityModels.mapKeys { ModelCapability.valueOf(it.key) },
     )
