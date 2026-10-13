@@ -74,7 +74,11 @@ class WorkspaceFileTool(
                 "renderPdfPage" -> renderPdfPage(file(input), input.int("page") ?: 1)
                 "imageInfo" -> imageInfo(file(input))
                 "imageBytes" -> success(TOOL_ID, mediaActions.imageBytes(file(input)).toString())
-                "analyzeImage" -> success(TOOL_ID, mediaActions.analyzeImage(file(input), input.requiredString("prompt")).toString())
+                "analyzeImage" ->
+                    success(
+                        TOOL_ID,
+                        mediaActions.analyzeImage(file(input), input.requiredString("prompt"), context["agentId"] as? String).toString(),
+                    )
                 else -> failure(TOOL_ID, "Unsupported workspace file action")
             }
         }.getOrElse { error ->
