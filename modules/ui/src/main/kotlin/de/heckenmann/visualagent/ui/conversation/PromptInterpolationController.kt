@@ -38,7 +38,9 @@ internal class PromptInterpolationController(
     private var preparedText: String? = null
     private var job: Job? = null
     private var token: CancellationTokenImpl? = null
-    @Volatile private var automaticInterpolationSetting: Boolean? = null
+
+    @Volatile
+    private var automaticInterpolationSetting: Boolean? = null
 
     /** Keeps the send path in sync with settings without rereading them for every message. */
     fun onSettingsChanged(enabled: Boolean) {
