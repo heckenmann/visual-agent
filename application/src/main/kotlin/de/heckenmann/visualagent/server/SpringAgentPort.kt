@@ -2,12 +2,12 @@ package de.heckenmann.visualagent.server
 
 import de.heckenmann.visualagent.agent.AgentCapabilityValidator
 import de.heckenmann.visualagent.agent.AgentManager
-import de.heckenmann.visualagent.agent.provider.ModelCapability
 import de.heckenmann.visualagent.agent.AgentStatusCallbackAdapter
 import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.agent.SubAgentExecutionSnapshot
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.getActiveJobCount
+import de.heckenmann.visualagent.agent.provider.ModelCapability
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.protocol.Agent
 import de.heckenmann.visualagent.protocol.AgentConfig
