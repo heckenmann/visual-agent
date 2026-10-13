@@ -36,6 +36,16 @@ class TaskContractTest {
     }
 
     @Test
+    fun `manual checks without an inspectable artifact fail validation`() {
+        val manualWithoutArtifact = TaskCriterion("review", "Review the result", method = TaskCheckMethod.MANUAL)
+        val invalid = contract.copy(criteria = listOf(manualWithoutArtifact))
+        val error = assertFailsWith<IllegalArgumentException> { TaskContractCodec.validate(invalid) }
+        kotlin.test.assertContains(error.message.orEmpty(), "declared artifact")
+        val valid = invalid.copy(criteria = listOf(manualWithoutArtifact.copy(artifactId = "answer")))
+        assertEquals(valid, TaskContractCodec.decode(TaskContractCodec.encode(valid)))
+    }
+
+    @Test
     fun `worker cannot forge provenance or claim an undeclared artifact`() {
         assertFailsWith<Exception> { WorkerHandoff.parse("""{"summary":"Done","outcome":"PRODUCED","agentId":"trusted"}""", contract) }
         assertFailsWith<IllegalArgumentException> {
