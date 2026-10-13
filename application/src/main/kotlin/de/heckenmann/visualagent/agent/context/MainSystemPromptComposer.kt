@@ -69,10 +69,14 @@ internal object MainSystemPromptComposer {
             appendLine(resumeHint)
             appendLine(runtimeStateGuidance)
             if (toolsExposed && toolConfigService.mainAgentTools().any { it.value == "agent:update" }) {
-                appendLine("Sub-agent capabilities: CHAT is always enabled; VISION, AUDIO_INPUT, AUDIO_OUTPUT, " +
-                    "IMAGE_GENERATION, EMBEDDING and TOOLS may be enabled separately.")
-                appendLine("Use the available agent configuration functions to grant or revoke a capability " +
-                    "and assign its provider-qualified model. Delegate specialized work only to capable agents.")
+                appendLine(
+                    "Sub-agent capabilities: CHAT is always enabled; VISION, AUDIO_INPUT, AUDIO_OUTPUT, " +
+                        "IMAGE_GENERATION, EMBEDDING and TOOLS may be enabled separately.",
+                )
+                appendLine(
+                    "Use the available agent configuration functions to grant or revoke a capability " +
+                        "and assign its provider-qualified model. Delegate specialized work only to capable agents.",
+                )
             }
             if (toolPolicy.isNotBlank()) {
                 appendLine()
