@@ -264,7 +264,7 @@ data class SubAgent(
         requestId: String?,
         executionMetadata: Map<String, Any>,
     ): ChatRequestContext {
-        val capability = if (messages.any { it.images.isNotEmpty() }) ModelCapability.VISION else ModelCapability.CHAT
+        val capability = if (messages.any { it.images?.isNotEmpty() == true }) ModelCapability.VISION else ModelCapability.CHAT
         val modelSelection = config.modelSelection(capability)
         return ChatRequestContext(
             messages = chatHistory + messages,
