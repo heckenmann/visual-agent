@@ -59,6 +59,7 @@ class AgentConfigTest {
         assertEquals(512, config.memoryLimitMb)
         assertEquals(listOf("context", "terminal"), config.tools)
     }
+
     @Test
     fun `capability selection routes to a provider-qualified model`() {
         val config =
@@ -86,5 +87,4 @@ class AgentConfigTest {
             AgentConfig(enabledCapabilities = setOf(ModelCapability.VISION))
         }
     }
-
 }
