@@ -113,11 +113,16 @@ private fun ProviderProfile.withDiscoveredModels(modelConfigs: List<ProviderMode
                     name = discovered.name,
                     capabilities =
                         when {
-                            discovered.capabilitiesComplete || existing.capabilitiesComplete ->
-                                if (discovered.capabilitiesComplete) discovered.capabilities else existing.capabilities
-                            else -> existing.capabilities + discovered.capabilities
+                            existing.capabilitiesOverridden -> existing.capabilities
+                            discovered.capabilitiesComplete || discovered.capabilities.isNotEmpty() -> discovered.capabilities
+                            else -> existing.capabilities
                         },
-                    capabilitiesComplete = discovered.capabilitiesComplete || existing.capabilitiesComplete,
+                    capabilitiesComplete =
+                        when {
+                            existing.capabilitiesOverridden -> existing.capabilitiesComplete
+                            discovered.capabilitiesComplete || discovered.capabilities.isNotEmpty() -> discovered.capabilitiesComplete
+                            else -> existing.capabilitiesComplete
+                        },
                 ) ?: discovered
             },
     )
