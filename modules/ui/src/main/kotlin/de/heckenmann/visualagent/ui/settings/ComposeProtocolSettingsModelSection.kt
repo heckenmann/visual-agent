@@ -18,6 +18,7 @@ import de.heckenmann.visualagent.ui.components.PanelCheckbox
 import de.heckenmann.visualagent.ui.components.PanelDropdownField
 import de.heckenmann.visualagent.ui.components.PanelInfoBox
 import de.heckenmann.visualagent.ui.components.PanelSelectOption
+import de.heckenmann.visualagent.ui.components.labelWithCapabilities
 
 /** Renders staged model selection and model-specific actions inside the provider connection section. */
 @Composable
@@ -47,7 +48,7 @@ internal fun modelSettingsContent(
                             capability.equals("chat", ignoreCase = true) || capability.equals("completion", ignoreCase = true)
                         }
                 }.map { model ->
-                    PanelSelectOption(model.id, "${model.name} [${model.capabilities.sorted().joinToString(", ")}]")
+                    PanelSelectOption(model.id, model.labelWithCapabilities())
                 },
         onSelected = onModelSelected,
         enabled = models.isNotEmpty(),
