@@ -197,6 +197,20 @@ class OllamaClient(
         modelId: String,
     ): Mono<ChatResponse> = auxiliary.visionReactive(image, prompt, modelId)
 
+    /** Uses a profile-specific Ollama endpoint for capability-scoped vision requests. */
+    internal fun visionReactive(
+        image: ByteArray,
+        prompt: String,
+        modelId: String,
+        profile: ProviderProfile,
+    ): Mono<ChatResponse> =
+        auxiliary.visionReactive(
+            image,
+            prompt,
+            modelId,
+            chatModelFor(ChatRequestContext(messages = emptyList(), model = modelId, providerProfile = profile)),
+        )
+
     override fun embeddingsReactive(text: String): Mono<List<Double>> = auxiliary.embeddingsReactive(text)
 
     override fun embeddingsReactive(
