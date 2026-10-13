@@ -29,6 +29,7 @@ class AgentCreateTool(
                 "Create a new sub-agent. " +
                     "Input: {\"name\":\"Coder\",\"role\":\"Implementation\",\"templateName\":\"coder\"}. " +
                     "templateName selects the tool set: researcher (read/search), coder (write/terminal), analyst (analysis). " +
+                    "Supports enabledCapabilities and capabilityModels (provider::model) for specialized models. " +
                     "Returns the new agent ID and its assigned tools.",
             inputSchema = STRING_SCHEMA,
         )
@@ -41,7 +42,21 @@ class AgentCreateTool(
         val name = input.requiredString("name")
         val role = input.requiredString("role")
         val templateName = input.string("templateName")?.takeIf(String::isNotBlank) ?: "researcher"
+        val requestedCapabilityConfig =
+            if ("enabledCapabilities" in input || "capabilityModels" in input) {
+                runCatching {
+                    applyCapabilityToolInput(agents.template(templateName), input).also(agents::validate)
+                }.getOrElse { return failure("agent:create", "TOOL_ARGUMENTS: ${it.message}") }
+            } else {
+                null
+            }
         val created = agents.create(name, role, templateName)
+        if (requestedCapabilityConfig != null) {
+            if (!agents.update(created.id, null, null, requestedCapabilityConfig)) {
+                agents.delete(created.id)
+                return failure("agent:create", "Unable to save the requested capability configuration")
+            }
+        }
         val tools = agents.providerToolNames(created.id)
         val toolHint =
             buildString {
@@ -70,7 +85,8 @@ class AgentUpdateTool(
             description =
                 "Update an existing sub-agent's configuration. " +
                     "Input fields: id (required), name, role, timeout, maxRetries, memoryLimitMb, provider, " +
-                    "model, temperature, topP, maxTokens, variant, options, tools, and templateName (optional). " +
+                    "model, temperature, topP, maxTokens, variant, options, tools, templateName, " +
+                    "enabledCapabilities, and capabilityModels (provider::model) (optional). " +
                     "For tools, use provider function names from an available agent inventory. " +
                     "Unknown function names are rejected. Only provided fields are updated.",
             inputSchema = STRING_SCHEMA,
@@ -106,7 +122,10 @@ class AgentUpdateTool(
                         "TOOL_ARGUMENTS: Unknown tool function '$name'. Use a name from the agent's available tool inventory.",
                     )
             }
-        val config = mergeConfigFromInput(baseConfig, input, tools)
+        val config =
+            runCatching {
+                applyCapabilityToolInput(mergeConfigFromInput(baseConfig, input, tools), input).also(agents::validate)
+            }.getOrElse { return failure("agent:update", "TOOL_ARGUMENTS: ${it.message}") }
         val updated = agents.update(id, input.string("name"), input.string("role"), config)
         return if (updated) {
             agents.get(id) ?: return failure("agent:update", "Agent not found")
@@ -261,6 +280,8 @@ class AgentShowTool(
             appendLine("Agent ${agent.id} | ${agent.name} | ${agent.role}")
             appendLine("Status: ${agent.status}")
             appendLine("Model: $model")
+            appendLine("Enabled capabilities: ${agent.config.enabledCapabilities.sorted()}")
+            appendLine("Capability models: ${agent.config.capabilityModels.toSortedMap()}")
             appendLine("Template/Config: $template")
             if (description.isNotBlank()) appendLine("Description: $description")
             appendLine("Tools: [${tools.joinToString(",")}]")
