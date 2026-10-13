@@ -34,11 +34,16 @@ internal fun modelSettingsContent(
     onContextLengthChanged: (Int) -> Unit,
     onRefreshModels: () -> Unit,
     onFavoriteChanged: (Boolean) -> Unit,
+    onModelCapabilitiesChanged: (Set<String>) -> Unit = {},
 ) {
     PanelDropdownField(
         label = "Model",
         selectedValue = modelId,
-        options = models.map { PanelSelectOption(it.id, it.name) },
+        options = models
+            .filter { !it.capabilitiesComplete || it.capabilities.any { cap -> cap.equals("chat", true) || cap.equals("completion", true) } }
+            .map { model ->
+                PanelSelectOption(model.id, "${model.name} [${model.capabilities.sorted().joinToString(", ")}]")
+            },
         onSelected = onModelSelected,
         enabled = models.isNotEmpty(),
         information = "Selects the model used for future main-agent requests through the selected provider.",
@@ -62,4 +67,5 @@ internal fun modelSettingsContent(
         )
     }
     PanelInfoBox(modelDetails)
+    ModelCapabilitiesEditor(models.firstOrNull { it.id == modelId }, onModelCapabilitiesChanged)
 }
