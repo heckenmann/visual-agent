@@ -7,6 +7,11 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/** Preserves the existing provider dropdown when advanced models are configured. */
+internal fun subAgentProviderOptions(providerPort: ProviderPort): List<PanelSelectOption> =
+    listOf(PanelSelectOption(INHERIT_SELECTION, "Inherit session provider")) +
+        providerPort.enabledProviders().map { PanelSelectOption(it.id, "${it.name} (${it.id})") }
+
 /** Model selections shared by the sub-agent editor and its regression tests. */
 internal fun subAgentModelOptions(
     providerPort: ProviderPort,
