@@ -38,6 +38,12 @@ internal class PromptInterpolationController(
     private var preparedText: String? = null
     private var job: Job? = null
     private var token: CancellationTokenImpl? = null
+    @Volatile private var automaticInterpolationSetting: Boolean? = null
+
+    /** Keeps the send path in sync with settings without rereading them for every message. */
+    fun onSettingsChanged(enabled: Boolean) {
+        automaticInterpolationSetting = enabled
+    }
 
     /** Invalidates pending and prepared results, including edits back to the previous text. */
     fun edited() {
@@ -76,7 +82,25 @@ internal class PromptInterpolationController(
         job =
             scope.launch {
                 try {
-                    val rewrite = !automatic || settings.snapshotAsync().automaticPromptInterpolation
+                    val rewrite =
+                        if (!automatic) {
+                            true
+                        } else {
+                            try {
+                                automaticInterpolationSetting
+                                    ?: settings.snapshotAsync().automaticPromptInterpolation.also { fetched ->
+                                        if (automaticInterpolationSetting == null) automaticInterpolationSetting = fetched
+                                    }
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                // Failure of an optional setting must never suppress a normal chat send.
+                                if (current(requestRevision, original)) {
+                                    status("Prompt interpolation settings unavailable; sending the original prompt.")
+                                }
+                                false
+                            }
+                        }
                     if (!current(requestRevision, original)) return@launch
                     val prepared = preparedRevision == requestRevision && preparedText == original
                     val result = if (rewrite && (!automatic || !prepared)) rewrite(original) else original
