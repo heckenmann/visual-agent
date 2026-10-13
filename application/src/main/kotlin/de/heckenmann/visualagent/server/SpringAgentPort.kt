@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.server
 
 import de.heckenmann.visualagent.agent.AgentManager
+import de.heckenmann.visualagent.agent.provider.ModelCapability
 import de.heckenmann.visualagent.agent.AgentStatusCallbackAdapter
 import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.agent.SubAgentExecutionSnapshot
@@ -128,6 +129,8 @@ private fun ApplicationAgentConfig.toProtocol(): AgentConfig =
         options = options,
         tools = tools,
         templateName = templateName,
+        enabledCapabilities = enabledCapabilities.mapTo(mutableSetOf()) { it.name },
+        capabilityModels = capabilityModels.mapKeys { it.key.name },
     )
 
 private fun AgentConfig.toApplication(): ApplicationAgentConfig =
@@ -144,6 +147,8 @@ private fun AgentConfig.toApplication(): ApplicationAgentConfig =
         options = options,
         tools = tools,
         templateName = templateName,
+        enabledCapabilities = enabledCapabilities.map(ModelCapability::valueOf).toSet(),
+        capabilityModels = capabilityModels.mapKeys { ModelCapability.valueOf(it.key) },
     )
 
 private fun ApplicationMessage.toProtocol(): ConversationMessage =
