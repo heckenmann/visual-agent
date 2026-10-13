@@ -169,14 +169,17 @@ class WorkspaceFileToolPortAdapter(
         agentId: String?,
     ): Mono<ToolImageAnalysis> {
         if (agentId == null) return analyzeImageReactive(file, prompt)
-        val agent = agents?.getSubAgent(agentId)
-            ?: error("Sub-agent '$agentId' is not available for image analysis")
+        val agent =
+            agents?.getSubAgent(agentId)
+                ?: error("Sub-agent '$agentId' is not available for image analysis")
         val selection =
             try {
                 agent.config.modelSelection(ModelCapability.VISION)
             } catch (failure: IllegalArgumentException) {
-                error("Sub-agent '${agent.name}' is not configured for vision analysis. " +
-                    "Enable the VISION capability and assign a vision model in sub-agent settings.")
+                error(
+                    "Sub-agent '${agent.name}' is not configured for vision analysis. " +
+                        "Enable the VISION capability and assign a vision model in sub-agent settings.",
+                )
             }
         val bytes = files.imageBytes(requireRecord(file))
         return llmProvider
