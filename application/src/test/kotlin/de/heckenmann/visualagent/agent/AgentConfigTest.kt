@@ -1,7 +1,9 @@
 package de.heckenmann.visualagent.agent
 
+import de.heckenmann.visualagent.agent.provider.ModelCapability
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 class AgentConfigTest {
@@ -57,4 +59,32 @@ class AgentConfigTest {
         assertEquals(512, config.memoryLimitMb)
         assertEquals(listOf("context", "terminal"), config.tools)
     }
+    @Test
+    fun `capability selection routes to a provider-qualified model`() {
+        val config =
+            AgentConfig(
+                provider = "ollama",
+                model = "qwen3",
+                enabledCapabilities = setOf(ModelCapability.CHAT, ModelCapability.VISION, ModelCapability.EMBEDDING),
+                capabilityModels =
+                    mapOf(
+                        ModelCapability.VISION to "openai::gpt-4o",
+                        ModelCapability.EMBEDDING to "ollama::nomic-embed-text",
+                    ),
+            )
+        assertEquals("qwen3", config.modelSelection().model)
+        assertEquals("openai", config.modelSelection(ModelCapability.VISION).provider)
+        assertEquals("gpt-4o", config.modelSelection(ModelCapability.VISION).model)
+        assertEquals("nomic-embed-text", config.modelSelection(ModelCapability.EMBEDDING).model)
+    }
+
+    @Test
+    fun `disabled capabilities fail without selecting a model`() {
+        val config = AgentConfig()
+        assertFailsWith<IllegalArgumentException> { config.modelSelection(ModelCapability.VISION) }
+        assertFailsWith<IllegalArgumentException> {
+            AgentConfig(enabledCapabilities = setOf(ModelCapability.VISION))
+        }
+    }
+
 }
