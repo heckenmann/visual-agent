@@ -25,6 +25,7 @@ class WorkspaceFileTool(
     private val grantedDirectories = WorkspaceGrantedDirectoryActions(directories)
     private val mediaActions = WorkspaceFileToolMediaActions(workspaceFiles)
     private val mutations = WorkspaceFileToolMutationActions(workspaceFiles, grantedDirectories)
+    private val metadataActions = WorkspaceFileToolMetadataActions(workspaceFiles, grantedDirectories)
     private val reactiveActions = WorkspaceFileToolReactiveActions(workspaceFiles, mediaActions)
     override val definition =
         ToolDefinition(
@@ -64,13 +65,13 @@ class WorkspaceFileTool(
                 "copy" -> mutations.transfer(input, move = false)
                 "move" -> mutations.transfer(input, move = true)
                 "info" -> info(file(input))
-                "sync" -> sync()
+                "sync" -> metadataActions.sync()
                 "delete" -> mutations.delete(input)
                 "deleteDirectory" -> mutations.deleteDirectory(input)
-                "hash" -> hash(file(input))
+                "hash" -> metadataActions.hash(file(input))
                 "readText" -> readText(input)
-                "mime" -> mime(input)
-                "extractPdfText" -> extractPdfText(file(input))
+                "mime" -> metadataActions.mime(input)
+                "extractPdfText" -> metadataActions.extractPdfText(file(input))
                 "renderPdfPage" -> renderPdfPage(file(input), input.int("page") ?: 1)
                 "imageInfo" -> imageInfo(file(input))
                 "imageBytes" -> success(TOOL_ID, mediaActions.imageBytes(file(input)).toString())
@@ -230,30 +231,6 @@ class WorkspaceFileTool(
         )
     }
 
-    private fun sync(): ToolResult {
-        val report = workspaceFiles.sync()
-        return success(
-            TOOL_ID,
-            buildJsonObject {
-                put("added", report.added)
-                put("updated", report.updated)
-                put("removed", report.removed)
-                put("total", report.total)
-            }.toString(),
-        )
-    }
-
-    private fun hash(record: ToolWorkspaceFile): ToolResult =
-        success(
-            TOOL_ID,
-            buildJsonObject {
-                put("id", record.id)
-                put("path", record.relativePath)
-                put("algorithm", "sha256")
-                put("sha256", workspaceFiles.hash(record))
-            }.toString(),
-        )
-
     private fun readText(input: kotlinx.serialization.json.JsonObject): ToolResult {
         val rootId = input.string("rootId")
         if (rootId != null && rootId != WorkspaceGrantedDirectoryActions.WORKSPACE_ROOT_ID) {
@@ -277,40 +254,6 @@ class WorkspaceFileTool(
                 put("content", workspaceFiles.readText(record))
             }.toString(),
         )
-
-    private fun mime(input: kotlinx.serialization.json.JsonObject): ToolResult {
-        val rootId = input.string("rootId")
-        val path = input.string("path")
-        if (rootId != null && rootId != WorkspaceGrantedDirectoryActions.WORKSPACE_ROOT_ID) {
-            return success(TOOL_ID, grantedDirectories.mimeJson(rootId, requireNotNull(path) { "Missing path" }).toString())
-        }
-        val record = file(input)
-        val detected = workspaceFiles.detectMimeType(record)
-        return success(
-            TOOL_ID,
-            buildJsonObject {
-                put("id", record.id)
-                put("path", record.relativePath)
-                put("detectedMimeType", detected.detectedMimeType)
-                put("storedMimeType", detected.storedMimeType)
-                put("sizeBytes", detected.sizeBytes)
-                put("sha256", detected.sha256)
-            }.toString(),
-        )
-    }
-
-    private fun extractPdfText(record: ToolWorkspaceFile): ToolResult {
-        val text = workspaceFiles.extractPdfText(record)
-        return success(
-            TOOL_ID,
-            buildJsonObject {
-                put("id", record.id)
-                put("path", record.relativePath)
-                put("cached", text.cached)
-                put("content", text.text)
-            }.toString(),
-        )
-    }
 
     private fun renderPdfPage(
         record: ToolWorkspaceFile,
