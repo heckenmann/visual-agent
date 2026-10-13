@@ -6,7 +6,9 @@ import de.heckenmann.visualagent.agent.provider.ProfiledProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderEnvironmentCredentials
+import de.heckenmann.visualagent.agent.provider.ModelCapability
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
+import de.heckenmann.visualagent.agent.provider.supportsCapability
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.agent.provider.ProviderRuntimeConfig
 import org.springframework.context.annotation.Primary
@@ -57,6 +59,32 @@ class ConfiguredLLMProvider(
                     adapterFor(profile.adapter).visionReactive(image, prompt, modelId, profile)
                 } else {
                     providerFor(profile).visionReactive(image, prompt, modelId)
+                }
+            }
+
+    /** Executes a vision request with the selected agent's provider and model. */
+    override fun visionReactive(
+        image: ByteArray,
+        prompt: String,
+        selection: ModelSelection,
+    ): Mono<ChatResponse> =
+        Mono
+            .fromCallable {
+                val resolved = providerCatalog.resolve(selection.provider, selection.model)
+                require(resolved.model.supportsCapability(ModelCapability.VISION)) {
+                    "Model '${resolved.provider.id}/${resolved.model.id}' does not support VISION. " +
+                        "Pick a vision-capable model in the sub-agent settings."
+                }
+                resolved
+            }.subscribeOn(Schedulers.boundedElastic())
+            .flatMap { resolved ->
+                when (resolved.provider.adapter) {
+                    ProviderAdapter.CODEX_CLI ->
+                        adapterFor(ProviderAdapter.CODEX_CLI)
+                            .visionReactive(image, prompt, resolved.model.id, resolved.provider)
+                    ProviderAdapter.OPENAI_COMPATIBLE ->
+                        openAiClient.visionReactive(image, prompt, resolved.model.id, resolved.provider)
+                    ProviderAdapter.OLLAMA -> ollamaClient.visionReactive(image, prompt, resolved.model.id)
                 }
             }
 
