@@ -95,6 +95,44 @@ class SpringSettingsPortTest {
     }
 
     @Test
+    fun `saving a staged provider preserves user capability overrides`() {
+        val catalog = mockk<ProviderCatalogService>(relaxed = true)
+        val port = SpringSettingsPort(AppConfigBean(), catalog, memoryStore())
+        val manuallyConfigured =
+            ProviderModel(
+                id = "custom-vision",
+                capabilities = setOf("vision"),
+                capabilitiesComplete = true,
+                capabilitiesOverridden = true,
+            )
+        val profile =
+            ProviderProfile(
+                id = "custom",
+                name = "Custom",
+                adapter = ProviderAdapter.OPENAI_COMPATIBLE,
+                baseUrl = "https://example.test",
+                models = listOf(manuallyConfigured),
+            )
+
+        port.save(
+            SettingsSnapshot(providerId = "custom", modelId = "custom-vision"),
+            ProviderConfiguration(listOf(profile), "custom", "custom-vision"),
+        )
+
+        verify {
+            catalog.replaceConfiguration(
+                match { configuration ->
+                    configuration.providers.single().models.single().let { model ->
+                        model.capabilities == setOf("vision") &&
+                            model.capabilitiesComplete &&
+                            model.capabilitiesOverridden
+                    }
+                },
+            )
+        }
+    }
+
+    @Test
     fun `save rejects a memory limit lower than the stored document`() {
         val port = SpringSettingsPort(AppConfigBean(), mockk(relaxed = true), memoryStore("x".repeat(1_001)))
 
