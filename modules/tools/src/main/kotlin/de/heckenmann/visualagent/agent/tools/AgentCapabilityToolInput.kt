@@ -17,10 +17,11 @@ internal fun applyCapabilityToolInput(
     val enabled =
         input["enabledCapabilities"]?.let { value ->
             require(value is JsonArray) { "enabledCapabilities must be an array" }
-            value.map { item ->
-                require(item is JsonPrimitive && item.isString) { "Capability names must be strings" }
-                item.content.also { require(it in AGENT_MODEL_CAPABILITIES) { "Unknown capability '$it'" } }
-            }.toSet()
+            value
+                .map { item ->
+                    require(item is JsonPrimitive && item.isString) { "Capability names must be strings" }
+                    item.content.also { require(it in AGENT_MODEL_CAPABILITIES) { "Unknown capability '$it'" } }
+                }.toSet()
         } ?: base.enabledCapabilities
     val models =
         input["capabilityModels"]?.let { value ->
