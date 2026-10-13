@@ -51,7 +51,7 @@ object TaskContractCodec {
             require(
                 criterion.artifactId == null || contract.deliverables.any { it.id == criterion.artifactId },
             ) { "Unknown criterion artifact" }
-            require(criterion.method == TaskCheckMethod.MANUAL || criterion.artifactId != null) { "Check requires an artifact" }
+            require(criterion.artifactId != null) { "Acceptance check requires a declared artifact, including MANUAL checks" }
             require(criterion.expected == null || criterion.expected.length <= 4_000) { "Expected text exceeds the limit" }
             if (criterion.method in setOf(TaskCheckMethod.TEXT_CONTAINS, TaskCheckMethod.SOURCE_QUOTE)) {
                 require(!criterion.expected.isNullOrBlank()) { "Text check requires expected text" }
