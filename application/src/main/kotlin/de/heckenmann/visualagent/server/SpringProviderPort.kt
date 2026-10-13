@@ -13,6 +13,9 @@ import de.heckenmann.visualagent.protocol.ModelDetails
 import de.heckenmann.visualagent.protocol.ModelStatus
 import de.heckenmann.visualagent.protocol.ProviderAdapter
 import de.heckenmann.visualagent.protocol.ProviderModel
+import de.heckenmann.visualagent.protocol.ProtocolErrorCategory
+import de.heckenmann.visualagent.protocol.ProtocolOperationException
+import de.heckenmann.visualagent.protocol.UserFacingError
 import de.heckenmann.visualagent.protocol.ProviderPort
 import de.heckenmann.visualagent.protocol.ProviderProfile
 import kotlinx.coroutines.reactor.awaitSingle
@@ -108,9 +111,14 @@ class SpringProviderPort(
                             ModelSelection(provider = providerId, model = modelId),
                         )
                     else ->
-                        throw UnsupportedOperationException(
-                            "A live $requested probe is not yet supported by this provider interface. " +
-                                "Model metadata alone cannot confirm functionality.",
+                        throw ProtocolOperationException(
+                            UserFacingError(
+                                category = ProtocolErrorCategory.PROVIDER,
+                                summary = "Live model probe unavailable",
+                                detail =
+                                    "A live $requested probe is not yet supported by this provider interface. " +
+                                        "Model metadata alone cannot confirm functionality.",
+                            ),
                         )
                 }.timeout(Duration.ofSeconds(15)).awaitSingle()
             require(response.message.content.isNotBlank()) { "Model '$providerId/$modelId' returned an empty response" }
