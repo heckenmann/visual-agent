@@ -28,21 +28,25 @@ internal fun SubAgentCapabilitiesEditor(
     onTest: (String, String) -> Unit,
 ) {
     Text("Capabilities", style = MaterialTheme.typography.titleSmall)
-    Text("CHAT is always enabled. Specialized capabilities require a compatible provider model.", style = MaterialTheme.typography.bodySmall)
+    Text(
+        "CHAT is always enabled. Specialized capabilities require a compatible provider model.",
+        style = MaterialTheme.typography.bodySmall,
+    )
     SPECIALIZED_MODEL_CAPABILITIES.forEach { capability ->
         val enabled = capability in enabledCapabilities
         val eligible =
             providers
                 .filter { it.enabled }
                 .flatMap { profile ->
-                    profile.models.filter { model ->
-                        model.id !in profile.modelBlacklist &&
-                            (profile.modelWhitelist.isEmpty() || model.id in profile.modelWhitelist) &&
-                            model.status.name !in setOf("DEPRECATED", "DISABLED") &&
-                            model.capabilities.any { it.equals(capability, ignoreCase = true) }
-                    }.map { model ->
-                        PanelSelectOption("${profile.id}::${model.id}", "${model.name} (${profile.name} — $capability)")
-                    }
+                    profile.models
+                        .filter { model ->
+                            model.id !in profile.modelBlacklist &&
+                                (profile.modelWhitelist.isEmpty() || model.id in profile.modelWhitelist) &&
+                                model.status.name !in setOf("DEPRECATED", "DISABLED") &&
+                                model.capabilities.any { it.equals(capability, ignoreCase = true) }
+                        }.map { model ->
+                            PanelSelectOption("${profile.id}::${model.id}", "${model.name} (${profile.name} — $capability)")
+                        }
                 }
         Column(modifier = Modifier.fillMaxWidth()) {
             PanelCheckbox(
