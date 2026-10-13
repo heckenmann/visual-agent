@@ -50,6 +50,11 @@ internal class TaskAttemptSession(
                     ?.policy
                     ?.tools
                     ?.let { tool.value in it } ?: true
+            }.filter { tool ->
+                de.heckenmann.visualagent.agent.tools.TaskToolAccess.supportsResourceScope(
+                    tool.value,
+                    claimedTodo.contract?.policy?.resources,
+                )
             }.toSet()
 
     fun needsIntervention(): Boolean {
