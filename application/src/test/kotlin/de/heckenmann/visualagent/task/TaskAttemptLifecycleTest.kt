@@ -117,7 +117,8 @@ class TaskAttemptLifecycleTest {
                                 "worker",
                                 TaskContract(
                                     objective = "Missing execution",
-                                    criteria = listOf(TaskCriterion("check", "Verify execution")),
+                                    deliverables = listOf(TaskDeliverable("result", "Expected result", "result.txt")),
+                                    criteria = listOf(TaskCriterion("check", "Verify execution", "result")),
                                 ),
                             ).todo
                     assertTrue(fixture.coordinator.startTodo(todo.id))
