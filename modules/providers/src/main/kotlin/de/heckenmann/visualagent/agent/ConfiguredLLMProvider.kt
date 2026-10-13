@@ -89,7 +89,9 @@ class ConfiguredLLMProvider(
             .subscribeOn(Schedulers.boundedElastic())
             .flatMap { profile ->
                 discoverModelConfigsReactive(profile).flatMap { discovered ->
-                    if (profile.adapter == ProviderAdapter.CODEX_CLI) {
+                    if (profile.adapter == ProviderAdapter.CODEX_CLI ||
+                        profile.adapter == ProviderAdapter.OPENAI_COMPATIBLE
+                    ) {
                         providerCatalog.updateDiscoveredModelConfigs(providerId, discovered)
                     } else {
                         providerCatalog.updateDiscoveredModels(providerId, discovered.map { it.id })
@@ -145,7 +147,8 @@ class ConfiguredLLMProvider(
                     }
                 }
             ProviderAdapter.OPENAI_COMPATIBLE ->
-                openAiClient.getModelsReactive(profile).map { models -> models.map(::ProviderModelConfig) }
+                runCatching { openAiClient.getModelConfigsReactive(profile) }
+                    .getOrElse { openAiClient.getModelsReactive(profile).map { models -> models.map(::ProviderModelConfig) } }
             ProviderAdapter.CODEX_CLI -> adapterFor(profile.adapter).loadModelsReactive(profile)
         }
 
