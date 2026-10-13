@@ -39,6 +39,7 @@ internal fun providerConnectionSection(
     onContextLengthChanged: (Int) -> Unit,
     onRefreshModels: () -> Unit,
     onFavoriteChanged: (Boolean) -> Unit,
+    onModelCapabilitiesChanged: (Set<String>) -> Unit = {},
 ) {
     PanelSection(title = "Main agent connection") {
         OutlinedButton(
@@ -83,6 +84,7 @@ internal fun providerConnectionSection(
             onContextLengthChanged = onContextLengthChanged,
             onRefreshModels = onRefreshModels,
             onFavoriteChanged = onFavoriteChanged,
+            onModelCapabilitiesChanged = onModelCapabilitiesChanged,
         )
     }
 }
