@@ -86,8 +86,9 @@ interface LLMProvider {
         image: ByteArray,
         prompt: String,
         selection: ModelSelection,
-    ): Mono<ChatResponse> =
-        selection.model?.let { visionReactive(image, prompt, it) } ?: visionReactive(image, prompt)
+    ): Mono<ChatResponse> {
+        return selection.model?.let { visionReactive(image, prompt, it) } ?: visionReactive(image, prompt)
+    }
 
     /**
      * Generate embeddings for text.
