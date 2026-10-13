@@ -40,9 +40,10 @@ internal fun rememberPromptInterpolationController(
     val busy by controller.busy.collectAsState()
     LaunchedEffect(busy, state.sending) { suggestions.onSendingChanged(busy || state.sending) }
     DisposableEffect(controller, settings) {
-        val listener = settings.addChangeListener { snapshot ->
-            controller.onSettingsChanged(snapshot.automaticPromptInterpolation)
-        }
+        val listener =
+            settings.addChangeListener { snapshot ->
+                controller.onSettingsChanged(snapshot.automaticPromptInterpolation)
+            }
         onDispose { listener.close() }
     }
     DisposableEffect(controller) { onDispose { controller.cancel(report = false) } }
