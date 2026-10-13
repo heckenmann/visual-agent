@@ -84,7 +84,8 @@ class ConfiguredLLMProvider(
                             .visionReactive(image, prompt, resolved.model.id, resolved.provider)
                     ProviderAdapter.OPENAI_COMPATIBLE ->
                         openAiClient.visionReactive(image, prompt, resolved.model.id, resolved.provider)
-                    ProviderAdapter.OLLAMA -> ollamaClient.visionReactive(image, prompt, resolved.model.id)
+                    ProviderAdapter.OLLAMA ->
+                        ollamaClient.visionReactive(image, prompt, resolved.model.id, resolved.provider)
                 }
             }
 
