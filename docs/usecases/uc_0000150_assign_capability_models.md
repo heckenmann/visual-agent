@@ -35,6 +35,11 @@ The agent persists the enabled feature set and feature-specific model references
 - Provider fails during analysis: propagate a user-facing provider failure without reporting a successful result.
 - Unknown provider metadata: avoid automatically granting specialized capabilities; allow an explicit user override.
 
+## Tool Calls
+
+- `agent_create` and `agent_update` accept validated capability toggles and provider-qualified model assignments.
+- `workspace:file` image analysis checks the assigned sub-agent's VISION capability before dispatching to the selected model.
+
 ## Code Entry Points
 
 - `ModelCapability`, `OpenAiModelCapabilities`, `ProviderCatalogService`
