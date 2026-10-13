@@ -252,13 +252,15 @@ internal fun SubAgentDetailsEditor(
                     scope.launch {
                         val providerId = selected.substringBefore("::")
                         val modelId = selected.substringAfter("::")
-                        runCatching { withContext(Dispatchers.IO) { providerPort.modelDetails(providerId, modelId) } }
-                            .onSuccess { details ->
-                                capabilityStatus =
-                                    "$capability model metadata available: ${details.model}; functional request not tested"
-                            }.onFailure { error ->
-                                capabilityStatus = "$capability model probe failed: ${error.message}"
+                        runCatching {
+                            withContext(Dispatchers.IO) {
+                                providerPort.probeModelCapability(providerId, modelId, capability)
                             }
+                        }.onSuccess { message ->
+                            capabilityStatus = message
+                        }.onFailure { error ->
+                            capabilityStatus = "$capability model probe failed: ${error.message}"
+                        }
                     }
                 },
             )
