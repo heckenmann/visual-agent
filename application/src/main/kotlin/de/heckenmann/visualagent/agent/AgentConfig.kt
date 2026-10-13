@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent
 
+import de.heckenmann.visualagent.agent.provider.ModelCapability
 import kotlinx.serialization.Serializable
 
 /**
@@ -20,6 +21,8 @@ import kotlinx.serialization.Serializable
  * @property options Provider-specific request options merged at execution time
  * @property tools Optional per-agent tool override; null keeps template/default tool selection
  * @property templateName Optional template key used to initialize this config and resolve tools
+ * @property enabledCapabilities Capability gates for this agent; CHAT always remains enabled
+ * @property capabilityModels Optional per-capability model identifiers, optionally provider-qualified with ::
  */
 @Serializable
 data class AgentConfig(
@@ -35,7 +38,14 @@ data class AgentConfig(
     val options: Map<String, String> = emptyMap(),
     val tools: List<String>? = null,
     val templateName: String? = null,
+    val enabledCapabilities: Set<ModelCapability> = setOf(ModelCapability.CHAT),
+    val capabilityModels: Map<ModelCapability, String> = emptyMap(),
 ) {
+    init {
+        require(ModelCapability.CHAT in enabledCapabilities) { "CHAT capability cannot be disabled" }
+        require(capabilityModels.keys.all { it in enabledCapabilities }) { "Assigned model requires an enabled capability" }
+    }
+
     /**
      * Converts the agent-specific model overrides into a provider request selection.
      *
@@ -43,10 +53,16 @@ data class AgentConfig(
      *
      * @return Request-scoped model selection
      */
-    fun modelSelection(): ModelSelection =
-        ModelSelection(
-            provider = provider?.trim()?.takeIf(String::isNotEmpty),
-            model = model?.trim()?.takeIf(String::isNotEmpty),
+    fun modelSelection(capability: ModelCapability = ModelCapability.CHAT): ModelSelection {
+        require(capability in enabledCapabilities) {
+            "Sub-agent is not configured for $capability. Enable $capability and assign a capable model in sub-agent settings."
+        }
+        val assigned = capabilityModels[capability]?.trim()?.takeIf(String::isNotBlank)
+        val explicitProvider = assigned?.takeIf { "::" in it }?.substringBefore("::")
+        val selectedModel = assigned?.substringAfter("::")?.takeIf(String::isNotBlank) ?: assigned
+        return ModelSelection(
+            provider = explicitProvider ?: provider?.trim()?.takeIf(String::isNotEmpty),
+            model = selectedModel ?: model?.trim()?.takeIf(String::isNotEmpty),
             variant = variant?.trim()?.takeIf(String::isNotEmpty),
             parameters =
                 ModelParameters(
@@ -56,6 +72,7 @@ data class AgentConfig(
                 ),
             options = options,
         )
+    }
 
     companion object {
         /**
