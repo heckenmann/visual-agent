@@ -11,6 +11,12 @@ import de.heckenmann.visualagent.ui.components.PanelCheckbox
 internal val EDITABLE_MODEL_CAPABILITIES =
     listOf("CHAT", "VISION", "AUDIO_INPUT", "AUDIO_OUTPUT", "IMAGE_GENERATION", "EMBEDDING", "TOOLS")
 
+/** Returns editable capabilities, preserving the legacy chat default on unknown models. */
+internal fun ProviderModel.capabilitiesForEditing(): Set<String> {
+    val known = capabilities.map { it.uppercase().replace('-', '_') }.toSet()
+    return if (!capabilitiesComplete && known.isEmpty()) known + "CHAT" else known
+}
+
 /** Displays model capabilities and persists manual toggles through the surrounding settings draft. */
 @Composable
 internal fun ModelCapabilitiesEditor(
@@ -24,11 +30,11 @@ internal fun ModelCapabilitiesEditor(
                 "Provider-reported capabilities are shown below. Change a toggle to override the declaration for this model.",
                 style = MaterialTheme.typography.bodySmall,
             )
-            val enabled = model.capabilities.map { it.uppercase().replace('-', '_') }.toSet()
+            val enabled = model.capabilitiesForEditing()
             EDITABLE_MODEL_CAPABILITIES.forEach { capability ->
                 PanelCheckbox(
                     label = capability.replace('_', ' '),
-                    checked = capability in enabled || capability == "CHAT" && !model.capabilitiesComplete && enabled.isEmpty(),
+                    checked = capability in enabled,
                     onCheckedChange = { checked ->
                         onChange(
                             if (checked) enabled + capability else enabled - capability,
