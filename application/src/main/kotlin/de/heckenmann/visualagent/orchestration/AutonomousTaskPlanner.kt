@@ -100,6 +100,10 @@ internal class AutonomousTaskPlanner(
         return contract.requiredOperations.all { operation ->
             !(contract.policy.resources?.isEmpty() == true && operation.tool.startsWith("workspace:")) &&
                 operation.tool in tools &&
+                de.heckenmann.visualagent.agent.tools.TaskToolAccess.supportsResourceScope(
+                    operation.tool,
+                    contract.policy.resources,
+                ) &&
                 operationReady(agent, operation) &&
                 (registeredTools()?.any { it.value == operation.tool } ?: true) &&
                 operation.tool !in setOf("web:search", "web:browse", "browser", "search") &&
