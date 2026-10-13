@@ -23,7 +23,9 @@ class TaskToolAccess(
         val action = input["action"]?.jsonPrimitive?.contentOrNull ?: defaultAction(tool)
         policy.actions[tool]?.let { require(action in it) { "TASK_SCOPE_DENIED: Action is outside this task" } }
         val resources = policy.resources ?: return
-        require(tool != "workspace:download") { "TASK_SCOPE_DENIED: Download destinations cannot be constrained by this task" }
+        require(supportsResourceScope(tool, resources)) {
+            "TASK_SCOPE_DENIED: Tool cannot enforce this task's filesystem resource boundary"
+        }
         if (tool != "workspace:file") return
         require(action !in setOf("list", "listRoots", "search", "sync", "glob", "grep", "renderPdfPage")) {
             "TASK_SCOPE_DENIED: Use an explicit path operation that preserves resource boundaries"
@@ -61,6 +63,31 @@ class TaskToolAccess(
             ) { "TASK_SCOPE_DENIED: Resource is outside this task" }
         }
         require(input["id"] == null) { "TASK_SCOPE_DENIED: Use an explicit path instead of an opaque file identifier" }
+    }
+
+    companion object {
+        /**
+         * A scoped task may only use file operations with checked paths or tools that cannot
+         * directly access the local filesystem. Unknown tools fail closed.
+         */
+        private val RESOURCE_SCOPED_SAFE_TOOLS =
+            setOf(
+                "workspace:file",
+                "system:time",
+                "sleep",
+                "network:dns",
+                "network:reverse-dns",
+                "network:tcp",
+                "network:ping",
+                "network:traceroute",
+                "network:http",
+                "network:tls",
+            )
+
+        fun supportsResourceScope(
+            tool: String,
+            resources: List<String>?,
+        ): Boolean = resources == null || tool in RESOURCE_SCOPED_SAFE_TOOLS
     }
 
     private fun defaultAction(tool: String): String? =
