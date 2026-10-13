@@ -132,6 +132,8 @@ private fun de.heckenmann.visualagent.protocol.ProviderProfile.toApplication(): 
                     contextLimit = model.contextLimit,
                     outputLimit = model.outputLimit,
                     capabilities = model.capabilities,
+                    capabilitiesComplete = model.capabilitiesComplete,
+                    capabilitiesOverridden = model.capabilitiesOverridden,
                 )
             },
         modelWhitelist = modelWhitelist,
