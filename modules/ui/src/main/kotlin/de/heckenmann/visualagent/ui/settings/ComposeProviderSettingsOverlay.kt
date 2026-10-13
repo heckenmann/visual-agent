@@ -283,6 +283,9 @@ internal fun providerSettingsOverlay(
                         draft = draft.copy(conversationSettings = draft.conversationSettings.copy(contextLength = value))
                     },
                     onRefreshModels = { refreshModels() },
+                    onModelCapabilitiesChanged = { capabilities ->
+                        draft = draft.withModelCapabilities(draft.providerId, draft.modelId, capabilities)
+                    },
                     onFavoriteChanged = { favorite ->
                         draft =
                             draft.copy(
