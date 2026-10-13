@@ -6,6 +6,7 @@ import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.task.TaskContract
 import de.heckenmann.visualagent.task.TaskOperation
+import de.heckenmann.visualagent.task.TaskPolicy
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoManager
 import io.mockk.every
@@ -14,6 +15,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class TaskRoutingTest {
     @Test
@@ -55,4 +57,24 @@ class TaskRoutingTest {
             ),
         )
     }
+    @Test
+    fun `routing treats unsandboxed terminal as incompatible with resource scopes`() {
+        val worker = SubAgent("terminal-worker", "Worker", "Commands", config = AgentConfig(tools = listOf("terminal")))
+        val config = mockk<AgentToolConfigService>()
+        every { config.toolsFor(worker) } returns setOf(ToolId("terminal"))
+        val planner =
+            AutonomousTaskPlanner(
+                TodoManager(),
+                mapOf(worker.id to worker),
+                mockk(),
+                config,
+                registeredTools = { setOf(ToolId("terminal")) },
+            )
+        val operation = TaskOperation("terminal")
+        val unrestricted = TaskContract(objective = "Build", requiredOperations = listOf(operation))
+        val restricted = unrestricted.copy(policy = TaskPolicy(resources = listOf("allowed")))
+        assertTrue(planner.compatible(Todo("unrestricted", "Build", contract = unrestricted), worker))
+        assertFalse(planner.compatible(Todo("restricted", "Build", contract = restricted), worker))
+    }
+
 }
