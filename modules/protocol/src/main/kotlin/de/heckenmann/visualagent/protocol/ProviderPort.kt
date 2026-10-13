@@ -93,6 +93,7 @@ data class ProviderModel(
     val outputLimit: Int? = null,
     val capabilities: Set<String> = emptySet(),
     val capabilitiesComplete: Boolean = false,
+    val capabilitiesOverridden: Boolean = false,
 )
 
 /** User-safe model detail response. */
