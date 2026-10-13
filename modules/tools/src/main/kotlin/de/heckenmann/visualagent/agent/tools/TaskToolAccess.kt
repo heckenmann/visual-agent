@@ -84,6 +84,7 @@ class TaskToolAccess(
                 "network:tls",
             )
 
+        /** Returns whether this tool can safely execute under the given resource restrictions. */
         fun supportsResourceScope(
             tool: String,
             resources: List<String>?,
