@@ -29,7 +29,11 @@ internal class OpenAiModelCatalog(
                     .list()
                     .data()
                     .map { it.id() }
-            return modelIds.map(String::trim).filter(String::isNotBlank).distinct().sorted()
+            return modelIds
+                .map(String::trim)
+                .filter(String::isNotBlank)
+                .distinct()
+                .sorted()
         } finally {
             client.close()
         }
