@@ -72,7 +72,8 @@ internal class WorkspaceFileToolMediaActions(
     fun analyzeImage(
         record: ToolWorkspaceFile,
         prompt: String,
-    ) = workspaceFiles.analyzeImage(record, prompt).let { response ->
+        agentId: String? = null,
+    ) = workspaceFiles.analyzeImage(record, prompt, agentId).let { response ->
         buildJsonObject {
             put("id", record.id)
             put("path", record.relativePath)
@@ -84,8 +85,9 @@ internal class WorkspaceFileToolMediaActions(
     fun analyzeImageReactive(
         record: ToolWorkspaceFile,
         prompt: String,
+        agentId: String? = null,
     ): Mono<kotlinx.serialization.json.JsonObject> =
-        workspaceFiles.analyzeImageReactive(record, prompt).map { response ->
+        workspaceFiles.analyzeImageReactive(record, prompt, agentId).map { response ->
             buildJsonObject {
                 put("id", record.id)
                 put("path", record.relativePath)
