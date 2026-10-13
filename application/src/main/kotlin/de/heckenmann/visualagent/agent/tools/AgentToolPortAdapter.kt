@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent.tools
 
+import de.heckenmann.visualagent.agent.AgentCapabilityValidator
 import de.heckenmann.visualagent.agent.AgentConfig
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.SubAgent
@@ -15,6 +16,7 @@ import de.heckenmann.visualagent.agent.tools.api.ToolAgentConfig
 import de.heckenmann.visualagent.agent.tools.api.ToolAgentExecutionStatus
 import de.heckenmann.visualagent.agent.tools.api.ToolAgentLog
 import de.heckenmann.visualagent.agent.tools.api.ToolAgentQueue
+import de.heckenmann.visualagent.agent.provider.ModelCapability
 import de.heckenmann.visualagent.knowledge.MemoryStore
 import org.springframework.context.annotation.Lazy
 import org.springframework.stereotype.Component
@@ -25,6 +27,7 @@ class AgentToolPortAdapter(
     @param:Lazy private val agentManager: AgentManager,
     @param:Lazy private val toolConfig: AgentToolConfigService,
     private val memoryStore: MemoryStore,
+    private val capabilityValidator: AgentCapabilityValidator? = null,
 ) : AgentToolPort {
     override fun list(): List<ToolAgent> = agentManager.getSubAgents().map(::toToolAgent)
 
@@ -43,7 +46,14 @@ class AgentToolPortAdapter(
         name: String?,
         role: String?,
         config: ToolAgentConfig,
-    ): Boolean = agentManager.updateAgent(id, name, role, config.toApplication())
+    ): Boolean {
+        validate(config)
+        return agentManager.updateAgent(id, name, role, config.toApplication())
+    }
+
+    override fun validate(config: ToolAgentConfig) {
+        capabilityValidator?.validate(config.toApplication())
+    }
 
     override fun delete(id: String): Boolean = agentManager.deleteAgent(id)
 
@@ -128,7 +138,13 @@ private fun AgentConfig.toToolConfig() =
         options,
         tools,
         templateName,
+        enabledCapabilities.mapTo(mutableSetOf()) { it.name },
+        capabilityModels.mapKeys { it.key.name },
     )
 
 private fun ToolAgentConfig.toApplication() =
-    AgentConfig(timeout, maxRetries, memoryLimitMb, provider, model, temperature, topP, maxTokens, variant, options, tools, templateName)
+    AgentConfig(
+        timeout, maxRetries, memoryLimitMb, provider, model, temperature, topP, maxTokens, variant, options, tools, templateName,
+        enabledCapabilities.map(ModelCapability::valueOf).toSet(),
+        capabilityModels.mapKeys { ModelCapability.valueOf(it.key) },
+    )
