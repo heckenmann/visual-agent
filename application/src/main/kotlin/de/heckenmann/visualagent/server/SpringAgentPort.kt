@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.server
 
+import de.heckenmann.visualagent.agent.AgentCapabilityValidator
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.provider.ModelCapability
 import de.heckenmann.visualagent.agent.AgentStatusCallbackAdapter
@@ -29,6 +30,7 @@ class SpringAgentPort(
     private val agentToolConfigService: AgentToolConfigService,
     private val toolRegistry: ToolRegistry,
     private val agentStatusCallbackAdapter: AgentStatusCallbackAdapter,
+    private val capabilityValidator: AgentCapabilityValidator? = null,
 ) : AgentPort {
     override fun list(): List<Agent> = agentManager.getSubAgents().map(SubAgent::toProtocol)
 
@@ -44,7 +46,9 @@ class SpringAgentPort(
         role: String,
         config: AgentConfig,
     ): Agent? {
-        val updated = agentManager.updateAgent(id, name, role, config.toApplication())
+        val configForAgent = config.toApplication()
+        capabilityValidator?.validate(configForAgent)
+        val updated = agentManager.updateAgent(id, name, role, configForAgent)
         return if (updated) agentManager.getSubAgent(id)?.toProtocol() else null
     }
 
