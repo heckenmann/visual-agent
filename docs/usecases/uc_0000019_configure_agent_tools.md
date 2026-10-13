@@ -54,6 +54,7 @@ delegates its result to the selected model when that model calls the tool.
 - Model-facing prompts and function schemas never expose Internal Tool IDs; provider function names are derived rather than persisted separately.
 - Per-agent tool overrides are resolved before template defaults and are still filtered by globally disabled tools.
 - Tool toggles remain separate from provider/model dropdowns so capability changes are explicit.
+- Model capabilities (CHAT, VISION, AUDIO_INPUT, AUDIO_OUTPUT, IMAGE_GENERATION, EMBEDDING, TOOLS) are assigned separately from tool access; granting a model capability does not enable any Internal Tool ID. See [UC-0000150](uc_0000150_assign_capability_models.md) and [UC-0000151](uc_0000151_manage_sub_agent_capabilities.md).
 - Self-model changes use `model:selection` (`model_selection`). The main agent has access by default;
   sub-agents require an explicit agent or template grant. Built-in role defaults never grant it.
   See [UC-0000147](uc_0000147_switch_agent_model.md).
