@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent
 
+import de.heckenmann.visualagent.agent.provider.ModelCapability
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -49,10 +50,39 @@ class SubAgentModelConfigurationTest {
                 temperature = 0.3,
                 topP = 0.85,
                 maxTokens = 2048,
+                enabledCapabilities = setOf(ModelCapability.CHAT, ModelCapability.EMBEDDING),
+                capabilityModels = mapOf(ModelCapability.EMBEDDING to "ollama::nomic-embed-text"),
             )
 
         val restored = Json.decodeFromString<AgentConfig>(Json.encodeToString(config))
 
         assertEquals(config, restored)
     }
+    @Test
+    fun `image-bearing messages select assigned vision provider and model`() {
+        val provider = mockk<LLMProvider>()
+        val request = slot<ChatRequestContext>()
+        every { provider.chatReactive(capture(request)) } returns
+            Mono.just(ChatResponse("gpt-4o", Message("assistant", "ok"), true))
+        val agent =
+            SubAgent(
+                id = "vision-agent",
+                name = "Vision Agent",
+                role = "Analyze images",
+                config =
+                    AgentConfig(
+                        provider = "ollama",
+                        model = "qwen3",
+                        enabledCapabilities = setOf(ModelCapability.CHAT, ModelCapability.VISION),
+                        capabilityModels = mapOf(ModelCapability.VISION to "openai::gpt-4o"),
+                    ),
+            )
+
+        agent.chatReactive(listOf(Message("user", "analyze", images = listOf("image-data"))), provider).block()
+
+        assertEquals("openai", request.captured.provider)
+        assertEquals("gpt-4o", request.captured.model)
+        assertEquals("VISION", request.captured.metadata["modelCapability"])
+    }
+
 }
