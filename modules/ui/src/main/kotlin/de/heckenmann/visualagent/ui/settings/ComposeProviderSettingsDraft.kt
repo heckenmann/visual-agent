@@ -103,12 +103,18 @@ internal fun ProviderSettingsDraft.withModelCapabilities(
     capabilities: Set<String>,
 ): ProviderSettingsDraft =
     copy(
-        providers = providers.map { provider ->
+        providers =
+            providers.map { provider ->
             if (provider.id == providerId) {
                 provider.copy(
-                    models = provider.models.map { model ->
+                    models =
+                        provider.models.map { model ->
                         if (model.id == modelId) {
-                            model.copy(capabilities = capabilities.map(String::lowercase).toSet(), capabilitiesComplete = true, capabilitiesOverridden = true)
+                            model.copy(
+                                capabilities = capabilities.map(String::lowercase).toSet(),
+                                capabilitiesComplete = true,
+                                capabilitiesOverridden = true,
+                            )
                         } else {
                             model
                         }
