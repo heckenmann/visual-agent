@@ -97,9 +97,18 @@ internal fun SubAgentDetailsEditor(
             if (provider.isBlank()) {
                 listOf(PanelSelectOption(INHERIT_SELECTION, "Inherit session model"))
             } else {
-                val catalogModels = providerPort.selectableModels(provider)
-                    .filter { !it.capabilitiesComplete || it.capabilities.any { c -> c.equals("chat", ignoreCase = true) || c.equals("completion", ignoreCase = true) } }
-                    .map { PanelSelectOption(it.id, "${it.name} [${it.capabilities.sorted().joinToString(", ")}]") }
+                val catalogModels =
+                    providerPort
+                        .selectableModels(provider)
+                        .filter { config ->
+                            !config.capabilitiesComplete ||
+                                config.capabilities.any { capability ->
+                                    capability.equals("chat", ignoreCase = true) ||
+                                        capability.equals("completion", ignoreCase = true)
+                                }
+                        }.map { config ->
+                            PanelSelectOption(config.id, "${config.name} [${config.capabilities.sorted().joinToString(", ")}]")
+                        }
                 val customModel =
                     model
                         .takeIf { current -> current.isNotBlank() && catalogModels.none { it.value == current } }
@@ -116,7 +125,9 @@ internal fun SubAgentDetailsEditor(
             maxTokens.optionalIntIsValid() &&
             optionsText.toOptionsMapOrNull() != null
     val canSave =
-        name.isNotBlank() && role.isNotBlank() && numericFieldsAreValid &&
+        name.isNotBlank() &&
+            role.isNotBlank() &&
+            numericFieldsAreValid &&
             validCapabilityAssignments(enabledCapabilities, capabilityModels, capabilityProviders)
 
     ModalDialogLayout(
@@ -242,8 +253,12 @@ internal fun SubAgentDetailsEditor(
                         val providerId = selected.substringBefore("::")
                         val modelId = selected.substringAfter("::")
                         runCatching { withContext(Dispatchers.IO) { providerPort.modelDetails(providerId, modelId) } }
-                            .onSuccess { capabilityStatus = "$capability model metadata available: ${it.model}; functional request not tested" }
-                            .onFailure { capabilityStatus = "$capability model probe failed: ${it.message}" }
+                            .onSuccess { details ->
+                                capabilityStatus =
+                                    "$capability model metadata available: ${details.model}; functional request not tested"
+                            }.onFailure { error ->
+                                capabilityStatus = "$capability model probe failed: ${error.message}"
+                            }
                     }
                 },
             )
