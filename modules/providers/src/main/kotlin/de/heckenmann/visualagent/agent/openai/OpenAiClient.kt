@@ -12,6 +12,8 @@ import de.heckenmann.visualagent.agent.ToolCallingLoop
 import de.heckenmann.visualagent.agent.VisionSupport
 import de.heckenmann.visualagent.agent.nativeResponseSchema
 import de.heckenmann.visualagent.agent.provider.DefaultProviderRuntimeConfig
+import de.heckenmann.visualagent.agent.provider.OpenAiModelCapabilities
+import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderEnvironmentCredentials
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.agent.provider.ProviderRuntimeConfig
@@ -165,6 +167,21 @@ class OpenAiClient(
             .fromCallable {
                 requireUsableApiKey(profile.baseUrl, ProviderEnvironmentCredentials.openAiApiKey(profile))
                 OpenAiModelCatalog { openAiClient(profile) }.load(modelsUri(profile))
+            }.subscribeOn(Schedulers.boundedElastic())
+
+    /** Discovers chat and specialized OpenAI models without applying chat-only selection filters. */
+    override fun getModelConfigsReactive(profile: ProviderProfile): Mono<List<ProviderModelConfig>> =
+        Mono
+            .fromCallable {
+                requireUsableApiKey(profile.baseUrl, ProviderEnvironmentCredentials.openAiApiKey(profile))
+                OpenAiModelCatalog { openAiClient(profile) }.loadAll().map { id ->
+                    val capabilities = OpenAiModelCapabilities.infer(id)
+                    ProviderModelConfig(
+                        id = id,
+                        capabilities = capabilities.map { it.name.lowercase() }.toSet(),
+                        capabilitiesComplete = false,
+                    )
+                }
             }.subscribeOn(Schedulers.boundedElastic())
 
     internal fun getModelDetailsReactive(
