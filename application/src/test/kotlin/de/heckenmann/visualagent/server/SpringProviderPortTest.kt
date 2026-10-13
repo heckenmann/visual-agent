@@ -1,6 +1,10 @@
 package de.heckenmann.visualagent.server
 
+import de.heckenmann.visualagent.agent.ChatRequestContext
+import de.heckenmann.visualagent.agent.ChatResponse
 import de.heckenmann.visualagent.agent.LLMProvider
+import de.heckenmann.visualagent.agent.Message
+import de.heckenmann.visualagent.agent.ModelSelection
 import de.heckenmann.visualagent.agent.ModelDetails
 import de.heckenmann.visualagent.agent.ShowResponse
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
@@ -9,12 +13,14 @@ import de.heckenmann.visualagent.protocol.ModelStatus
 import de.heckenmann.visualagent.protocol.ProviderAdapter
 import de.heckenmann.visualagent.protocol.ProviderProfile
 import io.mockk.every
+import io.mockk.slot
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import reactor.core.publisher.Mono
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import de.heckenmann.visualagent.agent.provider.ModelStatus as ApplicationModelStatus
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter as ApplicationProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderProfile as ApplicationProviderProfile
@@ -193,6 +199,51 @@ class SpringProviderPortTest {
 
         assertEquals(ProviderAdapter.CODEX_CLI, port.getProvider("codex")?.adapter)
     }
+
+    @Test
+    fun `chat probe sends a real tool-free request to the selected provider model`() =
+        runTest {
+            every { catalog.selectableModels("ollama") } returns
+                listOf(ProviderModelConfig("llama3", capabilities = setOf("chat"), capabilitiesComplete = true))
+            val request = slot<ChatRequestContext>()
+            every { provider.chatReactive(capture(request)) } returns
+                Mono.just(ChatResponse("llama3", Message("assistant", "OK"), done = true))
+
+            val result = port.probeModelCapability("ollama", "llama3", "CHAT")
+
+            assertTrue(result.contains("responded successfully"))
+            assertEquals("ollama", request.captured.provider)
+            assertEquals("llama3", request.captured.model)
+            assertTrue(request.captured.enabledTools.isEmpty())
+        }
+
+    @Test
+    fun `vision probe uses the chosen provider instead of global image routing`() =
+        runTest {
+            every { catalog.selectableModels("ollama") } returns
+                listOf(ProviderModelConfig("llava", capabilities = setOf("vision"), capabilitiesComplete = true))
+            val selection = slot<ModelSelection>()
+            every { provider.visionReactive(any(), any(), capture(selection)) } returns
+                Mono.just(ChatResponse("llava", Message("assistant", "One white pixel"), done = true))
+
+            val result = port.probeModelCapability("ollama", "llava", "VISION")
+
+            assertTrue(result.contains("responded successfully"))
+            assertEquals("ollama", selection.captured.provider)
+            assertEquals("llava", selection.captured.model)
+        }
+
+    @Test
+    fun `unsupported audio probes fail clearly instead of declaring metadata checks successful`() =
+        runTest {
+            every { catalog.selectableModels("ollama") } returns
+                listOf(ProviderModelConfig("audio", capabilities = setOf("audio_input"), capabilitiesComplete = true))
+
+            val result = runCatching { port.probeModelCapability("ollama", "audio", "AUDIO_INPUT") }
+
+            assertTrue(result.isFailure)
+            assertTrue(result.exceptionOrNull()?.message.orEmpty().contains("not yet supported"))
+        }
 
     @Test
     fun `provider change listeners are delegated to the catalog`() {
