@@ -47,7 +47,9 @@ object OpenAiModelCapabilities {
             id.startsWith("gpt-realtime") -> setOf(ModelCapability.CHAT, ModelCapability.AUDIO_INPUT, ModelCapability.AUDIO_OUTPUT)
             id.startsWith("gpt-4o-audio") ->
                 setOf(ModelCapability.CHAT, ModelCapability.AUDIO_INPUT, ModelCapability.AUDIO_OUTPUT, ModelCapability.TOOLS)
-            id.startsWith("gpt-4o") || id.startsWith("gpt-4.1") || id.startsWith("gpt-5") ||
+            id.startsWith("gpt-4o") ||
+                id.startsWith("gpt-4.1") ||
+                id.startsWith("gpt-5") ||
                 id.startsWith("gpt-6") ->
                 setOf(ModelCapability.CHAT, ModelCapability.VISION, ModelCapability.TOOLS)
             id.startsWith("gpt-") || id.startsWith("chatgpt-") || Regex("""^o[1-9]""").containsMatchIn(id) ->
