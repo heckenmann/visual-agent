@@ -144,6 +144,34 @@ class PromptInterpolationControllerTest {
         }
 
     @Test
+    fun `prefetched disabled setting sends normally without a settings lookup`() =
+        runTest {
+            val controller = controller()
+            coEvery { settings.snapshotAsync() } throws IllegalStateException("unexpected lookup")
+            controller.initializeSettings(false)
+            controller.submit()
+            runCurrent()
+
+            assertEquals(listOf("original"), sent)
+            coVerify(exactly = 0) { settings.snapshotAsync() }
+            coVerify(exactly = 0) { conversation.interpolate(any(), any()) }
+        }
+
+    @Test
+    fun `late initial settings load cannot override a newer preference`() =
+        runTest {
+            val controller = controller()
+            controller.onSettingsChanged(true)
+            controller.initializeSettings(false)
+            controller.submit()
+            runCurrent()
+
+            assertEquals(listOf("refined"), sent)
+            coVerify(exactly = 0) { settings.snapshotAsync() }
+            coVerify(exactly = 1) { conversation.interpolate(any(), any()) }
+        }
+
+    @Test
     fun `settings changes reuse the current preference without an extra lookup`() =
         runTest {
             val controller = controller()
