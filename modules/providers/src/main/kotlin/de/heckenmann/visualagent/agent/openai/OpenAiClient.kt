@@ -109,11 +109,26 @@ class OpenAiClient(
         image: ByteArray,
         prompt: String,
         modelId: String,
+    ): Mono<ChatResponse> = visionForProfile(image, prompt, modelId, null)
+
+    /** Uses the selected provider profile's endpoint and credentials for image analysis. */
+    internal fun visionReactive(
+        image: ByteArray,
+        prompt: String,
+        modelId: String,
+        profile: ProviderProfile,
+    ): Mono<ChatResponse> = visionForProfile(image, prompt, modelId, profile)
+
+    private fun visionForProfile(
+        image: ByteArray,
+        prompt: String,
+        modelId: String,
+        profile: ProviderProfile?,
     ): Mono<ChatResponse> =
         Mono
             .fromCallable {
                 val response =
-                    chatModel(modelId = modelId)
+                    chatModel(profile, modelId)
                         .call(
                             Prompt(
                                 listOf(
