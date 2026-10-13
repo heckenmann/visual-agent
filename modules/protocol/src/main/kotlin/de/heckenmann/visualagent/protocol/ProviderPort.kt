@@ -47,6 +47,16 @@ interface ProviderPort {
         modelId: String,
     ): ModelDetails
 
+    /**
+     * Sends a small real request to verify the selected model, rather than checking metadata only.
+     * Unsupported probe protocols are reported explicitly.
+     */
+    suspend fun probeModelCapability(
+        providerId: String,
+        modelId: String,
+        capability: String,
+    ): String = throw UnsupportedOperationException("Functional model probing is not available from this provider connection")
+
     /** Registers a listener for catalog changes. */
     fun addChangeListener(listener: () -> Unit): AutoCloseable
 }
