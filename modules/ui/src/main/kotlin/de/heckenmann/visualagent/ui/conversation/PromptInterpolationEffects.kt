@@ -10,6 +10,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import de.heckenmann.visualagent.protocol.ConversationPort
 import de.heckenmann.visualagent.protocol.SettingsPort
+import kotlinx.coroutines.CancellationException
 
 /** Cancels interpolation on disposal and suspends idle suggestions during preparation. */
 @Composable
@@ -45,6 +46,15 @@ internal fun rememberPromptInterpolationController(
                 controller.onSettingsChanged(snapshot.automaticPromptInterpolation)
             }
         onDispose { listener.close() }
+    }
+    LaunchedEffect(controller, settings) {
+        try {
+            controller.initializeSettings(settings.snapshotAsync().automaticPromptInterpolation)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // A failed optional preload is retried safely during the first send.
+        }
     }
     DisposableEffect(controller) { onDispose { controller.cancel(report = false) } }
     return controller
