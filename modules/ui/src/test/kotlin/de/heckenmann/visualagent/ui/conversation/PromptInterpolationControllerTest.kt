@@ -131,6 +131,37 @@ class PromptInterpolationControllerTest {
         }
 
     @Test
+    fun `settings read failure sends the original prompt instead of blocking chat`() =
+        runTest {
+            val controller = controller()
+            coEvery { settings.snapshotAsync() } throws IllegalStateException("settings unavailable")
+            controller.submit()
+            runCurrent()
+            assertEquals(listOf("original"), sent)
+            assertTrue(controller.notice.value.contains("sending the original prompt"))
+            assertFalse(controller.busy.value)
+            coVerify(exactly = 0) { conversation.interpolate(any(), any()) }
+        }
+
+    @Test
+    fun `settings changes reuse the current preference without an extra lookup`() =
+        runTest {
+            val controller = controller()
+            coEvery { settings.snapshotAsync() } throws IllegalStateException("should not be consulted")
+            controller.onSettingsChanged(false)
+            controller.submit()
+            runCurrent()
+            assertEquals(listOf("original"), sent)
+            controller.onSettingsChanged(true)
+            draft = "another prompt"
+            controller.submit()
+            runCurrent()
+            assertEquals(listOf("original", "refined"), sent)
+            coVerify(exactly = 0) { settings.snapshotAsync() }
+            coVerify(exactly = 1) { conversation.interpolate(any(), any()) }
+        }
+
+    @Test
     fun `invalid results and provider failures preserve draft and hide details`() =
         runTest {
             val controller = controller(true)
