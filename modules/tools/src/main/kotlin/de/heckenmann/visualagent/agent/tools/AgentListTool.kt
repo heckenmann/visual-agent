@@ -58,6 +58,8 @@ class AgentListTool(
             agent.currentTodoId?.let { append(" | todo=$it") }
             agent.currentTask?.let { append(" | task=${it.take(120)}") }
             append(" | tools=[${tools.joinToString(",")}]")
+            append(" | capabilities=[${agent.config.enabledCapabilities.sorted().joinToString(",")}]")
+            append(" | capabilityModels=${agent.config.capabilityModels.toSortedMap()}")
         }
     }
 
