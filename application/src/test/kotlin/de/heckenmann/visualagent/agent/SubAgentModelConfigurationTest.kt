@@ -58,6 +58,7 @@ class SubAgentModelConfigurationTest {
 
         assertEquals(config, restored)
     }
+
     @Test
     fun `image-bearing messages select assigned vision provider and model`() {
         val provider = mockk<LLMProvider>()
@@ -84,5 +85,4 @@ class SubAgentModelConfigurationTest {
         assertEquals("gpt-4o", request.captured.model)
         assertEquals("VISION", request.captured.metadata["modelCapability"])
     }
-
 }
