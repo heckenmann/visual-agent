@@ -30,6 +30,12 @@ Desktop user and main orchestrator agent.
 - `agent_list` and `agent_show` report enabled features and model assignments.
 - Feature references may contain `providerId::modelId` for a provider other than the agent's primary one.
 
+## Code Entry Points
+
+- `AgentCapabilityValidator` rejects disabled, unavailable, or incapable model assignments.
+- `AgentCreateTool` and `AgentUpdateTool` validate tool-provided configuration changes.
+- `SubAgentCapabilitiesEditor` and `SpringProviderPort` expose provider-qualified choices and live probes.
+
 ## Live Model Probes
 
 - The capability editor's Test action verifies **CHAT** with a real tool-free text request and **VISION** with a small image through the selected provider/model endpoint.
