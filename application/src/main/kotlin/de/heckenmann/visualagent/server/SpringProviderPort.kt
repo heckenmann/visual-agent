@@ -1,9 +1,14 @@
 package de.heckenmann.visualagent.server
 
+import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.LLMProvider
+import de.heckenmann.visualagent.agent.Message
+import de.heckenmann.visualagent.agent.ModelSelection
 import de.heckenmann.visualagent.agent.ShowResponse
+import de.heckenmann.visualagent.agent.provider.ModelCapability
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
+import de.heckenmann.visualagent.agent.provider.supportsCapability
 import de.heckenmann.visualagent.protocol.ModelDetails
 import de.heckenmann.visualagent.protocol.ModelStatus
 import de.heckenmann.visualagent.protocol.ProviderAdapter
@@ -12,6 +17,8 @@ import de.heckenmann.visualagent.protocol.ProviderPort
 import de.heckenmann.visualagent.protocol.ProviderProfile
 import kotlinx.coroutines.reactor.awaitSingle
 import org.springframework.stereotype.Component
+import java.time.Duration
+import java.util.Base64
 import de.heckenmann.visualagent.agent.provider.ModelStatus as ApplicationModelStatus
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter as ApplicationProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderProfile as ApplicationProviderProfile
@@ -70,7 +77,52 @@ class SpringProviderPort(
         modelId: String,
     ): ModelDetails = protocolBoundary { llmProvider.getModelDetailsReactive(providerId, modelId).awaitSingle().toProtocol() }
 
+    /** Performs a bounded live probe without persisting a conversation or exposing tools. */
+    override suspend fun probeModelCapability(
+        providerId: String,
+        modelId: String,
+        capability: String,
+    ): String =
+        protocolBoundary {
+            val requested = ModelCapability.valueOf(capability)
+            val model =
+                providerCatalog.selectableModels(providerId).firstOrNull { it.id == modelId }
+                    ?: error("Model '$providerId/$modelId' is not enabled or selectable")
+            require(model.supportsCapability(requested)) {
+                "Model '$providerId/$modelId' does not declare $requested capability"
+            }
+            val response =
+                when (requested) {
+                    ModelCapability.CHAT ->
+                        llmProvider.chatReactive(
+                            ChatRequestContext(
+                                messages = listOf(Message("user", "Reply with one short word: OK.")),
+                                provider = providerId,
+                                model = modelId,
+                            ),
+                        )
+                    ModelCapability.VISION ->
+                        llmProvider.visionReactive(
+                            Base64.getDecoder().decode(PROBE_PNG_BASE64),
+                            "Briefly describe the color of this image.",
+                            ModelSelection(provider = providerId, model = modelId),
+                        )
+                    else ->
+                        throw UnsupportedOperationException(
+                            "A live $requested probe is not yet supported by this provider interface. " +
+                                "Model metadata alone cannot confirm functionality.",
+                        )
+                }.timeout(Duration.ofSeconds(15)).awaitSingle()
+            require(response.message.content.isNotBlank()) { "Model '$providerId/$modelId' returned an empty response" }
+            "$requested model '$providerId/$modelId' responded successfully"
+        }
+
     override fun addChangeListener(listener: () -> Unit): AutoCloseable = providerCatalog.addChangeListener(listener)
+
+    private companion object {
+        const val PROBE_PNG_BASE64 =
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5+p/8AAAAASUVORK5CYII="
+    }
 }
 
 private fun ApplicationProviderProfile.toProtocol(): ProviderProfile =
