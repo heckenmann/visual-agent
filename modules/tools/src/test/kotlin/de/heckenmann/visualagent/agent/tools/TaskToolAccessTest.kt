@@ -5,6 +5,8 @@ import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
 import de.heckenmann.visualagent.task.TaskPolicy
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import java.nio.file.Files
 import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -71,6 +73,38 @@ class TaskToolAccessTest {
         assertFalse(registry.executeBlockingResult(tool, """{"action":"readText","path":"work/a.txt"}""", context).success)
         assertEquals(1, calls)
         assertEquals(listOf(false, true, false), scope.observations().map { it.success })
+    }
+
+    @Test
+    fun `resource-scoped tasks reject unsandboxed tools while preserving safe helpers`() {
+        val unsafe =
+            setOf("terminal", "javascript:execute", "workspace:download", "system:filesystem", "file:read", "canvas", "unknown:tool")
+        val access = TaskToolAccess(TaskPolicy(resources = listOf("allowed")), { unsafe + "system:time" }, { true })
+        unsafe.forEach { tool ->
+            assertFailsWith<IllegalArgumentException> { access.requireAllowed(tool, input("{}")) }
+            assertFalse(TaskToolAccess.supportsResourceScope(tool, listOf("allowed")))
+        }
+        access.requireAllowed("system:time", input("{}"))
+        assertTrue(TaskToolAccess.supportsResourceScope("terminal", null))
+        assertTrue(TaskToolAccess.supportsResourceScope("workspace:file", listOf("allowed")))
+    }
+
+    @Test
+    fun `terminal dispatch cannot create files outside a contracted workspace scope`() {
+        val root = Files.createTempDirectory("task-terminal-denial")
+        try {
+            val marker = root.resolve("out-of-scope.txt")
+            val terminal = TerminalTool()
+            val registry = ToolRegistry(listOf(terminal), ToolEventBus())
+            val access =
+                TaskToolAccess(TaskPolicy(resources = listOf("allowed")), { setOf("terminal") }, { true })
+            val argument = """{"command":${JsonPrimitive("echo bypass > $marker")}}"""
+            val result = registry.executeBlockingResult(terminal, argument, mapOf("taskToolAccess" to access))
+            assertFalse(result.success)
+            assertFalse(Files.exists(marker))
+        } finally {
+            root.toFile().deleteRecursively()
+        }
     }
 
     private fun input(text: String) = Json.parseToJsonElement(text).jsonObject
