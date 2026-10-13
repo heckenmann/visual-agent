@@ -121,7 +121,7 @@ class SpringProviderPort(
 
     private companion object {
         const val PROBE_PNG_BASE64 =
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5+p/8AAAAASUVORK5CYII="
+            "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGP8//8/AwMDEwMDAwMDAwAkBgMB/DXemwAAAABJRU5ErkJggg=="
     }
 }
 
