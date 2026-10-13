@@ -78,6 +78,18 @@ interface LLMProvider {
     ): Mono<ChatResponse> = visionReactive(image, prompt)
 
     /**
+     * Analyzes an image using a caller-selected provider and model.
+     *
+     * Implementations with no multi-provider routing retain their model-specific vision path.
+     */
+    fun visionReactive(
+        image: ByteArray,
+        prompt: String,
+        selection: ModelSelection,
+    ): Mono<ChatResponse> =
+        selection.model?.let { visionReactive(image, prompt, it) } ?: visionReactive(image, prompt)
+
+    /**
      * Generate embeddings for text.
      *
      * @param text Text to generate embeddings for
