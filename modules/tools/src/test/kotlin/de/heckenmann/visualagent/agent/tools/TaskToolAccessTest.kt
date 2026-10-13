@@ -4,9 +4,9 @@ import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
 import de.heckenmann.visualagent.task.TaskPolicy
+import java.nio.file.Files
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
-import java.nio.file.Files
 import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
