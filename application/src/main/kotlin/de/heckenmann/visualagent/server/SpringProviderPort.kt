@@ -11,17 +11,17 @@ import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.supportsCapability
 import de.heckenmann.visualagent.protocol.ModelDetails
 import de.heckenmann.visualagent.protocol.ModelStatus
-import de.heckenmann.visualagent.protocol.ProviderAdapter
-import de.heckenmann.visualagent.protocol.ProviderModel
 import de.heckenmann.visualagent.protocol.ProtocolErrorCategory
 import de.heckenmann.visualagent.protocol.ProtocolOperationException
-import de.heckenmann.visualagent.protocol.UserFacingError
+import de.heckenmann.visualagent.protocol.ProviderAdapter
+import de.heckenmann.visualagent.protocol.ProviderModel
 import de.heckenmann.visualagent.protocol.ProviderPort
 import de.heckenmann.visualagent.protocol.ProviderProfile
-import kotlinx.coroutines.reactor.awaitSingle
-import org.springframework.stereotype.Component
+import de.heckenmann.visualagent.protocol.UserFacingError
 import java.time.Duration
 import java.util.Base64
+import kotlinx.coroutines.reactor.awaitSingle
+import org.springframework.stereotype.Component
 import de.heckenmann.visualagent.agent.provider.ModelStatus as ApplicationModelStatus
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter as ApplicationProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderProfile as ApplicationProviderProfile
