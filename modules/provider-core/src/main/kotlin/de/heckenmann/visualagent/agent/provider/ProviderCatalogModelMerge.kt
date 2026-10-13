@@ -11,14 +11,10 @@ internal fun List<ProviderModelConfig>.mergeWithExisting(existing: Map<String, P
             capabilities =
                 when {
                     configured.capabilitiesOverridden -> configured.capabilities
-                    discovered.capabilitiesComplete || discovered.capabilities.isNotEmpty() -> discovered.capabilities
-                    else -> configured.capabilities
+                    discovered.capabilitiesComplete -> discovered.capabilities
+                    configured.capabilitiesComplete -> configured.capabilities
+                    else -> configured.capabilities + discovered.capabilities
                 },
-            capabilitiesComplete =
-                when {
-                    configured.capabilitiesOverridden -> configured.capabilitiesComplete
-                    discovered.capabilitiesComplete || discovered.capabilities.isNotEmpty() -> discovered.capabilitiesComplete
-                    else -> configured.capabilitiesComplete
-                },
+            capabilitiesComplete = configured.capabilitiesComplete || discovered.capabilitiesComplete,
         ) ?: discovered
     }
