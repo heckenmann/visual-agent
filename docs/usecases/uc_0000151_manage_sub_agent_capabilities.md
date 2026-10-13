@@ -30,6 +30,13 @@ Desktop user and main orchestrator agent.
 - `agent_list` and `agent_show` report enabled features and model assignments.
 - Feature references may contain `providerId::modelId` for a provider other than the agent's primary one.
 
+## Live Model Probes
+
+- The capability editor's Test action verifies **CHAT** with a real tool-free text request and **VISION** with a small image through the selected provider/model endpoint.
+- Probes are bounded to 15 seconds and never store a conversation or expose tool definitions.
+- AUDIO_INPUT, AUDIO_OUTPUT, IMAGE_GENERATION, EMBEDDING, and TOOLS currently have no corresponding functional probe protocol. The UI reports this limitation as an error rather than treating model metadata as a successful test.
+- Existing provider workflows determine whether specialized operations are executable. Declaring a capability alone does not enable provider operations that have not yet been implemented.
+
 ## Failure Cases
 
 - Reject disabling mandatory CHAT.
