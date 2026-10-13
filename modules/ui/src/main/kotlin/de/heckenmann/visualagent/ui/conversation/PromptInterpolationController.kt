@@ -43,8 +43,15 @@ internal class PromptInterpolationController(
     private var automaticInterpolationSetting: Boolean? = null
 
     /** Keeps the send path in sync with settings without rereading them for every message. */
+    @Synchronized
     fun onSettingsChanged(enabled: Boolean) {
         automaticInterpolationSetting = enabled
+    }
+
+    /** Initial async reads must not overwrite preference changes made after the read started. */
+    @Synchronized
+    fun initializeSettings(enabled: Boolean) {
+        if (automaticInterpolationSetting == null) automaticInterpolationSetting = enabled
     }
 
     /** Invalidates pending and prepared results, including edits back to the previous text. */
@@ -90,8 +97,9 @@ internal class PromptInterpolationController(
                         } else {
                             try {
                                 automaticInterpolationSetting
-                                    ?: settings.snapshotAsync().automaticPromptInterpolation.also { fetched ->
-                                        if (automaticInterpolationSetting == null) automaticInterpolationSetting = fetched
+                                    ?: settings.snapshotAsync().automaticPromptInterpolation.let { fetched ->
+                                        initializeSettings(fetched)
+                                        automaticInterpolationSetting ?: fetched
                                     }
                             } catch (cancelled: CancellationException) {
                                 throw cancelled
