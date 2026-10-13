@@ -57,6 +57,7 @@ class TaskRoutingTest {
             ),
         )
     }
+
     @Test
     fun `routing treats unsandboxed terminal as incompatible with resource scopes`() {
         val worker = SubAgent("terminal-worker", "Worker", "Commands", config = AgentConfig(tools = listOf("terminal")))
@@ -76,5 +77,4 @@ class TaskRoutingTest {
         assertTrue(planner.compatible(Todo("unrestricted", "Build", contract = unrestricted), worker))
         assertFalse(planner.compatible(Todo("restricted", "Build", contract = restricted), worker))
     }
-
 }
