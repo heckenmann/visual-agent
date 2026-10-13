@@ -172,6 +172,23 @@ class PromptInterpolationControllerTest {
         }
 
     @Test
+    fun `new settings changes win over a pending initial snapshot`() =
+        runTest {
+            val controller = controller()
+            val delayed = CompletableDeferred<SettingsSnapshot>()
+            coEvery { settings.snapshotAsync() } coAnswers { delayed.await() }
+
+            controller.submit()
+            runCurrent()
+            controller.onSettingsChanged(true)
+            delayed.complete(SettingsSnapshot(automaticPromptInterpolation = false))
+            runCurrent()
+
+            assertEquals(listOf("refined"), sent)
+            coVerify(exactly = 1) { conversation.interpolate(any(), any()) }
+        }
+
+    @Test
     fun `settings changes reuse the current preference without an extra lookup`() =
         runTest {
             val controller = controller()
