@@ -74,7 +74,7 @@ internal fun SubAgentCapabilitiesEditor(
                     }
                     val selected = capabilityModels[capability]
                     if (selected != null && eligible.any { it.value == selected }) {
-                        OutlinedButton(onClick = { onTest(capability, selected) }) { Text("Test $capability model metadata") }
+                        OutlinedButton(onClick = { onTest(capability, selected) }) { Text("Test $capability model") }
                     }
                 }
             }
