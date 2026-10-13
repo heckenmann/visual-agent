@@ -13,7 +13,8 @@ class AgentCapabilityToolInputTest {
         val input =
             Json.parseToJsonElement(
                 """{"enabledCapabilities":["CHAT","VISION"],"capabilityModels":{"VISION":"openai::gpt-4o"}}""",
-            ).jsonObject
+            )
+                .jsonObject
 
         val config = applyCapabilityToolInput(ToolAgentConfig(), input)
 
