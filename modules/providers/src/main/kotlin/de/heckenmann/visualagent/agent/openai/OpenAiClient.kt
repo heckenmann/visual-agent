@@ -32,7 +32,6 @@ import org.springframework.stereotype.Component
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
-import java.lang.reflect.Method
 import java.net.URI
 import java.time.Duration
 import javax.net.ssl.SSLContext
@@ -64,7 +63,7 @@ class OpenAiClient(
                 request.contextWindow.withRequestedOutput(request.parameters.maxTokens),
                 request.metadata,
                 request.onContextBudgeted,
-            ).onErrorMap(::buildDetailedProviderError)
+            ).onErrorMap(OpenAiProviderErrors::detailed)
     }
 
     override fun streamReactive(messages: List<Message>): Flux<ChatResponse> = streamReactive(ChatRequestContext(messages = messages))
@@ -97,7 +96,7 @@ class OpenAiClient(
                             request.onContextBudgeted,
                         )
                 }
-            }.onErrorMap(::buildDetailedProviderError)
+            }.onErrorMap(OpenAiProviderErrors::detailed)
     }
 
     override fun visionReactive(
@@ -173,7 +172,7 @@ class OpenAiClient(
                 try {
                     OpenAiModelCatalog(::openAiClient).load(modelsUri())
                 } catch (error: Throwable) {
-                    throw buildDetailedProviderError(error)
+                    throw OpenAiProviderErrors.detailed(error)
                 }
             }.subscribeOn(Schedulers.boundedElastic())
 
@@ -318,32 +317,4 @@ class OpenAiClient(
 
     private fun modelsUri(profile: ProviderProfile): URI = URI.create("${OpenAiEndpointNormalizer.apiBaseUrl(profile.baseUrl)}/models")
 
-    private fun buildDetailedProviderError(throwable: Throwable?): Throwable {
-        if (throwable == null) return IllegalStateException("Unknown OpenAI chat model error")
-        val detailedMessage = extractDetailedErrorMessage(throwable)
-        return IllegalStateException(detailedMessage, throwable)
-    }
-
-    private fun extractDetailedErrorMessage(throwable: Throwable): String {
-        var current: Throwable? = throwable
-        var fallbackMessage: String? = throwable.message?.takeIf { it.isNotBlank() }
-        while (current != null) {
-            val responseBody = invokeResponseBodyMethod(current)
-            if (!responseBody.isNullOrBlank()) {
-                val statusText = current.message?.takeIf { it.isNotBlank() }
-                return listOfNotNull(statusText, responseBody.trim()).joinToString(": ").trim()
-            }
-            if (!current.message.isNullOrBlank()) fallbackMessage = current.message
-            current = current.cause
-        }
-        return fallbackMessage ?: "Unknown OpenAI chat model error"
-    }
-
-    private fun invokeResponseBodyMethod(throwable: Throwable): String? {
-        val method: Method =
-            runCatching { throwable.javaClass.getMethod("getResponseBodyAsString") }
-                .getOrNull()
-                ?: return null
-        return runCatching { method.invoke(throwable) as? String }.getOrNull()
-    }
 }
