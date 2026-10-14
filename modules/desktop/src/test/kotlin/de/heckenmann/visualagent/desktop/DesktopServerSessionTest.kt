@@ -74,8 +74,15 @@ class DesktopServerSessionTest {
 
     @Test
     fun `desktop process inventory show returns only the requested pid`() {
-        val pid = ProcessHandle.current().pid()
-        val snapshot = JvmClientProcessInventoryDiagnosticsPort().snapshot(ClientProcessInventoryRequest("show", 0, 1, pid))
+        val diagnostics = JvmClientProcessInventoryDiagnosticsPort()
+        // Use a discoverable process even when the host maps the current JVM's PID namespace.
+        val pid =
+            diagnostics
+                .snapshot(ClientProcessInventoryRequest("list", 0, 1, null))
+                .processes
+                .single()
+                .pid
+        val snapshot = diagnostics.snapshot(ClientProcessInventoryRequest("show", 0, 1, pid))
 
         assertEquals(0, snapshot.offset)
         assertEquals(1, snapshot.processes.size)
