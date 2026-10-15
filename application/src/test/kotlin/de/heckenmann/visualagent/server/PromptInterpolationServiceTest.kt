@@ -99,6 +99,36 @@ class PromptInterpolationServiceTest {
     }
 
     @Test
+    fun `dedicated non chat model is rejected before invoking chat provider`() {
+        configure()
+        config.promptInterpolationProviderId = "remote"
+        config.promptInterpolationModelId = "embedding-only"
+        val embedding = ProviderModelConfig("embedding-only", capabilities = setOf("embedding"), capabilitiesComplete = true)
+        every { catalog.resolve(any(), any(), any(), any()) } returns
+            ResolvedModelConfig(profile.copy(models = listOf(embedding)), embedding, null, emptyMap())
+
+        StepVerifier
+            .create(service.interpolate("Improve the request", CancellationToken()))
+            .expectErrorMatches { it is IllegalArgumentException && it.message.orEmpty().contains("CHAT") }
+            .verify()
+        verify(exactly = 0) { provider.chatReactive(any<ChatRequestContext>()) }
+    }
+
+    @Test
+    fun `active non chat model is also rejected before provider access`() {
+        configure()
+        val embedding = ProviderModelConfig("embedding-only", capabilities = setOf("embedding"), capabilitiesComplete = true)
+        every { catalog.resolve(any(), any(), any(), any()) } returns
+            ResolvedModelConfig(profile.copy(models = listOf(embedding)), embedding, null, emptyMap())
+
+        StepVerifier
+            .create(service.interpolate("Improve the request", CancellationToken()))
+            .expectErrorMatches { it is IllegalArgumentException && it.message.orEmpty().contains("CHAT") }
+            .verify()
+        verify(exactly = 0) { provider.chatReactive(any<ChatRequestContext>()) }
+    }
+
+    @Test
     fun `invalid assignment fails without provider access`() {
         configure()
         config.promptInterpolationProviderId = "remote"
