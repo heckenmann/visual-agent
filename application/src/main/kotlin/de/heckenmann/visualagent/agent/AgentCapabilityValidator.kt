@@ -16,7 +16,10 @@ class AgentCapabilityValidator(
         require(config.capabilityModels.keys.all { it in config.enabledCapabilities }) {
             "Assigned model requires an enabled capability"
         }
-        for (capability in config.enabledCapabilities - ModelCapability.CHAT) {
+        val capabilitiesToValidate =
+            config.enabledCapabilities - ModelCapability.CHAT +
+                setOfNotNull(ModelCapability.CHAT.takeIf { it in config.capabilityModels })
+        for (capability in capabilitiesToValidate) {
             val selection = config.modelSelection(capability)
             val resolved = catalog.resolve(selection.provider, selection.model)
             require(resolved.model.supportsCapability(capability)) {
