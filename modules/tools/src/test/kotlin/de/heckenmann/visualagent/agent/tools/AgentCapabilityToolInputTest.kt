@@ -54,9 +54,10 @@ class AgentCapabilityToolInputTest {
                 capabilityModels = mapOf("VISION" to "openai::gpt-4o"),
             )
         val input =
-            Json.parseToJsonElement(
-                """{"enabledCapabilities":["CHAT"],"capabilityModels":{"VISION":"openai::gpt-4o"}}""",
-            ).jsonObject
+            Json
+                .parseToJsonElement(
+                    """{"enabledCapabilities":["CHAT"],"capabilityModels":{"VISION":"openai::gpt-4o"}}""",
+                ).jsonObject
 
         assertFailsWith<IllegalArgumentException> { applyCapabilityToolInput(original, input) }
     }
