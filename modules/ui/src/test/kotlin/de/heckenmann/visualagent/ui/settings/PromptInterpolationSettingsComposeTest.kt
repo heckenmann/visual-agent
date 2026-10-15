@@ -12,11 +12,11 @@ import de.heckenmann.visualagent.protocol.ProviderAdapter
 import de.heckenmann.visualagent.protocol.ProviderModel
 import de.heckenmann.visualagent.protocol.ProviderProfile
 import de.heckenmann.visualagent.protocol.SettingsSnapshot
+import org.junit.Rule
+import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import org.junit.Rule
-import org.junit.Test
 
 /** Verifies staged auxiliary settings do not change the main-agent selection. */
 class PromptInterpolationSettingsComposeTest {
