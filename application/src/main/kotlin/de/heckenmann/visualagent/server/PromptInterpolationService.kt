@@ -4,7 +4,9 @@ import de.heckenmann.visualagent.agent.CancellationToken
 import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.ModelParameters
+import de.heckenmann.visualagent.agent.provider.ModelCapability
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
+import de.heckenmann.visualagent.agent.provider.supportsCapability
 import de.heckenmann.visualagent.agent.text.ThinkingMarkup
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.knowledge.ConversationStore
@@ -46,6 +48,9 @@ class PromptInterpolationService(
                         require(resolved.model.id == modelId && resolved.provider.models.any { it == resolved.model }) {
                             "The interpolation model is unavailable; choose an enabled model in Settings"
                         }
+                    }
+                    require(resolved.model.supportsCapability(ModelCapability.CHAT)) {
+                        "The interpolation model must support CHAT. Choose a chat-capable model in Settings."
                     }
                     resolved
                 }.subscribeOn(Schedulers.boundedElastic())
