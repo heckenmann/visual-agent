@@ -33,7 +33,11 @@ internal fun applyCapabilityToolInput(
                 }
                 model.content
             }
-        } ?: base.capabilityModels
+        } ?: if ("enabledCapabilities" in input) {
+            base.capabilityModels.filterKeys { it in enabled }
+        } else {
+            base.capabilityModels
+        }
     require("CHAT" in enabled) { "CHAT capability cannot be disabled" }
     require(models.keys.all { it in enabled }) { "Assign models only to enabled capabilities" }
     return base.copy(enabledCapabilities = enabled, capabilityModels = models)
