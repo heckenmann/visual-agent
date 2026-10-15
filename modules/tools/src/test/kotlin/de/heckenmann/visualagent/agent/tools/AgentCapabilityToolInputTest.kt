@@ -32,6 +32,36 @@ class AgentCapabilityToolInputTest {
     }
 
     @Test
+    fun `disabling capability removes its inherited model assignment`() {
+        val original =
+            ToolAgentConfig(
+                enabledCapabilities = setOf("CHAT", "VISION"),
+                capabilityModels = mapOf("VISION" to "openai::gpt-4o"),
+            )
+        val input = Json.parseToJsonElement("""{"enabledCapabilities":["CHAT"]}""").jsonObject
+
+        val updated = applyCapabilityToolInput(original, input)
+
+        assertEquals(setOf("CHAT"), updated.enabledCapabilities)
+        assertEquals(emptyMap(), updated.capabilityModels)
+    }
+
+    @Test
+    fun `explicit disabled capability assignment remains invalid`() {
+        val original =
+            ToolAgentConfig(
+                enabledCapabilities = setOf("CHAT", "VISION"),
+                capabilityModels = mapOf("VISION" to "openai::gpt-4o"),
+            )
+        val input =
+            Json.parseToJsonElement(
+                """{"enabledCapabilities":["CHAT"],"capabilityModels":{"VISION":"openai::gpt-4o"}}""",
+            ).jsonObject
+
+        assertFailsWith<IllegalArgumentException> { applyCapabilityToolInput(original, input) }
+    }
+
+    @Test
     fun `agent capability tool input rejects unknown and malformed fields`() {
         val unknown = Json.parseToJsonElement("""{"enabledCapabilities":["CHAT","INVISIBLE"]}""").jsonObject
         val malformed = Json.parseToJsonElement("""{"capabilityModels":{"VISION":12}}""").jsonObject
