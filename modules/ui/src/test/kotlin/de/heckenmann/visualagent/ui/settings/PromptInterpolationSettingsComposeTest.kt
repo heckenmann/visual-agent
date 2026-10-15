@@ -5,6 +5,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.performClick
 import de.heckenmann.visualagent.protocol.ProviderAdapter
 import de.heckenmann.visualagent.protocol.ProviderModel
@@ -20,6 +22,34 @@ import kotlin.test.assertTrue
 class PromptInterpolationSettingsComposeTest {
     @get:Rule
     val compose = createComposeRule()
+
+    @Test
+    fun `interpolation selection excludes non chat models and providers`() {
+        val embedding = ProviderModel("embedding", capabilities = setOf("embedding"), capabilitiesComplete = true)
+        val chat = ProviderModel("chat", capabilities = setOf("chat"), capabilitiesComplete = true)
+        val mixed =
+            ProviderProfile(
+                "mixed",
+                "Mixed",
+                ProviderAdapter.OPENAI_COMPATIBLE,
+                "https://example.test",
+                defaultModel = "embedding",
+                models = listOf(embedding, chat),
+            )
+        val onlyEmbedding = mixed.copy(id = "only-embedding", name = "Embeddings only", models = listOf(embedding))
+        val state = mutableStateOf(SettingsSnapshot())
+
+        compose.setContent {
+            MaterialTheme { promptInterpolationSettings(state.value, listOf(mixed, onlyEmbedding)) { state.value = it } }
+        }
+        compose.onNodeWithText("Use active provider and model").performClick()
+        compose.onNodeWithText("Embeddings only").assertDoesNotExist()
+        compose.onNodeWithText("Mixed").performClick()
+        assertEquals("mixed", state.value.promptInterpolationProviderId)
+        assertEquals("chat", state.value.promptInterpolationModelId)
+        compose.onNodeWithText("chat").assertExists()
+        compose.onNodeWithText("embedding").assertDoesNotExist()
+    }
 
     @Test
     fun `automatic toggle and dedicated model are independent of main selection`() {
