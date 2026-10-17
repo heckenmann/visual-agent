@@ -1,6 +1,10 @@
 package de.heckenmann.visualagent.ui.conversation
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,8 +20,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -42,7 +49,32 @@ internal fun ConversationTodoCard(
 ) {
     val status = if (deleted) "Unavailable" else todo.status.name.labelizeEnumName()
     val statusColor = if (deleted) MaterialTheme.colorScheme.error else todoStatusColor(todo.status)
-    PanelContentCard(modifier = modifier.fillMaxWidth(), backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f)) {
+    val interactions = remember { MutableInteractionSource() }
+    val hovered by interactions.collectIsHoveredAsState()
+    val focused by interactions.collectIsFocusedAsState()
+    val pressed by interactions.collectIsPressedAsState()
+    val emphasis = !deleted && (hovered || focused || pressed)
+    PanelContentCard(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clickable(
+                    enabled = !deleted,
+                    interactionSource = interactions,
+                    indication = androidx.compose.foundation.LocalIndication.current,
+                    role = Role.Button,
+                    onClickLabel = "Open todo details",
+                    onClick = onOpenResponse,
+                ).semantics { contentDescription = "Todo: ${todo.description}" },
+        backgroundColor =
+            if (emphasis) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant.copy(
+                    alpha = 0.32f,
+                )
+            },
+    ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(10.dp),
             verticalArrangement = Arrangement.spacedBy(5.dp),
@@ -70,24 +102,18 @@ internal fun ConversationTodoCard(
                     )
                 }
             }
-            ConversationTodoResponsePreview(responseState = responseState, onOpen = onOpenResponse)
+            ConversationTodoResponsePreview(responseState = responseState)
+            if (!deleted) Text("Open todo details", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
         }
     }
 }
 
 /** Renders the newest todo output at the bottom while older lines scroll upward. */
 @Composable
-private fun ConversationTodoResponsePreview(
-    responseState: TodoResponseState,
-    onOpen: () -> Unit,
-) {
+private fun ConversationTodoResponsePreview(responseState: TodoResponseState) {
     if (responseState.text.isBlank()) return
     Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onOpen)
-                .semantics { contentDescription = "Open full todo response" },
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Text(
             text = todoResponseTail(responseState.text),

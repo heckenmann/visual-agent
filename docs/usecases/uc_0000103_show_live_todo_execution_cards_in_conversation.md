@@ -30,7 +30,9 @@ Keep the user aware of autonomous todo work by showing each todo as a compact ca
 - If no response has arrived yet, an in-progress card shows a compact working indicator.
 - If a retry starts with a new execution identifier, stale output is replaced by the current execution output.
 - When worker output finishes, the same progress channel ends streaming and signals `Reviewing result…`. The full response remains visible as static Markdown while approval is pending; the todo is not marked completed early.
-- If the full response is clicked, an internal scrollable overlay shows the complete Markdown response and continues observing live updates.
+- Clicking anywhere on an available todo card, including a pending card without output, opens the shared internal todo details/response overlay. The visible “Open todo details” hint and button semantics identify the action; hover, keyboard focus and press emphasize the card. Enter/Space activate the focused card.
+- Details opened before the first response show “No response output yet.” and retain the canonical response holder, so subsequent streaming and review updates appear without reopening. Status is read from the current todo snapshot.
+- Deleted/unavailable cards retain their readable snapshot and output but disable opening; they never navigate to a missing todo.
 - If the server is unavailable, the existing application error handling remains responsible for reporting the failure.
 
 ## Tool Calls
@@ -61,11 +63,15 @@ Keep the user aware of autonomous todo work by showing each todo as a compact ca
 - Each progress consumer applies deltas in order through a single UI collector while the provider stream is active; rendering does not wait for the final response event.
 - Codex provider text is forwarded on its first native delta, including when it is the only delta; completed text is never replayed as simulated progress.
 - Compact previews are bounded; the canonical full response is not truncated.
+- Initial snapshot reads preserve lifecycle events received while I/O is pending: newer status/description changes and deletion snapshots take precedence per todo. Unchanged todos still load normally.
+- Saved output hydrates the existing response holder in place, including when details opened before initialization completed. Any received live progress takes precedence over persisted prior output. Clearing presentation state invalidates an unfinished initial load.
 - Every canonical todo state is represented by both a readable status label and its corresponding accessible status icon; deleted snapshots use the unavailable state.
 - Deleting a todo never removes unrelated conversation content, and its retained snapshot survives panel reloads and application restarts.
 - Review formatting corrections keep the card in `Reviewing result…`; they do not restart worker streaming. Exhausted evaluation cancels the todo with `REVIEW_FAILED`, preserving its stored worker result. Only a valid reviewer `RETRY` requests new worker work (UC-0000057).
 
 ## Related Issues
+
+Library decision for #162: reuse the existing Compose Foundation `clickable`, interaction source and Material indication. These provide accessible click/keyboard behavior and interaction tracking; no additional library is needed (reviewed klibs.io and the AndroidX Foundation implementation).
 
 - #253 — Live todo execution cards in conversation with shared response overlay.
 - #162 — Todo progress and open behavior in conversation.
