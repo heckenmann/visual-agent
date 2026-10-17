@@ -75,6 +75,28 @@ interface ProviderPreferenceStore {
         value: String,
     )
 
+    /**
+     * Atomically replaces a preference only if its persisted value still equals [expected].
+     *
+     * Null means the key must be absent. Persistent implementations must enforce this in the
+     * database; this default is intended for single-instance in-memory adapters.
+     */
+    fun compareAndSetPreferenceReactive(
+        key: String,
+        expected: String?,
+        value: String,
+    ): Mono<Boolean> =
+        Mono.fromCallable {
+            synchronized(this) {
+                if (getPreference(key) != expected) {
+                    false
+                } else {
+                    setPreference(key, value)
+                    true
+                }
+            }
+        }
+
     /** Reactive counterpart of [getPreference]. */
     fun getPreferenceReactive(key: String): Mono<String> = Mono.fromCallable { getPreference(key) }
 

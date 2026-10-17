@@ -57,3 +57,7 @@ Different agents and sessions can use different providers and model parameters.
 - `structuredOutput.native=true` explicitly declares JSON-schema response support for an endpoint/model. Set it only after verifying support; `false` forces prompt-only output. Unknown OpenAI-compatible and Ollama endpoints remain prompt-only. Codex schema requests use its documented native protocol by default. All review results are validated server-side (UC-0000057).
 - Raw API keys are not included in tool output, model context, exported config, or logs.
 - Re-running onboarding preserves an existing credential unless the user explicitly replaces or clears it.
+
+- Concurrent catalog mutations use database compare-and-set and rebase on the latest persisted state, with at most 16 attempts before an actionable retry error.
+- Discovery/capability updates preserve concurrent provider edits and active selection. Explicit profile or complete-catalog replacements intentionally replace their declared scope; the last successful replacement wins within that scope.
+- Runtime selection and refresh hints are published only after a successful commit; failed or rolled-back writes emit no change.

@@ -507,3 +507,5 @@ tasks.register("verifyCentralizedVersions") {
         check(violations.isEmpty()) { "Centralized version check failed:\n${violations.joinToString("\n")}" }
     }
 }
+
+apply(from = "gradle/test-signatures.gradle.kts")

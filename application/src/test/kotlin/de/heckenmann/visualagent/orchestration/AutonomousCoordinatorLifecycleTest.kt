@@ -120,7 +120,7 @@ class AutonomousCoordinatorLifecycleTest {
         }
 
     @Test
-    fun `todo is completed even when sub-agent returns blank response`() =
+    fun `todo is completed even when sub-agent returns blank response`(): Unit =
         runBlocking {
             val fixture = buildFixture(responseContent = "")
             fixture.putSubAgent(SubAgent(id = "agent-1", name = "Coder", role = "Implementation", status = AgentStatus.IDLE))

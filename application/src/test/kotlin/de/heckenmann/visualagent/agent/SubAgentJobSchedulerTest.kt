@@ -89,7 +89,7 @@ class SubAgentJobSchedulerTest {
         }
 
     @Test
-    fun `paused jobs remain queued until their gate resumes`() =
+    fun `paused jobs remain queued until their gate resumes`(): Unit =
         runBlocking {
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
             val provider =
@@ -151,7 +151,7 @@ class SubAgentJobSchedulerTest {
         }
 
     @Test
-    fun `close cancels active jobs and releases scheduler subscriptions`() =
+    fun `close cancels active jobs and releases scheduler subscriptions`(): Unit =
         runBlocking {
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
             val scheduler =
