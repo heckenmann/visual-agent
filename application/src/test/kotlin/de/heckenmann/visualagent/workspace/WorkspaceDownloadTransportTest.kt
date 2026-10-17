@@ -20,7 +20,8 @@ class WorkspaceDownloadTransportTest {
     @Test
     fun `rejects unsupported protocol before transfer`() {
         assertFailsWith<IOException> {
-            transport.download(URI("gopher://example.org/file"), destination, control)
+            // A public address keeps protocol rejection independent of external DNS.
+            transport.download(URI("gopher://1.1.1.1/file"), destination, control)
         }
     }
 
