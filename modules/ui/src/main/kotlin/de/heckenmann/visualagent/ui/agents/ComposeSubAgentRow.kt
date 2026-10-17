@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.ui.agents
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -13,6 +14,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -49,83 +51,97 @@ internal fun SubAgentRow(
     onExecutionStateChanged: () -> Unit,
 ) {
     PanelContentCard(modifier = Modifier.fillMaxWidth().padding(bottom = 7.dp)) {
-        Text(agent.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-        Text(
-            buildString {
-                append(agent.status.name.labelizeEnumName())
-                if (globallyPaused) append(" · globally paused")
-                if (individuallyPaused) append(" · individually paused")
-                append(" · active jobs $activeJobCount")
-            },
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.tertiary,
-        )
-        Text(agent.role, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            ActionIconButton(
-                icon = if (individuallyPaused) Icons.Filled.PlayArrow else Icons.Filled.Pause,
-                description = if (individuallyPaused) "Resume sub-agent" else "Pause sub-agent",
-                onClick = {
-                    scope.launch {
-                        if (individuallyPaused) {
-                            agentPort.resume(agent.id)
-                            onStatusChanged("Resumed ${agent.name}")
-                        } else {
-                            agentPort.pause(agent.id)
-                            onStatusChanged("Paused ${agent.name}")
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    agent.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    buildString {
+                        append(agent.status.name.labelizeEnumName())
+                        if (globallyPaused) append(" · globally paused")
+                        if (individuallyPaused) append(" · individually paused")
+                        append(" · active jobs $activeJobCount")
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.tertiary,
+                )
+                Text(agent.role, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+                ActionIconButton(
+                    icon = if (individuallyPaused) Icons.Filled.PlayArrow else Icons.Filled.Pause,
+                    description = if (individuallyPaused) "Resume sub-agent" else "Pause sub-agent",
+                    onClick = {
+                        scope.launch {
+                            if (individuallyPaused) {
+                                agentPort.resume(agent.id)
+                                onStatusChanged("Resumed ${agent.name}")
+                            } else {
+                                agentPort.pause(agent.id)
+                                onStatusChanged("Paused ${agent.name}")
+                            }
+                            onExecutionStateChanged()
                         }
-                        onExecutionStateChanged()
-                    }
-                },
-            )
-            ActionIconButton(
-                icon = Icons.Filled.History,
-                description = "View sub-agent logs",
-                onClick = {
-                    modalRequester.requestInfo(
-                        ComposeInfoModal(
-                            title = "${agent.name} logs",
-                            message = subAgentLogSummary(agent, activeJobCount),
-                        ),
-                    )
-                },
-            )
-            ActionIconButton(
-                icon = Icons.Filled.Edit,
-                description = "Configure sub-agent details",
-                onClick = {
-                    modalRequester.request(
-                        ComposeContentModal(title = "Configure ${agent.name}") { dismiss ->
-                            SubAgentDetailsEditor(
-                                agent = agent,
-                                agentPort = agentPort,
-                                providerPort = providerPort,
-                                onSaved = {
-                                    refresh()
-                                    onStatusChanged("Saved ${it.name}")
-                                    dismiss()
-                                },
-                            )
-                        },
-                    )
-                },
-            )
-            ActionIconButton(
-                icon = Icons.Filled.Delete,
-                description = "Delete sub-agent",
-                onClick = {
-                    modalRequester.requestConfirmation(
-                        ComposeConfirmationModal(
-                            title = "Delete sub-agent?",
-                            message = "Delete '${agent.name}' and its persisted configuration.",
-                            confirmDescription = "Delete sub-agent",
-                        ) {
-                            agentPort.delete(agent.id)
-                            refresh()
-                        },
-                    )
-                },
-            )
+                    },
+                )
+                ActionIconButton(
+                    icon = Icons.Filled.History,
+                    description = "View sub-agent logs",
+                    onClick = {
+                        modalRequester.requestInfo(
+                            ComposeInfoModal(
+                                title = "${agent.name} logs",
+                                message = subAgentLogSummary(agent, activeJobCount),
+                            ),
+                        )
+                    },
+                )
+                ActionIconButton(
+                    icon = Icons.Filled.Edit,
+                    description = "Configure sub-agent details",
+                    onClick = {
+                        modalRequester.request(
+                            ComposeContentModal(title = "Configure ${agent.name}") { dismiss ->
+                                SubAgentDetailsEditor(
+                                    agent = agent,
+                                    agentPort = agentPort,
+                                    providerPort = providerPort,
+                                    onSaved = {
+                                        refresh()
+                                        onStatusChanged("Saved ${it.name}")
+                                        dismiss()
+                                    },
+                                )
+                            },
+                        )
+                    },
+                )
+                ActionIconButton(
+                    icon = Icons.Filled.Delete,
+                    description = "Delete sub-agent",
+                    onClick = {
+                        modalRequester.requestConfirmation(
+                            ComposeConfirmationModal(
+                                title = "Delete sub-agent?",
+                                message = "Delete '${agent.name}' and its persisted configuration.",
+                                confirmDescription = "Delete sub-agent",
+                            ) {
+                                agentPort.delete(agent.id)
+                                refresh()
+                            },
+                        )
+                    },
+                )
+            }
         }
     }
 }
