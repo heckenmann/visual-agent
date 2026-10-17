@@ -41,3 +41,4 @@ The user can see which agents are idle, busy, or running multiple jobs.
 - UI state is derived from manager/runtime state, not stale local counters.
 - Pause/Resume and Create remain adjacent and right-aligned in both execution states and at narrow panel widths.
 - Execution status never splits the action group; action dimensions and spacing match the Todo panel.
+- Both panels use the same 8 dp content inset, placing their action groups at identical top and trailing offsets.

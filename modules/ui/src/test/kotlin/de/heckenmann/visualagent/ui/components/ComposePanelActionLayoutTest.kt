@@ -108,6 +108,45 @@ class ComposePanelActionLayoutTest {
         assertTodoActionBounds()
     }
 
+    @Test
+    fun `sub-agent and todo actions share the same inset and geometry`() {
+        val agents = mockk<AgentPort>(relaxed = true)
+        every { agents.list() } returns emptyList()
+        every { agents.executionSnapshot() } returns AgentExecutionSnapshot(false)
+        val activity = mockk<ActivityPort>(relaxed = true)
+        val todos = todoPort()
+        val width = mutableStateOf(320.dp)
+        val showTodos = mutableStateOf(false)
+        composeTestRule.setContent {
+            MaterialTheme {
+                Box(Modifier.size(width.value, 240.dp)) {
+                    if (showTodos.value) {
+                        TodoPanel(todos, ComposeModalRequester { }, LifecycleState())
+                    } else {
+                        SubAgentsPanel(
+                            agents,
+                            mockk<ProviderPort>(relaxed = true),
+                            ComposeModalRequester { },
+                            activity,
+                            todos,
+                        )
+                    }
+                }
+            }
+        }
+        for (panelWidth in listOf(320.dp, 120.dp)) {
+            composeTestRule.runOnIdle {
+                width.value = panelWidth
+                showTodos.value = false
+            }
+            val agentAdd = composeTestRule.onNodeWithContentDescription("Create sub-agent").getBoundsInRoot()
+            val agentToggle = composeTestRule.onNodeWithContentDescription("Pause all sub-agents").getBoundsInRoot()
+            composeTestRule.runOnIdle { showTodos.value = true }
+            assertEquals(agentAdd, composeTestRule.onNodeWithContentDescription("Add todo").getBoundsInRoot())
+            assertEquals(agentToggle, composeTestRule.onNodeWithContentDescription("Stop all todos").getBoundsInRoot())
+        }
+    }
+
     private fun subAgentActionBounds(
         executionAction: String,
         status: String,
@@ -116,7 +155,8 @@ class ComposePanelActionLayoutTest {
         val add = composeTestRule.onNodeWithContentDescription("Create sub-agent").getBoundsInRoot()
         val panel = composeTestRule.onNodeWithTag("panel").getBoundsInRoot()
         val executionStatus = composeTestRule.onNodeWithText(status).getBoundsInRoot()
-        assertEquals(panel.right, add.right)
+        assertEquals(panel.right - 8.dp, add.right)
+        assertEquals(panel.top + 8.dp, add.top)
         assertEquals(toggle.right, add.left)
         assertEquals(toggle.top, add.top)
         assertEquals(32.dp, toggle.right - toggle.left)

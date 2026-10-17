@@ -3,6 +3,7 @@ package de.heckenmann.visualagent.ui.application
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -81,7 +82,7 @@ internal fun SubAgentsPanel(
     )
     val agentListScrollState = rememberScrollState()
     RegisterPanelVerticalScrollbar(agentListScrollState)
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize().padding(8.dp)) {
         PanelActionRow {
             ActionIconButton(
                 icon = if (executionSnapshot.globallyPaused) Icons.Filled.PlayArrow else Icons.Filled.Pause,
