@@ -96,6 +96,36 @@ internal fun ProviderSettingsDraft.withModels(
     return copy(providers = updated, modelId = selectedModel)
 }
 
+/** Stages user-edited capability metadata for the selected provider model. */
+internal fun ProviderSettingsDraft.withModelCapabilities(
+    providerId: String,
+    modelId: String,
+    capabilities: Set<String>,
+): ProviderSettingsDraft =
+    copy(
+        providers =
+            providers.map { provider ->
+                if (provider.id == providerId) {
+                    provider.copy(
+                        models =
+                            provider.models.map { model ->
+                                if (model.id == modelId) {
+                                    model.copy(
+                                        capabilities = capabilities.map(String::lowercase).toSet(),
+                                        capabilitiesComplete = true,
+                                        capabilitiesOverridden = true,
+                                    )
+                                } else {
+                                    model
+                                }
+                            },
+                    )
+                } else {
+                    provider
+                }
+            },
+    )
+
 /** Applies a discovered model context limit, optionally adopting it as the new user setting. */
 internal fun ProviderSettingsDraft.withModelContextLimit(
     limit: Int,

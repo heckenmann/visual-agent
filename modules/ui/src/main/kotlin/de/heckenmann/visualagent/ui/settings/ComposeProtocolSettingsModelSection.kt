@@ -18,6 +18,7 @@ import de.heckenmann.visualagent.ui.components.PanelCheckbox
 import de.heckenmann.visualagent.ui.components.PanelDropdownField
 import de.heckenmann.visualagent.ui.components.PanelInfoBox
 import de.heckenmann.visualagent.ui.components.PanelSelectOption
+import de.heckenmann.visualagent.ui.components.labelWithCapabilities
 
 /** Renders staged model selection and model-specific actions inside the provider connection section. */
 @Composable
@@ -34,11 +35,21 @@ internal fun modelSettingsContent(
     onContextLengthChanged: (Int) -> Unit,
     onRefreshModels: () -> Unit,
     onFavoriteChanged: (Boolean) -> Unit,
+    onModelCapabilitiesChanged: (Set<String>) -> Unit = {},
 ) {
     PanelDropdownField(
         label = "Model",
         selectedValue = modelId,
-        options = models.map { PanelSelectOption(it.id, it.name) },
+        options =
+            models
+                .filter { model ->
+                    !model.capabilitiesComplete ||
+                        model.capabilities.any { capability ->
+                            capability.equals("chat", ignoreCase = true) || capability.equals("completion", ignoreCase = true)
+                        }
+                }.map { model ->
+                    PanelSelectOption(model.id, model.labelWithCapabilities())
+                },
         onSelected = onModelSelected,
         enabled = models.isNotEmpty(),
         information = "Selects the model used for future main-agent requests through the selected provider.",
@@ -62,4 +73,5 @@ internal fun modelSettingsContent(
         )
     }
     PanelInfoBox(modelDetails)
+    ModelCapabilitiesEditor(models.firstOrNull { it.id == modelId }, onModelCapabilitiesChanged)
 }

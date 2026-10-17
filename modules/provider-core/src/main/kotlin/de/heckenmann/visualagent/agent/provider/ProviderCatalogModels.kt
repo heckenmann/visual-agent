@@ -34,6 +34,7 @@ enum class ModelStatus {
  * @property contextLimit Optional context-window limit
  * @property outputLimit Optional output-token limit
  * @property capabilitiesComplete Whether capabilities is a complete provider declaration rather than positive observations
+ * @property capabilitiesOverridden Whether the user explicitly edited capabilities and discovery must preserve them
  */
 @Serializable
 data class ProviderModelConfig(
@@ -46,6 +47,7 @@ data class ProviderModelConfig(
     val outputLimit: Int? = null,
     val capabilities: Set<String> = emptySet(),
     val capabilitiesComplete: Boolean = false,
+    val capabilitiesOverridden: Boolean = false,
 )
 
 /**

@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import de.heckenmann.visualagent.protocol.ProviderProfile
 import de.heckenmann.visualagent.protocol.SettingsSnapshot
 import de.heckenmann.visualagent.ui.components.ActionTooltip
 import de.heckenmann.visualagent.ui.components.PanelDropdownField
@@ -32,8 +33,18 @@ import de.heckenmann.visualagent.ui.components.PanelSection
 internal fun conversationSettingsSection(
     settings: SettingsSnapshot,
     onChange: (SettingsSnapshot) -> Unit,
+    providers: List<ProviderProfile> = emptyList(),
 ) {
     PanelSection(title = "Conversation") {
+        promptInterpolationSettings(settings, providers, onChange)
+        conversationNumberSetting(
+            label = "Interpolation context messages",
+            value = settings.promptInterpolationContextMessages,
+            help = "Maximum recent conversation window used to clarify the draft, within the selected model token budget.",
+            range = 5..10,
+            useStepper = true,
+            onChange = { onChange(settings.copy(promptInterpolationContextMessages = it)) },
+        )
         conversationSettingField(
             label = "Model instruction",
             help = "Optional guidance added to every main-agent request. It can set tone, language, or lasting preferences.",
@@ -176,6 +187,7 @@ private fun conversationNumberSetting(
             ) {
                 OutlinedButton(
                     enabled = value > range.first,
+                    modifier = Modifier.semantics { contentDescription = "Decrease $label" },
                     onClick = { onChange(value - 1) },
                 ) {
                     Icon(Icons.Filled.Remove, contentDescription = null)
@@ -185,6 +197,7 @@ private fun conversationNumberSetting(
                 Text(value.toString(), modifier = Modifier.semantics { contentDescription = label })
                 OutlinedButton(
                     enabled = value < range.last,
+                    modifier = Modifier.semantics { contentDescription = "Increase $label" },
                     onClick = { onChange(value + 1) },
                 ) {
                     Icon(Icons.Filled.Add, contentDescription = null)

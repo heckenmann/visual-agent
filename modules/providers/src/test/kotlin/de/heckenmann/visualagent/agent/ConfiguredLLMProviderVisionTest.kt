@@ -79,6 +79,34 @@ class ConfiguredLLMProviderVisionTest {
             assertEquals("Model Text only/text-model does not support image input", error.message)
         }
 
+    @Test
+    fun `qualified Ollama vision assignment uses the selected provider profile`() =
+        runTest {
+            val catalog = catalog()
+            val profile =
+                ProviderProfile(
+                    id = "secondary-ollama",
+                    name = "Secondary Ollama",
+                    adapter = ProviderAdapter.OLLAMA,
+                    baseUrl = "http://secondary.example:11434",
+                    defaultModel = "llava",
+                    models = listOf(ProviderModelConfig("llava", capabilities = setOf("vision"), capabilitiesComplete = true)),
+                )
+            catalog.saveProvider(profile)
+            val ollama = mockk<OllamaClient>()
+            every { ollama.visionReactive(any(), "describe", "llava", profile) } returns
+                Mono.just(ChatResponse("llava", Message("assistant", "routed image"), done = true))
+            val router = ConfiguredLLMProvider(ollama, mockk(relaxed = true), catalog)
+
+            val answer =
+                router
+                    .visionReactive(byteArrayOf(1), "describe", ModelSelection(provider = profile.id, model = "llava"))
+                    .awaitSingle()
+
+            assertEquals("routed image", answer.message.content)
+            io.mockk.verify(exactly = 1) { ollama.visionReactive(any(), "describe", "llava", profile) }
+        }
+
     private fun catalog(): ProviderCatalogService =
         ProviderCatalogService(
             object : ProviderPreferenceStore {

@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,6 +34,7 @@ import de.heckenmann.visualagent.ui.settings.*
 import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun SubAgentDetailsEditor(
@@ -72,30 +74,20 @@ internal fun SubAgentDetailsEditor(
     var maxRetries by remember { mutableStateOf(agent.config.maxRetries.toString()) }
     var memoryLimitMb by remember { mutableStateOf(agent.config.memoryLimitMb.toString()) }
     var optionsText by remember { mutableStateOf(agent.config.options.toOptionsText()) }
+    var enabledCapabilities by remember { mutableStateOf(agent.config.enabledCapabilities) }
+    var capabilityModels by remember { mutableStateOf(agent.config.capabilityModels) }
+    var capabilityStatus by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    val capabilityProviders = remember(providerPort) { providerPort.enabledProviders() }
     var selectedTools by remember {
         mutableStateOf(
             agent.config.tools?.toSet() ?: agentPort.toolsFor(agent.id),
         )
     }
     val toolDefinitions = remember(agentPort) { agentPort.toolDefinitions() }
-    val providerOptions =
-        remember(providerPort) {
-            listOf(PanelSelectOption(INHERIT_SELECTION, "Inherit session provider")) +
-                providerPort.enabledProviders().map { PanelSelectOption(it.id, "${it.name} (${it.id})") }
-        }
+    val providerOptions = remember(providerPort) { subAgentProviderOptions(providerPort) }
     val modelOptions =
-        remember(provider, model, providerPort) {
-            if (provider.isBlank()) {
-                listOf(PanelSelectOption(INHERIT_SELECTION, "Inherit session model"))
-            } else {
-                val catalogModels = providerPort.selectableModels(provider).map { PanelSelectOption(it.id, it.name) }
-                val customModel =
-                    model
-                        .takeIf { current -> current.isNotBlank() && catalogModels.none { it.value == current } }
-                        ?.let { PanelSelectOption(it, "Custom: $it") }
-                listOf(PanelSelectOption(INHERIT_SELECTION, "Inherit provider default")) + catalogModels + listOfNotNull(customModel)
-            }
-        }
+        remember(provider, model, providerPort) { subAgentModelOptions(providerPort, provider, model) }
     val numericFieldsAreValid =
         timeout.toIntOrNull()?.let { it > 0 } == true &&
             maxRetries.toIntOrNull()?.let { it >= 0 } == true &&
@@ -104,7 +96,11 @@ internal fun SubAgentDetailsEditor(
             topP.optionalDoubleIsValid() &&
             maxTokens.optionalIntIsValid() &&
             optionsText.toOptionsMapOrNull() != null
-    val canSave = name.isNotBlank() && role.isNotBlank() && numericFieldsAreValid
+    val canSave =
+        name.isNotBlank() &&
+            role.isNotBlank() &&
+            numericFieldsAreValid &&
+            validCapabilityAssignments(enabledCapabilities, capabilityModels, capabilityProviders)
 
     ModalDialogLayout(
         body = {
@@ -218,6 +214,19 @@ internal fun SubAgentDetailsEditor(
                     color = MaterialTheme.colorScheme.secondary,
                 )
             }
+            SubAgentCapabilitiesEditor(
+                enabledCapabilities = enabledCapabilities,
+                capabilityModels = capabilityModels,
+                providers = capabilityProviders,
+                onEnabledChanged = { enabledCapabilities = it },
+                onModelsChanged = { capabilityModels = it },
+                onTest = { capability, selected ->
+                    scope.launch {
+                        capabilityStatus = probeSubAgentCapability(providerPort, capability, selected)
+                    }
+                },
+            )
+            if (capabilityStatus.isNotBlank()) Text(capabilityStatus, style = MaterialTheme.typography.bodySmall)
             Text("Tools", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             toolDefinitions.forEach { definition ->
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -264,6 +273,8 @@ internal fun SubAgentDetailsEditor(
                             maxTokens = maxTokens.trim().takeIf(String::isNotEmpty)?.toInt(),
                             options = optionsText.toOptionsMapOrNull().orEmpty(),
                             tools = selectedTools.sorted(),
+                            enabledCapabilities = enabledCapabilities,
+                            capabilityModels = capabilityModels,
                         )
                     agentPort.update(agent.id, name.trim(), role.trim(), config)?.let(onSaved)
                 },

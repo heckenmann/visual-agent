@@ -206,7 +206,7 @@ class ProviderCatalogService(
         val profile = getProvider(providerId) ?: return
         val models =
             profile.models.map { model ->
-                capabilities[model.id]?.let { caps ->
+                capabilities[model.id]?.takeUnless { model.capabilitiesOverridden }?.let { caps ->
                     if (caps != model.capabilities || !model.capabilitiesComplete) {
                         model.copy(capabilities = caps, capabilitiesComplete = true)
                     } else {

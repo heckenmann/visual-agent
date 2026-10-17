@@ -44,6 +44,10 @@ class AppConfigBean(
     var favoriteModels: String = ""
     var queueFlushMode: String = "ONE_BY_ONE"
     var maxMainAgentMemoryChars: Int = DEFAULT_MAIN_AGENT_MEMORY_CHARS
+    var promptInterpolationProviderId: String = ""
+    var promptInterpolationModelId: String = ""
+    var automaticPromptInterpolation: Boolean = false
+    var promptInterpolationContextMessages: Int = 8
     var followUpSuggestionsEnabled: Boolean = true
     var followUpSuggestionIdleDelaySeconds: Int = 3
     var followUpSuggestionCount: Int = 3
@@ -139,6 +143,10 @@ class AppConfigBean(
         preferenceStore.setPreference(KEY_SESSION_FAVORITE_MODELS, favoriteModels)
         preferenceStore.setPreference(KEY_SESSION_QUEUE_FLUSH_MODE, queueFlushMode)
         preferenceStore.setPreference(KEY_MAIN_AGENT_MEMORY_CHARS, maxMainAgentMemoryChars.toString())
+        preferenceStore.setPreference(KEY_PROMPT_INTERPOLATION_PROVIDER, promptInterpolationProviderId)
+        preferenceStore.setPreference(KEY_PROMPT_INTERPOLATION_MODEL, promptInterpolationModelId)
+        preferenceStore.setPreference(KEY_AUTOMATIC_PROMPT_INTERPOLATION, automaticPromptInterpolation.toString())
+        preferenceStore.setPreference(KEY_PROMPT_INTERPOLATION_CONTEXT_MESSAGES, promptInterpolationContextMessages.toString())
         preferenceStore.setPreference(KEY_FOLLOW_UP_SUGGESTIONS_ENABLED, followUpSuggestionsEnabled.toString())
         preferenceStore.setPreference(KEY_FOLLOW_UP_SUGGESTION_DELAY_SECONDS, followUpSuggestionIdleDelaySeconds.toString())
         preferenceStore.setPreference(KEY_FOLLOW_UP_SUGGESTION_COUNT, followUpSuggestionCount.toString())
@@ -180,6 +188,10 @@ class AppConfigBean(
             KEY_SESSION_FAVORITE_MODELS to favoriteModels,
             KEY_SESSION_QUEUE_FLUSH_MODE to queueFlushMode,
             KEY_MAIN_AGENT_MEMORY_CHARS to maxMainAgentMemoryChars.toString(),
+            KEY_PROMPT_INTERPOLATION_PROVIDER to promptInterpolationProviderId,
+            KEY_PROMPT_INTERPOLATION_MODEL to promptInterpolationModelId,
+            KEY_AUTOMATIC_PROMPT_INTERPOLATION to automaticPromptInterpolation.toString(),
+            KEY_PROMPT_INTERPOLATION_CONTEXT_MESSAGES to promptInterpolationContextMessages.toString(),
             KEY_FOLLOW_UP_SUGGESTIONS_ENABLED to followUpSuggestionsEnabled.toString(),
             KEY_FOLLOW_UP_SUGGESTION_DELAY_SECONDS to followUpSuggestionIdleDelaySeconds.toString(),
             KEY_FOLLOW_UP_SUGGESTION_COUNT to followUpSuggestionCount.toString(),
@@ -210,6 +222,10 @@ class AppConfigBean(
         internal const val KEY_SESSION_FAVORITE_MODELS = "session.favorite.models"
         internal const val KEY_SESSION_QUEUE_FLUSH_MODE = "session.queue.flush.mode"
         internal const val KEY_MAIN_AGENT_MEMORY_CHARS = "agent.main.memory.max.chars"
+        internal const val KEY_PROMPT_INTERPOLATION_PROVIDER = "conversation.prompt_interpolation.provider"
+        internal const val KEY_PROMPT_INTERPOLATION_MODEL = "conversation.prompt_interpolation.model"
+        internal const val KEY_AUTOMATIC_PROMPT_INTERPOLATION = "conversation.prompt_interpolation.automatic"
+        internal const val KEY_PROMPT_INTERPOLATION_CONTEXT_MESSAGES = "conversation.prompt_interpolation.context_messages"
         internal const val KEY_FOLLOW_UP_SUGGESTIONS_ENABLED = "conversation.follow_up_suggestions.enabled"
         internal const val KEY_FOLLOW_UP_SUGGESTION_DELAY_SECONDS = "conversation.follow_up_suggestions.delay.seconds"
         internal const val KEY_FOLLOW_UP_SUGGESTION_COUNT = "conversation.follow_up_suggestions.count"

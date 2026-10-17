@@ -234,6 +234,7 @@ internal fun providerSettingsOverlay(
             ) {
                 conversationSettingsSection(
                     settings = draft.conversationSettings,
+                    providers = draft.providers,
                     onChange = { conversationSettings -> draft = draft.copy(conversationSettings = conversationSettings) },
                 )
                 mainAgentMemorySection(
@@ -282,6 +283,9 @@ internal fun providerSettingsOverlay(
                         draft = draft.copy(conversationSettings = draft.conversationSettings.copy(contextLength = value))
                     },
                     onRefreshModels = { refreshModels() },
+                    onModelCapabilitiesChanged = { capabilities ->
+                        draft = draft.withModelCapabilities(draft.providerId, draft.modelId, capabilities)
+                    },
                     onFavoriteChanged = { favorite ->
                         draft =
                             draft.copy(

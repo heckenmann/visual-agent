@@ -17,7 +17,10 @@ internal class OpenAiModelCatalog(
      * @param modelsUri Endpoint URI used to apply provider-specific filtering
      * @return Sorted model identifiers supported by the chat integration
      */
-    fun load(modelsUri: URI): List<String> {
+    fun load(modelsUri: URI): List<String> = OpenAiModelFilter.filter(loadAll(), modelsUri)
+
+    /** Discovers all provider models, including specialized non-chat models. */
+    fun loadAll(): List<String> {
         val client = clientFactory()
         try {
             val modelIds =
@@ -26,7 +29,11 @@ internal class OpenAiModelCatalog(
                     .list()
                     .data()
                     .map { it.id() }
-            return OpenAiModelFilter.filter(modelIds, modelsUri)
+            return modelIds
+                .map(String::trim)
+                .filter(String::isNotBlank)
+                .distinct()
+                .sorted()
         } finally {
             client.close()
         }

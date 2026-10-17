@@ -23,6 +23,10 @@ class SpringSettingsPort(
         settings: SettingsSnapshot,
         providerConfiguration: de.heckenmann.visualagent.protocol.ProviderConfiguration?,
     ) {
+        require(settings.promptInterpolationProviderId.isBlank() == settings.promptInterpolationModelId.isBlank()) {
+            "Choose both an interpolation provider and model, or use the active model"
+        }
+        require(settings.promptInterpolationContextMessages in 5..10) { "Prompt interpolation context must contain 5 to 10 messages" }
         val currentMemory = mainAgentMemoryStore.snapshot()
         val memoryLimit = settings.maxMainAgentMemoryChars.coerceIn(AppConfigBean.MAIN_AGENT_MEMORY_CHARS_RANGE)
         require(settings.followUpSuggestionIdleDelaySeconds in AppConfigBean.FOLLOW_UP_SUGGESTION_DELAY_RANGE) {
@@ -56,6 +60,10 @@ class SpringSettingsPort(
             favoriteModels = settings.favoriteModels.joinToString(",")
             queueFlushMode = settings.queueFlushMode
             maxMainAgentMemoryChars = memoryLimit
+            promptInterpolationProviderId = settings.promptInterpolationProviderId
+            promptInterpolationModelId = settings.promptInterpolationModelId
+            automaticPromptInterpolation = settings.automaticPromptInterpolation
+            promptInterpolationContextMessages = settings.promptInterpolationContextMessages
             followUpSuggestionsEnabled = settings.followUpSuggestionsEnabled
             followUpSuggestionIdleDelaySeconds = settings.followUpSuggestionIdleDelaySeconds
             followUpSuggestionCount = settings.followUpSuggestionCount
@@ -84,6 +92,10 @@ private fun AppConfigBean.toProtocol(providerCatalog: ProviderCatalogService): S
         favoriteModels = favoriteModels.split(',').map(String::trim).filter(String::isNotBlank),
         queueFlushMode = queueFlushMode,
         maxMainAgentMemoryChars = maxMainAgentMemoryChars,
+        promptInterpolationProviderId = promptInterpolationProviderId,
+        promptInterpolationModelId = promptInterpolationModelId,
+        automaticPromptInterpolation = automaticPromptInterpolation,
+        promptInterpolationContextMessages = promptInterpolationContextMessages,
         followUpSuggestionsEnabled = followUpSuggestionsEnabled,
         followUpSuggestionIdleDelaySeconds = followUpSuggestionIdleDelaySeconds,
         followUpSuggestionCount = followUpSuggestionCount,
@@ -120,6 +132,8 @@ private fun de.heckenmann.visualagent.protocol.ProviderProfile.toApplication(): 
                     contextLimit = model.contextLimit,
                     outputLimit = model.outputLimit,
                     capabilities = model.capabilities,
+                    capabilitiesComplete = model.capabilitiesComplete,
+                    capabilitiesOverridden = model.capabilitiesOverridden,
                 )
             },
         modelWhitelist = modelWhitelist,

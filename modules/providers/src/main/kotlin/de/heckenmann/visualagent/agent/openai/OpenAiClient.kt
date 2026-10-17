@@ -12,7 +12,9 @@ import de.heckenmann.visualagent.agent.ToolCallingLoop
 import de.heckenmann.visualagent.agent.VisionSupport
 import de.heckenmann.visualagent.agent.nativeResponseSchema
 import de.heckenmann.visualagent.agent.provider.DefaultProviderRuntimeConfig
+import de.heckenmann.visualagent.agent.provider.OpenAiModelCapabilities
 import de.heckenmann.visualagent.agent.provider.ProviderEnvironmentCredentials
+import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.agent.provider.ProviderRuntimeConfig
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
@@ -30,7 +32,6 @@ import org.springframework.stereotype.Component
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
-import java.lang.reflect.Method
 import java.net.URI
 import java.time.Duration
 import javax.net.ssl.SSLContext
@@ -62,7 +63,7 @@ class OpenAiClient(
                 request.contextWindow.withRequestedOutput(request.parameters.maxTokens),
                 request.metadata,
                 request.onContextBudgeted,
-            ).onErrorMap(::buildDetailedProviderError)
+            ).onErrorMap(OpenAiProviderErrors::detailed)
     }
 
     override fun streamReactive(messages: List<Message>): Flux<ChatResponse> = streamReactive(ChatRequestContext(messages = messages))
@@ -95,7 +96,7 @@ class OpenAiClient(
                             request.onContextBudgeted,
                         )
                 }
-            }.onErrorMap(::buildDetailedProviderError)
+            }.onErrorMap(OpenAiProviderErrors::detailed)
     }
 
     override fun visionReactive(
@@ -107,11 +108,26 @@ class OpenAiClient(
         image: ByteArray,
         prompt: String,
         modelId: String,
+    ): Mono<ChatResponse> = visionForProfile(image, prompt, modelId, null)
+
+    /** Uses the selected provider profile's endpoint and credentials for image analysis. */
+    internal fun visionReactive(
+        image: ByteArray,
+        prompt: String,
+        modelId: String,
+        profile: ProviderProfile,
+    ): Mono<ChatResponse> = visionForProfile(image, prompt, modelId, profile)
+
+    private fun visionForProfile(
+        image: ByteArray,
+        prompt: String,
+        modelId: String,
+        profile: ProviderProfile?,
     ): Mono<ChatResponse> =
         Mono
             .fromCallable {
                 val response =
-                    chatModel(modelId = modelId)
+                    chatModel(profile, modelId)
                         .call(
                             Prompt(
                                 listOf(
@@ -156,7 +172,7 @@ class OpenAiClient(
                 try {
                     OpenAiModelCatalog(::openAiClient).load(modelsUri())
                 } catch (error: Throwable) {
-                    throw buildDetailedProviderError(error)
+                    throw OpenAiProviderErrors.detailed(error)
                 }
             }.subscribeOn(Schedulers.boundedElastic())
 
@@ -165,6 +181,21 @@ class OpenAiClient(
             .fromCallable {
                 requireUsableApiKey(profile.baseUrl, ProviderEnvironmentCredentials.openAiApiKey(profile))
                 OpenAiModelCatalog { openAiClient(profile) }.load(modelsUri(profile))
+            }.subscribeOn(Schedulers.boundedElastic())
+
+    /** Discovers chat and specialized OpenAI models without applying chat-only selection filters. */
+    override fun getModelConfigsReactive(profile: ProviderProfile): Mono<List<ProviderModelConfig>> =
+        Mono
+            .fromCallable {
+                requireUsableApiKey(profile.baseUrl, ProviderEnvironmentCredentials.openAiApiKey(profile))
+                OpenAiModelCatalog { openAiClient(profile) }.loadAll().map { id ->
+                    val capabilities = OpenAiModelCapabilities.infer(id)
+                    ProviderModelConfig(
+                        id = id,
+                        capabilities = capabilities.map { it.name.lowercase() }.toSet(),
+                        capabilitiesComplete = false,
+                    )
+                }
             }.subscribeOn(Schedulers.boundedElastic())
 
     internal fun getModelDetailsReactive(
@@ -285,33 +316,4 @@ class OpenAiClient(
     private fun modelsUri(): URI = URI.create("${apiBaseUrl()}/models")
 
     private fun modelsUri(profile: ProviderProfile): URI = URI.create("${OpenAiEndpointNormalizer.apiBaseUrl(profile.baseUrl)}/models")
-
-    private fun buildDetailedProviderError(throwable: Throwable?): Throwable {
-        if (throwable == null) return IllegalStateException("Unknown OpenAI chat model error")
-        val detailedMessage = extractDetailedErrorMessage(throwable)
-        return IllegalStateException(detailedMessage, throwable)
-    }
-
-    private fun extractDetailedErrorMessage(throwable: Throwable): String {
-        var current: Throwable? = throwable
-        var fallbackMessage: String? = throwable.message?.takeIf { it.isNotBlank() }
-        while (current != null) {
-            val responseBody = invokeResponseBodyMethod(current)
-            if (!responseBody.isNullOrBlank()) {
-                val statusText = current.message?.takeIf { it.isNotBlank() }
-                return listOfNotNull(statusText, responseBody.trim()).joinToString(": ").trim()
-            }
-            if (!current.message.isNullOrBlank()) fallbackMessage = current.message
-            current = current.cause
-        }
-        return fallbackMessage ?: "Unknown OpenAI chat model error"
-    }
-
-    private fun invokeResponseBodyMethod(throwable: Throwable): String? {
-        val method: Method =
-            runCatching { throwable.javaClass.getMethod("getResponseBodyAsString") }
-                .getOrNull()
-                ?: return null
-        return runCatching { method.invoke(throwable) as? String }.getOrNull()
-    }
 }

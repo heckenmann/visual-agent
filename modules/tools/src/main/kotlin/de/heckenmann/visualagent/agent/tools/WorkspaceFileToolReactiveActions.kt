@@ -21,7 +21,7 @@ internal class WorkspaceFileToolReactiveActions(
                 trackedToolWork(context) {
                     workspaceFiles.requireFile(input.string("id"), input.string("path")) to input.requiredString("prompt")
                 }
-            }.flatMap { (record, prompt) -> mediaActions.analyzeImageReactive(record, prompt) }
+            }.flatMap { (record, prompt) -> mediaActions.analyzeImageReactive(record, prompt, context["agentId"] as? String) }
             .map { result -> success(TOOL_ID, result.toString()) }
             .onErrorResume { error -> Mono.just(failure(TOOL_ID, error.message ?: error::class.simpleName.orEmpty())) }
     }

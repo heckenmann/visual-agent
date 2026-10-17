@@ -1,6 +1,8 @@
 package de.heckenmann.visualagent.agent.tools
 
+import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.LLMProvider
+import de.heckenmann.visualagent.agent.provider.ModelCapability
 import de.heckenmann.visualagent.agent.tools.api.ToolDownloadRequest
 import de.heckenmann.visualagent.agent.tools.api.ToolExtractedText
 import de.heckenmann.visualagent.agent.tools.api.ToolImageAnalysis
@@ -29,6 +31,7 @@ import de.heckenmann.visualagent.workspace.searchFiles
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.springframework.beans.factory.ObjectProvider
+import org.springframework.context.annotation.Lazy
 import org.springframework.stereotype.Component
 import reactor.core.publisher.Mono
 import java.util.Base64
@@ -39,6 +42,7 @@ class WorkspaceFileToolPortAdapter(
     private val files: WorkspaceFileService,
     private val llmProvider: ObjectProvider<LLMProvider>,
     private val downloads: WorkspaceDownloadService? = null,
+    @param:Lazy private val agents: AgentManager? = null,
 ) : WorkspaceFileToolPort {
     override fun list(): List<ToolWorkspaceFile> = files.listFiles().map(::toToolFile)
 
@@ -148,6 +152,39 @@ class WorkspaceFileToolPortAdapter(
         return llmProvider
             .getObject()
             .visionReactive(Base64.getDecoder().decode(bytes.base64), prompt)
+            .map { response -> ToolImageAnalysis(response.model, response.message.content) }
+    }
+
+    override fun analyzeImage(
+        file: ToolWorkspaceFile,
+        prompt: String,
+        agentId: String?,
+    ): ToolImageAnalysis =
+        analyzeImageReactive(file, prompt, agentId).block()
+            ?: error("Vision provider returned no response")
+
+    override fun analyzeImageReactive(
+        file: ToolWorkspaceFile,
+        prompt: String,
+        agentId: String?,
+    ): Mono<ToolImageAnalysis> {
+        if (agentId == null) return analyzeImageReactive(file, prompt)
+        val agent =
+            agents?.getSubAgent(agentId)
+                ?: error("Sub-agent '$agentId' is not available for image analysis")
+        val selection =
+            try {
+                agent.config.modelSelection(ModelCapability.VISION)
+            } catch (failure: IllegalArgumentException) {
+                error(
+                    "Sub-agent '${agent.name}' is not configured for vision analysis. " +
+                        "Enable the VISION capability and assign a vision model in sub-agent settings.",
+                )
+            }
+        val bytes = files.imageBytes(requireRecord(file))
+        return llmProvider
+            .getObject()
+            .visionReactive(Base64.getDecoder().decode(bytes.base64), prompt, selection)
             .map { response -> ToolImageAnalysis(response.model, response.message.content) }
     }
 

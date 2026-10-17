@@ -4,7 +4,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -151,17 +150,14 @@ class ComposeProviderSettingsOverlayTest {
         }
         composeTestRule.waitForIdle()
 
-        composeTestRule
-            .onAllNodesWithText("Increase")
-            .get(0)
-            .performScrollTo()
-            .performClick()
+        composeTestRule.onNodeWithContentDescription("Increase Parallel agents").performScrollTo().performClick()
+        composeTestRule.onNodeWithContentDescription("Increase Interpolation context messages").performScrollTo().performClick()
         composeTestRule.onNodeWithText("Save changes").performClick()
         composeTestRule.waitForIdle()
 
         verify {
             settings.save(
-                match { snapshot -> snapshot.maxParallelSubAgents == 4 },
+                match { snapshot -> snapshot.maxParallelSubAgents == 4 && snapshot.promptInterpolationContextMessages == 9 },
                 null,
             )
         }

@@ -12,6 +12,8 @@ internal fun todoWorkerMessages(
             buildString {
                 append("You are ${agent.name}. Your role is ${agent.role}.")
                 append(" The main agent and orchestrator control the todo lifecycle.")
+                append(" Enabled model capabilities: ${agent.config.enabledCapabilities.sorted().joinToString(", ")}.")
+                append(" Use only capabilities enabled for you; specialized models are selected by the server.")
                 append(
                     " You may inspect todos and stored results, but do not add, update, complete, " +
                         "cancel, start, stop, remove, or reorder todos.",

@@ -1,11 +1,13 @@
 package de.heckenmann.visualagent.server
 
+import de.heckenmann.visualagent.agent.AgentCapabilityValidator
 import de.heckenmann.visualagent.agent.AgentManager
 import de.heckenmann.visualagent.agent.AgentStatusCallbackAdapter
 import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.agent.SubAgentExecutionSnapshot
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.getActiveJobCount
+import de.heckenmann.visualagent.agent.provider.ModelCapability
 import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.protocol.Agent
 import de.heckenmann.visualagent.protocol.AgentConfig
@@ -28,6 +30,7 @@ class SpringAgentPort(
     private val agentToolConfigService: AgentToolConfigService,
     private val toolRegistry: ToolRegistry,
     private val agentStatusCallbackAdapter: AgentStatusCallbackAdapter,
+    private val capabilityValidator: AgentCapabilityValidator? = null,
 ) : AgentPort {
     override fun list(): List<Agent> = agentManager.getSubAgents().map(SubAgent::toProtocol)
 
@@ -43,7 +46,9 @@ class SpringAgentPort(
         role: String,
         config: AgentConfig,
     ): Agent? {
-        val updated = agentManager.updateAgent(id, name, role, config.toApplication())
+        val configForAgent = config.toApplication()
+        capabilityValidator?.validate(configForAgent)
+        val updated = agentManager.updateAgent(id, name, role, configForAgent)
         return if (updated) agentManager.getSubAgent(id)?.toProtocol() else null
     }
 
@@ -128,6 +133,8 @@ private fun ApplicationAgentConfig.toProtocol(): AgentConfig =
         options = options,
         tools = tools,
         templateName = templateName,
+        enabledCapabilities = enabledCapabilities.mapTo(mutableSetOf()) { it.name },
+        capabilityModels = capabilityModels.mapKeys { it.key.name },
     )
 
 private fun AgentConfig.toApplication(): ApplicationAgentConfig =
@@ -144,6 +151,8 @@ private fun AgentConfig.toApplication(): ApplicationAgentConfig =
         options = options,
         tools = tools,
         templateName = templateName,
+        enabledCapabilities = enabledCapabilities.map(ModelCapability::valueOf).toSet(),
+        capabilityModels = capabilityModels.mapKeys { ModelCapability.valueOf(it.key) },
     )
 
 private fun ApplicationMessage.toProtocol(): ConversationMessage =

@@ -69,46 +69,26 @@ class OpenAiClientErrorTest {
         }
 
     @Test
-    fun `buildDetailedProviderError extracts response body`() {
-        val client =
-            OpenAiClient(
-                mockFactory(),
-                TestToolRegistry(),
-            )
+    fun `provider error mapper extracts response body`() {
         val exception = ExceptionWithResponseBody("HTTP 500 Internal Server Error", "{\"error\":\"bad request\"}")
 
-        val error = invokeBuildDetailedProviderError(client, exception)
+        val error = OpenAiProviderErrors.detailed(exception)
 
         assertEquals("HTTP 500 Internal Server Error: {\"error\":\"bad request\"}", error.message)
         assertTrue(error.cause === exception)
     }
 
     @Test
-    fun `extractDetailedErrorMessage uses fallback chain`() {
-        val client =
-            OpenAiClient(
-                mockFactory(),
-                TestToolRegistry(),
-            )
+    fun `provider error mapper preserves fallback message chain`() {
         val nested = IllegalStateException("inner")
         val exception = RuntimeException("outer", nested)
 
-        val error = invokeBuildDetailedProviderError(client, exception)
+        val error = OpenAiProviderErrors.detailed(exception)
 
         assertEquals("inner", error.message)
     }
 
     private fun mockFactory(): OpenAiPromptFactory = io.mockk.mockk(relaxed = true)
-
-    private fun invokeBuildDetailedProviderError(
-        client: OpenAiClient,
-        throwable: Throwable,
-    ): IllegalStateException {
-        val method = OpenAiClient::class.java.getDeclaredMethod("buildDetailedProviderError", Throwable::class.java)
-        method.isAccessible = true
-        @Suppress("UNCHECKED_CAST")
-        return method.invoke(client, throwable) as IllegalStateException
-    }
 
     private class ExceptionWithResponseBody(
         message: String,

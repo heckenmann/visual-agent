@@ -87,6 +87,8 @@ data class AgentConfig(
     val options: Map<String, String> = emptyMap(),
     val tools: List<String>? = null,
     val templateName: String? = null,
+    val enabledCapabilities: Set<String> = setOf("CHAT"),
+    val capabilityModels: Map<String, String> = emptyMap(),
 ) {
     companion object {
         /** Configurations offered by the agent creation dialog. */

@@ -110,6 +110,12 @@ class CancellationTokenImpl : CancellationToken {
 
 /** Transport-neutral conversation operations used by the Compose conversation panel. */
 interface ConversationPort {
+    /** Rewrites a draft through the interpolation model without sending or persisting it. */
+    suspend fun interpolate(
+        draft: String,
+        token: CancellationToken,
+    ): String
+
     /** Reads the newest persisted conversation page. */
     suspend fun latest(): ConversationHistoryPage
 
