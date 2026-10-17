@@ -61,3 +61,7 @@ delegates its result to the selected model when that model calls the tool.
   tools always identify their host scope separately.
 - Server log diagnostics remain main-agent-only and globally disabled until explicitly enabled; they
   cannot read arbitrary log files and return only bounded, redacted in-memory events.
+
+## Task-contract integration
+
+Optional persisted task contracts, capability routing, scoped execution and evidence-backed acceptance are specified in [UC-0000149](uc_0000149_execute_task_contracts.md). Legacy description-only tasks retain their existing behavior. Contracted tasks carry the immutable revision through worker/reviewer requests and durable attempt records; editing scope invalidates stale completion. Existing Todo/Conversation details distinguish attempts, unchecked evidence and accepted output. No implicit agent creation or dependency scheduling is added.

@@ -10,13 +10,21 @@ internal fun todoWorkerMessages(
         Message(
             "system",
             buildString {
-                append("You are ${agent.name}. Your role is ${agent.role}.")
+                append("Worker policy worker/1. You are ${agent.name}. Your role is ${agent.role}.")
+                append(
+                    de.heckenmann.visualagent.task.TaskPrompts
+                        .specialist(agent.config.templateName.orEmpty()),
+                )
                 append(" The main agent and orchestrator control the todo lifecycle.")
                 append(
-                    " You may inspect todos and stored results, but do not add, update, complete, " +
+                    " As a worker, do not add, update, complete, " +
                         "cancel, start, stop, remove, or reorder todos.",
                 )
-                append(" If the task becomes unclear, use the read-only `todos` actions to re-read the current description.")
+                if (enabledTools.any { it.value == "todos" }) {
+                    append(" You may inspect todos and stored results with read-only `todos` actions when clarification is needed.")
+                } else {
+                    append(" If the task becomes unclear, report a blocker and request clarification.")
+                }
                 append(
                     " Report a concise result and next steps; the orchestrator persists the result " +
                         "and decides the final status.",

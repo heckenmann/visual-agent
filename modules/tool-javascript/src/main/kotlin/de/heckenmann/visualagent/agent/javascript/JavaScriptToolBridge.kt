@@ -13,7 +13,6 @@ import org.graalvm.polyglot.proxy.ProxyExecutable
 import org.graalvm.polyglot.proxy.ProxyObject
 import java.util.concurrent.Semaphore
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
 /** Request-scoped bridge exposing only enabled registry tools to JavaScript. */
@@ -33,8 +32,7 @@ internal class JavaScriptToolBridge(
     private val permits = Semaphore(limits.maxConcurrentToolCalls, true)
     private val batchBridge =
         JavaScriptBatchBridge(registry, batchExecutor, enabledTools, requestContext, cancellationToken, limits, calls, lastFailure, permits)
-    private val workspaceReadBytes = AtomicLong()
-    private val workspaceBytes = AtomicLong()
+    private val workspaceBudget = JavaScriptWorkspaceBudget(limits, ::failure)
     private val valueConverter = JavaScriptGuestValueConverter(limits)
     private val toolsByFunctionName =
         registry
@@ -95,12 +93,13 @@ internal class JavaScriptToolBridge(
                         try {
                             cancellationToken.throwIfCancelled()
                             consumeCall()
+                            requireWorkspaceAccess("readText", workspacePath(arguments))
                             val read =
                                 workspaceWriter.read(
                                     workspacePath(arguments),
-                                    availableWorkspaceReadBytes(),
+                                    workspaceBudget.availableRead(),
                                 )
-                            reserveWorkspaceReadBytes(read.sizeBytes)
+                            workspaceBudget.reserveRead(read.sizeBytes)
                             read.content
                         } catch (error: JavaScriptExecutionException) {
                             lastFailure.set(error)
@@ -118,6 +117,7 @@ internal class JavaScriptToolBridge(
                         try {
                             cancellationToken.throwIfCancelled()
                             consumeCall()
+                            requireWorkspaceAccess("delete", workspacePath(arguments))
                             val result = workspaceWriter.delete(workspacePath(arguments))
                             ProxyObject.fromMap(mapOf("path" to result.relativePath, "deleted" to result.deleted))
                         } catch (error: JavaScriptExecutionException) {
@@ -218,6 +218,16 @@ internal class JavaScriptToolBridge(
         return descriptionObject(definition.toJavaScriptDescription())
     }
 
+    private fun requireWorkspaceAccess(
+        action: String,
+        path: String,
+    ) {
+        (requestContext["taskToolAccess"] as? de.heckenmann.visualagent.agent.tools.TaskToolAccess)?.requireAllowed(
+            "workspace:file",
+            JsonObject(mapOf("action" to JsonPrimitive(action), "path" to JsonPrimitive(path))),
+        )
+    }
+
     private fun writeWorkspaceFile(arguments: Array<out Value>): Any {
         cancellationToken.throwIfCancelled()
         val input =
@@ -228,9 +238,10 @@ internal class JavaScriptToolBridge(
         if (path.isBlank() || content == null) {
             throw failure(JavaScriptErrorCategory.TOOL_ARGUMENTS, "Workspace write requires string path and content")
         }
+        requireWorkspaceAccess("writeText", path)
         consumeCall()
         val contentBytes = content.toByteArray(Charsets.UTF_8)
-        reserveWorkspaceBytes(contentBytes.size.toLong())
+        workspaceBudget.reserveWrite(contentBytes.size.toLong())
         return try {
             val result = workspaceWriter.write(path, content)
             ProxyObject.fromMap(
@@ -241,10 +252,10 @@ internal class JavaScriptToolBridge(
                 ),
             )
         } catch (error: IllegalArgumentException) {
-            workspaceBytes.addAndGet(-contentBytes.size.toLong())
+            workspaceBudget.releaseWrite(contentBytes.size.toLong())
             throw failure(JavaScriptErrorCategory.TOOL_ARGUMENTS, error.message ?: "Invalid workspace path")
         } catch (error: Exception) {
-            workspaceBytes.addAndGet(-contentBytes.size.toLong())
+            workspaceBudget.releaseWrite(contentBytes.size.toLong())
             throw failure(JavaScriptErrorCategory.TOOL_FAILURE, "Workspace write failed")
         }
     }
@@ -295,40 +306,6 @@ internal class JavaScriptToolBridge(
     private fun consumeCall() {
         if (calls.incrementAndGet() > limits.maxToolCalls) {
             throw failure(JavaScriptErrorCategory.LIMIT_EXCEEDED, "JavaScript tool-call limit exceeded")
-        }
-    }
-
-    private fun reserveWorkspaceBytes(bytes: Long) {
-        if (bytes > limits.maxWorkspaceWriteBytes) {
-            throw failure(JavaScriptErrorCategory.LIMIT_EXCEEDED, "Workspace write size limit exceeded")
-        }
-        while (true) {
-            val current = workspaceBytes.get()
-            val next = current + bytes
-            if (next < current || next > limits.maxWorkspaceBytes) {
-                throw failure(JavaScriptErrorCategory.LIMIT_EXCEEDED, "Workspace write budget exceeded")
-            }
-            if (workspaceBytes.compareAndSet(current, next)) return
-        }
-    }
-
-    private fun availableWorkspaceReadBytes(): Long =
-        minOf(
-            limits.maxWorkspaceReadBytes,
-            (limits.maxWorkspaceReadTotalBytes - workspaceReadBytes.get()).coerceAtLeast(0),
-        )
-
-    private fun reserveWorkspaceReadBytes(bytes: Long) {
-        if (bytes < 0 || bytes > limits.maxWorkspaceReadBytes) {
-            throw failure(JavaScriptErrorCategory.LIMIT_EXCEEDED, "Workspace read size limit exceeded")
-        }
-        while (true) {
-            val current = workspaceReadBytes.get()
-            val next = current + bytes
-            if (next < current || next > limits.maxWorkspaceReadTotalBytes) {
-                throw failure(JavaScriptErrorCategory.LIMIT_EXCEEDED, "Workspace read budget exceeded")
-            }
-            if (workspaceReadBytes.compareAndSet(current, next)) return
         }
     }
 

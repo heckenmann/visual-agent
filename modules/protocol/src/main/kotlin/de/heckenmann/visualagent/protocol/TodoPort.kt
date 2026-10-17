@@ -1,5 +1,7 @@
 package de.heckenmann.visualagent.protocol
 
+import de.heckenmann.visualagent.task.TaskAttemptResult
+import de.heckenmann.visualagent.task.TaskContract
 import java.time.Instant
 
 /** Lifecycle state of a persisted todo item at the presentation boundary. */
@@ -22,6 +24,8 @@ data class TodoItem(
     val timelineSequence: Long = 0,
     val completedAt: Instant? = null,
     val dueDate: Instant? = null,
+    val contract: TaskContract? = null,
+    val executionGap: String? = null,
 )
 
 /** Minimal agent identity needed by todo assignment controls. */
@@ -57,6 +61,7 @@ data class TodoResponseSnapshot(
     val todoId: String,
     val text: String,
     val agentId: String? = null,
+    val attempts: List<TaskAttemptResult> = emptyList(),
 )
 
 /** Combined todo edit submitted as one atomic mutation. */
@@ -65,6 +70,8 @@ data class TodoUpdate(
     val description: String,
     val status: TodoState,
     val assignedAgentId: String?,
+    val contract: TaskContract? = null,
+    val replaceContract: Boolean = false,
 )
 
 /** Transport-neutral todo operations used by the todo panel. */
@@ -83,6 +90,13 @@ interface TodoPort {
 
     /** Creates a pending todo. */
     fun add(description: String): TodoItem
+
+    /** Creates an optional contract and assignment atomically, before autonomous workers can claim it. */
+    fun addContract(
+        description: String,
+        contract: TaskContract,
+        assignedAgentId: String?,
+    ): TodoItem = throw UnsupportedOperationException("Contract creation is unavailable")
 
     /** Updates a todo description. */
     fun updateDescription(

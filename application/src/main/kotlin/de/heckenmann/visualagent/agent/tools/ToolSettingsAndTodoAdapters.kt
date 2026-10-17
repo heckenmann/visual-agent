@@ -69,7 +69,15 @@ class TodoToolPortAdapter(
 
     override fun list(): List<ToolTodo> =
         todoStore.listTodos().map {
-            ToolTodo(it.id, it.description, it.status.name, it.position, it.assignedAgentId)
+            ToolTodo(
+                it.id,
+                it.description,
+                it.status.name,
+                it.position,
+                it.assignedAgentId,
+                it.contract,
+                if (it.contract == null) null else agentManagerProvider().autonomousCoordinator.executionGap(it),
+            )
         }
 
     override fun agentExists(agentId: String): Boolean = agentManagerProvider().getSubAgent(agentId) != null
@@ -96,6 +104,26 @@ class TodoToolPortAdapter(
             )
         }
 
+    override fun addIfAbsent(
+        description: String,
+        assignedAgentId: String,
+        contract: de.heckenmann.visualagent.task.TaskContract?,
+    ): ToolTodoCreation =
+        todoManager.addIfAbsent(description, assignedAgentId, contract).let { creation ->
+            val todo = creation.todo
+            ToolTodoCreation(
+                ToolTodo(todo.id, todo.description, todo.status.name, todo.position, todo.assignedAgentId, todo.contract),
+                creation.created,
+            )
+        }
+
+    override fun attempts(
+        id: String,
+        offset: Int,
+        limit: Int,
+    ): List<de.heckenmann.visualagent.task.TaskAttemptResult> =
+        agentManagerProvider().taskExecutionService?.attempts(id, offset, limit, todoManager.getById(id)?.acceptedResult).orEmpty()
+
     override fun update(request: TodoUpdateRequest): Boolean {
         val assignment =
             when (request.assignmentMode) {
@@ -110,6 +138,8 @@ class TodoToolPortAdapter(
                 description = request.description,
                 assignment = assignment,
                 status = status,
+                contract = request.contract,
+                replaceContract = request.replaceContract,
             ),
         )
     }

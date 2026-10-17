@@ -18,6 +18,8 @@ import kotlinx.serialization.json.jsonPrimitive
 class TodosTool(
     private val todos: TodoToolPort,
 ) : VisualAgentTool {
+    private val contractActions = TodoContractActions(todos)
+
     override val definition =
         ToolDefinition(
             id = ToolId("todos"),
@@ -27,6 +29,15 @@ class TodosTool(
                     "This tool is ONLY for tracking work items — NEVER use it to store code, data, file contents, or results. " +
                     "Sub-agents have read-only access; todo lifecycle changes are controlled by the main agent and orchestrator. " +
                     "Use an available file function to save code and data when one is enabled; use todos only to describe work.\n" +
+                    "For explicit work, add/update optional contract: {objective, inputs:[{id,path?,sourceUrl?,todoId?}], " +
+                    "deliverables:[{id,description,path}], criteria:[{id,description,artifactId?,method," +
+                    "expected?,sourceInputId?,required?,executionTool?}], " +
+                    "constraints:[text],stopConditions:[text],requiredOperations:[{tool,action?}]," +
+                    "policy:{tools?,actions?,resources?,includeAgentHistory?},reviewerAgentId?}. " +
+                    "Methods: FILE_EXISTS, TEXT_CONTAINS, JSON_VALID, SOURCE_QUOTE, MANUAL. tools use internal IDs. " +
+                    "Null scope inherits; empty scope denies. Contract revisions are server-owned. " +
+                    "get-contract {id} reads a contract; get-attempts {id,offset?} " +
+                    "reads one bounded attempt per page and returns nextOffset. " +
                     "Actions and their required input parameters:\n" +
                     "- list: no parameters. Returns all todos with status, description, id, position, assigned agent.\n" +
                     "- count: no parameters. Returns counts per status.\n" +
@@ -73,6 +84,7 @@ class TodosTool(
             )
         }
         return when (action) {
+            "get-contract", "get-attempts" -> contractActions.execute(action, input)
             "list" -> listTodos()
             "count" -> countTodos()
             "add" -> addTodo(input)
@@ -95,7 +107,8 @@ class TodosTool(
         if (rows.isEmpty()) return success("todos", "No todos.")
         val text =
             rows.joinToString("\n") {
-                "- [${it.status}] ${it.description} (id=${it.id}, position=${it.position}, assigned=${it.assignedAgentId ?: "none"})"
+                "- [${it.status}] ${it.description} (id=${it.id}, position=${it.position}, assigned=${it.assignedAgentId ?: "none"})" +
+                    it.executionGap?.let { gap -> " Waiting: $gap" }.orEmpty()
             }
         return success("todos", text)
     }
@@ -127,7 +140,7 @@ class TodosTool(
             )
         }
         val description = input.requiredString("description")
-        val creation = todos.addIfAbsent(description, assignedAgentId)
+        val creation = todos.addIfAbsent(description, assignedAgentId, contractActions.contract(input))
         if (!creation.created) {
             val existing = creation.todo
             return success(
@@ -168,6 +181,8 @@ class TodosTool(
                         },
                     assignedAgentId = newAssignedAgentId,
                     status = input.string("status")?.uppercase(),
+                    contract = contractActions.contract(input),
+                    replaceContract = input.containsKey("contract"),
                 ),
             )
         return if (updated) success("todos", "Updated todo $id") else failure("todos", "Todo update failed")
@@ -247,7 +262,7 @@ class TodosTool(
     private fun isSubAgentRequest(context: Map<String, Any>): Boolean = context["agentId"]?.toString()?.isNotBlank() == true
 
     private companion object {
-        val SUB_AGENT_READ_ONLY_ACTIONS = setOf("list", "count", "get-result")
+        val SUB_AGENT_READ_ONLY_ACTIONS = setOf("list", "count", "get-result", "get-contract", "get-attempts")
     }
 
     private fun extractSummary(content: String): String {

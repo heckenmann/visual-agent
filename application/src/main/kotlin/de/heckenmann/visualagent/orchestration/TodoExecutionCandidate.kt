@@ -27,6 +27,7 @@ internal fun findNextAssignableTodo(
     subAgents: Map<String, SubAgent>,
     requestedTodoId: String? = null,
     isAgentEligible: (String) -> Boolean = { true },
+    isCompatible: (Todo, SubAgent) -> Boolean = { _, _ -> true },
 ): TodoExecutionCandidate? {
     val idleAgents = subAgents.values.filter { it.status == AgentStatus.IDLE && isAgentEligible(it.id) }
     val idleAgentIds = idleAgents.mapTo(mutableSetOf()) { it.id }
@@ -34,7 +35,12 @@ internal fun findNextAssignableTodo(
         .asSequence()
         .filter { it.status == TodoStatus.PENDING && (requestedTodoId == null || it.id == requestedTodoId) }
         .mapNotNull { todo ->
-            findCompatibleAgent(todo, subAgents, idleAgents, idleAgentIds)?.let { TodoExecutionCandidate(todo, it) }
+            findCompatibleAgent(
+                todo,
+                subAgents,
+                idleAgents.filter { isCompatible(todo, it) },
+                idleAgentIds,
+            )?.let { TodoExecutionCandidate(todo, it) }
         }.minWithOrNull(compareBy({ it.todo.position }, { it.todo.id }))
 }
 
@@ -46,6 +52,6 @@ private fun findCompatibleAgent(
 ): SubAgent? =
     when {
         !todo.assignedAgentId.isNullOrBlank() ->
-            subAgents[todo.assignedAgentId]?.takeIf { it.id in idleAgentIds }
+            subAgents[todo.assignedAgentId]?.takeIf { it.id in idleAgentIds && it in idleAgents }
         else -> idleAgents.firstOrNull()
     }

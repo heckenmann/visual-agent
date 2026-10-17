@@ -67,6 +67,7 @@ internal fun TodoPanel(
 ) {
     var todos by remember { mutableStateOf<List<TodoItem>>(emptyList()) }
     var responseStates by remember { mutableStateOf<Map<String, TodoResponseState>>(emptyMap()) }
+    val attemptRefresh = remember(todoPort) { TodoAttemptRefresh() }
     val scope = rememberCoroutineScope()
     val actions = rememberTodoActions(modalRequester)
     var agents by remember(todoPort) { mutableStateOf<List<de.heckenmann.visualagent.protocol.AgentSummary>>(emptyList()) }
@@ -87,7 +88,14 @@ internal fun TodoPanel(
                 if (!lifecycle.closing) throw failure
                 return
             }
-        if (!lifecycle.closing) todos = refreshed
+        if (!lifecycle.closing) {
+            todos = refreshed
+            for (todo in refreshed.filter { it.contract != null }) {
+                val response = responseStates[todo.id] ?: TodoResponseState()
+                responseStates = responseStates + (todo.id to response)
+                attemptRefresh.refresh(todo, todoPort, response, { todos.firstOrNull { it.id == todo.id } }, { lifecycle.closing })
+            }
+        }
     }
     val refresh: () -> Unit = {
         if (!lifecycle.closing) scope.launch { refreshTodos() }
@@ -98,6 +106,10 @@ internal fun TodoPanel(
             val state = responseStates[update.todoId] ?: TodoResponseState()
             state.apply(update.executionId, update.agentId, update.delta, update.completed, update.reviewing)
             responseStates = responseStates + (update.todoId to state)
+            val todo = todos.firstOrNull { it.id == update.todoId }
+            if (update.completed && !update.reviewing && todo?.contract != null && todo.status != TodoState.IN_PROGRESS) {
+                attemptRefresh.refresh(todo, todoPort, state, { todos.firstOrNull { it.id == todo.id } }, { lifecycle.closing })
+            }
         }
     }
     DisposableEffect(todoPort, progressUpdates) {
@@ -114,7 +126,19 @@ internal fun TodoPanel(
                             responseStates = responseStates - removedId
                         }
                         changedTodo != null -> {
+                            val hadContract = todos.firstOrNull { it.id == changedTodo.id }?.contract != null
                             todos = (todos.filterNot { it.id == changedTodo.id } + changedTodo).sortedBy(TodoItem::position)
+                            if (changedTodo.contract != null || hadContract) {
+                                val response = responseStates[changedTodo.id] ?: TodoResponseState()
+                                responseStates = responseStates + (changedTodo.id to response)
+                                attemptRefresh.refresh(
+                                    changedTodo,
+                                    todoPort,
+                                    response,
+                                    { todos.firstOrNull { it.id == changedTodo.id } },
+                                    { lifecycle.closing },
+                                )
+                            }
                         }
                         else -> refreshTodos()
                     }
@@ -170,19 +194,28 @@ internal fun TodoPanel(
                                 todo = TodoItem(id = "", description = "", status = TodoState.PENDING),
                                 agents = agents,
                                 onCancel = dismiss,
-                                onSave = { newDescription, newStatus, newAgentId ->
+                                onSaveContract = { newDescription, newStatus, newAgentId, newContract ->
                                     actions.submit("add", {
-                                        val id = createdTodoId ?: todoPort.add(newDescription).id.also { createdTodoId = it }
-                                        check(
-                                            todoPort.update(
-                                                de.heckenmann.visualagent.protocol.TodoUpdate(
-                                                    todoId = id,
-                                                    description = newDescription,
-                                                    status = newStatus,
-                                                    assignedAgentId = newAgentId,
+                                        val firstCreation = createdTodoId == null
+                                        val id =
+                                            createdTodoId ?: (
+                                                newContract?.let { todoPort.addContract(newDescription, it, newAgentId) }
+                                                    ?: todoPort.add(newDescription)
+                                            ).id.also { createdTodoId = it }
+                                        if (!(firstCreation && newContract != null && newStatus == TodoState.PENDING)) {
+                                            check(
+                                                todoPort.update(
+                                                    de.heckenmann.visualagent.protocol.TodoUpdate(
+                                                        todoId = id,
+                                                        description = newDescription,
+                                                        status = newStatus,
+                                                        assignedAgentId = newAgentId,
+                                                        contract = newContract,
+                                                        replaceContract = newContract != null,
+                                                    ),
                                                 ),
-                                            ),
-                                        ) { "Todo was created, but its settings could not be saved. Retry to update the same todo." }
+                                            ) { "Todo was created, but its settings could not be saved. Retry to update the same todo." }
+                                        }
                                     }, {
                                         refresh()
                                         dismiss()
