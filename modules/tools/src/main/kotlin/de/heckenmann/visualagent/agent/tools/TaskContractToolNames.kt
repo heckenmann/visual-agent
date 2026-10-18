@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.agent.tools
 
 import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
+import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.task.TaskContract
 import de.heckenmann.visualagent.task.TaskContractCodec
 import de.heckenmann.visualagent.task.mapToolNames
@@ -20,6 +21,5 @@ internal class TaskContractToolNames(
             }.also(TaskContractCodec::validate)
     }
 
-    fun providerName(id: String): String =
-        requireNotNull(definitions().firstOrNull { it.id.value == id }) { "Tool is no longer registered: $id" }.name
+    fun providerName(id: String): String = definitions().firstOrNull { it.id.value == id }?.name ?: ToolId(id).toReferenceName()
 }

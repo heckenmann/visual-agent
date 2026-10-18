@@ -15,6 +15,25 @@ import kotlin.test.assertFailsWith
 
 class TaskContractToolNamesTest {
     @Test
+    fun `unavailable and oversized historical references remain readable but cannot be submitted`() {
+        val names = TaskContractToolNames { emptyList() }
+        for (id in listOf("missing:tool", "x".repeat(80))) {
+            val contract =
+                TaskContract(
+                    objective = "Historical task",
+                    requiredOperations = listOf(TaskOperation(id)),
+                    policy = TaskPolicy(tools = listOf(id), actions = mapOf(id to listOf("read"))),
+                )
+            TaskContractCodec.validate(contract)
+            val exported = contract.mapToolNames(names::providerName)
+            assertEquals(ToolId(id).toReferenceName(), exported.requiredOperations.single().tool)
+            assertEquals(listOf(ToolId(id).toReferenceName()), exported.policy.tools)
+            assertEquals(setOf(ToolId(id).toReferenceName()), exported.policy.actions.keys)
+            assertFailsWith<IllegalArgumentException> { names.decode(Json.encodeToString(exported)) }
+        }
+    }
+
+    @Test
     fun `all registered function names round trip without hard coded aliases`() {
         val definitions =
             listOf("workspace:file", "file:read", "network:dns").map {

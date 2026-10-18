@@ -93,6 +93,15 @@ class TodoContractNameBoundaryTest {
                 .toString()
                 .trim('"'),
         )
+        every { reference.getObject() } returns ToolRegistry(emptyList(), ToolEventBus())
+        assertEquals(exported, tool.execute("""{"action":"get-contract","id":"todo"}""", emptyMap()).content)
+        assertEquals(attempt, tool.execute("""{"action":"get-attempts","id":"todo"}""", emptyMap()).content)
+        assertFailsWith<IllegalArgumentException> {
+            tool.execute(
+                """{"action":"add","description":"Task","assignedAgentId":"worker","contract":{"objective":"Task","requiredOperations":[{"tool":"workspace_file"}]}}""",
+                emptyMap(),
+            )
+        }
         assertFailsWith<IllegalArgumentException> {
             tool.execute(
                 """{"action":"add","description":"Task","assignedAgentId":"worker","contract":{"objective":"Task","requiredOperations":[{"tool":"unknown_function"}]}}""",

@@ -13,6 +13,7 @@ import io.mockk.every
 import io.mockk.mockk
 import org.springframework.beans.factory.ObjectProvider
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -46,5 +47,7 @@ class TaskOperationSupportTest {
         assertFalse(service.supportsOperation(agent, TaskOperation("known", "write")))
         assertTrue(service.supportsOperation(agent, TaskOperation("unknown", "read")))
         assertFalse(service.supportsOperation(agent, TaskOperation("missing", "read")))
+        assertEquals("missing_tool", service.providerToolName("missing:tool"))
+        assertEquals("x".repeat(80), service.providerToolName("x".repeat(80)))
     }
 }
