@@ -147,10 +147,13 @@ val verifyGeneratedBranding =
             val uiPng = directory.resolve("ui/icons/visual-agent.png").readBytes()
             val composePng = directory.resolve("compose/drawable/visual_agent.png").readBytes()
             check(uiPng.contentEquals(composePng)) { "Generated UI and Compose PNG icons differ." }
-            val image = checkNotNull(javax.imageio.ImageIO.read(uiPng.inputStream())) {
-                "Generated application icon cannot be decoded as PNG."
+            val pngHeader = ByteBuffer.wrap(uiPng)
+            check(uiPng.size >= 24 && uiPng.copyOfRange(0, 8).contentEquals(byteArrayOf(
+                137.toByte(), 80, 78, 71, 13, 10, 26, 10,
+            ))) { "Generated application icon has an invalid PNG signature." }
+            check(pngHeader.getInt(16) == 1024 && pngHeader.getInt(20) == 1024) {
+                "Application PNG is not 1024 x 1024."
             }
-            check(image.width == 1024 && image.height == 1024) { "Application PNG is not 1024 x 1024." }
             val ico = directory.resolve("packaging/visual-agent.ico").readBytes()
             check(ico.size > 118) { "Windows ICO is incomplete." }
             val icoHeader = ByteBuffer.wrap(ico).order(ByteOrder.LITTLE_ENDIAN)
