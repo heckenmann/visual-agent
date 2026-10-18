@@ -15,12 +15,13 @@ class TaskModelCapabilities(
     fun supportsTools(agent: SubAgent): Boolean =
         runCatching {
             val providers = catalog.getObject()
-            val providerId = agent.config.provider?.takeIf(String::isNotBlank) ?: providers.activeProviderId()
+            val selection = agent.config.modelSelection()
+            val providerId = selection.provider ?: providers.activeProviderId()
             val provider = providers.getProvider(providerId) ?: return@runCatching false
             if (!provider.enabled) return@runCatching false
             val modelId =
-                agent.config.model?.takeIf(String::isNotBlank)
-                    ?: if (agent.config.provider.isNullOrBlank()) providers.activeModelId() else provider.defaultModel
+                selection.model
+                    ?: if (selection.provider == null) providers.activeModelId() else provider.defaultModel
             if (modelId.isBlank()) return@runCatching false
             if (modelId in provider.modelBlacklist ||
                 (provider.modelWhitelist.isNotEmpty() && modelId !in provider.modelWhitelist)

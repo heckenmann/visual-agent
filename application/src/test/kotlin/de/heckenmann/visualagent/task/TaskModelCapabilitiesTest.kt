@@ -2,6 +2,7 @@ package de.heckenmann.visualagent.task
 
 import de.heckenmann.visualagent.agent.AgentConfig
 import de.heckenmann.visualagent.agent.SubAgent
+import de.heckenmann.visualagent.agent.provider.ModelCapability
 import de.heckenmann.visualagent.agent.provider.ModelStatus
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
@@ -15,6 +16,49 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class TaskModelCapabilitiesTest {
+    @Test
+    fun `chat capability assignment governs tool eligibility instead of legacy overrides`() {
+        val catalog = mockk<ProviderCatalogService>()
+        val reference = mockk<ObjectProvider<ProviderCatalogService>>()
+        every { reference.getObject() } returns catalog
+        every { catalog.getProvider("chat") } returns
+            ProviderProfile(
+                "chat",
+                "Chat",
+                ProviderAdapter.OLLAMA,
+                "http://localhost",
+                models =
+                    listOf(
+                        ProviderModelConfig("capable", capabilities = setOf("tools"), capabilitiesComplete = true),
+                        ProviderModelConfig("text", capabilitiesComplete = true),
+                    ),
+            )
+        val agent =
+            SubAgent(
+                "worker",
+                "Worker",
+                "Role",
+                config =
+                    AgentConfig(
+                        provider = "unused",
+                        model = "unused",
+                        capabilityModels = mapOf(ModelCapability.CHAT to "chat::capable"),
+                    ),
+            )
+        val resolver = TaskModelCapabilities(reference)
+        assertTrue(resolver.supportsTools(agent))
+        assertFalse(
+            resolver.supportsTools(
+                agent.copy(
+                    config =
+                        agent.config.copy(
+                            capabilityModels = mapOf(ModelCapability.CHAT to "chat::text"),
+                        ),
+                ),
+            ),
+        )
+    }
+
     @Test
     fun `current explicit provider and authoritative capabilities govern eligibility`() {
         val catalog = mockk<ProviderCatalogService>()
