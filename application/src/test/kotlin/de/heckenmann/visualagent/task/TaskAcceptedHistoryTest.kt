@@ -57,14 +57,21 @@ class TaskAcceptedHistoryTest {
                 )
                 val service = TaskExecutionService(TaskArtifactVerifier(WorkspaceFileService(db.workspaceFileStore, root)), attempts)
                 assertTrue(service.attempts(todo.id, 0, 10, manager.getById(todo.id)!!.acceptedResult).single().currentAccepted)
+                assertTrue(manager.update(TodoUpdateCommand(todo.id, status = TodoStatus.COMPLETED)))
                 assertTrue(
                     manager.update(
-                        TodoUpdateCommand(todo.id, contract = contract.copy(objective = "New objective"), replaceContract = true),
+                        TodoUpdateCommand(
+                            todo.id,
+                            status = TodoStatus.COMPLETED,
+                            contract = contract.copy(objective = "New objective"),
+                            replaceContract = true,
+                        ),
                     ),
                 )
                 val reopened = manager.getById(todo.id)!!
                 assertEquals(TodoStatus.PENDING, reopened.status)
                 assertNull(reopened.acceptedResult)
+                assertFalse(manager.update(TodoUpdateCommand(todo.id, status = TodoStatus.COMPLETED)))
                 attempts.save(result.copy(reported = result.reported.copy(summary = "Late callback"))).block()
                 val historical = service.attempts(todo.id, 0, 10, null).single()
                 assertTrue(historical.accepted)

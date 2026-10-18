@@ -119,9 +119,9 @@ class TodoManager(
         expected: Todo? = null,
     ): Boolean {
         if (command.description?.isBlank() == true) return false
-        if (command.status == TodoStatus.COMPLETED && getById(command.id)?.contract != null) return false
         if (command.assignment is TodoAssignmentChange.Set && command.assignment.agentId.isBlank()) return false
         val original = expected ?: getById(command.id) ?: return false
+        if (command.status == TodoStatus.COMPLETED && original.contract != null && original.status != TodoStatus.COMPLETED) return false
         if (command.replaceContract) command.contract?.let(de.heckenmann.visualagent.task.TaskContractCodec::validate)
         val invalidatesAcceptance =
             command.replaceContract ||
@@ -149,7 +149,7 @@ class TodoManager(
             is TodoAssignmentChange.Set -> candidate.assignedAgentId = assignment.agentId
         }
         command.status?.let { status ->
-            if (candidate.status != status) {
+            if (candidate.status != status && !(invalidatesAcceptance && original.contract != null && status == TodoStatus.COMPLETED)) {
                 candidate.status = status
                 candidate.completedAt = if (status == TodoStatus.COMPLETED) java.time.Instant.now() else null
                 if (status != TodoStatus.CANCELLED) candidate.terminalDetail = null
