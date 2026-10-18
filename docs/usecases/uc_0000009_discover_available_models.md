@@ -48,3 +48,7 @@ The user sees a usable model list rather than raw provider inventory.
 - A provider switch refreshes that provider's list and restores its saved selection when still available.
 - Capability discovery never treats a failed or empty Ollama `/api/show` response as proof that a model lacks tools or vision.
 - Onboarding discovery returns structured model records without inventing an identifier when the result is empty.
+
+- Concurrent catalog mutations use database compare-and-set and rebase on the latest persisted state, with at most 16 attempts before an actionable retry error.
+- Discovery/capability updates preserve concurrent provider edits and active selection. Explicit profile or complete-catalog replacements intentionally replace their declared scope; the last successful replacement wins within that scope.
+- Runtime selection and refresh hints are published only after a successful commit; failed or rolled-back writes emit no change.

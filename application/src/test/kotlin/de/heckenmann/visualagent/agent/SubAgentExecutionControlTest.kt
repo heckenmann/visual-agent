@@ -32,7 +32,7 @@ class SubAgentExecutionControlTest {
     }
 
     @Test
-    fun `await resumes only after both gates are running`() =
+    fun `await resumes only after both gates are running`(): Unit =
         runBlocking {
             val control = SubAgentExecutionControl(MemoryPreferenceStore())
             control.pauseAll()
