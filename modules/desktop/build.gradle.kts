@@ -113,10 +113,33 @@ val generatedUiIcon = generatedBrandingDirectory.map { dir -> dir.file("ui/icons
 val generatedWindowsIcon = generatedBrandingDirectory.map { dir -> dir.file("packaging/visual-agent.ico") }
 val generatedMacOsIcon = generatedBrandingDirectory.map { dir -> dir.file("packaging/visual-agent.icns") }
 
+// Compose processes resources from a registered custom directory as one resource set.
+// Include the existing splash/onboarding images alongside the build-generated icon,
+// otherwise the image loader cannot find the original files at runtime.
+val bundledComposeResources = layout.buildDirectory.dir("generated/bundled-compose-resources")
+val prepareBundledComposeResources =
+    tasks.register<Sync>("prepareBundledComposeResources") {
+        group = "build"
+        description = "Bundles the existing Compose images together with the generated application icon."
+        dependsOn(generatedBranding)
+        from(layout.projectDirectory.dir("src/main/composeResources"))
+        from(generatedBrandingDirectory.map { dir -> dir.dir("compose") })
+        into(bundledComposeResources)
+        doFirst {
+            val pngSignature = byteArrayOf(137.toByte(), 80, 78, 71, 13, 10, 26, 10)
+            listOf("startup_background_light.png", "startup_background_dark.png").forEach { name ->
+                val file = layout.projectDirectory.file("src/main/composeResources/files/$name").asFile
+                check(file.isFile && file.inputStream().use { it.readNBytes(8) }.contentEquals(pngSignature)) {
+                    "Invalid $name: the splash backgrounds must be PNG files (run git lfs pull if necessary)."
+                }
+            }
+        }
+    }
+
 compose.resources {
     customDirectory(
         sourceSetName = "main",
-        directoryProvider = generatedBrandingDirectory.map { dir -> dir.dir("compose") },
+        directoryProvider = prepareBundledComposeResources.map { bundledComposeResources.get() },
     )
 }
 
