@@ -78,6 +78,7 @@ internal fun ActionTooltip(
  * @param iconSize Icon size
  * @param tint Optional icon color override for contextual emphasis
  * @param onLongClick Optional long-click handler
+ * @param iconModifier Drawing-only customization of the icon without changing the button's hit target
  */
 @Composable
 internal fun ActionIconButton(
@@ -91,6 +92,7 @@ internal fun ActionIconButton(
     iconSize: Dp = 17.dp,
     tint: Color? = null,
     onLongClick: (() -> Unit)? = null,
+    iconModifier: Modifier = Modifier,
 ) {
     val backgroundColor = if (selected) MaterialTheme.colorScheme.tertiaryContainer else Color.Transparent
     val iconTint = if (selected) MaterialTheme.colorScheme.tertiary else tint ?: LocalContentColor.current
@@ -116,7 +118,7 @@ internal fun ActionIconButton(
             Icon(
                 imageVector = icon,
                 contentDescription = description,
-                modifier = Modifier.size(iconSize),
+                modifier = Modifier.size(iconSize).then(iconModifier),
                 tint = if (enabled) iconTint else LocalContentColor.current,
             )
         }

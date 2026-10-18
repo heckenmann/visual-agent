@@ -19,6 +19,7 @@ import de.heckenmann.visualagent.protocol.ConversationStreamRequest
 import de.heckenmann.visualagent.protocol.ConversationStreamResult
 import de.heckenmann.visualagent.protocol.ConversationStreamUpdate
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -34,7 +35,22 @@ class SpringConversationPort(
     private val agentManager: AgentManager,
     private val appConfig: AppConfigBean,
     private val mediaResolver: ConversationMediaResolver,
+    private val interpolation: PromptInterpolationService,
 ) : ConversationPort {
+    override suspend fun interpolate(
+        draft: String,
+        token: CancellationToken,
+    ): String =
+        withContext(Dispatchers.IO) {
+            val applicationToken = ApplicationCancellationToken()
+            token.onCancelled(applicationToken::cancel)
+            try {
+                protocolBoundary { interpolation.interpolate(draft, applicationToken).awaitSingle() }
+            } finally {
+                applicationToken.cancel()
+            }
+        }
+
     override suspend fun latest(): ConversationHistoryPage =
         withContext(Dispatchers.IO) { protocolBoundary { agentManager.readLatestHistoryPage().toConversationPage(mediaResolver) } }
 

@@ -6,6 +6,36 @@ import kotlin.test.assertEquals
 /** Verifies discovered model metadata refreshes without discarding existing values when absent. */
 class ProviderCatalogModelMergeTest {
     @Test
+    fun `manual capability choices survive renewed provider discovery`() {
+        val manual =
+            ProviderModelConfig(
+                id = "gpt-custom",
+                capabilities = setOf("vision"),
+                capabilitiesComplete = true,
+                capabilitiesOverridden = true,
+            )
+        val discovered =
+            ProviderModelConfig(
+                id = "gpt-custom",
+                capabilities = setOf("chat", "tools"),
+                capabilitiesComplete = false,
+            )
+        val merged = listOf(discovered).mergeWithExisting(mapOf(manual.id to manual)).single()
+        assertEquals(setOf("vision"), merged.capabilities)
+        assertEquals(true, merged.capabilitiesComplete)
+        assertEquals(true, merged.capabilitiesOverridden)
+    }
+
+    @Test
+    fun `updated provider capabilities replace stale automatic declarations`() {
+        val old = ProviderModelConfig("model", capabilities = setOf("chat"), capabilitiesComplete = true)
+        val updated = ProviderModelConfig("model", capabilities = setOf("chat", "vision"), capabilitiesComplete = true)
+        val merged = listOf(updated).mergeWithExisting(mapOf(old.id to old)).single()
+        assertEquals(setOf("chat", "vision"), merged.capabilities)
+        assertEquals(true, merged.capabilitiesComplete)
+    }
+
+    @Test
     fun `updates discovered limits while preserving existing limits when discovery omits them`() {
         val existing =
             mapOf(

@@ -111,6 +111,20 @@ interface WorkspaceFileToolPort {
         prompt: String,
     ): Mono<ToolImageAnalysis> = Mono.fromCallable { analyzeImage(file, prompt) }
 
+    /** Analyzes an image under an authenticated sub-agent's model capability assignment. */
+    fun analyzeImage(
+        file: ToolWorkspaceFile,
+        prompt: String,
+        agentId: String?,
+    ): ToolImageAnalysis = analyzeImage(file, prompt)
+
+    /** Uses the assigned sub-agent model for reactive vision calls when supported. */
+    fun analyzeImageReactive(
+        file: ToolWorkspaceFile,
+        prompt: String,
+        agentId: String?,
+    ): Mono<ToolImageAnalysis> = analyzeImageReactive(file, prompt)
+
     /** Detects a managed file MIME type from its content rather than its name. */
     fun detectMimeType(file: ToolWorkspaceFile): ToolMimeType
 

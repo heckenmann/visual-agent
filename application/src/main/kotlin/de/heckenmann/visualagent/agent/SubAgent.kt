@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.conversation.appendStreamPart
+import de.heckenmann.visualagent.agent.provider.ModelCapability
 import de.heckenmann.visualagent.agent.tools.ToolExecutionScope
 import de.heckenmann.visualagent.knowledge.MemoryStore
 import mu.KotlinLogging
@@ -263,7 +264,8 @@ data class SubAgent(
         requestId: String?,
         executionMetadata: Map<String, Any>,
     ): ChatRequestContext {
-        val modelSelection = config.modelSelection()
+        val capability = if (messages.any { it.images?.isNotEmpty() == true }) ModelCapability.VISION else ModelCapability.CHAT
+        val modelSelection = config.modelSelection(capability)
         return ChatRequestContext(
             messages = chatHistory + messages,
             provider = modelSelection.provider,
@@ -273,7 +275,7 @@ data class SubAgent(
             options = modelSelection.options,
             enabledTools = enabledTools,
             metadata =
-                executionMetadata + mapOf("agentId" to id, "agentName" to name, "agentRole" to role) +
+                executionMetadata + mapOf("agentId" to id, "agentName" to name, "agentRole" to role, "modelCapability" to capability.name) +
                     requestId?.let { mapOf("requestId" to it, "sessionId" to AgentManagerConstants.MAIN_SESSION_ID) }.orEmpty(),
             cancellationToken = token,
         )

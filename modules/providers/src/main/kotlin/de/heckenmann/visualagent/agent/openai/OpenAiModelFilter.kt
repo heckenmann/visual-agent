@@ -1,24 +1,13 @@
 package de.heckenmann.visualagent.agent.openai
 
+import de.heckenmann.visualagent.agent.provider.ModelCapability
+import de.heckenmann.visualagent.agent.provider.OpenAiModelCapabilities
 import java.net.URI
 
 /**
  * Filters model-list responses to models usable by the text chat integration.
  */
 internal object OpenAiModelFilter {
-    private val unsupportedCapabilities =
-        listOf(
-            "audio",
-            "embedding",
-            "image",
-            "moderation",
-            "realtime",
-            "speech",
-            "transcribe",
-            "tts",
-            "whisper",
-        )
-
     internal fun filter(
         modelIds: List<String>,
         modelsUri: URI,
@@ -27,19 +16,12 @@ internal object OpenAiModelFilter {
             modelIds
                 .map(String::trim)
                 .filter(String::isNotBlank)
-                .filterNot(::hasUnsupportedCapability)
+                .filter { ModelCapability.CHAT in OpenAiModelCapabilities.infer(it) }
 
         return candidates
             .filter { !isOfficialOpenAiEndpoint(modelsUri) || isOfficialChatModel(it) }
             .distinct()
             .sorted()
-    }
-
-    private fun hasUnsupportedCapability(modelId: String): Boolean {
-        val normalized = modelId.lowercase()
-        return unsupportedCapabilities.any { capability ->
-            normalized.contains(capability)
-        }
     }
 
     private fun isOfficialChatModel(modelId: String): Boolean {

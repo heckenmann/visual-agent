@@ -57,6 +57,13 @@ class AppConfigPersistenceBinder(
             preferenceStore.getPreference(AppConfigBean.KEY_SESSION_FAVORITE_MODELS) ?: appConfigBean.favoriteModels
         appConfigBean.queueFlushMode =
             preferenceStore.getPreference(AppConfigBean.KEY_SESSION_QUEUE_FLUSH_MODE) ?: appConfigBean.queueFlushMode
+        appConfigBean.promptInterpolationProviderId =
+            preferenceStore.getPreference(AppConfigBean.KEY_PROMPT_INTERPOLATION_PROVIDER).orEmpty()
+        appConfigBean.promptInterpolationModelId = preferenceStore.getPreference(AppConfigBean.KEY_PROMPT_INTERPOLATION_MODEL).orEmpty()
+        appConfigBean.automaticPromptInterpolation =
+            preferenceStore.getPreference(AppConfigBean.KEY_AUTOMATIC_PROMPT_INTERPOLATION)?.toBooleanStrictOrNull() ?: false
+        appConfigBean.promptInterpolationContextMessages =
+            preferenceStore.getPreference(AppConfigBean.KEY_PROMPT_INTERPOLATION_CONTEXT_MESSAGES)?.toIntOrNull()?.coerceIn(5..10) ?: 8
         appConfigBean.followUpSuggestionsEnabled =
             preferenceStore.getPreference(AppConfigBean.KEY_FOLLOW_UP_SUGGESTIONS_ENABLED)?.toBooleanStrictOrNull()
                 ?: appConfigBean.followUpSuggestionsEnabled

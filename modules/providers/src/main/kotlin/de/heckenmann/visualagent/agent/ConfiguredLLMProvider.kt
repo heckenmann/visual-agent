@@ -2,6 +2,7 @@ package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.openai.OpenAiClient
 import de.heckenmann.visualagent.agent.provider.DefaultProviderRuntimeConfig
+import de.heckenmann.visualagent.agent.provider.ModelCapability
 import de.heckenmann.visualagent.agent.provider.ProfiledProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
@@ -9,6 +10,7 @@ import de.heckenmann.visualagent.agent.provider.ProviderEnvironmentCredentials
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.agent.provider.ProviderRuntimeConfig
+import de.heckenmann.visualagent.agent.provider.supportsCapability
 import org.springframework.context.annotation.Primary
 import org.springframework.stereotype.Component
 import reactor.core.publisher.Flux
@@ -60,6 +62,33 @@ class ConfiguredLLMProvider(
                 }
             }
 
+    /** Executes a vision request with the selected agent's provider and model. */
+    override fun visionReactive(
+        image: ByteArray,
+        prompt: String,
+        selection: ModelSelection,
+    ): Mono<ChatResponse> =
+        Mono
+            .fromCallable {
+                val resolved = providerCatalog.resolve(selection.provider, selection.model)
+                require(resolved.model.supportsCapability(ModelCapability.VISION)) {
+                    "Model '${resolved.provider.id}/${resolved.model.id}' does not support VISION. " +
+                        "Pick a vision-capable model in the sub-agent settings."
+                }
+                resolved
+            }.subscribeOn(Schedulers.boundedElastic())
+            .flatMap { resolved ->
+                when (resolved.provider.adapter) {
+                    ProviderAdapter.CODEX_CLI ->
+                        adapterFor(ProviderAdapter.CODEX_CLI)
+                            .visionReactive(image, prompt, resolved.model.id, resolved.provider)
+                    ProviderAdapter.OPENAI_COMPATIBLE ->
+                        openAiClient.visionReactive(image, prompt, resolved.model.id, resolved.provider)
+                    ProviderAdapter.OLLAMA ->
+                        ollamaClient.visionReactive(image, prompt, resolved.model.id, resolved.provider)
+                }
+            }
+
     override fun embeddingsReactive(text: String): Mono<List<Double>> =
         activeProviderSelectionReactive().flatMap { (provider, modelId) -> provider.embeddingsReactive(text, modelId) }
 
@@ -89,7 +118,9 @@ class ConfiguredLLMProvider(
             .subscribeOn(Schedulers.boundedElastic())
             .flatMap { profile ->
                 discoverModelConfigsReactive(profile).flatMap { discovered ->
-                    if (profile.adapter == ProviderAdapter.CODEX_CLI) {
+                    if (profile.adapter == ProviderAdapter.CODEX_CLI ||
+                        profile.adapter == ProviderAdapter.OPENAI_COMPATIBLE
+                    ) {
                         providerCatalog.updateDiscoveredModelConfigs(providerId, discovered)
                     } else {
                         providerCatalog.updateDiscoveredModels(providerId, discovered.map { it.id })
@@ -145,7 +176,8 @@ class ConfiguredLLMProvider(
                     }
                 }
             ProviderAdapter.OPENAI_COMPATIBLE ->
-                openAiClient.getModelsReactive(profile).map { models -> models.map(::ProviderModelConfig) }
+                runCatching { openAiClient.getModelConfigsReactive(profile) }
+                    .getOrElse { openAiClient.getModelsReactive(profile).map { models -> models.map(::ProviderModelConfig) } }
             ProviderAdapter.CODEX_CLI -> adapterFor(profile.adapter).loadModelsReactive(profile)
         }
 

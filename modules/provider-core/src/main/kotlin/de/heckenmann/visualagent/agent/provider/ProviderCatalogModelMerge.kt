@@ -8,6 +8,13 @@ internal fun List<ProviderModelConfig>.mergeWithExisting(existing: Map<String, P
             name = discovered.name,
             contextLimit = discovered.contextLimit ?: configured.contextLimit,
             outputLimit = discovered.outputLimit ?: configured.outputLimit,
-            capabilities = discovered.capabilities.ifEmpty { configured.capabilities },
+            capabilities =
+                when {
+                    configured.capabilitiesOverridden -> configured.capabilities
+                    discovered.capabilitiesComplete -> discovered.capabilities
+                    configured.capabilitiesComplete -> configured.capabilities
+                    else -> configured.capabilities + discovered.capabilities
+                },
+            capabilitiesComplete = configured.capabilitiesComplete || discovered.capabilitiesComplete,
         ) ?: discovered
     }

@@ -63,7 +63,7 @@ class ConversationResetIntegrationTest {
                     every { provider.checkConnectionReactive() } returns connection.asMono().doOnSubscribe { subscribed.complete(Unit) }
                     val config = AppConfigBean(db)
                     val manager = AgentManager(db, provider, AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), config)
-                    val port = SpringConversationPort(manager, config, mockk(relaxed = true))
+                    val port = SpringConversationPort(manager, config, mockk(relaxed = true), mockk())
                     val cleared = CompletableDeferred<Unit>()
                     val started = System.nanoTime()
                     var acknowledgementNanos = 0L

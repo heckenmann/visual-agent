@@ -28,6 +28,9 @@ interface AgentToolPort {
         config: ToolAgentConfig,
     ): Boolean
 
+    /** Validates a proposed capability/model assignment without mutating the agent. */
+    fun validate(config: ToolAgentConfig) = Unit
+
     /** Deletes a sub-agent. */
     fun delete(id: String): Boolean
 
@@ -81,6 +84,8 @@ data class ToolAgentConfig(
     val options: Map<String, String> = emptyMap(),
     val tools: List<String>? = null,
     val templateName: String? = null,
+    val enabledCapabilities: Set<String> = setOf("CHAT"),
+    val capabilityModels: Map<String, String> = emptyMap(),
 )
 
 /** Current sub-agent scheduler counts. */
