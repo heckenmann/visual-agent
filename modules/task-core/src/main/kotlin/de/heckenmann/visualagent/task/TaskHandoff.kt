@@ -44,7 +44,7 @@ data class WorkerHandoff(
     companion object {
         /** Provider-neutral schema for the worker-only report; trusted provenance is absent. */
         fun schema(): String =
-            """{"type":"object","properties":{"summary":{"type":"string"},"outcome":{"enum":["PRODUCED","PARTIAL","BLOCKED"]},"artifacts":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"path":{"type":"string"}},"required":["id","path"],"additionalProperties":false}},"sources":{"type":"array","items":{"type":"object","properties":{"inputId":{"type":"string"},"claim":{"type":"string"}},"required":["inputId","claim"],"additionalProperties":false}},"blockers":{"type":"array","items":{"type":"string"}},"nextAction":{"type":"string"}},"required":["summary","outcome"],"additionalProperties":false}"""
+            """{"type":"object","properties":{"summary":{"type":"string"},"outcome":{"type":"string","enum":["PRODUCED","PARTIAL","BLOCKED"]},"artifacts":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"path":{"type":"string"}},"required":["id","path"],"additionalProperties":false}},"sources":{"type":"array","items":{"type":"object","properties":{"inputId":{"type":"string"},"claim":{"type":"string"}},"required":["inputId","claim"],"additionalProperties":false}},"blockers":{"type":"array","items":{"type":"string"}},"nextAction":{"type":["string","null"]}},"required":["summary","outcome","artifacts","sources","blockers","nextAction"],"additionalProperties":false}"""
 
         /** Validates worker references against the immutable contract. */
         fun parse(

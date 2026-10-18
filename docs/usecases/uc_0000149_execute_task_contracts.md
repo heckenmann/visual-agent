@@ -48,6 +48,8 @@ Description-only tasks remain one executable job regardless of language or lengt
 ## Validation
 The versioned offline corpus uses the production coordinator, real H2 persistence, registry scope and workspace byte verifier. Additional tests cover revision conflicts, handoff forgery, missing decomposition coverage, resource traversal and global/ownership revocation. Scripted reviewers test server behavior; their results make no claim about real model quality. Opt-in real-model evaluation is documented in `docs/task-evaluations.md`.
 
+Production worker and reviewer response schemas use explicitly typed properties, require every declared property and prohibit additional properties recursively. The worker's optional next action is represented as a required nullable field for strict native structured output. Prompt-only decoding still accepts existing handoffs that omit optional fields. Regression tests exercise the production schemas.
+
 ## Library decision
 Reuse the existing Apache-2.0 `kotlinx.serialization` dependency for strict typed parsing and schema-compatible DTOs. Primary source: https://github.com/Kotlin/kotlinx.serialization (also indexed on https://klibs.io/). A general JSON Schema validator or schema generator adds dependencies without improving the small, explicitly validated contract boundary.
 

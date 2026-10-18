@@ -37,7 +37,7 @@ internal fun reviewTaskContract(
 ): Mono<Pair<WorkerReviewResult, TaskAttemptResult>> {
     val schema =
         ResponseSchema(
-            """{"type":"object","properties":{"verdict":{"enum":["APPROVED","RETRY"]},"feedback":{"type":"string"},"criteria":{"type":"array","items":{"type":"object","properties":{"criterionId":{"type":"string"},"state":{"enum":["PASSED","FAILED","NOT_CHECKED"]},"detail":{"type":"string"}},"required":["criterionId","state","detail"],"additionalProperties":false}}},"required":["verdict","feedback","criteria"],"additionalProperties":false}""",
+            """{"type":"object","properties":{"verdict":{"type":"string","enum":["APPROVED","RETRY"]},"feedback":{"type":"string"},"criteria":{"type":"array","items":{"type":"object","properties":{"criterionId":{"type":"string"},"state":{"type":"string","enum":["PASSED","FAILED","NOT_CHECKED"]},"detail":{"type":"string"}},"required":["criterionId","state","detail"],"additionalProperties":false}}},"required":["verdict","feedback","criteria"],"additionalProperties":false}""",
         )
 
     /** Retries one malformed review response without rerunning the worker. */
