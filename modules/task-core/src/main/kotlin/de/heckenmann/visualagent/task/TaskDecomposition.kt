@@ -51,10 +51,11 @@ data class TaskDecomposition(
             },
         ) { "Every deliverable needs a covered criterion" }
         val owners =
-            parent.deliverables.map { artifact ->
-                children.count { child -> parent.criteria.any { it.artifactId == artifact.id && it.id in child.criterionIds } }
+            parent.deliverables.groupBy { it.path }.values.map { artifacts ->
+                val artifactIds = artifacts.map { it.id }.toSet()
+                children.count { child -> parent.criteria.any { it.artifactId in artifactIds && it.id in child.criterionIds } }
             }
-        require(owners.all { it == 1 }) { "Concurrent children cannot share output artifacts" }
+        require(owners.all { it == 1 }) { "Concurrent children cannot share output paths" }
         return children.map { child ->
             require(
                 child.description.isNotBlank() && child.description.length <= 2_000 && child.criterionIds.isNotEmpty(),

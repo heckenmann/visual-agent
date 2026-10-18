@@ -76,4 +76,52 @@ class TaskContractTest {
         assertEquals("parent", children.first().parentTodoId)
         assertEquals(setOf("quote", "second"), children.flatMap { it.parentCriterionIds }.toSet())
     }
+
+    @Test
+    fun `different artifact identities cannot send concurrent children to the same output path`() {
+        val parent =
+            contract.copy(
+                deliverables = contract.deliverables + TaskDeliverable("alias", "Same file", "results/answer.txt"),
+                criteria = contract.criteria + TaskCriterion("second", "Another check", "alias"),
+            )
+        TaskContractCodec.validate(parent)
+        val proposal =
+            TaskDecomposition(
+                listOf(TaskChild("First package", listOf("quote")), TaskChild("Second package", listOf("second"))),
+                independent = true,
+            )
+        assertFailsWith<IllegalArgumentException> { proposal.contracts(parent, "parent") }
+    }
+
+    @Test
+    fun `multiple references to one output remain valid when owned by the same child`() {
+        val parent =
+            contract.copy(
+                deliverables =
+                    contract.deliverables +
+                        listOf(
+                            TaskDeliverable("alias", "Same file", "results/answer.txt"),
+                            TaskDeliverable("other", "Separate file", "other.txt"),
+                        ),
+                criteria =
+                    contract.criteria +
+                        listOf(
+                            TaskCriterion("alias-check", "Check the same file", "alias"),
+                            TaskCriterion("other-check", "Check the separate file", "other"),
+                        ),
+            )
+        val children =
+            TaskDecomposition(
+                listOf(TaskChild("First package", listOf("quote", "alias-check")), TaskChild("Second package", listOf("other-check"))),
+                independent = true,
+            ).contracts(parent, "parent")
+        assertEquals(
+            setOf("answer", "alias"),
+            children
+                .first()
+                .deliverables
+                .map { it.id }
+                .toSet(),
+        )
+    }
 }

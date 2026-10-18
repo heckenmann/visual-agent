@@ -29,6 +29,8 @@ Tool eligibility uses the same CHAT capability model selection as execution, inc
 ## Decomposition
 A bounded structured proposal maps existing parent criterion IDs onto two to eight children. The server inherits policy, inputs, constraints and stop conditions. It rejects missing coverage, unknown IDs or uncovered artifacts, keeping the original task executable on malformed proposals. Dependency scheduling remains outside this use case.
 
+Output ownership is checked by workspace path, including different artifact IDs referring to the same file. All references to one output path must belong to the same child; otherwise the proposal is rejected and the parent remains executable.
+
 ## Tool Calls
 
 - `todos`: add/update with optional contract; read `get-contract`, `get-attempts` (one bounded record per page, offset and nextOffset), and legacy summary `get-result`.

@@ -49,6 +49,20 @@ class TodoDecompositionGuardsTest {
         }
 
     @Test
+    fun `shared output paths preserve the executable parent instead of creating concurrent children`() =
+        runTest {
+            val manager = TodoManager()
+            val contract =
+                planningContract(description).let { original ->
+                    original.copy(deliverables = original.deliverables.map { it.copy(path = "shared.txt") })
+                }
+            val parent = manager.addIfAbsent(description, "worker", contract).todo
+            assertFalse(planner(manager, Mono.just(response(independentPlan))).expandComplexTodo(parent).awaitSingle())
+            assertEquals(listOf(parent), manager.getAll())
+            assertEquals(listOf(parent), manager.getPending())
+        }
+
+    @Test
     fun `late analyst response cannot replace edited cancelled or deleted parent`() =
         runTest {
             for (mutation in listOf<(TodoManager, String) -> Unit>(
