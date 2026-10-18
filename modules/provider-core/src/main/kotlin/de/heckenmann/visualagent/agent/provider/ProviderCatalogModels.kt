@@ -35,6 +35,7 @@ enum class ModelStatus {
  * @property outputLimit Optional output-token limit
  * @property capabilitiesComplete Whether capabilities is a complete provider declaration rather than positive observations
  * @property capabilitiesOverridden Whether the user explicitly edited capabilities and discovery must preserve them
+ * @property capabilityOverrides Targeted manual declarations; absent keys use provider evidence
  */
 @Serializable
 data class ProviderModelConfig(
@@ -48,6 +49,7 @@ data class ProviderModelConfig(
     val capabilities: Set<String> = emptySet(),
     val capabilitiesComplete: Boolean = false,
     val capabilitiesOverridden: Boolean = false,
+    val capabilityOverrides: Map<String, Boolean> = emptyMap(),
 )
 
 /**

@@ -10,42 +10,53 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.ProviderModel
-import de.heckenmann.visualagent.ui.components.PanelCheckbox
+import de.heckenmann.visualagent.protocol.capabilitySupport
+import de.heckenmann.visualagent.ui.components.PanelDropdownField
+import de.heckenmann.visualagent.ui.components.PanelSelectOption
 
 /** Features that a user can explicitly declare for any discovered or manually added model. */
 internal val EDITABLE_MODEL_CAPABILITIES =
     listOf("CHAT", "VISION", "AUDIO_INPUT", "AUDIO_OUTPUT", "IMAGE_GENERATION", "EMBEDDING", "TOOLS")
 
-/** Returns editable capabilities, preserving the legacy chat default on unknown models. */
-internal fun ProviderModel.capabilitiesForEditing(): Set<String> {
-    val known = capabilities.map { it.uppercase().replace('-', '_') }.toSet()
-    return if (!capabilitiesComplete && known.isEmpty()) known + "CHAT" else known
-}
-
-/** Displays model capabilities and persists manual toggles through the surrounding settings draft. */
+/** Displays independent automatic, supported and unsupported capability choices in the settings draft. */
 @Composable
 internal fun ModelCapabilitiesEditor(
     model: ProviderModel?,
-    onChange: (Set<String>) -> Unit,
+    onChange: (String, Boolean?) -> Unit,
 ) {
     AnimatedVisibility(visible = model != null) {
         if (model != null) {
             Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Model capabilities", style = MaterialTheme.typography.titleSmall)
                 Text(
-                    "Provider-reported capabilities are shown below. Change a toggle to override the declaration for this model.",
+                    "Automatic uses provider evidence. Unknown is not the same as unsupported; each override affects only one capability.",
                     style = MaterialTheme.typography.bodySmall,
                 )
-                val enabled = model.capabilitiesForEditing()
+                val automaticModel = model.copy(capabilityOverrides = emptyMap())
+                val baselineKey = if (model.capabilitiesOverridden) "legacy" else "auto"
+                val baselineLabel = if (model.capabilitiesOverridden) "Legacy declaration" else "Automatic"
+                if (model.capabilitiesOverridden) {
+                    Text(
+                        "Reset the legacy manual declaration before choosing Automatic; no provider evidence is available for this declaration.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
                 EDITABLE_MODEL_CAPABILITIES.forEach { capability ->
-                    PanelCheckbox(
+                    PanelDropdownField(
                         label = capability.replace('_', ' '),
-                        checked = capability in enabled,
-                        onCheckedChange = { checked ->
-                            onChange(
-                                if (checked) enabled + capability else enabled - capability,
-                            )
-                        },
+                        selectedValue =
+                            model.capabilityOverrides[capability.lowercase()]?.toString()
+                                ?: baselineKey,
+                        options =
+                            listOf(
+                                PanelSelectOption(
+                                    baselineKey,
+                                    "$baselineLabel (${automaticModel.capabilitySupport(capability).name.lowercase()})",
+                                ),
+                                PanelSelectOption("true", "Supported"),
+                                PanelSelectOption("false", "Unsupported"),
+                            ),
+                        onSelected = { onChange(capability, it.toBooleanStrictOrNull()) },
                     )
                 }
             }

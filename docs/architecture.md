@@ -8,6 +8,10 @@ own output. Today those surfaces include an editable canvas, managed workspace f
 todo/sub-agent system, and a conversation panel; future work will add more rendering and
 interaction surfaces.
 
+### Model Capability Evidence
+
+Provider-reported capabilities and targeted user overrides are separate persisted values. The shared pure Kotlin resolver in the dependency-free `model-core` module returns supported, unsupported or unknown for each feature independently. The protocol exposes these states to the UI; the provider core uses the same resolver without depending on the protocol. An override affects only that feature; omission from partial metadata remains unknown. Chat selection and native tool availability permit unknown support; specialized agent assignments require positive evidence. UI dropdowns, warnings and server validation use this same resolution. Refresh replaces provider evidence without erasing targeted overrides. Legacy whole-list overrides retain their existing meaning until explicit user reset; never infer intent from model names or silently repair user catalogs (issue #486, UC-0000007/0000009/0000150).
+
 The runtime uses Spring AI for model interaction and tool-calling, and Spring Data R2DBC over embedded H2 for persistent state. Spring Boot Flyway applies ordered, transactional SQL resources through a JDBC-only migration data source before any R2DBC store is created.
 The desktop host is launched from `:desktop` and the server-only `:application` entry point can
 run without Compose. In desktop mode, `:desktop` starts exactly one non-web Spring context from

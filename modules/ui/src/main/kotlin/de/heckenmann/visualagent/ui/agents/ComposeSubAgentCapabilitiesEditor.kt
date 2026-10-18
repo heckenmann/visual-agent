@@ -8,7 +8,9 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import de.heckenmann.visualagent.protocol.CapabilitySupport
 import de.heckenmann.visualagent.protocol.ProviderProfile
+import de.heckenmann.visualagent.protocol.capabilitySupport
 import de.heckenmann.visualagent.ui.components.PanelCheckbox
 import de.heckenmann.visualagent.ui.components.PanelDropdownField
 import de.heckenmann.visualagent.ui.components.PanelSelectOption
@@ -43,7 +45,7 @@ internal fun SubAgentCapabilitiesEditor(
                             model.id !in profile.modelBlacklist &&
                                 (profile.modelWhitelist.isEmpty() || model.id in profile.modelWhitelist) &&
                                 model.status.name !in setOf("DEPRECATED", "DISABLED") &&
-                                model.capabilities.any { it.equals(capability, ignoreCase = true) }
+                                model.capabilitySupport(capability) == CapabilitySupport.SUPPORTED
                         }.map { model ->
                             PanelSelectOption("${profile.id}::${model.id}", "${model.name} (${profile.name} — $capability)")
                         }
@@ -103,6 +105,6 @@ internal fun validCapabilityAssignments(
                         model.id !in profile.modelBlacklist &&
                         (profile.modelWhitelist.isEmpty() || model.id in profile.modelWhitelist) &&
                         model.status.name !in setOf("DEPRECATED", "DISABLED") &&
-                        model.capabilities.any { it.equals(capability, ignoreCase = true) }
+                        model.capabilitySupport(capability) == CapabilitySupport.SUPPORTED
                 } == true
         }

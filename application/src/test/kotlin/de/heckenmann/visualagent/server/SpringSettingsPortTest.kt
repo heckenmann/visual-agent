@@ -101,9 +101,10 @@ class SpringSettingsPortTest {
         val manuallyConfigured =
             ProviderModel(
                 id = "custom-vision",
-                capabilities = setOf("vision"),
+                capabilities = setOf("chat", "vision"),
                 capabilitiesComplete = true,
                 capabilitiesOverridden = true,
+                capabilityOverrides = mapOf("tools" to false),
             )
         val profile =
             ProviderProfile(
@@ -123,9 +124,10 @@ class SpringSettingsPortTest {
             catalog.replaceConfiguration(
                 match { configuration ->
                     configuration.providers.single().models.single().let { model ->
-                        model.capabilities == setOf("vision") &&
+                        model.capabilities == setOf("chat", "vision") &&
                             model.capabilitiesComplete &&
-                            model.capabilitiesOverridden
+                            model.capabilitiesOverridden &&
+                            model.capabilityOverrides == mapOf("tools" to false)
                     }
                 },
             )

@@ -6,6 +6,7 @@ include(
     ":protocol",
     ":desktop",
     ":agent-core",
+    ":model-core",
     ":task-core",
     ":provider-core",
     ":provider-standard",
@@ -21,6 +22,7 @@ project(":protocol").projectDir = file("modules/protocol")
 project(":desktop").projectDir = file("modules/desktop")
 project(":task-core").projectDir = file("modules/task-core")
 project(":agent-core").projectDir = file("modules/agent-core")
+project(":model-core").projectDir = file("modules/model-core")
 project(":provider-core").projectDir = file("modules/provider-core")
 project(":provider-standard").projectDir = file("modules/providers")
 project(":provider-openai-codex").projectDir = file("modules/provider-openai-codex")

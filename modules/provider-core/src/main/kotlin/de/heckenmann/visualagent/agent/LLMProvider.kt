@@ -2,6 +2,8 @@ package de.heckenmann.visualagent.agent
 
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
+import de.heckenmann.visualagent.model.CapabilitySupport
+import de.heckenmann.visualagent.model.capabilitySupport
 import kotlinx.serialization.Serializable
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
@@ -200,6 +202,7 @@ interface LLMProvider {
  * @property enabledTools Tool IDs that may be exposed to the model for this request
  * @property modelCapabilities Provider-reported capabilities of the selected model
  * @property modelCapabilitiesComplete Whether the capability set is authoritative
+ * @property modelCapabilityOverrides Targeted manual declarations for the selected model
  * @property metadata Additional provider-neutral execution context
  * @property cancellationToken Optional token the provider can consult to honour user cancellation
  * @property onContextBudgeted Optional request-scoped notification when history or tools are reduced
@@ -222,6 +225,7 @@ data class ChatRequestContext(
     val cancellationToken: CancellationToken? = null,
     val modelCapabilities: Set<String> = emptySet(),
     val modelCapabilitiesComplete: Boolean = false,
+    val modelCapabilityOverrides: Map<String, Boolean> = emptyMap(),
     val contextWindow: ContextWindow = ContextWindow(),
     val onContextBudgeted: ((ContextBudgetStatus) -> Unit)? = null,
     val responseSchema: ResponseSchema? = null,
@@ -244,7 +248,12 @@ data class ContextBudgetStatus(
  * capability metadata remain usable. An authoritative set must explicitly contain `tools`.
  */
 fun ChatRequestContext.supportsToolCalling(): Boolean =
-    !modelCapabilitiesComplete || modelCapabilities.any { it.equals("tools", ignoreCase = true) }
+    capabilitySupport(
+        "tools",
+        modelCapabilities,
+        modelCapabilitiesComplete,
+        modelCapabilityOverrides,
+    ) != CapabilitySupport.UNSUPPORTED
 
 /**
  * Context limits known for one provider request.

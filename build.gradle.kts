@@ -176,6 +176,7 @@ tasks.named("check") {
         ":protocol:check",
         ":desktop:check",
         ":agent-core:check",
+        ":model-core:check",
         ":provider-core:check",
         ":provider-standard:check",
         ":providers:check",
@@ -198,6 +199,7 @@ val verificationModules =
         ":protocol",
         ":desktop",
         ":agent-core",
+        ":model-core",
         ":provider-core",
         ":provider-standard",
         ":provider-openai-codex",
@@ -253,6 +255,7 @@ tasks.named("build") {
         ":protocol:build",
         ":desktop:build",
         ":agent-core:build",
+        ":model-core:build",
         ":provider-core:build",
         ":provider-standard:build",
         ":providers:build",
@@ -283,6 +286,7 @@ gradle.projectsEvaluated {
             ":protocol",
             ":desktop",
             ":agent-core",
+            ":model-core",
             ":provider-core",
             ":provider-standard",
             ":provider-openai-codex",
@@ -372,6 +376,7 @@ tasks.register("ktlintCheck") {
         ":protocol:ktlintCheck",
         ":desktop:ktlintCheck",
         ":agent-core:ktlintCheck",
+        ":model-core:ktlintCheck",
         ":provider-core:ktlintCheck",
         ":provider-standard:ktlintCheck",
         ":provider-openai-codex:ktlintCheck",
@@ -390,7 +395,7 @@ tasks.register("verifyModuleDependencies") {
     description = "Verifies the directed dependency graph between Visual Agent modules."
     doLast {
         val moduleDependencies =
-            setOf(":application", ":ui", ":protocol", ":desktop", ":agent-core", ":provider-core", ":provider-standard", ":provider-openai-codex", ":providers", ":tool-standard", ":tool-javascript", ":tools", ":task-core").associateWith { modulePath ->
+            setOf(":application", ":ui", ":protocol", ":desktop", ":agent-core", ":model-core", ":provider-core", ":provider-standard", ":provider-openai-codex", ":providers", ":tool-standard", ":tool-javascript", ":tools", ":task-core").associateWith { modulePath ->
                 project(modulePath)
                     .configurations
                     .filter { configuration -> !configuration.name.contains("test", ignoreCase = true) }
@@ -404,11 +409,12 @@ tasks.register("verifyModuleDependencies") {
             mapOf(
                 ":application" to setOf(":providers", ":tools", ":protocol"),
                 ":ui" to setOf(":protocol"),
-                ":protocol" to setOf(":task-core"),
+                ":protocol" to setOf(":task-core", ":model-core"),
+                ":model-core" to emptySet(),
                 ":task-core" to emptySet(),
                 ":desktop" to setOf(":ui", ":application", ":protocol"),
                 ":agent-core" to emptySet(),
-                ":provider-core" to setOf(":agent-core"),
+                ":provider-core" to setOf(":agent-core", ":model-core"),
                 ":provider-standard" to setOf(":agent-core", ":provider-core"),
                 ":provider-openai-codex" to setOf(":agent-core", ":provider-core"),
                 ":providers" to setOf(":provider-standard", ":provider-openai-codex"),
@@ -532,6 +538,7 @@ tasks.register("verifyCentralizedVersions") {
             "modules/protocol/build.gradle.kts",
             "modules/desktop/build.gradle.kts",
             "modules/agent-core/build.gradle.kts",
+            "modules/model-core/build.gradle.kts",
             "modules/provider-core/build.gradle.kts",
             "modules/providers/build.gradle.kts",
             "modules/provider-openai-codex/build.gradle.kts",

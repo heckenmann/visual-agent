@@ -14,6 +14,22 @@ import kotlin.test.assertTrue
 
 class ServerConfigurationDiagnosticsPortAdapterTest {
     @Test
+    fun `effective tool diagnostics expose negative overrides and unknown independent capabilities`() {
+        val catalog = ProviderCatalogService(InMemoryProviderPreferences(), AppConfigBean())
+        val model = ProviderModelConfig("model", capabilities = setOf("tools"), capabilityOverrides = mapOf("tools" to false))
+        catalog.saveProvider(
+            ProviderProfile("custom", "Custom", ProviderAdapter.CODEX_CLI, "", defaultModel = model.id, models = listOf(model)),
+        )
+        catalog.setActiveProvider("custom")
+        val tool = DiagnosticsConfigTool(ServerConfigurationDiagnosticsPortAdapter(catalog, AppConfigBean()))
+        val result = tool.execute("{}", emptyMap())
+        assertTrue(result.success)
+        assertTrue(result.content.contains("\"modelCapabilityOverrides\":{\"tools\":false}"))
+        assertTrue(result.content.contains("\"tools\":\"unsupported\""))
+        assertTrue(result.content.contains("\"vision\":\"unknown\""))
+    }
+
+    @Test
     fun `reports active catalog configuration without endpoint credentials or path`() {
         val preferences = InMemoryProviderPreferences()
         val catalog = ProviderCatalogService(preferences, AppConfigBean())
@@ -32,7 +48,7 @@ class ServerConfigurationDiagnosticsPortAdapterTest {
                             status = ModelStatus.ACTIVE,
                             contextLimit = 64_000,
                             outputLimit = 4_000,
-                            capabilities = setOf("tools", "vision"),
+                            capabilities = setOf("chat", "tools", "vision"),
                             capabilitiesComplete = true,
                         ),
                     ),

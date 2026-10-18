@@ -39,7 +39,8 @@ internal fun providerConnectionSection(
     onContextLengthChanged: (Int) -> Unit,
     onRefreshModels: () -> Unit,
     onFavoriteChanged: (Boolean) -> Unit,
-    onModelCapabilitiesChanged: (Set<String>) -> Unit = {},
+    onModelCapabilitiesChanged: (String, Boolean?) -> Unit = { _, _ -> },
+    onResetLegacyCapabilities: () -> Unit = {},
 ) {
     PanelSection(title = "Main agent connection") {
         OutlinedButton(
@@ -71,6 +72,7 @@ internal fun providerConnectionSection(
             onRemove = onRemoveProvider,
         )
         HorizontalDivider()
+        LegacyCapabilityReset(draft, onResetLegacyCapabilities)
         modelSettingsContent(
             providerId = draft.providerId,
             modelId = draft.modelId,

@@ -22,6 +22,7 @@ import de.heckenmann.visualagent.protocol.ProviderConfiguration
 import de.heckenmann.visualagent.protocol.ProviderPort
 import de.heckenmann.visualagent.protocol.ProviderProfile
 import de.heckenmann.visualagent.protocol.SettingsPort
+import de.heckenmann.visualagent.ui.components.PanelInfoBox
 import de.heckenmann.visualagent.ui.components.PanelScrollbarHost
 import de.heckenmann.visualagent.ui.components.RegisterPanelVerticalScrollbar
 import de.heckenmann.visualagent.ui.components.settingsDraftActionRow
@@ -62,11 +63,7 @@ internal fun providerSettingsOverlay(
     val selectedModel = models.firstOrNull { it.id == draft.modelId }
     val providerConfigurationChanged =
         draft.providers != persisted.providers || draft.providerId != persisted.providerId || draft.modelId != persisted.modelId
-    val canSave =
-        !refreshing &&
-            draft.providerId.isNotBlank() &&
-            draft.modelId.isNotBlank() &&
-            (!providerConfigurationChanged || models.any { it.id == draft.modelId })
+    val canSave = !refreshing && draft.canSaveModelSelection(providerConfigurationChanged)
     val memoryFitsLimit = draftMemory.codePointCount(0, draftMemory.length) <= draft.conversationSettings.maxMainAgentMemoryChars
 
     modelContextLimitEffect(
@@ -283,9 +280,10 @@ internal fun providerSettingsOverlay(
                         draft = draft.copy(conversationSettings = draft.conversationSettings.copy(contextLength = value))
                     },
                     onRefreshModels = { refreshModels() },
-                    onModelCapabilitiesChanged = { capabilities ->
-                        draft = draft.withModelCapabilities(draft.providerId, draft.modelId, capabilities)
+                    onModelCapabilitiesChanged = { capability, supported ->
+                        draft = draft.withModelCapabilities(draft.providerId, draft.modelId, capability, supported)
                     },
+                    onResetLegacyCapabilities = { draft = draft.resetLegacyCapabilities(draft.providerId) },
                     onFavoriteChanged = { favorite ->
                         draft =
                             draft.copy(
@@ -300,6 +298,7 @@ internal fun providerSettingsOverlay(
         }
         androidx.compose.material3.HorizontalDivider()
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            draft.modelSelectionError()?.let { PanelInfoBox(it) }
             settingsDraftActionRow(
                 hasUnsavedChanges = hasUnsavedChanges,
                 saving = saving,

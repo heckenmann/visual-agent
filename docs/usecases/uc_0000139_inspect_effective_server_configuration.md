@@ -23,6 +23,8 @@ Allow an authorized agent to inspect the active Visual Agent server provider/mod
 - Filesystem/database paths, user model instructions, and system properties are not included.
 - If the configuration source fails, the tool returns a normalized error without exception details.
 
+Capability diagnostics distinguish baseline metadata (`modelCapabilities`, `modelCapabilitiesComplete`), its legacy manual source flag (`modelCapabilitiesOverridden`), targeted choices (`modelCapabilityOverrides`) and effective supported/unsupported/unknown states (`modelCapabilityStates`). Effective states use the same resolver as execution and warnings; a negative tools override therefore reports tools as unsupported even when the provider baseline lists tools. No credentials are included in these fields.
+
 ## Tool Calls
 
 - `diagnostics:config`: `{"action":"get"}` or `{}`. No network call is made.

@@ -65,7 +65,7 @@ class ConfiguredLLMProviderVisionTest {
                     adapter = ProviderAdapter.OPENAI_COMPATIBLE,
                     baseUrl = "https://example.test",
                     defaultModel = "text-model",
-                    models = listOf(ProviderModelConfig("text-model", capabilities = setOf("tools"))),
+                    models = listOf(ProviderModelConfig("text-model", capabilities = setOf("tools"), capabilitiesComplete = true)),
                 ),
             )
             catalog.setActiveSelection("text-only", "text-model")

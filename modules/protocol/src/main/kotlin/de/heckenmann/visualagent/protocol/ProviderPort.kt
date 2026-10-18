@@ -104,6 +104,7 @@ data class ProviderModel(
     val capabilities: Set<String> = emptySet(),
     val capabilitiesComplete: Boolean = false,
     val capabilitiesOverridden: Boolean = false,
+    val capabilityOverrides: Map<String, Boolean> = emptyMap(),
 )
 
 /** User-safe model detail response. */

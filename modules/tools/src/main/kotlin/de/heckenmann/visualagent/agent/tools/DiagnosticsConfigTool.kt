@@ -8,6 +8,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 
 /** Reports the sanitized effective server and active model configuration. */
 @AgentTool
@@ -20,6 +21,7 @@ class DiagnosticsConfigTool(
             name = TOOL_ID.toFunctionName(),
             description =
                 "Show sanitized effective Visual Agent server configuration and validate the active provider/model selection. " +
+                    "Capability output separates the baseline declaration, manual overrides and effective per-feature states. " +
                     "Secrets, local filesystem paths, endpoint paths, and user instructions are never returned. Input: {}.",
             inputSchema = STRING_SCHEMA,
         )
@@ -47,6 +49,17 @@ class DiagnosticsConfigTool(
                 provider.modelOutputLimit?.let { put("modelOutputLimit", it) }
                 putJsonArray("modelCapabilities") { provider.modelCapabilities.sorted().forEach { add(JsonPrimitive(it)) } }
                 put("modelCapabilitiesComplete", provider.modelCapabilitiesComplete)
+                put("modelCapabilitiesOverridden", provider.modelCapabilitiesOverridden)
+                putJsonObject("modelCapabilityOverrides") {
+                    provider.modelCapabilityOverrides.toSortedMap().forEach { (key, value) ->
+                        put(key, value)
+                    }
+                }
+                putJsonObject("modelCapabilityStates") {
+                    provider.modelCapabilityStates.toSortedMap().forEach { (key, value) ->
+                        put(key, value)
+                    }
+                }
                 put("configuredContextWindow", snapshot.contextWindow)
                 put("timeoutSeconds", snapshot.timeoutSeconds)
                 put("maxParallelSubAgents", snapshot.maxParallelSubAgents)

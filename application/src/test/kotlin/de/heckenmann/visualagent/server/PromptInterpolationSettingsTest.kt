@@ -1,6 +1,9 @@
 package de.heckenmann.visualagent.server
 
+import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
+import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
+import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.knowledge.MainAgentLongTermMemory
 import de.heckenmann.visualagent.knowledge.MainAgentLongTermMemoryStore
@@ -26,6 +29,8 @@ class PromptInterpolationSettingsTest {
 
     @Test
     fun `assignment round trips independently of the active model`() {
+        every { catalog.listProviders() } returns
+            listOf(ProviderProfile("other", "Other", ProviderAdapter.CODEX_CLI, "", models = listOf(ProviderModelConfig("rewrite"))))
         port.save(
             SettingsSnapshot(
                 automaticPromptInterpolation = true,
@@ -40,6 +45,40 @@ class PromptInterpolationSettingsTest {
         assertEquals("other", restored.promptInterpolationProviderId)
         assertEquals("rewrite", restored.promptInterpolationModelId)
         verify(exactly = 0) { catalog.setActiveSelection(any(), any()) }
+    }
+
+    @Test
+    fun `explicit non chat interpolation model is rejected without changing configuration`() {
+        every { catalog.listProviders() } returns
+            listOf(
+                ProviderProfile(
+                    "other",
+                    "Other",
+                    ProviderAdapter.CODEX_CLI,
+                    "",
+                    models =
+                        listOf(
+                            ProviderModelConfig(
+                                "rewrite",
+                                capabilityOverrides =
+                                    mapOf(
+                                        "chat" to false,
+                                    ),
+                            ),
+                        ),
+                ),
+            )
+        assertFailsWith<IllegalArgumentException> {
+            port.save(
+                SettingsSnapshot(
+                    automaticPromptInterpolation = true,
+                    promptInterpolationProviderId = "other",
+                    promptInterpolationModelId = "rewrite",
+                ),
+            )
+        }
+        assertFalse(config.automaticPromptInterpolation)
+        verify(exactly = 0) { catalog.replaceConfiguration(any()) }
     }
 
     @Test

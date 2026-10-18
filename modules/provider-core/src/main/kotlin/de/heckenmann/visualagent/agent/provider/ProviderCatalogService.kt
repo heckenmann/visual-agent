@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent.provider
 
+import de.heckenmann.visualagent.model.CapabilitySupport
 import mu.KotlinLogging
 import org.springframework.context.annotation.DependsOn
 import org.springframework.stereotype.Service
@@ -114,6 +115,9 @@ class ProviderCatalogService(
         require(configuration.modelId.isNotBlank()) { "Model is required" }
         require(selectedProvider.selectableModels().any { it.id == configuration.modelId }) {
             "Model is missing, disabled, or filtered: ${configuration.providerId}/${configuration.modelId}"
+        }
+        require(selectedProvider.models.first { it.id == configuration.modelId }.supportsCapability(ModelCapability.CHAT)) {
+            "The active model declares CHAT unsupported. Correct its capability declaration or choose a chat-capable model."
         }
         return CatalogState(
             activeProviderId = configuration.providerId,
@@ -258,7 +262,7 @@ class ProviderCatalogService(
     fun activeModelSupportsToolCalling(): Boolean {
         val profile = getProvider(activeProviderId()) ?: return true
         val model = profile.models.firstOrNull { it.id == activeModelId() } ?: return true
-        return !model.capabilitiesComplete || model.capabilities.any { it.equals("tools", ignoreCase = true) }
+        return model.capabilitySupport(ModelCapability.TOOLS) != CapabilitySupport.UNSUPPORTED
     }
 
     /**

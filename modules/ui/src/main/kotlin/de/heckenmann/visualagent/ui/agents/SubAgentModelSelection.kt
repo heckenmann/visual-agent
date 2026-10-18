@@ -1,6 +1,8 @@
 package de.heckenmann.visualagent.ui.agents
 
+import de.heckenmann.visualagent.protocol.CapabilitySupport
 import de.heckenmann.visualagent.protocol.ProviderPort
+import de.heckenmann.visualagent.protocol.capabilitySupport
 import de.heckenmann.visualagent.ui.components.PanelSelectOption
 import de.heckenmann.visualagent.ui.components.labelWithCapabilities
 import kotlinx.coroutines.CancellationException
@@ -25,11 +27,7 @@ internal fun subAgentModelOptions(
         providerPort
             .selectableModels(providerId)
             .filter { model ->
-                !model.capabilitiesComplete ||
-                    model.capabilities.any { capability ->
-                        capability.equals("chat", ignoreCase = true) ||
-                            capability.equals("completion", ignoreCase = true)
-                    }
+                model.capabilitySupport("chat") != CapabilitySupport.UNSUPPORTED
             }.map { model -> PanelSelectOption(model.id, model.labelWithCapabilities()) }
     val customModel =
         currentModel

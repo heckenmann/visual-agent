@@ -13,7 +13,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import de.heckenmann.visualagent.protocol.CapabilitySupport
 import de.heckenmann.visualagent.protocol.ProviderModel
+import de.heckenmann.visualagent.protocol.capabilitySupport
 import de.heckenmann.visualagent.ui.components.PanelCheckbox
 import de.heckenmann.visualagent.ui.components.PanelDropdownField
 import de.heckenmann.visualagent.ui.components.PanelInfoBox
@@ -35,25 +37,22 @@ internal fun modelSettingsContent(
     onContextLengthChanged: (Int) -> Unit,
     onRefreshModels: () -> Unit,
     onFavoriteChanged: (Boolean) -> Unit,
-    onModelCapabilitiesChanged: (Set<String>) -> Unit = {},
+    onModelCapabilitiesChanged: (String, Boolean?) -> Unit = { _, _ -> },
 ) {
     PanelDropdownField(
         label = "Model",
         selectedValue = modelId,
         options =
-            models
-                .filter { model ->
-                    !model.capabilitiesComplete ||
-                        model.capabilities.any { capability ->
-                            capability.equals("chat", ignoreCase = true) || capability.equals("completion", ignoreCase = true)
-                        }
-                }.map { model ->
-                    PanelSelectOption(model.id, model.labelWithCapabilities())
-                },
+            models.map { model -> PanelSelectOption(model.id, model.labelWithCapabilities()) },
         onSelected = onModelSelected,
         enabled = models.isNotEmpty(),
         information = "Selects the model used for future main-agent requests through the selected provider.",
     )
+    if (models.firstOrNull { it.id == modelId }?.capabilitySupport("chat") == CapabilitySupport.UNSUPPORTED) {
+        PanelInfoBox(
+            "This model's current capability declaration excludes chat. Review its capability settings below; the declaration does not remove the model from this settings catalog.",
+        )
+    }
     modelContextLengthSetting(contextLength, contextLimit, onContextLengthChanged)
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
         OutlinedButton(

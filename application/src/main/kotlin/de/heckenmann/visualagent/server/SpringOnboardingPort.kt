@@ -178,6 +178,9 @@ class SpringOnboardingPort(
             contextLimit,
             outputLimit,
             capabilities,
+            capabilitiesComplete,
+            capabilitiesOverridden,
+            capabilityOverrides,
         )
 
     private fun ProviderModel.toApplication(): ApplicationProviderModel =
@@ -191,6 +194,9 @@ class SpringOnboardingPort(
             contextLimit,
             outputLimit,
             capabilities,
+            capabilitiesComplete,
+            capabilitiesOverridden,
+            capabilityOverrides,
         )
 
     private fun List<ApplicationProviderModel>.mergeSelectedModel(selected: ApplicationProviderModel): List<ApplicationProviderModel> {

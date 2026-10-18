@@ -24,6 +24,9 @@ Desktop user.
 7. The user may press **Esc** or select the title-bar close action to discard the local draft without saving.
 8. The user may select **Run onboarding again** to open the server-owned readiness wizard for the currently connected Visual Agent server.
 9. Later model requests resolve against the saved provider/model.
+10. For each model capability, the user selects **Automatic**, **Supported**, or **Unsupported**. Automatic uses provider evidence and may remain unknown. Editing one feature never declares unrelated features unsupported.
+    Existing whole-list manual declarations are labeled **Legacy declaration**, not Automatic. Automatic is available only after an explicit legacy reset; no provider evidence is inferred from manual values.
+11. If legacy whole-list overrides exist, the provider section offers an icon-only **Reset legacy capability overrides for this provider** action without selecting each affected model. It stages removal of those legacy declarations, retains targeted overrides, and marks discarded evidence unknown. Refresh then reloads provider evidence; Save persists the draft. No automatic repair guesses whether a legacy denial was intentional.
 
 ## Result
 
@@ -67,6 +70,9 @@ Main-agent requests use the user-selected provider and model unless an agent-spe
 - Custom provider profiles remain catalog-backed.
 - Saving the main-agent selection does not mutate a profile beyond explicitly staged profile edits.
 - Credentials are not exposed to model context or logs.
+- The Conversation settings model dropdown is a configuration catalog: every available model allowed by the provider profile remains visible, independently of capability metadata. A selected model whose declaration excludes chat shows an explanation and remains editable. Visibility never grants capabilities or changes persisted declarations. Execution-specific capability selectors still enforce their requirements.
+- Inspecting a non-chat model never makes it a valid active selection: Save remains disabled with an explanation while the active model or an explicit interpolation selection excludes CHAT. The server also rejects an invalid staged active selection and validates explicit interpolation assignments before writing settings or replacing the catalog. Unknown CHAT support remains eligible.
+- Provider evidence and targeted manual overrides are persisted separately. Refresh updates evidence but preserves overrides. Automatic removes only the selected feature's override.
 - Streaming is used automatically whenever the active provider supports it.
 - Follow-up suggestions can be enabled or disabled and have bounded idle-delay
   and question-count settings; they remain ghost text and are never sent

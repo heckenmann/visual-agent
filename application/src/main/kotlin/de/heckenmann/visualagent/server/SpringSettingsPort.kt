@@ -7,6 +7,7 @@ import de.heckenmann.visualagent.knowledge.MainAgentLongTermMemoryStore
 import de.heckenmann.visualagent.protocol.SettingsPort
 import de.heckenmann.visualagent.protocol.SettingsSnapshot
 import de.heckenmann.visualagent.protocol.ThemeMode
+import de.heckenmann.visualagent.server.validation.validateInterpolationSelection
 import org.springframework.stereotype.Component
 import de.heckenmann.visualagent.config.ThemeMode as ApplicationThemeMode
 
@@ -38,15 +39,22 @@ class SpringSettingsPort(
         require(memoryLimit >= currentMemory.contentLength) {
             "Main-agent memory has ${currentMemory.contentLength} characters; reduce it before lowering the limit below that size"
         }
-        providerConfiguration?.let { configuration ->
-            providerCatalog.replaceConfiguration(
+        val stagedConfiguration =
+            providerConfiguration?.let { configuration ->
                 ProviderConfiguration(
                     providers = configuration.providers.map { profile -> profile.toApplication() },
                     providerId = configuration.providerId,
                     modelId = configuration.modelId,
-                ),
+                )
+            }
+        if (settings.promptInterpolationProviderId.isNotBlank()) {
+            validateInterpolationSelection(
+                stagedConfiguration?.providers ?: providerCatalog.listProviders(),
+                settings.promptInterpolationProviderId,
+                settings.promptInterpolationModelId,
             )
         }
+        stagedConfiguration?.let(providerCatalog::replaceConfiguration)
         config.apply {
             uiThemeMode = settings.uiThemeMode.toApplication()
             fontSize = settings.fontSize
@@ -134,6 +142,7 @@ private fun de.heckenmann.visualagent.protocol.ProviderProfile.toApplication(): 
                     capabilities = model.capabilities,
                     capabilitiesComplete = model.capabilitiesComplete,
                     capabilitiesOverridden = model.capabilitiesOverridden,
+                    capabilityOverrides = model.capabilityOverrides,
                 )
             },
         modelWhitelist = modelWhitelist,

@@ -16,7 +16,7 @@ Desktop user.
 ## Main Flow
 
 1. The user opens the provider settings and refreshes the model catalog.
-2. Known capabilities are displayed for each discovered model; the user can correct or supplement them with explicit toggles. The heading, explanation and capability controls occupy separate vertically spaced rows, including at narrow widths and enlarged font scales. Showing or hiding this section must not stack its children on top of each other.
+2. Known capabilities are displayed for each discovered model; the user can correct or supplement each with **Automatic**, **Supported**, or **Unsupported**. Automatic retains unknown state when the provider omits evidence. The heading, explanation and capability controls occupy separate vertically spaced rows, including at narrow widths and enlarged font scales. Showing or hiding this section must not stack its children on top of each other.
 3. The user saves the provider catalog and opens the details of an existing sub-agent.
 4. CHAT remains enabled, while specialized features are independently granted or revoked.
 5. Each enabled feature requires a model selected from providers that advertise that feature. Selections store a provider-qualified `providerId::modelId` reference.
@@ -54,4 +54,10 @@ The agent persists the enabled feature set and feature-specific model references
 - Text-only and image-bearing requests select their respective configured models.
 - Agent-scoped vision calls never use an unrestricted global model silently.
 - Provider credentials remain in the provider adapter; capability strings never expose API keys.
-- The animated provider capability editor preserves non-overlapping text and independently clickable toggles at narrow widths and enlarged font scales.
+- The animated provider capability editor preserves non-overlapping text and independently selectable capability controls at narrow widths and enlarged font scales.
+- Targeted declarations take precedence over provider evidence in both the UI and server validation. Changing vision does not change unknown chat/tool support. A complete provider declaration may still explicitly exclude chat.
+- Old whole-list manual values are explicitly labeled Legacy declaration. They are never presented as provider evidence under Automatic; users must reset them before automatic capability resolution can use refreshed provider metadata.
+
+## Implementation Decision
+
+Issue #486 uses a pure Kotlin tri-state resolver in the dependency-free `model-core` module, shared by the protocol and provider core, plus a default-empty per-feature Boolean override map. A klibs.io/GitHub search did not identify a library that owns this application-specific persistence and precedence contract; Kotlin enums/maps and the existing Compose dropdown avoid a new third-party dependency, license, protocol or security surface. Existing catalogs decode without a schema migration; legacy whole-list intent is preserved until user reset.
