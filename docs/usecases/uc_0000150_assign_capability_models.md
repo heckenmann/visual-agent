@@ -16,7 +16,7 @@ Desktop user.
 ## Main Flow
 
 1. The user opens the provider settings and refreshes the model catalog.
-2. Known capabilities are displayed for each discovered model; the user can correct or supplement them with explicit toggles.
+2. Known capabilities are displayed for each discovered model; the user can correct or supplement them with explicit toggles. The heading, explanation and capability controls occupy separate vertically spaced rows, including at narrow widths and enlarged font scales. Showing or hiding this section must not stack its children on top of each other.
 3. The user saves the provider catalog and opens the details of an existing sub-agent.
 4. CHAT remains enabled, while specialized features are independently granted or revoked.
 5. Each enabled feature requires a model selected from providers that advertise that feature. Selections store a provider-qualified `providerId::modelId` reference.
@@ -54,3 +54,4 @@ The agent persists the enabled feature set and feature-specific model references
 - Text-only and image-bearing requests select their respective configured models.
 - Agent-scoped vision calls never use an unrestricted global model silently.
 - Provider credentials remain in the provider adapter; capability strings never expose API keys.
+- The animated provider capability editor preserves non-overlapping text and independently clickable toggles at narrow widths and enlarged font scales.
