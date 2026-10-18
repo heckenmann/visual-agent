@@ -9,6 +9,8 @@ User, main agent, persisted worker, optional independently configured reviewer.
 ## Preconditions
 A persisted agent exists. Its actual registered and enabled tools satisfy the required operations. No agent is created implicitly.
 
+Tool eligibility uses the same CHAT capability model selection as execution, including provider-qualified assignments. Declared action enumerations reject unsupported actions; absent action metadata remains unknown and the tool validates the actual call at dispatch.
+
 ## Flow
 1. The main agent or user attaches a validated version-1 contract to a todo. Server revisions are monotonic. Legacy todos retain the existing text workflow.
 2. The coordinator claims an immutable snapshot and intersects task restrictions with current agent tools, global toggles and existing resource grants. Null restrictions inherit; empty restrictions deny.

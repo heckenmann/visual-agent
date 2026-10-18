@@ -101,7 +101,7 @@ class AgentToolConfigService(
     ): Boolean {
         if (modelCapabilities?.supportsTools(agent) == false) return false
         val tool = registry?.ifAvailable?.resolve(setOf(RegistryToolId(operation.tool)))?.singleOrNull() ?: return false
-        return operation.action == null || tool.supportedActions?.contains(operation.action) == true
+        return operation.action == null || tool.supportedActions?.contains(operation.action) != false
     }
 
     /**
