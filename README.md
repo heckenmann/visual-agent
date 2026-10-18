@@ -82,6 +82,8 @@ The project uses an acyclic Gradle module graph:
 :tools ──► :tool-standard + :tool-javascript
 :tool-javascript ──► :tool-standard + :agent-core
 :ui ──► :protocol
+:protocol ──► :task-core + :model-core
+:provider-core ──► :agent-core + :model-core
 ```
 
 `:application` is the Spring server composition root. `:desktop` is the presentation/lifecycle
@@ -94,6 +96,7 @@ Filesystem ownership follows the same structure:
 application/          # :application
 modules/ui/           # :ui
 modules/agent-core/   # :agent-core
+modules/model-core/   # :model-core, pure capability evidence and override resolution
 modules/provider-core/ # :provider-core
 modules/providers/    # :provider-standard
 modules/provider-openai-codex/ # :provider-openai-codex

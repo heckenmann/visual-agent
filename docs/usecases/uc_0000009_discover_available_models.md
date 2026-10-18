@@ -25,6 +25,8 @@ Desktop user.
 
 ## Result
 
+Discovery retains per-capability manual overrides independently of provider evidence. Missing fields in a partial response stay unknown, not unsupported. Legacy whole-list overrides remain unchanged until an explicit user reset in UC-0000007; no model-name-specific migration or database repair is applied.
+
 The user sees a usable model list rather than raw provider inventory.
 
 ## Tool Calls

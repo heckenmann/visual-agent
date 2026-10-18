@@ -20,7 +20,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import de.heckenmann.visualagent.protocol.CapabilitySupport
 import de.heckenmann.visualagent.protocol.ProviderModel
+import de.heckenmann.visualagent.protocol.capabilitySupport
 import de.heckenmann.visualagent.ui.components.ActionTooltip
 
 /** Warnings derived from the active provider model's declared capabilities and limits. */
@@ -63,7 +65,7 @@ internal fun modelCapabilityWarnings(
     val toolingWarning =
         activeModel
             ?.takeIf { model ->
-                model.capabilitiesComplete && model.capabilities.none { it.equals("tools", ignoreCase = true) }
+                model.capabilitySupport("tools") == CapabilitySupport.UNSUPPORTED
             }?.let {
                 ModelCapabilityWarning(
                     label = "Tools unavailable",

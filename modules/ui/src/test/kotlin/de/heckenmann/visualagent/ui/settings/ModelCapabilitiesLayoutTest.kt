@@ -10,7 +10,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Density
@@ -46,7 +45,13 @@ class ModelCapabilitiesLayoutTest {
                 val density = LocalDensity.current
                 CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
                     Box(Modifier.width(width)) {
-                        ModelCapabilitiesEditor(model.value) { model.value = model.value.copy(capabilities = it) }
+                        ModelCapabilitiesEditor(model.value) { capability, supported ->
+                            model.value =
+                                model.value.copy(
+                                    capabilityOverrides =
+                                        model.value.capabilityOverrides + (capability.lowercase() to checkNotNull(supported)),
+                                )
+                        }
                     }
                 }
             }
@@ -54,14 +59,15 @@ class ModelCapabilitiesLayoutTest {
         val labels =
             listOf(
                 "Model capabilities",
-                "Provider-reported capabilities are shown below. Change a toggle to override the declaration for this model.",
+                "Automatic uses provider evidence. Unknown is not the same as unsupported; each override affects only one capability.",
             ) + EDITABLE_MODEL_CAPABILITIES.map { it.replace('_', ' ') }
         val bounds = labels.map { label -> compose.onNodeWithText(label).getBoundsInRoot() }
         bounds.zipWithNext().forEachIndexed { index, (previous, next) ->
             assertTrue(next.top >= previous.bottom, "${labels[index]} overlaps ${labels[index + 1]}")
         }
         labels.forEach { compose.onNodeWithText(it).assertIsDisplayed() }
-        compose.onNodeWithContentDescription("TOOLS").performClick()
-        assertEquals(setOf("CHAT", "TOOLS"), model.value.capabilities)
+        compose.onNodeWithText("TOOLS").performClick()
+        compose.onNodeWithText("Supported").performClick()
+        assertEquals(mapOf("tools" to true), model.value.capabilityOverrides)
     }
 }

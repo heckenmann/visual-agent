@@ -10,6 +10,7 @@ import de.heckenmann.visualagent.protocol.ModelStatus
 import de.heckenmann.visualagent.protocol.ProviderModel
 import de.heckenmann.visualagent.protocol.ProviderProfile
 import de.heckenmann.visualagent.protocol.SettingsSnapshot
+import de.heckenmann.visualagent.protocol.capabilityKey
 import de.heckenmann.visualagent.ui.components.PanelInfoBox
 import de.heckenmann.visualagent.ui.components.PanelSection
 
@@ -86,7 +87,43 @@ internal fun ProviderSettingsDraft.withModels(
     models: List<ProviderModel>,
     preferredModelId: String? = null,
 ): ProviderSettingsDraft {
-    val updated = providers.map { profile -> if (profile.id == providerId) profile.copy(models = models) else profile }
+    val updated =
+        providers.map { profile ->
+            if (profile.id != providerId) {
+                profile
+            } else {
+                profile.copy(
+                    models =
+                        models.map { discovered ->
+                            val current = profile.models.firstOrNull { it.id == discovered.id }
+                            if (current == null) {
+                                discovered
+                            } else {
+                                discovered.copy(
+                                    capabilityOverrides = current.capabilityOverrides,
+                                    capabilities =
+                                        if (discovered.capabilitiesOverridden &&
+                                            !current.capabilitiesOverridden
+                                        ) {
+                                            current.capabilities
+                                        } else {
+                                            discovered.capabilities
+                                        },
+                                    capabilitiesComplete =
+                                        if (discovered.capabilitiesOverridden &&
+                                            !current.capabilitiesOverridden
+                                        ) {
+                                            current.capabilitiesComplete
+                                        } else {
+                                            discovered.capabilitiesComplete
+                                        },
+                                    capabilitiesOverridden = current.capabilitiesOverridden,
+                                )
+                            }
+                        },
+                )
+            }
+        }
     if (this.providerId != providerId) return copy(providers = updated)
     val selectable = updated.firstOrNull { it.id == providerId }?.selectableModels().orEmpty()
     val selectedModel =
@@ -100,7 +137,8 @@ internal fun ProviderSettingsDraft.withModels(
 internal fun ProviderSettingsDraft.withModelCapabilities(
     providerId: String,
     modelId: String,
-    capabilities: Set<String>,
+    capability: String,
+    supported: Boolean?,
 ): ProviderSettingsDraft =
     copy(
         providers =
@@ -111,9 +149,11 @@ internal fun ProviderSettingsDraft.withModelCapabilities(
                             provider.models.map { model ->
                                 if (model.id == modelId) {
                                     model.copy(
-                                        capabilities = capabilities.map(String::lowercase).toSet(),
-                                        capabilitiesComplete = true,
-                                        capabilitiesOverridden = true,
+                                        capabilityOverrides =
+                                            model.capabilityOverrides.toMutableMap().apply {
+                                                val key = capabilityKey(capability)
+                                                if (supported == null) remove(key) else put(key, supported)
+                                            },
                                     )
                                 } else {
                                     model

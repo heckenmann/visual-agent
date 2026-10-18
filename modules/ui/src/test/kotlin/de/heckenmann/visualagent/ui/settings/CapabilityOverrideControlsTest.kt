@@ -1,0 +1,128 @@
+package de.heckenmann.visualagent.ui.settings
+
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import de.heckenmann.visualagent.protocol.ProviderAdapter
+import de.heckenmann.visualagent.protocol.ProviderModel
+import de.heckenmann.visualagent.protocol.ProviderProfile
+import org.junit.Rule
+import org.junit.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+
+/** Exercises model catalog visibility and recovery actions without timing assumptions. */
+class CapabilityOverrideControlsTest {
+    @get:Rule
+    val compose = createComposeRule()
+
+    @Test
+    fun `legacy declarations are not presented as automatic provider evidence`() {
+        val legacy = ProviderModel("legacy", capabilities = setOf("vision"), capabilitiesComplete = true, capabilitiesOverridden = true)
+        compose.setContent {
+            MaterialTheme { ModelCapabilitiesEditor(legacy) { _, _ -> } }
+        }
+        compose.onNodeWithText("CHAT").performClick()
+        compose.onNodeWithText("Automatic (unsupported)").assertDoesNotExist()
+        compose
+            .onNodeWithText(
+                "Reset the legacy manual declaration before choosing Automatic; no provider evidence is available for this declaration.",
+            ).assertIsDisplayed()
+    }
+
+    @Test
+    fun `model with persisted legacy vision only declaration remains visible in settings`() {
+        val legacy =
+            ProviderModel("legacy-partial", capabilities = setOf("vision"), capabilitiesComplete = true, capabilitiesOverridden = true)
+        val selected = mutableStateOf("")
+        compose.setContent {
+            MaterialTheme {
+                modelSettingsContent(
+                    providerId = "provider",
+                    modelId = selected.value,
+                    models = listOf(legacy),
+                    contextLength = 4096,
+                    contextLimit = null,
+                    loadingModels = false,
+                    modelDetails = "",
+                    favoriteModels = emptyList(),
+                    onModelSelected = { selected.value = it },
+                    onContextLengthChanged = {},
+                    onRefreshModels = {},
+                    onFavoriteChanged = {},
+                )
+            }
+        }
+        compose.onNodeWithText("Model").performClick()
+        compose.onNodeWithText("legacy-partial [vision]").performClick()
+        assertEquals(legacy.id, selected.value)
+        compose
+            .onNodeWithText(
+                "This model's current capability declaration excludes chat. Review its capability settings below; the declaration does not remove the model from this settings catalog.",
+            ).assertIsDisplayed()
+        compose.onNodeWithText("CHAT").assertIsDisplayed()
+    }
+
+    @Test
+    fun `main dropdown keeps partial model after unrelated capability edit`() {
+        val partial = ProviderModel("partial", capabilityOverrides = mapOf("vision" to false))
+        val blocked = ProviderModel("blocked", capabilityOverrides = mapOf("chat" to false))
+        var selected = ""
+        compose.setContent {
+            MaterialTheme {
+                modelSettingsContent(
+                    providerId = "provider",
+                    modelId = "",
+                    models = listOf(partial, blocked),
+                    contextLength = 4096,
+                    contextLimit = null,
+                    loadingModels = false,
+                    modelDetails = "",
+                    favoriteModels = emptyList(),
+                    onModelSelected = { selected = it },
+                    onContextLengthChanged = {},
+                    onRefreshModels = {},
+                    onFavoriteChanged = {},
+                )
+            }
+        }
+        compose.onNodeWithText("Model").performClick()
+        compose.onNodeWithText("blocked").assertIsDisplayed()
+        compose.onNodeWithText("partial").performClick()
+        assertEquals("partial", selected)
+        assertEquals(mapOf("chat" to false), blocked.capabilityOverrides)
+    }
+
+    @Test
+    fun `hidden legacy model can be reset without selecting it`() {
+        val legacy = ProviderModel("hidden", capabilities = setOf("vision"), capabilitiesComplete = true, capabilitiesOverridden = true)
+        val draft =
+            mutableStateOf(
+                ProviderSettingsDraft(
+                    providerId = "provider",
+                    providers =
+                        listOf(
+                            ProviderProfile("provider", "Provider", ProviderAdapter.CODEX_CLI, "", models = listOf(legacy)),
+                        ),
+                ),
+            )
+        compose.setContent {
+            MaterialTheme {
+                LegacyCapabilityReset(draft.value) { draft.value = draft.value.resetLegacyCapabilities("provider") }
+            }
+        }
+        compose.onNodeWithContentDescription("Reset legacy capability overrides for this provider").performClick()
+        compose.onNodeWithContentDescription("Reset legacy capability overrides for this provider").assertDoesNotExist()
+        assertFalse(
+            draft.value.providers
+                .single()
+                .models
+                .single()
+                .capabilitiesComplete,
+        )
+    }
+}

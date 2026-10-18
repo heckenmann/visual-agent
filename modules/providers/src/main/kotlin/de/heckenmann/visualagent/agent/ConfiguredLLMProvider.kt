@@ -10,7 +10,9 @@ import de.heckenmann.visualagent.agent.provider.ProviderEnvironmentCredentials
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.agent.provider.ProviderRuntimeConfig
+import de.heckenmann.visualagent.agent.provider.capabilitySupport
 import de.heckenmann.visualagent.agent.provider.supportsCapability
+import de.heckenmann.visualagent.model.CapabilitySupport
 import org.springframework.context.annotation.Primary
 import org.springframework.stereotype.Component
 import reactor.core.publisher.Flux
@@ -257,7 +259,7 @@ class ConfiguredLLMProvider(
         modelId: String,
     ) {
         val model = profile.models.firstOrNull { it.id == modelId } ?: return
-        if (model.capabilities.isNotEmpty() && model.capabilities.none { it.equals("vision", ignoreCase = true) }) {
+        if (model.capabilitySupport(ModelCapability.VISION) == CapabilitySupport.UNSUPPORTED) {
             error("Model ${profile.name}/$modelId does not support image input")
         }
     }
@@ -277,6 +279,11 @@ class ConfiguredLLMProvider(
                         ?.capabilities
                         .orEmpty(),
                 modelCapabilitiesComplete = stagedProfile.models.firstOrNull { it.id == stagedModel }?.capabilitiesComplete == true,
+                modelCapabilityOverrides =
+                    stagedProfile.models
+                        .firstOrNull { it.id == stagedModel }
+                        ?.capabilityOverrides
+                        .orEmpty(),
             )
         }
         val explicitOptions =
@@ -301,6 +308,7 @@ class ConfiguredLLMProvider(
             providerProfile = resolved.provider,
             modelCapabilities = resolved.model.capabilities,
             modelCapabilitiesComplete = resolved.model.capabilitiesComplete,
+            modelCapabilityOverrides = resolved.model.capabilityOverrides,
             contextWindow =
                 contextWindow.copy(
                     modelLimit = resolved.model.contextLimit,

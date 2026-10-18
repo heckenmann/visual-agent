@@ -49,6 +49,7 @@ class SpringProviderPortTest {
                         outputLimit = 2048,
                         capabilities = setOf("tools"),
                         capabilitiesComplete = true,
+                        capabilityOverrides = mapOf("vision" to false),
                     ),
                 ),
         )
@@ -69,6 +70,7 @@ class SpringProviderPortTest {
         assertEquals(ModelStatus.ACTIVE, port.selectableModels("ollama").single().status)
         assertEquals(8192, port.selectableModels("ollama").single().contextLimit)
         assertEquals(true, port.selectableModels("ollama").single().capabilitiesComplete)
+        assertEquals(mapOf("vision" to false), port.selectableModels("ollama").single().capabilityOverrides)
         assertEquals("ollama", port.activeProviderId())
         assertEquals("llama3", port.activeModelId())
         assertEquals(true, port.deleteProvider("ollama"))
@@ -79,7 +81,7 @@ class SpringProviderPortTest {
 
         verify { catalog.setActiveProvider("ollama") }
         verify { catalog.setActiveSelection("ollama", "llama3") }
-        verify { catalog.saveProvider(any()) }
+        verify { catalog.saveProvider(match { it.models.single().capabilityOverrides == mapOf("vision" to false) }) }
         verify { catalog.deleteProvider("ollama") }
     }
 
@@ -177,7 +179,7 @@ class SpringProviderPortTest {
                     models =
                         listOf(
                             de.heckenmann.visualagent.protocol
-                                .ProviderModel("model", capabilities = setOf("tools")),
+                                .ProviderModel("model", capabilities = setOf("tools"), capabilityOverrides = mapOf("vision" to false)),
                         ),
                 )
             every { provider.getModelConfigsReactive(any<ApplicationProviderProfile>()) } returns
@@ -187,6 +189,7 @@ class SpringProviderPortTest {
 
             assertEquals(setOf("tools", "vision"), discovered.capabilities)
             assertEquals(false, discovered.capabilitiesComplete)
+            assertEquals(mapOf("vision" to false), discovered.capabilityOverrides)
         }
 
     @Test

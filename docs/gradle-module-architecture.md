@@ -36,6 +36,14 @@ This document records the incremental Gradle modularisation planned in issues #1
 :tool-javascript
  ├── :tool-standard
  └── :agent-core
+
+:protocol
+ ├── :task-core
+ └── :model-core
+
+:provider-core
+ ├── :agent-core
+ └── :model-core
 ```
 
 The filesystem layout mirrors the ownership boundary without changing Gradle project paths:
@@ -46,6 +54,7 @@ modules/ui/           # :ui, a leaf module
 modules/protocol/     # :protocol, versioned gRPC contract
 modules/desktop/      # :desktop, Compose/server endpoint host
 modules/agent-core/   # :agent-core, shared cancellation primitives
+modules/model-core/   # :model-core, dependency-free model capability evidence
 modules/provider-core/ # :provider-core, shared provider contracts and catalog
 modules/providers/    # :provider-standard, built-in Ollama/OpenAI-compatible adapters
 modules/provider-openai-codex/ # :provider-openai-codex, OpenAI Codex CLI adapter
@@ -81,6 +90,8 @@ and transfers only the data named by that request. Apply this boundary to local 
 transports alike.
 
 `:provider-core` owns provider-facing contracts, provider profiles/catalog models, and shared cancellation primitives. It has no dependency on a concrete provider implementation.
+
+`:model-core` owns pure Kotlin capability normalization and supported/unsupported/unknown resolution. It has no runtime dependencies beyond Kotlin. `:provider-core` and `:protocol` expose it through their API dependencies; the UI uses protocol-owned aliases and helpers, never imports provider or agent implementations. Root quality, coverage and dependency-graph checks include this module (issue #486).
 
 `:provider-standard` owns the configured-provider router and the built-in Ollama and OpenAI-compatible adapters. It depends on `:provider-core` and `:agent-core`.
 

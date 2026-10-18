@@ -9,9 +9,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import de.heckenmann.visualagent.protocol.CapabilitySupport
 import de.heckenmann.visualagent.protocol.ProviderModel
 import de.heckenmann.visualagent.protocol.ProviderProfile
 import de.heckenmann.visualagent.protocol.SettingsSnapshot
+import de.heckenmann.visualagent.protocol.capabilitySupport
 import de.heckenmann.visualagent.ui.components.PanelDropdownField
 import de.heckenmann.visualagent.ui.components.PanelSelectOption
 
@@ -59,10 +61,5 @@ internal fun promptInterpolationSettings(
 /** Keeps text-only prompt rewriting away from non-chat model endpoints. */
 internal fun ProviderProfile.selectableInterpolationModels(): List<ProviderModel> =
     selectableModels().filter { model ->
-        !model.capabilitiesComplete ||
-            model.capabilities.any { capability ->
-                capability.equals("chat", ignoreCase = true) ||
-                    capability.equals("completion", ignoreCase = true) ||
-                    capability.equals("generate_text", ignoreCase = true)
-            }
+        model.capabilitySupport("chat") != CapabilitySupport.UNSUPPORTED
     }

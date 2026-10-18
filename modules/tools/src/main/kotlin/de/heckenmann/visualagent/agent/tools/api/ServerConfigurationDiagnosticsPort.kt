@@ -18,10 +18,16 @@ data class ProviderConfigurationDiagnostic(
     val modelContextLimit: Int?,
     /** Model output limit declared by the provider catalog. */
     val modelOutputLimit: Int?,
-    /** Explicitly declared model capabilities. */
+    /** Baseline provider or legacy manual declaration, before targeted overrides are applied. */
     val modelCapabilities: List<String>,
-    /** Whether the provider supplied a complete capability declaration. */
+    /** Whether the baseline declaration is complete; the source flag identifies legacy overrides. */
     val modelCapabilitiesComplete: Boolean,
+    /** Whether the baseline is an old manual declaration rather than provider evidence. */
+    val modelCapabilitiesOverridden: Boolean = false,
+    /** Explicit per-feature manual choices, separate from the baseline declaration. */
+    val modelCapabilityOverrides: Map<String, Boolean> = emptyMap(),
+    /** Effective supported, unsupported or unknown state for each known capability. */
+    val modelCapabilityStates: Map<String, String> = emptyMap(),
 )
 
 /** Sanitized server configuration used by the model-facing diagnostics tool. */

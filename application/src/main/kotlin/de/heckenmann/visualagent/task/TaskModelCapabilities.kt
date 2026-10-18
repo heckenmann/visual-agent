@@ -1,8 +1,11 @@
 package de.heckenmann.visualagent.task
 
 import de.heckenmann.visualagent.agent.SubAgent
+import de.heckenmann.visualagent.agent.provider.ModelCapability
 import de.heckenmann.visualagent.agent.provider.ModelStatus
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
+import de.heckenmann.visualagent.agent.provider.capabilitySupport
+import de.heckenmann.visualagent.model.CapabilitySupport
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.stereotype.Service
 
@@ -30,6 +33,6 @@ class TaskModelCapabilities(
             }
             val model = provider.models.firstOrNull { it.id == modelId }
             if (model?.status in setOf(ModelStatus.DISABLED, ModelStatus.DEPRECATED)) return@runCatching false
-            model == null || !model.capabilitiesComplete || model.capabilities.any { it.equals("tools", ignoreCase = true) }
+            model == null || model.capabilitySupport(ModelCapability.TOOLS) != CapabilitySupport.UNSUPPORTED
         }.getOrDefault(false)
 }

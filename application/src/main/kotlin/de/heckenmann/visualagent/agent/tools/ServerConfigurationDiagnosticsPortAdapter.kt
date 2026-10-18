@@ -1,10 +1,13 @@
 package de.heckenmann.visualagent.agent.tools
 
+import de.heckenmann.visualagent.agent.provider.ModelCapability
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
+import de.heckenmann.visualagent.agent.provider.capabilitySupport
 import de.heckenmann.visualagent.agent.tools.api.EffectiveServerConfigurationDiagnostic
 import de.heckenmann.visualagent.agent.tools.api.ProviderConfigurationDiagnostic
 import de.heckenmann.visualagent.agent.tools.api.ServerConfigurationDiagnosticsPort
 import de.heckenmann.visualagent.config.AppConfigBean
+import de.heckenmann.visualagent.model.CapabilitySupport
 import org.springframework.stereotype.Component
 import java.net.URI
 
@@ -19,6 +22,7 @@ class ServerConfigurationDiagnosticsPortAdapter(
         val modelId = providerCatalog.activeModelId()
         val profile = providerCatalog.getProvider(providerId)
         val model = profile?.models?.firstOrNull { it.id == modelId }
+        val chatUnsupported = model?.capabilitySupport(ModelCapability.CHAT) == CapabilitySupport.UNSUPPORTED
         val warnings =
             buildList {
                 if (profile == null) {
@@ -30,6 +34,7 @@ class ServerConfigurationDiagnosticsPortAdapter(
                         add("The active model is disabled or filtered by provider selection rules.")
                     }
                 }
+                if (chatUnsupported) add("The active model declares CHAT unsupported.")
                 if (appConfig.contextLength <= 0) add("The configured context window must be positive.")
                 if (appConfig.timeoutSeconds <= 0) add("The configured timeout must be positive.")
                 if (appConfig.maxParallelSubAgents <= 0) add("The maximum parallel sub-agent count must be positive.")
@@ -46,6 +51,7 @@ class ServerConfigurationDiagnosticsPortAdapter(
                         add("active_model_not_selectable")
                     }
                 }
+                if (chatUnsupported) add("active_model_chat_unsupported")
                 if (appConfig.contextLength <= 0) add("context_window_non_positive")
                 if (appConfig.timeoutSeconds <= 0) add("timeout_non_positive")
                 if (appConfig.maxParallelSubAgents <= 0) add("max_parallel_sub_agents_non_positive")
@@ -63,6 +69,16 @@ class ServerConfigurationDiagnosticsPortAdapter(
                     modelOutputLimit = model?.outputLimit,
                     modelCapabilities = model?.capabilities.orEmpty().sorted(),
                     modelCapabilitiesComplete = model?.capabilitiesComplete ?: false,
+                    modelCapabilitiesOverridden = model?.capabilitiesOverridden ?: false,
+                    modelCapabilityOverrides = model?.capabilityOverrides.orEmpty(),
+                    modelCapabilityStates =
+                        model
+                            ?.let { selected ->
+                                ModelCapability.entries.associate {
+                                    it.name.lowercase() to
+                                        selected.capabilitySupport(it).name.lowercase()
+                                }
+                            }.orEmpty(),
                 ),
             contextWindow = appConfig.contextLength,
             timeoutSeconds = appConfig.timeoutSeconds,

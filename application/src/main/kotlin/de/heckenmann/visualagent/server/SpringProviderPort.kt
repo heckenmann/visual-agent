@@ -217,6 +217,7 @@ private fun ProviderModelConfig.toProtocol(): ProviderModel =
         capabilities = capabilities,
         capabilitiesComplete = capabilitiesComplete,
         capabilitiesOverridden = capabilitiesOverridden,
+        capabilityOverrides = capabilityOverrides,
     )
 
 private fun ProviderModel.toApplication(): ProviderModelConfig =
@@ -231,6 +232,7 @@ private fun ProviderModel.toApplication(): ProviderModelConfig =
         capabilities = capabilities,
         capabilitiesComplete = capabilitiesComplete,
         capabilitiesOverridden = capabilitiesOverridden,
+        capabilityOverrides = capabilityOverrides,
     )
 
 private fun ApplicationModelStatus.toProtocol(): ModelStatus = ModelStatus.valueOf(name)

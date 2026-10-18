@@ -1,5 +1,8 @@
 package de.heckenmann.visualagent.agent.provider
 
+import de.heckenmann.visualagent.model.CapabilitySupport
+import de.heckenmann.visualagent.model.capabilityKey
+import de.heckenmann.visualagent.model.capabilitySupport
 import kotlinx.serialization.Serializable
 
 /** Provider-neutral model features used for explicit, independently configurable agent work. */
@@ -16,17 +19,7 @@ enum class ModelCapability {
 
     companion object {
         /** Normalizes provider-reported capability strings without dropping unknown metadata. */
-        fun fromProviderValue(raw: String): ModelCapability? =
-            when (raw.trim().lowercase().replace('-', '_')) {
-                "chat", "completion", "generate_text" -> CHAT
-                "vision", "image_input" -> VISION
-                "audio_input", "transcription", "transcribe" -> AUDIO_INPUT
-                "audio_output", "speech", "tts" -> AUDIO_OUTPUT
-                "image_generation", "image_output" -> IMAGE_GENERATION
-                "embedding", "embeddings" -> EMBEDDING
-                "tools", "tool_calling", "function_calling" -> TOOLS
-                else -> null
-            }
+        fun fromProviderValue(raw: String): ModelCapability? = entries.firstOrNull { it.name.lowercase() == capabilityKey(raw) }
     }
 }
 
@@ -61,5 +54,9 @@ object OpenAiModelCapabilities {
 
 /** Resolves normalized feature declarations in the legacy persisted provider-capability format. */
 fun ProviderModelConfig.supportsCapability(capability: ModelCapability): Boolean =
-    capabilities.any { ModelCapability.fromProviderValue(it) == capability } ||
-        (!capabilitiesComplete && capability == ModelCapability.CHAT)
+    capabilitySupport(capability) == CapabilitySupport.SUPPORTED ||
+        (capability == ModelCapability.CHAT && capabilitySupport(capability) == CapabilitySupport.UNKNOWN)
+
+/** Resolves one feature independently, including explicit negative user overrides. */
+fun ProviderModelConfig.capabilitySupport(capability: ModelCapability): CapabilitySupport =
+    capabilitySupport(capability.name, capabilities, capabilitiesComplete, capabilityOverrides)
