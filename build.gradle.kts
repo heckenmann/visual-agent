@@ -183,6 +183,7 @@ tasks.named("check") {
         ":tool-standard:check",
         ":tool-javascript:check",
         ":tools:check",
+        ":task-core:check",
         "verifyCentralizedVersions",
         "verifyModuleDependencies",
         "verifyReactorBoundaries",
@@ -204,6 +205,7 @@ val verificationModules =
         ":tool-standard",
         ":tool-javascript",
         ":tools",
+        ":task-core",
     )
 val clientModules = listOf(":ui", ":protocol")
 
@@ -288,6 +290,7 @@ gradle.projectsEvaluated {
             ":tool-standard",
             ":tool-javascript",
             ":tools",
+            ":task-core",
         )
     val moduleMainSourceSets =
         moduleProjects.map { modulePath ->
@@ -374,6 +377,7 @@ tasks.register("ktlintCheck") {
         ":provider-openai-codex:ktlintCheck",
         ":tool-standard:ktlintCheck",
         ":tool-javascript:ktlintCheck",
+        ":task-core:ktlintCheck",
     )
 }
 
@@ -386,7 +390,7 @@ tasks.register("verifyModuleDependencies") {
     description = "Verifies the directed dependency graph between Visual Agent modules."
     doLast {
         val moduleDependencies =
-            setOf(":application", ":ui", ":protocol", ":desktop", ":agent-core", ":provider-core", ":provider-standard", ":provider-openai-codex", ":providers", ":tool-standard", ":tool-javascript", ":tools").associateWith { modulePath ->
+            setOf(":application", ":ui", ":protocol", ":desktop", ":agent-core", ":provider-core", ":provider-standard", ":provider-openai-codex", ":providers", ":tool-standard", ":tool-javascript", ":tools", ":task-core").associateWith { modulePath ->
                 project(modulePath)
                     .configurations
                     .filter { configuration -> !configuration.name.contains("test", ignoreCase = true) }
@@ -400,14 +404,15 @@ tasks.register("verifyModuleDependencies") {
             mapOf(
                 ":application" to setOf(":providers", ":tools", ":protocol"),
                 ":ui" to setOf(":protocol"),
-                ":protocol" to emptySet(),
+                ":protocol" to setOf(":task-core"),
+                ":task-core" to emptySet(),
                 ":desktop" to setOf(":ui", ":application", ":protocol"),
                 ":agent-core" to emptySet(),
                 ":provider-core" to setOf(":agent-core"),
                 ":provider-standard" to setOf(":agent-core", ":provider-core"),
                 ":provider-openai-codex" to setOf(":agent-core", ":provider-core"),
                 ":providers" to setOf(":provider-standard", ":provider-openai-codex"),
-                ":tool-standard" to emptySet(),
+                ":tool-standard" to setOf(":task-core"),
                 ":tool-javascript" to setOf(":agent-core", ":tool-standard"),
                 ":tools" to setOf(":tool-standard", ":tool-javascript"),
             )

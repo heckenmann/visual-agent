@@ -70,7 +70,7 @@ internal class AutonomousTodoDecompositionScheduler(
                     it.status == TodoStatus.PENDING &&
                         it.decompositionDepth == 0 &&
                         it.id !in attemptedTodoIds &&
-                        taskPlanner.isComplex(it.description)
+                        taskPlanner.shouldDecompose(it)
                 }
         if (todo == null) {
             decompositionActive.set(false)

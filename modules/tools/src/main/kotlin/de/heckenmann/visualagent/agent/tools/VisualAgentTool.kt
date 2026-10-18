@@ -14,6 +14,10 @@ interface VisualAgentTool {
      */
     val definition: ToolDefinition
 
+    /** Executable action identities for capability matching; null means no declared action catalog. */
+    val supportedActions: Set<String>?
+        get() = schemaToolActions(definition.inputSchema)
+
     /**
      * Whether this tool manages asynchronous execution and waiting internally.
      *
@@ -66,12 +70,15 @@ interface VisualAgentTool {
  * @throws IllegalArgumentException when this ID cannot produce a portable provider function name
  */
 fun ToolId.toFunctionName(): String {
-    val functionName = value.lowercase().replace(UNSAFE_FUNCTION_NAME_CHARACTERS, "_").trim('_')
+    val functionName = toReferenceName()
     require(PROVIDER_FUNCTION_NAME.matches(functionName)) {
         "Tool ID '$value' cannot produce a valid provider function name."
     }
     return functionName
 }
+
+/** Canonical informational name for persisted references, including tools unavailable to this runtime. */
+fun ToolId.toReferenceName(): String = value.lowercase().replace(UNSAFE_FUNCTION_NAME_CHARACTERS, "_").trim('_')
 
 private val UNSAFE_FUNCTION_NAME_CHARACTERS = Regex("[^a-z0-9]+")
 private val PROVIDER_FUNCTION_NAME = Regex("[a-z][a-z0-9_]{0,63}")

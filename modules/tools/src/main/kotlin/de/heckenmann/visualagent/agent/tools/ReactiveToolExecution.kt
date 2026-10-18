@@ -99,9 +99,14 @@ internal class ReactiveToolExecution(
                 Mono
                     .create<ToolResult> { sink ->
                         val execution =
-                            tool
-                                .executeReactive(functionInput, effectiveContext)
-                                .subscribeOn(Schedulers.boundedElastic())
+                            Mono
+                                .defer {
+                                    (effectiveContext["taskToolAccess"] as? TaskToolAccess)?.requireAllowed(
+                                        toolId,
+                                        parseObject(functionInput),
+                                    )
+                                    tool.executeReactive(functionInput, effectiveContext)
+                                }.subscribeOn(Schedulers.boundedElastic())
                                 .subscribe(
                                     sink::success,
                                     { error ->

@@ -154,18 +154,19 @@ data class SubAgent(
         onStreamReset: (() -> Unit)? = null,
         requestId: String? = null,
         toolScope: ToolExecutionScope = ToolExecutionScope(),
+        taskMetadata: Map<String, Any> = emptyMap(),
     ): Mono<String> =
         Mono.defer {
             val messages = todoWorkerMessages(this, description, enabledTools)
 
-            val executionMetadata = mapOf("toolExecutionScope" to toolScope)
+            val executionMetadata = taskMetadata + mapOf("toolExecutionScope" to toolScope)
             finishTodoToolWork(toolScope, token) { followUp ->
                 if (followUp == null) {
                     responseForTodo(messages, provider, enabledTools, token, onChunk, onStreamReset, requestId, executionMetadata)
                 } else {
                     onStreamReset?.invoke()
                     responseForTodo(
-                        listOf(Message("user", followUp)),
+                        messages + Message("user", followUp),
                         provider,
                         enabledTools,
                         token,
@@ -267,7 +268,7 @@ data class SubAgent(
         val capability = if (messages.any { it.images?.isNotEmpty() == true }) ModelCapability.VISION else ModelCapability.CHAT
         val modelSelection = config.modelSelection(capability)
         return ChatRequestContext(
-            messages = chatHistory + messages,
+            messages = (if (executionMetadata["excludeAgentHistory"] == true) emptyList() else chatHistory) + messages,
             provider = modelSelection.provider,
             model = modelSelection.model,
             variant = modelSelection.variant,
@@ -278,6 +279,7 @@ data class SubAgent(
                 executionMetadata + mapOf("agentId" to id, "agentName" to name, "agentRole" to role, "modelCapability" to capability.name) +
                     requestId?.let { mapOf("requestId" to it, "sessionId" to AgentManagerConstants.MAIN_SESSION_ID) }.orEmpty(),
             cancellationToken = token,
+            responseSchema = executionMetadata["taskResponseSchema"] as? ResponseSchema,
         )
     }
 

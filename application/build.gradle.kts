@@ -98,6 +98,9 @@ tasks.test {
     workingDir = rootProject.projectDir
     systemProperty("visualagent.ollama.smoke", System.getProperty("visualagent.ollama.smoke", "false"))
     systemProperty("visualagent.codex.smoke", System.getProperty("visualagent.codex.smoke", "false"))
+    System.getProperties().stringPropertyNames().filter { it.startsWith("visualagent.taskEval.") }.forEach { key ->
+        systemProperty(key, System.getProperty(key))
+    }
     jvmArgs("-Xshare:off", "-Xmx2g", "-Dkotlinx.coroutines.debug=off")
     // The root coverage gate consumes this execution data alongside current classes.
     outputs.cacheIf { false }
@@ -247,6 +250,7 @@ val kotlinMainSourceRoots =
         rootProject.projectDir.toPath().resolve("modules/providers/src/main/kotlin"),
         rootProject.projectDir.toPath().resolve("modules/provider-openai-codex/src/main/kotlin"),
         rootProject.projectDir.toPath().resolve("modules/tools/src/main/kotlin"),
+        rootProject.projectDir.toPath().resolve("modules/task-core/src/main/kotlin"),
     )
 val kotlinProductionSourceRoots =
     buildList {

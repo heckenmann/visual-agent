@@ -29,7 +29,7 @@ class TodoDecompositionGuardsTest {
     fun `still complex children are executable leaves rather than new analysis roots`() =
         runTest {
             val manager = TodoManager()
-            val parent = manager.add(description)
+            val parent = manager.addIfAbsent(description, "worker", planningContract(description)).todo
             manager.replaceWithChildren(parent, listOf(description))
             val leaf = manager.getPending().single()
             val planner = planner(manager, Mono.error(IllegalStateException("Leaf must not call the analyst")))
@@ -42,10 +42,24 @@ class TodoDecompositionGuardsTest {
     fun `equivalent single child falls back to the original task`() =
         runTest {
             val manager = TodoManager()
-            val parent = manager.add(description)
+            val parent = manager.addIfAbsent(description, "worker", planningContract(description)).todo
             val response = Mono.just(response("- Design   the architecture and integrate the complete pipeline"))
             assertFalse(planner(manager, response).expandComplexTodo(parent).awaitSingle())
             assertEquals(listOf(parent), manager.getAll())
+        }
+
+    @Test
+    fun `shared output paths preserve the executable parent instead of creating concurrent children`() =
+        runTest {
+            val manager = TodoManager()
+            val contract =
+                planningContract(description).let { original ->
+                    original.copy(deliverables = original.deliverables.map { it.copy(path = "shared.txt") })
+                }
+            val parent = manager.addIfAbsent(description, "worker", contract).todo
+            assertFalse(planner(manager, Mono.just(response(independentPlan))).expandComplexTodo(parent).awaitSingle())
+            assertEquals(listOf(parent), manager.getAll())
+            assertEquals(listOf(parent), manager.getPending())
         }
 
     @Test
@@ -57,14 +71,14 @@ class TodoDecompositionGuardsTest {
                 { manager, id -> manager.remove(id) },
             )) {
                 val manager = TodoManager()
-                val parent = manager.add(description)
+                val parent = manager.addIfAbsent(description, "worker", planningContract(description)).todo
                 val gate = Sinks.one<ChatResponse>()
                 val planner = planner(manager, gate.asMono())
                 val work = async { planner.expandComplexTodo(parent).awaitSingle() }
                 runCurrent()
                 mutation(manager, parent.id)
                 val expected = manager.getAll()
-                gate.tryEmitValue(response("- Inspect modules\n- Implement pipeline"))
+                gate.tryEmitValue(response(independentPlan))
                 assertFalse(work.await())
                 assertEquals(expected, manager.getAll())
             }
@@ -74,7 +88,15 @@ class TodoDecompositionGuardsTest {
         manager: TodoManager,
         response: Mono<ChatResponse>,
     ): AutonomousTaskPlanner {
-        val analyst = SubAgent(id = "analyst", name = "Analyst", role = "Analysis")
+        val analyst =
+            SubAgent(
+                id = "analyst",
+                name = "Analyst",
+                role = "Analysis",
+                config =
+                    de.heckenmann.visualagent.agent
+                        .AgentConfig(templateName = "analyst"),
+            )
         val provider = mockk<LLMProvider>()
         val tools = mockk<AgentToolConfigService>()
         every { tools.toolsFor(analyst) } returns emptySet()

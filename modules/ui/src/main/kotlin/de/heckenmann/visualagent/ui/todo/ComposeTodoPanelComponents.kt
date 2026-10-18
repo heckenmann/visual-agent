@@ -22,12 +22,9 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -79,6 +76,7 @@ internal fun ReorderableColumnScope.TodoRow(
             modifier = Modifier.fillMaxWidth().alpha(alpha).animateContentSize(),
             backgroundColor = containerColor,
         ) {
+            todo.executionGap?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 TodoDragHandle(modifier = Modifier.draggableHandle())
                 Column(modifier = Modifier.weight(1f)) {
@@ -110,7 +108,7 @@ internal fun ReorderableColumnScope.TodoRow(
                                         todo = todo,
                                         agents = agents,
                                         onCancel = dismiss,
-                                        onSave = { updatedDescription, updatedStatus, updatedAgentId ->
+                                        onSaveContract = { updatedDescription, updatedStatus, updatedAgentId, updatedContract ->
                                             actions.submit("edit:${todo.id}", {
                                                 check(
                                                     todoPort.update(
@@ -119,6 +117,8 @@ internal fun ReorderableColumnScope.TodoRow(
                                                             description = updatedDescription,
                                                             status = updatedStatus,
                                                             assignedAgentId = updatedAgentId,
+                                                            contract = updatedContract,
+                                                            replaceContract = updatedContract != todo.contract,
                                                         ),
                                                     ),
                                                 ) { "Todo changed while editing; reload and retry." }
@@ -151,7 +151,7 @@ internal fun ReorderableColumnScope.TodoRow(
                     ActionIconButton(
                         icon = Icons.Filled.Done,
                         description = "Complete todo",
-                        enabled = todo.status != TodoState.COMPLETED && todo.status != TodoState.CANCELLED,
+                        enabled = todo.contract == null && todo.status != TodoState.COMPLETED && todo.status != TodoState.CANCELLED,
                         onClick = {
                             actions.submit("complete:${todo.id}", {
                                 check(todoPort.updateStatus(todo.id, TodoState.COMPLETED)) { "Todo changed; reload and retry." }
@@ -251,54 +251,3 @@ internal fun TodoDragHandle(modifier: Modifier = Modifier) {
         }
     }
 }
-
-@Composable
-internal fun TodoEditor(
-    todo: TodoItem,
-    agents: List<AgentSummary>,
-    onCancel: () -> Unit,
-    onSave: (String, TodoState, String?) -> Unit,
-) {
-    var description by remember(todo.id) { mutableStateOf(todo.description) }
-    var status by remember(todo.id) { mutableStateOf(todo.status) }
-    var assignedAgentId by remember(todo.id) { mutableStateOf(todo.assignedAgentId ?: UNASSIGNED_AGENT_ID) }
-    val agentOptions =
-        listOf(PanelSelectOption(UNASSIGNED_AGENT_ID, "Unassigned")) +
-            agents.map { PanelSelectOption(it.id, it.name) }
-    ModalDialogLayout(
-        body = {
-            OutlinedTextField(
-                value = description,
-                onValueChange = { description = it },
-                label = { Text("Description") },
-                minLines = 2,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            PanelDropdownField(
-                label = "Status",
-                selectedValue = status.name,
-                options = TodoState.entries.map { PanelSelectOption(it.name, it.name.labelizeEnumName()) },
-                onSelected = { status = TodoState.valueOf(it) },
-            )
-            PanelDropdownField(
-                label = "Assigned agent",
-                selectedValue = assignedAgentId,
-                options = agentOptions,
-                onSelected = { assignedAgentId = it },
-            )
-        },
-        footer = {
-            modalSecondaryButton(label = "Cancel", onClick = onCancel)
-            modalSaveButton(
-                label = "Save todo",
-                enabled = description.isNotBlank(),
-                onClick = {
-                    val selectedAgent = assignedAgentId.takeIf { it != UNASSIGNED_AGENT_ID }
-                    onSave(description.trim(), status, selectedAgent)
-                },
-            )
-        },
-    )
-}
-
-internal const val UNASSIGNED_AGENT_ID = "__unassigned__"

@@ -48,6 +48,7 @@ class AutonomousCoordinator
         private val subAgentOps: SubAgentOpsProvider,
         private val executionControl: SubAgentExecutionControl? = null,
         private val retryDelay: (Long) -> Mono<Void> = { Mono.delay(Duration.ofMillis(it)).then() },
+        private val taskExecutionService: de.heckenmann.visualagent.task.TaskExecutionService? = null,
         private val toolScopes: () -> ToolExecutionScope = ::ToolExecutionScope,
     ) : AutoCloseable {
         private val logger = KotlinLogging.logger {}
@@ -64,13 +65,7 @@ class AutonomousCoordinator
         private val closed = AtomicBoolean(false)
         private val autonomousProcessingEnabled = AtomicBoolean(false)
         private val subscriptions = mutableListOf<AutoCloseable>()
-        private val taskPlanner =
-            AutonomousTaskPlanner(
-                todoManager = todoManager,
-                subAgents = subAgents,
-                llmProvider = llmProvider,
-                agentToolConfigService = agentToolConfigService,
-            )
+        private val taskPlanner = configuredTaskPlanner(todoManager, subAgents, llmProvider, agentToolConfigService)
         private val decompositionScheduler =
             AutonomousTodoDecompositionScheduler(
                 todoStore = todoStore,
@@ -101,6 +96,8 @@ class AutonomousCoordinator
                 decompositionScheduler = decompositionScheduler,
                 executionControl = executionControl,
             )
+
+        internal fun executionGap(todo: de.heckenmann.visualagent.todo.Todo): String? = taskPlanner.executionGap(todo)
 
         init {
             logger.info { "AutonomousCoordinator initialized" }
@@ -330,6 +327,7 @@ class AutonomousCoordinator
                                     conversationRequestId = requestId,
                                     retryDelay = retryDelay,
                                     toolScopes = toolScopes,
+                                    taskExecutionService = taskExecutionService,
                                     onRetryPending = { startTodo(it) },
                                     onCleanup = workSignal::signal,
                                     withLifecycleLock = { action -> withTodoLifecycleLock(action) },

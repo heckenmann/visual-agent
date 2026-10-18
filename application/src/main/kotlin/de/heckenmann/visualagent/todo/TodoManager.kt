@@ -86,12 +86,20 @@ class TodoManager(
     /** Creates work once under the store's atomic description guard. */
     fun addIfAbsent(
         description: String,
-        assignedAgentId: String,
+        assignedAgentId: String?,
+        contract: de.heckenmann.visualagent.task.TaskContract? = null,
     ): de.heckenmann.visualagent.knowledge.TodoCreation {
         require(description.isNotBlank()) { "Todo description must not be blank" }
+        contract?.let(de.heckenmann.visualagent.task.TaskContractCodec::validate)
         val creation =
             todoStore.createTodoIfAbsent(
-                Todo(UUID.randomUUID().toString(), description, position = nextPosition(), assignedAgentId = assignedAgentId),
+                Todo(
+                    UUID.randomUUID().toString(),
+                    description,
+                    position = nextPosition(),
+                    assignedAgentId = assignedAgentId,
+                    contract = contract?.copy(revision = 1),
+                ),
             )
         if (creation.created) publish(TodoChange(TodoChangeType.ADDED, creation.todo.copy()))
         return creation.copy(todo = creation.todo.copy())
@@ -113,7 +121,29 @@ class TodoManager(
         if (command.description?.isBlank() == true) return false
         if (command.assignment is TodoAssignmentChange.Set && command.assignment.agentId.isBlank()) return false
         val original = expected ?: getById(command.id) ?: return false
-        val candidate = original.copy()
+        val effectiveContract = if (command.replaceContract) command.contract else original.contract
+        val requiresVerification = original.contract != null || effectiveContract != null
+        if (command.status == TodoStatus.COMPLETED && requiresVerification && original.status != TodoStatus.COMPLETED) return false
+        if (command.replaceContract) command.contract?.let(de.heckenmann.visualagent.task.TaskContractCodec::validate)
+        val invalidatesAcceptance =
+            command.replaceContract ||
+                (command.description != null && command.description != original.description)
+        val candidate =
+            original.copy(
+                acceptedResult = if (invalidatesAcceptance) null else original.acceptedResult,
+                contract =
+                    if (command.replaceContract) {
+                        command.contract?.copy(
+                            revision = (original.contract?.revision ?: 0) + 1,
+                        )
+                    } else {
+                        original.contract
+                    },
+            )
+        if (invalidatesAcceptance && requiresVerification && original.status == TodoStatus.COMPLETED) {
+            candidate.status = TodoStatus.PENDING
+            candidate.completedAt = null
+        }
         command.description?.let { candidate.description = it }
         when (val assignment = command.assignment) {
             TodoAssignmentChange.Unchanged -> Unit
@@ -121,7 +151,7 @@ class TodoManager(
             is TodoAssignmentChange.Set -> candidate.assignedAgentId = assignment.agentId
         }
         command.status?.let { status ->
-            if (candidate.status != status) {
+            if (candidate.status != status && !(invalidatesAcceptance && requiresVerification && status == TodoStatus.COMPLETED)) {
                 candidate.status = status
                 candidate.completedAt = if (status == TodoStatus.COMPLETED) java.time.Instant.now() else null
                 if (status != TodoStatus.CANCELLED) candidate.terminalDetail = null

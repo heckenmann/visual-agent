@@ -41,3 +41,7 @@ The main agent can match todos to agent capabilities before assignment.
 - Unknown agents produce a `failure` result.
 - The response includes: id, name, role, status, model, template/config, tool list, current todo/task, and recent log entries.
 - The tool list is filtered by globally disabled tools.
+
+## Task-contract integration
+
+Optional persisted task contracts, capability routing, scoped execution and evidence-backed acceptance are specified in [UC-0000149](uc_0000149_execute_task_contracts.md). Legacy description-only tasks retain their existing behavior. Contracted tasks carry the immutable revision through worker/reviewer requests and durable attempt records; editing scope invalidates stale completion. Existing Todo/Conversation details distinguish attempts, unchecked evidence and accepted output. No implicit agent creation or dependency scheduling is added.

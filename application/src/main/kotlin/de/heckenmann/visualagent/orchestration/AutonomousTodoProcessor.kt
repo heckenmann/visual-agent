@@ -16,7 +16,6 @@ import de.heckenmann.visualagent.todo.TodoApproval
 import de.heckenmann.visualagent.todo.TodoChange
 import de.heckenmann.visualagent.todo.TodoEventBus
 import de.heckenmann.visualagent.todo.TodoManager
-import de.heckenmann.visualagent.todo.TodoProgressUpdate
 import de.heckenmann.visualagent.todo.TodoStatus
 import de.heckenmann.visualagent.todo.TodoTerminalReason
 import de.heckenmann.visualagent.todo.getByIdReactive
@@ -52,6 +51,7 @@ internal class AutonomousTodoProcessor(
     private val conversationRequestId: String? = null,
     private val retryDelay: (Long) -> Mono<Void>,
     private val toolScopes: () -> ToolExecutionScope = ::ToolExecutionScope,
+    private val taskExecutionService: de.heckenmann.visualagent.task.TaskExecutionService? = null,
     private val onRetryPending: (String) -> Unit = {},
     private val onCleanup: () -> Unit = {},
     private val withLifecycleLock: (() -> Unit) -> Unit = { it() },
@@ -59,9 +59,20 @@ internal class AutonomousTodoProcessor(
     private val logger = KotlinLogging.logger {}
     private val token = cancellationToken ?: CancellationToken()
     private var requestId = ""
-    private var executionId = ""
+    private val progress = TodoAttemptProgress(todoEventBus, todoId, agent.id)
     private var attempt = 0
     private var retryFeedback: String? = null
+    private val contractAttempt =
+        TaskAttemptSession(
+            agent,
+            claimedTodo,
+            todoManager,
+            agentToolConfigService,
+            taskPlanner,
+            token,
+            taskExecutionService,
+            taskDescription,
+        )
     private var cancelledByChange = false
     private var watcher: AutoCloseable? = null
     private val maxRetries = agent.config.maxRetries.coerceAtLeast(1)
@@ -72,7 +83,15 @@ internal class AutonomousTodoProcessor(
             if (activeCancellationTokens[todoId] !== token) return@defer Mono.empty()
             requestId = conversationRequestId ?: conversationOps.beginConversationRequest()
             val changeWatcher =
-                startTodoChangeWatcher(todoId, agent.id, claimedTodo.description, token, todoEventBus, claimedTodo.timelineSequence)
+                startTodoChangeWatcher(
+                    todoId,
+                    agent.id,
+                    claimedTodo.description,
+                    token,
+                    todoEventBus,
+                    claimedTodo.timelineSequence,
+                    claimedTodo.contract,
+                )
             watcher = changeWatcher
             val cancelled = Sinks.one<Void>()
             val registration = token.onCancelled { cancelled.tryEmitError(CancellationException("Todo execution cancelled")) }
@@ -129,32 +148,29 @@ internal class AutonomousTodoProcessor(
                             .publishOn(Schedulers.boundedElastic())
                             .then(
                                 Mono.defer {
-                                    resetProgress()
+                                    progress.begin()
                                     jobScheduler.runReactive(agent.id, "todo:$todoId") {
                                         agent.performTodoReactive(
                                             todoId,
-                                            taskDescription +
-                                                retryFeedback
-                                                    ?.let {
-                                                        "\n\nReview correction: $it\nInspect prior work; correct the missing parts without repeating successful side effects."
-                                                    }.orEmpty(),
+                                            contractAttempt.instruction(retryFeedback),
                                             llmProvider,
                                             memoryStore,
-                                            agentToolConfigService.toolsFor(agent),
+                                            contractAttempt.enabledTools(),
                                             token,
                                             requestId = requestId,
                                             toolScope = tools,
-                                            onChunk = { delta -> publishProgress(delta = delta) },
-                                            onStreamReset = ::resetProgress,
+                                            taskMetadata = contractAttempt.metadata(),
+                                            onChunk = { delta -> progress.publish(delta = delta) },
+                                            onStreamReset = progress::reset,
                                         )
                                     }
                                 },
                             ).flatMap { result ->
-                                publishProgress(completed = true, reviewing = true)
+                                progress.publish(completed = true, reviewing = true)
                                 allowed()
                                     .then(
                                         jobScheduler.runReactive(agent.id, "todo:$todoId") {
-                                            taskPlanner.reviewWorkerResult(todoId, taskDescription, result, token, tools.evidence())
+                                            contractAttempt.captureAndReview(result, tools, progress.attemptId, attempt + 1)
                                         },
                                     ).publishOn(Schedulers.boundedElastic())
                                     .flatMap { review -> handleReview(review, result) }
@@ -170,7 +186,7 @@ internal class AutonomousTodoProcessor(
                                 TodoTerminalReason.REVIEW_FAILED,
                                 "The worker finished, but its result could not be reviewed. No automatic worker retry was performed.",
                             )
-                        else -> retryFailure(error)
+                        else -> contractAttempt.recordFailure(progress.attemptId, attempt + 1, tools).then(retryFailure(error))
                     }
                 }
         }
@@ -181,7 +197,13 @@ internal class AutonomousTodoProcessor(
     ): Mono<Void> =
         Mono.defer {
             token.throwIfCancelled()
-            if (review.approved) {
+            if (contractAttempt.needsIntervention()) {
+                return@defer cancel(
+                    TodoTerminalReason.REVIEW_FAILED,
+                    "Task requires additional evidence or an available verifier. ${review.feedback}",
+                )
+            }
+            if (review.approved && contractAttempt.canAccept()) {
                 watcher?.close()
                 todoManager
                     .transitionReactive(
@@ -189,12 +211,21 @@ internal class AutonomousTodoProcessor(
                         TodoStatus.COMPLETED,
                         TodoTerminalReason.COMPLETED,
                         approval = TodoApproval(review.feedback, requestId),
+                        acceptedResult = contractAttempt.result?.copy(accepted = true, reviewFeedback = review.feedback),
                     ).publishOn(Schedulers.boundedElastic())
                     .doOnNext { completed ->
                         if (!completed) {
                             cancelledByChange = true
                         } else {
-                            persistTodoCompletion(agent, todoId, result, requestId, attempt + 1, executionId, conversationOps::persist)
+                            persistTodoCompletion(
+                                agent,
+                                todoId,
+                                result,
+                                requestId,
+                                attempt + 1,
+                                progress.attemptId,
+                                conversationOps::persist,
+                            )
                         }
                     }.then()
             } else {
@@ -248,42 +279,7 @@ internal class AutonomousTodoProcessor(
             todoManager.transitionReactive(claimedTodo, TodoStatus.CANCELLED, reason, detail).then()
         }
 
-    private fun persist(content: String) {
-        persistSubAgentMessage(
-            agent = agent,
-            content = content,
-            success = false,
-            persistMessage = { conversationOps.persist(it.copy(conversationRequestId = requestId)) },
-            attempt = attempt,
-            executionId = executionId,
-            todoId = todoId,
-        )
-    }
-
-    private fun resetProgress() {
-        executionId =
-            java.util.UUID
-                .randomUUID()
-                .toString()
-        publishProgress()
-    }
-
-    private fun publishProgress(
-        delta: String = "",
-        completed: Boolean = false,
-        reviewing: Boolean = false,
-    ) {
-        todoEventBus.publishProgress(
-            TodoProgressUpdate(
-                todoId = todoId,
-                delta = delta,
-                completed = completed,
-                executionId = executionId,
-                agentId = agent.id,
-                reviewing = reviewing,
-            ),
-        )
-    }
+    private fun persist(content: String) = progress.persist(agent, content, conversationOps, requestId, attempt)
 
     private fun cleanup(
         registration: AutoCloseable,
@@ -298,7 +294,7 @@ internal class AutonomousTodoProcessor(
             isActive,
             registration,
             watcher,
-            { publishProgress(completed = true) },
+            { progress.publish(completed = true) },
             activeCancellationTokens,
             pendingTodoChanges,
             agentBusySince,

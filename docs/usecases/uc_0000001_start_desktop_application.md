@@ -66,3 +66,4 @@ The user sees the Visual Agent main window and can interact with chat, session s
 - The portable Linux AppImage starts without installation and provides the same Visual Agent desktop window as the DEB and RPM packages.
 - The matching executable JAR starts with `java -jar` on its target platform and Java 24.
 - The splash, workspace header, native windows, and packaged launchers display the F2 Facette identity from the existing icon resources; see `docs/branding.md` for the SVG source and automatically generated Gradle assets.
+- The Gradle desktop run task can resolve native icon locations during configuration before branding generation runs. Its native application dependency generates the actual assets before launch; package CI also verifies the run task graph with `:desktop:run --dry-run`.

@@ -23,6 +23,7 @@ internal class AutonomousTodoCandidateSelector(
                 },
             subAgents,
             requestedTodoId = requestedTodoId,
+            isCompatible = taskPlanner::compatible,
             isAgentEligible = { agentId -> executionControl?.isExecutionAllowed(agentId) ?: true },
         )
 
@@ -38,6 +39,6 @@ internal class AutonomousTodoCandidateSelector(
     ): Boolean =
         requestedTodoId == null &&
             todo.decompositionDepth == 0 &&
-            taskPlanner.isComplex(todo.description) &&
+            taskPlanner.shouldDecompose(todo) &&
             !decompositionScheduler.hasAttemptedDecomposition(todo.id)
 }

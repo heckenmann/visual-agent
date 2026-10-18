@@ -78,3 +78,7 @@ user's current intent, while all events remain auditable.
 - Historical execution, memory, and runtime state are reference data rather than
   system instructions; they cannot override the newest user request.
 - Initial history and full audit history remain unchanged for the UI.
+
+## Task-contract integration
+
+Optional persisted task contracts, capability routing, scoped execution and evidence-backed acceptance are specified in [UC-0000149](uc_0000149_execute_task_contracts.md). Legacy description-only tasks retain their existing behavior. Contracted tasks carry the immutable revision through worker/reviewer requests and durable attempt records; editing scope invalidates stale completion. Existing Todo/Conversation details distinguish attempts, unchecked evidence and accepted output. No implicit agent creation or dependency scheduling is added.

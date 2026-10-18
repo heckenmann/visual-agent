@@ -1,5 +1,7 @@
 package de.heckenmann.visualagent.todo
 
+import de.heckenmann.visualagent.task.TaskAttemptResult
+import de.heckenmann.visualagent.task.TaskContract
 import java.time.Instant
 
 /**
@@ -55,6 +57,8 @@ data class Todo(
     val dueDate: Instant? = null,
     var terminalDetail: String? = null,
     val decompositionDepth: Int = 0,
+    val contract: TaskContract? = null,
+    val acceptedResult: TaskAttemptResult? = null,
 )
 
 /** Assignment mutation requested together with a todo update. */
@@ -78,4 +82,6 @@ internal data class TodoUpdateCommand(
     val assignment: TodoAssignmentChange = TodoAssignmentChange.Unchanged,
     val status: TodoStatus? = null,
     val terminalDetail: String? = null,
+    val contract: TaskContract? = null,
+    val replaceContract: Boolean = false,
 )

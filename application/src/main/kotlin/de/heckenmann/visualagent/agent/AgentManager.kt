@@ -61,6 +61,7 @@ class AgentManager
         internal val providerCatalog: ProviderCatalogService,
         internal val conversationCompletionEvents: ConversationCompletionEventBus,
         internal val todoToolScopeSource: TodoToolScopeSource,
+        internal val taskExecutionService: de.heckenmann.visualagent.task.TaskExecutionService? = null,
     ) : DisposableBean {
         internal constructor(
             stores: PersistenceStores,
@@ -150,6 +151,7 @@ class AgentManager
                     subAgentOps = subAgentOpsProvider,
                     executionControl = subAgentExecutionControl,
                     toolScopes = todoToolScopeSource::create,
+                    taskExecutionService = taskExecutionService,
                 )
             todoTrigger =
                 AgentTodoTrigger(
