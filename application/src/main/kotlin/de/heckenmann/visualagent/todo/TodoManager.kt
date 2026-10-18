@@ -121,7 +121,9 @@ class TodoManager(
         if (command.description?.isBlank() == true) return false
         if (command.assignment is TodoAssignmentChange.Set && command.assignment.agentId.isBlank()) return false
         val original = expected ?: getById(command.id) ?: return false
-        if (command.status == TodoStatus.COMPLETED && original.contract != null && original.status != TodoStatus.COMPLETED) return false
+        val effectiveContract = if (command.replaceContract) command.contract else original.contract
+        val requiresVerification = original.contract != null || effectiveContract != null
+        if (command.status == TodoStatus.COMPLETED && requiresVerification && original.status != TodoStatus.COMPLETED) return false
         if (command.replaceContract) command.contract?.let(de.heckenmann.visualagent.task.TaskContractCodec::validate)
         val invalidatesAcceptance =
             command.replaceContract ||
@@ -138,7 +140,7 @@ class TodoManager(
                         original.contract
                     },
             )
-        if (invalidatesAcceptance && original.contract != null && original.status == TodoStatus.COMPLETED) {
+        if (invalidatesAcceptance && requiresVerification && original.status == TodoStatus.COMPLETED) {
             candidate.status = TodoStatus.PENDING
             candidate.completedAt = null
         }
@@ -149,7 +151,7 @@ class TodoManager(
             is TodoAssignmentChange.Set -> candidate.assignedAgentId = assignment.agentId
         }
         command.status?.let { status ->
-            if (candidate.status != status && !(invalidatesAcceptance && original.contract != null && status == TodoStatus.COMPLETED)) {
+            if (candidate.status != status && !(invalidatesAcceptance && requiresVerification && status == TodoStatus.COMPLETED)) {
                 candidate.status = status
                 candidate.completedAt = if (status == TodoStatus.COMPLETED) java.time.Instant.now() else null
                 if (status != TodoStatus.CANCELLED) candidate.terminalDetail = null
