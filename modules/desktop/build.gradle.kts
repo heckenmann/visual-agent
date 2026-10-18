@@ -1,3 +1,4 @@
+import de.heckenmann.visualagent.gradle.GenerateBranding
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.tasks.SourceSetContainer
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
@@ -106,6 +107,19 @@ if (macOsDnsResolverClassifier != null) {
     }
 }
 
+val generatedBranding = rootProject.tasks.named<GenerateBranding>("generateBranding")
+val generatedBrandingDirectory = generatedBranding.flatMap { task -> task.outputDirectory }
+val generatedUiIcon = generatedBrandingDirectory.map { dir -> dir.file("ui/icons/visual-agent.png") }
+val generatedWindowsIcon = generatedBrandingDirectory.map { dir -> dir.file("packaging/visual-agent.ico") }
+val generatedMacOsIcon = generatedBrandingDirectory.map { dir -> dir.file("packaging/visual-agent.icns") }
+
+compose.resources {
+    customDirectory(
+        sourceSetName = "main",
+        directoryProvider = generatedBrandingDirectory.map { dir -> dir.dir("compose") },
+    )
+}
+
 compose.desktop {
     application {
         mainClass = "de.heckenmann.visualagent.desktop.DesktopMain"
@@ -142,14 +156,14 @@ compose.desktop {
             packageVersion = project.version.toString()
             macOS {
                 bundleID = "de.heckenmann.visualagent"
-                iconFile.set(project.file("packaging/icons/visual-agent.icns"))
+                iconFile.set(generatedMacOsIcon)
                 dockName = "Visual Agent"
             }
             windows {
-                iconFile.set(project.file("packaging/icons/visual-agent.ico"))
+                iconFile.set(generatedWindowsIcon)
             }
             linux {
-                iconFile.set(project.file("../ui/src/main/resources/icons/visual-agent.png"))
+                iconFile.set(generatedUiIcon)
                 packageName = "visual-agent"
             }
         }
@@ -191,7 +205,7 @@ installPackagedKeytool.configure {
 }
 
 tasks.matching { it.name == "createDistributable" }.configureEach {
-    dependsOn(installPackagedKeytool)
+    dependsOn(generatedBranding, installPackagedKeytool)
 }
 
 val linuxApplicationImage =
@@ -450,13 +464,13 @@ val prepareAppImage =
     tasks.register("prepareAppImage") {
         group = "distribution"
         description = "Prepares the portable Visual Agent AppDir from the native application image."
-        dependsOn("createDistributable")
+        dependsOn("createDistributable", generatedBranding)
         val desktopEntry = linuxJpackageResources.file("de.heckenmann.VisualAgent.desktop")
         val appRun = linuxJpackageResources.file("AppRun")
         inputs.dir(linuxApplicationImage)
         inputs.file(desktopEntry)
         inputs.file(appRun)
-        inputs.file(project.file("../ui/src/main/resources/icons/visual-agent.png"))
+        inputs.file(generatedUiIcon)
         outputs.dir(appImageDirectory)
         onlyIf {
             System.getProperty("os.name", "").contains("linux", ignoreCase = true) &&
@@ -476,7 +490,7 @@ val prepareAppImage =
             }
             copy {
                 from(appRun)
-                from(project.file("../ui/src/main/resources/icons/visual-agent.png"))
+                from(generatedUiIcon)
                 into(appDir)
                 rename("visual-agent.png", "de.heckenmann.VisualAgent.png")
             }
@@ -543,6 +557,8 @@ val prepareDevelopmentLinuxDesktopEntry =
     tasks.register("prepareDevelopmentLinuxDesktopEntry") {
         group = "application"
         description = "Prepares the temporary Linux desktop entry used while running Visual Agent from Gradle."
+        dependsOn(generatedBranding)
+        inputs.file(generatedUiIcon)
         val template = linuxJpackageResources.file("de.heckenmann.VisualAgent.development.desktop.template")
         inputs.file(template)
         outputs.file(developmentLinuxDesktopEntry)
@@ -553,7 +569,7 @@ val prepareDevelopmentLinuxDesktopEntry =
                     .asFile
                     .resolve("bin/Visual Agent")
                     .absolutePath
-            val icon = project.file("../ui/src/main/resources/icons/visual-agent.png").absolutePath
+            val icon = generatedUiIcon.get().asFile.absolutePath
             val desktopEntry = developmentLinuxDesktopEntry.get().asFile
             desktopEntry.parentFile.mkdirs()
             desktopEntry.writeText(
@@ -596,11 +612,13 @@ val verifyNativeDistributionIcons =
     tasks.register("verifyNativeDistributionIcons") {
         group = "verification"
         description = "Verifies that every native distribution has its required platform icon."
+        dependsOn(generatedBranding)
+        inputs.files(generatedMacOsIcon, generatedWindowsIcon, generatedUiIcon)
         doLast {
-            verifyIconFile(project.file("packaging/icons/visual-agent.icns"), byteArrayOf(0x69, 0x63, 0x6e, 0x73))
-            verifyIconFile(project.file("packaging/icons/visual-agent.ico"), byteArrayOf(0, 0, 1, 0))
+            verifyIconFile(generatedMacOsIcon.get().asFile, byteArrayOf(0x69, 0x63, 0x6e, 0x73))
+            verifyIconFile(generatedWindowsIcon.get().asFile, byteArrayOf(0, 0, 1, 0))
             verifyIconFile(
-                project.file("../ui/src/main/resources/icons/visual-agent.png"),
+                generatedUiIcon.get().asFile,
                 byteArrayOf(137.toByte(), 80, 78, 71, 13, 10, 26, 10),
             )
         }

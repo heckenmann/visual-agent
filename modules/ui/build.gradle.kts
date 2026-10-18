@@ -1,4 +1,6 @@
 
+import de.heckenmann.visualagent.gradle.GenerateBranding
+
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.serialization)
@@ -67,4 +69,9 @@ ktlint {
             .get(),
     )
     android.set(false)
+}
+
+val generatedBranding = rootProject.tasks.named<GenerateBranding>("generateBranding")
+sourceSets.named("main") {
+    resources.srcDir(generatedBranding.flatMap { task -> task.outputDirectory }.map { dir -> dir.dir("ui") })
 }
