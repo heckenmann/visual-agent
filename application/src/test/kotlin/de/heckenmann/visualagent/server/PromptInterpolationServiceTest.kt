@@ -71,7 +71,7 @@ class PromptInterpolationServiceTest {
             catalog.resolve(null, null, null, emptyMap())
             store.getConversationMessagesReactive("main", 8)
         }
-        assertEquals(listOf("system", "user", "assistant", "user"), request.captured.messages.map { it.role })
+        assertEquals(listOf("system", "user"), request.captured.messages.map { it.role })
         assertTrue(request.captured.enabledTools.isEmpty())
         assertEquals(256, request.captured.parameters.maxTokens)
         assertEquals(profile, request.captured.providerProfile)
