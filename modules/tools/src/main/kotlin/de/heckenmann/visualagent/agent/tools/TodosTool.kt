@@ -17,8 +17,9 @@ import kotlinx.serialization.json.jsonPrimitive
 @AgentTool
 class TodosTool(
     private val todos: TodoToolPort,
+    private val registry: org.springframework.beans.factory.ObjectProvider<ToolRegistry>? = null,
 ) : VisualAgentTool {
-    private val contractActions = TodoContractActions(todos)
+    private val contractActions = TodoContractActions(todos, TaskContractToolNames { registry?.getObject()?.toolDefinitions().orEmpty() })
 
     override val definition =
         ToolDefinition(
@@ -34,7 +35,8 @@ class TodosTool(
                     "expected?,sourceInputId?,required?,executionTool?}], " +
                     "constraints:[text],stopConditions:[text],requiredOperations:[{tool,action?}]," +
                     "policy:{tools?,actions?,resources?,includeAgentHistory?},reviewerAgentId?}. " +
-                    "Methods: FILE_EXISTS, TEXT_CONTAINS, JSON_VALID, SOURCE_QUOTE, MANUAL. tools use internal IDs. " +
+                    "Methods: FILE_EXISTS, TEXT_CONTAINS, JSON_VALID, SOURCE_QUOTE, MANUAL. " +
+                    "Tool references use the exact function names supplied by tool discovery. " +
                     "Null scope inherits; empty scope denies. Contract revisions are server-owned. " +
                     "get-contract {id} reads a contract; get-attempts {id,offset?} " +
                     "reads one bounded attempt per page and returns nextOffset. " +

@@ -12,6 +12,7 @@ import de.heckenmann.visualagent.agent.SubAgentJobScheduler
 import de.heckenmann.visualagent.agent.SubAgentOpsProvider
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
+import de.heckenmann.visualagent.agent.tools.toFunctionName
 import de.heckenmann.visualagent.knowledge.MemoryStore
 import de.heckenmann.visualagent.knowledge.PreferenceStore
 import de.heckenmann.visualagent.todo.TodoChange
@@ -158,6 +159,11 @@ internal fun buildFixture(
     every { toolConfig.mainAgentTools() } returns emptySet()
     every { toolConfig.toolsFor(any<SubAgent>()) } returns enabledWorkerTools
     every { toolConfig.registeredTools() } returns enabledWorkerTools
+    every { toolConfig.providerToolName(any()) } answers {
+        de.heckenmann.visualagent.agent.tools.api
+            .ToolId(firstArg<String>())
+            .toFunctionName()
+    }
     every { provider.chatReactive(any<ChatRequestContext>()) } answers {
         val ctx = it.invocation.args[0] as ChatRequestContext
         val isReview = ctx.metadata["sessionId"] == "review"

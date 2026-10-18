@@ -94,6 +94,9 @@ class AgentToolConfigService(
             ?.map { ToolId(it.value) }
             ?.toSet()
 
+    /** Resolves the model-visible function identity from the live registry. */
+    fun providerToolName(id: String): String = resolveProviderToolName(registry, id)
+
     /** Matches declared actions against executable implementations, rather than prompt prose. */
     fun supportsOperation(
         agent: SubAgent,

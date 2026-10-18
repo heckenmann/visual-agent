@@ -31,6 +31,7 @@ A bounded structured proposal maps existing parent criterion IDs onto two to eig
 ## Tool Calls
 
 - `todos`: add/update with optional contract; read `get-contract`, `get-attempts` (one bounded record per page, offset and nextOffset), and legacy summary `get-result`.
+- Contract tool references use registry function names (for example `workspace_file`) in model requests and responses. The server translates them to stable internal IDs before validation and persistence, and translates contract snapshots and tool evidence back for workers, decomposition, review and tool responses. Unknown function names fail without saving a contract.
 - `workspace_file`: only enabled actions and scoped normalized workspace paths.
 - `javascript_execute` and `tools_batch`: inherited task authority for nested operations when no explicit resource scope is present. Resource-scoped execution denies JavaScript entry points that cannot enforce the filesystem boundary.
 

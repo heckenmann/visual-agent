@@ -5,10 +5,13 @@ import de.heckenmann.visualagent.agent.CancellationToken
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
+import de.heckenmann.visualagent.task.mapToolNames
 import de.heckenmann.visualagent.todo.Todo
 import de.heckenmann.visualagent.todo.TodoManager
 import de.heckenmann.visualagent.todo.TodoStatus
 import de.heckenmann.visualagent.todo.replaceWithChildrenReactive
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import reactor.core.publisher.Mono
 
 /**
@@ -63,8 +66,7 @@ internal class AutonomousTaskPlanner(
                 de.heckenmann.visualagent.agent
                     .Message(
                         "user",
-                        de.heckenmann.visualagent.task.TaskContractCodec
-                            .encode(contract),
+                        Json.encodeToString(contract.mapToolNames(agentToolConfigService::providerToolName)),
                     ),
             )
         return analyst
@@ -127,7 +129,7 @@ internal class AutonomousTaskPlanner(
         } else {
             val required =
                 todo.contract.requiredOperations.joinToString { operation ->
-                    operation.tool + operation.action?.let { ":$it" }.orEmpty()
+                    agentToolConfigService.providerToolName(operation.tool) + operation.action?.let { ":$it" }.orEmpty()
                 }
             "No compatible configured agent for [$required]. Check enabled tools/actions, provider/model availability and task grants. " +
                 "Explicit assignments are not rerouted; configure a suitable existing agent or change the assignment."
@@ -138,7 +140,7 @@ internal class AutonomousTaskPlanner(
     fun buildWorkerInstruction(todo: Todo): String =
         todo.contract?.let {
             de.heckenmann.visualagent.task.TaskPrompts
-                .worker(it) + "\n\nOriginal task instructions:\n" + todo.description.take(8_192) +
+                .worker(it, agentToolConfigService::providerToolName) + "\n\nOriginal task instructions:\n" + todo.description.take(8_192) +
                 if (todo.description.length > 8_192) "\nRemaining task text omitted by context budget" else ""
         } ?: OrchestrationConstants.workerInstruction(todo.id, todo.description)
 
@@ -166,7 +168,15 @@ internal class AutonomousTaskPlanner(
                     ?: return Mono.error(WorkerReviewFailedException())
             }
         return service.evidence(contract).flatMap { evidence ->
-            reviewTaskContract(llmProvider, contract, result, evidence, reviewer?.config?.modelSelection(), token)
+            reviewTaskContract(
+                llmProvider,
+                contract,
+                result,
+                evidence,
+                reviewer?.config?.modelSelection(),
+                token,
+                agentToolConfigService::providerToolName,
+            )
         }
     }
 

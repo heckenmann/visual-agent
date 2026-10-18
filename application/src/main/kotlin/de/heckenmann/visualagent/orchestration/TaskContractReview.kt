@@ -11,7 +11,9 @@ import de.heckenmann.visualagent.task.TaskCheckMethod
 import de.heckenmann.visualagent.task.TaskCheckState
 import de.heckenmann.visualagent.task.TaskContract
 import de.heckenmann.visualagent.task.TaskObservation
+import de.heckenmann.visualagent.task.mapToolNames
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import reactor.core.publisher.Mono
 
@@ -31,12 +33,14 @@ internal fun reviewTaskContract(
     evidence: de.heckenmann.visualagent.task.TaskReviewEvidence,
     selection: ModelSelection?,
     token: CancellationToken,
+    toolName: (String) -> String = { it },
 ): Mono<Pair<WorkerReviewResult, TaskAttemptResult>> {
     val schema =
         ResponseSchema(
             """{"type":"object","properties":{"verdict":{"enum":["APPROVED","RETRY"]},"feedback":{"type":"string"},"criteria":{"type":"array","items":{"type":"object","properties":{"criterionId":{"type":"string"},"state":{"enum":["PASSED","FAILED","NOT_CHECKED"]},"detail":{"type":"string"}},"required":["criterionId","state","detail"],"additionalProperties":false}}},"required":["verdict","feedback","criteria"],"additionalProperties":false}""",
         )
 
+    /** Retries one malformed review response without rerunning the worker. */
     fun evaluate(attempt: Int): Mono<Pair<WorkerReviewResult, TaskAttemptResult>> =
         Mono.defer {
             token.throwIfCancelled()
@@ -55,9 +59,9 @@ internal fun reviewTaskContract(
                             ),
                             Message(
                                 "user",
-                                "Contract:\n${de.heckenmann.visualagent.task.TaskContractCodec.encode(
-                                    contract,
-                                )}\nAttempt:\n${result.encode()}\nActual content:\n${evidence.text}",
+                                "Contract:\n${Json.encodeToString(
+                                    contract.mapToolNames(toolName),
+                                )}\nAttempt:\n${result.mapToolNames(toolName).encode()}\nActual content:\n${evidence.text}",
                             ),
                         ),
                     provider = selection?.provider,

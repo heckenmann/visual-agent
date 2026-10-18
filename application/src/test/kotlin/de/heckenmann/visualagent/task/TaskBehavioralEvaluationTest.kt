@@ -24,6 +24,7 @@ import java.nio.file.Files
 import java.time.Duration
 import java.util.UUID
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -140,6 +141,7 @@ class TaskBehavioralEvaluationTest {
                     assertTrue(fixture.coordinator.startTodo(todo.id))
                     withTimeout(15_000) { fixture.awaitTodoStatus(todo.id, case.terminal) }
                     val stored = fixture.todoManager.getById(todo.id)!!
+                    assertFalse(fixture.providerRequests.any { request -> request.messages.any { it.content.contains("workspace:file") } })
                     assertEquals(case.accepted, stored.acceptedResult?.accepted == true)
                     val records = attempts.list(todo.id).collectList().block(Duration.ofSeconds(5))!!
                     assertEquals(1, records.size)
