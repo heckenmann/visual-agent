@@ -5,6 +5,8 @@ import com.github.jk1.license.render.ReportRenderer
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.testing.Test
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 plugins {
     base
@@ -151,7 +153,7 @@ val verifyGeneratedBranding =
             check(image.width == 1024 && image.height == 1024) { "Application PNG is not 1024 x 1024." }
             val ico = directory.resolve("packaging/visual-agent.ico").readBytes()
             check(ico.size > 118) { "Windows ICO is incomplete." }
-            val icoHeader = java.nio.ByteBuffer.wrap(ico).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+            val icoHeader = ByteBuffer.wrap(ico).order(ByteOrder.LITTLE_ENDIAN)
             check(icoHeader.short.toInt() == 0 && icoHeader.short.toInt() == 1 && icoHeader.short.toInt() == 7) {
                 "Windows ICO has an invalid icon directory."
             }
@@ -159,7 +161,7 @@ val verifyGeneratedBranding =
             check(icns.size > 8 && icns.copyOfRange(0, 4).toString(Charsets.US_ASCII) == "icns") {
                 "macOS ICNS header is missing."
             }
-            check(java.nio.ByteBuffer.wrap(icns).getInt(4) == icns.size) { "macOS ICNS length is invalid." }
+            check(ByteBuffer.wrap(icns).getInt(4) == icns.size) { "macOS ICNS length is invalid." }
         }
     }
 
