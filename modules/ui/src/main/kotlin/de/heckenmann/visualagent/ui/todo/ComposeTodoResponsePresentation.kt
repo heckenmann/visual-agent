@@ -98,6 +98,17 @@ internal class TodoResponseState {
         isReviewing = false
     }
 
+    /** Hydrates saved output without discarding an already received completion or review phase. */
+    fun hydrateOutput(
+        response: String,
+        restoredAgentId: String? = null,
+        restoredAttempts: List<de.heckenmann.visualagent.task.TaskAttemptResult> = emptyList(),
+    ) {
+        text = response
+        if (agentId == null) agentId = restoredAgentId
+        attempts = restoredAttempts
+    }
+
     /** Restores persisted output when a conversation panel is opened. */
     fun restore(
         response: String,
