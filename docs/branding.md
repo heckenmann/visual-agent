@@ -2,50 +2,46 @@
 
 The application uses the selected **F2 Facette** mark: a closed eye with a
 stronger upper lid and a four-point star with a diagonally detached right tip.
-The separated facet suggests an AI impulse becoming an independent visual
-object. The artwork contains no letters, gradients, shadows, or embedded images.
+The artwork contains no letters, gradients, shadows, or embedded images.
 
-## Source and color
+## Canonical SVG
 
 The single editable source is
 `modules/ui/src/main/resources/icons/visual-agent.svg` with a 512 × 512 viewBox.
-The application-icon treatment uses Material3 dark primary **#D0BCFF** on dark
-surface **#141218**, from the baseline `darkColorScheme()` used by
-`ComposeWorkspaceTheme`. The dark tile preserves contrast when the same
-application icon appears on either light or dark UI and operating-system
-backgrounds. Transparent outer corners preserve the rounded tile.
+The icon uses Material3 dark primary **#D0BCFF** over dark surface **#141218**.
+The same dark tile works with light/dark UI themes and OS backgrounds.
 
-Keep the mark's proportions fixed. For freestanding uses, leave at least the
-height of the detached facet (approximately 26 viewBox units) clear around the
-eye; the app tile already includes a 48-unit horizontal inset.
-
-The diagonal gap becomes less distinct below 32 pixels. The small ICO sizes
-retain the complete selected F2 geometry, without claiming that the detached
-facet remains separately recognizable at 16 pixels. No trademark clearance
-is implied by adoption of this design.
-
-## Regenerate derived icons
-
-Install Inkscape and Python 3 with Pillow, then run:
+## Build-generated icon assets
 
 ```bash
-python3 scripts/generate-app-icons.py
+./gradlew generateBranding
+./gradlew verifyGeneratedBranding
 ```
 
-This updates the existing resources automatically consumed by the application:
+All application icons are automatically generated from the SVG during the normal
+Gradle resource-processing, packaging and verification tasks. No manual
+Inkscape, Python, Pillow or other native imaging tools are required. The
+build-only Apache Batik renderer generates PNGs on the JVM. PNGs are then packed
+into standard Windows ICO and macOS ICNS containers.
 
-| Asset | Existing consumer |
+Files are written below `build/generated/branding/` at the repository root:
+
+| Generated path | Consumers |
 | --- | --- |
-| `modules/ui/src/main/resources/icons/visual-agent.png` | Workspace header, `AppIdentity`, Linux packaging and development launcher |
-| `modules/desktop/src/main/composeResources/drawable/visual_agent.png` | Splash and native Compose window icons |
-| `modules/desktop/packaging/icons/visual-agent.ico` | Windows installer icon, sizes 16, 24, 32, 48, 64, 128, 256 |
-| `modules/desktop/packaging/icons/visual-agent.icns` | macOS bundle icon |
+| `ui/icons/visual-agent.png` | Workspace header, `AppIdentity`, Linux launcher and AppImage |
+| `compose/drawable/visual_agent.png` | Splash and Compose native window icons |
+| `packaging/visual-agent.ico` | Windows EXE/MSI icon, 16, 24, 32, 48, 64, 128, 256 px |
+| `packaging/visual-agent.icns` | macOS bundle and Dock icon, 16 to 1024 px |
 
-The README uses the source SVG directly. No resource-path or application-code
-changes are needed. Both PNG copies are byte-identical exports of the source;
-ICO and ICNS contain size-specific raster representations of the same artwork.
+Both PNGs are byte-identical 1024 × 1024 exports. The Gradle task declares
+tracked SVG inputs and output directories for incremental builds and caching.
+The root `check` task validates image signatures, dimensions and consistency,
+while the desktop packaging verification checks native icon signatures.
 
-The SVG is ordinary Git text. All derived PNG, ICO, and ICNS files are stored
-through Git LFS; checkouts must download LFS objects before building. Existing
-CI checkout steps already enable `lfs: true`. Replacing the assets removes the
-old artwork from the current tree without rewriting repository history.
+The README references the SVG directly. The only application icon committed
+to Git is the SVG; generated raster and native icon assets are neither checked
+in nor stored in Git LFS. The existing LFS settings remain for unrelated binary
+assets. Native installers are built on their respective CI operating systems.
+
+The small icon sizes retain the complete geometry but the detached facet is
+less legible below 32 px. No trademark clearance is implied.

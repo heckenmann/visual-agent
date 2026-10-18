@@ -17,6 +17,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import de.heckenmann.visualagent.desktop.generated.resources.Res
 import de.heckenmann.visualagent.protocol.ThemeMode
 import de.heckenmann.visualagent.ui.workspace.isSystemInDarkTheme
 import de.heckenmann.visualagent.ui.workspace.visualAgentDarkColorScheme
@@ -99,6 +100,23 @@ class ComposeStartupBackgroundTest {
         )
         compose.onNodeWithText("Startup status").assertIsDisplayed()
     }
+
+    @Test
+    fun `bundled images include both startup backgrounds and generated branding`() =
+        runBlocking {
+            val signature = byteArrayOf(137.toByte(), 80, 78, 71, 13, 10, 26, 10)
+            listOf(
+                "files/startup_background_light.png",
+                "files/startup_background_dark.png",
+                "drawable/visual_agent.png",
+            ).forEach { path ->
+                val imageBytes = Res.readBytes(path)
+                assertTrue(
+                    imageBytes.take(signature.size).toByteArray().contentEquals(signature),
+                    "Compose resource is missing or invalid: $path",
+                )
+            }
+        }
 
     @Test
     fun `bundled variants have identical HiDPI dimensions`() =

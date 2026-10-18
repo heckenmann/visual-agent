@@ -1,9 +1,12 @@
 import com.github.jk1.license.render.CsvReportRenderer
+import de.heckenmann.visualagent.gradle.GenerateBranding
 import com.github.jk1.license.render.InventoryHtmlReportRenderer
 import com.github.jk1.license.render.ReportRenderer
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.testing.Test
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 plugins {
     base
@@ -124,8 +127,50 @@ repositories {
     mavenCentral()
 }
 
+val generateBranding =
+    tasks.register<GenerateBranding>("generateBranding") {
+        group = "build"
+        description = "Renders PNG, ICO and ICNS icons from the canonical Visual Agent SVG."
+        sourceSvg.set(layout.projectDirectory.file("modules/ui/src/main/resources/icons/visual-agent.svg"))
+        outputDirectory.set(layout.buildDirectory.dir("generated/branding"))
+    }
+
+val verifyGeneratedBranding =
+    tasks.register("verifyGeneratedBranding") {
+        group = "verification"
+        description = "Verifies that the generated icons have valid headers, dimensions and consistent content."
+        dependsOn(generateBranding)
+        val generated = generateBranding.flatMap { it.outputDirectory }
+        inputs.dir(generated)
+        doLast {
+            val directory = generated.get().asFile
+            val uiPng = directory.resolve("ui/icons/visual-agent.png").readBytes()
+            val composePng = directory.resolve("compose/drawable/visual_agent.png").readBytes()
+            check(uiPng.contentEquals(composePng)) { "Generated UI and Compose PNG icons differ." }
+            val pngHeader = ByteBuffer.wrap(uiPng)
+            check(uiPng.size >= 24 && uiPng.copyOfRange(0, 8).contentEquals(byteArrayOf(
+                137.toByte(), 80, 78, 71, 13, 10, 26, 10,
+            ))) { "Generated application icon has an invalid PNG signature." }
+            check(pngHeader.getInt(16) == 1024 && pngHeader.getInt(20) == 1024) {
+                "Application PNG is not 1024 x 1024."
+            }
+            val ico = directory.resolve("packaging/visual-agent.ico").readBytes()
+            check(ico.size > 118) { "Windows ICO is incomplete." }
+            val icoHeader = ByteBuffer.wrap(ico).order(ByteOrder.LITTLE_ENDIAN)
+            check(icoHeader.short.toInt() == 0 && icoHeader.short.toInt() == 1 && icoHeader.short.toInt() == 7) {
+                "Windows ICO has an invalid icon directory."
+            }
+            val icns = directory.resolve("packaging/visual-agent.icns").readBytes()
+            check(icns.size > 8 && icns.copyOfRange(0, 4).toString(Charsets.US_ASCII) == "icns") {
+                "macOS ICNS header is missing."
+            }
+            check(ByteBuffer.wrap(icns).getInt(4) == icns.size) { "macOS ICNS length is invalid." }
+        }
+    }
+
 tasks.named("check") {
     dependsOn(
+        verifyGeneratedBranding,
         ":application:check",
         ":ui:check",
         ":protocol:check",
