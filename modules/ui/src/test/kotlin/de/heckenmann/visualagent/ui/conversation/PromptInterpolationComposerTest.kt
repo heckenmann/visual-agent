@@ -9,10 +9,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import de.heckenmann.visualagent.protocol.ConversationInputPlacement
 import org.junit.Rule
@@ -86,10 +86,10 @@ class PromptInterpolationComposerTest {
                 }
             }
         }
-        compose.onNodeWithText("Interpolating prompt…").assertDoesNotExist()
+        val idleBounds = compose.onNodeWithTag("composer").getBoundsInRoot()
         compose.onNodeWithContentDescription("Refine prompt").performClick()
         compose.mainClock.advanceTimeBy(240)
-        compose.onNodeWithText("Interpolating prompt…").assertIsDisplayed()
+        assertEquals(idleBounds, compose.onNodeWithTag("composer").getBoundsInRoot())
         compose.onNodeWithContentDescription("Refine prompt").assertIsNotEnabled()
         assertEquals(1, requests)
         val before = compose.onNodeWithTag("composer").captureToImage().toPixelMap()
@@ -98,7 +98,7 @@ class PromptInterpolationComposerTest {
         assertTrue((0 until before.width).any { x -> (0 until before.height).any { y -> before[x, y] != after[x, y] } })
         compose.onNodeWithContentDescription("Cancel prompt interpolation").performClick()
         compose.mainClock.advanceTimeBy(240)
-        compose.onNodeWithText("Interpolating prompt…").assertDoesNotExist()
+        assertEquals(idleBounds, compose.onNodeWithTag("composer").getBoundsInRoot())
         compose.onNodeWithContentDescription("Send message").assertIsDisplayed()
     }
 }

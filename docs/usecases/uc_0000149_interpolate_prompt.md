@@ -15,7 +15,7 @@ Turn a draft into a precise, concise, self-contained prompt by recovering releva
 2. Click **Refine prompt** to rewrite without sending. Alternatively enable automatic interpolation to rewrite once before the existing send/queue action.
 3. Read the latest eight conversation records by default (configurable from five to ten). Include only user/assistant text that fits the model context budget; omit tools, audit records, attachments and assistant reasoning.
 4. Send a separate tool-free request without persisting the auxiliary draft or response. Encode the draft and eligible chronological conversation as distinct JSON fields in a single user message; conversation records are reference data, not live turns to continue. Include JSON escaping and structure in token budgeting. Preserve intent, language and explicit constraints. Resolve references within the draft itself first, then consult recent conversation; replace every unambiguous reference even when the original sentence is already understandable. Recover only relevant omitted details clearly established by the user or unambiguously referenced in the draft. The final draft overrides conflicting history; assistant suggestions are not user requirements without evidence of acceptance. Preserve code, identifiers, quoted text, examples, placeholders and requested output formats. Return only the rewritten prompt, without answering or executing it.
-5. Show the themed Magic wand and animated sparkles while the request runs. Keep cancellation and editing available.
+5. While the request runs, animate only the existing wand icon with a gentle sway and breathing theme-accent halo. Do not add a status row or change composer height. The button exposes indeterminate progress and an accessible state description, with a progress tooltip. Keep cancellation and editing available; restore the stationary icon when the request ends.
 6. Replace the draft with the result for manual review, or forward it to the existing send/queue action in automatic mode. An unchanged manually refined draft is reused; queue draining does not interpolate again.
 
 ## Alternative Flows
@@ -24,6 +24,7 @@ Turn a draft into a precise, concise, self-contained prompt by recovering releva
 - Invalid, disabled or unavailable explicit assignments fail rather than silently switching models.
 - Oversized drafts are rejected before inference. Older context is omitted rather than truncating the draft.
 - If a reference has multiple plausible referents or its context is missing, preserve the unresolved wording rather than guessing. Do not introduce generic roles, reasoning instructions, output formats or unrelated history to make a prompt appear more elaborate.
+- Animation changes only the icon's drawing layer: it never rotates text, moves the button hit target, or changes layout. Its progress semantics remain indeterminate rather than implying a completion percentage. Compose's motion-duration scale governs the animation.
 
 ## Rewrite Examples and Verification
 - Given a conversation about the Download button, "It should be disabled during the download" can become "The Download button should be disabled during the download."
@@ -40,7 +41,7 @@ Turn a draft into a precise, concise, self-contained prompt by recovering releva
 - `ConversationPort.interpolate`
 - `PromptInterpolationService` and `PromptInterpolationContext`
 - `PromptInterpolationController` and `rememberPromptInterpolationController`
-- `PromptInterpolationMagic` and the conversation composers
+- `promptInterpolationIconModifier`, `ComposerActions` and the conversation composers
 - `promptInterpolationSettings` and `SpringSettingsPort`
 
 ## Related Issues

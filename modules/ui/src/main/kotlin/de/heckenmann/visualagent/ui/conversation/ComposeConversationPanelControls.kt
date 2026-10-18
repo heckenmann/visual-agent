@@ -150,7 +150,6 @@ internal fun ConversationInputArea(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
             )
         }
-        if (interpolating) PromptInterpolationMagic()
         if (interpolationNotice.isNotBlank()) {
             Text(interpolationNotice, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 12.dp))
         }
@@ -179,7 +178,7 @@ internal fun ConversationInputArea(
             minLines = 1,
             maxLines = 5,
             trailingIcon = {
-                ComposerActions(input, sending, interpolationBusy, contextReduced, onInterpolate, onSend, onCancel)
+                ComposerActions(input, sending, interpolationBusy, contextReduced, onInterpolate, onSend, onCancel, interpolating)
             },
             modifier =
                 Modifier

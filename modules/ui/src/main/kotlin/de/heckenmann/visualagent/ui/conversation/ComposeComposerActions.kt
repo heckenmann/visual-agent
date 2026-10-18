@@ -9,6 +9,13 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.ui.components.ActionIconButton
 
@@ -22,6 +29,7 @@ internal fun ComposerActions(
     onInterpolate: () -> Unit,
     onSend: () -> Unit,
     onCancel: () -> Unit,
+    interpolating: Boolean = false,
 ) {
     Row {
         ActionIconButton(
@@ -29,7 +37,16 @@ internal fun ComposerActions(
             description = "Refine prompt",
             onClick = onInterpolate,
             enabled = input.isNotBlank() && !busy,
-            modifier = Modifier.size(40.dp),
+            tooltipDescription = if (interpolating) "Interpolating prompt…" else "Refine prompt",
+            modifier =
+                Modifier.size(40.dp).testTag("prompt-interpolation-action").semantics {
+                    if (interpolating) {
+                        liveRegion = LiveRegionMode.Polite
+                        progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate
+                        stateDescription = "Interpolating prompt"
+                    }
+                },
+            iconModifier = promptInterpolationIconModifier(interpolating),
         )
         if (sending || busy) {
             ActionIconButton(
