@@ -50,7 +50,7 @@ internal class ConversationTodoState {
         if (token != generation || !initialLoadPending) return
         loadedResponses.forEach { snapshot ->
             if (snapshot.todoId !in progressedDuringLoad) {
-                responseFor(snapshot.todoId).restore(snapshot.text, snapshot.agentId, snapshot.attempts)
+                responseFor(snapshot.todoId).hydrateOutput(snapshot.text, snapshot.agentId, snapshot.attempts)
             }
         }
         todos =
@@ -87,7 +87,7 @@ internal class ConversationTodoState {
 
     /** Preserves live execution state when an older persisted response finishes loading. */
     fun applyProgress(update: TodoProgress) {
-        if (initialLoadPending) progressedDuringLoad += update.todoId
+        if (initialLoadPending && (!update.completed || update.delta.isNotEmpty())) progressedDuringLoad += update.todoId
         responseFor(update.todoId).apply(update.executionId, update.agentId, update.delta, update.completed, update.reviewing)
     }
 

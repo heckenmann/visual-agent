@@ -152,6 +152,33 @@ class ConversationTodoInitialLoadTest {
     }
 
     @Test
+    fun `terminal only progress retains saved output and the current review phase`() {
+        listOf(false, true).forEach { reviewing ->
+            val state = ConversationTodoState()
+            val token = state.initialLoadToken()
+            val holder = state.responseFor("finished")
+            state.applyProgress(TodoProgress("finished", completed = true, executionId = "run", agentId = "worker", reviewing = reviewing))
+            state.restoreInitialSnapshots(token, emptyList(), emptyList(), listOf(TodoResponseSnapshot("finished", "Saved output")))
+            assertSame(holder, state.responseFor("finished"))
+            assertEquals("Saved output", holder.text)
+            assertEquals("run", holder.executionId)
+            assertEquals("worker", holder.agentId)
+            assertEquals(reviewing, holder.isReviewing)
+            assertEquals(false, holder.isStreaming)
+        }
+    }
+
+    @Test
+    fun `empty start for a new execution must not hydrate the previous result`() {
+        val state = ConversationTodoState()
+        val token = state.initialLoadToken()
+        state.applyProgress(TodoProgress("retry", executionId = "new", agentId = "worker"))
+        state.restoreInitialSnapshots(token, emptyList(), emptyList(), listOf(TodoResponseSnapshot("retry", "Previous result")))
+        assertEquals("", state.responseFor("retry").text)
+        assertTrue(state.responseFor("retry").isStreaming)
+    }
+
+    @Test
     fun `clear invalidates a pending initial snapshot`() {
         val state = ConversationTodoState()
         val token = state.initialLoadToken()
