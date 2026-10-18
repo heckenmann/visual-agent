@@ -103,6 +103,9 @@ jobs:
       - name: Verify packages
         run: env -u DISPLAY -u WAYLAND_DISPLAY ./gradlew verifyPackages --build-cache --no-daemon --parallel --max-workers=4
 
+      - name: Verify desktop run task configuration
+        run: env -u DISPLAY -u WAYLAND_DISPLAY ./gradlew :desktop:run --dry-run --no-daemon
+
       - name: Verify executable JARs can launch
         shell: bash
         run: |

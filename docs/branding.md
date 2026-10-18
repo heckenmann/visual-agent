@@ -38,6 +38,12 @@ tracked SVG inputs and output directories for incremental builds and caching.
 The root `check` task validates image signatures, dimensions and consistency,
 while the desktop packaging verification checks native icon signatures.
 
+Compose reads native icon locations while configuring its `run` task. Those
+paths use Gradle's `locationOnly` provider; the native `createDistributable`
+task explicitly depends on `generateBranding` before consuming icon content.
+The package CI job also configures `:desktop:run --dry-run` to catch startup
+task configuration failures without launching a graphical application.
+
 The README references the SVG directly. The only application icon committed
 to Git is the SVG; generated raster and native icon assets are neither checked
 in nor stored in Git LFS. The existing LFS settings remain for unrelated binary

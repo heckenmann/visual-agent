@@ -109,9 +109,11 @@ if (macOsDnsResolverClassifier != null) {
 
 val generatedBranding = rootProject.tasks.named<GenerateBranding>("generateBranding")
 val generatedBrandingDirectory = generatedBranding.flatMap { task -> task.outputDirectory }
-val generatedUiIcon = generatedBrandingDirectory.map { dir -> dir.file("ui/icons/visual-agent.png") }
-val generatedWindowsIcon = generatedBrandingDirectory.map { dir -> dir.file("packaging/visual-agent.ico") }
-val generatedMacOsIcon = generatedBrandingDirectory.map { dir -> dir.file("packaging/visual-agent.icns") }
+// Compose queries icon paths while configuring run; createDistributable separately requires the generated content.
+val generatedIconDirectory = generatedBranding.get().outputDirectory.locationOnly
+val generatedUiIcon = generatedIconDirectory.map { dir -> dir.file("ui/icons/visual-agent.png") }
+val generatedWindowsIcon = generatedIconDirectory.map { dir -> dir.file("packaging/visual-agent.ico") }
+val generatedMacOsIcon = generatedIconDirectory.map { dir -> dir.file("packaging/visual-agent.icns") }
 
 // Compose processes resources from a registered custom directory as one resource set.
 // Include the existing splash/onboarding images alongside the build-generated icon,
