@@ -67,7 +67,7 @@ class ProviderCatalogService(
      */
     fun saveProvider(profile: ProviderProfile) {
         mutate { state ->
-            val normalizedProfile = profile.withSelectableCodexDefault()
+            val normalizedProfile = profile.withSelectedCredentialRoute().withSelectableCodexDefault()
             val providers = state.providers.filterNot { it.id == normalizedProfile.id } + normalizedProfile
             require(providers.any(ProviderProfile::enabled)) { "At least one provider profile must remain enabled" }
             val nextActiveProviderId =
@@ -105,7 +105,7 @@ class ProviderCatalogService(
     }
 
     private fun validatedCatalogState(configuration: ProviderConfiguration): CatalogState {
-        val providers = configuration.providers.map { profile -> profile.withSelectableCodexDefault() }
+        val providers = configuration.providers.map { profile -> profile.withSelectedCredentialRoute().withSelectableCodexDefault() }
         require(providers.map(ProviderProfile::id).all { it.isNotBlank() }) { "Provider identifiers must not be blank" }
         require(providers.map(ProviderProfile::id).distinct().size == providers.size) { "Provider identifiers must be unique" }
         require(providers.any(ProviderProfile::enabled)) { "At least one provider profile must remain enabled" }

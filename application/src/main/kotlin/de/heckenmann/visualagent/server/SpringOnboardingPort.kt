@@ -145,13 +145,24 @@ class SpringOnboardingPort(
             name = name.trim(),
             adapter = ApplicationProviderAdapter.valueOf(adapter.name),
             baseUrl = baseUrl.trim(),
-            apiKey = key,
+            apiKey =
+                if (adapter == ProviderAdapter.CODEX_DIRECT &&
+                    directAuthMode == de.heckenmann.visualagent.protocol.DirectProviderAuthMode.CHATGPT_OAUTH
+                ) {
+                    ""
+                } else {
+                    key
+                },
             enabled = enabled,
             defaultModel = defaultModel,
             models = existing?.models.orEmpty(),
             options = existing?.options.orEmpty(),
             modelWhitelist = existing?.modelWhitelist.orEmpty(),
             modelBlacklist = existing?.modelBlacklist.orEmpty(),
+            directAuthMode =
+                de.heckenmann.visualagent.agent.provider.DirectProviderAuthMode
+                    .valueOf(directAuthMode.name),
+            credentialReference = credentialReference,
         )
     }
 
@@ -161,10 +172,19 @@ class SpringOnboardingPort(
             name = name,
             adapter = ProviderAdapter.valueOf(adapter.name),
             baseUrl = baseUrl,
-            credentialConfigured = apiKey.isNotBlank(),
+            credentialConfigured =
+                if (directAuthMode == de.heckenmann.visualagent.agent.provider.DirectProviderAuthMode.CHATGPT_OAUTH) {
+                    credentialReference != null
+                } else {
+                    apiKey.isNotBlank()
+                },
             enabled = enabled,
             defaultModel = defaultModel,
             models = models.map { model -> model.toProtocol() },
+            directAuthMode =
+                de.heckenmann.visualagent.protocol.DirectProviderAuthMode
+                    .valueOf(directAuthMode.name),
+            credentialReference = credentialReference,
         )
 
     private fun ApplicationProviderModel.toProtocol(): ProviderModel =
@@ -227,6 +247,8 @@ class SpringOnboardingPort(
                 draft.id,
                 draft.name,
                 draft.adapter.name,
+                draft.directAuthMode.name,
+                draft.credentialReference.orEmpty(),
                 draft.baseUrl,
                 credentialMarker,
                 draft.enabled,

@@ -147,6 +147,10 @@ private fun de.heckenmann.visualagent.protocol.ProviderProfile.toApplication(): 
             },
         modelWhitelist = modelWhitelist,
         modelBlacklist = modelBlacklist,
+        directAuthMode =
+            de.heckenmann.visualagent.agent.provider.DirectProviderAuthMode
+                .valueOf(directAuthMode.name),
+        credentialReference = credentialReference,
     )
 
 private val UI_SCALE_PERCENT_RANGE = 50..200

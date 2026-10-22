@@ -1,5 +1,24 @@
 # Architecture
 
+## Direct Codex Provider
+
+`:provider-codex-direct` supplies the separate `CODEX_DIRECT` adapter through the
+existing provider router. It uses Spring AI's Responses model and the existing
+permission-aware tool registry, not the Codex executable or a second agent runtime.
+The existing `CODEX_CLI`, `OPENAI_COMPATIBLE`, and `OLLAMA` adapters retain their
+identities. See [the design and route matrix](codex-direct-provider.md).
+
+Each direct profile explicitly selects ChatGPT OAuth or Platform API-key billing.
+Failures must never trigger another credential route. OAuth credentials stay in
+owner-protected server files; protocol responses and provider profiles carry only
+opaque references. Browser authorization uses a request-scoped loopback listener.
+An external browser cannot reach a remote server's loopback address without an
+explicit forwarding arrangement; no public callback listener is opened implicitly.
+
+Native Responses replay is separate from visible conversation text and scoped to
+the originating profile and model. Migration V7 persists that payload. It must not
+be exposed through ordinary UI DTOs or reused after a provider/model switch.
+
 ## Overview
 
 Visual Agent is a Compose Multiplatform desktop application with a transport boundary between presentation and Spring-managed services.

@@ -181,6 +181,7 @@ tasks.named("check") {
         ":provider-standard:check",
         ":providers:check",
         ":provider-openai-codex:check",
+        ":provider-codex-direct:check",
         ":tool-standard:check",
         ":tool-javascript:check",
         ":tools:check",
@@ -203,6 +204,7 @@ val verificationModules =
         ":provider-core",
         ":provider-standard",
         ":provider-openai-codex",
+        ":provider-codex-direct",
         ":providers",
         ":tool-standard",
         ":tool-javascript",
@@ -260,6 +262,7 @@ tasks.named("build") {
         ":provider-standard:build",
         ":providers:build",
         ":provider-openai-codex:build",
+        ":provider-codex-direct:build",
         ":tool-standard:build",
         ":tool-javascript:build",
         ":tools:build",
@@ -290,6 +293,7 @@ gradle.projectsEvaluated {
             ":provider-core",
             ":provider-standard",
             ":provider-openai-codex",
+            ":provider-codex-direct",
             ":providers",
             ":tool-standard",
             ":tool-javascript",
@@ -380,6 +384,7 @@ tasks.register("ktlintCheck") {
         ":provider-core:ktlintCheck",
         ":provider-standard:ktlintCheck",
         ":provider-openai-codex:ktlintCheck",
+        ":provider-codex-direct:ktlintCheck",
         ":tool-standard:ktlintCheck",
         ":tool-javascript:ktlintCheck",
         ":task-core:ktlintCheck",
@@ -395,7 +400,7 @@ tasks.register("verifyModuleDependencies") {
     description = "Verifies the directed dependency graph between Visual Agent modules."
     doLast {
         val moduleDependencies =
-            setOf(":application", ":ui", ":protocol", ":desktop", ":agent-core", ":model-core", ":provider-core", ":provider-standard", ":provider-openai-codex", ":providers", ":tool-standard", ":tool-javascript", ":tools", ":task-core").associateWith { modulePath ->
+            setOf(":application", ":ui", ":protocol", ":desktop", ":agent-core", ":model-core", ":provider-core", ":provider-standard", ":provider-openai-codex", ":provider-codex-direct", ":providers", ":tool-standard", ":tool-javascript", ":tools", ":task-core").associateWith { modulePath ->
                 project(modulePath)
                     .configurations
                     .filter { configuration -> !configuration.name.contains("test", ignoreCase = true) }
@@ -417,7 +422,8 @@ tasks.register("verifyModuleDependencies") {
                 ":provider-core" to setOf(":agent-core", ":model-core"),
                 ":provider-standard" to setOf(":agent-core", ":provider-core"),
                 ":provider-openai-codex" to setOf(":agent-core", ":provider-core"),
-                ":providers" to setOf(":provider-standard", ":provider-openai-codex"),
+                ":provider-codex-direct" to setOf(":provider-core", ":provider-standard"),
+                ":providers" to setOf(":provider-standard", ":provider-openai-codex", ":provider-codex-direct"),
                 ":tool-standard" to setOf(":task-core"),
                 ":tool-javascript" to setOf(":agent-core", ":tool-standard"),
                 ":tools" to setOf(":tool-standard", ":tool-javascript"),
@@ -542,6 +548,7 @@ tasks.register("verifyCentralizedVersions") {
             "modules/provider-core/build.gradle.kts",
             "modules/providers/build.gradle.kts",
             "modules/provider-openai-codex/build.gradle.kts",
+            "modules/provider-codex-direct/build.gradle.kts",
             "modules/providers-bundle/build.gradle.kts",
             "modules/tools/build.gradle.kts",
             "modules/tool-javascript/build.gradle.kts",

@@ -41,6 +41,7 @@ internal fun providerConnectionSection(
     onFavoriteChanged: (Boolean) -> Unit,
     onModelCapabilitiesChanged: (String, Boolean?) -> Unit = { _, _ -> },
     onResetLegacyCapabilities: () -> Unit = {},
+    authorizationControls: @Composable () -> Unit = {},
 ) {
     PanelSection(title = "Main agent connection") {
         OutlinedButton(
@@ -71,6 +72,7 @@ internal fun providerConnectionSection(
             onEdit = onEditProvider,
             onRemove = onRemoveProvider,
         )
+        authorizationControls()
         HorizontalDivider()
         LegacyCapabilityReset(draft, onResetLegacyCapabilities)
         modelSettingsContent(

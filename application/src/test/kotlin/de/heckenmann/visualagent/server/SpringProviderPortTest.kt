@@ -11,6 +11,7 @@ import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.protocol.ModelStatus
 import de.heckenmann.visualagent.protocol.ProviderAdapter
+import de.heckenmann.visualagent.protocol.ProviderModel
 import de.heckenmann.visualagent.protocol.ProviderProfile
 import io.mockk.every
 import io.mockk.mockk
@@ -164,6 +165,28 @@ class SpringProviderPortTest {
                 )
             }
             verify(exactly = 0) { catalog.updateDiscoveredModels(any(), any()) }
+            verify(exactly = 0) { catalog.updateDiscoveredModelConfigs(any(), any()) }
+        }
+
+    @Test
+    fun `staged discovery refreshes reported limits and preserves limits omitted by every adapter`() =
+        runTest {
+            ProviderAdapter.entries.forEach { adapter ->
+                val existing = ProviderModel("model", options = mapOf("custom" to "retained"), contextLimit = 8192, outputLimit = 1024)
+                val staged = ProviderProfile("profile", "Profile", adapter, "https://example.test", models = listOf(existing))
+                listOf(
+                    ProviderModelConfig("model", contextLimit = 98304, outputLimit = 4096),
+                    ProviderModelConfig("model"),
+                ).forEach { response ->
+                    every { provider.getModelConfigsReactive(any<ApplicationProviderProfile>()) } returns Mono.just(listOf(response))
+
+                    val discovered = port.discoverModels(staged).single()
+
+                    assertEquals(response.contextLimit ?: existing.contextLimit, discovered.contextLimit)
+                    assertEquals(response.outputLimit ?: existing.outputLimit, discovered.outputLimit)
+                    assertEquals(existing.options, discovered.options)
+                }
+            }
             verify(exactly = 0) { catalog.updateDiscoveredModelConfigs(any(), any()) }
         }
 

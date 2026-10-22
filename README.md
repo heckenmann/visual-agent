@@ -76,9 +76,10 @@ The project uses an acyclic Gradle module graph:
 ```text
 :desktop ──► :ui + :application + :protocol
 :application ──► :providers + :tools + :protocol
-:providers ──► :provider-standard + :provider-openai-codex
+:providers ──► :provider-standard + :provider-openai-codex + :provider-codex-direct
 :provider-standard ──► :provider-core + :agent-core
 :provider-openai-codex ──► :provider-core + :agent-core
+:provider-codex-direct ──► :provider-core + :provider-standard
 :tools ──► :tool-standard + :tool-javascript
 :tool-javascript ──► :tool-standard + :agent-core
 :ui ──► :protocol
@@ -100,6 +101,7 @@ modules/model-core/   # :model-core, pure capability evidence and override resol
 modules/provider-core/ # :provider-core
 modules/providers/    # :provider-standard
 modules/provider-openai-codex/ # :provider-openai-codex
+modules/provider-codex-direct/ # CLI-independent Responses and explicit OAuth/API-key authentication
 modules/providers-bundle/ # :providers
 modules/tools/        # :tool-standard
 modules/tool-javascript/ # :tool-javascript

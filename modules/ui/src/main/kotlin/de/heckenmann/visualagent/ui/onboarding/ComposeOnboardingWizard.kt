@@ -43,6 +43,7 @@ fun ComposeOnboardingWizard(
     onFinished: () -> Unit,
     skipRequested: Boolean = false,
     onSkipRequestHandled: () -> Unit = {},
+    providers: de.heckenmann.visualagent.protocol.ProviderPort? = null,
 ) {
     var profiles by remember { mutableStateOf<List<OnboardingProviderProfile>>(emptyList()) }
     var loadingProfiles by remember { mutableStateOf(true) }
@@ -170,6 +171,15 @@ fun ComposeOnboardingWizard(
                                 selected = selected,
                                 customDraft = customDraft,
                                 loading = loadingProfiles,
+                                authorizationControls = { providerDraft ->
+                                    OnboardingDirectAuthorization(providerDraft, providers) { changed ->
+                                        selected = null
+                                        customDraft = changed
+                                        models = emptyList()
+                                        selectedModel = null
+                                        validationError = null
+                                    }
+                                },
                                 onSelect = {
                                     selected = it
                                     customDraft = null
