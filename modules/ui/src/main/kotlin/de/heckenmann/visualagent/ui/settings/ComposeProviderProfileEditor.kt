@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import de.heckenmann.visualagent.protocol.DirectProviderAuthMode
 import de.heckenmann.visualagent.protocol.ProviderAdapter
 import de.heckenmann.visualagent.protocol.ProviderModel
 import de.heckenmann.visualagent.protocol.ProviderProfile
@@ -38,6 +39,7 @@ internal data class ProviderProfileFormState(
     val enabled: Boolean = true,
     val defaultModel: String = "",
     val optionsText: String = "",
+    val directAuthMode: DirectProviderAuthMode = DirectProviderAuthMode.API_KEY,
 )
 
 /** Edits one provider profile without exposing application or Spring types to the UI module. */
@@ -87,7 +89,9 @@ internal fun ProviderProfileEditor(
                                     state.apiKey
                                 },
                             baseUrl =
-                                if (adapter ==
+                                if (adapter == ProviderAdapter.CODEX_DIRECT) {
+                                    "https://api.openai.com"
+                                } else if (adapter ==
                                     ProviderAdapter.CODEX_CLI
                                 ) {
                                     ""
@@ -97,33 +101,41 @@ internal fun ProviderProfileEditor(
                         )
                 },
             )
+            if (state.adapter == ProviderAdapter.CODEX_DIRECT) {
+                DirectProviderAuthenticationFields(state.directAuthMode) { mode ->
+                    state = state.copy(directAuthMode = mode)
+                }
+            }
             if (state.adapter != ProviderAdapter.CODEX_CLI) {
                 OutlinedTextField(
                     value = state.baseUrl,
                     onValueChange = { state = state.copy(baseUrl = it) },
                     label = { Text("Base URL") },
                     singleLine = true,
+                    readOnly = state.adapter == ProviderAdapter.CODEX_DIRECT,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
-                    value = state.apiKey,
-                    onValueChange = { state = state.copy(apiKey = it) },
-                    label = { Text("API key") },
-                    singleLine = true,
-                    visualTransformation = if (apiKeyVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                    trailingIcon = {
-                        TextButton(
-                            onClick = { apiKeyVisible = !apiKeyVisible },
-                        ) {
-                            Icon(
-                                imageVector = if (apiKeyVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                                contentDescription = null,
-                            )
-                            Text(if (apiKeyVisible) "Hide" else "Show")
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                if (state.adapter != ProviderAdapter.CODEX_DIRECT || state.directAuthMode == DirectProviderAuthMode.API_KEY) {
+                    OutlinedTextField(
+                        value = state.apiKey,
+                        onValueChange = { state = state.copy(apiKey = it) },
+                        label = { Text("API key") },
+                        singleLine = true,
+                        visualTransformation = if (apiKeyVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            TextButton(
+                                onClick = { apiKeyVisible = !apiKeyVisible },
+                            ) {
+                                Icon(
+                                    imageVector = if (apiKeyVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                    contentDescription = null,
+                                )
+                                Text(if (apiKeyVisible) "Hide" else "Show")
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
             OutlinedTextField(
                 value = state.defaultModel,
@@ -168,7 +180,7 @@ internal fun ProviderProfileEditor(
 }
 
 internal fun ProviderProfile.toFormState(): ProviderProfileFormState =
-    ProviderProfileFormState(id, name, adapter, baseUrl, apiKey, enabled, defaultModel, options.toSettingsMapText())
+    ProviderProfileFormState(id, name, adapter, baseUrl, apiKey, enabled, defaultModel, options.toSettingsMapText(), directAuthMode)
 
 internal fun newProviderFormState(): ProviderProfileFormState =
     ProviderProfileFormState(
@@ -201,13 +213,25 @@ private fun ProviderProfileFormState.toProviderProfile(existing: ProviderProfile
             name = name.trim(),
             adapter = adapter,
             baseUrl = baseUrl.trim(),
-            apiKey = apiKey.trim(),
+            apiKey =
+                if (adapter == ProviderAdapter.CODEX_DIRECT &&
+                    directAuthMode == DirectProviderAuthMode.CHATGPT_OAUTH
+                ) {
+                    ""
+                } else {
+                    apiKey.trim()
+                },
             enabled = enabled,
             defaultModel = selectedDefault,
             options = optionsText.toSettingsMap(),
             models = models,
             modelWhitelist = existing?.modelWhitelist.orEmpty(),
             modelBlacklist = existing?.modelBlacklist.orEmpty(),
+            directAuthMode = if (adapter == ProviderAdapter.CODEX_DIRECT) directAuthMode else DirectProviderAuthMode.API_KEY,
+            credentialReference =
+                existing?.credentialReference?.takeIf {
+                    adapter == ProviderAdapter.CODEX_DIRECT && directAuthMode == DirectProviderAuthMode.CHATGPT_OAUTH
+                },
         )
     }
 

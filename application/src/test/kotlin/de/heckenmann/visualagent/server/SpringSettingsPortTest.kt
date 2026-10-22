@@ -21,6 +21,40 @@ import de.heckenmann.visualagent.protocol.ThemeMode as ProtocolThemeMode
 /** Verifies that settings exposed to the UI are read from and written to the server bean. */
 class SpringSettingsPortTest {
     @Test
+    fun `saving settings preserves the explicit direct OAuth mode and credential reference`() {
+        val catalog = mockk<ProviderCatalogService>(relaxed = true)
+        val port = SpringSettingsPort(AppConfigBean(), catalog, memoryStore())
+        val provider =
+            ProviderProfile(
+                "direct",
+                "Direct",
+                ProviderAdapter.CODEX_DIRECT,
+                "https://api.openai.com",
+                defaultModel = "selected",
+                models = listOf(ProviderModel("selected")),
+                directAuthMode = de.heckenmann.visualagent.protocol.DirectProviderAuthMode.CHATGPT_OAUTH,
+                credentialReference = "opaque-reference",
+            )
+
+        port.save(
+            SettingsSnapshot(providerId = "direct", modelId = "selected"),
+            ProviderConfiguration(listOf(provider), "direct", "selected"),
+        )
+
+        verify {
+            catalog.replaceConfiguration(
+                match { configuration ->
+                    configuration.providers.single().let { saved ->
+                        saved.directAuthMode == de.heckenmann.visualagent.agent.provider.DirectProviderAuthMode.CHATGPT_OAUTH &&
+                            saved.credentialReference == "opaque-reference" &&
+                            saved.apiKey.isEmpty()
+                    }
+                },
+            )
+        }
+    }
+
+    @Test
     fun `snapshot reflects persisted server configuration`() {
         val config = AppConfigBean()
         config.llmProvider = "openai"

@@ -23,6 +23,8 @@ data class OnboardingProviderProfile(
     val enabled: Boolean,
     val defaultModel: String,
     val models: List<ProviderModel>,
+    val directAuthMode: DirectProviderAuthMode = DirectProviderAuthMode.API_KEY,
+    val credentialReference: String? = null,
 )
 
 /** Write-only instruction for the credential of one staged provider configuration. */
@@ -48,6 +50,8 @@ data class OnboardingProviderDraft(
     val credential: CredentialUpdate = CredentialUpdate.Unchanged,
     val enabled: Boolean = true,
     val defaultModel: String = "",
+    val directAuthMode: DirectProviderAuthMode = DirectProviderAuthMode.API_KEY,
+    val credentialReference: String? = null,
 )
 
 /** Safe result of validating a staged provider or selected model. */

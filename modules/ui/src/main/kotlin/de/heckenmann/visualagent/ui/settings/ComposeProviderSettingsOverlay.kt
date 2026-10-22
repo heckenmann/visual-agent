@@ -249,21 +249,17 @@ internal fun providerSettingsOverlay(
                     contextLimit = selectedContextLimit,
                     refreshing = refreshing,
                     onRunOnboarding = onRunOnboarding,
-                    onProviderSelected = { providerId ->
-                        val nextModels =
-                            draft.providers
-                                .firstOrNull { it.id == providerId }
-                                ?.selectableModels()
-                                .orEmpty()
-                        val previous =
-                            if (providerId == persisted.providerId) {
-                                persisted.modelId
-                            } else {
-                                draft.providers.firstOrNull { it.id == providerId }?.defaultModel
+                    authorizationControls = {
+                        selectedProvider?.let { profile ->
+                            DirectAuthorizationControls(profile, providerPort) { id, reference ->
+                                draft = draft.withDirectCredentialReference(id, reference)
                             }
-                        val modelId = previous?.takeIf(String::isNotBlank) ?: nextModels.firstOrNull()?.id.orEmpty()
-                        selectModel(providerId, modelId)
-                        refreshModels(draft.providers.firstOrNull { it.id == providerId }, previous)
+                        }
+                    },
+                    onProviderSelected = { providerId ->
+                        val selection = draft.selectionForProvider(persisted, providerId)
+                        selectModel(providerId, selection.modelId)
+                        refreshModels(draft.providers.firstOrNull { it.id == providerId }, selection.preferredModelId)
                     },
                     onAddProvider = { creatingProfile = true },
                     onEditProvider = { editingProfile = selectedProvider },

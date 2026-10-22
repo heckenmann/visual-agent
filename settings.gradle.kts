@@ -11,6 +11,7 @@ include(
     ":provider-core",
     ":provider-standard",
     ":provider-openai-codex",
+    ":provider-codex-direct",
     ":providers",
     ":tool-standard",
     ":tool-javascript",
@@ -26,6 +27,7 @@ project(":model-core").projectDir = file("modules/model-core")
 project(":provider-core").projectDir = file("modules/provider-core")
 project(":provider-standard").projectDir = file("modules/providers")
 project(":provider-openai-codex").projectDir = file("modules/provider-openai-codex")
+project(":provider-codex-direct").projectDir = file("modules/provider-codex-direct")
 project(":providers").projectDir = file("modules/providers-bundle")
 project(":tool-standard").projectDir = file("modules/tools")
 project(":tool-javascript").projectDir = file("modules/tool-javascript")
