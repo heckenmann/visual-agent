@@ -262,6 +262,7 @@ internal class AgentManagerConversationStreamingOps(
                     id = id,
                     assistantToolTurn = toolTurn,
                     conversationRequestId = requestId,
+                    providerReplay = turn?.takeUnless { round in telemetryOmittedRounds }?.providerReplay,
                 )
             persist(message)
         }

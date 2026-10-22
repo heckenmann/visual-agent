@@ -83,6 +83,7 @@ internal object ProviderTurnResponseMapper {
                 Message(
                     role = "assistant",
                     content = if (normalizeContent) ProviderResponseContentNormalizer.normalize(turn.content) else turn.content,
+                    providerReplay = turn.providerReplay,
                 ),
             done = turn.finishReason != null,
             totalDuration = turn.timing?.totalMillis?.times(NANOS_PER_MILLI),

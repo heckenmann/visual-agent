@@ -121,6 +121,7 @@ class TestPersistence internal constructor(
         turnOrder: Int?,
         assistantToolTurn: Boolean,
         conversationRequestId: String?,
+        providerReplay: de.heckenmann.visualagent.agent.ProviderReplayState?,
     ): String =
         conversationStore.saveConversationMessage(
             id,
@@ -133,6 +134,7 @@ class TestPersistence internal constructor(
             turnOrder,
             assistantToolTurn,
             conversationRequestId,
+            providerReplay,
         )
 
     /** Persists a test conversation message with a generated identifier. */
