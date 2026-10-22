@@ -259,6 +259,7 @@ internal class AgentConversationHistoryOps(
                     message.turnOrder,
                     message.assistantToolTurn,
                     message.conversationRequestId,
+                    message.providerReplay,
                 )
             val record = owner.conversationStore.getConversationMessage(id)
             val persisted =
@@ -298,6 +299,7 @@ internal class AgentConversationHistoryOps(
                     turnOrder = it.turnOrder,
                     assistantToolTurn = it.assistantToolTurn,
                     conversationRequestId = it.conversationRequestId,
+                    providerReplay = it.providerReplay,
                 )
             }
 

@@ -34,6 +34,7 @@ internal object ProviderTurnAccumulator {
             usage = next.usage ?: current.usage,
             timing = next.timing ?: current.timing,
             metadata = next.metadata.takeUnless { it == ProviderResponseMetadata() } ?: current.metadata,
+            providerReplay = next.providerReplay ?: current.providerReplay,
         )
     }
 }

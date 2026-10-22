@@ -64,12 +64,13 @@ class OpenAiPromptFactory(
     fun buildPrompt(
         request: ChatRequestContext,
         selectedModel: String,
+        providerLabel: String = "openai",
     ): Prompt {
         val schema = request.nativeResponseSchema()
         val budgetRequest = request.copy(responseSchema = schema)
         val toolContext =
             request.metadata +
-                mapOf("model" to selectedModel, "provider" to "openai") +
+                mapOf("model" to selectedModel, "provider" to providerLabel) +
                 (request.cancellationToken?.let { mapOf("cancellationToken" to it) } ?: emptyMap())
         val callbacks =
             if (request.supportsToolCalling()) {
@@ -151,7 +152,8 @@ class OpenAiPromptFactory(
     private fun toSpringMessages(messages: List<Message>): List<SpringMessage> =
         messages.map { msg ->
             val metadata =
-                msg.contextPolicy?.let { mapOf(ContextPolicyMetadata.KEY to it.name) }.orEmpty()
+                msg.contextPolicy?.let { mapOf(ContextPolicyMetadata.KEY to it.name) }.orEmpty() +
+                    (msg.id?.let { mapOf("visualAgent.sourceMessageId" to it) } ?: emptyMap())
             when (msg.role) {
                 "system" ->
                     SystemMessage

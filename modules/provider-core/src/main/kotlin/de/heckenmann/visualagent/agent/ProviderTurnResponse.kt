@@ -34,6 +34,8 @@ data class ProviderTurnResponse(
     val usage: ProviderTokenUsage? = null,
     val timing: ProviderResponseTiming? = null,
     val metadata: ProviderResponseMetadata = ProviderResponseMetadata(),
+    /** Native replay state kept separate from allowlisted telemetry and display content. */
+    val providerReplay: ProviderReplayState? = null,
 )
 
 /**

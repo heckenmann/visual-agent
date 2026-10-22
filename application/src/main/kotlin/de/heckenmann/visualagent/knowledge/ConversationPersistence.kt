@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.knowledge
 
 import de.heckenmann.visualagent.agent.ConversationContextPolicy
+import de.heckenmann.visualagent.agent.ProviderReplayState
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import java.time.Instant
@@ -18,6 +19,7 @@ data class ConversationRecord(
     val turnOrder: Int? = null,
     val assistantToolTurn: Boolean = false,
     val conversationRequestId: String? = null,
+    val providerReplay: ProviderReplayState? = null,
 ) {
     /** Returns a field value by its persistence-facing name. */
     operator fun get(key: String): Any? =
@@ -73,6 +75,7 @@ interface ConversationStore {
         turnOrder: Int? = null,
         assistantToolTurn: Boolean = false,
         conversationRequestId: String? = null,
+        providerReplay: ProviderReplayState? = null,
     ): String = saveConversationMessage(id, sessionId, role, content, metadata)
 
     /** Returns messages eligible for a bounded main-agent context projection. */
@@ -169,6 +172,7 @@ interface ConversationStore {
         turnOrder: Int? = null,
         assistantToolTurn: Boolean = false,
         conversationRequestId: String? = null,
+        providerReplay: ProviderReplayState? = null,
     ): Mono<String> =
         Mono.fromCallable {
             saveConversationMessage(
@@ -182,6 +186,7 @@ interface ConversationStore {
                 turnOrder,
                 assistantToolTurn,
                 conversationRequestId,
+                providerReplay,
             )
         }
 
