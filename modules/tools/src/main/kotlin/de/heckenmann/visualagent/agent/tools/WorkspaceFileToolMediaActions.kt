@@ -106,6 +106,21 @@ internal class WorkspaceFileToolMediaActions(
                 put("content", response.content)
             }
         }
+
+    /** Returns only the native file analysis, never the input bytes or credential state. */
+    fun analyzeFileReactive(
+        record: ToolWorkspaceFile,
+        prompt: String,
+        agentId: String? = null,
+    ): Mono<kotlinx.serialization.json.JsonObject> =
+        workspaceFiles.analyzeFileReactive(record, prompt, agentId).map { response ->
+            buildJsonObject {
+                put("id", record.id)
+                put("path", record.relativePath)
+                put("model", response.model)
+                put("content", response.content)
+            }
+        }
 }
 
 /** Returns a safe metadata representation of a managed workspace file. */

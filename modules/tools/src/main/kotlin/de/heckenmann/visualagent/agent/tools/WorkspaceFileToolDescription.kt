@@ -49,6 +49,9 @@ internal fun workspaceFileToolDescription(): String =
         "- imageBytes: {\"action\":\"imageBytes\",\"id\":\"...\"}. Base64-encoded image bytes.\n" +
         "- analyzeImage: {\"action\":\"analyzeImage\",\"id\":\"...\",\"prompt\":\"describe this\"}. " +
         "Analyze image with vision model.\n" +
+        "- analyzeFile: {\"action\":\"analyzeFile\",\"id\":\"...\",\"prompt\":\"summarize this\"}. " +
+        "Explicitly send a managed file (up to 8 MiB) to the calling agent's selected model as native file input. " +
+        "Requires a provider/model supporting files; unsupported providers fail without fallback. Audio/video are unsupported.\n" +
         "For an image in the conversation, use `![alt text](workspace:<path>)` for the managed workspace or " +
         "`![alt text](visual-agent-file://<rootId>/<path>)` for a granted root. " +
         "Do not invent paths or paste imageBytes base64 into a response.\n" +

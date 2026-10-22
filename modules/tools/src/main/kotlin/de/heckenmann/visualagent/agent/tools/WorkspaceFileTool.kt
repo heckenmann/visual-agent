@@ -77,6 +77,18 @@ class WorkspaceFileTool(
                 "renderPdfPage" -> renderPdfPage(file(input), input.int("page") ?: 1)
                 "imageInfo" -> imageInfo(file(input))
                 "imageBytes" -> success(TOOL_ID, mediaActions.imageBytes(file(input)).toString())
+                "analyzeFile" ->
+                    success(
+                        TOOL_ID,
+                        requireNotNull(
+                            mediaActions
+                                .analyzeFileReactive(
+                                    file(input),
+                                    input.requiredString("prompt"),
+                                    context["agentId"] as? String,
+                                ).block(),
+                        ).toString(),
+                    )
                 "analyzeImage" ->
                     success(
                         TOOL_ID,

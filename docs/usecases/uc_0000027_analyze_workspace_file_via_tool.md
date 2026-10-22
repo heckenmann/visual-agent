@@ -26,14 +26,20 @@ Agents can work with imported files while content access remains explicit and au
 
 ## Tool Calls
 
-- `workspace:file` actions: `list`, `info`, `hash`, `readText`, `extractPdfText`, `renderPdfPage`, `imageInfo`, `imageBytes`, `analyzeImage`.
+- `workspace_file` actions: `list`, `info`, `hash`, `readText`, `extractPdfText`, `renderPdfPage`, `imageInfo`, `imageBytes`, `analyzeImage`, `analyzeFile`.
 - `renderPdfPage` writes a generated PNG preview into the managed workspace and returns its metadata.
+- `analyzeFile`: `{"action":"analyzeFile","id":"<managed-file-id>","prompt":"Summarize this file"}`.
+  Sends up to 8 MiB of native file content to the calling agent's selected provider/model.
+  The tool returns the analysis, not base64 input bytes. Native file support is currently
+  implemented by Codex (direct), independently for OAuth and API-key mode; unsupported
+  adapters fail explicitly without fallback. Audio/video are not supported.
 
 ## Code Entry Points
 
 - `de.heckenmann.visualagent.agent.tools.WorkspaceFileTool`
 - `de.heckenmann.visualagent.workspace.WorkspaceFileService`
 - `de.heckenmann.visualagent.agent.LLMProvider.vision`
+- `de.heckenmann.visualagent.agent.LLMProvider.fileReactive`
 
 ## Acceptance Criteria
 
@@ -43,3 +49,5 @@ Agents can work with imported files while content access remains explicit and au
 - Unsupported vision/model combinations return clear failures.
 - Codex CLI vision requests use the app-server image input protocol and preserve the detected image MIME type.
 - Image bytes and provider credentials are not written to logs or conversation history.
+- Native file analysis is explicit, bounded, managed-path validated, and preserves the
+  calling sub-agent's selected provider/model. Missing agents and path escapes fail closed.

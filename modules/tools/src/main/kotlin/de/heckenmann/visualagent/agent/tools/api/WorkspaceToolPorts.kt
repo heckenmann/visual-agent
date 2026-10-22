@@ -99,6 +99,13 @@ interface WorkspaceFileToolPort {
     /** Reads encoded image bytes. */
     fun imageBytes(file: ToolWorkspaceFile): ToolImageBytes
 
+    /** Explicitly sends a bounded managed file to the calling agent's selected native file-capable provider. */
+    fun analyzeFileReactive(
+        file: ToolWorkspaceFile,
+        prompt: String,
+        agentId: String?,
+    ): Mono<ToolFileAnalysis> = Mono.error(UnsupportedOperationException("Native file analysis is not configured"))
+
     /** Analyzes an image through the active model. */
     fun analyzeImage(
         file: ToolWorkspaceFile,
@@ -204,6 +211,12 @@ data class ToolImageBytes(
 
 /** Vision-model response projection. */
 data class ToolImageAnalysis(
+    val model: String,
+    val content: String,
+)
+
+/** Native file-model response; file bytes are never returned in tool history. */
+data class ToolFileAnalysis(
     val model: String,
     val content: String,
 )
