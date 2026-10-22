@@ -24,6 +24,7 @@ repositories {
 }
 
 dependencies {
+    implementation(libs.reactor.netty.http)
     implementation(libs.kotlin.stdlib)
     implementation(libs.kotlin.reflect)
     implementation(project(":providers"))

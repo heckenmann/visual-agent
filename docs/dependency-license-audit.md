@@ -2,6 +2,24 @@
 
 Audit date: 2026-09-28. Scope: Issue [#47](https://github.com/heckenmann/visual-agent/issues/47), repository `master` at the start of the audit, macOS arm64 dependency resolution. This is an engineering compliance inventory, not a legal opinion.
 
+## October 21 Framework Upgrade Supplement
+
+Issue #484 upgrades Spring AI to 2.1.0-M1 and Spring Boot to 4.2.0-M2 and adds the
+direct provider module. The regenerated [October 21 snapshot](dependency-licenses-2026-10-21.csv)
+contains 465 resolved coordinates; every row has a POM license declaration. It was
+generated on macOS arm64 using the command below, including the new module. The
+older counts and platform findings in the original audit remain historical evidence,
+not assertions about this upgraded graph. POM declarations alone do not establish
+complete redistribution compliance or cover embedded native components.
+
+New direct aliases are `spring-webflux`, `jackson-databind`,
+`spring-security-oauth2-client`, `spring-security-oauth2-jose`, and
+`reactor-netty-http`. Their resolved POMs declare Apache-2.0; preserve the applicable
+upstream LICENSE/NOTICE material. No rejected Kotlin client/proxy library from the
+[provider assessment](codex-direct-provider.md#library-assessment) is added. Repeat
+the platform package/native inventory in release CI; this local snapshot does not
+claim Windows/Linux verification or replace the full packaged-artifact audit.
+
 ## Method and reproducibility
 
 Run `./gradlew generateLicenseReport --no-daemon --no-parallel --no-configuration-cache`. The maintained [Gradle License Report plugin](https://github.com/jk1/Gradle-License-Report) 3.1.4 scans `compileClasspath`, `runtimeClasspath`, and `testRuntimeClasspath` of every project plus build-script projects; it emits `build/reports/dependency-license/licenses.csv` and `index.html`. `--no-parallel` follows the plugin's [Gradle 9 limitation](https://github.com/jk1/Gradle-License-Report/blob/master/README.md#gradle-9). The checked-in [CSV snapshot](dependency-licenses-2026-10-01.csv) contains 477 resolved artifact coordinates and POM-derived license declarations, regenerated against the current PR base dependency versions. It is evidence, not a license grant or a substitute for artifact-level inspection. It merges scopes and can list multiple versions of the same artifact because modules resolve independently. The snapshot is **macOS arm64-specific**; rerun on Windows and Linux before release.
