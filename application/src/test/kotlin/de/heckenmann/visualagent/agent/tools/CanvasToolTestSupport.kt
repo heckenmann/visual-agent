@@ -205,8 +205,9 @@ internal class FakeConversationStore : ConversationStore {
         turnOrder: Int?,
         assistantToolTurn: Boolean,
         conversationRequestId: String?,
+        providerReplay: de.heckenmann.visualagent.agent.ProviderReplayState?,
     ): String {
-        saved += SavedMessage(sessionId, role, content, metadata, conversationRequestId)
+        saved += SavedMessage(sessionId, role, content, metadata, conversationRequestId, providerReplay)
         return "message-${saved.size}"
     }
 
@@ -254,4 +255,5 @@ internal data class SavedMessage(
     val content: String,
     val metadata: String?,
     val conversationRequestId: String? = null,
+    val providerReplay: de.heckenmann.visualagent.agent.ProviderReplayState? = null,
 )

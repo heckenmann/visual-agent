@@ -15,14 +15,20 @@ internal class WorkspaceFileToolReactiveActions(
         context: Map<String, Any>,
     ): Mono<ToolResult>? {
         val input = parseObject(inputJson)
-        if (input.string("action") != "analyzeImage") return null
+        val action = input.string("action")
+        if (action !in setOf("analyzeImage", "analyzeFile")) return null
         return Mono
             .fromCallable {
                 trackedToolWork(context) {
                     workspaceFiles.requireFile(input.string("id"), input.string("path")) to input.requiredString("prompt")
                 }
-            }.flatMap { (record, prompt) -> mediaActions.analyzeImageReactive(record, prompt, context["agentId"] as? String) }
-            .map { result -> success(TOOL_ID, result.toString()) }
+            }.flatMap { (record, prompt) ->
+                if (action == "analyzeFile") {
+                    mediaActions.analyzeFileReactive(record, prompt, context["agentId"] as? String)
+                } else {
+                    mediaActions.analyzeImageReactive(record, prompt, context["agentId"] as? String)
+                }
+            }.map { result -> success(TOOL_ID, result.toString()) }
             .onErrorResume { error -> Mono.just(failure(TOOL_ID, error.message ?: error::class.simpleName.orEmpty())) }
     }
 

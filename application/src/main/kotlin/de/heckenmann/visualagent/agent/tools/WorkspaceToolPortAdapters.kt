@@ -1,10 +1,14 @@
 package de.heckenmann.visualagent.agent.tools
 
 import de.heckenmann.visualagent.agent.AgentManager
+import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.LLMProvider
+import de.heckenmann.visualagent.agent.Message
+import de.heckenmann.visualagent.agent.ModelSelection
 import de.heckenmann.visualagent.agent.provider.ModelCapability
 import de.heckenmann.visualagent.agent.tools.api.ToolDownloadRequest
 import de.heckenmann.visualagent.agent.tools.api.ToolExtractedText
+import de.heckenmann.visualagent.agent.tools.api.ToolFileAnalysis
 import de.heckenmann.visualagent.agent.tools.api.ToolImageAnalysis
 import de.heckenmann.visualagent.agent.tools.api.ToolImageBytes
 import de.heckenmann.visualagent.agent.tools.api.ToolImageInfo
@@ -30,10 +34,14 @@ import de.heckenmann.visualagent.workspace.replaceText
 import de.heckenmann.visualagent.workspace.searchFiles
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.springframework.ai.content.Media
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.context.annotation.Lazy
+import org.springframework.core.io.ByteArrayResource
 import org.springframework.stereotype.Component
+import org.springframework.util.MimeType
 import reactor.core.publisher.Mono
+import reactor.core.scheduler.Schedulers
 import java.util.Base64
 
 /** Application adapter for managed workspace-file operations consumed by tools. */
@@ -127,6 +135,42 @@ class WorkspaceFileToolPortAdapter(
 
     override fun imageBytes(file: ToolWorkspaceFile): ToolImageBytes =
         files.imageBytes(requireRecord(file)).let { ToolImageBytes(it.mimeType, it.base64) }
+
+    override fun analyzeFileReactive(
+        file: ToolWorkspaceFile,
+        prompt: String,
+        agentId: String?,
+    ): Mono<ToolFileAnalysis> =
+        Mono
+            .fromCallable {
+                val record = requireRecord(file)
+                val selection =
+                    if (agentId == null) {
+                        ModelSelection()
+                    } else {
+                        requireNotNull(
+                            agents?.getSubAgent(agentId),
+                        ) { "Sub-agent is not available for file analysis" }.config.modelSelection()
+                    }
+                val media =
+                    Media
+                        .builder()
+                        .mimeType(MimeType.valueOf(files.detectMimeType(record).detectedMimeType))
+                        .data(ByteArrayResource(files.readBytes(record, 8 * 1024 * 1024L)))
+                        .name(record.relativePath.substringAfterLast('/'))
+                        .build()
+                media to
+                    ChatRequestContext(
+                        messages = listOf(Message("user", prompt)),
+                        provider = selection.provider,
+                        model = selection.model,
+                        variant = selection.variant,
+                        parameters = selection.parameters,
+                        options = selection.options,
+                    )
+            }.subscribeOn(Schedulers.boundedElastic())
+            .flatMap { (media, request) -> llmProvider.getObject().fileReactive(media, request) }
+            .map { ToolFileAnalysis(it.model, it.message.content) }
 
     override fun analyzeImage(
         file: ToolWorkspaceFile,
