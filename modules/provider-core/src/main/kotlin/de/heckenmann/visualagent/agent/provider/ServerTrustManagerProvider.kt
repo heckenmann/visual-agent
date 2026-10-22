@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.agent.provider
 
 import java.security.KeyStore
+import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
 import javax.net.ssl.X509TrustManager
 
@@ -16,4 +17,10 @@ fun ServerTrustManagerProvider?.resolveTrustManager(): X509TrustManager {
     val factory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
     factory.init(null as KeyStore?)
     return factory.trustManagers.filterIsInstance<X509TrustManager>().first()
+}
+
+/** Creates a JSSE context with the same platform and managed roots used by provider transports. */
+fun ServerTrustManagerProvider?.resolveSslContext(): SSLContext {
+    val manager = resolveTrustManager()
+    return SSLContext.getInstance("TLS").apply { init(null, arrayOf(manager), null) }
 }

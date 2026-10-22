@@ -3,20 +3,19 @@ package de.heckenmann.visualagent.agent.ollama
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.agent.provider.ProviderRuntimeConfig
 import de.heckenmann.visualagent.agent.provider.ServerTrustManagerProvider
-import de.heckenmann.visualagent.agent.provider.resolveTrustManager
-import io.netty.channel.ChannelOption
-import io.netty.handler.ssl.SslContextBuilder
+import de.heckenmann.visualagent.agent.provider.resolveSslContext
+import org.springframework.ai.ollama.OllamaChatModel
 import org.springframework.ai.ollama.api.OllamaApi
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.HttpHeaders
-import org.springframework.http.client.ReactorClientHttpRequestFactory
-import org.springframework.http.client.reactive.ReactorClientHttpConnector
+import org.springframework.http.client.JdkClientHttpRequestFactory
+import org.springframework.http.client.reactive.JdkClientHttpConnector
 import org.springframework.web.client.RestClient
 import org.springframework.web.reactive.function.client.ClientRequest
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction
 import org.springframework.web.reactive.function.client.WebClient
-import reactor.netty.http.client.HttpClient
+import java.net.http.HttpClient
 import java.time.Duration
 
 /**
@@ -39,6 +38,10 @@ class OllamaApiConfiguration(
      */
     @Bean
     fun ollamaApi(): OllamaApi = createOllamaApi(appConfig, serverTrustManagerProvider)
+
+    /** Creates the fallback model from the same authenticated, managed-TLS API client. */
+    @Bean
+    fun ollamaChatModel(ollamaApi: OllamaApi): OllamaChatModel = OllamaChatModel.builder().ollamaApi(ollamaApi).build()
 }
 
 internal fun createOllamaApi(
@@ -73,18 +76,14 @@ private fun createOllamaApi(
     val effectiveTimeout = timeoutSeconds.coerceIn(MIN_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS)
     val httpClient =
         HttpClient
-            .create()
-            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, CONNECT_TIMEOUT_MILLIS)
-            .responseTimeout(Duration.ofSeconds(effectiveTimeout.toLong()))
-            .let { client ->
-                serverTrustManagerProvider?.let { trustProvider ->
-                    client.secure { spec ->
-                        spec.sslContext(SslContextBuilder.forClient().trustManager(trustProvider.resolveTrustManager()).build())
-                    }
-                } ?: client
-            }
-    val restConnector = ReactorClientHttpRequestFactory(httpClient)
-    val webConnector = ReactorClientHttpConnector(httpClient)
+            .newBuilder()
+            .connectTimeout(Duration.ofMillis(CONNECT_TIMEOUT_MILLIS.toLong()))
+            .followRedirects(HttpClient.Redirect.NEVER)
+            .sslContext(serverTrustManagerProvider.resolveSslContext())
+            .build()
+    val readTimeout = Duration.ofSeconds(effectiveTimeout.toLong())
+    val restConnector = JdkClientHttpRequestFactory(httpClient).apply { setReadTimeout(readTimeout) }
+    val webConnector = JdkClientHttpConnector(httpClient).apply { setReadTimeout(readTimeout) }
     return OllamaApi
         .builder()
         .baseUrl(baseUrl.ifBlank { "http://localhost:11434" }.trimEnd('/'))
