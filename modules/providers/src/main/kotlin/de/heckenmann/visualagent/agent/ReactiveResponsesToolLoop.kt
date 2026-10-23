@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent
 
+import de.heckenmann.visualagent.agent.metrics.ResponsesExecutionMetrics
 import de.heckenmann.visualagent.agent.provider.DirectProviderAuthMode
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
 import org.springframework.ai.chat.model.ChatModel
@@ -23,6 +24,7 @@ class ReactiveResponsesToolLoop(
     private val registry: ProviderToolCallbacks,
     private val budgeter: RequestContextBudgeter = RequestContextBudgeter(),
     private val replays: ProviderReplayCodec = ProviderReplayCodec(),
+    private val metrics: ResponsesExecutionMetrics = ResponsesExecutionMetrics(),
 ) {
     /** Executes a cold, cancellable stream without falling back to synchronous model calls. */
     fun stream(
@@ -72,7 +74,7 @@ class ReactiveResponsesToolLoop(
             val terminalStatus = AtomicReference<String>()
             MessageAggregator()
                 .aggregate(
-                    model.stream(bounded).withResponsePartLimit(replays).doOnNext { chunk ->
+                    model.stream(bounded).transform(metrics::model).withResponsePartLimit(replays).doOnNext { chunk ->
                         chunk.metadata.get<String>(OpenAiResponsesMetadata.STATUS)?.let(terminalStatus::set)
                     },
                     aggregated::set,
@@ -126,7 +128,7 @@ class ReactiveResponsesToolLoop(
                                             callbacks,
                                             request.metadata +
                                                 (request.cancellationToken?.let { mapOf("cancellationToken" to it) } ?: emptyMap()),
-                                        )
+                                        ).transform { metrics.tools(it) }
                                     },
                                     AutoCloseable::close,
                                 )

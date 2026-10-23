@@ -36,6 +36,7 @@ internal class CodexDirectProvider(
     private val execution: ReactiveResponsesToolLoop,
     @Qualifier("codexDirectWebClient") private val webClient: WebClient,
     private val replays: ProviderReplayCodec = ProviderReplayCodec(),
+    private val metrics: DirectRequestMetrics = DirectRequestMetrics(),
 ) : ProfiledProviderAdapter {
     override val adapter = ProviderAdapter.CODEX_DIRECT
 
@@ -80,11 +81,12 @@ internal class CodexDirectProvider(
                                 }
                             },
                     )
-                credentials.bearer(profile).flatMapMany { bearer ->
+                metrics.stage(credentials.bearer(profile), DirectRequestStage.CREDENTIAL).flatMapMany { bearer ->
                     Flux.usingWhen(
                         Mono
                             .fromCallable { models.open(bearer, requireNotNull(selected.model)) }
                             .subscribeOn(Schedulers.boundedElastic())
+                            .transform { metrics.stage(it, DirectRequestStage.TRANSPORT) }
                             .doOnDiscard(DirectResponsesModelLease::class.java) { it.close() },
                         { lease ->
                             val counted =
@@ -126,6 +128,7 @@ internal class CodexDirectProvider(
             prompt.instructions.mapIndexed { index, message ->
                 val state = originals[message.metadata["visualAgent.sourceMessageId"]]?.providerReplay
                 when {
+            .transform(metrics::observe)
                     message is AssistantMessage && state != null -> replays.restore(state, profile.id, model, message) ?: message
                     message is UserMessage && media != null && index == imageMessageIndex -> message.mutate().media(media).build()
                     else -> message
