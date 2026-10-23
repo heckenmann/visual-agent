@@ -38,6 +38,15 @@ tasks.test {
     filter { isFailOnNoMatchingTests = false }
 }
 
+tasks.register<JavaExec>("benchmarkDirectProvider") {
+    group = "verification"
+    description = "Measures local direct-provider setup and encoding overhead without making API calls."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("de.heckenmann.visualagent.agent.codexdirect.DirectProviderBenchmarkKt")
+    javaLauncher.set(javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(24)) })
+}
+
 kotlin {
     jvmToolchain(24)
     compilerOptions {
