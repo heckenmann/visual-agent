@@ -9,7 +9,16 @@ import javax.net.ssl.X509TrustManager
 fun interface ServerTrustManagerProvider {
     /** Returns an X.509 trust manager combining platform roots with application-managed additional roots. */
     fun trustManager(): X509TrustManager
+
+    /** Supplies a consistent policy snapshot; null revision deliberately disables transport reuse. */
+    fun trustSnapshot(): ServerTrustSnapshot = ServerTrustSnapshot(trustManager())
 }
+
+/** Trust policy and its provider-owned revision, which must change whenever validation policy changes. */
+data class ServerTrustSnapshot(
+    val manager: X509TrustManager,
+    val revision: String? = null,
+)
 
 /** Returns the configured managed trust manager, or JSSE's platform default when none is wired. */
 fun ServerTrustManagerProvider?.resolveTrustManager(): X509TrustManager {

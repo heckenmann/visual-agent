@@ -75,13 +75,20 @@ class ManagedTlsMaterialServiceTest {
         val service = service(temporaryDirectory)
         val ca = service.generateCertificate("trusted-root", "CN=Trusted Root", emptyList(), emptyList(), true, 30)
         val caPem = service.exportPublicCertificate(ca.alias)!!
+        val initialTrust = service.trustSnapshot()
+        assertEquals(initialTrust.revision, service.trustSnapshot().revision)
         assertIllegalArgument { service.importTrustedCertificate("binary-input", "\u0000$caPem") }
         val trustEntry = service.importTrustedCertificate("private-ca", caPem)
+        val importedTrust = service.trustSnapshot()
+        assertTrue(initialTrust.revision != importedTrust.revision)
+        assertEquals(importedTrust.revision, service.trustSnapshot().revision)
+        assertTrue(importedTrust.manager.acceptedIssuers.size > initialTrust.manager.acceptedIssuers.size)
 
         assertEquals("private-ca", trustEntry.alias)
         assertEquals("trusted_certificate", trustEntry.entryType)
         assertEquals(ca.certificate.sha256, trustEntry.certificates.single().sha256)
         assertTrue(service.removeTrustedCertificate("private-ca"))
+        assertEquals(initialTrust.revision, service.trustSnapshot().revision)
         assertFalse(service.removeTrustedCertificate("private-ca"))
     }
 

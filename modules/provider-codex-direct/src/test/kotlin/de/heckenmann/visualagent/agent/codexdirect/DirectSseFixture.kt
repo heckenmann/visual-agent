@@ -23,6 +23,7 @@ internal class DirectSseFixture(
 
     val requests = CopyOnWriteArrayList<String>()
     val paths = CopyOnWriteArrayList<String>()
+    val authorizationHeaders = CopyOnWriteArrayList<String>()
     val disconnected = Sinks.one<Void>()
     private val server =
         HttpServer
@@ -31,6 +32,7 @@ internal class DirectSseFixture(
             .host("127.0.0.1")
             .port(0)
             .handle { request, response ->
+                authorizationHeaders.add(request.requestHeaders().get("Authorization").orEmpty())
                 request.withConnection { connection -> connection.onDispose { disconnected.tryEmitEmpty() } }
                 request.receive().aggregate().asString().flatMap { body ->
                     requests.add(body)
@@ -95,6 +97,17 @@ internal class DirectSseFixture(
 
     /** Supplies the same synthetic SDK clients to the production provider lifecycle. */
     fun lease() = DirectResponsesModelLease(model, sync, async)
+
+    /** Exercises official SDK credential views sharing the root client's underlying transport. */
+    fun scopedModel(bearer: String): OpenAiResponsesChatModel {
+        val scoped = sync.withOptions { it.apiKey(bearer) }
+        return OpenAiResponsesChatModel
+            .builder()
+            .openAiClient(scoped)
+            .openAiClientAsync(scoped.async())
+            .options(OpenAiResponsesChatOptions.builder().model("selected").build())
+            .build()
+    }
 
     override fun close() {
         try {
