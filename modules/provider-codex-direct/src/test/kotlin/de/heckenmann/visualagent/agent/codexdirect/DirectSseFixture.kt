@@ -12,12 +12,15 @@ import reactor.netty.http.HttpResources
 import reactor.netty.http.server.HttpServer
 import java.nio.charset.StandardCharsets
 import java.time.Duration
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicLong
 
 /** Local-only real SDK transport; synthetic credentials never leave the loopback server. */
 internal class DirectSseFixture(
     private val responseFrames: (String) -> Flux<String>,
     private val attachmentTokenCount: Int? = null,
+    private val captureBodies: Boolean = true,
 ) : AutoCloseable {
     constructor(frames: Flux<String>, attachmentTokenCount: Int? = null) : this({ frames }, attachmentTokenCount)
 
@@ -25,30 +28,49 @@ internal class DirectSseFixture(
     val paths = CopyOnWriteArrayList<String>()
     val authorizationHeaders = CopyOnWriteArrayList<String>()
     val disconnected = Sinks.one<Void>()
+    val connections = AtomicLong()
+    private val connectionIds = ConcurrentHashMap.newKeySet<String>()
+    val requestCount = AtomicLong()
+    val receivedBytes = AtomicLong()
+    val sentBytes = AtomicLong()
     private val server =
         HttpServer
             .create()
             .runOn(HttpResources.get(), false)
             .host("127.0.0.1")
             .port(0)
+            .doOnConnection { if (connectionIds.add(it.channel().id().asLongText())) connections.incrementAndGet() }
             .handle { request, response ->
                 authorizationHeaders.add(request.requestHeaders().get("Authorization").orEmpty())
                 request.withConnection { connection -> connection.onDispose { disconnected.tryEmitEmpty() } }
                 request.receive().aggregate().asString().flatMap { body ->
-                    requests.add(body)
+                    requestCount.incrementAndGet()
+                    receivedBytes.addAndGet(body.toByteArray(StandardCharsets.UTF_8).size.toLong())
+                    if (captureBodies) requests.add(body)
                     paths.add(request.uri())
                     if (request.uri() == "/v1/responses/input_tokens") {
+                        val payload = """{"object":"response.input_tokens","input_tokens":${requireNotNull(attachmentTokenCount)}}"""
+                        sentBytes.addAndGet(payload.toByteArray(StandardCharsets.UTF_8).size.toLong())
                         response
                             .header("Content-Type", "application/json")
                             .sendString(
-                                Mono.just("""{"object":"response.input_tokens","input_tokens":${requireNotNull(attachmentTokenCount)}}"""),
+                                Mono.just(payload),
                             ).then()
                     } else {
-                        response.sse().send(responseFrames(body).map { Unpooled.copiedBuffer(it, StandardCharsets.UTF_8) }) { true }.then()
+                        response
+                            .sse()
+                            .send(
+                                responseFrames(body).map {
+                                    val bytes = it.toByteArray(StandardCharsets.UTF_8)
+                                    sentBytes.addAndGet(bytes.size.toLong())
+                                    Unpooled.wrappedBuffer(bytes)
+                                },
+                            ) { true }
+                            .then()
                     }
                 }
             }.bindNow()
-    private val endpoint = "http://127.0.0.1:${server.port()}/v1"
+    val endpoint = "http://127.0.0.1:${server.port()}/v1"
     private val sync =
         OpenAiSetup.setupSyncClient(
             endpoint,
