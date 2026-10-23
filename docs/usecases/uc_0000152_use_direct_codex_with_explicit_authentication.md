@@ -26,8 +26,9 @@ explicitly between eligible ChatGPT plan authorization and Platform API-key bill
    state/nonce/PKCE transaction and loopback listener before the browser opens.
 5. Complete consent. The server validates the callback and signed account identity,
    granted plan permission, and registration identity before storing credentials.
-6. The UI receives only an opaque credential reference. Save settings to retain the
-   selected registration; editing or switching providers alone does not run inference.
+6. The UI receives only an opaque credential reference after the server persists the
+   selected registration. No additional settings save is required to retain a completed
+   login across dialog closure or restart. Editing or switching providers alone does not run inference.
 7. Refresh models or explicitly test the selected model. Listing a model does not prove
    inference entitlement. A failed refresh must not clear the persisted catalog.
    An explicitly returned positive numeric `context_window` is retained. Missing or
@@ -44,7 +45,8 @@ explicitly between eligible ChatGPT plan authorization and Platform API-key bill
    cancellation remain distinguishable without recording content or credentials;
    no network metrics exporter is enabled by this feature.
 9. Cancel an outstanding sign-in using the cancel action, or sign out the selected account.
-   Sign-out clears local credentials and reports whether remote revocation was confirmed.
+   Sign-out clears local credentials and the persisted provider reference immediately,
+   and reports whether remote revocation was confirmed.
 
 ## Alternative and Error Flows
 
@@ -57,6 +59,11 @@ explicitly between eligible ChatGPT plan authorization and Platform API-key bill
   rejected duplicate claims never sign out the successful claimant.
 - Refresh uses only the selected registration and replaces rotated credentials atomically.
   Concurrent callers serialize session renewal; stale refresh cannot undo local sign-out.
+- A completed login atomically updates only the provider's authentication route and reference,
+  retaining concurrently edited model settings and the active conversation selection.
+  For a new provider, successful authorization also retains its profile. A deleted provider
+  or concurrently changed authentication route cannot be silently overwritten by a late callback.
+  Stale settings drafts cannot erase a newer login or restore a signed-out registration.
 - API-key failures never switch to ChatGPT OAuth, and OAuth failures never incur API billing.
 - The callback is HTTP on 127.0.0.1 at `/auth/callback`. A browser running on another host
   requires an explicitly arranged loopback forwarding path; do not expose callback listeners

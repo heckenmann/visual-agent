@@ -3,6 +3,7 @@ package de.heckenmann.visualagent.agent.codexdirect
 import de.heckenmann.visualagent.agent.provider.DirectProviderAuthMode
 import de.heckenmann.visualagent.agent.provider.DirectProviderAuthorization
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
+import de.heckenmann.visualagent.agent.provider.ProviderAuthorizationCatalog
 import de.heckenmann.visualagent.agent.provider.ProviderAuthorizationResult
 import de.heckenmann.visualagent.agent.provider.ProviderAuthorizationSession
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
@@ -32,6 +33,7 @@ internal class DirectProviderAuthorizationService(
     private val store: DirectOAuthCredentialStore,
     private val protocol: DirectOAuthProtocol,
     private val sessions: DirectOAuthSessionLock,
+    private val catalog: ProviderAuthorizationCatalog,
     private val clock: Clock = Clock.systemUTC(),
 ) : DirectProviderAuthorization,
     SmartLifecycle {
@@ -50,7 +52,7 @@ internal class DirectProviderAuthorizationService(
                 profile.credentialReference?.let { reference ->
                     store.load(reference, profile.id).map { Optional.of(it) }.defaultIfEmpty(Optional.empty())
                 } ?: Mono.just(Optional.empty())
-            Mono.zip(installation.load(), previous).flatMap { prepared ->
+            Mono.zip(installation.load(), previous, catalog.prepare(profile)).flatMap { prepared ->
                 val holder = AtomicReference<DirectSignInTransaction>()
                 HttpServer
                     .create()
@@ -66,7 +68,13 @@ internal class DirectProviderAuthorizationService(
                             val callback = URI("http://127.0.0.1:${server.port()}/auth/callback")
                             val attempt = DirectOAuthAttempt.create(profile.id, prepared.t1, callback, clock, prepared.t2.orElse(null))
                             val transaction =
-                                DirectSignInTransaction(UUID.randomUUID().toString(), UUID.randomUUID().toString(), attempt, server)
+                                DirectSignInTransaction(
+                                    UUID.randomUUID().toString(),
+                                    UUID.randomUUID().toString(),
+                                    attempt,
+                                    server,
+                                    prepared.t3,
+                                )
                             holder.set(transaction)
                             synchronized(attempts) {
                                 check(accepting.get()) { "ChatGPT sign-in is shutting down" }
@@ -96,18 +104,25 @@ internal class DirectProviderAuthorizationService(
             Mono.usingWhen(
                 Mono.just(transaction),
                 { it.result.asMono() },
-                {
-                    Mono.fromRunnable<Void> {
-                        synchronized(it) {
-                            check(it.active.get() && !it.claimed.get()) { "The sign-in attempt is no longer claimable" }
-                            it.claimed.set(true)
-                            close(it)
-                        }
-                    }
-                },
+                { commit(it) },
                 { current, _ -> discard(current) },
                 { discard(it) },
             )
+        }
+
+    private fun commit(transaction: DirectSignInTransaction): Mono<Void> =
+        Mono.defer {
+            synchronized(transaction) {
+                check(transaction.active.get() && !transaction.claimed.get()) { "The sign-in attempt is no longer claimable" }
+                transaction.claimed.set(true)
+                close(transaction)
+            }
+            catalog.complete(transaction.target, transaction.reference).onErrorResume { error ->
+                sessions
+                    .withSession(transaction.reference) {
+                        store.signOut(transaction.reference, transaction.attempt.profileId)
+                    }.then(Mono.error(error))
+            }
         }
 
     override fun cancel(sessionId: String): Mono<Void> =
@@ -128,22 +143,25 @@ internal class DirectProviderAuthorizationService(
     override fun signOut(profile: ProviderProfile): Mono<Boolean> =
         Mono.defer {
             val pending = attempts.values.filter { it.attempt.profileId == profile.id }
-            Flux.fromIterable(pending).concatMap { cancel(it.id) }.then(
-                profile.credentialReference?.let { reference ->
-                    sessions.withSession(reference) {
-                        store
-                            .load(reference, profile.id)
-                            .flatMap { record ->
-                                protocol.revoke(record).onErrorReturn(false).flatMap { confirmed ->
-                                    store.signOut(reference, profile.id).map { cleared ->
-                                        check(cleared) { "The ChatGPT session changed while signing out" }
-                                        confirmed
+            Flux
+                .fromIterable(pending)
+                .concatMap { cancel(it.id) }
+                .then(
+                    profile.credentialReference?.let { reference ->
+                        sessions.withSession(reference) {
+                            store
+                                .load(reference, profile.id)
+                                .flatMap { record ->
+                                    protocol.revoke(record).onErrorReturn(false).flatMap { confirmed ->
+                                        store.signOut(reference, profile.id).map { cleared ->
+                                            check(cleared) { "The ChatGPT session changed while signing out" }
+                                            confirmed
+                                        }
                                     }
-                                }
-                            }.defaultIfEmpty(true)
-                    }
-                } ?: Mono.just(true),
-            )
+                                }.defaultIfEmpty(true)
+                        }
+                    } ?: Mono.just(true),
+                ).flatMap { confirmed -> catalog.clear(profile).thenReturn(confirmed) }
         }
 
     private fun callback(

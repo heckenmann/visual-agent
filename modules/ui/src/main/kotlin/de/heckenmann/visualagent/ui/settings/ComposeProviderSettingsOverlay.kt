@@ -253,6 +253,7 @@ internal fun providerSettingsOverlay(
                         selectedProvider?.let { profile ->
                             DirectAuthorizationControls(profile, providerPort) { id, reference ->
                                 draft = draft.withDirectCredentialReference(id, reference)
+                                persisted = persisted.withDirectCredentialReference(id, reference)
                             }
                         }
                     },

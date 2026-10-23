@@ -67,7 +67,11 @@ class ProviderCatalogService(
      */
     fun saveProvider(profile: ProviderProfile) {
         mutate { state ->
-            val normalizedProfile = profile.withSelectedCredentialRoute().withSelectableCodexDefault()
+            val normalizedProfile =
+                profile
+                    .withSelectedCredentialRoute()
+                    .withSelectableCodexDefault()
+                    .withAuthoritativeCredential(state.providers.firstOrNull { it.id == profile.id })
             val providers = state.providers.filterNot { it.id == normalizedProfile.id } + normalizedProfile
             require(providers.any(ProviderProfile::enabled)) { "At least one provider profile must remain enabled" }
             val nextActiveProviderId =
@@ -93,14 +97,15 @@ class ProviderCatalogService(
      * @param configuration Complete catalog and active main-agent selection to persist
      */
     fun replaceConfiguration(configuration: ProviderConfiguration) {
-        save(validatedCatalogState(configuration))
+        val proposed = validatedCatalogState(configuration)
+        mutate { current -> proposed.withAuthoritativeCredentials(current) }
     }
 
     /** Reactively replaces the complete provider catalog and active selection. */
     fun replaceConfigurationReactive(configuration: ProviderConfiguration): Mono<Void> {
         val state = validatedCatalogState(configuration)
         return persistence
-            .mutateReactive { state }
+            .mutateReactive { current -> state.withAuthoritativeCredentials(current) }
             .flatMap { notifications.publishReactive() }
     }
 
@@ -378,10 +383,6 @@ class ProviderCatalogService(
     }
 
     private fun load(): CatalogState = persistence.load()
-
-    private fun save(state: CatalogState) {
-        mutate { state }
-    }
 
     private fun mutate(transform: (CatalogState) -> CatalogState) {
         var changed = false

@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.agent.codexdirect
 
 import de.heckenmann.visualagent.agent.provider.ProviderAuthorizationResult
+import de.heckenmann.visualagent.agent.provider.ProviderAuthorizationTarget
 import reactor.core.Disposable
 import reactor.core.publisher.Sinks
 import reactor.netty.DisposableServer
@@ -13,6 +14,7 @@ internal data class DirectSignInTransaction(
     val reference: String,
     val attempt: DirectOAuthAttempt,
     val server: DisposableServer,
+    val target: ProviderAuthorizationTarget,
     val result: Sinks.One<ProviderAuthorizationResult> = Sinks.one(),
     val accepted: AtomicBoolean = AtomicBoolean(),
     val active: AtomicBoolean = AtomicBoolean(true),

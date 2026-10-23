@@ -51,7 +51,7 @@ internal fun DirectAuthorizationControls(
                         withContext(Dispatchers.IO) { browser.openUri(session.authorizationUrl) }
                         val result = withContext(Dispatchers.IO) { port.awaitDirectSignIn(session.id) }
                         onReferenceChanged(profile.id, result.credentialReference)
-                        status = "${result.accountLabel} authorized. Save settings to retain this account selection."
+                        status = "${result.accountLabel} authorized. This account selection is saved."
                     } catch (cancelled: CancellationException) {
                         status = "ChatGPT authorization cancelled."
                         throw cancelled

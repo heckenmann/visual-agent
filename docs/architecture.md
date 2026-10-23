@@ -12,6 +12,11 @@ Each direct profile explicitly selects ChatGPT OAuth or Platform API-key billing
 Failures must never trigger another credential route. OAuth credentials stay in
 owner-protected server files; protocol responses and provider profiles carry only
 opaque references. Browser authorization uses a request-scoped loopback listener.
+Successful authorization persists its provider reference before reporting success,
+independently of the settings draft. Database-conditional catalog updates preserve
+unrelated edits and reject authentication changes made during authorization.
+Settings writes retain the authoritative registration rather than copying stale
+references from UI drafts; explicit sign-out clears both credentials and their reference.
 An external browser cannot reach a remote server's loopback address without an
 explicit forwarding arrangement; no public callback listener is opened implicitly.
 

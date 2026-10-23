@@ -45,7 +45,7 @@ class ComposeDirectAuthorizationControlsTest {
 
             assertEquals("profile" to "reference", changed.await())
             assertEquals("https://synthetic.invalid/authorize", opened.await())
-            onNodeWithText("Synthetic account authorized. Save settings to retain this account selection.").assertExists()
+            onNodeWithText("Synthetic account authorized. This account selection is saved.").assertExists()
             coVerify(exactly = 1) { port.beginDirectSignIn(any()) }
             coVerify(exactly = 0) { port.discoverModels(any()) }
         }
