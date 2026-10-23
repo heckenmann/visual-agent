@@ -24,6 +24,7 @@ import reactor.core.publisher.Sinks
 import reactor.test.StepVerifier
 import java.util.concurrent.CancellationException
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import org.springframework.ai.chat.model.ChatResponse as SpringChatResponse
 
 class ReactiveResponsesToolLoopTest {
@@ -118,13 +119,15 @@ class ReactiveResponsesToolLoopTest {
     fun `cancellation disposes a stalled model stream without another chunk`() {
         val model = mockk<ChatModel>()
         val token = CancellationToken()
-        every { model.stream(any<Prompt>()) } returns Flux.never()
+        var cancelled = false
+        every { model.stream(any<Prompt>()) } returns Flux.never<SpringChatResponse>().doOnCancel { cancelled = true }
 
         StepVerifier
             .create(ReactiveResponsesToolLoop(mockk()).stream(model, prompt(), request().copy(cancellationToken = token)))
             .then(token::cancel)
             .expectError(CancellationException::class.java)
             .verify()
+        assertTrue(cancelled, "Cancellation must reach the underlying transport, not just the subscriber")
     }
 
     private fun text(
