@@ -68,6 +68,87 @@ Sources: [Spring release](https://github.com/spring-projects/spring-ai/releases/
 
 ## Integration Boundaries
 
+Native attachments are encoded into request-local immutable SDK content once, then
+shared by the count request and inference continuations. Only this one request owns
+the prepared content; no workspace-content or cross-request token-count cache is
+introduced. Counting still precedes inference and the attachment is still transmitted
+to both endpoints. Transport reuse also requires cancellation to reach the actual
+stream: the loop's cancellation notifier emits a value to cancel upstream, then
+reports the cancellation error rather than only terminating the downstream observer.
+
+### WebSocket Feasibility Gate
+
+The installed official Java SDK is 4.49.0. Its Responses service exposes HTTP and SSE
+but no Responses `connect()` API. Spring AI 2.1.0-M1's Responses model uses that HTTP
+streaming contract. OpenAI's current WebSocket documentation identifies native Java
+support in SDK 4.79.0. Therefore a WebSocket prototype is not enabled on this resolved
+stack. Replacing the framework path with a hand-written event protocol or upgrading
+the SDK alone without Spring AI compatibility verification would violate the
+framework-first design. Re-evaluate after a compatible framework/SDK upgrade, with
+same-authenticated-connection OAuth continuation, reconnect recovery, bounded
+concurrency, and tool idempotency explicitly tested. Keep HTTP/SSE for this change.
+
+Source: [OpenAI Responses WebSocket mode](https://developers.openai.com/api/docs/guides/websocket-mode).
+
+### HTTP/SSE Runtime and Measurement
+
+The server owns a reusable SDK transport generation for a versioned trust policy.
+The root client contains no user credential; official SDK `withOptions` views and
+their `async()` facade bind the bearer independently for each request. Model options,
+tools, and history remain request-scoped. A request releases only its own lease, not
+the shared connection pool. A changed trust revision retires the previous generation;
+it closes after its last active lease. Unversioned custom trust providers deliberately
+disable reuse. Managed trust snapshots identify the exact platform-plus-managed root
+set under the service lock. Shutdown rejects new leases and drains existing ones.
+
+Direct requests expose bounded Micrometer timers `visualagent.codex.direct.request`
+and `visualagent.codex.direct.first.text`. Both start at subscription, before profile,
+credential, and transport setup. The first-text timer ignores empty events and spans
+tool continuations; it measures the first nonempty display-content delta, not the
+first provider event or hidden reasoning token. The total timer ends at completion,
+error, or cancellation and includes setup, attachment counting, and tool execution.
+Only the total timer has a bounded Reactor termination tag. Neither timer records
+model/profile identifiers, prompts, attachments, credentials, or replay payloads.
+The server supplies an in-memory registry unless another registry is configured;
+this does not enable a network metrics exporter. These measurements establish a
+baseline, not a claim of improved real-provider latency.
+The `visualagent.codex.direct.stage` timer separates credential resolution/refresh,
+transport acquisition, attachment preparation, and attachment counting using a fixed stage enum and the
+same termination tags. Stage measurements are per subscription, including retries
+made by resubscribing; they are not inferred from wall-clock timestamps.
+The shared Responses loop additionally measures each model stream separately in
+`visualagent.responses.model.round` and `visualagent.responses.model.first.text`,
+and registry execution in `visualagent.responses.tools.round`. These timers do not
+label model/profile IDs or tool arguments and do not combine subsequent tool waits
+with the next model round. They apply to users of that loop, not the CLI provider.
+
+Run `./gradlew :provider-codex-direct:benchmarkDirectProvider --no-daemon` to compare
+cold and warm transport acquisition and repeated versus request-prepared encoding
+of a synthetic 1 MiB attachment. This opt-in Java 24 benchmark reports median/p95
+and current-thread allocated bytes after warm-up; it is not a unit test and has no
+elapsed-time success threshold. It performs no API calls and uses no real credentials.
+Cold/warm setup measures the current implementation, not historical end-to-end API
+latency, managed-store I/O, network handshakes, or OpenAI generation. Heap allocation
+is thread-local and does not describe total JVM/native memory. Compare repeated runs
+on the same machine/JDK; do not extrapolate these numbers to hosted inference speed.
+
+Local measurements on October 23, 2026 (macOS ARM64, Java 24, 10 warm-up and 50
+measured iterations per scenario, two runs) gave the following ranges. These are
+observations, not CI thresholds or an inference-service SLA.
+
+| Scenario | Median ms, run 1 / run 2 | p95 ms, run 1 / run 2 | Allocated bytes/op, run 2 |
+| --- | --- | --- | --- |
+| Cold current transport acquisition | 0.294 / 0.296 | 0.551 / 0.686 | 68,957 |
+| Warm current transport acquisition | 0.049 / 0.050 | 0.066 / 0.068 | 14,171 |
+| 1 MiB attachment, repeated encoding | 0.995 / 0.939 | 1.553 / 1.491 | 8,392,578 |
+| 1 MiB attachment, request-prepared encoding | 0.513 / 0.435 | 0.633 / 0.564 | 4,196,994 |
+
+Prompt caching remains provider-managed. The existing tool guard uses sorted function
+names and durable instructions are preserved; this optimization does not rewrite
+history, weaken context priorities, pad prompts, or add unsupported OAuth cache
+parameters. Cache-read tokens continue through the existing usage mapping. Real
+cache-hit ratios and provider latency require separately authorized measurements.
+
 - Add a separate `CODEX_DIRECT` adapter through `ProfiledProviderAdapter` and the
   existing `ConfiguredLLMProvider` routing. Keep all existing adapter identities.
 - Keep authentication mode explicit per profile: ChatGPT OAuth or Platform API key.

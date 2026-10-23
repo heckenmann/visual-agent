@@ -37,6 +37,12 @@ explicitly between eligible ChatGPT plan authorization and Platform API-key bill
    losing model options. An omitted limit preserves an already known value.
 8. Chat and tool continuations use streaming Responses requests under existing context,
    tool permission, cancellation, and conversation ownership rules.
+   Server-local Micrometer timers measure subscription-to-first-visible-text and
+   total request duration, plus credential, transport, preparation, and attachment-count stages.
+   Each native model stream and each registry tool round also has a separate timer.
+   Empty provider events do not count as visible text. Completion, failure, and
+   cancellation remain distinguishable without recording content or credentials;
+   no network metrics exporter is enabled by this feature.
 9. Cancel an outstanding sign-in using the cancel action, or sign out the selected account.
    Sign-out clears local credentials and reports whether remote revocation was confirmed.
 
