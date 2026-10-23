@@ -2,7 +2,9 @@ package de.heckenmann.visualagent.agent.codexdirect
 
 import de.heckenmann.visualagent.agent.provider.DirectProviderAuthMode
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
+import de.heckenmann.visualagent.agent.provider.ProviderAuthorizationCatalog
 import de.heckenmann.visualagent.agent.provider.ProviderAuthorizationSession
+import de.heckenmann.visualagent.agent.provider.ProviderAuthorizationTarget
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import io.mockk.every
 import io.mockk.mockk
@@ -56,6 +58,41 @@ class DirectProviderAuthorizationServiceTest {
                 },
             ).expectNext(record)
             .verifyComplete()
+    }
+
+    @Test
+    fun `catalog failure never reports a saved login and invalidates the new credentials`() {
+        val protocol = mockk<DirectOAuthProtocol>()
+        every { protocol.exchange(any(), any(), any()) } returns Mono.just(record())
+        var reference = ""
+        val catalog = authorizationCatalog()
+        every { catalog.complete(any(), any()) } answers {
+            reference = secondArg()
+            Mono.error(IllegalStateException("Synthetic catalog failure"))
+        }
+        val service = service(protocol, catalog = catalog)
+        StepVerifier
+            .create(
+                service.begin(profile()).flatMap { session ->
+                    Mono.zip(
+                        service.await(session.id),
+                        WebClient
+                            .create()
+                            .get()
+                            .uri(callback(session))
+                            .retrieve()
+                            .bodyToMono(String::class.java),
+                    )
+                },
+            ).expectErrorMatches { it.cause?.message == "Synthetic catalog failure" }
+            .verify()
+
+        StepVerifier
+            .create(store().load(reference, profile().id))
+            .assertNext {
+                assertEquals("", it.accessToken)
+                assertEquals("", it.refreshToken)
+            }.verifyComplete()
     }
 
     @Test
@@ -255,12 +292,21 @@ class DirectProviderAuthorizationServiceTest {
     private fun service(
         protocol: DirectOAuthProtocol,
         credentials: DirectOAuthCredentialStore = store(),
+        catalog: ProviderAuthorizationCatalog = authorizationCatalog(),
     ) = DirectProviderAuthorizationService(
         DirectInstallationId(location()),
         credentials,
         protocol,
         DirectOAuthSessionLock(location()),
+        catalog,
     ).also(running::add)
+
+    private fun authorizationCatalog() =
+        mockk<ProviderAuthorizationCatalog> {
+            every { prepare(any()) } answers { Mono.just(ProviderAuthorizationTarget(firstArg(), null)) }
+            every { complete(any(), any()) } returns Mono.empty()
+            every { clear(any()) } returns Mono.empty()
+        }
 
     private fun location() = DirectCredentialDirectory(directory.resolve("oauth"))
 

@@ -20,6 +20,9 @@ Desktop user.
 3. The panel validates required fields and stages the profile in the global provider settings overlay.
 4. The user may refresh models with the staged endpoint and credentials; discovered models remain local to the draft until saved.
 5. The user explicitly saves the overlay to persist the complete catalog and active model selection together, or resets it to reload the persisted catalog.
+   Direct Codex browser sign-in and sign-out are explicit, immediately persisted
+   authentication actions, independent of this staged save. Completed sign-in is retained
+   when the dialog closes or the application restarts. See UC-0000152.
 6. The catalog permits multiple profiles using the same adapter, so separate endpoints and credentials can be configured independently.
 7. If the active profile is disabled or deleted, the catalog selects another enabled profile; it never leaves the session without an enabled provider.
 8. Model resolution uses provider, model, agent, and variant settings in deterministic order.

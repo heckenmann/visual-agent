@@ -23,6 +23,9 @@ class ProviderCatalogPersistence(
 
     internal fun load(): CatalogState = decode(preferences.getPreference(KEY_CATALOG))
 
+    internal fun loadReactive(): Mono<CatalogState> =
+        preferences.getPreferenceReactive(KEY_CATALOG).map(::decode).defaultIfEmpty(CatalogState())
+
     internal fun mutate(transform: (CatalogState) -> CatalogState): CatalogState = requireNotNull(mutateReactive(transform).block())
 
     internal fun mutateReactive(transform: (CatalogState) -> CatalogState): Mono<CatalogState> = attempt(transform, 16)
