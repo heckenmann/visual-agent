@@ -11,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalUriHandler
 import de.heckenmann.visualagent.protocol.DirectProviderAuthMode
@@ -36,35 +37,43 @@ internal fun DirectAuthorizationControls(
     if (profile.adapter != ProviderAdapter.CODEX_DIRECT || profile.directAuthMode != DirectProviderAuthMode.CHATGPT_OAUTH) return
     val scope = rememberCoroutineScope()
     val browser = LocalUriHandler.current
+    val publishReference by rememberUpdatedState(onReferenceChanged)
+    val hasRegistration = profile.credentialReference != null
     var operation by remember(profile.id) { mutableStateOf<Job?>(null) }
     var status by remember(profile.id) { mutableStateOf<String?>(null) }
     DisposableEffect(profile.id) { onDispose { operation?.cancel() } }
     Row {
-        ActionIconButton(Icons.Filled.AccountCircle, "Continue with ChatGPT", enabled = operation == null, onClick = {
-            operation =
-                scope.launch {
-                    var sessionId: String? = null
-                    try {
-                        status = "Complete ChatGPT authorization in your browser."
-                        val session = withContext(Dispatchers.IO) { port.beginDirectSignIn(profile) }
-                        sessionId = session.id
-                        withContext(Dispatchers.IO) { browser.openUri(session.authorizationUrl) }
-                        val result = withContext(Dispatchers.IO) { port.awaitDirectSignIn(session.id) }
-                        onReferenceChanged(profile.id, result.credentialReference)
-                        status = "${result.accountLabel} authorized. This account selection is saved."
-                    } catch (cancelled: CancellationException) {
-                        status = "ChatGPT authorization cancelled."
-                        throw cancelled
-                    } catch (_: Exception) {
-                        status = "ChatGPT authorization failed. Retry sign-in and check plan permissions."
-                    } finally {
-                        sessionId?.let { id ->
-                            withContext(NonCancellable + Dispatchers.IO) { runCatching { port.cancelDirectSignIn(id) } }
+        ActionIconButton(
+            Icons.Filled.AccountCircle,
+            if (hasRegistration) "Sign in to ChatGPT again" else "Continue with ChatGPT",
+            enabled =
+                operation == null,
+            onClick = {
+                operation =
+                    scope.launch {
+                        var sessionId: String? = null
+                        try {
+                            status = "Complete ChatGPT authorization in your browser."
+                            val session = withContext(Dispatchers.IO) { port.beginDirectSignIn(profile) }
+                            sessionId = session.id
+                            withContext(Dispatchers.IO) { browser.openUri(session.authorizationUrl) }
+                            val result = withContext(Dispatchers.IO) { port.awaitDirectSignIn(session.id) }
+                            publishReference(profile.id, result.credentialReference)
+                            status = "${result.accountLabel} authorized. This account selection is saved."
+                        } catch (cancelled: CancellationException) {
+                            status = "ChatGPT authorization cancelled."
+                            throw cancelled
+                        } catch (_: Exception) {
+                            status = "ChatGPT authorization failed. Retry sign-in and check plan permissions."
+                        } finally {
+                            sessionId?.let { id ->
+                                withContext(NonCancellable + Dispatchers.IO) { runCatching { port.cancelDirectSignIn(id) } }
+                            }
+                            operation = null
                         }
-                        operation = null
                     }
-                }
-        })
+            },
+        )
         ActionIconButton(Icons.Filled.Close, "Cancel ChatGPT authorization", enabled = operation != null, onClick = { operation?.cancel() })
         ActionIconButton(
             Icons.AutoMirrored.Filled.Logout,
@@ -75,7 +84,7 @@ internal fun DirectAuthorizationControls(
                     scope.launch {
                         try {
                             val confirmed = withContext(Dispatchers.IO) { port.signOutDirectProvider(profile) }
-                            onReferenceChanged(profile.id, null)
+                            publishReference(profile.id, null)
                             status =
                                 if (confirmed) {
                                     "Signed out of ChatGPT."
@@ -92,6 +101,10 @@ internal fun DirectAuthorizationControls(
         )
     }
     PanelInfoBox(
-        status ?: if (profile.credentialReference == null) "ChatGPT authorization is required." else "A ChatGPT registration is selected.",
+        status ?: if (hasRegistration) {
+            "ChatGPT sign-in is configured for this provider. Sign out first to use a different account."
+        } else {
+            "ChatGPT authorization is required."
+        },
     )
 }
