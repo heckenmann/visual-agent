@@ -17,6 +17,16 @@ import java.util.Base64
 /** Preserves real filenames where Spring AI M1 otherwise appends MIME subtypes such as `.plain`. */
 internal fun directFileTransportMessage(message: Message): Message {
     if (message !is UserMessage || message.media.isEmpty() || message.media.all { it.mimeType.type == "image" }) return message
+    val item = directFileInputItem(message)
+    return AssistantMessage
+        .builder()
+        .properties(message.metadata)
+        .parts(listOf(UnknownPart(OpenAiResponsesMetadata.PROVIDER, "message", jsonMapper().writeValueAsString(item), null, emptyMap())))
+        .build()
+}
+
+/** Shares the exact native file/image mapping between token counting and inference. */
+internal fun directFileInputItem(message: UserMessage): ResponseInputItem {
     val content = mutableListOf<ResponseInputContent>()
     message.text?.takeIf(String::isNotBlank)?.let {
         content += ResponseInputContent.ofInputText(ResponseInputText.builder().text(it).build())
@@ -43,17 +53,11 @@ internal fun directFileTransportMessage(message: Message): Message {
                 )
             }
     }
-    val item =
-        ResponseInputItem.ofEasyInputMessage(
-            EasyInputMessage
-                .builder()
-                .role(EasyInputMessage.Role.USER)
-                .contentOfResponseInputMessageContentList(content)
-                .build(),
-        )
-    return AssistantMessage
-        .builder()
-        .properties(message.metadata)
-        .parts(listOf(UnknownPart(OpenAiResponsesMetadata.PROVIDER, "message", jsonMapper().writeValueAsString(item), null, emptyMap())))
-        .build()
+    return ResponseInputItem.ofEasyInputMessage(
+        EasyInputMessage
+            .builder()
+            .role(EasyInputMessage.Role.USER)
+            .contentOfResponseInputMessageContentList(content)
+            .build(),
+    )
 }

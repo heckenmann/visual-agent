@@ -80,27 +80,6 @@ internal class CodexDirectProvider(
                                 }
                             },
                     )
-                val prompt = prompts.buildPrompt(selected, requireNotNull(selected.model), "codex_direct")
-                val callbacks = prompts.callbacks(prompt)
-                val options =
-                    directResponsesOptions(selected, profile.directAuthMode, callbacks)
-                        .mutate()
-                        .toolContext(
-                            selected.metadata + mapOf("provider" to "codex_direct", "model" to requireNotNull(selected.model)),
-                        ).build()
-                val originals = selected.messages.mapNotNull { message -> message.id?.let { it to message } }.toMap()
-                val imageMessageIndex = prompt.instructions.indexOfLast { it is UserMessage }
-                val messages =
-                    prompt.instructions.mapIndexed { index, message ->
-                        val state = originals[message.metadata["visualAgent.sourceMessageId"]]?.providerReplay
-                        when {
-                            message is AssistantMessage && state != null ->
-                                replays.restore(state, profile.id, requireNotNull(selected.model), message) ?: message
-                            message is UserMessage && media != null && index == imageMessageIndex ->
-                                message.mutate().media(media).build()
-                            else -> message
-                        }
-                    }
                 credentials.bearer(profile).flatMapMany { bearer ->
                     Flux.usingWhen(
                         Mono
@@ -108,16 +87,52 @@ internal class CodexDirectProvider(
                             .subscribeOn(Schedulers.boundedElastic())
                             .doOnDiscard(DirectResponsesModelLease::class.java) { it.close() },
                         { lease ->
-                            execution.stream(
-                                DirectResponsesTransport(lease.model, profile.directAuthMode),
-                                Prompt(messages, options),
-                                selected,
-                            )
+                            val counted =
+                                media?.let {
+                                    lease
+                                        .countAttachmentTokens(it, requireNotNull(selected.model), selected.cancellationToken)
+                                        .map { tokens ->
+                                            selected.copy(additionalInputTokens = Math.addExact(selected.additionalInputTokens, tokens))
+                                        }
+                                } ?: Mono.just(selected)
+                            counted.flatMapMany { budgeted ->
+                                execution.stream(
+                                    DirectResponsesTransport(lease.model, profile.directAuthMode),
+                                    buildPrompt(budgeted, media),
+                                    budgeted,
+                                )
+                            }
                         },
                         { lease -> Mono.fromRunnable<Void> { lease.close() }.subscribeOn(Schedulers.boundedElastic()) },
                     )
                 }
             }.onErrorMap(DirectProviderErrors::safe)
+
+    private fun buildPrompt(
+        selected: ChatRequestContext,
+        media: Media?,
+    ): Prompt {
+        val profile = requireNotNull(selected.providerProfile)
+        val model = requireNotNull(selected.model)
+        val prompt = prompts.buildPrompt(selected, model, "codex_direct")
+        val options =
+            directResponsesOptions(selected, profile.directAuthMode, prompts.callbacks(prompt))
+                .mutate()
+                .toolContext(selected.metadata + mapOf("provider" to "codex_direct", "model" to model))
+                .build()
+        val originals = selected.messages.mapNotNull { message -> message.id?.let { it to message } }.toMap()
+        val imageMessageIndex = prompt.instructions.indexOfLast { it is UserMessage }
+        val messages =
+            prompt.instructions.mapIndexed { index, message ->
+                val state = originals[message.metadata["visualAgent.sourceMessageId"]]?.providerReplay
+                when {
+                    message is AssistantMessage && state != null -> replays.restore(state, profile.id, model, message) ?: message
+                    message is UserMessage && media != null && index == imageMessageIndex -> message.mutate().media(media).build()
+                    else -> message
+                }
+            }
+        return Prompt(messages, options)
+    }
 
     override fun loadModelsReactive(profile: ProviderProfile): Mono<List<ProviderModelConfig>> =
         Mono

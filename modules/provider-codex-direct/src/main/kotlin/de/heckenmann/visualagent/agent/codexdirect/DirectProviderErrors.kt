@@ -4,6 +4,7 @@ import com.openai.errors.OpenAIInvalidDataException
 import com.openai.errors.OpenAIIoException
 import com.openai.errors.OpenAIServiceException
 import com.openai.errors.SseException
+import de.heckenmann.visualagent.agent.ContextWindowExceededException
 import de.heckenmann.visualagent.agent.provider.ProviderUserFacingError
 import de.heckenmann.visualagent.agent.provider.ProviderUserFacingException
 import org.springframework.ai.openai.responses.OpenAiResponsesException
@@ -19,7 +20,7 @@ import java.util.concurrent.TimeoutException
 internal object DirectProviderErrors {
     /** Returns a safe classified failure while preserving explicit request cancellation. */
     fun safe(error: Throwable): Throwable {
-        if (error is CancellationException || error is ProviderUserFacingException) return error
+        if (error is CancellationException || error is ProviderUserFacingException || error is ContextWindowExceededException) return error
         val chain = generateSequence(error) { it.cause }.take(16).toList()
         val service = chain.filterIsInstance<OpenAIServiceException>().firstOrNull()
         val status =
@@ -37,6 +38,11 @@ internal object DirectProviderErrors {
         val responseCode = chain.filterIsInstance<OpenAiResponsesException>().firstOrNull()?.code
         val description =
             when {
+                responseCode == "input_token_count_unavailable" ->
+                    problem(
+                        "Input token count unavailable",
+                        "The selected account could not verify the file's token cost. No inference was sent.",
+                    )
                 responseCode == "response_size_limit" ->
                     problem("Provider response too large", "Request a smaller response or split the task into smaller parts.")
                 responseCode == "subscription_sharing_usage_limit_exceeded" ->

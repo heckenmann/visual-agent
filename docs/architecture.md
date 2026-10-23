@@ -19,6 +19,13 @@ Native Responses replay is separate from visible conversation text and scoped to
 the originating profile and model. Migration V7 persists that payload. It must not
 be exposed through ordinary UI DTOs or reused after a provider/model switch.
 
+Native attachments use the selected model's input-token counting API on the same
+SDK credential/TLS lease before inference. The request-local `additionalInputTokens`
+reservation remains part of initial and continuation budgets; it is neither persisted
+as history nor inferred from file bytes/model names. Counting failure prevents
+generation, without changing authentication routes. See the design for transfer
+behavior, OAuth counting limitations, and the distinction from local text estimates.
+
 ## Overview
 
 Visual Agent is a Compose Multiplatform desktop application with a transport boundary between presentation and Spring-managed services.
