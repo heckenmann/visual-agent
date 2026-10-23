@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent
 
+import de.heckenmann.visualagent.agent.provider.DirectProviderAuthMode
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
 import org.springframework.ai.chat.model.ChatModel
 import org.springframework.ai.chat.model.MessageAggregator
@@ -55,7 +56,7 @@ class ReactiveResponsesToolLoop(
                 budgeter.fitPrompt(request, prompt, callbacks) { options, limit ->
                     val responses = options as? OpenAiResponsesChatOptions
                     if (responses == null ||
-                        responses.maxOutputTokens == null
+                        request.providerProfile?.directAuthMode == DirectProviderAuthMode.CHATGPT_OAUTH
                     ) {
                         options
                     } else {

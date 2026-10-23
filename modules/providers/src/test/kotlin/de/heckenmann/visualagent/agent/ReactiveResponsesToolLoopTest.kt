@@ -1,8 +1,12 @@
 package de.heckenmann.visualagent.agent
 
+import de.heckenmann.visualagent.agent.provider.DirectProviderAuthMode
+import de.heckenmann.visualagent.agent.provider.ProviderAdapter
+import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.verify
 import org.junit.jupiter.api.Test
 import org.springframework.ai.chat.messages.AssistantMessage
@@ -23,6 +27,32 @@ import kotlin.test.assertEquals
 import org.springframework.ai.chat.model.ChatResponse as SpringChatResponse
 
 class ReactiveResponsesToolLoopTest {
+    @Test
+    fun `computed output budget is applied unless the selected route is OAuth`() {
+        DirectProviderAuthMode.entries.forEach { mode ->
+            val model = mockk<ChatModel>()
+            val captured = slot<Prompt>()
+            every { model.stream(capture(captured)) } returns Flux.just(text("done"))
+            val profile =
+                ProviderProfile(
+                    "profile",
+                    "Profile",
+                    ProviderAdapter.CODEX_DIRECT,
+                    "https://api.openai.com",
+                    directAuthMode = mode,
+                )
+            val request = request().copy(providerProfile = profile, contextWindow = ContextWindow(configuredLimit = 4096))
+            val options = OpenAiResponsesChatOptions.builder().model("selected").build()
+            StepVerifier
+                .create(
+                    ReactiveResponsesToolLoop(mockk()).stream(model, Prompt(listOf(UserMessage("question")), options), request),
+                ).expectNextCount(2)
+                .verifyComplete()
+            val limit = (captured.captured.options as OpenAiResponsesChatOptions).maxOutputTokens
+            assertEquals(if (mode == DirectProviderAuthMode.API_KEY) 1024 else null, limit)
+        }
+    }
+
     @Test
     fun `text reaches subscriber before the model stream completes`() {
         val model = mockk<ChatModel>()
