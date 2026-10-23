@@ -14,7 +14,6 @@ import org.springframework.stereotype.Component
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
-import java.util.concurrent.CancellationException
 import java.util.concurrent.atomic.AtomicReference
 import org.springframework.ai.chat.model.ChatResponse as SpringChatResponse
 
@@ -33,12 +32,18 @@ class ReactiveResponsesToolLoop(
     ): Flux<ChatResponse> =
         round(model, prompt, request, 0).let { stream ->
             request.cancellationToken?.let { token ->
-                stream.takeUntilOther(
-                    Mono.create<Any> { sink ->
-                        val registration = token.onCancelled { sink.error(CancellationException("Request cancelled")) }
-                        sink.onDispose { registration.close() }
-                    },
-                )
+                stream
+                    .takeUntilOther(
+                        Mono.create<Any> { sink ->
+                            val registration = token.onCancelled { sink.success(true) }
+                            sink.onDispose { registration.close() }
+                        },
+                    ).concatWith(
+                        Flux.defer {
+                            token.throwIfCancelled()
+                            Flux.empty()
+                        },
+                    )
             } ?: stream
         }
 
