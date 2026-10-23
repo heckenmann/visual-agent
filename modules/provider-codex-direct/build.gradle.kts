@@ -40,7 +40,7 @@ tasks.test {
 
 tasks.register<JavaExec>("benchmarkDirectProvider") {
     group = "verification"
-    description = "Measures local direct-provider setup and encoding overhead without making API calls."
+    description = "Measures direct-provider setup, encoding, and loopback HTTP/SSE overhead without external API calls."
     dependsOn(tasks.testClasses)
     classpath = sourceSets.test.get().runtimeClasspath
     mainClass.set("de.heckenmann.visualagent.agent.codexdirect.DirectProviderBenchmarkKt")

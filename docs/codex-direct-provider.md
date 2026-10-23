@@ -126,11 +126,18 @@ Run `./gradlew :provider-codex-direct:benchmarkDirectProvider --no-daemon` to co
 cold and warm transport acquisition and repeated versus request-prepared encoding
 of a synthetic 1 MiB attachment. This opt-in Java 24 benchmark reports median/p95
 and current-thread allocated bytes after warm-up; it is not a unit test and has no
-elapsed-time success threshold. It performs no API calls and uses no real credentials.
+elapsed-time success threshold. It performs no external API calls and uses no real credentials.
 Cold/warm setup measures the current implementation, not historical end-to-end API
 latency, managed-store I/O, network handshakes, or OpenAI generation. Heap allocation
 is thread-local and does not describe total JVM/native memory. Compare repeated runs
 on the same machine/JDK; do not extrapolate these numbers to hosted inference speed.
+
+The same task also measures loopback HTTP/SSE text, synthetic PNG/PDF counting plus
+inference, two tool rounds, four concurrent requests, cancellation, credential
+rotation, and transport-generation replacement. It reports first visible text,
+total median/p95, caller-thread allocation, unique connections, and payload sizes.
+See [the benchmark scope and complete measurements](codex-direct-benchmark.md) for
+methodology, reproducible scenarios, and explicit HTTP/TLS/account limitations.
 
 Local measurements on October 23, 2026 (macOS ARM64, Java 24, 10 warm-up and 50
 measured iterations per scenario, two runs) gave the following ranges. These are

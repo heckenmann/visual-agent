@@ -1,6 +1,8 @@
 package de.heckenmann.visualagent.agent.codexdirect
 
+import com.openai.core.jsonMapper
 import com.sun.management.ThreadMXBean
+import de.heckenmann.visualagent.agent.codexdirect.benchmark.DirectNetworkBenchmark
 import org.springframework.ai.chat.messages.UserMessage
 import org.springframework.ai.content.Media
 import org.springframework.core.io.ByteArrayResource
@@ -13,7 +15,7 @@ private var benchmarkResult: Any? = null
 
 /** Runs explicitly requested local overhead measurements, never inference or real-account operations. */
 fun main() {
-    println("Local-only overhead benchmark; no API calls, no latency pass/fail thresholds.")
+    println("Local-only overhead benchmark; no external API calls, no latency pass/fail thresholds.")
     println("Cold/warm compare the current implementation, not historical end-to-end provider latency.")
     benchmark("cold transport acquisition") {
         val pool = DirectTransportPool()
@@ -52,6 +54,11 @@ fun main() {
         val prepared = DirectPreparedAttachment(file)
         listOf(directFileInputItem(message, prepared), directFileInputItem(message, prepared))
     }
+    val preparedInput = directFileInputItem(message, DirectPreparedAttachment(file))
+    benchmark("1 MiB prepared input, JSON serialization") {
+        jsonMapper().writeValueAsBytes(preparedInput)
+    }
+    DirectNetworkBenchmark().use { it.run() }
 }
 
 private fun benchmark(

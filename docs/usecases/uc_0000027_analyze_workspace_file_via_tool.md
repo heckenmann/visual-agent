@@ -60,3 +60,8 @@ Agents can work with imported files while content access remains explicit and au
   inference with an explicit error. OAuth counting entitlement is not assumed from login.
 - API-key output respects the calculated remaining budget even without an explicit
   output setting; OAuth requests continue to omit unsupported output-limit fields.
+- Native attachment bytes are prepared once per request and reused for counting
+  and inference continuations, without a cross-request file/count cache. The local
+  benchmark measures encoding and both HTTP requests separately from correctness
+  tests; see [benchmark scope](../codex-direct-benchmark.md). No benchmark implies
+  real-account entitlement or a guaranteed hosted-inference speedup.

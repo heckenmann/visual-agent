@@ -12,7 +12,10 @@ internal object DirectSseFrames {
             """"delta":${JsonPrimitive(text)},"output_index":0,"content_index":0,"item_id":"msg_1"""",
         )
 
-    fun completed(text: String): String = event("response.completed", """"response":${response("completed", text)}""")
+    fun completed(
+        text: String,
+        cachedTokens: Long = 0,
+    ): String = event("response.completed", """"response":${response("completed", text, cachedTokens = cachedTokens)}""")
 
     fun failed(code: String): String = event("response.failed", """"response":${response("failed", "", code)}""")
 
@@ -34,6 +37,7 @@ internal object DirectSseFrames {
         status: String,
         text: String,
         code: String? = null,
+        cachedTokens: Long = 0,
         output: String = """[{"type":"message","id":"msg_1","role":"assistant","status":"completed","content":[{"type":"output_text","text":${JsonPrimitive(
             text,
         )},"annotations":[]}]}]""",
@@ -43,7 +47,7 @@ internal object DirectSseFrames {
             "id":"resp_1","object":"response","created_at":1,"model":"selected","status":"$status",
             "output":$output,
             "usage":{"input_tokens":10,"output_tokens":2,"total_tokens":12,
-            "input_tokens_details":{"cached_tokens":0},"output_tokens_details":{"reasoning_tokens":0}}$error
+            "input_tokens_details":{"cached_tokens":$cachedTokens},"output_tokens_details":{"reasoning_tokens":0}}$error
         }""".replace("\n", "")
     }
 }
