@@ -29,6 +29,11 @@ explicitly between eligible ChatGPT plan authorization and Platform API-key bill
 6. The UI receives only an opaque credential reference after the server persists the
    selected registration. No additional settings save is required to retain a completed
    login across dialog closure or restart. Editing or switching providers alone does not run inference.
+   Reopening settings with a retained reference shows configured ChatGPT sign-in,
+   an optional Sign in to ChatGPT again action, and sign-out rather than asking for
+   initial sign-in again. Switching accounts requires explicit sign-out first;
+   reauthorization retains the verified account identity. This indicates stored configuration, not verified live
+   entitlement or token validity; merely displaying settings performs no login or API call.
 7. Refresh models or explicitly test the selected model. Listing a model does not prove
    inference entitlement. A failed refresh must not clear the persisted catalog.
    An explicitly returned positive numeric `context_window` is retained. Missing or
