@@ -18,6 +18,7 @@ import reactor.core.publisher.Flux
 internal class DirectResponsesTransport(
     private val delegate: ChatModel,
     private val mode: DirectProviderAuthMode,
+    private val attachment: DirectPreparedAttachment? = null,
 ) : ChatModel by delegate {
     override fun call(prompt: Prompt): ChatResponse = delegate.call(transportPrompt(prompt))
 
@@ -25,7 +26,7 @@ internal class DirectResponsesTransport(
 
     /** Uses the documented developer input item instead of unsupported flat OAuth tool declarations. */
     internal fun transportPrompt(prompt: Prompt): Prompt {
-        val instructions = prompt.instructions.map(::directFileTransportMessage)
+        val instructions = prompt.instructions.map { directFileTransportMessage(it, attachment) }
         val mapped = if (instructions == prompt.instructions) prompt else Prompt(instructions, prompt.options)
         if (mode != DirectProviderAuthMode.CHATGPT_OAUTH) return mapped
         val options = prompt.options as OpenAiResponsesChatOptions

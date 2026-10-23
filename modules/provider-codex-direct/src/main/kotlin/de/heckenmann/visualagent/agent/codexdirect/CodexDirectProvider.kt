@@ -89,26 +89,46 @@ internal class CodexDirectProvider(
                             .transform { metrics.stage(it, DirectRequestStage.TRANSPORT) }
                             .doOnDiscard(DirectResponsesModelLease::class.java) { it.close() },
                         { lease ->
-                            val counted =
-                                media?.let {
-                                    lease
-                                        .countAttachmentTokens(it, requireNotNull(selected.model), selected.cancellationToken)
-                                        .map { tokens ->
-                                            selected.copy(additionalInputTokens = Math.addExact(selected.additionalInputTokens, tokens))
-                                        }
-                                } ?: Mono.just(selected)
-                            counted.flatMapMany { budgeted ->
-                                execution.stream(
-                                    DirectResponsesTransport(lease.model, profile.directAuthMode),
-                                    buildPrompt(budgeted, media),
-                                    budgeted,
-                                )
+                            val preparing =
+                                media?.let { file ->
+                                    metrics.stage(
+                                        Mono
+                                            .fromCallable {
+                                                selected.cancellationToken?.throwIfCancelled()
+                                                listOf(DirectPreparedAttachment(file))
+                                            }.subscribeOn(Schedulers.boundedElastic()),
+                                        DirectRequestStage.ATTACHMENT_PREPARATION,
+                                    )
+                                } ?: Mono.just(emptyList())
+                            preparing.flatMapMany { prepared ->
+                                val attachment = prepared.singleOrNull()
+                                val counted =
+                                    media?.let {
+                                        lease
+                                            .countAttachmentTokens(
+                                                it,
+                                                requireNotNull(selected.model),
+                                                selected.cancellationToken,
+                                                attachment,
+                                            ).transform { count -> metrics.stage(count, DirectRequestStage.ATTACHMENT_COUNT) }
+                                            .map { tokens ->
+                                                selected.copy(additionalInputTokens = Math.addExact(selected.additionalInputTokens, tokens))
+                                            }
+                                    } ?: Mono.just(selected)
+                                counted.flatMapMany { budgeted ->
+                                    execution.stream(
+                                        DirectResponsesTransport(lease.model, profile.directAuthMode, attachment),
+                                        buildPrompt(budgeted, media),
+                                        budgeted,
+                                    )
+                                }
                             }
                         },
                         { lease -> Mono.fromRunnable<Void> { lease.close() }.subscribeOn(Schedulers.boundedElastic()) },
                     )
                 }
             }.onErrorMap(DirectProviderErrors::safe)
+            .transform(metrics::observe)
 
     private fun buildPrompt(
         selected: ChatRequestContext,
@@ -128,7 +148,6 @@ internal class CodexDirectProvider(
             prompt.instructions.mapIndexed { index, message ->
                 val state = originals[message.metadata["visualAgent.sourceMessageId"]]?.providerReplay
                 when {
-            .transform(metrics::observe)
                     message is AssistantMessage && state != null -> replays.restore(state, profile.id, model, message) ?: message
                     message is UserMessage && media != null && index == imageMessageIndex -> message.mutate().media(media).build()
                     else -> message

@@ -110,11 +110,12 @@ internal class DirectResponsesModelLease(
         media: Media,
         modelId: String,
         token: CancellationToken? = null,
+        prepared: DirectPreparedAttachment? = null,
     ): Mono<Int> =
         Mono
             .defer {
                 token?.throwIfCancelled()
-                val input = directFileInputItem(UserMessage.builder().media(media).build())
+                val input = directFileInputItem(UserMessage.builder().media(media).build(), prepared)
                 val parameters =
                     InputTokenCountParams
                         .builder()

@@ -11,13 +11,18 @@ import org.springframework.ai.chat.messages.AssistantMessage
 import org.springframework.ai.chat.messages.Message
 import org.springframework.ai.chat.messages.UserMessage
 import org.springframework.ai.chat.messages.part.UnknownPart
+import org.springframework.ai.content.Media
 import org.springframework.ai.openai.responses.OpenAiResponsesMetadata
 import java.util.Base64
 
 /** Preserves real filenames where Spring AI M1 otherwise appends MIME subtypes such as `.plain`. */
-internal fun directFileTransportMessage(message: Message): Message {
-    if (message !is UserMessage || message.media.isEmpty() || message.media.all { it.mimeType.type == "image" }) return message
-    val item = directFileInputItem(message)
+internal fun directFileTransportMessage(
+    message: Message,
+    prepared: DirectPreparedAttachment? = null,
+): Message {
+    if (message !is UserMessage || message.media.isEmpty()) return message
+    if (message.media.all { it.mimeType.type == "image" } && message.media.none { it === prepared?.media }) return message
+    val item = directFileInputItem(message, prepared)
     return AssistantMessage
         .builder()
         .properties(message.metadata)
@@ -26,32 +31,16 @@ internal fun directFileTransportMessage(message: Message): Message {
 }
 
 /** Shares the exact native file/image mapping between token counting and inference. */
-internal fun directFileInputItem(message: UserMessage): ResponseInputItem {
+internal fun directFileInputItem(
+    message: UserMessage,
+    prepared: DirectPreparedAttachment? = null,
+): ResponseInputItem {
     val content = mutableListOf<ResponseInputContent>()
     message.text?.takeIf(String::isNotBlank)?.let {
         content += ResponseInputContent.ofInputText(ResponseInputText.builder().text(it).build())
     }
     message.media.forEach { file ->
-        validateDirectFile(file)
-        val data = "data:${file.mimeType};base64," + Base64.getEncoder().encodeToString(file.data as ByteArray)
-        content +=
-            if (file.mimeType.type == "image") {
-                ResponseInputContent.ofInputImage(
-                    ResponseInputImage
-                        .builder()
-                        .detail(ResponseInputImage.Detail.AUTO)
-                        .imageUrl(data)
-                        .build(),
-                )
-            } else {
-                ResponseInputContent.ofInputFile(
-                    ResponseInputFile
-                        .builder()
-                        .filename(file.name)
-                        .fileData(data)
-                        .build(),
-                )
-            }
+        content += if (file === prepared?.media) prepared.content else directMediaContent(file)
     }
     return ResponseInputItem.ofEasyInputMessage(
         EasyInputMessage
@@ -60,4 +49,33 @@ internal fun directFileInputItem(message: UserMessage): ResponseInputItem {
             .contentOfResponseInputMessageContentList(content)
             .build(),
     )
+}
+
+/** Request-local immutable wire content shared by counting and each inference continuation. */
+internal class DirectPreparedAttachment(
+    val media: Media,
+) {
+    val content: ResponseInputContent = directMediaContent(media)
+}
+
+private fun directMediaContent(file: Media): ResponseInputContent {
+    validateDirectFile(file)
+    val data = "data:${file.mimeType};base64," + Base64.getEncoder().encodeToString(file.data as ByteArray)
+    return if (file.mimeType.type == "image") {
+        ResponseInputContent.ofInputImage(
+            ResponseInputImage
+                .builder()
+                .detail(ResponseInputImage.Detail.AUTO)
+                .imageUrl(data)
+                .build(),
+        )
+    } else {
+        ResponseInputContent.ofInputFile(
+            ResponseInputFile
+                .builder()
+                .filename(file.name)
+                .fileData(data)
+                .build(),
+        )
+    }
 }
