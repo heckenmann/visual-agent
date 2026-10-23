@@ -51,3 +51,12 @@ Agents can work with imported files while content access remains explicit and au
 - Image bytes and provider credentials are not written to logs or conversation history.
 - Native file analysis is explicit, bounded, managed-path validated, and preserves the
   calling sub-agent's selected provider/model. Missing agents and path escapes fail closed.
+- Before native file/image inference, the direct provider counts the attachment with
+  the selected model and credential route through the official input-token API. Its
+  token cost is reserved across prompt fitting and continuation rounds, independently
+  of the 8-MiB transport limit. Mandatory user text is never truncated to make it fit.
+- Counting transfers the explicitly selected attachment to the provider; a fitting file
+  is transferred again for inference. Unsupported, failed, or invalid counts prevent
+  inference with an explicit error. OAuth counting entitlement is not assumed from login.
+- API-key output respects the calculated remaining budget even without an explicit
+  output setting; OAuth requests continue to omit unsupported output-limit fields.

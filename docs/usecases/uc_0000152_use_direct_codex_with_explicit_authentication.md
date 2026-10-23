@@ -60,6 +60,12 @@ explicitly between eligible ChatGPT plan authorization and Platform API-key bill
 - Unknown/misspelled options and conflicting aliases fail locally instead of being
   silently ignored. A separate native-output memory guard cancels excessive responses
   with an explicit failure; it never replaces the selected model's context budget.
+- Native file/image requests first count the attachment with the selected model and
+  credentials using the official SDK input-token operation. That cost remains reserved
+  across all provider rounds. Counting is an explicit attachment transfer, not inference;
+  a fitting attachment is subsequently sent again for generation. If counting is unavailable
+  or exceeds the configured/model context limit, no inference is sent and no billing
+  route changes. OAuth counting entitlement is not assumed from successful sign-in.
 
 ## Security
 

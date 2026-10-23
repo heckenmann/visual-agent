@@ -97,7 +97,16 @@ class RequestContextBudgeter(
                     message
                 }
             }
-        val contextLimit = request.contextWindow.effectiveLimit()
+        require(request.additionalInputTokens >= 0) { "Additional input tokens must not be negative" }
+        val contextLimit =
+            request.contextWindow.effectiveLimit()?.let { limit ->
+                if (request.additionalInputTokens >= limit) {
+                    throw ContextWindowExceededException(
+                        "Native attachment input exceeds the selected model context window ($limit tokens).",
+                    )
+                }
+                limit - request.additionalInputTokens
+            }
         if (contextLimit == null) {
             val latestUser = messages.indexOfLast { it.role == "user" }
             val leadingSystemCount = messages.indexOfFirst { it.role != "system" }.let { if (it < 0) messages.size else it }

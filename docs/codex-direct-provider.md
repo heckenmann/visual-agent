@@ -211,6 +211,41 @@ permissions, and no synchronous inference or duplicate declarations.
 
 ## Native File Input
 
+Native files and images are counted before inference through the selected model's
+`POST /v1/responses/input_tokens` operation on the existing official Java SDK client.
+The same request-scoped credential and managed TLS configuration are used, without
+another HTTP client, tokenizer library, or credential-route fallback. Spring's local
+text estimator cannot establish the model's PDF/image token cost; bytes and base64
+length are not substituted for tokens. The shared SDK input-item mapping preserves
+the same filename, MIME type, image detail, and bytes for counting and inference.
+Only the attachment item is counted remotely; ordinary message text, tools, and
+native replay retain the existing local budget estimates. The count includes the
+attachment item's framing, which is conservatively reserved in addition to those
+local estimates; it is not claimed to be an exact count of the entire combined prompt.
+
+`ChatRequestContext.additionalInputTokens` carries that request-local reservation
+through both initial prompt fitting and every continuation round. The selected
+context window must still leave room for mandatory instructions, the complete latest
+user message, and output. An oversized attachment is rejected before generation;
+history may be reduced to accommodate a fitting attachment. This neither truncates
+nor rewrites native file bytes. Input counting sends the explicitly requested
+attachment to the provider before inference, so a fitting attachment is transferred
+for counting and again for inference. Ordinary text chat adds no counting request.
+
+Count failures or invalid counts fail closed with an actionable error, never with
+an inferred zero or another billing route. OAuth authorization of the counting
+operation is not established by the published sign-in guide or by synthetic tests;
+if the selected account does not permit it, native analysis stops rather than
+bypassing context validation. No real counting request was authorized or performed
+during this change. Cancellation disposes the SDK count future and the request's
+transport lease. API-key requests enforce calculated output limits even without an
+explicit `maxTokens`; OAuth still omits its unsupported `max_output_tokens` field.
+
+References: [OpenAI token counting](https://developers.openai.com/api/docs/guides/token-counting),
+[official Java SDK](https://github.com/openai/openai-java),
+[Spring token estimator](https://docs.spring.io/spring-ai/docs/current/api/org/springframework/ai/tokenizer/TokenCountEstimator.html).
+The existing SDK is reused; no additional dependency or license obligation is introduced.
+
 `workspace_file` action `analyzeFile` explicitly sends a managed workspace file to
 the calling agent's configured provider/model through `LLMProvider.fileReactive`.
 The request uses Spring AI `Media`, carries no enabled tools of its own, and returns
