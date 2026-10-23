@@ -5,6 +5,7 @@ import com.openai.client.OpenAIClientAsync
 import com.openai.models.responses.inputtokens.InputTokenCountParams
 import de.heckenmann.visualagent.agent.CancellationToken
 import de.heckenmann.visualagent.agent.provider.ServerTrustManagerProvider
+import de.heckenmann.visualagent.agent.provider.ServerTrustSnapshot
 import de.heckenmann.visualagent.agent.provider.resolveTrustManager
 import io.micrometer.observation.ObservationRegistry
 import org.springframework.ai.chat.messages.UserMessage
@@ -24,13 +25,39 @@ import javax.net.ssl.SSLContext
 @Service
 internal class DirectResponsesModels(
     private val trust: ServerTrustManagerProvider? = null,
+    private val pool: DirectTransportPool = DirectTransportPool(),
 ) {
-    /** Opens explicit clients so both transports can be closed after completion or cancellation. */
+    private val platform by lazy { ServerTrustSnapshot(null.resolveTrustManager(), "platform-default") }
+
+    /** Shares only transport resources; credentials and model options remain request-scoped. */
     fun open(
         bearer: String,
         modelId: String,
     ): DirectResponsesModelLease {
-        val manager = trust.resolveTrustManager()
+        val snapshot = trust?.trustSnapshot() ?: platform
+        val lease = pool.acquire(snapshot.revision) { createTransport(snapshot, modelId) }
+        try {
+            val sync = (lease.resource as DirectSdkTransport).client.withOptions { it.apiKey(bearer) }
+            val async = sync.async()
+            val model =
+                OpenAiResponsesChatModel
+                    .builder()
+                    .openAiClient(sync)
+                    .openAiClientAsync(async)
+                    .options(OpenAiResponsesChatOptions.builder().model(modelId).build())
+                    .build()
+            return DirectResponsesModelLease(model, sync, async, lease::close)
+        } catch (error: Throwable) {
+            lease.close()
+            throw error
+        }
+    }
+
+    private fun createTransport(
+        snapshot: ServerTrustSnapshot,
+        modelId: String,
+    ): DirectSdkTransport {
+        val manager = snapshot.manager
         val ssl = SSLContext.getInstance("TLS").apply { init(null, arrayOf(manager), null) }
         val customizer =
             OpenAiHttpClientBuilderCustomizer { builder ->
@@ -39,7 +66,7 @@ internal class DirectResponsesModels(
         val sync =
             OpenAiSetup.setupSyncClient(
                 DirectOAuthAttempt.RESOURCE,
-                bearer,
+                "request-scoped-credential-required",
                 null,
                 null,
                 null,
@@ -55,44 +82,14 @@ internal class DirectResponsesModels(
                 null,
                 listOf(customizer),
             )
-        try {
-            val async =
-                OpenAiSetup.setupAsyncClient(
-                    DirectOAuthAttempt.RESOURCE,
-                    bearer,
-                    null,
-                    null,
-                    null,
-                    null,
-                    false,
-                    false,
-                    modelId,
-                    Duration.ofSeconds(120),
-                    0,
-                    null,
-                    emptyMap(),
-                    ObservationRegistry.NOOP,
-                    null,
-                    listOf(customizer),
-                )
-            try {
-                val model =
-                    OpenAiResponsesChatModel
-                        .builder()
-                        .openAiClient(sync)
-                        .openAiClientAsync(async)
-                        .options(OpenAiResponsesChatOptions.builder().model(modelId).build())
-                        .build()
-                return DirectResponsesModelLease(model, sync, async)
-            } catch (error: Throwable) {
-                async.close()
-                throw error
-            }
-        } catch (error: Throwable) {
-            sync.close()
-            throw error
-        }
+        return DirectSdkTransport(sync)
     }
+}
+
+private class DirectSdkTransport(
+    val client: OpenAIClient,
+) : AutoCloseable {
+    override fun close() = client.close()
 }
 
 /** Request-scoped transport ownership; credentials are never included in diagnostic strings. */
@@ -100,6 +97,13 @@ internal class DirectResponsesModelLease(
     val model: ChatModel,
     private val sync: OpenAIClient,
     private val async: OpenAIClientAsync,
+    private val release: () -> Unit = {
+        try {
+            async.close()
+        } finally {
+            sync.close()
+        }
+    },
 ) : AutoCloseable {
     /** Counts native attachment tokens with the selected model and this lease's credential route. */
     fun countAttachmentTokens(
@@ -150,10 +154,6 @@ internal class DirectResponsesModelLease(
             }
 
     override fun close() {
-        try {
-            async.close()
-        } finally {
-            sync.close()
-        }
+        release()
     }
 }
