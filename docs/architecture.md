@@ -18,6 +18,8 @@ unrelated edits and reject authentication changes made during authorization.
 Settings writes retain the authoritative registration rather than copying stale
 references from UI drafts; explicit sign-out clears both credentials and their reference.
 Adapter conversion persists a validated endpoint with the new authentication route.
+Reactive post-commit refresh notifications cannot turn a successful write into a
+credential rollback; notification failures produce a safe warning instead.
 An external browser cannot reach a remote server's loopback address without an
 explicit forwarding arrangement; no public callback listener is opened implicitly.
 

@@ -72,6 +72,9 @@ explicitly between eligible ChatGPT plan authorization and Platform API-key bill
 - Converting an existing profile to direct OAuth also persists the validated direct
   endpoint, while preserving unrelated concurrent edits. Concurrent changes to the
   previous adapter's endpoint reject the pending conversion instead of overwriting it.
+- Refresh notifications are best-effort after a successful catalog write. A notification
+  failure is logged without credentials and cannot invalidate a committed registration
+  or report an already-persisted sign-out as a failed database write.
 - API-key failures never switch to ChatGPT OAuth, and OAuth failures never incur API billing.
 - The callback is HTTP on 127.0.0.1 at `/auth/callback`. A browser running on another host
   requires an explicitly arranged loopback forwarding path; do not expose callback listeners
