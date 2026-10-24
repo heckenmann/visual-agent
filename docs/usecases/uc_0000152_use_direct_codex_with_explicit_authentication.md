@@ -69,6 +69,9 @@ explicitly between eligible ChatGPT plan authorization and Platform API-key bill
   For a new provider, successful authorization also retains its profile. A deleted provider
   or concurrently changed authentication route cannot be silently overwritten by a late callback.
   Stale settings drafts cannot erase a newer login or restore a signed-out registration.
+- Converting an existing profile to direct OAuth also persists the validated direct
+  endpoint, while preserving unrelated concurrent edits. Concurrent changes to the
+  previous adapter's endpoint reject the pending conversion instead of overwriting it.
 - API-key failures never switch to ChatGPT OAuth, and OAuth failures never incur API billing.
 - The callback is HTTP on 127.0.0.1 at `/auth/callback`. A browser running on another host
   requires an explicitly arranged loopback forwarding path; do not expose callback listeners

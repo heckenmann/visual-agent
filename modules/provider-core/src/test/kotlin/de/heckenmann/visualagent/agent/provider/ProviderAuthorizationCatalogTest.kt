@@ -26,6 +26,41 @@ class ProviderAuthorizationCatalogTest {
         )
 
     @Test
+    fun `invalid staged direct endpoints fail before an authorization target is created`() {
+        assertFailsWith<IllegalArgumentException> {
+            authorization.prepare(profile.copy(baseUrl = "https://custom.example.test")).block()
+        }
+        assertNull(catalog.getProvider(profile.id))
+    }
+
+    @Test
+    fun `conversion rejects a concurrently edited previous endpoint`() {
+        val previous = profile.copy(adapter = ProviderAdapter.OLLAMA, baseUrl = "https://first.example.test")
+        catalog.saveProvider(previous)
+        val target = requireNotNull(authorization.prepare(profile).block())
+        catalog.saveProvider(previous.copy(baseUrl = "https://second.example.test"))
+        assertFailsWith<IllegalStateException> { authorization.complete(target, "registration").block() }
+        assertEquals(ProviderAdapter.OLLAMA, catalog.getProvider(profile.id)?.adapter)
+        assertEquals("https://second.example.test", catalog.getProvider(profile.id)?.baseUrl)
+        assertNull(catalog.getProvider(profile.id)?.credentialReference)
+    }
+
+    @Test
+    fun `conversion retains the staged direct endpoint instead of the previous adapter endpoint`() {
+        listOf(ProviderAdapter.OLLAMA, ProviderAdapter.OPENAI_COMPATIBLE).forEach { adapter ->
+            catalog.saveProvider(profile.copy(adapter = adapter, baseUrl = "https://custom.example.test"))
+            val target = requireNotNull(authorization.prepare(profile).block())
+            catalog.saveProvider(requireNotNull(catalog.getProvider(profile.id)).copy(name = "Concurrent name"))
+            authorization.complete(target, "registration").block()
+            val restored = requireNotNull(catalog.getProvider(profile.id))
+            assertEquals(ProviderAdapter.CODEX_DIRECT, restored.adapter)
+            assertEquals(profile.baseUrl, restored.baseUrl)
+            assertEquals("Concurrent name", restored.name)
+            assertEquals("registration", restored.credentialReference)
+        }
+    }
+
+    @Test
     fun `registration survives a new catalog instance without saving the settings draft`() {
         val selection = catalog.activeProviderId() to catalog.activeModelId()
         complete(profile, "registration")
@@ -40,11 +75,11 @@ class ProviderAuthorizationCatalogTest {
         catalog.saveProvider(profile)
         val target = requireNotNull(authorization.prepare(profile).block())
         val others = catalog.listProviders().filterNot { it.id == profile.id }
-        catalog.saveProvider(profile.copy(name = "Edited", baseUrl = "https://example.test"))
+        catalog.saveProvider(profile.copy(name = "Edited", baseUrl = "https://api.openai.com/v1"))
         authorization.complete(target, "registration").block()
 
         assertEquals("Edited", catalog.getProvider(profile.id)?.name)
-        assertEquals("https://example.test", catalog.getProvider(profile.id)?.baseUrl)
+        assertEquals("https://api.openai.com/v1", catalog.getProvider(profile.id)?.baseUrl)
         assertEquals(others, catalog.listProviders().filterNot { it.id == profile.id })
     }
 

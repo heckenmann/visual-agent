@@ -15,6 +15,7 @@ import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
+import de.heckenmann.visualagent.agent.provider.requireDirectCodexEndpoint
 import org.springframework.ai.chat.messages.AssistantMessage
 import org.springframework.ai.chat.messages.UserMessage
 import org.springframework.ai.chat.prompt.Prompt
@@ -244,10 +245,7 @@ internal class CodexDirectProvider(
             }.subscribeOn(Schedulers.boundedElastic())
 
     private fun validateEndpoint(profile: ProviderProfile) {
-        require(profile.adapter == adapter) { "The profile is not a direct Codex profile" }
-        require(profile.baseUrl.trimEnd('/') in setOf("https://api.openai.com", DirectOAuthAttempt.RESOURCE)) {
-            "Direct Codex requires the documented OpenAI API endpoint"
-        }
+        profile.requireDirectCodexEndpoint()
     }
 
     private fun complete(stream: Flux<ChatResponse>): Mono<ChatResponse> =
