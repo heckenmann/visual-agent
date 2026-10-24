@@ -41,6 +41,8 @@ internal class MainAgentContextHistoryLoader(
                             turnOrder = it.turnOrder,
                             assistantToolTurn = it.assistantToolTurn,
                             conversationRequestId = it.conversationRequestId,
+                            // Stateless Responses must replay native parts, not just display text; see docs/context-transport.md.
+                            providerReplay = it.providerReplay,
                         )
                     }
             }
