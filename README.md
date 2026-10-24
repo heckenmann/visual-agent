@@ -49,6 +49,9 @@ Supported native release platforms are macOS (Apple Silicon and Intel), Windows 
 - Managed workspace files the model can import, read, search, and render (including PDF page previews).
 - Todo list and sub-agents that can work on tasks autonomously.
 - Per-agent tool configuration, provider profiles, and persisted settings.
+- Searchable model selection directly in the Conversation composer, with favorites
+  and provider grouping. Global Settings separates Appearance, Providers, Agent,
+  and Updates; Conversation settings contains only model context and message behavior.
 - Self-model switching through `model_selection`, with explicit grants required for sub-agents.
 - Searchable reusable Markdown skills that the main agent can save and retrieve explicitly,
   with a user-facing Skills panel and database-backed search.
