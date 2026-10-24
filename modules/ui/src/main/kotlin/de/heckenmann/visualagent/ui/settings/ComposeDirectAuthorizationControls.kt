@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,16 +39,43 @@ internal fun DirectAuthorizationControls(
     val scope = rememberCoroutineScope()
     val browser = LocalUriHandler.current
     val publishReference by rememberUpdatedState(onReferenceChanged)
-    val hasRegistration = profile.credentialReference != null
+    var reference by remember(profile.id, profile.credentialReference) { mutableStateOf(profile.credentialReference) }
+    var registrationLoaded by remember(profile.id, port) { mutableStateOf(false) }
+    var catalogRevision by remember(profile.id, port) { mutableStateOf(0) }
+    val hasRegistration = reference != null
     var operation by remember(profile.id) { mutableStateOf<Job?>(null) }
     var status by remember(profile.id) { mutableStateOf<String?>(null) }
-    DisposableEffect(profile.id) { onDispose { operation?.cancel() } }
+    DisposableEffect(profile.id, port) {
+        val listener = port.addChangeListener { scope.launch { catalogRevision++ } }
+        onDispose {
+            listener.close()
+            operation?.cancel()
+        }
+    }
+    LaunchedEffect(profile.id, profile.credentialReference, port, catalogRevision) {
+        registrationLoaded = false
+        try {
+            val saved = withContext(Dispatchers.IO) { port.getProvider(profile.id) }
+            val current =
+                saved
+                    ?.takeIf { it.adapter == ProviderAdapter.CODEX_DIRECT && it.directAuthMode == DirectProviderAuthMode.CHATGPT_OAUTH }
+                    ?.credentialReference
+            if (reference != current) status = null
+            reference = current
+            registrationLoaded = true
+            if (profile.credentialReference != current) publishReference(profile.id, current)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            status = "Could not load ChatGPT sign-in status. Reopen settings to retry."
+        }
+    }
     Row {
         ActionIconButton(
             Icons.Filled.AccountCircle,
-            if (hasRegistration) "Sign in to ChatGPT again" else "Continue with ChatGPT",
+            "Continue with ChatGPT",
             enabled =
-                operation == null,
+                operation == null && registrationLoaded && !hasRegistration,
             onClick = {
                 operation =
                     scope.launch {
@@ -58,6 +86,7 @@ internal fun DirectAuthorizationControls(
                             sessionId = session.id
                             withContext(Dispatchers.IO) { browser.openUri(session.authorizationUrl) }
                             val result = withContext(Dispatchers.IO) { port.awaitDirectSignIn(session.id) }
+                            reference = result.credentialReference
                             publishReference(profile.id, result.credentialReference)
                             status = "${result.accountLabel} authorized. This account selection is saved."
                         } catch (cancelled: CancellationException) {
@@ -78,12 +107,14 @@ internal fun DirectAuthorizationControls(
         ActionIconButton(
             Icons.AutoMirrored.Filled.Logout,
             "Sign out of ChatGPT",
-            enabled = operation == null && profile.credentialReference != null,
+            enabled = operation == null && registrationLoaded && hasRegistration,
             onClick = {
                 operation =
                     scope.launch {
                         try {
-                            val confirmed = withContext(Dispatchers.IO) { port.signOutDirectProvider(profile) }
+                            val selected = profile.copy(credentialReference = reference)
+                            val confirmed = withContext(Dispatchers.IO) { port.signOutDirectProvider(selected) }
+                            reference = null
                             publishReference(profile.id, null)
                             status =
                                 if (confirmed) {
@@ -101,7 +132,9 @@ internal fun DirectAuthorizationControls(
         )
     }
     PanelInfoBox(
-        status ?: if (hasRegistration) {
+        status ?: if (!registrationLoaded) {
+            "Loading ChatGPT sign-in status..."
+        } else if (hasRegistration) {
             "ChatGPT sign-in is configured for this provider. Sign out first to use a different account."
         } else {
             "ChatGPT authorization is required."
