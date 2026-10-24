@@ -37,6 +37,7 @@ internal class MainAgentMemoryDraft {
 internal fun MainAgentMemoryEditor(
     port: MainAgentMemoryPort,
     state: MainAgentMemoryDraft = remember(port) { MainAgentMemoryDraft() },
+    configuredLimit: Int? = null,
 ) {
     val scope = rememberCoroutineScope()
     var snapshot by state.snapshot
@@ -44,6 +45,7 @@ internal fun MainAgentMemoryEditor(
     var loaded by state.loaded
     var busy by state.busy
     var status by state.status
+    val limit = configuredLimit ?: snapshot.limit
 
     /** Loads the revisioned memory after initial entry or explicit reload. */
     fun load() {
@@ -64,13 +66,13 @@ internal fun MainAgentMemoryEditor(
         }
     }
     LaunchedEffect(port) { if (!loaded || content == snapshot.content) load() }
-    mainAgentMemorySection(content, snapshot, snapshot.limit) { content = it }
+    mainAgentMemorySection(content, snapshot, limit) { content = it }
     Row {
         ActionIconButton(Icons.Filled.Refresh, "Reload main-agent memory", enabled = !busy, onClick = ::load)
         ActionIconButton(
             Icons.Filled.Save,
             "Save main-agent memory",
-            enabled = loaded && !busy && content != snapshot.content && content.codePointCount(0, content.length) <= snapshot.limit,
+            enabled = loaded && !busy && content != snapshot.content && content.codePointCount(0, content.length) <= limit,
             onClick = {
                 val submitted = content
                 val revision = snapshot.revision
