@@ -23,7 +23,7 @@ class SpringSettingsPortTest {
     @Test
     fun `saving settings preserves the explicit direct OAuth mode and credential reference`() {
         val catalog = mockk<ProviderCatalogService>(relaxed = true)
-        val port = SpringSettingsPort(AppConfigBean(), catalog, memoryStore())
+        val port = SpringSettingsPort(AppConfigBean(), catalog, memoryStore(), mockk(relaxed = true))
         val provider =
             ProviderProfile(
                 "direct",
@@ -66,7 +66,7 @@ class SpringSettingsPortTest {
         every { catalog.activeProviderId() } returns "openai"
         every { catalog.activeModelId() } returns "gpt-test"
 
-        val snapshot = SpringSettingsPort(config, catalog, memoryStore()).snapshot()
+        val snapshot = SpringSettingsPort(config, catalog, memoryStore(), mockk(relaxed = true)).snapshot()
 
         assertEquals("openai", snapshot.providerId)
         assertEquals("gpt-test", snapshot.modelId)
@@ -79,7 +79,7 @@ class SpringSettingsPortTest {
     fun `save writes the complete settings snapshot to the server bean`() {
         val config = AppConfigBean()
         val catalog = mockk<ProviderCatalogService>(relaxed = true)
-        val port = SpringSettingsPort(config, catalog, memoryStore())
+        val port = SpringSettingsPort(config, catalog, memoryStore(), mockk(relaxed = true))
 
         port.save(
             SettingsSnapshot(
@@ -101,7 +101,7 @@ class SpringSettingsPortTest {
     fun `save persists a staged provider configuration with its settings draft`() {
         val config = AppConfigBean()
         val catalog = mockk<ProviderCatalogService>(relaxed = true)
-        val port = SpringSettingsPort(config, catalog, memoryStore())
+        val port = SpringSettingsPort(config, catalog, memoryStore(), mockk(relaxed = true))
         val provider =
             ProviderProfile(
                 id = "openai",
@@ -131,7 +131,7 @@ class SpringSettingsPortTest {
     @Test
     fun `saving a staged provider preserves user capability overrides`() {
         val catalog = mockk<ProviderCatalogService>(relaxed = true)
-        val port = SpringSettingsPort(AppConfigBean(), catalog, memoryStore())
+        val port = SpringSettingsPort(AppConfigBean(), catalog, memoryStore(), mockk(relaxed = true))
         val manuallyConfigured =
             ProviderModel(
                 id = "custom-vision",
@@ -170,7 +170,7 @@ class SpringSettingsPortTest {
 
     @Test
     fun `save rejects a memory limit lower than the stored document`() {
-        val port = SpringSettingsPort(AppConfigBean(), mockk(relaxed = true), memoryStore("x".repeat(1_001)))
+        val port = SpringSettingsPort(AppConfigBean(), mockk(relaxed = true), memoryStore("x".repeat(1_001)), mockk(relaxed = true))
 
         val error = assertFailsWith<IllegalArgumentException> { port.save(SettingsSnapshot(maxMainAgentMemoryChars = 1_000)) }
 

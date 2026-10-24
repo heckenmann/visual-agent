@@ -118,6 +118,37 @@ class AppConfigBean(
         preferenceStore.setPreference(KEY_UI_SHOW_PANEL_LABELS, showPanelLabels.toString())
     }
 
+    /** Persists only owned settings keys, never rewriting credentials or unrelated preferences. */
+    internal fun saveFields(keys: Set<String>) {
+        val values = snapshot()
+        keys.forEach { key -> preferenceStore.setPreference(key, requireNotNull(values[key])) }
+        publishChanges()
+    }
+
+    /** Uses database compare-and-set so independent clients cannot lose each other's favorite edits. */
+    internal fun updateFavorite(
+        modelId: String,
+        favorite: Boolean,
+    ) {
+        repeat(16) {
+            val previous = preferenceStore.getPreference(KEY_SESSION_FAVORITE_MODELS)
+            val values =
+                previous
+                    .orEmpty()
+                    .split(',')
+                    .filter(String::isNotBlank)
+                    .toMutableSet()
+            if (favorite) values.add(modelId) else values.remove(modelId)
+            val next = values.sorted().joinToString(",")
+            if (preferenceStore.compareAndSetPreferenceReactive(KEY_SESSION_FAVORITE_MODELS, previous, next).block() == true) {
+                favoriteModels = preferenceStore.getPreference(KEY_SESSION_FAVORITE_MODELS) ?: next
+                publishChanges()
+                return
+            }
+        }
+        error("Favorites changed concurrently. Retry the action.")
+    }
+
     /**
      * Persists current settings to the database-backed preference store.
      */

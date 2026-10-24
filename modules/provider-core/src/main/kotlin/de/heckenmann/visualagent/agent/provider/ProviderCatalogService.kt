@@ -101,6 +101,28 @@ class ProviderCatalogService(
         mutate { current -> proposed.withAuthoritativeCredentials(current) }
     }
 
+    /** Saves profile edits against their database baseline without replacing a concurrent model selection. */
+    fun replaceProfiles(
+        profiles: List<ProviderProfile>,
+        expectedProfiles: List<ProviderProfile>,
+    ) {
+        val proposed = profiles.map { it.withSelectedCredentialRoute().withSelectableCodexDefault() }
+        require(proposed.all { it.id.isNotBlank() } && proposed.map { it.id }.distinct().size == proposed.size) {
+            "Provider identifiers must be nonblank and unique"
+        }
+        require(proposed.any(ProviderProfile::enabled)) { "At least one provider must remain enabled" }
+        mutate { current ->
+            val baseline = current.copy(providers = expectedProfiles).withAuthoritativeCredentials(current).providers
+            check(baseline.associateBy(ProviderProfile::id) == current.providers.associateBy(ProviderProfile::id)) {
+                "Provider configuration changed elsewhere. Reload before saving."
+            }
+            require(proposed.any { it.id == current.activeProviderId && it.enabled }) {
+                "Switch the Conversation to another provider before removing or disabling the active provider"
+            }
+            current.copy(providers = proposed).withAuthoritativeCredentials(current)
+        }
+    }
+
     /** Reactively replaces the complete provider catalog and active selection. */
     fun replaceConfigurationReactive(configuration: ProviderConfiguration): Mono<Void> {
         val state = validatedCatalogState(configuration)
