@@ -20,6 +20,7 @@ class ProviderAuthorizationCatalog(
     /** Captures a database-backed precondition without saving unrelated settings edits. */
     fun prepare(profile: ProviderProfile): Mono<ProviderAuthorizationTarget> =
         persistence.loadReactive().map { state ->
+            profile.requireDirectCodexEndpoint()
             ProviderAuthorizationTarget(profile, state.providers.firstOrNull { it.id == profile.id })
         }
 
@@ -32,13 +33,19 @@ class ProviderAuthorizationCatalog(
             .mutateReactive { state ->
                 val current = state.providers.firstOrNull { it.id == target.profile.id }
                 check(current.sameAuthorization(target.previous)) { "Provider authentication changed during sign-in; retry sign-in" }
+                val converting = current != null && current.adapter != target.profile.adapter
+                check(!converting || current.baseUrl == target.previous?.baseUrl) {
+                    "Provider endpoint changed during sign-in; retry sign-in"
+                }
                 val registered =
                     (current ?: target.profile).copy(
+                        baseUrl = if (converting) target.profile.baseUrl else (current ?: target.profile).baseUrl,
                         adapter = ProviderAdapter.CODEX_DIRECT,
                         directAuthMode = DirectProviderAuthMode.CHATGPT_OAUTH,
                         credentialReference = reference,
                         apiKey = "",
                     )
+                registered.requireDirectCodexEndpoint()
                 state.copy(providers = state.providers.filterNot { it.id == registered.id } + registered)
             }.flatMap { notifications.publishReactive() }
 

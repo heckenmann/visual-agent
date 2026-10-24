@@ -17,6 +17,7 @@ independently of the settings draft. Database-conditional catalog updates preser
 unrelated edits and reject authentication changes made during authorization.
 Settings writes retain the authoritative registration rather than copying stale
 references from UI drafts; explicit sign-out clears both credentials and their reference.
+Adapter conversion persists a validated endpoint with the new authentication route.
 An external browser cannot reach a remote server's loopback address without an
 explicit forwarding arrangement; no public callback listener is opened implicitly.
 
