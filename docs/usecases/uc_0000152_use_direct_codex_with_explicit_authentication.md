@@ -2,6 +2,10 @@
 
 ## Goal
 
+Context transport and native replay follow the [context transport decision](../context-transport.md).
+Both authentication routes remain stateless and resend the complete selected context;
+API-key stateful alternatives and OAuth WebSocket continuation are not enabled.
+
 Use OpenAI's documented Responses endpoint without installing Codex CLI, choosing
 explicitly between eligible ChatGPT plan authorization and Platform API-key billing.
 
