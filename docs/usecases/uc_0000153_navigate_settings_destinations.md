@@ -24,6 +24,8 @@ destinations instead of one overloaded provider/conversation form.
 6. Updates contains the existing version/update preferences and actions.
 7. Switch destinations without losing unsaved settings or memory drafts. Each
    category has its own Save/Reset actions; these do not submit another category.
+   Unfinished provider creation/edit forms also retain their field values until
+   explicitly saved or cancelled, including across destination changes.
 8. The model picker can reveal Providers directly, opening the Settings panel if hidden.
 9. The Conversation settings dialog contains only Model and Conversation tabs.
    Interpolation details are expandable and automatic-mode details remain visible
@@ -39,8 +41,12 @@ destinations instead of one overloaded provider/conversation form.
 - The active provider must be switched in Conversation before it can be removed or
   disabled through provider administration.
 - Invalid/incomplete advanced options remain visible in the draft and block Save.
+  Removing their provider discards its option drafts, so an invisible removed
+  resource cannot block saving the remaining catalog.
 - Save failures retain the draft and show a concise error. Reset rereads server state,
   not factory defaults.
+- Conversation settings catches catalog-load failures and offers an explicit retry
+  without closing the dialog or replacing edited context values.
 - Server I/O is asynchronous from presentation. Navigation/recomposition itself does
   not execute blocking provider, filesystem or database work on the UI thread.
 

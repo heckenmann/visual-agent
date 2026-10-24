@@ -9,6 +9,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,8 +51,9 @@ internal fun ProviderProfileEditor(
     canDisable: Boolean,
     onCancel: () -> Unit,
     onSave: (ProviderProfile) -> Unit,
+    formState: MutableState<ProviderProfileFormState> = remember { mutableStateOf(initial) },
 ) {
-    var state by remember { mutableStateOf(initial) }
+    var state by formState
     var apiKeyVisible by remember { mutableStateOf(false) }
     val validation = state.validationError()
     ModalDialogLayout(

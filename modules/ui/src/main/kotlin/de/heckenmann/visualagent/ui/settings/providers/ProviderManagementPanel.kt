@@ -35,6 +35,7 @@ import de.heckenmann.visualagent.ui.components.settingsDraftActionRow
 import de.heckenmann.visualagent.ui.components.toUiErrorMessage
 import de.heckenmann.visualagent.ui.settings.DirectAuthorizationControls
 import de.heckenmann.visualagent.ui.settings.ProviderProfileEditor
+import de.heckenmann.visualagent.ui.settings.ProviderProfileFormState
 import de.heckenmann.visualagent.ui.settings.ProviderSettingsDraft
 import de.heckenmann.visualagent.ui.settings.newProviderFormState
 import de.heckenmann.visualagent.ui.settings.providerProfileActions
@@ -62,6 +63,7 @@ internal class ProviderManagementState {
     var generation = 0
     val modelOptions = mutableStateMapOf<String, String>()
     var optionsDirty by mutableStateOf(false)
+    val form = mutableStateOf(ProviderProfileFormState())
 }
 
 /** Manages provider definitions independently of the main agent's live provider/model selection. */
@@ -121,7 +123,8 @@ internal fun ProviderManagementPanel(
     }
     if (state.creating || state.editing != null) {
         ProviderProfileEditor(
-            initial = state.editing?.toFormState() ?: newProviderFormState(),
+            initial = state.form.value,
+            formState = state.form,
             existing = state.editing,
             canDisable = state.editing?.id != state.persisted.providerId,
             onCancel = {
@@ -142,9 +145,23 @@ internal fun ProviderManagementPanel(
                 canAdd = state.loaded && !state.busy,
                 canEdit = selected != null && !state.busy,
                 canRemove = selected != null && selected.id != state.persisted.providerId && !state.busy,
-                onAdd = { state.creating = true },
-                onEdit = { state.editing = selected },
-                onRemove = { selected?.let { state.draft = state.draft.remove(it.id) } },
+                onAdd = {
+                    state.form.value = newProviderFormState()
+                    state.creating = true
+                },
+                onEdit = {
+                    selected?.let { state.form.value = it.toFormState() }
+                    state.editing = selected
+                },
+                onRemove = {
+                    selected?.let { profile ->
+                        state.draft = state.draft.remove(profile.id)
+                        state.modelOptions.keys
+                            .filter { it.startsWith("${profile.id}/") }
+                            .forEach(state.modelOptions::remove)
+                        state.optionsDirty = state.modelOptions.isNotEmpty()
+                    }
+                },
             )
             ActionIconButton(Icons.Filled.Explore, "Run onboarding again", onClick = onRunOnboarding)
         }

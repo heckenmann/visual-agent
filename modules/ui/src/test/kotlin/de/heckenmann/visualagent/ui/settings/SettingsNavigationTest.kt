@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import de.heckenmann.visualagent.protocol.MainAgentMemorySnapshot
 import de.heckenmann.visualagent.protocol.SettingsSnapshot
 import de.heckenmann.visualagent.ui.application.ComposePanelServices
@@ -48,5 +49,27 @@ class SettingsNavigationTest {
         compose.onNodeWithContentDescription("Model instruction").assertDoesNotExist()
         compose.runOnIdle { navigation.destination = SettingsDestination.PROVIDERS }
         compose.onNodeWithContentDescription("Add provider").assertExists()
+    }
+
+    @Test fun `an unfinished provider form survives switching settings destinations`() {
+        val services = mockk<ComposePanelServices>(relaxed = true)
+        val navigation = SettingsNavigationState()
+        every { services.settingsNavigation } returns navigation
+        every { services.updateState } returns mutableStateOf(UpdatePresentationState())
+        coEvery { services.settings.snapshotAsync() } returns SettingsSnapshot()
+        every { services.settings.snapshot() } returns SettingsSnapshot()
+        every { services.providers.listProviders() } returns emptyList()
+        compose.setContent { MaterialTheme { SettingsWorkspacePanel(services) } }
+        compose.onNodeWithText("Providers").performClick()
+        compose.waitUntil {
+            runCatching { compose.onNodeWithText("Provider settings loaded").assertExists() }.isSuccess
+        }
+        compose.onNodeWithContentDescription("Add provider").performClick()
+        compose.onNodeWithText("Name").performTextReplacement("Unfinished profile")
+        compose.onNodeWithText("Base URL").performTextReplacement("https://example.invalid")
+        compose.onNodeWithText("Appearance").performClick()
+        compose.onNodeWithText("Providers").performClick()
+        compose.onNodeWithText("Name").assertTextContains("Unfinished profile")
+        compose.onNodeWithText("Base URL").assertTextContains("https://example.invalid")
     }
 }
