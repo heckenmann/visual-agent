@@ -1,15 +1,22 @@
 package de.heckenmann.visualagent.ui.settings
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import de.heckenmann.visualagent.protocol.MainAgentMemoryPort
 import de.heckenmann.visualagent.protocol.MainAgentMemorySnapshot
 import de.heckenmann.visualagent.protocol.MainAgentMemoryUpdate
+import de.heckenmann.visualagent.protocol.SettingsPort
+import de.heckenmann.visualagent.protocol.SettingsSnapshot
+import de.heckenmann.visualagent.ui.settings.agent.AgentSettingsPage
 import de.heckenmann.visualagent.ui.settings.agent.MainAgentMemoryEditor
+import de.heckenmann.visualagent.ui.settings.navigation.SettingsPageDraft
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -46,5 +53,20 @@ class MainAgentMemoryEditorTest {
         verify(exactly = 1) { port.replace("My draft", 1) }
         verify(exactly = 1) { port.replace("My draft", 2) }
         verify(exactly = 2) { port.snapshot() }
+    }
+
+    @Test fun `saving a greater memory limit immediately enables a larger document without reloading`() {
+        val port = mockk<MainAgentMemoryPort>()
+        val settings = mockk<SettingsPort>(relaxed = true)
+        val state = SettingsPageDraft()
+        coEvery { settings.snapshotAsync() } returns SettingsSnapshot(maxMainAgentMemoryChars = 1000)
+        every { port.snapshot() } returns MainAgentMemorySnapshot("", contentLength = 0, limit = 1000, revision = 1)
+        compose.setContent { MaterialTheme { AgentSettingsPage(settings, port, state, onSaved = {}) } }
+        compose.waitUntil { state.loaded.value }
+        compose.onNodeWithContentDescription("Main-agent memory limit").performScrollTo().performTextReplacement("2000")
+        compose.onNodeWithText("Save changes").performClick()
+        compose.waitUntil { state.persisted.value.maxMainAgentMemoryChars == 2000 }
+        compose.onNodeWithText("Durable model reference").performScrollTo().performTextReplacement("x".repeat(1500))
+        compose.onNodeWithContentDescription("Save main-agent memory").performScrollTo().assertIsEnabled()
     }
 }

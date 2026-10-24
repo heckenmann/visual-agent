@@ -25,6 +25,8 @@ without coupling it to the visible conversation history, provider, or model.
    count. It does not silently truncate content.
 5. The memory's own Save action replaces the document only when its revision still
    matches. Changing the memory size limit is a separate Agent-settings save.
+   After that save, the editor immediately uses the saved limit for its character
+   counter and Save-button validation without discarding the document draft.
 6. If another editor changed the document, the editor reports a conflict and retains
    the user's draft. Reload discards that draft explicitly and reads the current document.
 7. Before every main-agent request, the server reads the latest document and adds

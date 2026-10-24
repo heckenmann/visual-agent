@@ -36,7 +36,7 @@ internal fun AgentSettingsPage(
                 )
             }
         }
-        MainAgentMemoryEditor(memory, memoryDraft)
+        MainAgentMemoryEditor(memory, memoryDraft, configuredLimit = state.persisted.value.maxMainAgentMemoryChars)
         PanelSection("Execution") {
             conversationNumberSetting("Parallel agents", draft.maxParallelSubAgents, "Maximum simultaneous sub-agent jobs.", 1..20, true) {
                 change(draft.copy(maxParallelSubAgents = it))
