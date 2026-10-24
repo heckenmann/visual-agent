@@ -34,10 +34,14 @@ explicitly between eligible ChatGPT plan authorization and Platform API-key bill
    selected registration. No additional settings save is required to retain a completed
    login across dialog closure or restart. Editing or switching providers alone does not run inference.
    Reopening settings with a retained reference shows configured ChatGPT sign-in,
-   an optional Sign in to ChatGPT again action, and sign-out rather than asking for
-   initial sign-in again. Switching accounts requires explicit sign-out first;
-   reauthorization retains the verified account identity. This indicates stored configuration, not verified live
-   entitlement or token validity; merely displaying settings performs no login or API call.
+   a disabled sign-in action and an enabled sign-out action. Signing in again requires
+   explicit sign-out first. The controls reload the server-owned registration on opening
+   and on provider-catalog events, including while settings remain open. Only the opaque
+   registration reference is reconciled; unsaved provider/model edits remain intact.
+   Authentication actions are disabled until that asynchronous lookup completes, and
+   only cancellation is enabled during an ongoing authorization operation.
+   This indicates stored configuration, not verified live entitlement or token validity;
+   merely displaying settings performs no login or external provider API call.
 7. Refresh models or explicitly test the selected model. Listing a model does not prove
    inference entitlement. A failed refresh must not clear the persisted catalog.
    An explicitly returned positive numeric `context_window` is retained. Missing or
@@ -142,6 +146,9 @@ explicitly between eligible ChatGPT plan authorization and Platform API-key bill
 - Native PDF/text/CSV filename and byte preservation in both routes, managed-path and
   payload limits, deferred execution, and sub-agent/provider selection tests.
 - Settings mapping tests preserve explicit authentication mode and credential reference.
+- Settings button tests cover retained and externally changed registrations, sign-in/out
+  transitions and draft preservation. A blocked catalog read permits independent UI
+  progress, and presentation-only recomposition does not trigger additional reads.
 - Catalog regression tests retain reported context limits and reject invalid values
   without guessing limits, capabilities, or output budgets.
 - Real-account testing requires explicit user authorization and disclosure of potential API cost.

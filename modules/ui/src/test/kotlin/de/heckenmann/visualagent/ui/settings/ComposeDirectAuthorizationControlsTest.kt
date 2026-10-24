@@ -11,6 +11,8 @@ import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -23,16 +25,21 @@ import de.heckenmann.visualagent.protocol.ProviderSignInResult
 import de.heckenmann.visualagent.protocol.ProviderSignInSession
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
 import org.junit.Test
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.assertEquals
 
 /** Exercises authorization buttons without opening browsers, using accounts, or sending inference. */
 @OptIn(ExperimentalTestApi::class)
 class ComposeDirectAuthorizationControlsTest {
-    private val port = mockk<ProviderPort>()
+    private val port =
+        mockk<ProviderPort> {
+            every { addChangeListener(any()) } returns AutoCloseable { }
+        }
     private val opened = CompletableDeferred<String>()
     private val changed = CompletableDeferred<Pair<String, String?>>()
 
@@ -40,8 +47,7 @@ class ComposeDirectAuthorizationControlsTest {
     fun `saved browser registration displays configured sign in instead of asking to log in again`() =
         runComposeUiTest {
             render(profile().copy(credentialReference = "saved-reference"))
-            onNodeWithContentDescription("Continue with ChatGPT").assertDoesNotExist()
-            onNodeWithContentDescription("Sign in to ChatGPT again").assertIsEnabled()
+            onNodeWithContentDescription("Continue with ChatGPT").assertIsNotEnabled()
             onNodeWithContentDescription("Sign out of ChatGPT").assertIsEnabled()
             onNodeWithText("ChatGPT sign-in is configured for this provider. Sign out first to use a different account.").assertExists()
             coVerify(exactly = 0) { port.beginDirectSignIn(any()) }
@@ -64,10 +70,59 @@ class ComposeDirectAuthorizationControlsTest {
             awaitIdle()
             published.await()
             awaitIdle()
-            onNodeWithContentDescription("Continue with ChatGPT").assertDoesNotExist()
-            onNodeWithContentDescription("Sign in to ChatGPT again").assertIsEnabled()
+            onNodeWithContentDescription("Continue with ChatGPT").assertIsNotEnabled()
             onNodeWithContentDescription("Sign out of ChatGPT").assertIsEnabled()
             onNodeWithText("Synthetic account authorized. This account selection is saved.").assertExists()
+        }
+
+    @Test
+    fun `stored registration replaces a stale unsigned settings draft without losing edits`() =
+        runComposeUiTest {
+            var current by mutableStateOf(profile().copy(name = "Unsaved name", options = mapOf("reasoningEffort" to "high")))
+            renderProfile({ current }, storedProfile = { profile().copy(credentialReference = "saved-reference") }) { id, reference ->
+                current = current.copy(credentialReference = reference)
+                changed.complete(id to reference)
+            }
+            assertEquals("profile" to "saved-reference", changed.await())
+            onNodeWithContentDescription("Continue with ChatGPT").assertIsNotEnabled()
+            onNodeWithContentDescription("Sign out of ChatGPT").assertIsEnabled()
+            assertEquals("Unsaved name", current.name)
+            assertEquals(mapOf("reasoningEffort" to "high"), current.options)
+            coVerify(exactly = 0) { port.beginDirectSignIn(any()) }
+        }
+
+    @Test
+    fun `catalog events update login and logout actions while settings remain open`() =
+        runComposeUiTest {
+            var current by mutableStateOf(profile())
+            val stored = AtomicReference(profile())
+            var notify: () -> Unit = {}
+            every { port.addChangeListener(any()) } answers {
+                notify = firstArg()
+                AutoCloseable { }
+            }
+            renderProfile({ current }, storedProfile = stored::get) { _, reference ->
+                current = current.copy(credentialReference = reference)
+            }
+            onNodeWithContentDescription("Continue with ChatGPT").assertIsEnabled()
+            onNodeWithContentDescription("Sign out of ChatGPT").assertIsNotEnabled()
+
+            stored.set(profile().copy(credentialReference = "external-registration"))
+            runOnIdle { notify() }
+            waitUntil { current.credentialReference == "external-registration" }
+            awaitIdle()
+            onNodeWithContentDescription("Continue with ChatGPT").assertIsNotEnabled()
+            onNodeWithContentDescription("Sign out of ChatGPT").assertIsEnabled()
+
+            stored.set(profile())
+            runOnIdle { notify() }
+            waitUntil { current.credentialReference == null }
+            awaitIdle()
+            onNodeWithContentDescription("Continue with ChatGPT").assertIsEnabled()
+            onNodeWithContentDescription("Sign out of ChatGPT").assertIsNotEnabled()
+            coVerify(exactly = 0) { port.beginDirectSignIn(any()) }
+            coVerify(exactly = 0) { port.signOutDirectProvider(any()) }
+            coVerify(exactly = 0) { port.discoverModels(any()) }
         }
 
     @Test
@@ -77,6 +132,9 @@ class ComposeDirectAuthorizationControlsTest {
             coEvery { port.awaitDirectSignIn("attempt") } returns ProviderSignInResult("reference", "Synthetic account")
             coEvery { port.cancelDirectSignIn("attempt") } returns Unit
             render(profile())
+
+            onNodeWithContentDescription("Continue with ChatGPT").assertIsEnabled()
+            onNodeWithContentDescription("Sign out of ChatGPT").assertIsNotEnabled()
 
             onNodeWithContentDescription("Continue with ChatGPT").performClick()
             awaitIdle()
@@ -106,6 +164,10 @@ class ComposeDirectAuthorizationControlsTest {
             awaitIdle()
             awaiting.await()
 
+            onNodeWithContentDescription("Continue with ChatGPT").assertIsNotEnabled()
+            onNodeWithContentDescription("Sign out of ChatGPT").assertIsNotEnabled()
+            onNodeWithContentDescription("Cancel ChatGPT authorization").assertIsEnabled()
+
             onNodeWithContentDescription("Cancel ChatGPT authorization").performClick()
             awaitIdle()
 
@@ -129,6 +191,8 @@ class ComposeDirectAuthorizationControlsTest {
             ).assertExists()
             assertEquals(false, opened.isCompleted)
             coVerify(exactly = 1) { port.signOutDirectProvider(any()) }
+            onNodeWithContentDescription("Continue with ChatGPT").assertIsEnabled()
+            onNodeWithContentDescription("Sign out of ChatGPT").assertIsNotEnabled()
         }
 
     @Test
@@ -149,8 +213,10 @@ class ComposeDirectAuthorizationControlsTest {
 
     private fun ComposeUiTest.renderProfile(
         profile: () -> ProviderProfile,
+        storedProfile: () -> ProviderProfile? = profile,
         onChanged: (String, String?) -> Unit,
     ) {
+        every { port.getProvider(any()) } answers { storedProfile() }
         setContent {
             CompositionLocalProvider(
                 LocalUriHandler provides
@@ -167,6 +233,7 @@ class ComposeDirectAuthorizationControlsTest {
                 }
             }
         }
+        waitUntil { onAllNodesWithText("Loading ChatGPT sign-in status...").fetchSemanticsNodes().isEmpty() }
     }
 
     private fun profile() =
