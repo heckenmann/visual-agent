@@ -5,6 +5,7 @@ import io.micrometer.core.instrument.simple.SimpleConfig
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.junit.jupiter.api.Test
 import org.springframework.ai.chat.messages.AssistantMessage
+import org.springframework.ai.chat.metadata.DefaultUsage
 import org.springframework.ai.chat.model.ChatResponse
 import org.springframework.ai.chat.model.Generation
 import reactor.core.publisher.Flux
@@ -15,6 +16,33 @@ import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 
 class ResponsesExecutionMetricsTest {
+    @Test
+    fun `usage counts only explicit valid cache reports without treating unknown values as misses`() {
+        val registry = SimpleMeterRegistry()
+        try {
+            val metrics = ResponsesExecutionMetrics(registry)
+
+            fun report(
+                input: Int?,
+                cached: Long?,
+            ) = metrics.usage(
+                DefaultUsage(input, 0, input, null, cached, null),
+            )
+            report(100, null)
+            report(null, 10)
+            report(100, -1)
+            report(100, 101)
+            report(-1, 0)
+            assertEquals(null, registry.find("visualagent.responses.input.tokens").counter())
+            report(100, 40)
+            report(50, 0)
+            assertEquals(150.0, registry.get("visualagent.responses.input.tokens").counter().count())
+            assertEquals(40.0, registry.get("visualagent.responses.cached.input.tokens").counter().count())
+        } finally {
+            registry.close()
+        }
+    }
+
     @Test
     fun `model rounds ignore empty events and tools have independent timing`() {
         val clock = MockClock()
