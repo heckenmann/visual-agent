@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -23,11 +24,14 @@ import de.heckenmann.visualagent.protocol.ProviderProfile
 import de.heckenmann.visualagent.protocol.SettingsPort
 import de.heckenmann.visualagent.protocol.SettingsSection
 import de.heckenmann.visualagent.ui.components.ActionIconButton
+import de.heckenmann.visualagent.ui.components.PanelInfoBox
 import de.heckenmann.visualagent.ui.components.PanelSection
+import de.heckenmann.visualagent.ui.components.toUiErrorMessage
 import de.heckenmann.visualagent.ui.settings.conversationSettingsSection
 import de.heckenmann.visualagent.ui.settings.modelContextLengthSetting
 import de.heckenmann.visualagent.ui.settings.modelContextLimitEffect
 import de.heckenmann.visualagent.ui.settings.navigation.SettingsPageDraft
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -44,8 +48,23 @@ internal fun ConversationSettingsPage(
     val model = remember { SettingsPageDraft() }
     val conversation = remember { SettingsPageDraft() }
     var profiles by remember(providers) { mutableStateOf(emptyList<ProviderProfile>()) }
-    LaunchedEffect(providers) { profiles = withContext(Dispatchers.IO) { providers.listProviders() } }
+    var catalogError by remember(providers) { mutableStateOf<String?>(null) }
+    var catalogRevision by remember(providers) { mutableStateOf(0) }
+    LaunchedEffect(providers, catalogRevision) {
+        try {
+            profiles = withContext(Dispatchers.IO) { providers.listProviders() }
+            catalogError = null
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            catalogError = error.toUiErrorMessage()
+        }
+    }
     Column(Modifier.fillMaxSize()) {
+        catalogError?.let { error ->
+            PanelInfoBox(error)
+            ActionIconButton(Icons.Filled.Refresh, "Retry loading providers", onClick = { catalogRevision++ })
+        }
         PrimaryTabRow(selectedTabIndex = selected) {
             listOf("Model", "Conversation").forEachIndexed { index, label ->
                 Tab(selected == index, onClick = { selected = index }, text = { Text(label) })
@@ -66,7 +85,15 @@ internal fun ConversationSettingsPage(
                         adoptLimit = false,
                         providerPort = providers,
                         onLimitResolved = { contextLimit = it },
-                        onLimitApplied = { limit, _ -> if (snapshot.contextLength > limit) change(snapshot.copy(contextLength = limit)) },
+                        onLimitApplied = { limit, _ ->
+                            val current = model.draft.value
+                            if (current.providerId == snapshot.providerId &&
+                                current.modelId == snapshot.modelId &&
+                                current.contextLength > limit
+                            ) {
+                                model.draft.value = current.copy(contextLength = limit)
+                            }
+                        },
                         onSelectionResolved = {},
                     )
                     PanelSection("Current model") {

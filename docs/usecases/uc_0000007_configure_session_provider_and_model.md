@@ -44,6 +44,8 @@ Desktop user; an explicitly permitted agent can change the same active selection
 - External or tool-driven selection changes refresh the displayed model without
   rewriting the user's message or resetting scroll/pinning behavior.
 - A context-budget draft cannot be applied after its associated active model changes.
+- A delayed context-capacity response clamps the latest draft only when necessary;
+  it never increases or restores a budget that the user reduced during the lookup.
 - No matching models produces an explicit empty state with provider administration
   still reachable.
 
