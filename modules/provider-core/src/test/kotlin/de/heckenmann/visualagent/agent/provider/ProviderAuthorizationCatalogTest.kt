@@ -61,6 +61,25 @@ class ProviderAuthorizationCatalogTest {
     }
 
     @Test
+    fun `notification read failure after commit does not fail authorization or forget the registration`() {
+        val target = requireNotNull(authorization.prepare(profile).block())
+        preferences.afterWrite = { preferences.failReads = true }
+        authorization.complete(target, "registration").block()
+        preferences.failReads = false
+        assertEquals("registration", catalog.getProvider(profile.id)?.credentialReference)
+    }
+
+    @Test
+    fun `notification read failure after sign out does not turn successful persistence into failure`() {
+        complete(profile, "registration")
+        val registered = requireNotNull(catalog.getProvider(profile.id))
+        preferences.afterWrite = { preferences.failReads = true }
+        authorization.clear(registered).block()
+        preferences.failReads = false
+        assertNull(catalog.getProvider(profile.id)?.credentialReference)
+    }
+
+    @Test
     fun `registration survives a new catalog instance without saving the settings draft`() {
         val selection = catalog.activeProviderId() to catalog.activeModelId()
         complete(profile, "registration")
@@ -170,8 +189,13 @@ class ProviderAuthorizationCatalogTest {
     private class MemoryPreferences : ProviderPreferenceStore {
         private val values = mutableMapOf<String, String>()
         var beforeWrite: (() -> Unit)? = null
+        var afterWrite: (() -> Unit)? = null
+        var failReads = false
 
-        override fun getPreference(key: String): String? = values[key]
+        override fun getPreference(key: String): String? {
+            check(!failReads) { "Synthetic notification read failure" }
+            return values[key]
+        }
 
         override fun setPreference(
             key: String,
@@ -191,6 +215,9 @@ class ProviderAuthorizationCatalogTest {
                 action?.invoke()
                 if (values[key] == expected) {
                     values[key] = value
+                    val committed = afterWrite
+                    afterWrite = null
+                    committed?.invoke()
                     true
                 } else {
                     false
