@@ -69,12 +69,14 @@ class OllamaPromptFactory(
             request.metadata +
                 mapOf("model" to selectedModel) +
                 (request.cancellationToken?.let { mapOf("cancellationToken" to it) } ?: emptyMap())
+        // Stable schema order permits prefix-cache reuse without widening the allowlist; see docs/context-transport.md.
         val callbacks =
             if (supportsTools) {
-                toolRegistry.functionCallbacks(
-                    enabledTools = request.enabledTools,
-                    context = toolContext,
-                )
+                toolRegistry
+                    .functionCallbacks(
+                        enabledTools = request.enabledTools,
+                        context = toolContext,
+                    ).sortedBy { it.toolDefinition.name() }
             } else {
                 emptyList()
             }
