@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.agent.metrics
 
 import io.micrometer.core.instrument.MeterRegistry
+import org.springframework.ai.chat.metadata.Usage
 import org.springframework.ai.chat.model.ChatResponse
 import org.springframework.stereotype.Component
 import reactor.core.publisher.Flux
@@ -13,6 +14,16 @@ import java.util.concurrent.atomic.AtomicBoolean
 class ResponsesExecutionMetrics(
     private val registry: MeterRegistry? = null,
 ) {
+    /** Records reported input/cache totals once per completed round, never per streaming delta. */
+    fun usage(usage: Usage) {
+        val meters = registry ?: return
+        val input = usage.promptTokens
+        val cached = usage.cacheReadInputTokens ?: return
+        if (input < 0 || cached < 0 || cached > input.toLong()) return
+        meters.counter("visualagent.responses.input.tokens").increment(input.toDouble())
+        meters.counter("visualagent.responses.cached.input.tokens").increment(cached.toDouble())
+    }
+
     /** Measures one native model stream independently of later tool execution or continuations. */
     fun model(source: Flux<ChatResponse>): Flux<ChatResponse> {
         val meters = registry ?: return source

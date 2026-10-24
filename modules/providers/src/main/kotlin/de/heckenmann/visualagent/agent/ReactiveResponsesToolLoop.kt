@@ -3,6 +3,7 @@ package de.heckenmann.visualagent.agent
 import de.heckenmann.visualagent.agent.metrics.ResponsesExecutionMetrics
 import de.heckenmann.visualagent.agent.provider.DirectProviderAuthMode
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
+import org.springframework.ai.chat.metadata.Usage
 import org.springframework.ai.chat.model.ChatModel
 import org.springframework.ai.chat.model.MessageAggregator
 import org.springframework.ai.chat.prompt.Prompt
@@ -72,10 +73,15 @@ class ReactiveResponsesToolLoop(
                 }
             val aggregated = AtomicReference<SpringChatResponse>()
             val terminalStatus = AtomicReference<String>()
+            val reportedUsage = AtomicReference<Usage>()
             MessageAggregator()
                 .aggregate(
                     model.stream(bounded).transform(metrics::model).withResponsePartLimit(replays).doOnNext { chunk ->
                         chunk.metadata.get<String>(OpenAiResponsesMetadata.STATUS)?.let(terminalStatus::set)
+                        // Aggregation loses extended cache usage; retain the provider report, not per-delta totals.
+                        chunk.metadata.usage
+                            .takeIf { it.cacheReadInputTokens != null }
+                            ?.let(reportedUsage::set)
                     },
                     aggregated::set,
                 ).index()
@@ -96,6 +102,7 @@ class ReactiveResponsesToolLoop(
                                 "The Responses stream did not complete successfully.",
                             )
                         }
+                        reportedUsage.get()?.let(metrics::usage)
                         if (response?.hasToolCalls() != true) {
                             val profile = request.providerProfile ?: return@defer Flux.empty()
                             val output = response?.result?.output ?: return@defer Flux.empty()
