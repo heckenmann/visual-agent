@@ -16,7 +16,7 @@ class MainSystemPromptComposerTest {
 
     @Test
     fun `prompt puts language and direct answer priority before tool policy`() {
-        val prompt = MainSystemPromptComposer.compose(null, toolConfigService, userModelInstruction = "Sprich deutsch")
+        val prompt = MainSystemPromptComposer.compose(toolConfigService, userModelInstruction = "Sprich deutsch")
 
         assertTrue(prompt.startsWith("You are Visual Agent's main orchestrator."))
         assertTrue(prompt.contains("Apply this durable user preference silently: Sprich deutsch"))
@@ -27,14 +27,14 @@ class MainSystemPromptComposerTest {
 
     @Test
     fun `prompt remains compact enough for local models`() {
-        val prompt = MainSystemPromptComposer.compose(null, toolConfigService)
+        val prompt = MainSystemPromptComposer.compose(toolConfigService)
 
         assertTrue(prompt.length < 6_000, "Main-agent prompt is ${prompt.length} characters")
     }
 
     @Test
     fun `prompt contains provider neutral tool policy and direct execution rules`() {
-        val prompt = MainSystemPromptComposer.compose(null, toolConfigService)
+        val prompt = MainSystemPromptComposer.compose(toolConfigService)
 
         assertTrue("Answer simple requests directly" in prompt)
         assertTrue("a todo is not required" in prompt)
@@ -44,7 +44,7 @@ class MainSystemPromptComposerTest {
 
     @Test
     fun `prompt never exposes internal tool identifiers or action names`() {
-        val prompt = MainSystemPromptComposer.compose(null, toolConfigService)
+        val prompt = MainSystemPromptComposer.compose(toolConfigService)
 
         assertFalse("agent:list" in prompt)
         assertFalse("agent:create" in prompt)
@@ -63,7 +63,7 @@ class MainSystemPromptComposerTest {
                 )
             }
 
-        val prompt = MainSystemPromptComposer.compose(null, AgentToolConfigService(disabledStore))
+        val prompt = MainSystemPromptComposer.compose(AgentToolConfigService(disabledStore))
 
         assertFalse("agent:list" in prompt)
         assertFalse("agent:create" in prompt)
@@ -73,7 +73,7 @@ class MainSystemPromptComposerTest {
 
     @Test
     fun `prompt omits tool policy when tooling is explicitly unavailable`() {
-        val prompt = MainSystemPromptComposer.compose(null, toolConfigService, toolingAvailable = false)
+        val prompt = MainSystemPromptComposer.compose(toolConfigService, toolingAvailable = false)
 
         assertFalse("## Tool Policy" in prompt)
         assertFalse("tool list" in prompt)
@@ -112,7 +112,7 @@ class MainSystemPromptComposerTest {
 
     @Test
     fun `prompt keeps concise safety and recovery rules`() {
-        val prompt = MainSystemPromptComposer.compose(null, toolConfigService)
+        val prompt = MainSystemPromptComposer.compose(toolConfigService)
 
         assertTrue("On a tool failure, inspect the error" in prompt)
         assertTrue("Respond in the user's language" in prompt)

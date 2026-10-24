@@ -3,12 +3,28 @@ package de.heckenmann.visualagent.agent.conversation
 import de.heckenmann.visualagent.agent.ConversationContextPolicy
 import de.heckenmann.visualagent.agent.Message
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** Verifies deterministic main-agent history projection before model-aware token budgeting. */
 class MainAgentContextAssemblerTest {
     private val assembler = MainAgentContextAssembler()
+
+    @Test
+    fun `current references preserve active turn ordering and are not normalized as dialogue`() {
+        val previous = Message("assistant", "Previous answer")
+        val current = Message("user", "Current question")
+        val execution = Message("assistant", "Active tool output", assistantToolTurn = true)
+        val reference =
+            Message("assistant", "<think>literal reference text</think>", contextPolicy = ConversationContextPolicy.SUMMARY_SOURCE)
+        val history = listOf(previous, current, execution)
+
+        assertEquals(listOf(previous, reference, current, execution), assembler.withCurrentReferences(history, listOf(reference)))
+        assertEquals(listOf(previous, reference), assembler.withCurrentReferences(listOf(previous), listOf(reference)))
+        assertEquals(listOf(reference), assembler.withCurrentReferences(emptyList(), listOf(reference)))
+        assertEquals(listOf(previous, current, execution), history)
+    }
 
     @Test
     fun `projects dialogue and summarizes execution events while dropping audit-only records`() {

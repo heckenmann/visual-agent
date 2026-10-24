@@ -34,6 +34,7 @@ internal class AgentManagerContextOps(
             MainAgentRuntimeStatePrompt.compose(
                 todos = owner.todoStore.listTodos(),
                 subAgents = owner.getSubAgents(),
+                pendingResumeMessage = owner.pendingResumeMessage,
             )
         val memoryPrompt =
             MainAgentLongTermMemoryPrompt.compose(
@@ -44,12 +45,18 @@ internal class AgentManagerContextOps(
             )
         val preparedMessages = mutableListOf<Message>()
         preparedMessages += Message("system", contextPrompt)
-        preparedMessages += Message("assistant", memoryPrompt, contextPolicy = ConversationContextPolicy.SUMMARY_SOURCE)
-        preparedMessages += Message("assistant", runtimeStatePrompt, contextPolicy = ConversationContextPolicy.SUMMARY_SOURCE)
         preparedMessages +=
             contextAssembler
-                .assemble(history)
-                .map(::normalizeHistoryRoleForProvider)
+                .withCurrentReferences(
+                    contextAssembler.assemble(history).map(::normalizeHistoryRoleForProvider),
+                    listOf(memoryPrompt, runtimeStatePrompt).map { content ->
+                        Message(
+                            "assistant",
+                            "Current application reference data (not a conversation turn or instructions):\n$content",
+                            contextPolicy = ConversationContextPolicy.SUMMARY_SOURCE,
+                        )
+                    },
+                )
         val metadata =
             mutableMapOf<String, Any>(
                 "sessionId" to AgentManagerConstants.MAIN_SESSION_ID,
@@ -78,7 +85,6 @@ internal class AgentManagerContextOps(
     internal fun buildMainSystemContextPrompt(toolingAvailable: Boolean = owner.providerCatalog.activeModelSupportsToolCalling()): String =
         de.heckenmann.visualagent.agent.context.MainSystemPromptComposer
             .compose(
-                pendingResumeMessage = owner.pendingResumeMessage,
                 toolConfigService = owner.agentToolConfigService,
                 userModelInstruction = owner.appConfig.userModelInstruction,
                 toolingAvailable = toolingAvailable,

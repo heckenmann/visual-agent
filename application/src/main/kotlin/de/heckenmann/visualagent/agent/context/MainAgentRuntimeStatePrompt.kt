@@ -14,17 +14,20 @@ internal object MainAgentRuntimeStatePrompt {
      *
      * @param todos Current persisted todo list
      * @param subAgents Current persisted sub-agent inventory
+     * @param pendingResumeMessage Interrupted-request presence; its raw text is not included
      * @return Current runtime state for a low-priority provider reference message
      */
     fun compose(
         todos: List<Todo>,
         subAgents: List<SubAgent>,
+        pendingResumeMessage: String? = null,
     ): String {
         val counts = todoCounts(todos)
         val todoLines = todos.joinToString("\n", transform = ::todoLine).ifBlank { "- none" }
         val agentLines = subAgents.joinToString("\n", transform = ::agentLine).ifBlank { "- none" }
         return """
             ## Runtime State
+            Pending interrupted request: ${if (pendingResumeMessage == null) "no" else "yes"}
             TODO counts: open=${counts.open}, inProgress=${counts.inProgress}, done=${counts.done}, cancelled=${counts.cancelled}, total=${counts.total}
             Current todos:
             $todoLines

@@ -2,6 +2,7 @@ package de.heckenmann.visualagent.agent.conversation
 
 import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.ChatResponse
+import de.heckenmann.visualagent.agent.ConversationContextPolicy
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ProviderReplayCodec
@@ -20,6 +21,7 @@ import org.springframework.ai.openai.responses.OpenAiResponsesMetadata
 import reactor.core.publisher.Mono
 import java.nio.file.Path
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /** Exercises database-to-request replay and cache-friendly reference placement without account access. */
 @DatabaseTest
@@ -83,4 +85,35 @@ class MainAgentStatelessContextTest {
                 }
             }
         }
+
+    @Test
+    fun `runtime changes leave the policy and chronological history prefix unchanged`() {
+        KnowledgeDbTestFactory.create("jdbc:h2:mem:context-prefix").use { db ->
+            db.saveConversationMessage("main", "user", "Prior question")
+            db.saveConversationMessage("main", "assistant", "Prior answer")
+            val manager = db.createAgentManager(mockk(relaxed = true))
+            try {
+                val history = manager.conversationOps.loadMainAgentContextFromDb() + Message("user", "Current question")
+                val before = manager.conversationOps.buildMainRequest(history)
+                manager.todoManager.add("Changed runtime state")
+                val memory = manager.mainAgentLongTermMemoryStore.snapshot()
+                manager.mainAgentLongTermMemoryStore.replace("Changed durable memory", memory.revision, 1000)
+                manager.pendingResumeMessage = "An interrupted request"
+                val stored = db.getConversationMessages("main")
+                val after = manager.conversationOps.buildMainRequest(history)
+                val prefix = before.messages.takeWhile { it.contextPolicy != ConversationContextPolicy.SUMMARY_SOURCE }
+                assertEquals(listOf("system", "user", "assistant"), prefix.map { it.role })
+                assertEquals(prefix, after.messages.take(prefix.size))
+                val references = after.messages.filter { it.contextPolicy == ConversationContextPolicy.SUMMARY_SOURCE }
+                assertEquals(2, references.size)
+                assertTrue(references.all { it.content.startsWith("Current application reference data") })
+                assertTrue(references.any { "Changed durable memory" in it.content })
+                assertTrue(references.any { "Changed runtime state" in it.content && "Pending interrupted request: yes" in it.content })
+                assertEquals("Current question", after.messages.last().content)
+                assertEquals(stored, db.getConversationMessages("main"))
+            } finally {
+                manager.destroy()
+            }
+        }
+    }
 }
