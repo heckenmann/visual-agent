@@ -1,5 +1,30 @@
 # Architecture
 
+## Settings Ownership And Navigation
+
+Global Settings has Appearance, Providers, Agent and Updates destinations. The
+Conversation composer owns immediate model selection; its contextual settings
+dialog contains Model and Conversation preferences only. Provider administration
+never implicitly changes the live main-agent selection. The presentation retains
+per-destination drafts when tabs change; model and catalog events do not rewrite
+the message draft, reset scrolling or restart an in-flight request.
+
+`SettingsPort.saveSection` updates only owned configuration fields and preference
+keys, rather than replaying a full stale snapshot or rewriting credentials.
+`selectConversationModel` validates the selected catalog entry, resolves reported
+context capacity, and updates only the provider/model selection and its context
+budget. Unknown capacities remain unknown. Favorites use database compare-and-set.
+`ProviderPort.replaceProfiles` compares the edited catalog's baseline in the same
+database-conditional mutation, retaining concurrent active-selection changes and
+authoritative OAuth references. Conflicts require reload rather than silently
+discarding another client's configuration.
+
+UI snapshots are composition-owned presentation state, not a second persistence
+layer. All catalog, settings, metadata and memory I/O executes off the presentation
+dispatcher. Model-selector state is held above the lazy/pinned composers so scrolling
+and recomposition do not trigger new reads. Existing Material 3 components supply
+navigation and selection; no new library is introduced. See UC-0000153 and issue #494.
+
 ## Direct Codex Provider
 
 `:provider-codex-direct` supplies the separate `CODEX_DIRECT` adapter through the

@@ -15,7 +15,7 @@ Desktop user.
 
 ## Main Flow
 
-1. The user opens the **Providers and models** modal from the Conversation panel title bar.
+1. The user opens **Conversation settings** from the Conversation panel title bar.
 2. In the Conversation section, the user selects a flush mode from the "Queue flush" dropdown.
 3. Options: "One by one" (each queued message sent as a separate request) or "All at once" (all queued messages combined into one request).
 4. The user saves settings.
@@ -36,11 +36,11 @@ The queue delivery behavior matches the user's preference.
 - `de.heckenmann.visualagent.config.AppConfigBean.queueFlushMode`
 - `de.heckenmann.visualagent.config.AppConfig.queueFlushMode`
 - `de.heckenmann.visualagent.ui.settings.conversationSettingsSection`
-- `de.heckenmann.visualagent.ui.settings.providerSettingsOverlay`
+- `de.heckenmann.visualagent.ui.settings.forms.ConversationSettingsPage`
 
 ## Acceptance Criteria
 
-- The "Queue flush" dropdown is visible in the Conversation section of the Providers and models modal.
+- The "Queue flush" dropdown is visible under Conversation settings > Conversation.
 - Selecting "One by one" sets `queueFlushMode` to `ONE_BY_ONE`.
 - Selecting "All at once" sets `queueFlushMode` to `ALL_AT_ONCE`.
 - The setting is persisted across application restarts.

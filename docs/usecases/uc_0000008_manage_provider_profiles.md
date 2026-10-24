@@ -11,20 +11,23 @@ Desktop user.
 ## Preconditions
 
 - The provider catalog store is available.
-- The settings/session UI can open provider profile editing.
+- Settings > Providers is available.
 
 ## Main Flow
 
 1. The user opens the same provider-connection dialog for creating or editing a profile. The dialog uses mode-specific titles and primary actions while keeping the connection fields and validation consistent.
 2. The profile editor generates an opaque stable provider ID for new profiles and stores it without exposing it as a user-editable setting. The user manages the display name, adapter type, endpoint, API key, enabled state, and provider options independently from main-agent model selection.
-3. The panel validates required fields and stages the profile in the global provider settings overlay.
+3. The panel validates required fields and stages the profile under Settings > Providers.
 4. The user may refresh models with the staged endpoint and credentials; discovered models remain local to the draft until saved.
-5. The user explicitly saves the overlay to persist the complete catalog and active model selection together, or resets it to reload the persisted catalog.
+5. The user explicitly saves the profile draft or resets it to reload the persisted catalog.
+   Saving definitions does not submit an active model selection. A stale catalog
+   baseline produces a conflict rather than overwriting another client's edits.
    Direct Codex browser sign-in and sign-out are explicit, immediately persisted
    authentication actions, independent of this staged save. Completed sign-in is retained
    when the dialog closes or the application restarts. See UC-0000152.
 6. The catalog permits multiple profiles using the same adapter, so separate endpoints and credentials can be configured independently.
-7. If the active profile is disabled or deleted, the catalog selects another enabled profile; it never leaves the session without an enabled provider.
+7. Before removing or disabling the active profile, the user selects another provider/model
+   in Conversation. Merely browsing provider details never switches the active model.
 8. Model resolution uses provider, model, agent, and variant settings in deterministic order.
 9. The optional onboarding wizard receives only safe profile information; existing credentials are represented as configured or not configured and are write-only when changed.
 
@@ -40,7 +43,7 @@ Different agents and sessions can use different providers and model parameters.
 
 - `de.heckenmann.visualagent.agent.provider.ProviderProfile`
 - `de.heckenmann.visualagent.agent.provider.ProviderCatalogService`
-- `de.heckenmann.visualagent.ui.settings.providerSettingsOverlay`
+- `de.heckenmann.visualagent.ui.settings.providers.ProviderManagementPanel`
 - `de.heckenmann.visualagent.ui.settings.ComposeProtocolSettingsSupport`
 - `de.heckenmann.visualagent.ui.components.ActionIconButton`
 
@@ -51,8 +54,7 @@ Different agents and sessions can use different providers and model parameters.
 - Model refresh uses the staged provider profile and does not persist a catalog update until the overlay is saved.
 - New profiles receive a generated stable provider ID; existing profile IDs never change during editing.
 - Name and Base URL are required unless the selected adapter owns a fixed endpoint.
-- Deleting the active provider selects another enabled provider.
-- Disabling the active provider selects another enabled provider.
+- Removing/disabling the active provider from this UI requires an explicit Conversation selection change first.
 - Multiple profiles may use the same adapter type.
 - Changing the main-agent model does not overwrite provider endpoints or credentials.
 - At least one provider profile remains enabled.

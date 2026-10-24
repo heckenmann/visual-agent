@@ -2,83 +2,81 @@
 
 ## Goal
 
-Let the user select the active provider, model, and related model settings for the current session.
+Choose the model for the next main-agent request directly beside the message input,
+without opening provider administration or saving an unrelated settings form.
 
 ## Primary Actor
 
-Desktop user.
+Desktop user; an explicitly permitted agent can change the same active selection.
 
 ## Preconditions
 
-- Provider catalog data is available.
-- The conversation panel is visible.
+- The desktop is connected to a Visual Agent server.
+- The Conversation panel is visible. Its header need not be visible.
 
 ## Main Flow
 
-1. The user opens the global **Providers and models** overlay with the settings icon in the Conversation panel title bar.
-2. The UI shows enabled provider connections and models selectable for the selected connection.
-3. Selecting a provider immediately refreshes its model list from that provider's endpoint. The stored active model is restored for the active provider; another provider uses its stored default model when it remains selectable.
-4. The user stages a provider, model, favorite, or profile change without affecting active agent requests. A manual refresh preserves the current draft model when it remains selectable.
-5. The user configures model instruction, startup history, parallel agents, tool timeout, queue behavior, and optional idle follow-up suggestions in the same local draft. The context-length field appears beside the model and adopts that model's reported context limit whenever the model changes.
-6. The user selects **Save changes** to persist the staged catalog, conversation settings, and active provider/model together, or **Reset changes** to reload the persisted state from H2.
-7. The user may press **Esc** or select the title-bar close action to discard the local draft without saving.
-8. The user may select **Run onboarding again** to open the server-owned readiness wizard for the currently connected Visual Agent server.
-9. Later model requests resolve against the saved provider/model.
-10. For each model capability, the user selects **Automatic**, **Supported**, or **Unsupported**. Automatic uses provider evidence and may remain unknown. Editing one feature never declares unrelated features unsupported.
-    Existing whole-list manual declarations are labeled **Legacy declaration**, not Automatic. Automatic is available only after an explicit legacy reset; no provider evidence is inferred from manual values.
-11. If legacy whole-list overrides exist, the provider section offers an icon-only **Reset legacy capability overrides for this provider** action without selecting each affected model. It stages removal of those legacy declarations, retains targeted overrides, and marks discarded evidence unknown. Refresh then reloads provider evidence; Save persists the draft. No automatic repair guesses whether a legacy denial was intentional.
+1. The composer displays the active model and its provider in a compact selector.
+   It is present for both the scrolling and pinned composer placements.
+2. Open the selector. Search model IDs, display names, or provider names. Favorites
+   appear first; other entries are grouped by provider. Identical model IDs from
+   different providers retain their distinct provider identities.
+3. Select a model. Switching to another provider first refreshes that provider's
+   catalog asynchronously. The server validates the selection and persists the
+   provider/model pair without changing profile definitions or unrelated settings.
+4. The configured context budget adopts a positive model-reported limit, whether
+   larger or smaller. Missing catalog limits are resolved through provider metadata;
+   when no limit can be established, retain the configured budget without guessing.
+5. Subsequent requests use the new selection. Already running requests retain their
+   captured provider/model; changing the selection never resends the input draft.
+6. Refresh the current provider catalog or toggle a model favorite through icon-only
+   actions. Refresh does not select a different model automatically.
+7. Manage providers opens Settings > Providers. The Conversation header's settings
+   action instead opens a small Model/Conversation dialog for context budget,
+   interpolation, follow-up suggestions and queue behavior.
 
-## Result
+## Alternative And Error Flows
 
-Main-agent requests use the user-selected provider and model unless an agent-specific override applies.
+- Discovery or selection failure retains the last saved selection and shows an error.
+- Explicitly unsupported CHAT entries are disabled with an explanation. Unknown
+  capability declarations remain eligible; no model-name heuristic is used.
+- Disabled or profile-filtered models do not become selectable.
+- External or tool-driven selection changes refresh the displayed model without
+  rewriting the user's message or resetting scroll/pinning behavior.
+- A context-budget draft cannot be applied after its associated active model changes.
+- No matching models produces an explicit empty state with provider administration
+  still reachable.
 
 ## Tool Calls
 
-- None.
+- `model_selection` actions `get`, `listProviders`, `listModels`, `refreshModels` and
+  `set` access the same server catalog and selection. Existing permissions apply.
+- Account authorization remains an explicit user action, not a model tool call.
 
 ## Code Entry Points
 
-- `de.heckenmann.visualagent.ui.workspace.SplitPanelHeader`
-- `de.heckenmann.visualagent.ui.conversation.openConversationProviderSettings`
-- `de.heckenmann.visualagent.ui.settings.providerSettingsOverlay`
-- `de.heckenmann.visualagent.ui.settings.ComposeProtocolSettingsSupport`
-- `de.heckenmann.visualagent.config.AppConfig`
-- `de.heckenmann.visualagent.agent.provider.ProviderCatalogService`
-- `de.heckenmann.visualagent.agent.ConfiguredLLMProvider`
+- `ui/conversation/models/ConversationWorkspacePanel.kt`
+- `ui/conversation/models/ConversationModelPicker.kt`
+- `ui/conversation/models/ConversationModelState.kt`
+- `ui/settings/forms/ConversationSettingsPage.kt`
+- `SettingsPort.selectConversationModel`, `SettingsPort.saveSection`
+- `SpringSettingsPort`, `SpringProviderPort`, `ProviderCatalogService`
 
 ## Acceptance Criteria
 
-- Provider selection uses enabled provider profiles rather than free-form text.
-- Provider/model edits stay local until the user explicitly saves the global overlay.
-- Each provider switch requests a fresh model list, including OpenAI-compatible and Codex CLI providers; stale responses cannot replace a later selection.
-- Discovery failures retain the staged model list and selection.
-- Conversation settings stay local until the user explicitly saves the same global overlay.
-- Reset discards the local draft and rereads the persisted configuration; it does not restore factory defaults.
-- The overlay occupies 80% of the application window height, keeps its title bar visible, and shows a vertical scrollbar when content exceeds the available space.
-- Provider selection and its model selection appear together in one main-agent connection section.
-- The overlay close action is in its title bar; Reset and Save remain right-aligned in a fixed footer.
-- Pressing **Esc** or the title-bar close action discards unsaved local changes.
-- Provider and model controls include information icons explaining their effects.
-- Endpoint and credential configuration is available only through the separate provider-profile editor.
-- API-key entry is available in the provider-profile editor and is masked by default.
-- Model selection displays only catalog models that are selectable for the active provider.
-- Context length is shown beside the model, uses the model's reported context limit as its maximum, and adopts a newly selected model's limit whether it is higher or lower. If the provider reports no limit, the current value is retained and the field shows that the limit is unknown.
-- Codex CLI model discovery uses the catalog's `context_window` as the active limit; its `max_context_window` is only an override ceiling and must not be presented as the model's current window. Refreshing discovered metadata updates known limits without erasing stored values when a provider omits them.
-- The model section has a clear empty state when the active provider has no recognized selectable models.
-- Provider/model changes persist across restart.
-- Standard providers mirror settings to their legacy `AppConfig` fields.
-- Custom provider profiles remain catalog-backed.
-- Saving the main-agent selection does not mutate a profile beyond explicitly staged profile edits.
-- Credentials are not exposed to model context or logs.
-- The Conversation settings model dropdown is a configuration catalog: every available model allowed by the provider profile remains visible, independently of capability metadata. A selected model whose declaration excludes chat shows an explanation and remains editable. Visibility never grants capabilities or changes persisted declarations. Execution-specific capability selectors still enforce their requirements.
-- Inspecting a non-chat model never makes it a valid active selection: Save remains disabled with an explanation while the active model or an explicit interpolation selection excludes CHAT. The server also rejects an invalid staged active selection and validates explicit interpolation assignments before writing settings or replacing the catalog. Unknown CHAT support remains eligible.
-- Provider evidence and targeted manual overrides are persisted separately. Refresh updates evidence but preserves overrides. Automatic removes only the selected feature's override.
-- Streaming is used automatically whenever the active provider supports it.
-- Follow-up suggestions can be enabled or disabled and have bounded idle-delay
-  and question-count settings; they remain ghost text and are never sent
-  automatically.
-- Re-running onboarding never downloads a stored credential into the desktop client.
+- Model selection is immediate; it does not require a separate settings save.
+- Selecting a model does not overwrite instructions, appearance, credentials,
+  provider defaults, favorites or other independently edited settings.
+- Native provider schema/streaming behavior and request-scoped tool permissions remain unchanged.
+- Known context limits are honored in both directions; unreported limits stay unknown.
+- Model search, favorites, refresh and administration navigation work with keyboard
+  and accessibility semantics, including narrow panels and theme changes.
+- Queries and network operations run off the UI thread. Scrolling, recomposition
+  and resizing do not initiate provider/database reads.
+- The active selection and favorites survive restart. No credentials enter logs,
+  model context or search metadata.
 
-- Concurrent catalog mutations use database compare-and-set and rebase on the latest persisted state, with at most 16 attempts before an actionable retry error.
-- Discovery/capability updates preserve concurrent provider edits and active selection. Explicit profile or complete-catalog replacements intentionally replace their declared scope; the last successful replacement wins within that scope.
-- Runtime selection and refresh hints are published only after a successful commit; failed or rolled-back writes emit no change.
+## Related Use Cases
+
+- UC-0000008: provider administration.
+- UC-0000153: separated global Settings destinations and draft ownership.
