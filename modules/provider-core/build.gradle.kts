@@ -23,6 +23,7 @@ dependencies {
     implementation(platform(libs.spring.boot.bom))
     implementation(platform(libs.spring.ai.bom))
     implementation(libs.spring.ai.model)
+    implementation(libs.jackson.databind)
     implementation(libs.spring.context)
     implementation(libs.spring.tx)
     implementation(libs.coroutines.core)

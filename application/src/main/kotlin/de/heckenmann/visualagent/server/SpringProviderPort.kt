@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ModelSelection
 import de.heckenmann.visualagent.agent.ShowResponse
+import de.heckenmann.visualagent.agent.provider.DirectProviderAuthorization
 import de.heckenmann.visualagent.agent.provider.ModelCapability
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
@@ -17,8 +18,11 @@ import de.heckenmann.visualagent.protocol.ProviderAdapter
 import de.heckenmann.visualagent.protocol.ProviderModel
 import de.heckenmann.visualagent.protocol.ProviderPort
 import de.heckenmann.visualagent.protocol.ProviderProfile
+import de.heckenmann.visualagent.protocol.ProviderSignInResult
+import de.heckenmann.visualagent.protocol.ProviderSignInSession
 import de.heckenmann.visualagent.protocol.UserFacingError
 import kotlinx.coroutines.reactor.awaitSingle
+import kotlinx.coroutines.reactor.awaitSingleOrNull
 import org.springframework.stereotype.Component
 import java.time.Duration
 import java.util.Base64
@@ -31,6 +35,7 @@ import de.heckenmann.visualagent.agent.provider.ProviderProfile as ApplicationPr
 class SpringProviderPort(
     private val providerCatalog: ProviderCatalogService,
     private val llmProvider: LLMProvider,
+    private val authorization: DirectProviderAuthorization? = null,
 ) : ProviderPort {
     override fun listProviders(): List<ProviderProfile> =
         protocolBoundary {
@@ -60,12 +65,26 @@ class SpringProviderPort(
 
     override fun saveProvider(profile: ProviderProfile) = protocolBoundary { providerCatalog.saveProvider(profile.toApplication()) }
 
+    override fun replaceProfiles(
+        profiles: List<ProviderProfile>,
+        expectedProfiles: List<ProviderProfile>,
+    ) = protocolBoundary {
+        providerCatalog.replaceProfiles(
+            profiles.map { it.toApplication() },
+            expectedProfiles.map { it.toApplication() },
+        )
+    }
+
     override fun deleteProvider(providerId: String): Boolean = protocolBoundary { providerCatalog.deleteProvider(providerId) }
 
     override suspend fun refreshModels(providerId: String): List<ProviderModel> =
         protocolBoundary {
-            val discovered = llmProvider.getModelsReactive(providerId).awaitSingle()
-            providerCatalog.updateDiscoveredModels(providerId, discovered)
+            val profile = requireNotNull(providerCatalog.getProvider(providerId)) { "Provider is missing" }
+            val discovered = llmProvider.getModelConfigsReactive(profile).awaitSingle()
+            check(
+                providerCatalog.getProvider(providerId) == profile,
+            ) { "Provider changed during refresh. Retry with its current configuration." }
+            providerCatalog.updateDiscoveredModelConfigs(providerId, discovered)
             selectableModels(providerId)
         }
 
@@ -127,6 +146,26 @@ class SpringProviderPort(
 
     override fun addChangeListener(listener: () -> Unit): AutoCloseable = providerCatalog.addChangeListener(listener)
 
+    override suspend fun beginDirectSignIn(profile: ProviderProfile): ProviderSignInSession {
+        val result =
+            requireNotNull(authorization) { "Direct provider authorization is unavailable" }
+                .begin(profile.toApplication())
+                .awaitSingle()
+        return ProviderSignInSession(result.id, result.authorizationUrl)
+    }
+
+    override suspend fun awaitDirectSignIn(sessionId: String): ProviderSignInResult {
+        val result = requireNotNull(authorization) { "Direct provider authorization is unavailable" }.await(sessionId).awaitSingle()
+        return ProviderSignInResult(result.credentialReference, result.accountLabel)
+    }
+
+    override suspend fun cancelDirectSignIn(sessionId: String) {
+        requireNotNull(authorization) { "Direct provider authorization is unavailable" }.cancel(sessionId).awaitSingleOrNull()
+    }
+
+    override suspend fun signOutDirectProvider(profile: ProviderProfile): Boolean =
+        requireNotNull(authorization) { "Direct provider authorization is unavailable" }.signOut(profile.toApplication()).awaitSingle()
+
     private companion object {
         const val PROBE_PNG_BASE64 =
             "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGP8//8/AwMDEwMDAwMDAwAkBgMB/DXemwAAAABJRU5ErkJggg=="
@@ -146,6 +185,10 @@ private fun ApplicationProviderProfile.toProtocol(): ProviderProfile =
         models = models.map(ProviderModelConfig::toProtocol),
         modelWhitelist = modelWhitelist,
         modelBlacklist = modelBlacklist,
+        directAuthMode =
+            de.heckenmann.visualagent.protocol.DirectProviderAuthMode
+                .valueOf(directAuthMode.name),
+        credentialReference = credentialReference,
     )
 
 private fun ProviderProfile.toApplication(): ApplicationProviderProfile =
@@ -161,6 +204,10 @@ private fun ProviderProfile.toApplication(): ApplicationProviderProfile =
         models = models.map(ProviderModel::toApplication),
         modelWhitelist = modelWhitelist,
         modelBlacklist = modelBlacklist,
+        directAuthMode =
+            de.heckenmann.visualagent.agent.provider.DirectProviderAuthMode
+                .valueOf(directAuthMode.name),
+        credentialReference = credentialReference,
     )
 
 private fun ProviderProfile.withDiscoveredModels(modelConfigs: List<ProviderModelConfig>): ProviderProfile =
@@ -171,6 +218,8 @@ private fun ProviderProfile.withDiscoveredModels(modelConfigs: List<ProviderMode
                 val existing = models.firstOrNull { it.id == config.id }
                 existing?.copy(
                     name = discovered.name,
+                    contextLimit = discovered.contextLimit ?: existing.contextLimit,
+                    outputLimit = discovered.outputLimit ?: existing.outputLimit,
                     capabilities =
                         when {
                             existing.capabilitiesOverridden -> existing.capabilities
@@ -196,6 +245,7 @@ private fun ApplicationProviderAdapter.toProtocol(): ProviderAdapter =
         ApplicationProviderAdapter.OLLAMA -> ProviderAdapter.OLLAMA
         ApplicationProviderAdapter.OPENAI_COMPATIBLE -> ProviderAdapter.OPENAI_COMPATIBLE
         ApplicationProviderAdapter.CODEX_CLI -> ProviderAdapter.CODEX_CLI
+        ApplicationProviderAdapter.CODEX_DIRECT -> ProviderAdapter.CODEX_DIRECT
     }
 
 private fun ProviderAdapter.toApplication(): ApplicationProviderAdapter =
@@ -203,6 +253,7 @@ private fun ProviderAdapter.toApplication(): ApplicationProviderAdapter =
         ProviderAdapter.OLLAMA -> ApplicationProviderAdapter.OLLAMA
         ProviderAdapter.OPENAI_COMPATIBLE -> ApplicationProviderAdapter.OPENAI_COMPATIBLE
         ProviderAdapter.CODEX_CLI -> ApplicationProviderAdapter.CODEX_CLI
+        ProviderAdapter.CODEX_DIRECT -> ApplicationProviderAdapter.CODEX_DIRECT
     }
 
 private fun ProviderModelConfig.toProtocol(): ProviderModel =

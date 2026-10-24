@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.model.CapabilitySupport
 import de.heckenmann.visualagent.model.capabilitySupport
 import kotlinx.serialization.Serializable
+import org.springframework.ai.content.Media
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 
@@ -21,6 +22,12 @@ import reactor.core.publisher.Mono
  * @see OllamaCloudProvider for cloud implementation
  */
 interface LLMProvider {
+    /** Sends a bounded native file attachment under the same explicit request/profile selection as chat. */
+    fun fileReactive(
+        file: Media,
+        request: ChatRequestContext,
+    ): Mono<ChatResponse> = Mono.error(UnsupportedOperationException("This provider does not support native file input"))
+
     /**
      * Send a chat message and receive a complete response.
      *
@@ -207,6 +214,7 @@ interface LLMProvider {
  * @property cancellationToken Optional token the provider can consult to honour user cancellation
  * @property onContextBudgeted Optional request-scoped notification when history or tools are reduced
  * @property responseSchema Optional JSON Schema for a complete, server-validated response
+ * @property additionalInputTokens Provider-counted attachment input, separate from visible message text
  * @see docs/usecases/uc_0000002_send_main_agent_message.md
  * @see docs/usecases/uc_0000007_configure_session_provider_and_model.md
  * @see docs/usecases/uc_0000020_execute_tool_call.md
@@ -229,6 +237,7 @@ data class ChatRequestContext(
     val contextWindow: ContextWindow = ContextWindow(),
     val onContextBudgeted: ((ContextBudgetStatus) -> Unit)? = null,
     val responseSchema: ResponseSchema? = null,
+    val additionalInputTokens: Int = 0,
 )
 
 /** Describes whether assembling a request omitted conversation history or ordinary tool schemas. */
@@ -398,6 +407,8 @@ data class Message(
     /** Request identity shared by assistant turns emitted while answering one streamed user message. */
     @kotlinx.serialization.Transient
     val conversationRequestId: String? = null,
+    /** Native replay data for the original provider/profile/model only; never presentation metadata. */
+    val providerReplay: ProviderReplayState? = null,
 )
 
 /**

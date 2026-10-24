@@ -138,17 +138,17 @@ internal class AgentManagerConversationOps(
         persist(Message("user", content, conversationRequestId = requestId))
         token?.throwIfCancelled()
         var providerFailed = false
-        val assistantContent =
+        val assistantResponse =
             try {
-                owner.responseCoordinator.generateAssistantContentWithRepetitionGuard(requestId, token)
+                owner.responseCoordinator.generateAssistantMessageWithRepetitionGuard(requestId, token)
             } catch (error: kotlinx.coroutines.CancellationException) {
                 throw error
             } catch (error: Throwable) {
                 providerFailed = true
-                providerFailureMessage(error)
+                Message("assistant", providerFailureMessage(error))
             }
         token?.throwIfCancelled()
-        val assistantMessage = Message(role = "assistant", content = assistantContent, conversationRequestId = requestId)
+        val assistantMessage = assistantResponse.copy(role = "assistant", conversationRequestId = requestId)
         val persisted = persist(assistantMessage)
         if (!providerFailed) publishAssistantCompletion(persisted)
         owner.finishedToolEventsByRequestId.remove(requestId)

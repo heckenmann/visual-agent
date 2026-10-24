@@ -12,6 +12,7 @@ import de.heckenmann.visualagent.protocol.ProviderPort
 import de.heckenmann.visualagent.protocol.ProviderProfile
 import de.heckenmann.visualagent.protocol.SettingsPort
 import de.heckenmann.visualagent.protocol.SettingsSnapshot
+import de.heckenmann.visualagent.ui.settings.providers.ProviderManagementPanel
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -44,16 +45,14 @@ class ComposeProviderSettingsControlsTest {
         every { memory.snapshot() } returns MainAgentMemorySnapshot("", 0, 12_000, 0)
 
         composeTestRule.setContent {
-            MaterialTheme { providerSettingsOverlay(settings, memory, providers, onSettingsChanged = {}) }
+            MaterialTheme { ProviderManagementPanel(settings, providers, onSaved = {}) }
         }
 
-        composeTestRule.onNodeWithText("Main agent connection").assertExists()
         composeTestRule.onNodeWithText("Provider settings loaded").assertExists()
-        composeTestRule.onNodeWithText("Conversation").assertExists()
-        composeTestRule.onNodeWithText("Model instruction").assertExists()
-        composeTestRule.onNodeWithText("Queue flush").assertExists()
-        composeTestRule.onNodeWithText("Main-agent memory").assertExists()
-        composeTestRule.onNodeWithText("Revision 0 · 0 / 12000 characters").assertExists()
+        composeTestRule.onNodeWithText("Conversation").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Model instruction").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Queue flush").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Main-agent memory").assertDoesNotExist()
         listOf(
             "Model instruction",
             "Context length",
@@ -62,15 +61,13 @@ class ComposeProviderSettingsControlsTest {
             "Default tool timeout (seconds)",
             "Queue flush",
         ).forEach { label ->
-            composeTestRule.onNodeWithContentDescription("$label information").assertExists()
+            composeTestRule.onNodeWithContentDescription("$label information").assertDoesNotExist()
         }
-        listOf("Provider", "Model", "Favorite").forEach { label ->
-            composeTestRule.onNodeWithContentDescription("$label information").assertExists()
-        }
+        composeTestRule.onNodeWithText("Model catalog").assertExists()
         listOf("Add provider", "Edit provider", "Remove provider", "Refresh models").forEach { label ->
-            composeTestRule.onNodeWithText(label).assertExists()
+            composeTestRule.onNodeWithContentDescription(label).assertExists()
         }
-        composeTestRule.onNodeWithText("Run onboarding again").assertExists()
+        composeTestRule.onNodeWithContentDescription("Run onboarding again").assertExists()
         verify(exactly = 0) { settings.save(any(), any()) }
     }
 }

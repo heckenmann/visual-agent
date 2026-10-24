@@ -13,6 +13,7 @@ import de.heckenmann.visualagent.agent.provider.ProviderRuntimeConfig
 import de.heckenmann.visualagent.agent.provider.capabilitySupport
 import de.heckenmann.visualagent.agent.provider.supportsCapability
 import de.heckenmann.visualagent.model.CapabilitySupport
+import org.springframework.ai.content.Media
 import org.springframework.context.annotation.Primary
 import org.springframework.stereotype.Component
 import reactor.core.publisher.Flux
@@ -32,6 +33,12 @@ class ConfiguredLLMProvider(
     private val profiledAdapters: List<ProfiledProviderAdapter> = emptyList(),
     private val runtimeConfig: ProviderRuntimeConfig = DefaultProviderRuntimeConfig(),
 ) : LLMProvider {
+    override fun fileReactive(
+        file: Media,
+        request: ChatRequestContext,
+    ): Mono<ChatResponse> =
+        resolveRequest(request).flatMap { resolved -> providerFor(resolved.providerProfile).fileReactive(file, resolved) }
+
     override fun chatReactive(messages: List<Message>): Mono<ChatResponse> = chatReactive(ChatRequestContext(messages = messages))
 
     override fun chatReactive(request: ChatRequestContext): Mono<ChatResponse> =
@@ -57,7 +64,7 @@ class ConfiguredLLMProvider(
                 profile to modelId
             }.subscribeOn(Schedulers.boundedElastic())
             .flatMap { (profile, modelId) ->
-                if (profile.adapter == ProviderAdapter.CODEX_CLI) {
+                if (profile.adapter in setOf(ProviderAdapter.CODEX_CLI, ProviderAdapter.CODEX_DIRECT)) {
                     adapterFor(profile.adapter).visionReactive(image, prompt, modelId, profile)
                 } else {
                     providerFor(profile).visionReactive(image, prompt, modelId)
@@ -81,8 +88,8 @@ class ConfiguredLLMProvider(
             }.subscribeOn(Schedulers.boundedElastic())
             .flatMap { resolved ->
                 when (resolved.provider.adapter) {
-                    ProviderAdapter.CODEX_CLI ->
-                        adapterFor(ProviderAdapter.CODEX_CLI)
+                    ProviderAdapter.CODEX_CLI, ProviderAdapter.CODEX_DIRECT ->
+                        adapterFor(resolved.provider.adapter)
                             .visionReactive(image, prompt, resolved.model.id, resolved.provider)
                     ProviderAdapter.OPENAI_COMPATIBLE ->
                         openAiClient.visionReactive(image, prompt, resolved.model.id, resolved.provider)
@@ -99,7 +106,7 @@ class ConfiguredLLMProvider(
         return when (profile.adapter) {
             ProviderAdapter.OLLAMA -> true
             ProviderAdapter.OPENAI_COMPATIBLE -> ProviderEnvironmentCredentials.openAiApiKey(profile).isNotBlank()
-            ProviderAdapter.CODEX_CLI -> adapterFor(profile.adapter).isConnected()
+            ProviderAdapter.CODEX_CLI, ProviderAdapter.CODEX_DIRECT -> adapterFor(profile.adapter).isConnected()
         }
     }
 
@@ -121,6 +128,7 @@ class ConfiguredLLMProvider(
             .flatMap { profile ->
                 discoverModelConfigsReactive(profile).flatMap { discovered ->
                     if (profile.adapter == ProviderAdapter.CODEX_CLI ||
+                        profile.adapter == ProviderAdapter.CODEX_DIRECT ||
                         profile.adapter == ProviderAdapter.OPENAI_COMPATIBLE
                     ) {
                         providerCatalog.updateDiscoveredModelConfigs(providerId, discovered)
@@ -158,7 +166,10 @@ class ConfiguredLLMProvider(
                 when (profile.adapter) {
                     ProviderAdapter.OLLAMA -> ollamaClient.getModelDetailsReactive(profile, modelName)
                     ProviderAdapter.OPENAI_COMPATIBLE -> openAiClient.getModelDetailsReactive(profile, modelName)
-                    ProviderAdapter.CODEX_CLI -> adapterFor(profile.adapter).getModelDetailsReactive(profile, modelName)
+                    ProviderAdapter.CODEX_CLI, ProviderAdapter.CODEX_DIRECT ->
+                        adapterFor(
+                            profile.adapter,
+                        ).getModelDetailsReactive(profile, modelName)
                 }
             }
 
@@ -180,14 +191,14 @@ class ConfiguredLLMProvider(
             ProviderAdapter.OPENAI_COMPATIBLE ->
                 runCatching { openAiClient.getModelConfigsReactive(profile) }
                     .getOrElse { openAiClient.getModelsReactive(profile).map { models -> models.map(::ProviderModelConfig) } }
-            ProviderAdapter.CODEX_CLI -> adapterFor(profile.adapter).loadModelsReactive(profile)
+            ProviderAdapter.CODEX_CLI, ProviderAdapter.CODEX_DIRECT -> adapterFor(profile.adapter).loadModelsReactive(profile)
         }
 
     private fun checkConnectionReactive(profile: ProviderProfile): Mono<Boolean> =
         when (profile.adapter) {
             ProviderAdapter.OLLAMA -> ollamaClient.checkConnectionReactive(profile)
             ProviderAdapter.OPENAI_COMPATIBLE -> openAiClient.checkConnectionReactive(profile)
-            ProviderAdapter.CODEX_CLI -> adapterFor(profile.adapter).checkConnectionReactive(profile)
+            ProviderAdapter.CODEX_CLI, ProviderAdapter.CODEX_DIRECT -> adapterFor(profile.adapter).checkConnectionReactive(profile)
         }
 
     private fun activeProviderSelectionReactive(): Mono<Pair<LLMProvider, String>> =
@@ -205,7 +216,7 @@ class ConfiguredLLMProvider(
         when (profile?.adapter) {
             ProviderAdapter.OPENAI_COMPATIBLE -> openAiClient
             ProviderAdapter.OLLAMA -> ollamaClient
-            ProviderAdapter.CODEX_CLI -> adapterFor(profile.adapter)
+            ProviderAdapter.CODEX_CLI, ProviderAdapter.CODEX_DIRECT -> adapterFor(profile.adapter)
             null -> error("Resolved provider profile is missing")
         }
 
@@ -251,7 +262,7 @@ class ConfiguredLLMProvider(
         when (profile.adapter) {
             ProviderAdapter.OLLAMA -> ollamaClient.getModelDetailsReactive(profile, model)
             ProviderAdapter.OPENAI_COMPATIBLE -> openAiClient.getModelDetailsReactive(profile, model)
-            ProviderAdapter.CODEX_CLI -> adapterFor(profile.adapter).getModelDetailsReactive(profile, model)
+            ProviderAdapter.CODEX_CLI, ProviderAdapter.CODEX_DIRECT -> adapterFor(profile.adapter).getModelDetailsReactive(profile, model)
         }
 
     private fun requireVisionCapability(
@@ -314,17 +325,6 @@ class ConfiguredLLMProvider(
                     modelLimit = resolved.model.contextLimit,
                     outputLimit = resolved.model.outputLimit,
                 ),
-        )
-    }
-
-    private fun ProviderProfile.contextWindow(
-        modelId: String,
-        current: ContextWindow,
-    ): ContextWindow {
-        val modelConfig = models.firstOrNull { it.id == modelId }
-        return current.copy(
-            modelLimit = modelConfig?.contextLimit,
-            outputLimit = modelConfig?.outputLimit,
         )
     }
 }

@@ -1,7 +1,9 @@
 package de.heckenmann.visualagent.knowledge
 
 import de.heckenmann.visualagent.agent.ConversationContextPolicy
+import de.heckenmann.visualagent.agent.ProviderReplayState
 import io.r2dbc.spi.Row
+import kotlinx.serialization.json.Json
 import java.time.Instant
 
 /** Identity fields used to validate idempotent conversation inserts. */
@@ -15,6 +17,7 @@ internal data class ConversationIdentity(
     val turnOrder: Int?,
     val assistantToolTurn: Boolean,
     val conversationRequestId: String?,
+    val providerReplay: ProviderReplayState?,
 )
 
 /** Maps the identity columns used by idempotent conversation inserts. */
@@ -31,6 +34,7 @@ internal fun Row.toConversationIdentity(): ConversationIdentity =
         turnOrder = R2dbcPersistenceSupport.integer(this, "turn_order"),
         assistantToolTurn = R2dbcPersistenceSupport.requiredText(this, "assistant_tool_turn").toBoolean(),
         conversationRequestId = R2dbcPersistenceSupport.text(this, "conversation_request_id"),
+        providerReplay = R2dbcPersistenceSupport.text(this, "provider_replay_json")?.let { Json.decodeFromString<ProviderReplayState>(it) },
     )
 
 /** Maps a conversation row into the persistence domain record. */
@@ -49,4 +53,5 @@ internal fun Row.toConversationRecord(): ConversationRecord =
         turnOrder = R2dbcPersistenceSupport.integer(this, "turn_order"),
         assistantToolTurn = R2dbcPersistenceSupport.requiredText(this, "assistant_tool_turn").toBoolean(),
         conversationRequestId = R2dbcPersistenceSupport.text(this, "conversation_request_id"),
+        providerReplay = R2dbcPersistenceSupport.text(this, "provider_replay_json")?.let { Json.decodeFromString<ProviderReplayState>(it) },
     )

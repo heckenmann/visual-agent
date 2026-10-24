@@ -1,13 +1,19 @@
 package de.heckenmann.visualagent.server
 
+import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderConfiguration
+import de.heckenmann.visualagent.agent.provider.supportsCapability
 import de.heckenmann.visualagent.config.AppConfigBean
 import de.heckenmann.visualagent.knowledge.MainAgentLongTermMemoryStore
 import de.heckenmann.visualagent.protocol.SettingsPort
+import de.heckenmann.visualagent.protocol.SettingsSection
 import de.heckenmann.visualagent.protocol.SettingsSnapshot
 import de.heckenmann.visualagent.protocol.ThemeMode
+import de.heckenmann.visualagent.server.settings.applySettingsSection
 import de.heckenmann.visualagent.server.validation.validateInterpolationSelection
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.reactor.awaitSingle
 import org.springframework.stereotype.Component
 import de.heckenmann.visualagent.config.ThemeMode as ApplicationThemeMode
 
@@ -17,8 +23,52 @@ class SpringSettingsPort(
     private val config: AppConfigBean,
     private val providerCatalog: ProviderCatalogService,
     private val mainAgentMemoryStore: MainAgentLongTermMemoryStore,
+    private val provider: LLMProvider,
 ) : SettingsPort {
     override fun snapshot(): SettingsSnapshot = config.toProtocol(providerCatalog)
+
+    override fun saveSection(
+        section: SettingsSection,
+        settings: SettingsSnapshot,
+    ) {
+        config.applySettingsSection(section, settings, providerCatalog, mainAgentMemoryStore)
+    }
+
+    override suspend fun selectConversationModel(
+        providerId: String,
+        modelId: String,
+    ) {
+        val model =
+            providerCatalog.selectableModels(providerId).firstOrNull { it.id == modelId }
+                ?: error("Model is unavailable or filtered")
+        require(model.supportsCapability(de.heckenmann.visualagent.agent.provider.ModelCapability.CHAT)) {
+            "The selected model declares chat unsupported"
+        }
+        val contextLimit =
+            model.contextLimit?.takeIf { it > 0 } ?: try {
+                provider
+                    .getModelDetailsReactive(providerId, modelId)
+                    .awaitSingle()
+                    .details
+                    ?.contextLimit
+                    ?.takeIf { it > 0 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            }
+        providerCatalog.setActiveSelection(providerId, modelId)
+        contextLimit?.let { config.contextLength = it }
+        config.saveFields(setOf(AppConfigBean.KEY_SESSION_CONTEXT_LENGTH))
+    }
+
+    override fun setModelFavorite(
+        modelId: String,
+        favorite: Boolean,
+    ) {
+        require(modelId.isNotBlank())
+        config.updateFavorite(modelId, favorite)
+    }
 
     override fun save(
         settings: SettingsSnapshot,
@@ -147,6 +197,10 @@ private fun de.heckenmann.visualagent.protocol.ProviderProfile.toApplication(): 
             },
         modelWhitelist = modelWhitelist,
         modelBlacklist = modelBlacklist,
+        directAuthMode =
+            de.heckenmann.visualagent.agent.provider.DirectProviderAuthMode
+                .valueOf(directAuthMode.name),
+        credentialReference = credentialReference,
     )
 
 private val UI_SCALE_PERCENT_RANGE = 50..200

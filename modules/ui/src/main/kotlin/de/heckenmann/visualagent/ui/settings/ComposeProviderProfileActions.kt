@@ -2,21 +2,14 @@ package de.heckenmann.visualagent.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import de.heckenmann.visualagent.ui.components.PanelInfoBox
+import de.heckenmann.visualagent.ui.components.ActionIconButton
 
 /** Displays provider profile editing actions for a staged settings draft. */
 @Composable
@@ -26,23 +19,11 @@ internal fun providerProfileActions(
     onAdd: () -> Unit,
     onEdit: () -> Unit,
     onRemove: () -> Unit,
+    canAdd: Boolean = true,
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Button(onClick = onAdd) {
-            Icon(Icons.Filled.Add, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text("Add provider")
-        }
-        OutlinedButton(enabled = canEdit, onClick = onEdit) {
-            Icon(Icons.Filled.Edit, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text("Edit provider")
-        }
-        OutlinedButton(enabled = canRemove, onClick = onRemove) {
-            Icon(Icons.Filled.Delete, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text("Remove provider")
-        }
+        ActionIconButton(Icons.Filled.Add, "Add provider", enabled = canAdd, onClick = onAdd)
+        ActionIconButton(Icons.Filled.Edit, "Edit provider", enabled = canEdit, onClick = onEdit)
+        ActionIconButton(Icons.Filled.Delete, "Remove provider", enabled = canRemove, onClick = onRemove)
     }
-    PanelInfoBox("Provider and credential changes remain local until you save this dialog.")
 }

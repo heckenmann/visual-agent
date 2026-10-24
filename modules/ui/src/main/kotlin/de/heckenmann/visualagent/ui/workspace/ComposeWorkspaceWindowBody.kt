@@ -6,10 +6,12 @@ import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
 import de.heckenmann.visualagent.ui.components.*
 import de.heckenmann.visualagent.ui.conversation.*
+import de.heckenmann.visualagent.ui.conversation.models.ConversationWorkspacePanel
 import de.heckenmann.visualagent.ui.directories.DirectoryAccessPanel
 import de.heckenmann.visualagent.ui.files.*
 import de.heckenmann.visualagent.ui.modal.*
 import de.heckenmann.visualagent.ui.settings.*
+import de.heckenmann.visualagent.ui.settings.navigation.SettingsWorkspacePanel
 import de.heckenmann.visualagent.ui.skills.SkillsPanel
 import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
@@ -28,16 +30,7 @@ internal fun WindowBody(
 ) {
     when (window.id) {
         "chat" ->
-            ConversationPanel(
-                modalRequester = panelServices.modalRequester,
-                inFlight = panelServices.inFlight,
-                activityPort = panelServices.activity,
-                todoPort = panelServices.todos,
-                conversationPort = panelServices.conversation,
-                suggestionPort = panelServices.conversationSuggestions,
-                settingsPort = panelServices.settings,
-                clientImagePort = panelServices.clientImagePort,
-            )
+            ConversationWorkspacePanel(panelServices)
         "todos" ->
             TodoPanel(
                 todoPort = panelServices.todos,
@@ -60,13 +53,7 @@ internal fun WindowBody(
                 todoPort = panelServices.todos,
             )
         "settings" ->
-            settingsPanel(
-                settingsPort = panelServices.settings,
-                updatePort = panelServices.updates,
-                updateState = panelServices.updateState.value,
-                onUpdateStateChanged = panelServices.onUpdateStateChanged,
-                onSettingsChanged = panelServices.onSettingsChanged,
-            )
+            SettingsWorkspacePanel(panelServices)
         "skills" ->
             SkillsPanel(
                 skillPort = panelServices.skills,

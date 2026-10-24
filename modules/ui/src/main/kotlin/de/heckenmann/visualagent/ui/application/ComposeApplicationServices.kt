@@ -6,6 +6,8 @@ import de.heckenmann.visualagent.protocol.ClientImagePort
 import de.heckenmann.visualagent.protocol.LayoutWindowState
 import de.heckenmann.visualagent.protocol.UpdateStatus
 import de.heckenmann.visualagent.ui.modal.ComposeModalRequester
+import de.heckenmann.visualagent.ui.settings.navigation.SettingsDestination
+import de.heckenmann.visualagent.ui.settings.navigation.SettingsNavigationState
 import de.heckenmann.visualagent.ui.status.InFlightStateHolder
 import de.heckenmann.visualagent.ui.workspace.ComposeWorkspaceWindow
 import de.heckenmann.visualagent.ui.workspace.ComposeWorkspaceWindowBounds
@@ -58,6 +60,8 @@ data class ComposePanelServices(
     val onRunOnboarding: () -> Unit,
     val inFlight: InFlightStateHolder,
     val lifecycle: de.heckenmann.visualagent.protocol.LifecyclePort,
+    val settingsNavigation: SettingsNavigationState,
+    val onOpenSettings: (SettingsDestination) -> Unit,
 )
 
 /** Presentation state shared by automatic and manually triggered update checks. */

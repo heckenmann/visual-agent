@@ -213,14 +213,16 @@ See `README.md` for the full tree and the feature status table.
 
 The model does not receive arbitrary global state. The main agent gets a request-scoped `ChatRequestContext` built in `AgentManager.buildMainRequest(...)` with:
 
-- System prompt from `MainSystemPromptComposer` (resume hint, authoritative todo counters, current todo list, active provider/model, execution policy).
-- Optional `userModelInstruction` system message from `AppConfig`.
-- Recent DB-backed conversation history (max 20 messages; older rows are reachable via the `history` tool).
+- Stable system policy from `MainSystemPromptComposer`, including durable user preferences from `AppConfig` and recovery rules.
+- DB-backed, chronologically projected history with matching native Responses replay. `RequestContextBudgeter` prioritizes the latest user request and up to ten recent final answers, then tool schemas and lower-priority history, within the resolved model window.
+- Labelled optional memory/runtime reference snapshots immediately before the latest user turn, not at the start of the reusable history prefix. Interrupted-request presence is runtime data rather than changing system policy.
 - Tool-name guard system message from the active provider's prompt factory.
 - `enabledTools = agentToolConfigService.mainAgentTools()`.
 - Metadata: `sessionId=main`, `agent=main`, optional `requestId`.
 
 Sub-agents get their own `chatHistory + new turn`, `agentId/agentName/agentRole` metadata, and a role-based tool set.
+
+All adapters remain stateless, including Codex CLI/app-server: do not introduce thread reuse, `previous_response_id`, or provider-side conversations as a cache optimization. Sort selected provider tool callbacks by function name without widening their allowlist. Preserve native replay through database-to-context mapping; display text alone cannot preserve encrypted reasoning. See `docs/context-transport.md` for the dated API/framework research and design rationale.
 
 ## Use-Case Documentation
 

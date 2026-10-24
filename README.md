@@ -49,6 +49,9 @@ Supported native release platforms are macOS (Apple Silicon and Intel), Windows 
 - Managed workspace files the model can import, read, search, and render (including PDF page previews).
 - Todo list and sub-agents that can work on tasks autonomously.
 - Per-agent tool configuration, provider profiles, and persisted settings.
+- Searchable model selection directly in the Conversation composer, with favorites
+  and provider grouping. Global Settings separates Appearance, Providers, Agent,
+  and Updates; Conversation settings contains only model context and message behavior.
 - Self-model switching through `model_selection`, with explicit grants required for sub-agents.
 - Searchable reusable Markdown skills that the main agent can save and retrieve explicitly,
   with a user-facing Skills panel and database-backed search.
@@ -76,9 +79,10 @@ The project uses an acyclic Gradle module graph:
 ```text
 :desktop ──► :ui + :application + :protocol
 :application ──► :providers + :tools + :protocol
-:providers ──► :provider-standard + :provider-openai-codex
+:providers ──► :provider-standard + :provider-openai-codex + :provider-codex-direct
 :provider-standard ──► :provider-core + :agent-core
 :provider-openai-codex ──► :provider-core + :agent-core
+:provider-codex-direct ──► :provider-core + :provider-standard
 :tools ──► :tool-standard + :tool-javascript
 :tool-javascript ──► :tool-standard + :agent-core
 :ui ──► :protocol
@@ -100,6 +104,7 @@ modules/model-core/   # :model-core, pure capability evidence and override resol
 modules/provider-core/ # :provider-core
 modules/providers/    # :provider-standard
 modules/provider-openai-codex/ # :provider-openai-codex
+modules/provider-codex-direct/ # CLI-independent Responses and explicit OAuth/API-key authentication
 modules/providers-bundle/ # :providers
 modules/tools/        # :tool-standard
 modules/tool-javascript/ # :tool-javascript

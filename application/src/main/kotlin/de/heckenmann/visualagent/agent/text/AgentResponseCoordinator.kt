@@ -72,32 +72,39 @@ class AgentResponseCoordinator
         suspend fun generateAssistantContentWithRepetitionGuard(
             requestId: String,
             token: CancellationToken? = null,
-        ): String {
+        ): String = generateAssistantMessageWithRepetitionGuard(requestId, token).content
+
+        /** Preserves native provider replay state while normalizing and retrying the visible answer. */
+        suspend fun generateAssistantMessageWithRepetitionGuard(
+            requestId: String,
+            token: CancellationToken? = null,
+        ): Message {
             token?.throwIfCancelled()
-            var raw =
+            val response =
                 llmProvider
                     .chatReactive(conversationOps.buildMainRequest(conversationOps.loadMainAgentContextFromDb(), requestId, token))
                     .awaitSingle()
                     .message
-                    .content
-                    .trim()
+            val raw = response.content.trim()
             token?.throwIfCancelled()
             if (raw.isBlank()) {
-                val finalFromTools = completeToolOnlyTurnWithFollowup(requestId, token)
-                if (!finalFromTools.isNullOrBlank()) return normalizeAssistantContent(finalFromTools)
+                val finalFromTools = completeToolOnlyMessage(requestId, token)
+                if (!finalFromTools?.content.isNullOrBlank()) {
+                    return requireNotNull(finalFromTools).copy(content = normalizeAssistantContent(finalFromTools.content))
+                }
             }
             if (!ResponseRepetitionGuard.isRunawayRepetition(raw)) {
-                return normalizeAssistantContent(raw)
+                return response.copy(content = normalizeAssistantContent(raw))
             }
-            raw = runRepetitionGuardRetry(token)
-            return normalizeAssistantContent(raw)
+            val retry = runRepetitionGuardRetry(token)
+            return retry.copy(content = normalizeAssistantContent(retry.content))
         }
 
         /**
          * Retries the assistant response after a repetition-guard failure.
          */
         suspend fun retryAfterRepetition(token: CancellationToken? = null): String =
-            normalizeAssistantContent(runRepetitionGuardRetry(token))
+            normalizeAssistantContent(runRepetitionGuardRetry(token).content)
 
         /**
          * When the assistant returns a blank response but tool calls were made, this sends a
@@ -107,7 +114,12 @@ class AgentResponseCoordinator
         suspend fun completeToolOnlyTurnWithFollowup(
             requestId: String,
             token: CancellationToken? = null,
-        ): String? {
+        ): String? = completeToolOnlyMessage(requestId, token)?.content
+
+        private suspend fun completeToolOnlyMessage(
+            requestId: String,
+            token: CancellationToken?,
+        ): Message? {
             val toolEvents = conversationOps.finishedToolEventsByRequestId.remove(requestId).orEmpty()
             if (toolEvents.isEmpty()) return null
             val summary =
@@ -138,8 +150,8 @@ class AgentResponseCoordinator
             return llmProvider
                 .chatReactive(followup)
                 .awaitSingle()
-                .message.content
-                .trim()
+                .message
+                .let { it.copy(content = it.content.trim()) }
         }
 
         private fun isToolCallsOnlyPayload(text: String): Boolean {
@@ -149,8 +161,8 @@ class AgentResponseCoordinator
                 compact == """```{"tool_calls":[]}```"""
         }
 
-        private suspend fun runRepetitionGuardRetry(token: CancellationToken? = null): String {
-            var retryRaw = ""
+        private suspend fun runRepetitionGuardRetry(token: CancellationToken? = null): Message {
+            var retryRaw = Message("assistant", "")
             repeat(repetitionGuardRetryLimit) {
                 token?.throwIfCancelled()
                 val base = conversationOps.buildMainRequest(conversationOps.loadMainAgentContextFromDb(), null, token)
@@ -170,8 +182,8 @@ class AgentResponseCoordinator
                     llmProvider
                         .chatReactive(retryRequest)
                         .awaitSingle()
-                        .message.content
-                        .trim()
+                        .message
+                        .let { it.copy(content = it.content.trim()) }
             }
             return retryRaw
         }

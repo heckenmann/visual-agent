@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.security
 
 import de.heckenmann.visualagent.agent.provider.ServerTrustManagerProvider
+import de.heckenmann.visualagent.agent.provider.ServerTrustSnapshot
 import de.heckenmann.visualagent.agent.tools.GeneratedServerCertificate
 import de.heckenmann.visualagent.agent.tools.ServerTlsEntry
 import de.heckenmann.visualagent.agent.tools.ServerTlsMaterialPort
@@ -36,6 +37,22 @@ class ManagedTlsMaterialService internal constructor(
             .managers.trustManagers
             .filterIsInstance<X509TrustManager>()
             .first()
+
+    /** Identifies the exact platform-plus-managed root policy captured by this snapshot. */
+    @Synchronized
+    override fun trustSnapshot(): ServerTrustSnapshot {
+        val manager = trustManager()
+        val roots =
+            manager.acceptedIssuers
+                .map { certificate ->
+                    java.security.MessageDigest
+                        .getInstance("SHA-256")
+                        .digest(certificate.encoded)
+                        .toHexString()
+                }.sorted()
+                .joinToString(":")
+        return ServerTrustSnapshot(manager, "composite-v1:$roots")
+    }
 
     /** Supplies managed trust to JDK-only tools without coupling their module to provider APIs. */
     override fun get(): X509TrustManager = trustManager()

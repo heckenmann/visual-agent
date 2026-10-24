@@ -20,7 +20,7 @@ internal class R2dbcConversationHistoryQueries(
             .sql(
                 """
                 SELECT id, session_id, role, content, metadata, created_at, timeline_sequence, context_policy,
-                       parent_assistant_turn_id, turn_order, assistant_tool_turn, conversation_request_id
+                       parent_assistant_turn_id, turn_order, assistant_tool_turn, conversation_request_id, provider_replay_json
                 FROM conversation_history
                 WHERE conversation_request_id = :requestId AND role = 'assistant'
                 ORDER BY timeline_sequence ASC, created_at ASC, id ASC
@@ -80,7 +80,7 @@ internal class R2dbcConversationHistoryQueries(
             .sql(
                 """
                 SELECT id, session_id, role, content, metadata, created_at, timeline_sequence, context_policy,
-                       parent_assistant_turn_id, turn_order, assistant_tool_turn, conversation_request_id
+                       parent_assistant_turn_id, turn_order, assistant_tool_turn, conversation_request_id, provider_replay_json
                 FROM conversation_history
                 WHERE session_id = :sessionId
                 ORDER BY timeline_sequence DESC, created_at DESC, id DESC
@@ -113,7 +113,7 @@ internal class R2dbcConversationHistoryQueries(
                         LIMIT 1 OFFSET :boundaryOffset
                     )
                     SELECT id, session_id, role, content, metadata, created_at, timeline_sequence, context_policy,
-                           parent_assistant_turn_id, turn_order, assistant_tool_turn, conversation_request_id
+                           parent_assistant_turn_id, turn_order, assistant_tool_turn, conversation_request_id, provider_replay_json
                     FROM conversation_history
                     WHERE session_id = :sessionId AND context_policy = 'DIALOGUE'
                       AND (
@@ -143,7 +143,7 @@ internal class R2dbcConversationHistoryQueries(
                         LIMIT 1 OFFSET :turnLimit
                     )
                     SELECT id, session_id, role, content, metadata, created_at, timeline_sequence, context_policy,
-                           parent_assistant_turn_id, turn_order, assistant_tool_turn, conversation_request_id
+                           parent_assistant_turn_id, turn_order, assistant_tool_turn, conversation_request_id, provider_replay_json
                     FROM conversation_history
                     WHERE session_id = :sessionId AND context_policy = 'SUMMARY_SOURCE'
                       AND (
@@ -180,7 +180,7 @@ internal class R2dbcConversationHistoryQueries(
             .sql(
                 """
                 SELECT id, session_id, role, content, metadata, created_at, timeline_sequence, context_policy,
-                       parent_assistant_turn_id, turn_order, assistant_tool_turn, conversation_request_id
+                       parent_assistant_turn_id, turn_order, assistant_tool_turn, conversation_request_id, provider_replay_json
                 FROM conversation_history
                 WHERE session_id = :sessionId
                 ORDER BY timeline_sequence DESC, created_at DESC, id DESC
@@ -206,7 +206,7 @@ internal class R2dbcConversationHistoryQueries(
             .sql(
                 """
                 SELECT id, session_id, role, content, metadata, created_at, timeline_sequence, context_policy,
-                       parent_assistant_turn_id, turn_order, assistant_tool_turn, conversation_request_id
+                       parent_assistant_turn_id, turn_order, assistant_tool_turn, conversation_request_id, provider_replay_json
                 FROM conversation_history
                 WHERE session_id = :sessionId AND lower(content) LIKE :query
                 ORDER BY timeline_sequence DESC, created_at DESC, id DESC
@@ -242,7 +242,7 @@ internal class R2dbcConversationHistoryQueries(
                     WHERE id IN (SELECT id FROM selected_rows) AND parent_assistant_turn_id IS NOT NULL
                 )
                 SELECT id, session_id, role, content, metadata, created_at, timeline_sequence, context_policy,
-                       parent_assistant_turn_id, turn_order, assistant_tool_turn, conversation_request_id,
+                       parent_assistant_turn_id, turn_order, assistant_tool_turn, conversation_request_id, provider_replay_json,
                        (SELECT COUNT(*) FROM selected_rows) AS raw_page_count,
                        (SELECT COUNT(*) FROM conversation_history WHERE session_id = :sessionId) AS total_row_count
                 FROM conversation_history

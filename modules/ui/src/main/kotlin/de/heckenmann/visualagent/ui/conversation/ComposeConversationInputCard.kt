@@ -64,6 +64,7 @@ internal fun ConversationInputCard(
     ghostText: String = "",
     ghostCursorVisible: Boolean = false,
     onFocusChanged: (Boolean) -> Unit = {},
+    modelSelector: @Composable () -> Unit = {},
 ) {
     val sizedModifier = onSizeChanged?.let { modifier.onSizeChanged(it) } ?: modifier
     Column(
@@ -76,6 +77,7 @@ internal fun ConversationInputCard(
                 .padding(bottom = if (isRequestActive) 3.dp else 0.dp),
     ) {
         ConversationInputArea(
+            modelSelector = modelSelector,
             input = input,
             sending = sending,
             contextReduced = contextReduced,

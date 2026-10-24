@@ -1,19 +1,22 @@
 package de.heckenmann.visualagent.ui.settings
 
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import de.heckenmann.visualagent.protocol.ProviderAdapter
 import de.heckenmann.visualagent.protocol.ProviderModel
 import de.heckenmann.visualagent.protocol.ProviderProfile
+import de.heckenmann.visualagent.ui.settings.providers.ProviderModelCatalog
 import org.junit.Rule
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /** Exercises model catalog visibility and recovery actions without timing assumptions. */
 class CapabilityOverrideControlsTest {
@@ -24,7 +27,7 @@ class CapabilityOverrideControlsTest {
     fun `legacy declarations are not presented as automatic provider evidence`() {
         val legacy = ProviderModel("legacy", capabilities = setOf("vision"), capabilitiesComplete = true, capabilitiesOverridden = true)
         compose.setContent {
-            MaterialTheme { ModelCapabilitiesEditor(legacy) { _, _ -> } }
+            ProviderCatalogTestHost { ModelCapabilitiesEditor(legacy) { _, _ -> } }
         }
         compose.onNodeWithText("CHAT").performClick()
         compose.onNodeWithText("Automatic (unsupported)").assertDoesNotExist()
@@ -38,62 +41,42 @@ class CapabilityOverrideControlsTest {
     fun `model with persisted legacy vision only declaration remains visible in settings`() {
         val legacy =
             ProviderModel("legacy-partial", capabilities = setOf("vision"), capabilitiesComplete = true, capabilitiesOverridden = true)
-        val selected = mutableStateOf("")
+        val draft = mutableStateOf(catalogDraft(listOf(legacy)))
         compose.setContent {
-            MaterialTheme {
-                modelSettingsContent(
-                    providerId = "provider",
-                    modelId = selected.value,
-                    models = listOf(legacy),
-                    contextLength = 4096,
-                    contextLimit = null,
-                    loadingModels = false,
-                    modelDetails = "",
-                    favoriteModels = emptyList(),
-                    onModelSelected = { selected.value = it },
-                    onContextLengthChanged = {},
-                    onRefreshModels = {},
-                    onFavoriteChanged = {},
-                )
+            ProviderCatalogTestHost {
+                ProviderModelCatalog(draft.value, false, onChange = { draft.value = it }, onRefresh = {})
             }
         }
-        compose.onNodeWithText("Model").performClick()
-        compose.onNodeWithText("legacy-partial [vision]").performClick()
-        assertEquals(legacy.id, selected.value)
+        assertTrue(
+            compose.onNodeWithText("Model catalog").getBoundsInRoot().bottom <=
+                compose.onNodeWithContentDescription("Refresh models").getBoundsInRoot().top,
+            "The test host must place catalog controls vertically instead of overlaying their click targets",
+        )
+        compose.onNodeWithText("Model catalog").performClick()
+        compose.onNodeWithText("legacy-partial").performClick()
+        assertEquals(legacy.id, draft.value.modelId)
         compose
             .onNodeWithText(
-                "This model's current capability declaration excludes chat. Review its capability settings below; the declaration does not remove the model from this settings catalog.",
+                "This model's current capability declaration excludes chat. Review its advanced capability settings; the model remains visible in this catalog.",
             ).assertIsDisplayed()
-        compose.onNodeWithText("CHAT").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Advanced model configuration").performScrollTo().performClick()
+        compose.onNodeWithText("CHAT").performScrollTo().assertIsDisplayed()
     }
 
     @Test
     fun `main dropdown keeps partial model after unrelated capability edit`() {
         val partial = ProviderModel("partial", capabilityOverrides = mapOf("vision" to false))
         val blocked = ProviderModel("blocked", capabilityOverrides = mapOf("chat" to false))
-        var selected = ""
+        val draft = mutableStateOf(catalogDraft(listOf(partial, blocked)))
         compose.setContent {
-            MaterialTheme {
-                modelSettingsContent(
-                    providerId = "provider",
-                    modelId = "",
-                    models = listOf(partial, blocked),
-                    contextLength = 4096,
-                    contextLimit = null,
-                    loadingModels = false,
-                    modelDetails = "",
-                    favoriteModels = emptyList(),
-                    onModelSelected = { selected = it },
-                    onContextLengthChanged = {},
-                    onRefreshModels = {},
-                    onFavoriteChanged = {},
-                )
+            ProviderCatalogTestHost {
+                ProviderModelCatalog(draft.value, false, onChange = { draft.value = it }, onRefresh = {})
             }
         }
-        compose.onNodeWithText("Model").performClick()
+        compose.onNodeWithText("Model catalog").performClick()
         compose.onNodeWithText("blocked").assertIsDisplayed()
         compose.onNodeWithText("partial").performClick()
-        assertEquals("partial", selected)
+        assertEquals("partial", draft.value.modelId)
         assertEquals(mapOf("chat" to false), blocked.capabilityOverrides)
     }
 
@@ -111,7 +94,7 @@ class CapabilityOverrideControlsTest {
                 ),
             )
         compose.setContent {
-            MaterialTheme {
+            ProviderCatalogTestHost {
                 LegacyCapabilityReset(draft.value) { draft.value = draft.value.resetLegacyCapabilities("provider") }
             }
         }
@@ -125,4 +108,10 @@ class CapabilityOverrideControlsTest {
                 .capabilitiesComplete,
         )
     }
+
+    private fun catalogDraft(models: List<ProviderModel>): ProviderSettingsDraft =
+        ProviderSettingsDraft(
+            providerId = "provider",
+            providers = listOf(ProviderProfile("provider", "Provider", ProviderAdapter.CODEX_CLI, "", models = models)),
+        )
 }

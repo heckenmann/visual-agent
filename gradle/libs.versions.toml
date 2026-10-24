@@ -4,8 +4,8 @@ kotlin = "2.4.21"
 ktlint = "14.2.0"
 ktlint-core = "1.5.0"
 ktlint-kotlin = "2.1.0"
-spring-boot = "4.1.1"
-spring-ai = "2.0.1"
+spring-boot = "4.2.0-M2"
+spring-ai = "2.1.0-M1"
 spring-integration = "7.1.1"
 compose = "1.12.2"
 compose-material3 = "1.9.0"
@@ -46,13 +46,17 @@ spring-boot-starter-restclient = { module = "org.springframework.boot:spring-boo
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
 spring-boot-starter-flyway = { module = "org.springframework.boot:spring-boot-starter-flyway" }
 spring-context = { module = "org.springframework:spring-context" }
+spring-webflux = { module = "org.springframework:spring-webflux" }
+jackson-databind = { module = "tools.jackson.core:jackson-databind" }
+spring-security-oauth2-client = { module = "org.springframework.security:spring-security-oauth2-client" }
+spring-security-oauth2-jose = { module = "org.springframework.security:spring-security-oauth2-jose" }
 spring-data-r2dbc = { module = "org.springframework.data:spring-data-r2dbc" }
 spring-r2dbc = { module = "org.springframework:spring-r2dbc" }
 spring-tx = { module = "org.springframework:spring-tx" }
 netty-resolver-dns-native-macos = { module = "io.netty:netty-resolver-dns-native-macos" }
 spring-ai-bom = { module = "org.springframework.ai:spring-ai-bom", version.ref = "spring-ai" }
 spring-ai-model = { module = "org.springframework.ai:spring-ai-model" }
-spring-ai-ollama = { module = "org.springframework.ai:spring-ai-starter-model-ollama" }
+spring-ai-ollama = { module = "org.springframework.ai:spring-ai-ollama" }
 spring-ai-openai = { module = "org.springframework.ai:spring-ai-openai" }
 spring-integration-sftp = { module = "org.springframework.integration:spring-integration-sftp", version.ref = "spring-integration" }
 h2 = { module = "com.h2database:h2", version.ref = "h2" }
@@ -61,6 +65,7 @@ coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", ve
 coroutines-bom = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-bom", version.ref = "coroutines" }
 coroutines-reactor = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactor", version.ref = "coroutines" }
 reactor-core = { module = "io.projectreactor:reactor-core" }
+reactor-netty-http = { module = "io.projectreactor.netty:reactor-netty-http" }
 reactor-test = { module = "io.projectreactor:reactor-test" }
 coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }

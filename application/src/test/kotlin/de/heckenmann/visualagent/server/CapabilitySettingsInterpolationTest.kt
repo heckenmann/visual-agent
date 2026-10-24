@@ -34,7 +34,7 @@ class CapabilitySettingsInterpolationTest {
                 Mono.just(ChatResponse("legacy", Message("assistant", "Clarified prompt."), true))
             val providerPort = SpringProviderPort(catalog, provider)
             val config = AppConfigBean(db.preferenceStore)
-            val settings = SpringSettingsPort(config, catalog, db.mainAgentLongTermMemoryStore)
+            val settings = SpringSettingsPort(config, catalog, db.mainAgentLongTermMemoryStore, io.mockk.mockk(relaxed = true))
             val profiles = providerPort.listProviders()
             val selection = ProviderConfiguration(profiles, "custom", model.id)
             val snapshot = SettingsSnapshot(providerId = "custom", modelId = model.id, automaticPromptInterpolation = true)

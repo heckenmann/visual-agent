@@ -44,6 +44,11 @@ The provider model catalog continues to use the official `codex debug models` co
 
 Each request receives the server-managed workspace directory (or its request-scoped `workingDirectory` override), an ephemeral Codex thread, read-only sandboxing, and the `never` approval policy. The app-server process is closed after success, failure, cancellation, timeout, or application shutdown.
 
+This stateless lifecycle is intentional. Context-prefix improvements do not enable
+`thread/resume`, persistent thread IDs or cross-request process reuse. Current reference
+snapshots follow completed history and precede the current user input, with explicit
+data labels. See the [context transport decision](../context-transport.md).
+
 ## Library and protocol decision
 
 The former `org.springaicommunity.agents:agent-codex` dependency was removed. Its public API exposed synchronous `codex exec` execution but not the app-server protocol, native response deltas, or request-scoped dynamic tool callbacks.

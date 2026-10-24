@@ -1,5 +1,64 @@
 # Architecture
 
+## Settings Ownership And Navigation
+
+Global Settings has Appearance, Providers, Agent and Updates destinations. The
+Conversation composer owns immediate model selection; its contextual settings
+dialog contains Model and Conversation preferences only. Provider administration
+never implicitly changes the live main-agent selection. The presentation retains
+per-destination drafts when tabs change; model and catalog events do not rewrite
+the message draft, reset scrolling or restart an in-flight request.
+
+`SettingsPort.saveSection` updates only owned configuration fields and preference
+keys, rather than replaying a full stale snapshot or rewriting credentials.
+`selectConversationModel` validates the selected catalog entry, resolves reported
+context capacity, and updates only the provider/model selection and its context
+budget. Unknown capacities remain unknown. Favorites use database compare-and-set.
+`ProviderPort.replaceProfiles` compares the edited catalog's baseline in the same
+database-conditional mutation, retaining concurrent active-selection changes and
+authoritative OAuth references. Conflicts require reload rather than silently
+discarding another client's configuration.
+
+UI snapshots are composition-owned presentation state, not a second persistence
+layer. All catalog, settings, metadata and memory I/O executes off the presentation
+dispatcher. Model-selector state is held above the lazy/pinned composers so scrolling
+and recomposition do not trigger new reads. Existing Material 3 components supply
+navigation and selection; no new library is introduced. See UC-0000153 and issue #494.
+
+## Direct Codex Provider
+
+`:provider-codex-direct` supplies the separate `CODEX_DIRECT` adapter through the
+existing provider router. It uses Spring AI's Responses model and the existing
+permission-aware tool registry, not the Codex executable or a second agent runtime.
+The existing `CODEX_CLI`, `OPENAI_COMPATIBLE`, and `OLLAMA` adapters retain their
+identities. See [the design and route matrix](codex-direct-provider.md).
+
+Each direct profile explicitly selects ChatGPT OAuth or Platform API-key billing.
+Failures must never trigger another credential route. OAuth credentials stay in
+owner-protected server files; protocol responses and provider profiles carry only
+opaque references. Browser authorization uses a request-scoped loopback listener.
+Successful authorization persists its provider reference before reporting success,
+independently of the settings draft. Database-conditional catalog updates preserve
+unrelated edits and reject authentication changes made during authorization.
+Settings writes retain the authoritative registration rather than copying stale
+references from UI drafts; explicit sign-out clears both credentials and their reference.
+Adapter conversion persists a validated endpoint with the new authentication route.
+Reactive post-commit refresh notifications cannot turn a successful write into a
+credential rollback; notification failures produce a safe warning instead.
+An external browser cannot reach a remote server's loopback address without an
+explicit forwarding arrangement; no public callback listener is opened implicitly.
+
+Native Responses replay is separate from visible conversation text and scoped to
+the originating profile and model. Migration V7 persists that payload. It must not
+be exposed through ordinary UI DTOs or reused after a provider/model switch.
+
+Native attachments use the selected model's input-token counting API on the same
+SDK credential/TLS lease before inference. The request-local `additionalInputTokens`
+reservation remains part of initial and continuation budgets; it is neither persisted
+as history nor inferred from file bytes/model names. Counting failure prevents
+generation, without changing authentication routes. See the design for transfer
+behavior, OAuth counting limitations, and the distinction from local text estimates.
+
 ## Overview
 
 Visual Agent is a Compose Multiplatform desktop application with a transport boundary between presentation and Spring-managed services.
@@ -102,10 +161,11 @@ resize/recomposition does not repeat database reads.
    in-flight activity indicator in the header pulses for the duration
    of the request.
 5. `AgentManager` builds a `ChatRequestContext` with:
-   - static system context prompt from `MainSystemPromptComposer` (policy,
-     execution rules, active provider and model, and a conditional resume hint);
+   - stable system context prompt from `MainSystemPromptComposer` (policy,
+     execution rules, durable preferences, and recovery policy);
    - optional low-priority reference sections for durable memory and current
-     runtime state;
+     runtime state, including interrupted-request presence, placed after prior
+     history and immediately before the latest user turn;
    - a history projection from persisted dialogue and individually summarized
      execution events; the active provider applies one model-aware token budget that
      prioritizes the latest user message, ten recent assistant answers, then native
@@ -125,10 +185,19 @@ source for provider context, but those concerns are deliberately separated. Each
 record has a `context_policy`: `DIALOGUE` records preserve user requests and visible
 assistant outcomes, `SUMMARY_SOURCE` records contribute compact execution summaries,
 and `AUDIT_ONLY` records remain visible to the UI without being copied to the model.
-`MainAgentContextAssembler` selects the latest user-turn boundary, deduplicates todo,
-tool, sub-agent, and workspace events, and applies a token budget while never evicting
-the current user request. It is used for normal requests, streaming, retries, resume,
-and autonomous terminal reviews.
+`MainAgentContextAssembler` projects user turns and deduplicates todo, tool, sub-agent,
+and workspace events. The provider's `RequestContextBudgeter` applies the token budget
+without evicting the current user request. Both are used for normal requests,
+streaming, retries, resume, and autonomous terminal reviews.
+
+The [context transport decision](context-transport.md) records why native Responses
+replay must survive the dedicated main-agent database loader, why changing reference
+snapshots follow the stable history prefix, and why selected schemas have deterministic
+provider-function-name ordering. Current snapshots are explicitly labelled as data,
+not prior assistant speech or instructions. All provider routes, including Codex
+CLI/app-server, remain stateless; HTTP resource reuse is not conversation-state reuse.
+Reported Responses input/cache usage is counted only once per completed round and
+without request-content or identity labels.
 
 Request budgeting prioritizes the complete latest user message, then completed assistant
 answers from newest to oldest through the tenth answer, retaining each answer with its

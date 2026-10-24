@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -103,6 +104,7 @@ internal fun ConversationInputArea(
     ghostText: String = "",
     ghostCursorVisible: Boolean = false,
     onFocusChanged: (Boolean) -> Unit = {},
+    modelSelector: @Composable () -> Unit = {},
 ) {
     Column {
         Row(
@@ -110,7 +112,7 @@ internal fun ConversationInputArea(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Spacer(modifier = Modifier.weight(1f))
+            Box(modifier = Modifier.weight(1f)) { modelSelector() }
             ActionIconButton(
                 icon = Icons.Filled.Delete,
                 description = "Clear conversation",

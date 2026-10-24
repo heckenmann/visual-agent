@@ -1,11 +1,10 @@
 package de.heckenmann.visualagent.ui.conversation
 
-import de.heckenmann.visualagent.protocol.MainAgentMemoryPort
 import de.heckenmann.visualagent.protocol.ProviderPort
 import de.heckenmann.visualagent.protocol.SettingsPort
+import de.heckenmann.visualagent.ui.modal.ComposeContentModal
 import de.heckenmann.visualagent.ui.modal.ComposeModal
 import de.heckenmann.visualagent.ui.modal.ComposeModalRequester
-import de.heckenmann.visualagent.ui.modal.ComposeSettingsModal
 import io.mockk.mockk
 import org.junit.Test
 import kotlin.test.assertTrue
@@ -19,11 +18,10 @@ class ComposeConversationProviderSettingsTest {
         openConversationProviderSettings(
             modalRequester = ComposeModalRequester { modal -> requested = modal },
             settingsPort = mockk<SettingsPort>(),
-            mainAgentMemoryPort = mockk<MainAgentMemoryPort>(),
             providerPort = mockk<ProviderPort>(),
             onSettingsChanged = {},
         )
 
-        assertTrue(requested is ComposeSettingsModal)
+        assertTrue(requested is ComposeContentModal)
     }
 }

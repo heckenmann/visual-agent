@@ -12,6 +12,7 @@ repositories {
 dependencies {
     api(project(":provider-standard"))
     api(project(":provider-openai-codex"))
+    api(project(":provider-codex-direct"))
 }
 
 java {
