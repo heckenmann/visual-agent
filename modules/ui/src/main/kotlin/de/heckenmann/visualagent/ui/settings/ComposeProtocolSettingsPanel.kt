@@ -12,7 +12,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -20,7 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.SettingsPort
-import de.heckenmann.visualagent.protocol.SettingsSnapshot
+import de.heckenmann.visualagent.protocol.SettingsSection
 import de.heckenmann.visualagent.protocol.UpdatePort
 import de.heckenmann.visualagent.protocol.UpdateRequest
 import de.heckenmann.visualagent.protocol.UpdateStatus
@@ -28,6 +27,7 @@ import de.heckenmann.visualagent.ui.application.UpdatePresentationState
 import de.heckenmann.visualagent.ui.components.RegisterPanelVerticalScrollbar
 import de.heckenmann.visualagent.ui.components.settingsDraftActionRow
 import de.heckenmann.visualagent.ui.components.toUiErrorMessage
+import de.heckenmann.visualagent.ui.settings.navigation.SettingsPageDraft
 import de.heckenmann.visualagent.ui.workspace.PanelStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -41,13 +41,15 @@ internal fun settingsPanel(
     updatePort: UpdatePort = DisabledUpdatePort,
     updateState: UpdatePresentationState = UpdatePresentationState(),
     onUpdateStateChanged: (UpdatePresentationState) -> Unit = {},
+    section: SettingsSection = SettingsSection.APPEARANCE,
+    state: SettingsPageDraft = remember(settingsPort, section) { SettingsPageDraft() },
 ) {
     val scope = rememberCoroutineScope()
-    var persisted by remember { mutableStateOf(SettingsSnapshot()) }
-    var draft by remember { mutableStateOf(SettingsSnapshot()) }
-    var loaded by remember { mutableStateOf(false) }
-    var saving by remember { mutableStateOf(false) }
-    var status by remember { mutableStateOf("Loading settings...") }
+    var persisted by state.persisted
+    var draft by state.draft
+    var loaded by state.loaded
+    var saving by state.saving
+    var status by state.status
     val hasUnsavedChanges = loaded && draft != persisted
     val hasUnsavedChangesState by rememberUpdatedState(hasUnsavedChanges)
 
@@ -69,16 +71,16 @@ internal fun settingsPanel(
     fun saveDraft() {
         if (!loaded || saving || !hasUnsavedChanges) return
         saving = true
+        val submitted = draft
         scope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val merged = settingsPort.snapshot().withAppearanceFrom(draft)
-                    settingsPort.save(merged)
-                    merged
+                    settingsPort.saveSection(section, submitted)
+                    submitted
                 }
             }.onSuccess { saved ->
                 persisted = saved
-                draft = saved
+                if (draft == submitted) draft = saved
                 status = "Saved settings"
                 onSettingsChanged()
             }.onFailure { error -> status = error.toUiErrorMessage() }
@@ -86,7 +88,7 @@ internal fun settingsPanel(
         }
     }
 
-    LaunchedEffect(settingsPort) { loadPersistedDraft(discardingLocalEdits = false) }
+    LaunchedEffect(settingsPort, section) { if (!loaded || draft == persisted) loadPersistedDraft(discardingLocalEdits = false) }
     DisposableEffect(settingsPort) {
         val handle =
             settingsPort.addChangeListener { current ->
@@ -111,14 +113,17 @@ internal fun settingsPanel(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.verticalScroll(scrollState),
             ) {
-                AppearanceSettingsSection(draft) { draft = it }
-                UpdateSettingsSection(
-                    settings = draft,
-                    updatePort = updatePort,
-                    initialState = updateState,
-                    onStateChanged = onUpdateStateChanged,
-                    onChange = { draft = it },
-                )
+                if (section == SettingsSection.APPEARANCE) {
+                    AppearanceSettingsSection(draft) { draft = it }
+                } else {
+                    UpdateSettingsSection(
+                        settings = draft,
+                        updatePort = updatePort,
+                        initialState = updateState,
+                        onStateChanged = onUpdateStateChanged,
+                        onChange = { draft = it },
+                    )
+                }
             }
         }
         HorizontalDivider()
@@ -133,17 +138,6 @@ internal fun settingsPanel(
         }
     }
 }
-
-/** Replaces only persisted appearance values with those staged in the appearance settings panel. */
-internal fun SettingsSnapshot.withAppearanceFrom(appearance: SettingsSnapshot): SettingsSnapshot =
-    copy(
-        uiThemeMode = appearance.uiThemeMode,
-        fontSize = appearance.fontSize,
-        uiScalePercent = appearance.uiScalePercent,
-        showPanelLabels = appearance.showPanelLabels,
-        automaticUpdatesEnabled = appearance.automaticUpdatesEnabled,
-        includePrereleaseUpdates = appearance.includePrereleaseUpdates,
-    )
 
 private object DisabledUpdatePort : UpdatePort {
     override fun check(request: UpdateRequest): UpdateStatus =

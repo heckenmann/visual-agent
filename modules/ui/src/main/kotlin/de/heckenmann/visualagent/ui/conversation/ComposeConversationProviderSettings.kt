@@ -1,31 +1,25 @@
 package de.heckenmann.visualagent.ui.conversation
 
-import de.heckenmann.visualagent.protocol.MainAgentMemoryPort
 import de.heckenmann.visualagent.protocol.ProviderPort
 import de.heckenmann.visualagent.protocol.SettingsPort
+import de.heckenmann.visualagent.ui.modal.ComposeContentModal
 import de.heckenmann.visualagent.ui.modal.ComposeModalRequester
-import de.heckenmann.visualagent.ui.modal.ComposeSettingsModal
-import de.heckenmann.visualagent.ui.modal.requestSettings
-import de.heckenmann.visualagent.ui.settings.providerSettingsOverlay
+import de.heckenmann.visualagent.ui.settings.forms.ConversationSettingsPage
 
-/** Opens the reusable global provider and model settings overlay from the conversation header. */
+/** Opens only model context and message-composition preferences from the Conversation header. */
 internal fun openConversationProviderSettings(
     modalRequester: ComposeModalRequester,
     settingsPort: SettingsPort,
-    mainAgentMemoryPort: MainAgentMemoryPort,
     providerPort: ProviderPort,
     onSettingsChanged: () -> Unit,
-    onRunOnboarding: () -> Unit = {},
+    onManageProviders: () -> Unit = {},
 ) {
-    modalRequester.requestSettings(
-        ComposeSettingsModal(title = "Providers and models") {
-            providerSettingsOverlay(
-                settingsPort = settingsPort,
-                mainAgentMemoryPort = mainAgentMemoryPort,
-                providerPort = providerPort,
-                onSettingsChanged = onSettingsChanged,
-                onRunOnboarding = onRunOnboarding,
-            )
+    modalRequester.request(
+        ComposeContentModal(title = "Conversation settings") { dismiss ->
+            ConversationSettingsPage(settingsPort, providerPort, onSettingsChanged) {
+                dismiss()
+                onManageProviders()
+            }
         },
     )
 }

@@ -1,14 +1,12 @@
 package de.heckenmann.visualagent.ui.settings
 
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import de.heckenmann.visualagent.protocol.MainAgentMemoryPort
 import de.heckenmann.visualagent.protocol.MainAgentMemorySnapshot
@@ -17,273 +15,152 @@ import de.heckenmann.visualagent.protocol.ProviderModel
 import de.heckenmann.visualagent.protocol.ProviderPort
 import de.heckenmann.visualagent.protocol.ProviderProfile
 import de.heckenmann.visualagent.protocol.SettingsPort
+import de.heckenmann.visualagent.protocol.SettingsSection
 import de.heckenmann.visualagent.protocol.SettingsSnapshot
+import de.heckenmann.visualagent.ui.conversation.models.ConversationModelPicker
+import de.heckenmann.visualagent.ui.conversation.models.rememberConversationModelState
+import de.heckenmann.visualagent.ui.settings.agent.AgentSettingsPage
+import de.heckenmann.visualagent.ui.settings.forms.ConversationSettingsPage
+import de.heckenmann.visualagent.ui.settings.navigation.SettingsPageDraft
+import de.heckenmann.visualagent.ui.settings.providers.ProviderManagementPanel
+import de.heckenmann.visualagent.ui.settings.providers.ProviderManagementState
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import kotlin.test.assertTrue
 
-/** Verifies that provider and model edits stay in the global overlay until explicitly saved. */
+/** Retains the former overlay scenarios at their new, independently persisted destinations. */
 class ComposeProviderSettingsOverlayTest {
-    @get:Rule
-    val composeTestRule = createComposeRule()
+    @get:Rule val compose = createComposeRule()
+    private val settings = mockk<SettingsPort>(relaxed = true)
+    private val providers = mockk<ProviderPort>(relaxed = true)
+    private val memory = mockk<MainAgentMemoryPort>()
+    private val ollama =
+        ProviderProfile(
+            "ollama",
+            "Ollama",
+            ProviderAdapter.OLLAMA,
+            "http://localhost",
+            defaultModel = "llama",
+            models = listOf(ProviderModel("llama")),
+        )
+    private val codex =
+        ProviderProfile(
+            "codex",
+            "Codex",
+            ProviderAdapter.CODEX_CLI,
+            "",
+            defaultModel = "codex-2",
+            models = listOf(ProviderModel("codex-1")),
+        )
+    private var snapshot = SettingsSnapshot(providerId = "ollama", modelId = "llama", maxParallelSubAgents = 3)
 
-    @Test
-    fun `switching providers refreshes models and restores persisted selections`() {
-        val settings = mockk<SettingsPort>(relaxed = true)
-        val providers = mockk<ProviderPort>(relaxed = true)
-        val memory = mockk<MainAgentMemoryPort>()
-        val ollama =
-            ProviderProfile(
-                id = "ollama",
-                name = "Ollama",
-                adapter = ProviderAdapter.OLLAMA,
-                baseUrl = "http://localhost:11434",
-                defaultModel = "llama-2",
-                models = listOf(ProviderModel("llama-1"), ProviderModel("llama-2")),
-            )
-        val codex =
-            ProviderProfile(
-                id = "codex",
-                name = "Codex",
-                adapter = ProviderAdapter.CODEX_CLI,
-                baseUrl = "",
-                defaultModel = "codex-2",
-                models = listOf(ProviderModel("codex-1")),
-            )
-        coEvery { settings.snapshotAsync() } returns SettingsSnapshot(providerId = "ollama", modelId = "llama-2")
+    @Before fun prepare() {
+        coEvery { settings.snapshotAsync() } answers { snapshot }
+        every { settings.snapshot() } answers { snapshot }
         every { providers.listProviders() } returns listOf(ollama, codex)
-        every { memory.snapshot() } returns MainAgentMemorySnapshot("", 0, 12_000, 0)
-        coEvery { providers.discoverModels(match { it.id == "codex" }) } returns
-            listOf(ProviderModel("codex-1"), ProviderModel("codex-2"))
-        coEvery { providers.discoverModels(match { it.id == "ollama" }) } returns
-            listOf(ProviderModel("llama-1"), ProviderModel("llama-2"))
-
-        composeTestRule.setContent {
-            MaterialTheme { providerSettingsOverlay(settings, memory, providers, onSettingsChanged = {}) }
-        }
-        composeTestRule.onNodeWithText("Provider settings loaded").assertExists()
-        composeTestRule.onNodeWithText("Ollama").performScrollTo().performClick()
-        composeTestRule.onNodeWithText("Codex").performClick()
-        composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithText("codex-2").assertExists()
-
-        composeTestRule.onNodeWithText("Codex").performClick()
-        composeTestRule.onNodeWithText("Ollama").performClick()
-        composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithText("llama-2").assertExists()
-        coVerify(exactly = 1) { providers.discoverModels(match { it.id == "codex" }) }
-        coVerify(exactly = 1) { providers.discoverModels(match { it.id == "ollama" }) }
+        every { memory.snapshot() } returns MainAgentMemorySnapshot("", 0, 12000, 0)
     }
 
-    @Test
-    fun `conversation settings save without rewriting an uncached provider catalog`() {
-        val settings = mockk<SettingsPort>(relaxed = true)
-        val providers = mockk<ProviderPort>(relaxed = true)
-        val memory = mockk<MainAgentMemoryPort>()
-        val current = SettingsSnapshot(providerId = "openai", modelId = "gpt-4o-mini")
-        val profile =
-            ProviderProfile(
-                id = "openai",
-                name = "OpenAI",
-                adapter = ProviderAdapter.OPENAI_COMPATIBLE,
-                baseUrl = "https://api.openai.com",
-                defaultModel = "gpt-4o-mini",
-            )
-        var settingsChanged = false
-        coEvery { settings.snapshotAsync() } returns current
-        every { settings.snapshot() } returns current
-        every { providers.listProviders() } returns listOf(profile)
-        every { memory.snapshot() } returns MainAgentMemorySnapshot("", 0, 12_000, 0)
+    @Test fun `switching provider details refreshes its catalog without changing the Conversation selection`() {
+        coEvery { providers.discoverModels(codex) } returns listOf(ProviderModel("codex-1"), ProviderModel("codex-2"))
+        compose.setContent { MaterialTheme { ProviderManagementPanel(settings, providers) } }
+        compose.onNodeWithText("Provider settings loaded").assertExists()
+        compose.onNodeWithContentDescription("Configure provider: codex").performClick()
+        compose.onNodeWithContentDescription("Refresh models").performScrollTo().performClick()
+        compose.waitUntil { runCatching { compose.onNodeWithText("Loaded 2 models").assertExists() }.isSuccess }
+        compose.onNodeWithText("codex-2").assertExists()
+        coVerify(exactly = 1) { providers.discoverModels(codex) }
+        verify(exactly = 0) { providers.setActiveSelection(any(), any()) }
+        coVerify(exactly = 0) { settings.selectConversationModel(any(), any()) }
+    }
 
-        composeTestRule.setContent {
-            MaterialTheme {
-                providerSettingsOverlay(
-                    settings,
-                    memory,
-                    providers,
-                    onSettingsChanged = { settingsChanged = true },
-                )
-            }
-        }
-        composeTestRule.waitForIdle()
-
-        composeTestRule.onNodeWithContentDescription("Model instruction").performTextInput("Keep answers concise")
-        composeTestRule.onNodeWithText("Save changes").performClick()
-        composeTestRule.waitForIdle()
-
+    @Test fun `agent instructions and execution limits save without rewriting the provider catalog`() {
+        var changed = false
+        compose.setContent { MaterialTheme { AgentSettingsPage(settings, memory, SettingsPageDraft()) { changed = true } } }
+        compose.onNodeWithContentDescription("Model instruction").performTextInput("Keep answers concise")
+        compose.onNodeWithContentDescription("Increase Parallel agents").performScrollTo().performClick()
+        compose.onNodeWithText("Save changes").performClick()
+        compose.waitUntil { changed }
         verify {
-            settings.save(
-                match { snapshot -> snapshot.userModelInstruction == "Keep answers concise" },
-                null,
+            settings.saveSection(
+                SettingsSection.AGENT,
+                match {
+                    it.userModelInstruction == "Keep answers concise" &&
+                        it.maxParallelSubAgents == 4
+                },
             )
         }
-        assertTrue(settingsChanged)
+        verify(exactly = 0) { settings.save(any(), any()) }
+        verify(exactly = 0) { providers.replaceProfiles(any(), any()) }
     }
 
-    @Test
-    fun `conversation setting steppers save their updated values`() {
-        val settings = mockk<SettingsPort>(relaxed = true)
-        val providers = mockk<ProviderPort>(relaxed = true)
-        val memory = mockk<MainAgentMemoryPort>()
-        val current = SettingsSnapshot(providerId = "ollama", modelId = "llama", maxParallelSubAgents = 3)
-        val profile =
-            ProviderProfile(
-                id = "ollama",
-                name = "Ollama",
-                adapter = ProviderAdapter.OLLAMA,
-                baseUrl = "http://localhost:11434",
-                defaultModel = "llama",
-                models = listOf(ProviderModel("llama")),
-            )
-        coEvery { settings.snapshotAsync() } returns current
-        every { settings.snapshot() } returns current
-        every { providers.listProviders() } returns listOf(profile)
-        every { memory.snapshot() } returns MainAgentMemorySnapshot("", 0, 12_000, 0)
-
-        composeTestRule.setContent {
-            MaterialTheme { providerSettingsOverlay(settings, memory, providers, onSettingsChanged = {}) }
-        }
-        composeTestRule.waitForIdle()
-
-        composeTestRule.onNodeWithContentDescription("Increase Parallel agents").performScrollTo().performClick()
-        composeTestRule.onNodeWithContentDescription("Increase Interpolation context messages").performScrollTo().performClick()
-        composeTestRule.onNodeWithText("Save changes").performClick()
-        composeTestRule.waitForIdle()
-
+    @Test fun `conversation setting steppers save only the composition preferences`() {
+        compose.setContent { MaterialTheme { ConversationSettingsPage(settings, providers, {}, {}) } }
+        compose.onNodeWithText("Conversation").performClick()
+        compose.onNodeWithContentDescription("Configure prompt interpolation").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Increase Interpolation context messages").performScrollTo().performClick()
+        compose.onNodeWithText("Save changes").performClick()
+        compose.waitUntil { runCatching { compose.onNodeWithText("Saved conversation settings").assertExists() }.isSuccess }
         verify {
-            settings.save(
-                match { snapshot -> snapshot.maxParallelSubAgents == 4 && snapshot.promptInterpolationContextMessages == 9 },
-                null,
+            settings.saveSection(
+                SettingsSection.CONVERSATION,
+                match {
+                    it.promptInterpolationContextMessages == 9 &&
+                        it.maxParallelSubAgents == 3
+                },
             )
         }
     }
 
-    @Test
-    fun `reset button restores unsaved conversation settings`() {
-        val settings = mockk<SettingsPort>(relaxed = true)
-        val providers = mockk<ProviderPort>(relaxed = true)
-        val memory = mockk<MainAgentMemoryPort>()
-        val current = SettingsSnapshot(providerId = "ollama", modelId = "llama")
-        val profile =
-            ProviderProfile(
-                id = "ollama",
-                name = "Ollama",
-                adapter = ProviderAdapter.OLLAMA,
-                baseUrl = "http://localhost:11434",
-                defaultModel = "llama",
-                models = listOf(ProviderModel("llama")),
-            )
-        coEvery { settings.snapshotAsync() } returns current
-        every { providers.listProviders() } returns listOf(profile)
-        every { memory.snapshot() } returns MainAgentMemorySnapshot("", 0, 12_000, 0)
+    @Test fun `reset button restores unsaved agent instructions`() {
+        compose.setContent { MaterialTheme { AgentSettingsPage(settings, memory, SettingsPageDraft()) {} } }
+        compose.onNodeWithContentDescription("Model instruction").performTextInput("Unsaved guidance")
+        compose.onNodeWithText("Reset changes").performClick()
+        compose.waitUntil { runCatching { compose.onNodeWithContentDescription("Model instruction").assertTextEquals("") }.isSuccess }
+        compose.onNodeWithContentDescription("Model instruction").performTextInput("Reset verified")
+        compose.onNodeWithContentDescription("Model instruction").assertTextEquals("Reset verified")
+        verify(exactly = 0) { settings.saveSection(any(), any()) }
+    }
 
-        composeTestRule.setContent {
-            MaterialTheme { providerSettingsOverlay(settings, memory, providers, onSettingsChanged = {}) }
-        }
-        composeTestRule.waitForIdle()
-
-        composeTestRule.onNodeWithContentDescription("Model instruction").performTextInput("Unsaved guidance")
-        composeTestRule.onNodeWithText("Reset changes").performClick()
-        composeTestRule.waitForIdle()
-
-        composeTestRule.onNodeWithContentDescription("Model instruction").performTextInput("Reset verified")
-        composeTestRule.onNodeWithContentDescription("Model instruction").assertTextEquals("Reset verified")
+    @Test fun `refresh and favorite actions persist through the composer without a settings save`() {
+        every { settings.setModelFavorite("llama", true) } answers { snapshot = snapshot.copy(favoriteModels = listOf("llama")) }
+        coEvery { providers.refreshModels("ollama") } returns ollama.models
+        compose.setContent { MaterialTheme { ConversationModelPicker(rememberConversationModelState(providers, settings)) {} } }
+        compose.waitUntil { runCatching { compose.onNodeWithText("llama · Ollama").assertExists() }.isSuccess }
+        compose.onNodeWithContentDescription("Select conversation model").performClick()
+        compose.onNodeWithContentDescription("Favorite llama").performClick()
+        compose.waitUntil { runCatching { compose.onNodeWithContentDescription("Remove llama from favorites").assertExists() }.isSuccess }
+        compose.onNodeWithContentDescription("Refresh current provider models").performClick()
+        compose.waitUntil { runCatching { coVerify(exactly = 1) { providers.refreshModels("ollama") } }.isSuccess }
+        verify { settings.setModelFavorite("llama", true) }
         verify(exactly = 0) { settings.save(any(), any()) }
     }
 
-    @Test
-    fun `refresh and favorite buttons update the staged model settings`() {
-        val settings = mockk<SettingsPort>(relaxed = true)
-        val providers = mockk<ProviderPort>(relaxed = true)
-        val memory = mockk<MainAgentMemoryPort>()
-        val current = SettingsSnapshot(providerId = "ollama", modelId = "llama")
-        val profile =
-            ProviderProfile(
-                id = "ollama",
-                name = "Ollama",
-                adapter = ProviderAdapter.OLLAMA,
-                baseUrl = "http://localhost:11434",
-                defaultModel = "llama",
-                models = listOf(ProviderModel("llama")),
-            )
-        coEvery { settings.snapshotAsync() } returns current
-        every { settings.snapshot() } returns current
-        every { providers.listProviders() } returns listOf(profile)
-        every { memory.snapshot() } returns MainAgentMemorySnapshot("", 0, 12_000, 0)
-        coEvery { providers.discoverModels(profile) } returns listOf(ProviderModel("llama"))
-
-        composeTestRule.setContent {
-            MaterialTheme { providerSettingsOverlay(settings, memory, providers, onSettingsChanged = {}) }
-        }
-        composeTestRule.waitForIdle()
-
-        composeTestRule.onNodeWithText("Refresh models").performScrollTo().performClick()
-        composeTestRule.waitForIdle()
-        coVerify(exactly = 1) { providers.discoverModels(profile) }
-        composeTestRule.onNodeWithContentDescription("Favorite").performClick()
-        composeTestRule.onNodeWithText("Save changes").performClick()
-        composeTestRule.waitForIdle()
-
-        verify {
-            settings.save(
-                match { snapshot -> snapshot.favoriteModels == listOf("llama") },
-                null,
-            )
-        }
-    }
-
-    @Test
-    fun `provider remove and onboarding buttons invoke their actions`() {
-        val settings = mockk<SettingsPort>(relaxed = true)
-        val providers = mockk<ProviderPort>(relaxed = true)
-        val memory = mockk<MainAgentMemoryPort>()
-        val ollama =
-            ProviderProfile(
-                id = "ollama",
-                name = "Ollama",
-                adapter = ProviderAdapter.OLLAMA,
-                baseUrl = "http://localhost:11434",
-                defaultModel = "llama",
-                models = listOf(ProviderModel("llama")),
-            )
-        val codex =
-            ProviderProfile(
-                id = "codex",
-                name = "Codex",
-                adapter = ProviderAdapter.CODEX_CLI,
-                baseUrl = "",
-                defaultModel = "codex-model",
-                models = listOf(ProviderModel("codex-model")),
-            )
-        coEvery { settings.snapshotAsync() } returns SettingsSnapshot(providerId = "ollama", modelId = "llama")
-        every { providers.listProviders() } returns listOf(ollama, codex)
-        every { memory.snapshot() } returns MainAgentMemorySnapshot("", 0, 12_000, 0)
-        var onboardingRequested = false
-
-        composeTestRule.setContent {
+    @Test fun `provider remove and onboarding actions remain in provider administration`() {
+        var onboarding = false
+        val state = ProviderManagementState()
+        compose.setContent {
             MaterialTheme {
-                providerSettingsOverlay(
+                ProviderManagementPanel(
                     settings,
-                    memory,
                     providers,
-                    onSettingsChanged = {},
-                    onRunOnboarding = { onboardingRequested = true },
+                    state,
+                    onRunOnboarding = { onboarding = true },
                 )
             }
         }
-        composeTestRule.waitForIdle()
-
-        composeTestRule.onNodeWithText("Remove provider").performSemanticsAction(SemanticsActions.OnClick) { it() }
-        composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithText("Codex").assertExists()
-        composeTestRule.onNodeWithText("Run onboarding again").performScrollTo().performClick()
-
-        assertTrue(onboardingRequested)
+        compose.onNodeWithText("Provider settings loaded").assertExists()
+        compose.onNodeWithContentDescription("Configure provider: codex").performClick()
+        compose.onNodeWithContentDescription("Remove provider").performClick()
+        assertTrue(state.draft.providers.none { it.id == "codex" })
+        compose.onNodeWithContentDescription("Run onboarding again").performClick()
+        assertTrue(onboarding)
         verify(exactly = 0) { settings.save(any(), any()) }
     }
 }

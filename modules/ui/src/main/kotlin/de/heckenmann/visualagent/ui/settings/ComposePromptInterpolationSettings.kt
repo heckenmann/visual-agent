@@ -2,9 +2,15 @@ package de.heckenmann.visualagent.ui.settings
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
@@ -14,6 +20,7 @@ import de.heckenmann.visualagent.protocol.ProviderModel
 import de.heckenmann.visualagent.protocol.ProviderProfile
 import de.heckenmann.visualagent.protocol.SettingsSnapshot
 import de.heckenmann.visualagent.protocol.capabilitySupport
+import de.heckenmann.visualagent.ui.components.ActionIconButton
 import de.heckenmann.visualagent.ui.components.PanelDropdownField
 import de.heckenmann.visualagent.ui.components.PanelSelectOption
 
@@ -24,6 +31,7 @@ internal fun promptInterpolationSettings(
     providers: List<ProviderProfile>,
     onChange: (SettingsSnapshot) -> Unit,
 ) {
+    var expanded by remember { mutableStateOf(false) }
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Checkbox(
@@ -34,26 +42,41 @@ internal fun promptInterpolationSettings(
             Text("Automatically refine prompts before sending")
         }
         Text("Manual refinement never sends a message. Automatic refinement uses an extra model request.")
-        val enabled = providers.filter { it.enabled && it.selectableInterpolationModels().isNotEmpty() }
-        val provider = enabled.firstOrNull { it.id == settings.promptInterpolationProviderId }
-        PanelDropdownField(
-            label = "Interpolation provider",
-            selectedValue = settings.promptInterpolationProviderId,
-            options = listOf(PanelSelectOption("", "Use active provider and model")) + enabled.map { PanelSelectOption(it.id, it.name) },
-            onSelected = { id ->
-                val selected = enabled.firstOrNull { it.id == id }
-                val models = selected?.selectableInterpolationModels().orEmpty()
-                val model = models.firstOrNull { it.id == selected?.defaultModel } ?: models.firstOrNull()
-                onChange(settings.copy(promptInterpolationProviderId = id, promptInterpolationModelId = model?.id.orEmpty()))
-            },
-        )
-        if (settings.promptInterpolationProviderId.isNotBlank()) {
+        ActionIconButton(Icons.Filled.Tune, "Configure prompt interpolation", selected = expanded, onClick = { expanded = !expanded })
+        if (settings.automaticPromptInterpolation || expanded) {
+            val enabled = providers.filter { it.enabled && it.selectableInterpolationModels().isNotEmpty() }
+            val provider = enabled.firstOrNull { it.id == settings.promptInterpolationProviderId }
             PanelDropdownField(
-                label = "Interpolation model",
-                selectedValue = settings.promptInterpolationModelId,
-                options = provider?.selectableInterpolationModels().orEmpty().map { PanelSelectOption(it.id, it.name) },
-                onSelected = { onChange(settings.copy(promptInterpolationModelId = it)) },
+                label = "Interpolation provider",
+                selectedValue = settings.promptInterpolationProviderId,
+                options =
+                    listOf(
+                        PanelSelectOption("", "Use active provider and model"),
+                    ) + enabled.map { PanelSelectOption(it.id, it.name) },
+                onSelected = { id ->
+                    val selected = enabled.firstOrNull { it.id == id }
+                    val models = selected?.selectableInterpolationModels().orEmpty()
+                    val model = models.firstOrNull { it.id == selected?.defaultModel } ?: models.firstOrNull()
+                    onChange(settings.copy(promptInterpolationProviderId = id, promptInterpolationModelId = model?.id.orEmpty()))
+                },
             )
+            if (settings.promptInterpolationProviderId.isNotBlank()) {
+                PanelDropdownField(
+                    label = "Interpolation model",
+                    selectedValue = settings.promptInterpolationModelId,
+                    options = provider?.selectableInterpolationModels().orEmpty().map { PanelSelectOption(it.id, it.name) },
+                    onSelected = { onChange(settings.copy(promptInterpolationModelId = it)) },
+                )
+            }
+            conversationNumberSetting(
+                "Interpolation context messages",
+                settings.promptInterpolationContextMessages,
+                "Maximum recent messages used to clarify a draft within the selected model budget.",
+                5..10,
+                true,
+            ) {
+                onChange(settings.copy(promptInterpolationContextMessages = it))
+            }
         }
     }
 }

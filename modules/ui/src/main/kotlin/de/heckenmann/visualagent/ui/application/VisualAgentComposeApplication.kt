@@ -38,6 +38,7 @@ import de.heckenmann.visualagent.ui.conversation.*
 import de.heckenmann.visualagent.ui.files.*
 import de.heckenmann.visualagent.ui.modal.*
 import de.heckenmann.visualagent.ui.settings.*
+import de.heckenmann.visualagent.ui.settings.navigation.SettingsNavigationState
 import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
@@ -62,7 +63,7 @@ fun VisualAgentComposeApp(
     var settings by remember { mutableStateOf(SettingsSnapshot()) }
     var settingsLoaded by remember { mutableStateOf(false) }
     val updateState = remember { mutableStateOf(UpdatePresentationState()) }
-    var settingsRevision by remember { mutableStateOf(0) }
+    val settingsNavigation = remember { SettingsNavigationState() }
     var providerRevision by remember { mutableStateOf(0) }
     val workspaceFocusRequester = remember { FocusRequester() }
     val composeScope = rememberCoroutineScope()
@@ -93,12 +94,16 @@ fun VisualAgentComposeApp(
                     composeScope.launch {
                         settings = deps.applicationPort.settings.snapshotAsync()
                         settingsLoaded = true
-                        settingsRevision += 1
                     }
                 },
                 onRunOnboarding = onRunOnboarding,
                 inFlight = inFlight,
                 lifecycle = deps.applicationPort.lifecycle,
+                settingsNavigation = settingsNavigation,
+                onOpenSettings = { destination ->
+                    settingsNavigation.destination = destination
+                    windows = windows.map { if (it.id == "settings") it.copy(visible = true) else it }
+                },
             )
         }
     DisposableEffect(deps.applicationPort.settings) {

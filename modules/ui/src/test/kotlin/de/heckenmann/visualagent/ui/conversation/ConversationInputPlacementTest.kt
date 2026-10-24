@@ -129,6 +129,7 @@ class ConversationInputPlacementTest {
                             listState = observed
                             if (state.history.size == history.size) historyRendered.complete(Unit)
                         },
+                        modelSelector = { androidx.compose.material3.Text("Composer model selector") },
                     )
                 }
             }
@@ -137,16 +138,19 @@ class ConversationInputPlacementTest {
         runBlocking { historyRendered.await() }
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithContentDescription("Pin input field to panel").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Composer model selector").assertIsDisplayed()
 
         runBlocking { listState.scrollToItem(15) }
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithContentDescription("Pin input field to panel").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Composer model selector").assertDoesNotExist()
         runBlocking { listState.scrollToItem(0) }
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithContentDescription("Pin input field to panel").performClick()
         composeTestRule.waitForIdle()
         assertEquals(ConversationInputPlacement.FIXED, runBlocking { persistedPlacements.receive() }.inputPlacement)
         composeTestRule.onNodeWithTag("conversation-input-overlay").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Composer model selector").assertIsDisplayed()
 
         runBlocking { listState.scrollToItem(15) }
         composeTestRule.waitForIdle()

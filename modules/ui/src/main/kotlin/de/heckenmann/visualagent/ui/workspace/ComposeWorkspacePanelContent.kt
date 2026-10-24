@@ -60,10 +60,13 @@ internal fun ReorderableCollectionItemScope.SplitPanelContent(
                 openConversationProviderSettings(
                     modalRequester = panelServices.modalRequester,
                     settingsPort = panelServices.settings,
-                    mainAgentMemoryPort = panelServices.mainAgentMemory,
                     providerPort = panelServices.providers,
                     onSettingsChanged = panelServices.onSettingsChanged,
-                    onRunOnboarding = panelServices.onRunOnboarding,
+                    onManageProviders = {
+                        panelServices.onOpenSettings(
+                            de.heckenmann.visualagent.ui.settings.navigation.SettingsDestination.PROVIDERS,
+                        )
+                    },
                 )
             }
         } else {
@@ -220,7 +223,7 @@ internal fun workspacePanelHeaderActions(
     onOpenSettings?.let { openSettings ->
         ActionIconButton(
             icon = Icons.Filled.Settings,
-            description = "Configure providers and models",
+            description = "Conversation settings",
             onClick = openSettings,
             modifier = Modifier.size(buttonSize),
             iconSize = iconSize,

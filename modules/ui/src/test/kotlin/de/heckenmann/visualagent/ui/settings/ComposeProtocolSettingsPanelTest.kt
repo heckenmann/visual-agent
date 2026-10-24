@@ -6,7 +6,9 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextReplacement
 import de.heckenmann.visualagent.protocol.SettingsPort
+import de.heckenmann.visualagent.protocol.SettingsSection
 import de.heckenmann.visualagent.protocol.SettingsSnapshot
 import de.heckenmann.visualagent.ui.components.settingsDraftActionRow
 import io.mockk.coEvery
@@ -15,7 +17,6 @@ import io.mockk.mockk
 import io.mockk.verify
 import org.junit.Rule
 import org.junit.Test
-import kotlin.test.assertEquals
 
 /** Verifies that UI settings are staged locally and can be reset from persisted state. */
 class ComposeProtocolSettingsPanelTest {
@@ -69,15 +70,17 @@ class ComposeProtocolSettingsPanelTest {
     }
 
     @Test
-    fun `appearance merge preserves newer conversation settings`() {
+    fun `appearance saves through the scoped API instead of replaying a complete snapshot`() {
         val current = SettingsSnapshot(fontSize = 14, contextLength = 20, timeoutSeconds = 120)
-        val appearanceDraft = SettingsSnapshot(fontSize = 18, contextLength = 5, timeoutSeconds = 30)
-
-        val merged = current.withAppearanceFrom(appearanceDraft)
-
-        assertEquals(18, merged.fontSize)
-        assertEquals(20, merged.contextLength)
-        assertEquals(120, merged.timeoutSeconds)
+        val settings = settingsPort(current)
+        composeTestRule.setContent { MaterialTheme { settingsPanel(settings, {}) } }
+        composeTestRule.waitUntil { runCatching { composeTestRule.onNodeWithText("Font size").assertExists() }.isSuccess }
+        composeTestRule.onNodeWithText("Font size").performTextReplacement("18")
+        composeTestRule.onNodeWithText("Save changes").performClick()
+        composeTestRule.waitUntil {
+            runCatching { verify(exactly = 1) { settings.saveSection(SettingsSection.APPEARANCE, current.copy(fontSize = 18)) } }.isSuccess
+        }
+        verify(exactly = 0) { settings.save(any()) }
     }
 
     private fun settingsPort(snapshot: SettingsSnapshot): SettingsPort =
