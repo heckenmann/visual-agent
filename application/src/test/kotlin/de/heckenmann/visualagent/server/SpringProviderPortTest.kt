@@ -108,7 +108,8 @@ class SpringProviderPortTest {
     @Test
     fun `refresh and model details delegate to provider and map responses`() =
         runTest {
-            every { provider.getModelsReactive("ollama") } returns Mono.just(listOf("llama3"))
+            every { catalog.getProvider("ollama") } returns applicationProfile
+            every { provider.getModelConfigsReactive(applicationProfile) } returns Mono.just(applicationProfile.models)
             every { catalog.selectableModels("ollama") } returns applicationProfile.models
             every { provider.getModelDetailsReactive("ollama", "llama3") } returns
                 Mono.just(
@@ -133,9 +134,9 @@ class SpringProviderPortTest {
             assertEquals("8B", details.parameterSize)
             assertEquals("Q4_K_M", details.quantizationLevel)
             assertEquals(4096, details.contextLimit)
-            verify { provider.getModelsReactive("ollama") }
+            verify { provider.getModelConfigsReactive(applicationProfile) }
             verify { provider.getModelDetailsReactive("ollama", "llama3") }
-            verify { catalog.updateDiscoveredModels("ollama", listOf("llama3")) }
+            verify { catalog.updateDiscoveredModelConfigs("ollama", applicationProfile.models) }
         }
 
     @Test

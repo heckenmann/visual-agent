@@ -32,6 +32,12 @@ interface ProviderPort {
     /** Persists or replaces a provider profile. */
     fun saveProvider(profile: ProviderProfile)
 
+    /** Saves an edited catalog without changing the live Conversation selection; rejects stale drafts. */
+    fun replaceProfiles(
+        profiles: List<ProviderProfile>,
+        expectedProfiles: List<ProviderProfile>,
+    ): Unit = throw UnsupportedOperationException("Provider catalog editing is unavailable")
+
     /** Deletes a provider profile when the catalog allows it. */
     fun deleteProvider(providerId: String): Boolean
 

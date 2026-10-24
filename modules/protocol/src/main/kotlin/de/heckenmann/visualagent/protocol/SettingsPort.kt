@@ -23,8 +23,35 @@ interface SettingsPort {
         providerConfiguration: ProviderConfiguration? = null,
     )
 
+    /** Persists only the fields owned by one settings section, preserving other concurrent edits. */
+    fun saveSection(
+        section: SettingsSection,
+        settings: SettingsSnapshot,
+    ): Unit = throw UnsupportedOperationException("Section-scoped settings updates are unavailable")
+
+    /** Changes only the main-agent selection and adopts a reported positive model context limit. */
+    suspend fun selectConversationModel(
+        providerId: String,
+        modelId: String,
+    ): Unit = throw UnsupportedOperationException("Conversation model selection is unavailable")
+
+    /** Updates one model favorite without submitting any other settings fields. */
+    fun setModelFavorite(
+        modelId: String,
+        favorite: Boolean,
+    ): Unit = throw UnsupportedOperationException("Model favorites are unavailable")
+
     /** Registers a listener for settings changes. */
     fun addChangeListener(listener: (SettingsSnapshot) -> Unit): AutoCloseable
+}
+
+/** Ownership boundaries for explicit, independently saved settings drafts. */
+enum class SettingsSection {
+    APPEARANCE,
+    CONVERSATION,
+    AGENT,
+    MODEL,
+    UPDATES,
 }
 
 /** Serializable settings state needed by the Compose shell and panels. */

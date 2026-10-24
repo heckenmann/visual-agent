@@ -65,12 +65,26 @@ class SpringProviderPort(
 
     override fun saveProvider(profile: ProviderProfile) = protocolBoundary { providerCatalog.saveProvider(profile.toApplication()) }
 
+    override fun replaceProfiles(
+        profiles: List<ProviderProfile>,
+        expectedProfiles: List<ProviderProfile>,
+    ) = protocolBoundary {
+        providerCatalog.replaceProfiles(
+            profiles.map { it.toApplication() },
+            expectedProfiles.map { it.toApplication() },
+        )
+    }
+
     override fun deleteProvider(providerId: String): Boolean = protocolBoundary { providerCatalog.deleteProvider(providerId) }
 
     override suspend fun refreshModels(providerId: String): List<ProviderModel> =
         protocolBoundary {
-            val discovered = llmProvider.getModelsReactive(providerId).awaitSingle()
-            providerCatalog.updateDiscoveredModels(providerId, discovered)
+            val profile = requireNotNull(providerCatalog.getProvider(providerId)) { "Provider is missing" }
+            val discovered = llmProvider.getModelConfigsReactive(profile).awaitSingle()
+            check(
+                providerCatalog.getProvider(providerId) == profile,
+            ) { "Provider changed during refresh. Retry with its current configuration." }
+            providerCatalog.updateDiscoveredModelConfigs(providerId, discovered)
             selectableModels(providerId)
         }
 
