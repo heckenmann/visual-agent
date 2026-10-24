@@ -31,9 +31,11 @@ internal fun ConversationInputOverlay(
     onFocusChanged: (Boolean) -> Unit,
     onSizeChanged: (IntSize) -> Unit,
     modifier: Modifier = Modifier,
+    modelSelector: @Composable () -> Unit = {},
 ) {
     Box(modifier = modifier) {
         ConversationInputCard(
+            modelSelector = modelSelector,
             input = input,
             sending = sending,
             isRequestActive = isRequestActive,

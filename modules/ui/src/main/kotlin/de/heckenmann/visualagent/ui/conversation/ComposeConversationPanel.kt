@@ -61,6 +61,7 @@ internal fun ConversationPanel(
     settingsPort: SettingsPort,
     clientImagePort: ClientImagePort? = null,
     onScrollStateObserved: ConversationScrollStateObserver? = null,
+    modelSelector: @Composable () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     val clearGuard = remember { Mutex() }
@@ -89,14 +90,7 @@ internal fun ConversationPanel(
     LaunchedEffect(queue.messages.size) {
         suggestionController.onQueueSizeChanged(queue.messages.size)
     }
-    LaunchedEffect(preferences.queueFlushMode) {
-        queue.flushMode =
-            try {
-                QueueFlushMode.valueOf(preferences.queueFlushMode)
-            } catch (_: IllegalArgumentException) {
-                QueueFlushMode.ONE_BY_ONE
-            }
-    }
+    ConversationQueueSettingsEffect(settingsPort, queue)
     val inputIsConversationMessage = inputPlacement == ConversationInputPlacement.CONVERSATION_MESSAGE
     val isRequestActive = inFlight.state.value.totalActive > 0
     val overlayBottomPadding = with(LocalDensity.current) { overlayHeightPx.toDp() + 8.dp }.coerceAtLeast(112.dp)
@@ -213,6 +207,7 @@ internal fun ConversationPanel(
                     inlineComposer = {
                         Box(Modifier.fillMaxWidth().onSizeChanged { inlineComposerHeightPx = it.height }) {
                             ConversationInputCard(
+                                modelSelector = modelSelector,
                                 input = conversationState.input,
                                 sending = conversationState.sending,
                                 isRequestActive = isRequestActive,
@@ -241,6 +236,7 @@ internal fun ConversationPanel(
                 )
                 if (!inputIsConversationMessage) {
                     ConversationInputOverlay(
+                        modelSelector = modelSelector,
                         input = conversationState.input,
                         sending = conversationState.sending,
                         isRequestActive = isRequestActive,

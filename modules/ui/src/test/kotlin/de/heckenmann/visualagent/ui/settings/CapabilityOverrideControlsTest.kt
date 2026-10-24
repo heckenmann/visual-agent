@@ -10,6 +10,7 @@ import androidx.compose.ui.test.performClick
 import de.heckenmann.visualagent.protocol.ProviderAdapter
 import de.heckenmann.visualagent.protocol.ProviderModel
 import de.heckenmann.visualagent.protocol.ProviderProfile
+import de.heckenmann.visualagent.ui.settings.providers.ProviderModelCatalog
 import org.junit.Rule
 import org.junit.Test
 import kotlin.test.assertEquals
@@ -38,32 +39,20 @@ class CapabilityOverrideControlsTest {
     fun `model with persisted legacy vision only declaration remains visible in settings`() {
         val legacy =
             ProviderModel("legacy-partial", capabilities = setOf("vision"), capabilitiesComplete = true, capabilitiesOverridden = true)
-        val selected = mutableStateOf("")
+        val draft = mutableStateOf(catalogDraft(listOf(legacy)))
         compose.setContent {
             MaterialTheme {
-                modelSettingsContent(
-                    providerId = "provider",
-                    modelId = selected.value,
-                    models = listOf(legacy),
-                    contextLength = 4096,
-                    contextLimit = null,
-                    loadingModels = false,
-                    modelDetails = "",
-                    favoriteModels = emptyList(),
-                    onModelSelected = { selected.value = it },
-                    onContextLengthChanged = {},
-                    onRefreshModels = {},
-                    onFavoriteChanged = {},
-                )
+                ProviderModelCatalog(draft.value, false, onChange = { draft.value = it }, onRefresh = {})
             }
         }
-        compose.onNodeWithText("Model").performClick()
-        compose.onNodeWithText("legacy-partial [vision]").performClick()
-        assertEquals(legacy.id, selected.value)
+        compose.onNodeWithText("Model catalog").performClick()
+        compose.onNodeWithText("legacy-partial").performClick()
+        assertEquals(legacy.id, draft.value.modelId)
         compose
             .onNodeWithText(
-                "This model's current capability declaration excludes chat. Review its capability settings below; the declaration does not remove the model from this settings catalog.",
+                "This model's current capability declaration excludes chat. Review its advanced capability settings; the model remains visible in this catalog.",
             ).assertIsDisplayed()
+        compose.onNodeWithContentDescription("Advanced model configuration").performClick()
         compose.onNodeWithText("CHAT").assertIsDisplayed()
     }
 
@@ -71,29 +60,16 @@ class CapabilityOverrideControlsTest {
     fun `main dropdown keeps partial model after unrelated capability edit`() {
         val partial = ProviderModel("partial", capabilityOverrides = mapOf("vision" to false))
         val blocked = ProviderModel("blocked", capabilityOverrides = mapOf("chat" to false))
-        var selected = ""
+        val draft = mutableStateOf(catalogDraft(listOf(partial, blocked)))
         compose.setContent {
             MaterialTheme {
-                modelSettingsContent(
-                    providerId = "provider",
-                    modelId = "",
-                    models = listOf(partial, blocked),
-                    contextLength = 4096,
-                    contextLimit = null,
-                    loadingModels = false,
-                    modelDetails = "",
-                    favoriteModels = emptyList(),
-                    onModelSelected = { selected = it },
-                    onContextLengthChanged = {},
-                    onRefreshModels = {},
-                    onFavoriteChanged = {},
-                )
+                ProviderModelCatalog(draft.value, false, onChange = { draft.value = it }, onRefresh = {})
             }
         }
-        compose.onNodeWithText("Model").performClick()
+        compose.onNodeWithText("Model catalog").performClick()
         compose.onNodeWithText("blocked").assertIsDisplayed()
         compose.onNodeWithText("partial").performClick()
-        assertEquals("partial", selected)
+        assertEquals("partial", draft.value.modelId)
         assertEquals(mapOf("chat" to false), blocked.capabilityOverrides)
     }
 
@@ -125,4 +101,10 @@ class CapabilityOverrideControlsTest {
                 .capabilitiesComplete,
         )
     }
+
+    private fun catalogDraft(models: List<ProviderModel>): ProviderSettingsDraft =
+        ProviderSettingsDraft(
+            providerId = "provider",
+            providers = listOf(ProviderProfile("provider", "Provider", ProviderAdapter.CODEX_CLI, "", models = models)),
+        )
 }

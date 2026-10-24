@@ -3,17 +3,14 @@ package de.heckenmann.visualagent.ui.settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,11 +21,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.ProviderProfile
 import de.heckenmann.visualagent.protocol.SettingsSnapshot
+import de.heckenmann.visualagent.ui.components.ActionIconButton
 import de.heckenmann.visualagent.ui.components.ActionTooltip
 import de.heckenmann.visualagent.ui.components.PanelDropdownField
 import de.heckenmann.visualagent.ui.components.PanelSection
 
-/** Renders the conversation settings that are staged with the selected provider and model. */
+/** Keeps only message-composition behavior in the contextual Conversation settings. */
 @Composable
 internal fun conversationSettingsSection(
     settings: SettingsSnapshot,
@@ -37,114 +35,44 @@ internal fun conversationSettingsSection(
 ) {
     PanelSection(title = "Conversation") {
         promptInterpolationSettings(settings, providers, onChange)
-        conversationNumberSetting(
-            label = "Interpolation context messages",
-            value = settings.promptInterpolationContextMessages,
-            help = "Maximum recent conversation window used to clarify the draft, within the selected model token budget.",
-            range = 5..10,
-            useStepper = true,
-            onChange = { onChange(settings.copy(promptInterpolationContextMessages = it)) },
-        )
-        conversationSettingField(
-            label = "Model instruction",
-            help = "Optional guidance added to every main-agent request. It can set tone, language, or lasting preferences.",
-        ) {
-            OutlinedTextField(
-                value = settings.userModelInstruction,
-                onValueChange = { onChange(settings.copy(userModelInstruction = it)) },
-                placeholder = { Text("Optional instruction for the main agent") },
-                minLines = 2,
-                modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Model instruction" },
-            )
-        }
-        conversationNumberSetting(
-            label = "Startup history",
-            value = settings.loadLimit,
-            help =
-                "Number of persisted conversation messages loaded when the application starts. " +
-                    "Higher values make more history immediately available.",
-            range = 1..1000,
-            onChange = { value -> onChange(settings.copy(loadLimit = value)) },
-        )
-        conversationNumberSetting(
-            label = "Parallel agents",
-            value = settings.maxParallelSubAgents,
-            help =
-                "Maximum number of sub-agents that may work simultaneously. Higher values can finish " +
-                    "independent work sooner but consume more resources.",
-            range = 1..20,
-            useStepper = true,
-            onChange = { value -> onChange(settings.copy(maxParallelSubAgents = value)) },
-        )
-        conversationNumberSetting(
-            label = "Main-agent memory limit",
-            value = settings.maxMainAgentMemoryChars,
-            help =
-                "Maximum Unicode character count of the durable main-agent memory document. " +
-                    "Lowering it requires reducing the document first.",
-            range = 1000..100000,
-            onChange = { value -> onChange(settings.copy(maxMainAgentMemoryChars = value)) },
-        )
-        conversationNumberSetting(
-            label = "Default tool timeout (seconds)",
-            value = settings.timeoutSeconds,
-            help =
-                "Default maximum duration for each model-invoked tool call. The model may request a " +
-                    "different timeout within the supported range.",
-            range = 5..600,
-            onChange = { value -> onChange(settings.copy(timeoutSeconds = value)) },
-        )
-        conversationSettingField(
-            label = "Follow-up suggestions",
-            help =
-                "When enabled, the active model may suggest questions after an idle, completed answer. " +
-                    "Suggestions remain ghost text and are never sent automatically.",
-        ) {
+        conversationSettingField("Follow-up suggestions", "Suggestions are never submitted automatically.") {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(
-                    checked = settings.followUpSuggestionsEnabled,
-                    onCheckedChange = { enabled -> onChange(settings.copy(followUpSuggestionsEnabled = enabled)) },
-                )
+                Checkbox(settings.followUpSuggestionsEnabled, { onChange(settings.copy(followUpSuggestionsEnabled = it)) })
                 Text("Suggest questions after an idle response")
             }
         }
-        conversationNumberSetting(
-            label = "Suggestion idle delay (seconds)",
-            value = settings.followUpSuggestionIdleDelaySeconds,
-            help =
-                "Wait time after a completed answer before requesting suggestions. Higher values reduce " +
-                    "provider requests while the user is still reading.",
-            range = 1..60,
-            useStepper = true,
-            onChange = { value -> onChange(settings.copy(followUpSuggestionIdleDelaySeconds = value)) },
-        )
-        conversationNumberSetting(
-            label = "Suggestion count",
-            value = settings.followUpSuggestionCount,
-            help =
-                "Number of questions requested per idle response. More questions increase provider usage " +
-                    "and animation time.",
-            range = 1..5,
-            useStepper = true,
-            onChange = { value -> onChange(settings.copy(followUpSuggestionCount = value)) },
-        )
-        conversationSettingField(
-            label = "Queue flush",
-            help =
-                "Controls how messages queued while the main agent is busy are delivered: separately or " +
-                    "combined into one follow-up request.",
-        ) {
+        if (settings.followUpSuggestionsEnabled) {
+            conversationNumberSetting(
+                "Suggestion idle delay (seconds)",
+                settings.followUpSuggestionIdleDelaySeconds,
+                "Delay after a completed answer before requesting suggestions.",
+                1..60,
+                true,
+            ) {
+                onChange(settings.copy(followUpSuggestionIdleDelaySeconds = it))
+            }
+            conversationNumberSetting(
+                "Suggestion count",
+                settings.followUpSuggestionCount,
+                "Number of questions requested per idle response.",
+                1..5,
+                true,
+            ) {
+                onChange(settings.copy(followUpSuggestionCount = it))
+            }
+        }
+        conversationSettingField("Queue flush", "Send queued messages separately or together as a follow-up.") {
             PanelDropdownField(
-                label = "",
-                selectedValue = settings.queueFlushMode,
-                options = queueFlushOptions(),
-                onSelected = { selected -> onChange(settings.copy(queueFlushMode = selected)) },
+                "",
+                settings.queueFlushMode,
+                queueFlushOptions(),
+                onSelected = { onChange(settings.copy(queueFlushMode = it)) },
             )
         }
     }
 }
 
-/** Renders the context budget beside its model, bounded by the model's reported capacity when known. */
+/** Renders the configured context budget beside its authoritative model capacity. */
 @Composable
 internal fun modelContextLengthSetting(
     value: Int,
@@ -153,25 +81,21 @@ internal fun modelContextLengthSetting(
 ) {
     val maximum = modelLimit?.takeIf { it > 0 } ?: maxOf(32768, value)
     val minimum = minOf(1024, maximum)
-    conversationSettingField(
-        label = "Context length",
-        help = "Maximum context budget for this model. The value is capped to the model's reported context limit.",
-    ) {
+    conversationSettingField("Context length", "Input and output share the selected model's context capacity.") {
         OutlinedTextField(
             value = value.toString(),
-            onValueChange = { input -> input.toIntOrNull()?.let { onChange(it.coerceIn(minimum, maximum)) } },
+            onValueChange = { text -> text.toIntOrNull()?.let { onChange(it.coerceIn(minimum, maximum)) } },
             label = { Text("Tokens") },
-            supportingText = {
-                Text(modelLimit?.takeIf { it > 0 }?.let { "Model limit: $it tokens" } ?: "Model limit not reported")
-            },
+            supportingText = { Text(modelLimit?.takeIf { it > 0 }?.let { "Model limit: $it tokens" } ?: "Model limit not reported") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Context length" },
         )
     }
 }
 
+/** Shared labelled numeric field for the separated Agent and Conversation forms. */
 @Composable
-private fun conversationNumberSetting(
+internal fun conversationNumberSetting(
     label: String,
     value: Int,
     help: String,
@@ -181,34 +105,15 @@ private fun conversationNumberSetting(
 ) {
     conversationSettingField(label, help) {
         if (useStepper) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                OutlinedButton(
-                    enabled = value > range.first,
-                    modifier = Modifier.semantics { contentDescription = "Decrease $label" },
-                    onClick = { onChange(value - 1) },
-                ) {
-                    Icon(Icons.Filled.Remove, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Decrease")
-                }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ActionIconButton(Icons.Filled.Remove, "Decrease $label", enabled = value > range.first, onClick = { onChange(value - 1) })
                 Text(value.toString(), modifier = Modifier.semantics { contentDescription = label })
-                OutlinedButton(
-                    enabled = value < range.last,
-                    modifier = Modifier.semantics { contentDescription = "Increase $label" },
-                    onClick = { onChange(value + 1) },
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Increase")
-                }
+                ActionIconButton(Icons.Filled.Add, "Increase $label", enabled = value < range.last, onClick = { onChange(value + 1) })
             }
         } else {
             OutlinedTextField(
                 value = value.toString(),
-                onValueChange = { next -> next.toIntOrNull()?.let { parsed -> onChange(parsed.coerceIn(range)) } },
+                onValueChange = { next -> next.toIntOrNull()?.let { onChange(it.coerceIn(range)) } },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth().semantics { contentDescription = label },
             )
@@ -216,8 +121,9 @@ private fun conversationNumberSetting(
     }
 }
 
+/** Shows contextual help on demand instead of a permanent explanatory block. */
 @Composable
-private fun conversationSettingField(
+internal fun conversationSettingField(
     label: String,
     help: String,
     content: @Composable () -> Unit,
@@ -226,11 +132,7 @@ private fun conversationSettingField(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(label)
             ActionTooltip(description = help) {
-                Icon(
-                    imageVector = Icons.Filled.Info,
-                    contentDescription = "$label information",
-                    modifier = Modifier.size(16.dp),
-                )
+                Icon(Icons.Filled.Info, contentDescription = "$label information", modifier = Modifier.size(16.dp))
             }
         }
         content()
