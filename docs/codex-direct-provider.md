@@ -68,6 +68,11 @@ Sources: [Spring release](https://github.com/spring-projects/spring-ai/releases/
 
 ## Integration Boundaries
 
+The [context transport decision](context-transport.md) specifies native replay across
+database reloads, stable policy/history prefixes, labelled current snapshots and
+deterministic schema ordering. This does not introduce server-side conversations or
+`previous_response_id`; both Direct routes and Codex app-server remain stateless.
+
 Native attachments are encoded into request-local immutable SDK content once, then
 shared by the count request and inference continuations. Only this one request owns
 the prepared content; no workspace-content or cross-request token-count cache is

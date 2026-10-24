@@ -136,10 +136,11 @@ resize/recomposition does not repeat database reads.
    in-flight activity indicator in the header pulses for the duration
    of the request.
 5. `AgentManager` builds a `ChatRequestContext` with:
-   - static system context prompt from `MainSystemPromptComposer` (policy,
-     execution rules, active provider and model, and a conditional resume hint);
+   - stable system context prompt from `MainSystemPromptComposer` (policy,
+     execution rules, durable preferences, and recovery policy);
    - optional low-priority reference sections for durable memory and current
-     runtime state;
+     runtime state, including interrupted-request presence, placed after prior
+     history and immediately before the latest user turn;
    - a history projection from persisted dialogue and individually summarized
      execution events; the active provider applies one model-aware token budget that
      prioritizes the latest user message, ten recent assistant answers, then native
@@ -159,10 +160,19 @@ source for provider context, but those concerns are deliberately separated. Each
 record has a `context_policy`: `DIALOGUE` records preserve user requests and visible
 assistant outcomes, `SUMMARY_SOURCE` records contribute compact execution summaries,
 and `AUDIT_ONLY` records remain visible to the UI without being copied to the model.
-`MainAgentContextAssembler` selects the latest user-turn boundary, deduplicates todo,
-tool, sub-agent, and workspace events, and applies a token budget while never evicting
-the current user request. It is used for normal requests, streaming, retries, resume,
-and autonomous terminal reviews.
+`MainAgentContextAssembler` projects user turns and deduplicates todo, tool, sub-agent,
+and workspace events. The provider's `RequestContextBudgeter` applies the token budget
+without evicting the current user request. Both are used for normal requests,
+streaming, retries, resume, and autonomous terminal reviews.
+
+The [context transport decision](context-transport.md) records why native Responses
+replay must survive the dedicated main-agent database loader, why changing reference
+snapshots follow the stable history prefix, and why selected schemas have deterministic
+provider-function-name ordering. Current snapshots are explicitly labelled as data,
+not prior assistant speech or instructions. All provider routes, including Codex
+CLI/app-server, remain stateless; HTTP resource reuse is not conversation-state reuse.
+Reported Responses input/cache usage is counted only once per completed round and
+without request-content or identity labels.
 
 Request budgeting prioritizes the complete latest user message, then completed assistant
 answers from newest to oldest through the tenth answer, retaining each answer with its
