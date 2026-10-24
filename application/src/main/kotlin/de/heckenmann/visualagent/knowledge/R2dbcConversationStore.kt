@@ -1,8 +1,11 @@
 package de.heckenmann.visualagent.knowledge
 
 import de.heckenmann.visualagent.agent.ConversationContextPolicy
+import de.heckenmann.visualagent.agent.ProviderReplayState
 import de.heckenmann.visualagent.knowledge.R2dbcPersistenceSupport.blockNullable
 import de.heckenmann.visualagent.knowledge.R2dbcPersistenceSupport.blockRequired
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.springframework.context.annotation.DependsOn
 import org.springframework.r2dbc.core.DatabaseClient
 import org.springframework.stereotype.Service
@@ -56,6 +59,7 @@ internal class R2dbcConversationStore(
         turnOrder: Int?,
         assistantToolTurn: Boolean,
         conversationRequestId: String?,
+        providerReplay: ProviderReplayState?,
     ): String =
         saveConversationMessageReactive(
             id,
@@ -68,6 +72,7 @@ internal class R2dbcConversationStore(
             turnOrder,
             assistantToolTurn,
             conversationRequestId,
+            providerReplay,
         ).blockRequired()
 
     override fun getConversationMessage(id: String): ConversationRecord? = getConversationMessageReactive(id).blockNullable()
@@ -161,6 +166,7 @@ internal class R2dbcConversationStore(
         turnOrder: Int?,
         assistantToolTurn: Boolean,
         conversationRequestId: String?,
+        providerReplay: ProviderReplayState?,
     ): Mono<String> {
         require(UUID.fromString(id).toString() == id) { "Conversation message ID must be a canonical UUID" }
         return transactionOperator.transactional(
@@ -176,7 +182,8 @@ internal class R2dbcConversationStore(
                                 existing.parentAssistantTurnId == parentAssistantTurnId &&
                                 existing.turnOrder == turnOrder &&
                                 existing.assistantToolTurn == assistantToolTurn &&
-                                existing.conversationRequestId == conversationRequestId,
+                                existing.conversationRequestId == conversationRequestId &&
+                                existing.providerReplay == providerReplay,
                         ) { "Conversation message $id conflicts with an existing entry" }
                         Mono.just(id)
                     }.switchIfEmpty(
@@ -187,9 +194,9 @@ internal class R2dbcConversationStore(
                                         """
                                         INSERT INTO conversation_history
                                             (id, session_id, role, content, metadata, created_at, timeline_sequence, context_policy,
-                                             parent_assistant_turn_id, turn_order, assistant_tool_turn, conversation_request_id)
+                                             parent_assistant_turn_id, turn_order, assistant_tool_turn, conversation_request_id, provider_replay_json)
                                         VALUES (:id, :sessionId, :role, :content, :metadata, :createdAt, :timelineSequence, :contextPolicy,
-                                                :parentAssistantTurnId, :turnOrder, :assistantToolTurn, :conversationRequestId)
+                                                :parentAssistantTurnId, :turnOrder, :assistantToolTurn, :conversationRequestId, :providerReplay)
                                         """.trimIndent(),
                                     ).bind("id", id)
                                     .bind("sessionId", sessionId)
@@ -198,6 +205,12 @@ internal class R2dbcConversationStore(
                             statement = R2dbcPersistenceSupport.bindText(statement, "metadata", metadata)
                             statement = R2dbcPersistenceSupport.bindText(statement, "parentAssistantTurnId", parentAssistantTurnId)
                             statement = R2dbcPersistenceSupport.bindText(statement, "conversationRequestId", conversationRequestId)
+                            statement =
+                                R2dbcPersistenceSupport.bindText(
+                                    statement,
+                                    "providerReplay",
+                                    providerReplay?.let { Json.encodeToString(it) },
+                                )
                             statement =
                                 if (turnOrder == null) {
                                     statement.bindNull("turnOrder", Int::class.java)
@@ -243,8 +256,10 @@ internal class R2dbcConversationStore(
         newContent: String,
     ): Mono<Int> =
         databaseClient
-            .sql("UPDATE conversation_history SET content = :content WHERE id = :id")
-            .bind("content", newContent)
+            .sql(
+                "UPDATE conversation_history SET provider_replay_json = " +
+                    "CASE WHEN content = :content THEN provider_replay_json ELSE NULL END, content = :content WHERE id = :id",
+            ).bind("content", newContent)
             .bind("id", id)
             .fetch()
             .rowsUpdated()
@@ -256,8 +271,11 @@ internal class R2dbcConversationStore(
         newMetadata: String,
     ): Mono<Int> =
         databaseClient
-            .sql("UPDATE conversation_history SET content = :content, metadata = :metadata WHERE id = :id")
-            .bind("content", newContent)
+            .sql(
+                "UPDATE conversation_history SET provider_replay_json = " +
+                    "CASE WHEN content = :content THEN provider_replay_json ELSE NULL END, " +
+                    "content = :content, metadata = :metadata WHERE id = :id",
+            ).bind("content", newContent)
             .bind("metadata", newMetadata)
             .bind("id", id)
             .fetch()
@@ -269,7 +287,7 @@ internal class R2dbcConversationStore(
     private fun existingMessage(id: String): Mono<ConversationRecord> =
         databaseClient
             .sql(
-                "SELECT id, session_id, role, content, metadata, created_at, timeline_sequence, context_policy, parent_assistant_turn_id, turn_order, assistant_tool_turn, conversation_request_id FROM conversation_history WHERE id = :id",
+                "SELECT id, session_id, role, content, metadata, created_at, timeline_sequence, context_policy, parent_assistant_turn_id, turn_order, assistant_tool_turn, conversation_request_id, provider_replay_json FROM conversation_history WHERE id = :id",
             ).bind("id", id)
             .map { row, _ -> row.toConversationRecord() }
             .one()
@@ -277,7 +295,7 @@ internal class R2dbcConversationStore(
     private fun existingIdentity(id: String): Mono<ConversationIdentity> =
         databaseClient
             .sql(
-                "SELECT session_id, role, content, metadata, context_policy, parent_assistant_turn_id, turn_order, assistant_tool_turn, conversation_request_id FROM conversation_history WHERE id = :id",
+                "SELECT session_id, role, content, metadata, context_policy, parent_assistant_turn_id, turn_order, assistant_tool_turn, conversation_request_id, provider_replay_json FROM conversation_history WHERE id = :id",
             ).bind("id", id)
             .map { row, _ -> row.toConversationIdentity() }
             .one()

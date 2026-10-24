@@ -36,7 +36,7 @@ let the configured main model create a first sub-agent after the desktop client 
 
 ## Manual Re-run
 
-1. The user selects **Run onboarding again** in **Providers and models**.
+1. The user selects **Run onboarding again** in **Settings > Providers**.
 2. The wizard loads a safe draft from the currently connected Visual Agent server.
 3. The user may select **Cancel**, close the window, or press `Esc` to discard the draft without changing onboarding state or provider configuration.
 4. Saving the provider advances to the optional sub-agent step; finishing or skipping that step stores `COMPLETED`.
@@ -73,7 +73,7 @@ and persisted sub-agents; the desktop never reads existing credentials.
 - Provider views expose credential presence but not credential values.
 - Skip changes only the server-owned onboarding state.
 - Manual cancellation does not change the server-owned onboarding state.
-- Providers and models can open the manual onboarding flow for the current server.
+- Settings > Providers can open the manual onboarding flow for the current server.
 - Provider/model validation occurs in the connected Visual Agent server environment.
 - Model discovery preserves provider-supplied metadata when available and can be refreshed without saving configuration.
 - Existing sub-agents are shown before the optional creation request.

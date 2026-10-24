@@ -57,7 +57,7 @@ class AgentManagerToolContextTest {
         }
 
     @Test
-    fun `main request injects the current durable memory once before history`() =
+    fun `main request injects current durable memory once before the newest user turn`() =
         runTest {
             val db =
                 de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory

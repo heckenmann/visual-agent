@@ -145,8 +145,16 @@ compose.resources {
     )
 }
 
+val desktopJavaVersion = 24
+val desktopJavaHome =
+    javaToolchains
+        .launcherFor { languageVersion.set(JavaLanguageVersion.of(desktopJavaVersion)) }
+        .get()
+        .metadata.installationPath.asFile
+
 compose.desktop {
     application {
+        javaHome = desktopJavaHome.absolutePath
         mainClass = "de.heckenmann.visualagent.desktop.DesktopMain"
         jvmArgs +=
             listOfNotNull(
@@ -209,7 +217,7 @@ val installPackagedKeytool =
             val osName = System.getProperty("os.name")
             val isWindows = osName.startsWith("Windows", ignoreCase = true)
             val launcherName = if (isWindows) "keytool.exe" else "keytool"
-            val source = file(System.getProperty("java.home")).resolve("bin/$launcherName")
+            val source = desktopJavaHome.resolve("bin/$launcherName")
             check(source.isFile) { "The configured JDK does not provide $launcherName: $source" }
             val target = runtimeHome.resolve("bin/$launcherName")
             target.parentFile.mkdirs()
@@ -305,7 +313,7 @@ val packageLinuxDeb =
         onlyIf { System.getProperty("os.name", "").contains("linux", ignoreCase = true) }
         doFirst {
             commandLine(
-                File(System.getProperty("java.home"), "bin/jpackage"),
+                desktopJavaHome.resolve("bin/jpackage"),
                 "--type",
                 "deb",
                 "--app-image",
@@ -331,7 +339,7 @@ val packageLinuxRpm =
         onlyIf { System.getProperty("os.name", "").contains("linux", ignoreCase = true) }
         doFirst {
             commandLine(
-                File(System.getProperty("java.home"), "bin/jpackage"),
+                desktopJavaHome.resolve("bin/jpackage"),
                 "--type",
                 "rpm",
                 "--app-image",
@@ -689,6 +697,16 @@ val verifyNativeDistributionLauncher =
                 }
             val keytool = runtimeHome.resolve("bin/${if (osName.startsWith("Windows", ignoreCase = true)) "keytool.exe" else "keytool"}")
             check(keytool.isFile && keytool.canExecute()) { "Native distribution keytool is missing or not executable: $keytool" }
+            val runtimeVersion =
+                runtimeHome
+                    .resolve("release")
+                    .readLines()
+                    .first { it.startsWith("JAVA_VERSION=") }
+                    .substringAfter('=')
+                    .trim('"')
+            check(JavaVersion.toVersion(runtimeVersion).majorVersion == desktopJavaVersion.toString()) {
+                "Native distribution runtime $runtimeVersion does not match project toolchain $desktopJavaVersion."
+            }
         }
     }
 
@@ -785,7 +803,7 @@ tasks.named("check") {
 }
 
 kotlin {
-    jvmToolchain(24)
+    jvmToolchain(desktopJavaVersion)
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_24)
         freeCompilerArgs.addAll("-Xjsr305=strict", "-Werror")

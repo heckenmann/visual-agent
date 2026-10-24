@@ -25,7 +25,7 @@ class PromptInterpolationSettingsTest {
             every { it.snapshot() } returns
                 MainAgentLongTermMemory("", 0, 0, java.time.Instant.EPOCH)
         }
-    private val port = SpringSettingsPort(config, catalog, memory)
+    private val port = SpringSettingsPort(config, catalog, memory, mockk(relaxed = true))
 
     @Test
     fun `assignment round trips independently of the active model`() {

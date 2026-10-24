@@ -27,7 +27,7 @@ class StructuredOutputRoutingTest {
                 val ollama = mockk<OllamaClient>()
                 val openAi = mockk<OpenAiClient>()
                 val codex = mockk<ProfiledProviderAdapter>()
-                every { codex.adapter } returns ProviderAdapter.CODEX_CLI
+                every { codex.adapter } returns if (adapter == ProviderAdapter.CODEX_DIRECT) adapter else ProviderAdapter.CODEX_CLI
                 val profile = ProviderProfile("provider", "Provider", adapter, "https://example.invalid", defaultModel = "model")
                 val model = ProviderModelConfig("model", options = mapOf("structuredOutput.native" to "true"))
                 every { catalog.resolve(any(), any(), any(), any()) } returns ResolvedModelConfig(profile, model, null, model.options)
@@ -36,7 +36,7 @@ class StructuredOutputRoutingTest {
                     when (adapter) {
                         ProviderAdapter.OLLAMA -> ollama
                         ProviderAdapter.OPENAI_COMPATIBLE -> openAi
-                        ProviderAdapter.CODEX_CLI -> codex
+                        ProviderAdapter.CODEX_CLI, ProviderAdapter.CODEX_DIRECT -> codex
                     }
                 every { selected.chatReactive(capture(captured)) } returns
                     Mono.just(ChatResponse("model", Message("assistant", "{}"), true))
@@ -44,7 +44,9 @@ class StructuredOutputRoutingTest {
                 when (adapter) {
                     ProviderAdapter.OLLAMA -> every { ollama.getModelDetailsReactive(profile, "model") } returns details
                     ProviderAdapter.OPENAI_COMPATIBLE -> every { openAi.getModelDetailsReactive(profile, "model") } returns details
-                    ProviderAdapter.CODEX_CLI -> every { codex.getModelDetailsReactive(profile, "model") } returns details
+                    ProviderAdapter.CODEX_CLI, ProviderAdapter.CODEX_DIRECT ->
+                        every { codex.getModelDetailsReactive(profile, "model") } returns
+                            details
                 }
                 ConfiguredLLMProvider(ollama, openAi, catalog, profiledAdapters = listOf(codex))
                     .chatReactive(ChatRequestContext(listOf(Message("user", "review")), responseSchema = schema))

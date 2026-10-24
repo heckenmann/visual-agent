@@ -26,14 +26,20 @@ Agents can work with imported files while content access remains explicit and au
 
 ## Tool Calls
 
-- `workspace:file` actions: `list`, `info`, `hash`, `readText`, `extractPdfText`, `renderPdfPage`, `imageInfo`, `imageBytes`, `analyzeImage`.
+- `workspace_file` actions: `list`, `info`, `hash`, `readText`, `extractPdfText`, `renderPdfPage`, `imageInfo`, `imageBytes`, `analyzeImage`, `analyzeFile`.
 - `renderPdfPage` writes a generated PNG preview into the managed workspace and returns its metadata.
+- `analyzeFile`: `{"action":"analyzeFile","id":"<managed-file-id>","prompt":"Summarize this file"}`.
+  Sends up to 8 MiB of native file content to the calling agent's selected provider/model.
+  The tool returns the analysis, not base64 input bytes. Native file support is currently
+  implemented by Codex (direct), independently for OAuth and API-key mode; unsupported
+  adapters fail explicitly without fallback. Audio/video are not supported.
 
 ## Code Entry Points
 
 - `de.heckenmann.visualagent.agent.tools.WorkspaceFileTool`
 - `de.heckenmann.visualagent.workspace.WorkspaceFileService`
 - `de.heckenmann.visualagent.agent.LLMProvider.vision`
+- `de.heckenmann.visualagent.agent.LLMProvider.fileReactive`
 
 ## Acceptance Criteria
 
@@ -43,3 +49,19 @@ Agents can work with imported files while content access remains explicit and au
 - Unsupported vision/model combinations return clear failures.
 - Codex CLI vision requests use the app-server image input protocol and preserve the detected image MIME type.
 - Image bytes and provider credentials are not written to logs or conversation history.
+- Native file analysis is explicit, bounded, managed-path validated, and preserves the
+  calling sub-agent's selected provider/model. Missing agents and path escapes fail closed.
+- Before native file/image inference, the direct provider counts the attachment with
+  the selected model and credential route through the official input-token API. Its
+  token cost is reserved across prompt fitting and continuation rounds, independently
+  of the 8-MiB transport limit. Mandatory user text is never truncated to make it fit.
+- Counting transfers the explicitly selected attachment to the provider; a fitting file
+  is transferred again for inference. Unsupported, failed, or invalid counts prevent
+  inference with an explicit error. OAuth counting entitlement is not assumed from login.
+- API-key output respects the calculated remaining budget even without an explicit
+  output setting; OAuth requests continue to omit unsupported output-limit fields.
+- Native attachment bytes are prepared once per request and reused for counting
+  and inference continuations, without a cross-request file/count cache. The local
+  benchmark measures encoding and both HTTP requests separately from correctness
+  tests; see [benchmark scope](../codex-direct-benchmark.md). No benchmark implies
+  real-account entitlement or a guaranteed hosted-inference speedup.

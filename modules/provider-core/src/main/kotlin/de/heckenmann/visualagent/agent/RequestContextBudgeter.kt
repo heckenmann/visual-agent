@@ -21,6 +21,7 @@ import org.springframework.ai.chat.messages.Message as SpringMessage
  */
 class RequestContextBudgeter(
     private val tokenEstimator: TokenCountEstimator = JTokkitTokenCountEstimator(),
+    private val replayCodec: ProviderReplayCodec = ProviderReplayCodec(),
 ) {
     /** Fits a request while keeping history ahead of optional provider tool schemas. */
     fun fitWithToolFallback(
@@ -76,10 +77,36 @@ class RequestContextBudgeter(
 
     private fun fitInternal(
         request: ChatRequestContext,
-        messages: List<Message>,
+        sourceMessages: List<Message>,
         toolDefinitions: List<ToolDefinition>,
     ): ChatRequestContext {
-        val contextLimit = request.contextWindow.effectiveLimit()
+        val messages =
+            sourceMessages.map { message ->
+                val profile = request.providerProfile
+                val replay = message.providerReplay
+                if (profile != null &&
+                    replay != null &&
+                    (
+                        profile.adapter != de.heckenmann.visualagent.agent.provider.ProviderAdapter.CODEX_DIRECT ||
+                            replay.providerProfileId != profile.id ||
+                            replay.modelId != request.model
+                    )
+                ) {
+                    message.copy(providerReplay = null)
+                } else {
+                    message
+                }
+            }
+        require(request.additionalInputTokens >= 0) { "Additional input tokens must not be negative" }
+        val contextLimit =
+            request.contextWindow.effectiveLimit()?.let { limit ->
+                if (request.additionalInputTokens >= limit) {
+                    throw ContextWindowExceededException(
+                        "Native attachment input exceeds the selected model context window ($limit tokens).",
+                    )
+                }
+                limit - request.additionalInputTokens
+            }
         if (contextLimit == null) {
             val latestUser = messages.indexOfLast { it.role == "user" }
             val leadingSystemCount = messages.indexOfFirst { it.role != "system" }.let { if (it < 0) messages.size else it }
@@ -147,9 +174,20 @@ class RequestContextBudgeter(
                         } else {
                             null
                         },
+                    providerReplay =
+                        if (message is AssistantMessage &&
+                            message.parts.any {
+                                it !is org.springframework.ai.chat.messages.part.TextPart
+                            }
+                        ) {
+                            replayCodec.encode(request.providerProfile?.id ?: "prompt-budget", request.model.orEmpty(), message)
+                        } else {
+                            null
+                        },
                 )
             }
-        val fitted = fit(request, messages, toolCallbacks.map { it.toProviderDefinition() })
+        // These parts already belong to the assembled native prompt, not foreign persisted replay.
+        val fitted = fit(request.copy(providerProfile = null), messages, toolCallbacks.map { it.toProviderDefinition() })
         val retainedIds = fitted.messages.mapNotNull { it.id?.toIntOrNull() }.toSet()
         val fittedById = fitted.messages.mapNotNull { message -> message.id?.toIntOrNull()?.let { it to message } }.toMap()
         val options =
@@ -171,7 +209,7 @@ class RequestContextBudgeter(
     private fun SpringMessage.withText(text: String): SpringMessage =
         when (this) {
             is SystemMessage -> mutate().text(text).build()
-            is AssistantMessage -> mutate().content(text).build()
+            is AssistantMessage -> withBudgetedText(text)
             is UserMessage -> mutate().text(text).build()
             else -> this
         }
@@ -340,15 +378,19 @@ class RequestContextBudgeter(
     }
 
     private fun estimateMessages(messages: List<Message>): Int =
-        messages.sumOf { message -> tokenEstimator.estimate("${message.role}: ${message.content}") } +
+        messages.sumOf(::messageTokens) +
             (messages.size - 1).coerceAtLeast(0)
 
     private fun additionalMessageTokens(
         messages: List<Message>,
         hasExistingMessages: Boolean,
     ): Int =
-        messages.sumOf { message -> tokenEstimator.estimate("${message.role}: ${message.content}") } +
+        messages.sumOf(::messageTokens) +
             if (hasExistingMessages) messages.size else (messages.size - 1).coerceAtLeast(0)
+
+    private fun messageTokens(message: Message): Int =
+        tokenEstimator.estimate("${message.role}: ${message.content}") +
+            (message.providerReplay?.let { replayCodec.additionalTokens(it, tokenEstimator) } ?: 0)
 
     private fun estimateTools(tools: List<ToolDefinition>): Int =
         tokenEstimator.estimate(
@@ -391,7 +433,7 @@ class RequestContextBudgeter(
                 it.role != "system" ||
                     it.contextPolicy == ConversationContextPolicy.SUMMARY_SOURCE
             }
-        return sourceConversation != retainedConversation
+        return sourceConversation.map { it.copy(providerReplay = null) } != retainedConversation.map { it.copy(providerReplay = null) }
     }
 
     private fun ToolCallback.toProviderDefinition(): ToolDefinition =

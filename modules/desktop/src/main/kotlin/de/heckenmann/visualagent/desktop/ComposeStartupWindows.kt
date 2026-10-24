@@ -148,6 +148,7 @@ internal fun ComposeOnboardingWindow(
             ComposeOnboardingBackground(darkTheme) {
                 ComposeOnboardingWizard(
                     onboarding = applicationPort.onboarding,
+                    providers = applicationPort.providers,
                     automatic = automatic,
                     onFinished = onFinished,
                     skipRequested = skipRequested,

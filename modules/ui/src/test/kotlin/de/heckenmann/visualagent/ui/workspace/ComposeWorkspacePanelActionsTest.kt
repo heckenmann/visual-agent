@@ -36,7 +36,7 @@ class ComposeWorkspacePanelActionsTest {
         }
 
         composeTestRule
-            .onNodeWithContentDescription("Configure providers and models")
+            .onNodeWithContentDescription("Conversation settings")
             .performSemanticsAction(SemanticsActions.OnClick) { it() }
         composeTestRule.onNodeWithContentDescription("Close Files panel").performSemanticsAction(SemanticsActions.OnClick) { it() }
 
@@ -53,7 +53,7 @@ class ComposeWorkspacePanelActionsTest {
             }
         }
 
-        composeTestRule.onNodeWithContentDescription("Configure providers and models").assertDoesNotExist()
+        composeTestRule.onNodeWithContentDescription("Conversation settings").assertDoesNotExist()
         composeTestRule.onNodeWithContentDescription("Close Canvas panel").performSemanticsAction(SemanticsActions.OnClick) { it() }
 
         assertTrue(closed)
@@ -83,7 +83,7 @@ class ComposeWorkspacePanelActionsTest {
 
         listOf(
             composeTestRule.onNodeWithTag("workspace-panel-identity-icon"),
-            composeTestRule.onNodeWithContentDescription("Configure providers and models"),
+            composeTestRule.onNodeWithContentDescription("Conversation settings"),
             composeTestRule.onNodeWithContentDescription("Close Files panel"),
         ).forEach { node ->
             val pixels = node.captureToImage().toPixelMap()

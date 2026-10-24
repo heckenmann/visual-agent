@@ -13,9 +13,19 @@ internal class MainAgentContextAssembler {
      * Projects user turns into dialogue plus individual execution summaries.
      *
      * @param history Persisted messages in chronological order
-     * @return Projected history in chronological order; token budgeting is deferred until the provider resolves model limits and tools
+     * @return Projected history in chronological order; the provider applies model-aware token budgeting
      */
     fun assemble(history: List<Message>): List<Message> = splitIntoTurns(history).flatMap(::projectTurn)
+
+    /** Places request-only snapshots after completed history without treating them as persisted dialogue. */
+    fun withCurrentReferences(
+        history: List<Message>,
+        currentReferences: List<Message>,
+    ): List<Message> {
+        val currentTurn = history.indexOfLast { it.role == "user" }.takeIf { it >= 0 } ?: history.size
+        // Keep changing snapshots out of the reusable policy/history prefix; see docs/context-transport.md.
+        return history.take(currentTurn) + currentReferences + history.drop(currentTurn)
+    }
 
     private fun splitIntoTurns(history: List<Message>): List<List<Message>> {
         val turns = mutableListOf<MutableList<Message>>()

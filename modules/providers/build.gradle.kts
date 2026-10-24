@@ -24,6 +24,8 @@ dependencies {
     implementation(platform(libs.spring.ai.bom))
     implementation(libs.spring.ai.ollama)
     implementation(libs.spring.ai.openai)
+    implementation(libs.jackson.databind)
+    implementation(libs.reactor.netty.http)
     implementation(libs.coroutines.core)
     implementation(libs.serialization.json)
     implementation(libs.kotlin.logging)

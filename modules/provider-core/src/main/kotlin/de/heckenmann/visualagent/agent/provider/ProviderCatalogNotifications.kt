@@ -47,7 +47,11 @@ class ProviderCatalogNotifications(
 
     internal fun publishReactive(): Mono<Void> =
         Mono.defer {
-            val publication = Mono.fromRunnable<Void> { publish() }.subscribeOn(Schedulers.boundedElastic())
+            val publication =
+                Mono.fromRunnable<Void> { publish() }.subscribeOn(Schedulers.boundedElastic()).onErrorResume {
+                    logger.warn { "Provider catalog was saved, but its refresh notification failed; reload the catalog" }
+                    Mono.empty()
+                }
             org.springframework.transaction.reactive.TransactionSynchronizationManager
                 .forCurrentTransaction()
                 .flatMap { manager ->

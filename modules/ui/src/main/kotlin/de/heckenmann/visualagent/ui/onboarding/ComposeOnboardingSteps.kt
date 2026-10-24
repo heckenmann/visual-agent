@@ -1,7 +1,6 @@
 package de.heckenmann.visualagent.ui.onboarding
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
@@ -41,6 +40,7 @@ internal fun OnboardingProviderStep(
     loading: Boolean,
     onSelect: (OnboardingProviderProfile) -> Unit,
     onDraftChange: (OnboardingProviderDraft) -> Unit,
+    authorizationControls: @Composable (OnboardingProviderDraft) -> Unit = {},
 ) {
     Text("LLM provider", style = MaterialTheme.typography.titleLarge)
     when {
@@ -69,6 +69,7 @@ internal fun OnboardingProviderStep(
         Text("Add provider")
     }
     customDraft?.let { draft -> OnboardingProviderEditor(draft, onDraftChange) }
+    (customDraft ?: selected?.toDraft())?.let { authorizationControls(it) }
 }
 
 @Composable
@@ -85,7 +86,7 @@ private fun OnboardingProviderEditor(
         modifier = Modifier.fillMaxWidth(),
     )
     Text("Provider type", style = MaterialTheme.typography.labelLarge)
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         ProviderAdapter.entries.forEach { adapter ->
             OutlinedButton(onClick = { onChange(draft.withAdapter(adapter)) }) {
                 Text(if (adapter == draft.adapter) "✓ ${adapter.label()}" else adapter.label())
@@ -95,6 +96,11 @@ private fun OnboardingProviderEditor(
     if (draft.adapter == ProviderAdapter.CODEX_CLI) {
         Text("Codex CLI is checked on the connected Visual Agent server and does not use an HTTP endpoint.")
     } else {
+        if (draft.adapter == ProviderAdapter.CODEX_DIRECT) {
+            de.heckenmann.visualagent.ui.settings.DirectProviderAuthenticationFields(draft.directAuthMode) { mode ->
+                onChange(draft.copy(directAuthMode = mode))
+            }
+        }
         OnboardingHttpProviderFields(draft, onChange)
     }
 }
@@ -110,8 +116,14 @@ private fun OnboardingHttpProviderFields(
         label = { Text("Provider endpoint") },
         supportingText = { Text("Resolved from the connected Visual Agent server.") },
         singleLine = true,
+        readOnly = draft.adapter == ProviderAdapter.CODEX_DIRECT,
         modifier = Modifier.fillMaxWidth(),
     )
+    if (draft.adapter == ProviderAdapter.CODEX_DIRECT &&
+        draft.directAuthMode == de.heckenmann.visualagent.protocol.DirectProviderAuthMode.CHATGPT_OAUTH
+    ) {
+        return
+    }
     val credential = (draft.credential as? CredentialUpdate.Replace)?.value.orEmpty()
     OutlinedTextField(
         value = credential,
@@ -175,17 +187,33 @@ internal fun OnboardingReviewStep(
 
 /** Converts a safe persisted provider view into a write-only staged draft. */
 internal fun OnboardingProviderProfile.toDraft(): OnboardingProviderDraft =
-    OnboardingProviderDraft(id, name, adapter, baseUrl, CredentialUpdate.Unchanged, enabled, defaultModel)
+    OnboardingProviderDraft(
+        id,
+        name,
+        adapter,
+        baseUrl,
+        CredentialUpdate.Unchanged,
+        enabled,
+        defaultModel,
+        directAuthMode,
+        credentialReference,
+    )
 
 /** Updates a staged provider adapter with the matching default endpoint. */
 internal fun OnboardingProviderDraft.withAdapter(adapter: ProviderAdapter): OnboardingProviderDraft =
-    copy(adapter = adapter, baseUrl = adapter.defaultEndpoint())
+    copy(
+        adapter = adapter,
+        baseUrl = adapter.defaultEndpoint(),
+        directAuthMode = de.heckenmann.visualagent.protocol.DirectProviderAuthMode.API_KEY,
+        credentialReference = null,
+    )
 
 /** Returns the documented default endpoint for an HTTP provider adapter. */
 internal fun ProviderAdapter.defaultEndpoint(): String =
     when (this) {
         ProviderAdapter.OLLAMA -> "http://localhost:11434"
         ProviderAdapter.OPENAI_COMPATIBLE -> "https://api.openai.com"
+        ProviderAdapter.CODEX_DIRECT -> "https://api.openai.com"
         ProviderAdapter.CODEX_CLI -> ""
     }
 
@@ -194,4 +222,5 @@ private fun ProviderAdapter.label(): String =
         ProviderAdapter.OLLAMA -> "Ollama"
         ProviderAdapter.OPENAI_COMPATIBLE -> "OpenAI-compatible"
         ProviderAdapter.CODEX_CLI -> "Codex CLI"
+        ProviderAdapter.CODEX_DIRECT -> "Codex (direct)"
     }

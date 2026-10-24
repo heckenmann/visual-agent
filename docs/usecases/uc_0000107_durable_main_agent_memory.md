@@ -17,18 +17,20 @@ without coupling it to the visible conversation history, provider, or model.
 
 ## Main Flow
 
-1. The user opens **Providers and models** from the conversation header.
-2. The dialog loads the current memory content, revision, character count, and
-   configured limit together with the other staged conversation settings.
+1. The user opens **Settings > Agent**.
+2. The memory editor loads the current content, revision, character count and
+   configured limit asynchronously, independently of other settings drafts.
 3. The user may edit the full document and optionally adjust its character limit.
 4. The dialog validates the draft using Unicode code points and displays the live
    count. It does not silently truncate content.
-5. On save, the server persists the settings and replaces the memory only when the
-   revision still matches.
-6. If another editor changed the document, the dialog reloads the current version
-   and reports the conflict instead of overwriting it.
+5. The memory's own Save action replaces the document only when its revision still
+   matches. Changing the memory size limit is a separate Agent-settings save.
+   After that save, the editor immediately uses the saved limit for its character
+   counter and Save-button validation without discarding the document draft.
+6. If another editor changed the document, the editor reports a conflict and retains
+   the user's draft. Reload discards that draft explicitly and reads the current document.
 7. Before every main-agent request, the server reads the latest document and adds
-   exactly one labelled system section before the conversation history.
+   exactly one labelled, optional reference snapshot before the latest user turn.
 8. The main model may call the enabled `memory` tool directly in any turn to show
    or replace the same document with an expected revision. It does not need to
    create, update, or delegate a todo to use memory. Sub-agents do not receive
@@ -51,7 +53,7 @@ provider/model change while conversation history remains separate and auditable.
 - `de.heckenmann.visualagent.agent.conversation.AgentManagerContextOps`
 - `de.heckenmann.visualagent.agent.tools.MainAgentMemoryTool`
 - `de.heckenmann.visualagent.server.SpringMainAgentMemoryPort`
-- `de.heckenmann.visualagent.ui.settings.providerSettingsOverlay`
+- `de.heckenmann.visualagent.ui.settings.agent.MainAgentMemoryEditor`
 
 ## Acceptance Criteria
 
@@ -60,8 +62,8 @@ provider/model change while conversation history remains separate and auditable.
 - Content has a persisted revision and timestamp; writes use compare-and-set.
 - The document is bounded by a configurable Unicode code-point limit and oversized
   writes fail without truncation.
-- Every main-agent request receives exactly one fresh labelled memory section before
-  history, including when the document is empty.
+- Each assembled main-agent request includes exactly one fresh labelled memory
+  reference before the latest user turn; provider budgeting can omit this optional data.
 - The model can read and edit memory directly through the regular enabled
   `memory` tool without creating or delegating a todo.
 - The UI shows a revision-aware editable draft, live character count, and a clear

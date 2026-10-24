@@ -10,6 +10,14 @@ enum class ProviderAdapter {
     OLLAMA,
     OPENAI_COMPATIBLE,
     CODEX_CLI,
+    CODEX_DIRECT,
+}
+
+/** Explicit credential and billing route for a direct Responses provider profile. */
+@Serializable
+enum class DirectProviderAuthMode {
+    API_KEY,
+    CHATGPT_OAUTH,
 }
 
 /**
@@ -66,6 +74,8 @@ data class ProviderModelConfig(
  * @property models Known provider models
  * @property modelWhitelist Optional model IDs allowed for selection
  * @property modelBlacklist Model IDs excluded from selection
+ * @property directAuthMode Explicit direct-provider authentication route; never inferred from credentials
+ * @property credentialReference Opaque reference to server-owned OAuth credentials, never token contents
  */
 @Serializable
 data class ProviderProfile(
@@ -80,6 +90,8 @@ data class ProviderProfile(
     val models: List<ProviderModelConfig> = emptyList(),
     val modelWhitelist: Set<String> = emptySet(),
     val modelBlacklist: Set<String> = emptySet(),
+    val directAuthMode: DirectProviderAuthMode = DirectProviderAuthMode.API_KEY,
+    val credentialReference: String? = null,
 )
 
 /**

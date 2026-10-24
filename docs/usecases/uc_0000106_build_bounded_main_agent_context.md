@@ -22,6 +22,10 @@ Main agent orchestration.
 2. It projects each user turn into the user request, individually deduplicated
    execution references, and final visible assistant outcome without applying an
    independent token limit.
+   Matching native Responses replay accompanies the final assistant outcome after
+   database reload; it is not replaced by its display text. Current memory/runtime
+   snapshots are labelled reference data and inserted after previous history,
+   immediately before the latest user turn, without changing the stored audit timeline.
 3. After resolving the model-reported and configured context window, the provider
    reserves output capacity and the minimal `tool_help` schema.
 4. The provider retains the complete latest user request, then up to ten final
@@ -78,6 +82,19 @@ user's current intent, while all events remain auditable.
 - Historical execution, memory, and runtime state are reference data rather than
   system instructions; they cannot override the newest user request.
 - Initial history and full audit history remain unchanged for the UI.
+- Native replay survives saving, restarting, loading main-agent context and provider
+  restoration; profile/model isolation, edit invalidation and visible-text budgets remain enforced.
+- Runtime and interrupted-request changes do not rewrite stable policy or preceding
+  dialogue. Selected tool schemas are ordered deterministically by provider function name.
+- All adapters still receive the full selected context for each request. No provider-side
+  response chain, persistent thread or second history owner is introduced.
+
+## Design Rationale
+
+See [Context Transport Decision](../context-transport.md) for the API/library research,
+provider matrix and reasons behind native replay, snapshot placement and schema ordering.
+The implementation uses existing Spring AI message parts rather than a new memory library.
+Cache-friendly ordering does not imply less context-window usage or guaranteed savings.
 
 ## Task-contract integration
 

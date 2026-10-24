@@ -25,4 +25,5 @@ internal val workspaceFileActions =
         "imageInfo",
         "imageBytes",
         "analyzeImage",
+        "analyzeFile",
     )

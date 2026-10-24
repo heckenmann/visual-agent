@@ -40,6 +40,7 @@ class PromptInterpolationSettingsComposeTest {
         compose.setContent {
             MaterialTheme { promptInterpolationSettings(state.value, listOf(mixed, onlyEmbedding)) { state.value = it } }
         }
+        compose.onNodeWithContentDescription("Configure prompt interpolation").performClick()
         compose.onNodeWithText("Use active provider and model").performClick()
         compose.onNodeWithText("Embeddings only").assertDoesNotExist()
         compose.onNodeWithText("Mixed").performClick()

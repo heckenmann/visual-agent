@@ -67,7 +67,11 @@ class ProviderCatalogService(
      */
     fun saveProvider(profile: ProviderProfile) {
         mutate { state ->
-            val normalizedProfile = profile.withSelectableCodexDefault()
+            val normalizedProfile =
+                profile
+                    .withSelectedCredentialRoute()
+                    .withSelectableCodexDefault()
+                    .withAuthoritativeCredential(state.providers.firstOrNull { it.id == profile.id })
             val providers = state.providers.filterNot { it.id == normalizedProfile.id } + normalizedProfile
             require(providers.any(ProviderProfile::enabled)) { "At least one provider profile must remain enabled" }
             val nextActiveProviderId =
@@ -93,19 +97,42 @@ class ProviderCatalogService(
      * @param configuration Complete catalog and active main-agent selection to persist
      */
     fun replaceConfiguration(configuration: ProviderConfiguration) {
-        save(validatedCatalogState(configuration))
+        val proposed = validatedCatalogState(configuration)
+        mutate { current -> proposed.withAuthoritativeCredentials(current) }
+    }
+
+    /** Saves profile edits against their database baseline without replacing a concurrent model selection. */
+    fun replaceProfiles(
+        profiles: List<ProviderProfile>,
+        expectedProfiles: List<ProviderProfile>,
+    ) {
+        val proposed = profiles.map { it.withSelectedCredentialRoute().withSelectableCodexDefault() }
+        require(proposed.all { it.id.isNotBlank() } && proposed.map { it.id }.distinct().size == proposed.size) {
+            "Provider identifiers must be nonblank and unique"
+        }
+        require(proposed.any(ProviderProfile::enabled)) { "At least one provider must remain enabled" }
+        mutate { current ->
+            val baseline = current.copy(providers = expectedProfiles).withAuthoritativeCredentials(current).providers
+            check(baseline.associateBy(ProviderProfile::id) == current.providers.associateBy(ProviderProfile::id)) {
+                "Provider configuration changed elsewhere. Reload before saving."
+            }
+            require(proposed.any { it.id == current.activeProviderId && it.enabled }) {
+                "Switch the Conversation to another provider before removing or disabling the active provider"
+            }
+            current.copy(providers = proposed).withAuthoritativeCredentials(current)
+        }
     }
 
     /** Reactively replaces the complete provider catalog and active selection. */
     fun replaceConfigurationReactive(configuration: ProviderConfiguration): Mono<Void> {
         val state = validatedCatalogState(configuration)
         return persistence
-            .mutateReactive { state }
+            .mutateReactive { current -> state.withAuthoritativeCredentials(current) }
             .flatMap { notifications.publishReactive() }
     }
 
     private fun validatedCatalogState(configuration: ProviderConfiguration): CatalogState {
-        val providers = configuration.providers.map { profile -> profile.withSelectableCodexDefault() }
+        val providers = configuration.providers.map { profile -> profile.withSelectedCredentialRoute().withSelectableCodexDefault() }
         require(providers.map(ProviderProfile::id).all { it.isNotBlank() }) { "Provider identifiers must not be blank" }
         require(providers.map(ProviderProfile::id).distinct().size == providers.size) { "Provider identifiers must be unique" }
         require(providers.any(ProviderProfile::enabled)) { "At least one provider profile must remain enabled" }
@@ -378,10 +405,6 @@ class ProviderCatalogService(
     }
 
     private fun load(): CatalogState = persistence.load()
-
-    private fun save(state: CatalogState) {
-        mutate { state }
-    }
 
     private fun mutate(transform: (CatalogState) -> CatalogState) {
         var changed = false

@@ -64,7 +64,12 @@ class AgentManagerStreamingConversationTest {
                     previousMarkdown,
                     "Explain that",
                 ),
-                followUpContext.filter { it.role == "user" || it.role == "assistant" }.takeLast(3).map { it.content },
+                // Current snapshots are low-priority reference messages, not dialogue turns.
+                followUpContext
+                    .filter {
+                        it.contextPolicy != ConversationContextPolicy.SUMMARY_SOURCE && (it.role == "user" || it.role == "assistant")
+                    }.takeLast(3)
+                    .map { it.content },
             )
             db.close()
         }

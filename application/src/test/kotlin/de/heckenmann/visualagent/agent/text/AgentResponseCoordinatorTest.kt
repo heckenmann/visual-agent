@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.agent.ChatResponse
 import de.heckenmann.visualagent.agent.ConversationOpsProvider
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
+import de.heckenmann.visualagent.agent.ProviderReplayState
 import de.heckenmann.visualagent.agent.ToolResult
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
@@ -106,10 +107,60 @@ class AgentResponseCoordinatorTest {
         }
 
     @Test
+    fun `normal answer preserves native replay while normalizing visible whitespace`() =
+        runTest {
+            val replay = replay("normal")
+            val answer = response(" answer ")
+            every { provider.chatReactive(any<ChatRequestContext>()) } returns
+                Mono.just(answer.copy(message = answer.message.copy(providerReplay = replay)))
+
+            val result = coordinator.generateAssistantMessageWithRepetitionGuard("native-normal")
+
+            assertEquals("answer", result.content)
+            assertEquals(replay, result.providerReplay)
+        }
+
+    @Test
+    fun `repetition retry keeps only the replacement answers native replay`() =
+        runTest {
+            val malformed = response("repeat pattern ".repeat(60))
+            val replacement = response("clean answer")
+            every { provider.chatReactive(any<ChatRequestContext>()) } returnsMany
+                listOf(
+                    Mono.just(malformed.copy(message = malformed.message.copy(providerReplay = replay("discarded")))),
+                    Mono.just(replacement.copy(message = replacement.message.copy(providerReplay = replay("retry")))),
+                )
+
+            val result = coordinator.generateAssistantMessageWithRepetitionGuard("native-retry")
+
+            assertEquals("clean answer", result.content)
+            assertEquals(replay("retry"), result.providerReplay)
+        }
+
+    @Test
+    fun `tool finalization retains the final answers native replay`() =
+        runTest {
+            conversationOps.finishedToolEventsByRequestId["native-tools"] = mutableListOf(toolEvent(success = true))
+            val answer = response("finalized answer")
+            every { provider.chatReactive(any<ChatRequestContext>()) } returnsMany
+                listOf(
+                    Mono.just(response("")),
+                    Mono.just(answer.copy(message = answer.message.copy(providerReplay = replay("finalized")))),
+                )
+
+            val result = coordinator.generateAssistantMessageWithRepetitionGuard("native-tools")
+
+            assertEquals("finalized answer", result.content)
+            assertEquals(replay("finalized"), result.providerReplay)
+        }
+
+    @Test
     fun `tool followup returns null when no events exist`() =
         runTest {
             assertNull(coordinator.completeToolOnlyTurnWithFollowup("missing"))
         }
+
+    private fun replay(marker: String) = ProviderReplayState("openai.responses.parts.v1", "profile", "model", marker)
 
     private fun response(content: String) =
         ChatResponse(

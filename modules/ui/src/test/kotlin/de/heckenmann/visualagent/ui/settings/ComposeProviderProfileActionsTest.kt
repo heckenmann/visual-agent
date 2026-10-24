@@ -3,7 +3,7 @@ package de.heckenmann.visualagent.ui.settings
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performSemanticsAction
 import org.junit.Rule
 import org.junit.Test
@@ -32,9 +32,9 @@ class ComposeProviderProfileActionsTest {
             }
         }
 
-        composeTestRule.onNodeWithText("Add provider").performSemanticsAction(SemanticsActions.OnClick) { it() }
-        composeTestRule.onNodeWithText("Edit provider").performSemanticsAction(SemanticsActions.OnClick) { it() }
-        composeTestRule.onNodeWithText("Remove provider").performSemanticsAction(SemanticsActions.OnClick) { it() }
+        composeTestRule.onNodeWithContentDescription("Add provider").performSemanticsAction(SemanticsActions.OnClick) { it() }
+        composeTestRule.onNodeWithContentDescription("Edit provider").performSemanticsAction(SemanticsActions.OnClick) { it() }
+        composeTestRule.onNodeWithContentDescription("Remove provider").performSemanticsAction(SemanticsActions.OnClick) { it() }
 
         composeTestRule.runOnIdle {
             assertEquals(1, addCalls.get())

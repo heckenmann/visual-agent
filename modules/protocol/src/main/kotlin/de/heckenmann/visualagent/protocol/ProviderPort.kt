@@ -32,6 +32,12 @@ interface ProviderPort {
     /** Persists or replaces a provider profile. */
     fun saveProvider(profile: ProviderProfile)
 
+    /** Saves an edited catalog without changing the live Conversation selection; rejects stale drafts. */
+    fun replaceProfiles(
+        profiles: List<ProviderProfile>,
+        expectedProfiles: List<ProviderProfile>,
+    ): Unit = throw UnsupportedOperationException("Provider catalog editing is unavailable")
+
     /** Deletes a provider profile when the catalog allows it. */
     fun deleteProvider(providerId: String): Boolean
 
@@ -59,13 +65,44 @@ interface ProviderPort {
 
     /** Registers a listener for catalog changes. */
     fun addChangeListener(listener: () -> Unit): AutoCloseable
+
+    /** Starts an explicit, server-owned ChatGPT authorization attempt. Never starts inference. */
+    suspend fun beginDirectSignIn(profile: ProviderProfile): ProviderSignInSession =
+        throw UnsupportedOperationException("Direct provider authorization is unavailable")
+
+    /** Awaits validated account authorization without returning tokens. */
+    suspend fun awaitDirectSignIn(sessionId: String): ProviderSignInResult =
+        throw UnsupportedOperationException("Direct provider authorization is unavailable")
+
+    /** Cancels an outstanding browser authorization attempt. */
+    suspend fun cancelDirectSignIn(sessionId: String): Unit =
+        throw UnsupportedOperationException("Direct provider authorization is unavailable")
+
+    /** Signs out the selected OAuth profile and reports whether remote revocation was confirmed. */
+    suspend fun signOutDirectProvider(profile: ProviderProfile): Boolean =
+        throw UnsupportedOperationException("Direct provider authorization is unavailable")
 }
+
+/** Browser instructions; authorization URLs may contain identity hints and must never be logged. */
+data class ProviderSignInSession(
+    val id: String,
+    val authorizationUrl: String,
+) {
+    override fun toString(): String = "ProviderSignInSession(redacted)"
+}
+
+/** Safe account-registration reference returned after successful server-side validation. */
+data class ProviderSignInResult(
+    val credentialReference: String,
+    val accountLabel: String,
+)
 
 /** Supported provider adapter. */
 enum class ProviderAdapter {
     OLLAMA,
     OPENAI_COMPATIBLE,
     CODEX_CLI,
+    CODEX_DIRECT,
 }
 
 /** Availability state used for model selection. */
@@ -78,6 +115,12 @@ enum class ModelStatus {
 }
 
 /** Configured provider profile. */
+enum class DirectProviderAuthMode {
+    API_KEY,
+    CHATGPT_OAUTH,
+}
+
+/** Configured provider profile; OAuth secrets are represented only by an opaque server reference. */
 data class ProviderProfile(
     val id: String,
     val name: String,
@@ -90,6 +133,8 @@ data class ProviderProfile(
     val models: List<ProviderModel> = emptyList(),
     val modelWhitelist: Set<String> = emptySet(),
     val modelBlacklist: Set<String> = emptySet(),
+    val directAuthMode: DirectProviderAuthMode = DirectProviderAuthMode.API_KEY,
+    val credentialReference: String? = null,
 )
 
 /** Configured model metadata. */

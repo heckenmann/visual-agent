@@ -11,6 +11,7 @@ import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
 import de.heckenmann.visualagent.protocol.ModelStatus
 import de.heckenmann.visualagent.protocol.ProviderAdapter
+import de.heckenmann.visualagent.protocol.ProviderModel
 import de.heckenmann.visualagent.protocol.ProviderProfile
 import io.mockk.every
 import io.mockk.mockk
@@ -107,7 +108,8 @@ class SpringProviderPortTest {
     @Test
     fun `refresh and model details delegate to provider and map responses`() =
         runTest {
-            every { provider.getModelsReactive("ollama") } returns Mono.just(listOf("llama3"))
+            every { catalog.getProvider("ollama") } returns applicationProfile
+            every { provider.getModelConfigsReactive(applicationProfile) } returns Mono.just(applicationProfile.models)
             every { catalog.selectableModels("ollama") } returns applicationProfile.models
             every { provider.getModelDetailsReactive("ollama", "llama3") } returns
                 Mono.just(
@@ -132,9 +134,9 @@ class SpringProviderPortTest {
             assertEquals("8B", details.parameterSize)
             assertEquals("Q4_K_M", details.quantizationLevel)
             assertEquals(4096, details.contextLimit)
-            verify { provider.getModelsReactive("ollama") }
+            verify { provider.getModelConfigsReactive(applicationProfile) }
             verify { provider.getModelDetailsReactive("ollama", "llama3") }
-            verify { catalog.updateDiscoveredModels("ollama", listOf("llama3")) }
+            verify { catalog.updateDiscoveredModelConfigs("ollama", applicationProfile.models) }
         }
 
     @Test
@@ -164,6 +166,28 @@ class SpringProviderPortTest {
                 )
             }
             verify(exactly = 0) { catalog.updateDiscoveredModels(any(), any()) }
+            verify(exactly = 0) { catalog.updateDiscoveredModelConfigs(any(), any()) }
+        }
+
+    @Test
+    fun `staged discovery refreshes reported limits and preserves limits omitted by every adapter`() =
+        runTest {
+            ProviderAdapter.entries.forEach { adapter ->
+                val existing = ProviderModel("model", options = mapOf("custom" to "retained"), contextLimit = 8192, outputLimit = 1024)
+                val staged = ProviderProfile("profile", "Profile", adapter, "https://example.test", models = listOf(existing))
+                listOf(
+                    ProviderModelConfig("model", contextLimit = 98304, outputLimit = 4096),
+                    ProviderModelConfig("model"),
+                ).forEach { response ->
+                    every { provider.getModelConfigsReactive(any<ApplicationProviderProfile>()) } returns Mono.just(listOf(response))
+
+                    val discovered = port.discoverModels(staged).single()
+
+                    assertEquals(response.contextLimit ?: existing.contextLimit, discovered.contextLimit)
+                    assertEquals(response.outputLimit ?: existing.outputLimit, discovered.outputLimit)
+                    assertEquals(existing.options, discovered.options)
+                }
+            }
             verify(exactly = 0) { catalog.updateDiscoveredModelConfigs(any(), any()) }
         }
 
