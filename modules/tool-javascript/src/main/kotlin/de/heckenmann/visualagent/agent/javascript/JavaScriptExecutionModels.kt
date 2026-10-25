@@ -83,6 +83,8 @@ data class JavaScriptExecutionRequest(
     val requestContext: Map<String, Any> = emptyMap(),
     val cancellationToken: CancellationToken? = null,
     val limits: JavaScriptExecutionLimits = JavaScriptExecutionLimits(),
+    /** Invocation-local observer; never included in model context or persisted history. */
+    val onLogs: (List<JavaScriptLogEntry>) -> Unit = {},
 )
 
 /** Safe error categories returned by the JavaScript execution tool. */

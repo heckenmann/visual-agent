@@ -11,7 +11,6 @@ import org.apache.tika.Tika
 import org.springframework.stereotype.Service
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Sinks
-import java.io.IOException
 import java.net.URI
 import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Files
@@ -48,17 +47,34 @@ class WorkspaceDownloadService(
     val changes: Flux<Unit> = changeSink.asFlux()
 
     /** Downloads, validates, atomically publishes, and registers one remote file. */
-    fun download(request: WorkspaceDownloadRequest): WorkspaceFileRecord {
+    fun download(
+        request: WorkspaceDownloadRequest,
+        onProgress: (Long, Long?) -> Unit = { _, _ -> },
+    ): WorkspaceFileRecord = download(request, onProgress, {})
+
+    /** Observes the same transfer lifecycle used by Files, without a separate execution or polling loop. */
+    fun download(
+        request: WorkspaceDownloadRequest,
+        onProgress: (Long, Long?) -> Unit,
+        onStatus: (DownloadActivityStatus) -> Unit,
+    ): WorkspaceFileRecord {
         var temporary: Path? = null
         val target = normalizeTarget(request)
         val id = UUID.randomUUID().toString()
         lateinit var job: WorkspaceDownloadJob
-        val control =
+        lateinit var control: WorkspaceDownloadControl
+        control =
             WorkspaceDownloadControl(
-                onProgress = { notifyProgressListeners() },
-                onTotal = { notifyListeners() },
+                onProgress = {
+                    notifyObserver { onProgress(control.downloadedBytes, control.totalBytes) }
+                    notifyProgressListeners()
+                },
+                onTotal = {
+                    notifyObserver { onProgress(control.downloadedBytes, control.totalBytes) }
+                    notifyListeners()
+                },
             )
-        job = WorkspaceDownloadJob(id, relativePath(target), control)
+        job = WorkspaceDownloadJob(id, relativePath(target), control, onStatus)
         jobs[id] = job
         publishStatus(job, DownloadActivityStatus.STARTED)
         notifyListeners()
@@ -108,8 +124,8 @@ class WorkspaceDownloadService(
             Thread.currentThread().interrupt()
             throw WorkspaceFileException("Download cancelled", "The remote download was cancelled before completion.", true)
         } catch (error: Exception) {
-            if (!control.isCancelled()) publishStatus(job, DownloadActivityStatus.FAILED, safeFailure(error))
-            throw WorkspaceFileException("Download failed", safeFailure(error), true)
+            if (!control.isCancelled()) publishStatus(job, DownloadActivityStatus.FAILED, safeDownloadFailure(error))
+            throw WorkspaceFileException("Download failed", safeDownloadFailure(error), true)
         } finally {
             jobs.remove(id)
             notifyListeners()
@@ -210,6 +226,7 @@ class WorkspaceDownloadService(
         status: DownloadActivityStatus,
         detail: String? = null,
     ) {
+        notifyObserver { job.onStatus(status) }
         eventBus.publish(
             DownloadActivity(
                 id = job.id,
@@ -231,13 +248,17 @@ class WorkspaceDownloadService(
         require(source.scheme?.lowercase() in SUPPORTED_SCHEMES) { "Download protocol is not supported" }
         require(source.fragment == null) { "Remote source fragments are not supported" }
         require(source.host.isNullOrBlank().not()) { "Remote source host is missing" }
-        require(!hasCredentialQuery(source.rawQuery)) { "Credentials are not accepted in a remote source" }
+        require(!hasDownloadCredentialQuery(source.rawQuery)) { "Credentials are not accepted in a remote source" }
         if (source.scheme.equals("http", true) || source.scheme.equals("https", true) || source.scheme.equals("ftp", true)) {
             require(source.userInfo == null) { "Credentials are not accepted in a remote source" }
         } else {
             require(source.userInfo?.contains(':') != true) { "Passwords are not accepted in a remote source" }
         }
         return source
+    }
+
+    private fun notifyObserver(observer: () -> Unit) {
+        runCatching(observer).onFailure { logger.warn { "Workspace download presentation observer failed." } }
     }
 
     private fun resolveDirectory(
@@ -301,26 +322,12 @@ class WorkspaceDownloadService(
         }.getOrThrow()
     }
 
-    private fun safeFailure(error: Exception): String =
-        when (error) {
-            is IllegalArgumentException -> error.message ?: "The remote source or destination is invalid"
-            is IOException -> error.message ?: "The remote transfer could not be completed"
-            else -> "The remote transfer could not be completed"
-        }.replace(Regex("(?i)(password|token|secret|api[_-]?key)\\s*[=:]\\s*[^, ]+"), "credential=[redacted]")
-
     private companion object {
         const val DEFAULT_DIRECTORY = "downloads"
         const val DEFAULT_FILE_NAME = "download"
         const val MAX_MIME_DETECTION_BYTES = 1024 * 1024
         val SUPPORTED_SCHEMES = setOf("http", "https", "ftp", "sftp", "scp")
         val destinationLock = Any()
-        val CREDENTIAL_QUERY_KEY = Regex("(?i)(password|token|secret|api[_-]?key|credential|signature)")
         const val PROGRESS_NOTIFICATION_INTERVAL_NANOS = 100_000_000L
     }
-
-    private fun hasCredentialQuery(rawQuery: String?): Boolean =
-        rawQuery
-            ?.split('&', ';')
-            ?.any { parameter -> CREDENTIAL_QUERY_KEY.containsMatchIn(parameter.substringBefore('=')) }
-            ?: false
 }

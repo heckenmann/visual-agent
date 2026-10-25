@@ -48,6 +48,7 @@ class ConversationActivityHistoryEffectTest {
         val completionListener = slot<(ConversationCompletionEvent) -> Unit>()
         every { activity.addToolListener(any()) } returns AutoCloseable {}
         every { activity.addDownloadListener(any()) } returns AutoCloseable {}
+        every { activity.activeToolActivities() } returns emptyList()
         every { suggestions.addCompletionListener(capture(completionListener)) } returns AutoCloseable {}
         every { todos.list() } returns emptyList()
         every { todos.deletedSnapshots(any()) } returns emptyList()
@@ -140,6 +141,7 @@ class ConversationActivityHistoryEffectTest {
         val downloadHandle = mockk<AutoCloseable>(relaxed = true)
         every { activity.addToolListener(any()) } returns toolHandle
         every { activity.addDownloadListener(any()) } returns downloadHandle
+        every { activity.activeToolActivities() } returns emptyList()
         every { first.addCompletionListener(any()) } returns firstCompletionHandle
         every { second.addCompletionListener(any()) } returns secondCompletionHandle
         val state = ConversationUiState(emptyList())

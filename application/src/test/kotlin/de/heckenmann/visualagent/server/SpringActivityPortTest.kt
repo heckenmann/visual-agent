@@ -4,6 +4,7 @@ import de.heckenmann.visualagent.agent.AgentStatusCallbackAdapter
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
+import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
 import de.heckenmann.visualagent.protocol.DownloadActivity
 import de.heckenmann.visualagent.protocol.DownloadActivityStatus
@@ -17,7 +18,7 @@ class SpringActivityPortTest {
     @Test
     fun `tool lifecycle events preserve request metadata and outcome`() {
         val toolBus = ToolEventBus()
-        val port = SpringActivityPort(toolBus, AgentStatusCallbackAdapter())
+        val port = SpringActivityPort(toolBus, AgentStatusCallbackAdapter(), toolRegistry = ToolRegistry(emptyList(), toolBus))
         val activities = mutableListOf<de.heckenmann.visualagent.protocol.ToolActivity>()
         val registration = port.addToolListener(activities::add)
         val now = Instant.now()
@@ -65,7 +66,8 @@ class SpringActivityPortTest {
     @Test
     fun `agent status events map busy and idle transitions`() {
         val callback = AgentStatusCallbackAdapter()
-        val port = SpringActivityPort(ToolEventBus(), callback)
+        val toolBus = ToolEventBus()
+        val port = SpringActivityPort(toolBus, callback, toolRegistry = ToolRegistry(emptyList(), toolBus))
         val activities = mutableListOf<de.heckenmann.visualagent.protocol.AgentActivity>()
         val registration = port.addAgentListener(activities::add)
 
@@ -92,7 +94,8 @@ class SpringActivityPortTest {
     @Test
     fun `download status events cross the activity boundary`() {
         val downloadBus = WorkspaceDownloadEventBus()
-        val port = SpringActivityPort(ToolEventBus(), AgentStatusCallbackAdapter(), downloadBus)
+        val toolBus = ToolEventBus()
+        val port = SpringActivityPort(toolBus, AgentStatusCallbackAdapter(), downloadBus, ToolRegistry(emptyList(), toolBus))
         val activities = mutableListOf<DownloadActivity>()
         val registration = port.addDownloadListener(activities::add)
 

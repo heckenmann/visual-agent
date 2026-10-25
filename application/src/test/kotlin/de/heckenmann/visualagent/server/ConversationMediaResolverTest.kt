@@ -223,11 +223,13 @@ class ConversationMediaResolverTest {
                 updatedAt = Instant.EPOCH,
             )
         every { workspace.requireFile(null, "imports/plot..final.png") } returns record
+        every { workspace.requireFile("image-1", null) } returns record
         every { workspace.resolveManagedPath("imports/plot..final.png") } returns path
 
         val result = newResolver { error("remote fetch must not be called") }
 
         assertIs<ConversationImageResolution.Loaded>(result.resolve("workspace:imports/plot..final.png"))
+        assertIs<ConversationImageResolution.Loaded>(result.resolve("workspace-id:image-1"))
         Files.deleteIfExists(path)
     }
 

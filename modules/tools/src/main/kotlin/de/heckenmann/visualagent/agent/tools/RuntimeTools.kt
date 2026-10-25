@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit
  * Use cases: UC-0000021.
  */
 @AgentTool
-class TerminalTool : VisualAgentTool {
+class TerminalTool : LiveVisualAgentTool {
     override val definition =
         ToolDefinition(
             id = ToolId("terminal"),
@@ -30,6 +30,20 @@ class TerminalTool : VisualAgentTool {
     override fun execute(
         inputJson: String,
         context: Map<String, Any>,
+    ): ToolResult = executeCommand(inputJson, context, null)
+
+    override fun executeLiveReactive(
+        inputJson: String,
+        context: Map<String, Any>,
+        reporter: ToolLiveReporter,
+    ): reactor.core.publisher.Mono<ToolResult> =
+        reactor.core.publisher.Mono
+            .fromCallable { trackedToolWork(context) { executeCommand(inputJson, context, reporter) } }
+
+    private fun executeCommand(
+        inputJson: String,
+        context: Map<String, Any>,
+        reporter: ToolLiveReporter?,
     ): ToolResult {
         val input = parseObject(inputJson)
         val command = input.requiredString("command")
@@ -40,7 +54,27 @@ class TerminalTool : VisualAgentTool {
                 .start()
         val cancellationRegistration =
             (context["toolCancellationToken"] as? ToolCancellationToken)?.onCancelled { destroyProcessTree(process) }
+        val output = StringBuilder()
+        val recent = ArrayDeque<String>()
         try {
+            reporter?.report(
+                de.heckenmann.visualagent.model
+                    .ToolLiveState("", 0, "Running command"),
+            )
+            process.inputStream.reader(StandardCharsets.UTF_8).use { reader ->
+                val chunk = CharArray(512)
+                var count = reader.read(chunk)
+                while (count >= 0) {
+                    if (output.length < 8000) output.append(chunk, 0, count.coerceAtMost(8000 - output.length))
+                    recent.addLast(String(chunk, 0, count))
+                    if (recent.size > 40) recent.removeFirst()
+                    reporter?.report(
+                        de.heckenmann.visualagent.model
+                            .ToolLiveState("", 0, "Running command", logs = recent.toList()),
+                    )
+                    count = reader.read(chunk)
+                }
+            }
             process.waitFor()
         } catch (_: InterruptedException) {
             destroyProcessTree(process)
@@ -49,15 +83,10 @@ class TerminalTool : VisualAgentTool {
         } finally {
             cancellationRegistration?.close()
         }
-        val output =
-            process.inputStream
-                .readBytes()
-                .toString(StandardCharsets.UTF_8)
-                .take(8000)
         return ToolResult(
             "terminal",
             process.exitValue() == 0,
-            output,
+            output.toString(),
             if (process.exitValue() == 0) null else "Exit ${process.exitValue()}",
         )
     }
@@ -140,7 +169,7 @@ class SearchTool : VisualAgentTool {
  * Use cases: UC-0000043.
  */
 @AgentTool
-class SleepTool : VisualAgentTool {
+class SleepTool : LiveVisualAgentTool {
     override val definition =
         ToolDefinition(
             id = ToolId("sleep"),
@@ -162,4 +191,28 @@ class SleepTool : VisualAgentTool {
             .onFailure { error -> return failure("sleep", error.message ?: "Interrupted") }
         return success("sleep", "slept ${seconds}s")
     }
+
+    override fun executeLiveReactive(
+        inputJson: String,
+        context: Map<String, Any>,
+        reporter: ToolLiveReporter,
+    ): reactor.core.publisher.Mono<ToolResult> =
+        reactor.core.publisher.Mono.defer {
+            val seconds = (parseObject(inputJson).int("seconds") ?: 1).coerceIn(0, 300)
+            reporter.report(
+                de.heckenmann.visualagent.model.ToolLiveState(
+                    executionId = "",
+                    revision = 0,
+                    status = "Waiting",
+                    deadlineEpochMillis =
+                        java.time.Instant
+                            .now()
+                            .plusSeconds(seconds.toLong())
+                            .toEpochMilli(),
+                ),
+            )
+            reactor.core.publisher.Mono
+                .delay(java.time.Duration.ofSeconds(seconds.toLong()))
+                .map { success("sleep", "slept ${seconds}s") }
+        }
 }

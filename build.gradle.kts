@@ -424,7 +424,7 @@ tasks.register("verifyModuleDependencies") {
                 ":provider-openai-codex" to setOf(":agent-core", ":provider-core"),
                 ":provider-codex-direct" to setOf(":provider-core", ":provider-standard"),
                 ":providers" to setOf(":provider-standard", ":provider-openai-codex", ":provider-codex-direct"),
-                ":tool-standard" to setOf(":task-core"),
+                ":tool-standard" to setOf(":task-core", ":model-core"),
                 ":tool-javascript" to setOf(":agent-core", ":tool-standard"),
                 ":tools" to setOf(":tool-standard", ":tool-javascript"),
             )

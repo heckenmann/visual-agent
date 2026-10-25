@@ -50,10 +50,12 @@ class GraalJavaScriptExecutionServiceTest {
 
     @Test
     fun `supports markdown string assembly and bounded console`() {
+        val liveLogs = mutableListOf<List<JavaScriptLogEntry>>()
         val result =
             execute(
                 "console.log('building'); console.warn('0123456789abcdef'); return '# Report\\n\\nDone.';",
                 limits = JavaScriptExecutionLimits(maxLogCharacters = 18),
+                onLogs = liveLogs::add,
             )
 
         assertEquals("# Report\n\nDone.", result.value)
@@ -61,6 +63,8 @@ class GraalJavaScriptExecutionServiceTest {
             listOf(JavaScriptLogEntry("log", "building"), JavaScriptLogEntry("warn", "0123456789")),
             result.logs,
         )
+        assertEquals(listOf(JavaScriptLogEntry("log", "building")), liveLogs.first())
+        assertEquals(result.logs, liveLogs.last())
     }
 
     @Test
@@ -360,6 +364,7 @@ class GraalJavaScriptExecutionServiceTest {
         enabled: Set<String> = emptySet(),
         token: CancellationToken? = null,
         limits: JavaScriptExecutionLimits = JavaScriptExecutionLimits(),
+        onLogs: (List<JavaScriptLogEntry>) -> Unit = {},
     ): JavaScriptExecutionResult =
         service.execute(
             JavaScriptExecutionRequest(
@@ -367,6 +372,7 @@ class GraalJavaScriptExecutionServiceTest {
                 enabledTools = enabled,
                 cancellationToken = token,
                 limits = limits,
+                onLogs = onLogs,
             ),
         )
 

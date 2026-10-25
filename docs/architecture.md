@@ -466,6 +466,21 @@ and `ToolEventBus.events` exposes lifecycle notifications as a hot `Flux`. The s
 AI callback uses the deliberately named `executeBlocking` adapter because Spring AI's callback SPI
 returns `String`.
 
+Tools may implement `LiveVisualAgentTool` to publish semantic execution snapshots. The runtime
+replaces status, deadline and measured progress in place; it never derives log entries from
+those refreshes. Log-producing tools provide their ordered retained log entries separately
+in each complete snapshot, so countdown and transfer updates cannot flood the log.
+The runtime
+assigns an execution UUID, revisions and terminal state; producer-supplied identities are never
+trusted. Snapshots use shared serializable model-core data, while the runtime uses Reactor and
+the ActivityPort/UI remain Reactor-free. Intermediate `UPDATED` events never write history or
+cause database refreshes. Only the final bounded snapshot is stored in the existing tool-call
+metadata, so paging and restart reuse the authoritative conversation store. The first update is
+immediate; subsequent updates are coalesced per invocation without delaying completion.
+UI cancellation resolves an active execution UUID and matching request identity on the server;
+it cannot turn arbitrary presentation data into a tool invocation. Clearing Conversation
+invalidates presentation subscriptions to already-started executions. See UC-0000154 and #495.
+
 Every connection outside the presentation process is proxied by the server: provider/network
 requests, persistence, workspace filesystem access, tool execution, and remote services are
 owned by `:application` and exposed through protocol ports. The UI does not open those

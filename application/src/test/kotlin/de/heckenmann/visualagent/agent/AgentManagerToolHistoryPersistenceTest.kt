@@ -6,8 +6,12 @@ import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
 import de.heckenmann.visualagent.config.AppConfigBean
+import de.heckenmann.visualagent.model.ToolLiveState
 import de.heckenmann.visualagent.todo.TodoEventBus
 import io.mockk.mockk
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.jsonObject
 import java.time.Instant
 import java.util.UUID
 import kotlin.io.path.createTempDirectory
@@ -56,11 +60,14 @@ class AgentManagerToolHistoryPersistenceTest {
         manager1.recordToolCall(baseEvent.copy(phase = ToolCallPhase.STARTED))
         val rowWhileRunning = db1.getConversationMessages("main", 10).single { it.role == "tool" }
         assertTrue(rowWhileRunning.content.contains("running"))
+        manager1.recordToolCall(baseEvent.copy(phase = ToolCallPhase.UPDATED, liveState = ToolLiveState("execution", 1, "Intermediate")))
+        assertEquals(rowWhileRunning, db1.getConversationMessages("main", 10).single { it.role == "tool" })
         manager1.recordToolCall(
             baseEvent.copy(
                 phase = ToolCallPhase.FINISHED,
                 result = ToolResult("file:read", true, "configuration contents"),
                 durationMillis = 28,
+                liveState = ToolLiveState("execution", 2, "Completed", terminal = true),
             ),
         )
 
@@ -69,6 +76,12 @@ class AgentManagerToolHistoryPersistenceTest {
         assertEquals(parentId, completedRow.parentAssistantTurnId)
         assertEquals(0, completedRow.turnOrder)
         assertTrue(completedRow.content.contains("configuration contents"))
+        val savedSnapshot =
+            Json.decodeFromJsonElement<ToolLiveState>(
+                Json.parseToJsonElement(completedRow.metadata!!).jsonObject.getValue("liveState"),
+            )
+        assertTrue(savedSnapshot.terminal)
+        assertEquals("Completed", savedSnapshot.status)
         val page = db1.getConversationHistoryPage("main", 1, 0)
         assertEquals(setOf(parentId, completedRow.id), page.records.map { it.id }.toSet())
         assertEquals(1, page.nextOffset)
@@ -87,6 +100,7 @@ class AgentManagerToolHistoryPersistenceTest {
         val restored = manager2.getHistory()
         assertTrue(restored.any { it.id == parentId && it.assistantToolTurn })
         assertTrue(restored.any { it.parentAssistantTurnId == parentId && it.turnOrder == 0 })
+        assertEquals(completedRow.metadata, restored.single { it.id == completedRow.id }.metadata)
         db2.close()
     }
 

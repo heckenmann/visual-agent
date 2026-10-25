@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.agent.tools
 
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
+import de.heckenmann.visualagent.model.ToolLiveState
 import mu.KotlinLogging
 import org.springframework.stereotype.Component
 import reactor.core.publisher.Flux
@@ -39,6 +40,8 @@ data class ToolCallEvent(
     val startedAtUtc: Instant,
     val finishedAtUtc: Instant,
     val durationMillis: Long,
+    val liveState: ToolLiveState? = null,
+    val executionId: String? = null,
 )
 
 /**
@@ -46,6 +49,7 @@ data class ToolCallEvent(
  */
 enum class ToolCallPhase {
     STARTED,
+    UPDATED,
     FINISHED,
 }
 

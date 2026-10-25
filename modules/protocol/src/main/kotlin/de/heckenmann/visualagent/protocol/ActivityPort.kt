@@ -1,5 +1,7 @@
 package de.heckenmann.visualagent.protocol
 
+import de.heckenmann.visualagent.model.ToolLiveState
+
 /** Application activity events translated for the presentation layer. */
 interface ActivityPort {
     /** Registers a listener for tool activity changes. */
@@ -10,6 +12,15 @@ interface ActivityPort {
 
     /** Registers a listener for server-owned workspace download status changes. */
     fun addDownloadListener(listener: (DownloadActivity) -> Unit): AutoCloseable = AutoCloseable {}
+
+    /** Requests cancellation of one active execution belonging to the supplied request. */
+    fun cancelToolExecution(
+        executionId: String,
+        requestId: String?,
+    ): Boolean = false
+
+    /** Fetches current invocation state once after subscribing, not on resize or every progress frame. */
+    fun activeToolActivities(): List<ToolActivity> = emptyList()
 }
 
 /** One tool execution transition. */
@@ -23,11 +34,14 @@ data class ToolActivity(
     val sequence: Int? = null,
     val batchId: String? = null,
     val batchSequence: Int? = null,
+    val liveState: ToolLiveState? = null,
+    val executionId: String? = null,
 )
 
 /** Tool execution phase. */
 enum class ToolActivityPhase {
     STARTED,
+    UPDATED,
     FINISHED,
 }
 

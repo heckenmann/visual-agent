@@ -3,6 +3,7 @@ package de.heckenmann.visualagent.server
 import de.heckenmann.visualagent.agent.AgentStatusCallbackAdapter
 import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
+import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.protocol.ActivityPort
 import de.heckenmann.visualagent.protocol.AgentActivity
 import de.heckenmann.visualagent.protocol.AgentActivityPhase
@@ -18,27 +19,39 @@ class SpringActivityPort(
     private val toolEventBus: ToolEventBus,
     private val agentStatusCallbackAdapter: AgentStatusCallbackAdapter,
     private val workspaceDownloadEventBus: WorkspaceDownloadEventBus = WorkspaceDownloadEventBus(),
+    private val toolRegistry: ToolRegistry,
 ) : ActivityPort {
+    override fun cancelToolExecution(
+        executionId: String,
+        requestId: String?,
+    ): Boolean = toolRegistry.cancelLiveExecution(executionId, requestId)
+
+    override fun activeToolActivities(): List<ToolActivity> = toolRegistry.liveExecutionSnapshots().map(::toolActivity)
+
     override fun addToolListener(listener: (ToolActivity) -> Unit): AutoCloseable =
         toolEventBus.addListener { event ->
-            listener(
-                ToolActivity(
-                    toolId = event.toolId,
-                    requestId = event.context["requestId"]?.toString(),
-                    phase =
-                        when (event.phase) {
-                            ToolCallPhase.STARTED -> ToolActivityPhase.STARTED
-                            ToolCallPhase.FINISHED -> ToolActivityPhase.FINISHED
-                        },
-                    success = event.result.success,
-                    providerToolCallId = event.providerToolCallId,
-                    parentAssistantTurnId = event.parentAssistantTurnId,
-                    sequence = event.sequence,
-                    batchId = event.context["batchId"] as? String,
-                    batchSequence = event.context["batchSequence"] as? Int,
-                ),
-            )
+            listener(toolActivity(event))
         }
+
+    private fun toolActivity(event: de.heckenmann.visualagent.agent.tools.ToolCallEvent): ToolActivity =
+        ToolActivity(
+            toolId = event.toolId,
+            requestId = event.requestId ?: event.context["requestId"]?.toString(),
+            phase =
+                when (event.phase) {
+                    ToolCallPhase.STARTED -> ToolActivityPhase.STARTED
+                    ToolCallPhase.UPDATED -> ToolActivityPhase.UPDATED
+                    ToolCallPhase.FINISHED -> ToolActivityPhase.FINISHED
+                },
+            success = event.result.success,
+            providerToolCallId = event.providerToolCallId,
+            parentAssistantTurnId = event.parentAssistantTurnId,
+            sequence = event.sequence,
+            batchId = event.context["batchId"] as? String,
+            batchSequence = event.context["batchSequence"] as? Int,
+            liveState = event.liveState,
+            executionId = event.executionId,
+        )
 
     override fun addAgentListener(listener: (AgentActivity) -> Unit): AutoCloseable =
         agentStatusCallbackAdapter.addListener { agentId, message ->

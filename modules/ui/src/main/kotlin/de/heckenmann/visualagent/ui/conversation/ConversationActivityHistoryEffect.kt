@@ -31,13 +31,23 @@ internal fun ConversationActivityHistoryEffect(
         }
         val toolHandle =
             activityPort.addToolListener { event ->
-                when (event.phase) {
-                    ToolActivityPhase.STARTED, ToolActivityPhase.FINISHED -> refreshHistory()
+                val liveGeneration = conversationState.liveTools.generation
+                scope.launch(Dispatchers.Main) {
+                    if (liveGeneration != conversationState.liveTools.generation) return@launch
+                    conversationState.liveTools.accept(event, liveGeneration)
+                    if (event.phase != ToolActivityPhase.UPDATED) refreshHistory()
                 }
+            }
+        val initialGeneration = conversationState.liveTools.generation
+        val liveSnapshotJob =
+            scope.launch {
+                val snapshots = withContext(Dispatchers.IO) { activityPort.activeToolActivities() }
+                snapshots.forEach { conversationState.liveTools.accept(it, initialGeneration) }
             }
         val downloadHandle = activityPort.addDownloadListener { refreshHistory() }
         val completionHandle = suggestionPort.addCompletionListener { refreshHistory() }
         onDispose {
+            liveSnapshotJob.cancel()
             toolHandle.close()
             downloadHandle.close()
             completionHandle.close()
