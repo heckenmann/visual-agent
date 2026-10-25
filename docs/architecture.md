@@ -137,6 +137,14 @@ CPU-intensive work must run on `Dispatchers.Default`. Publish results on
 getter inside `LaunchedEffect`, does not move the work off the UI thread.
 `block()`, `runBlocking`, and blocking waits for I/O are forbidden there.
 
+The desktop host explicitly includes `kotlinx-coroutines-swing` as a runtime dependency,
+using the same version catalog entry as coroutine core. It supplies `Dispatchers.Main`
+for Compose Desktop's event thread; Compose alone does not install that dispatcher.
+This is runtime integration, not permission to add Swing/AWT widgets or toolkit imports.
+An isolated JVM regression test exercises the production runtime classpath without
+Compose test rules, which would otherwise mask a missing main dispatcher.
+See the [official dispatcher documentation](https://kotlinlang.org/api/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/-dispatchers/-main.html).
+
 Presentation snapshots are refreshed on source-change events or explicit reload,
 not on every frame, resize, or recomposition. These snapshots are display state,
 not a replacement for the database as the authoritative source. Server-side

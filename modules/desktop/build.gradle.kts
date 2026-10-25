@@ -68,6 +68,8 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.compose.material.icons)
     implementation(libs.compose.components.resources)
+    // Compose does not install Dispatchers.Main; its desktop event loop needs this runtime provider.
+    runtimeOnly(libs.coroutines.swing)
     implementation(libs.spring.boot.starter)
     implementation(platform(libs.spring.boot.bom))
     macOsDnsResolverClassifier?.let { classifier ->
@@ -84,6 +86,15 @@ dependencies {
     testImplementation(libs.compose.ui.test.junit4.desktop)
     testImplementation(libs.mockk)
     testImplementation(project(":application"))
+}
+
+tasks.withType<Test>().configureEach {
+    val probeClasspath = files(sourceSets.main.get().runtimeClasspath, sourceSets.test.get().output)
+    jvmArgumentProviders.add(
+        org.gradle.process.CommandLineArgumentProvider {
+            listOf("-Dvisualagent.desktop.dispatcherProbeClasspath=${probeClasspath.asPath}")
+        },
+    )
 }
 
 if (macOsDnsResolverClassifier != null) {
