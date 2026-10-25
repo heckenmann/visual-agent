@@ -21,6 +21,8 @@ internal fun ConversationActivityHistoryEffect(
 ) {
     val scope = rememberCoroutineScope()
     DisposableEffect(activityPort, conversationPort, conversationState, suggestionPort) {
+        val snapshotSync = conversationState.liveTools.beginSnapshotSync()
+
         /** Reloads the newest complete page while preserving older pages and live stream deltas. */
         fun refreshHistory() {
             scope.launch {
@@ -32,22 +34,27 @@ internal fun ConversationActivityHistoryEffect(
         val toolHandle =
             activityPort.addToolListener { event ->
                 val liveGeneration = conversationState.liveTools.generation
-                scope.launch(Dispatchers.Main) {
+                // The composition-owned scope uses this host's UI dispatcher, including offscreen hosts.
+                scope.launch {
                     if (liveGeneration != conversationState.liveTools.generation) return@launch
                     conversationState.liveTools.accept(event, liveGeneration)
                     if (event.phase != ToolActivityPhase.UPDATED) refreshHistory()
                 }
             }
-        val initialGeneration = conversationState.liveTools.generation
         val liveSnapshotJob =
             scope.launch {
-                val snapshots = withContext(Dispatchers.IO) { activityPort.activeToolActivities() }
-                snapshots.forEach { conversationState.liveTools.accept(it, initialGeneration) }
+                try {
+                    val snapshots = withContext(Dispatchers.IO) { activityPort.activeToolActivities() }
+                    conversationState.liveTools.completeSnapshotSync(snapshots, snapshotSync)
+                } finally {
+                    conversationState.liveTools.cancelSnapshotSync(snapshotSync)
+                }
             }
         val downloadHandle = activityPort.addDownloadListener { refreshHistory() }
         val completionHandle = suggestionPort.addCompletionListener { refreshHistory() }
         onDispose {
             liveSnapshotJob.cancel()
+            conversationState.liveTools.cancelSnapshotSync(snapshotSync)
             toolHandle.close()
             downloadHandle.close()
             completionHandle.close()

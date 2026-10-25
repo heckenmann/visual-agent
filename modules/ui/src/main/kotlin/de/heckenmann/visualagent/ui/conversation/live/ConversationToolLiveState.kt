@@ -14,11 +14,38 @@ internal class ConversationToolLiveState {
     val snapshots = mutableStateMapOf<String, ToolLiveState>()
     private val active = mutableSetOf<String>()
     private val finished = linkedSetOf<String>()
+    private val awaitingStart = mutableMapOf<String, ToolLiveState>()
+    private var snapshotSequence = 0L
+    private var synchronization: LiveSnapshotSync? = null
 
     /** Captured by background listeners before enqueueing a Main-dispatcher update. */
     @Volatile
     var generation: Long = 0
         private set
+
+    /** Opens the bounded window in which updates may precede the initial active-call snapshot. */
+    fun beginSnapshotSync(): LiveSnapshotSync =
+        LiveSnapshotSync(generation, ++snapshotSequence).also {
+            awaitingStart.clear()
+            synchronization = it
+        }
+
+    /** Merges initial starts with newer buffered revisions without resurrecting completed calls. */
+    fun completeSnapshotSync(
+        events: List<ToolActivity>,
+        token: LiveSnapshotSync,
+    ) {
+        if (synchronization != token || generation != token.generation) return
+        events.forEach { accept(it, token.generation) }
+        cancelSnapshotSync(token)
+    }
+
+    /** Discards unclaimed updates on disposal, failure or replacement of the subscription. */
+    fun cancelSnapshotSync(token: LiveSnapshotSync) {
+        if (synchronization != token) return
+        awaitingStart.clear()
+        synchronization = null
+    }
 
     /** Applies ordered runtime frames only after observing their start in this conversation. */
     fun accept(
@@ -32,13 +59,26 @@ internal class ConversationToolLiveState {
                 if (key in finished) return
                 active += key
                 event.liveState?.let { applySnapshot(key, it) }
+                awaitingStart.remove(key)?.let { applySnapshot(key, it) }
             }
             ToolActivityPhase.UPDATED, ToolActivityPhase.FINISHED -> {
                 if (event.phase == ToolActivityPhase.FINISHED) {
                     finished += key
+                    awaitingStart.remove(key)
                     while (finished.size > 256) finished.remove(finished.first())
                 }
-                if (key !in active) return
+                if (key !in active) {
+                    if (event.phase == ToolActivityPhase.UPDATED && synchronization != null && key !in finished) {
+                        event.liveState?.let { next ->
+                            val previous = awaitingStart[key]
+                            if (previous == null || previous.executionId == next.executionId && previous.revision < next.revision) {
+                                awaitingStart[key] = next
+                            }
+                        }
+                        while (awaitingStart.size > 256) awaitingStart.remove(awaitingStart.keys.first())
+                    }
+                    return
+                }
                 event.liveState?.let { next ->
                     applySnapshot(key, next)
                 }
@@ -63,11 +103,19 @@ internal class ConversationToolLiveState {
     /** Invalidates in-flight frames when the user clears or replaces the conversation. */
     fun clear() {
         generation++
+        awaitingStart.clear()
+        synchronization = null
         active.clear()
         finished.clear()
         snapshots.clear()
     }
 }
+
+/** Identifies one initial fetch independently of history resets and later replacement subscriptions. */
+internal data class LiveSnapshotSync(
+    val generation: Long,
+    val sequence: Long,
+)
 
 /** Supplies the existing conversation's snapshots to rows without tool-specific dispatch. */
 internal val LocalToolLiveSnapshots = staticCompositionLocalOf<Map<String, ToolLiveState>> { emptyMap() }

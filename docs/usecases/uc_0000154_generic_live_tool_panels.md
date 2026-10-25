@@ -31,6 +31,9 @@ message for each update or sending presentation refreshes back to the model.
    Reopening the panel requests active execution snapshots once after subscribing; it does not
    poll history or wait for a second producer update. A completion racing this initial request
    takes precedence over its older running snapshot.
+   Updates received while the initial fetch is pending are buffered by execution identity
+   and revision, then merged when its start arrives. Disposal, reset and replacement
+   subscriptions invalidate their own pending fetches without discarding a newer subscription.
 8. A running live card offers an icon-only Cancel action. The server resolves the generated
    execution identity and validates its request identity before signalling cancellation.
    Finished or unknown execution identities cannot be used to invoke another tool.

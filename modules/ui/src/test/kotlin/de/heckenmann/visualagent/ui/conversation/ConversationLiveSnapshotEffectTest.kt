@@ -14,6 +14,7 @@ import de.heckenmann.visualagent.protocol.ToolActivityPhase
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.verify
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.runBlocking
@@ -36,6 +37,8 @@ class ConversationLiveSnapshotEffectTest {
         val replies = Channel<List<ToolActivity>>(Channel.UNLIMITED)
         val rendered = Channel<List<ToolLiveState>>(Channel.UNLIMITED)
         val applyingSnapshot = AtomicBoolean(false)
+        val listener = slot<(ToolActivity) -> Unit>()
+        every { activity.addToolListener(capture(listener)) } returns AutoCloseable {}
         compose.registerIdlingResource(
             object : IdlingResource {
                 override val isIdleNow: Boolean
@@ -68,12 +71,17 @@ class ConversationLiveSnapshotEffectTest {
         }
         compose.onNodeWithText("Still responsive").assertExists()
         val snapshot = ToolLiveState("execution", 1, "Waiting")
+        val newer = snapshot.copy(revision = 2, status = "Paused")
+        compose.runOnIdle {
+            listener.captured(ToolActivity("sleep", phase = ToolActivityPhase.UPDATED, executionId = "execution", liveState = newer))
+        }
+        compose.waitForIdle()
         applyingSnapshot.set(true)
         runBlocking {
             replies.send(listOf(ToolActivity("sleep", phase = ToolActivityPhase.STARTED, executionId = "execution", liveState = snapshot)))
         }
         compose.waitForIdle()
-        assertEquals(listOf(snapshot), runBlocking { rendered.receive() })
+        assertEquals(listOf(newer), runBlocking { rendered.receive() })
         compose.runOnIdle { state.input = "Recomposed" }
         compose.waitForIdle()
         verify(exactly = 1) { activity.activeToolActivities() }
