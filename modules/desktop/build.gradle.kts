@@ -10,6 +10,7 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 import java.security.DigestInputStream
 import java.security.MessageDigest
+import java.util.concurrent.Callable
 import java.util.jar.JarFile
 
 plugins {
@@ -88,11 +89,21 @@ dependencies {
     testImplementation(project(":application"))
 }
 
+val desktopDispatcherProbeClasspath = files(sourceSets.main.get().runtimeClasspath, sourceSets.test.get().output)
+val generateDesktopDispatcherProbeClasspath =
+    tasks.register<WriteProperties>("generateDesktopDispatcherProbeClasspath") {
+        destinationFile.set(layout.buildDirectory.file("generated/dispatcher-probe/classpath.properties"))
+        encoding = "UTF-8"
+        property("classpath", Callable { desktopDispatcherProbeClasspath.asPath })
+        dependsOn(desktopDispatcherProbeClasspath)
+    }
+
 tasks.withType<Test>().configureEach {
-    val probeClasspath = files(sourceSets.main.get().runtimeClasspath, sourceSets.test.get().output)
+    dependsOn(generateDesktopDispatcherProbeClasspath)
+    val probeClasspathFile = generateDesktopDispatcherProbeClasspath.flatMap { it.destinationFile }
     jvmArgumentProviders.add(
         org.gradle.process.CommandLineArgumentProvider {
-            listOf("-Dvisualagent.desktop.dispatcherProbeClasspath=${probeClasspath.asPath}")
+            listOf("-Dvisualagent.desktop.dispatcherProbeClasspathFile=${probeClasspathFile.get().asFile.absolutePath}")
         },
     )
 }

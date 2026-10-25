@@ -5,8 +5,11 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.Properties
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /** Verifies the actual desktop runtime without Compose rules or test-dispatcher factories. */
 class DesktopMainDispatcherTest {
@@ -14,8 +17,16 @@ class DesktopMainDispatcherTest {
     val temporary = TemporaryFolder()
 
     @Test
+    fun `Gradle supplies only a classpath file reference to the test worker`() {
+        assertNull(System.getProperty("visualagent.desktop.dispatcherProbeClasspath"))
+        assertTrue(Files.isRegularFile(classpathFile()))
+    }
+
+    @Test
     fun `production classpath provides a functioning main dispatcher in a fresh JVM`() {
-        val classpath = assertNotNull(System.getProperty("visualagent.desktop.dispatcherProbeClasspath"))
+        val properties = Properties()
+        Files.newBufferedReader(classpathFile(), Charsets.UTF_8).use { properties.load(it) }
+        val classpath = assertNotNull(properties.getProperty("classpath"))
         val java =
             Path.of(
                 System.getProperty("java.home"),
@@ -38,4 +49,6 @@ class DesktopMainDispatcherTest {
             if (process.isAlive) process.destroyForcibly()
         }
     }
+
+    private fun classpathFile(): Path = Path.of(assertNotNull(System.getProperty("visualagent.desktop.dispatcherProbeClasspathFile")))
 }

@@ -143,6 +143,10 @@ for Compose Desktop's event thread; Compose alone does not install that dispatch
 This is runtime integration, not permission to add Swing/AWT widgets or toolkit imports.
 An isolated JVM regression test exercises the production runtime classpath without
 Compose test rules, which would otherwise mask a missing main dispatcher.
+Gradle's built-in `WriteProperties` task generates the probe classpath before tests run.
+Only the generated file path crosses the test-worker command line; the probe itself
+also uses a Java argument file. Neither process launch embeds the full dependency
+classpath in its command line, avoiding the Windows process-command length limit.
 See the [official dispatcher documentation](https://kotlinlang.org/api/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/-dispatchers/-main.html).
 
 Presentation snapshots are refreshed on source-change events or explicit reload,
