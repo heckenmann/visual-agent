@@ -58,6 +58,8 @@ message for each update or sending presentation refreshes back to the model.
   Pausing or resuming through the existing Files controls updates the same live phase; an
   already in-flight progress callback cannot overwrite a paused state. Cancelled transfers
   retain a cancellation outcome rather than being presented as generic failures.
+  State mutation and publication share one serialized boundary, preventing an older
+  progress callback from publishing after a newer pause/resume phase.
 - Tools without the capability retain their existing compact static presentation.
 - Snapshot text and collections are bounded; common credential assignments, URL credentials,
   and terminal escape sequences are removed from live presentation snapshots. This is not a
