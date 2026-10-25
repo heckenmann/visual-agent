@@ -53,6 +53,15 @@ class ToolRegistry(
     /** Returns the current provider-neutral runtime guidance for model instructions. */
     fun runtimeGuidance(): String = toolTimeoutGuidance(defaultTimeoutSeconds())
 
+    /** Cancels a live invocation by trusted runtime identity, never by a model-provided command. */
+    fun cancelLiveExecution(
+        executionId: String,
+        requestId: String?,
+    ): Boolean = reactiveExecution.cancelLive(executionId, requestId)
+
+    /** Returns active execution state for an explicitly attaching presentation client. */
+    fun liveExecutionSnapshots(): List<ToolCallEvent> = reactiveExecution.liveSnapshots()
+
     /**
      * Resolve registered tools by ID.
      *

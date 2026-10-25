@@ -8,12 +8,13 @@ import de.heckenmann.visualagent.agent.tools.api.ToolWorkspaceFile
 import de.heckenmann.visualagent.agent.tools.api.WorkspaceFileToolPort
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import reactor.core.publisher.Mono
 
 /** Downloads a remote file into the server-owned managed workspace. */
 @AgentTool
 class WorkspaceDownloadTool(
     private val workspaceFiles: WorkspaceFileToolPort,
-) : VisualAgentTool {
+) : LiveVisualAgentTool {
     override val definition =
         ToolDefinition(
             id = ToolId(TOOL_ID),
@@ -30,21 +31,53 @@ class WorkspaceDownloadTool(
     override fun execute(
         inputJson: String,
         context: Map<String, Any>,
-    ): ToolResult =
-        runCatching {
+    ): ToolResult = download(inputJson, null)
+
+    override fun executeLiveReactive(
+        inputJson: String,
+        context: Map<String, Any>,
+        reporter: ToolLiveReporter,
+    ): Mono<ToolResult> = Mono.fromCallable { trackedToolWork(context) { download(inputJson, reporter) } }
+
+    private fun download(
+        inputJson: String,
+        reporter: ToolLiveReporter?,
+    ): ToolResult {
+        val live = reporter?.let(::WorkspaceDownloadLiveReporter)
+        return runCatching {
             val input = parseObject(inputJson)
-            val file =
-                workspaceFiles.download(
-                    ToolDownloadRequest(
-                        source = input.requiredString("source"),
-                        directory = input.string("directory"),
-                        filename = input.string("filename"),
-                    ),
+            live?.phase(de.heckenmann.visualagent.agent.tools.api.ToolDownloadPhase.STARTED)
+            val request =
+                ToolDownloadRequest(
+                    source = input.requiredString("source"),
+                    directory = input.string("directory"),
+                    filename = input.string("filename"),
                 )
+            val file =
+                if (live == null) {
+                    workspaceFiles.download(request)
+                } else {
+                    workspaceFiles.download(
+                        request,
+                        onProgress = live::progress,
+                        onPhase = live::phase,
+                    )
+                }
+            live?.complete(file)
             success(TOOL_ID, file.toJson().toString())
         }.getOrElse { error ->
-            failure(TOOL_ID, error.message ?: "Workspace download failed")
+            failure(
+                TOOL_ID,
+                if (live?.isCancelled ==
+                    true
+                ) {
+                    "TOOL_CANCELLED: Download was cancelled."
+                } else {
+                    error.message ?: "Workspace download failed"
+                },
+            )
         }
+    }
 
     private companion object {
         const val TOOL_ID = "workspace:download"

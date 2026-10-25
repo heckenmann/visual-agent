@@ -21,6 +21,8 @@ internal fun ConversationActivityHistoryEffect(
 ) {
     val scope = rememberCoroutineScope()
     DisposableEffect(activityPort, conversationPort, conversationState, suggestionPort) {
+        val snapshotSync = conversationState.liveTools.beginSnapshotSync()
+
         /** Reloads the newest complete page while preserving older pages and live stream deltas. */
         fun refreshHistory() {
             scope.launch {
@@ -31,13 +33,28 @@ internal fun ConversationActivityHistoryEffect(
         }
         val toolHandle =
             activityPort.addToolListener { event ->
-                when (event.phase) {
-                    ToolActivityPhase.STARTED, ToolActivityPhase.FINISHED -> refreshHistory()
+                val liveGeneration = conversationState.liveTools.generation
+                // The composition-owned scope uses this host's UI dispatcher, including offscreen hosts.
+                scope.launch {
+                    if (liveGeneration != conversationState.liveTools.generation) return@launch
+                    conversationState.liveTools.accept(event, liveGeneration)
+                    if (event.phase != ToolActivityPhase.UPDATED) refreshHistory()
+                }
+            }
+        val liveSnapshotJob =
+            scope.launch {
+                try {
+                    val snapshots = withContext(Dispatchers.IO) { activityPort.activeToolActivities() }
+                    conversationState.liveTools.completeSnapshotSync(snapshots, snapshotSync)
+                } finally {
+                    conversationState.liveTools.cancelSnapshotSync(snapshotSync)
                 }
             }
         val downloadHandle = activityPort.addDownloadListener { refreshHistory() }
         val completionHandle = suggestionPort.addCompletionListener { refreshHistory() }
         onDispose {
+            liveSnapshotJob.cancel()
+            conversationState.liveTools.cancelSnapshotSync(snapshotSync)
             toolHandle.close()
             downloadHandle.close()
             completionHandle.close()

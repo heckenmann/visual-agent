@@ -109,6 +109,7 @@ class GraalJavaScriptExecutionService(
                 limits = request.limits,
                 logs = logs,
                 batchExecutor = batchExecutorProvider(),
+                onLogs = request.onLogs,
             )
         val context = contextFactory.create(bridge, request.limits)
         contextReference.set(context)

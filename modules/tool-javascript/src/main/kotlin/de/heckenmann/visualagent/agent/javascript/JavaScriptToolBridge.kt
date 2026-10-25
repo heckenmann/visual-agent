@@ -25,6 +25,7 @@ internal class JavaScriptToolBridge(
     private val limits: JavaScriptExecutionLimits,
     private val logs: MutableList<JavaScriptLogEntry>,
     private val batchExecutor: de.heckenmann.visualagent.agent.tools.ToolBatchExecutor,
+    private val onLogs: (List<JavaScriptLogEntry>) -> Unit = {},
 ) {
     /** Last bridge error, retained because Graal may erase host exception details in a Promise. */
     val lastFailure = AtomicReference<JavaScriptExecutionException?>()
@@ -293,6 +294,7 @@ internal class JavaScriptToolBridge(
         val remaining = (limits.maxLogCharacters - logs.sumOf { it.message.length }).coerceAtLeast(0)
         if (remaining == 0) return null
         logs += JavaScriptLogEntry(level, valueConverter.logText(arguments, remaining))
+        onLogs(logs.toList())
         return null
     }
 

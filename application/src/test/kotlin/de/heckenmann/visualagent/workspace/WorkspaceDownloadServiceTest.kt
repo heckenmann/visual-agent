@@ -21,6 +21,27 @@ import kotlin.test.assertTrue
 
 class WorkspaceDownloadServiceTest {
     @Test
+    fun `invocation progress observes measured bytes before download returns`() {
+        val files = WorkspaceFileService(FakeWorkspaceFileStore(), tempDir().resolve("db.h2").toString())
+        val progress = mutableListOf<Pair<Long, Long?>>()
+        var completed = false
+        val transfer =
+            WorkspaceDownloadTransfer { _, destination, control ->
+                control.setTotalBytes(4)
+                destination.writeBytes(byteArrayOf(1, 2, 3, 4))
+                control.recordProgress(2)
+                control.recordProgress(2)
+            }
+        WorkspaceDownloadService(files, transfer).download(WorkspaceDownloadRequest("https://example.org/file.bin")) { current, total ->
+            assertTrue(!completed)
+            progress += current to total
+        }
+        completed = true
+        assertEquals(listOf<Pair<Long, Long?>>(0L to 4L, 2L to 4L, 4L to 4L), progress)
+        assertTrue(completed)
+    }
+
+    @Test
     fun `download uses downloads default and detects content MIME`() {
         val dbPath = tempDir().resolve("data/visual-agent.db").toString()
         val store = FakeWorkspaceFileStore()
@@ -133,6 +154,7 @@ class WorkspaceDownloadServiceTest {
 
     @Test
     fun `download can be paused and resumed`() {
+        val phases = java.util.concurrent.CopyOnWriteArrayList<DownloadActivityStatus>()
         val root = tempDir()
         val store = FakeWorkspaceFileStore()
         val files = WorkspaceFileService(store, root.resolve("db/visual-agent.db").toString())
@@ -155,8 +177,13 @@ class WorkspaceDownloadServiceTest {
             }
         val service = WorkspaceDownloadService(files, transfer)
         thread(start = true) {
-            runCatching { service.download(WorkspaceDownloadRequest("https://example.org/file.bin")) }
-                .onFailure(downloadFailure::set)
+            runCatching {
+                service.download(WorkspaceDownloadRequest("https://example.org/file.bin"), onProgress = {
+                    _,
+                    _,
+                    ->
+                }, onStatus = phases::add)
+            }.onFailure(downloadFailure::set)
                 .also { downloadCompleted.countDown() }
         }
 
@@ -171,6 +198,15 @@ class WorkspaceDownloadServiceTest {
         downloadCompleted.await()
         downloadFailure.get()?.let { throw it }
         assertTrue(store.records.isNotEmpty())
+        assertEquals(
+            listOf(
+                DownloadActivityStatus.STARTED,
+                DownloadActivityStatus.PAUSED,
+                DownloadActivityStatus.RESUMED,
+                DownloadActivityStatus.COMPLETED,
+            ),
+            phases.toList(),
+        )
     }
 
     @Test

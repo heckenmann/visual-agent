@@ -12,6 +12,7 @@ internal data class WorkspaceDownloadJob(
     val id: String,
     val relativePath: String,
     val control: WorkspaceDownloadControl,
+    val onStatus: (de.heckenmann.visualagent.protocol.DownloadActivityStatus) -> Unit = {},
     @Volatile var paused: Boolean = false,
     @Volatile var mimeType: String? = null,
     @Volatile var sizeBytes: Long? = null,

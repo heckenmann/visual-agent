@@ -2,11 +2,14 @@ package de.heckenmann.visualagent.agent.javascript
 
 import de.heckenmann.visualagent.agent.CancellationToken
 import de.heckenmann.visualagent.agent.tools.DEFAULT_TOOL_TIMEOUT_SECONDS
+import de.heckenmann.visualagent.agent.tools.LiveVisualAgentTool
 import de.heckenmann.visualagent.agent.tools.ToolCancellationToken
-import de.heckenmann.visualagent.agent.tools.VisualAgentTool
+import de.heckenmann.visualagent.agent.tools.ToolLiveReporter
 import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
+import de.heckenmann.visualagent.agent.tools.trackedToolWork
+import de.heckenmann.visualagent.model.ToolLiveState
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
@@ -15,12 +18,13 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import org.springframework.stereotype.Component
+import reactor.core.publisher.Mono
 
 /** Model-facing tool for bounded JavaScript orchestration and data processing. */
 @Component
 class JavaScriptExecuteTool(
     private val executionService: GraalJavaScriptExecutionService,
-) : VisualAgentTool {
+) : LiveVisualAgentTool {
     override val definition =
         ToolDefinition(
             id = ToolId(TOOL_ID),
@@ -45,6 +49,18 @@ class JavaScriptExecuteTool(
     override fun execute(
         inputJson: String,
         context: Map<String, Any>,
+    ): ToolResult = executeScript(inputJson, context, null)
+
+    override fun executeLiveReactive(
+        inputJson: String,
+        context: Map<String, Any>,
+        reporter: ToolLiveReporter,
+    ): Mono<ToolResult> = Mono.fromCallable { trackedToolWork(context) { executeScript(inputJson, context, reporter) } }
+
+    private fun executeScript(
+        inputJson: String,
+        context: Map<String, Any>,
+        reporter: ToolLiveReporter?,
     ): ToolResult {
         val input =
             runCatching {
@@ -89,6 +105,7 @@ class JavaScriptExecuteTool(
         val toolCancellationRegistration =
             (context["toolCancellationToken"] as? ToolCancellationToken)?.onCancelled(cancellationToken::cancel)
         return try {
+            reporter?.report(ToolLiveState("", 0, "Executing JavaScript"))
             val result =
                 executionService.execute(
                     JavaScriptExecutionRequest(
@@ -97,6 +114,11 @@ class JavaScriptExecuteTool(
                         requestContext = context,
                         cancellationToken = cancellationToken,
                         limits = limits,
+                        onLogs = { entries ->
+                            reporter?.report(
+                                ToolLiveState("", 0, "Executing JavaScript", logs = entries.map { "${it.level}: ${it.message}" }),
+                            )
+                        },
                     ),
                 )
             ToolResult(

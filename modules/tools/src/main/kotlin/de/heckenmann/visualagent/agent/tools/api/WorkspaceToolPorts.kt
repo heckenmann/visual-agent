@@ -137,6 +137,29 @@ interface WorkspaceFileToolPort {
 
     /** Downloads a remote resource into the managed workspace. */
     fun download(request: ToolDownloadRequest): ToolWorkspaceFile = error("Workspace downloads are not configured")
+
+    /** Downloads with invocation-local measured progress; adapters may override their transfer observer. */
+    fun download(
+        request: ToolDownloadRequest,
+        onProgress: (Long, Long?) -> Unit,
+    ): ToolWorkspaceFile = download(request).also { onProgress(it.sizeBytes, it.sizeBytes) }
+
+    /** Observes canonical transfer lifecycle as well as measured progress. */
+    fun download(
+        request: ToolDownloadRequest,
+        onProgress: (Long, Long?) -> Unit,
+        onPhase: (ToolDownloadPhase) -> Unit,
+    ): ToolWorkspaceFile = download(request, onProgress).also { onPhase(ToolDownloadPhase.COMPLETED) }
+}
+
+/** Transfer transitions exposed by the server-owned download lifecycle. */
+enum class ToolDownloadPhase {
+    STARTED,
+    PAUSED,
+    RESUMED,
+    COMPLETED,
+    CANCELLED,
+    FAILED,
 }
 
 /** Managed workspace-file projection. */

@@ -62,6 +62,7 @@ spring-integration-sftp = { module = "org.springframework.integration:spring-int
 h2 = { module = "com.h2database:h2", version.ref = "h2" }
 r2dbc-h2 = { module = "io.r2dbc:r2dbc-h2" }
 coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "coroutines" }
 coroutines-bom = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-bom", version.ref = "coroutines" }
 coroutines-reactor = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactor", version.ref = "coroutines" }
 reactor-core = { module = "io.projectreactor:reactor-core" }

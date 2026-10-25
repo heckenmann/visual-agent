@@ -162,8 +162,9 @@ class InFlightStateHolder internal constructor() {
      * only reflects activities we know to be running.
      */
     internal fun onToolEvent(event: ToolActivity) {
-        val key = event.toolId + "@" + (event.requestId ?: event.toolId)
+        val key = event.toolId + "@" + (event.executionId ?: event.requestId ?: event.toolId)
         when (event.phase) {
+            ToolActivityPhase.UPDATED -> Unit
             ToolActivityPhase.STARTED -> {
                 if (key !in pendingToolKeys) {
                     pendingToolKeys += key
@@ -205,7 +206,7 @@ fun rememberInFlightState(activityPort: ActivityPort): InFlightStateHolder {
     DisposableEffect(activityPort, holder) {
         val handle =
             activityPort.addToolListener { event ->
-                collector.tryEmit(event)
+                if (event.phase != ToolActivityPhase.UPDATED) collector.tryEmit(event)
             }
         val job =
             scope.launch {

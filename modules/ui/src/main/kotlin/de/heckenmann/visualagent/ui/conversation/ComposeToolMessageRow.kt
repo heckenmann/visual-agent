@@ -29,17 +29,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import de.heckenmann.visualagent.model.ToolLiveState
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
 import de.heckenmann.visualagent.ui.components.*
 import de.heckenmann.visualagent.ui.conversation.*
+import de.heckenmann.visualagent.ui.conversation.live.LocalToolLiveSnapshots
+import de.heckenmann.visualagent.ui.conversation.live.ToolLivePanel
+import de.heckenmann.visualagent.ui.conversation.live.toolLiveKey
 import de.heckenmann.visualagent.ui.files.*
 import de.heckenmann.visualagent.ui.modal.*
 import de.heckenmann.visualagent.ui.settings.*
 import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
 import de.heckenmann.visualagent.ui.workspace.*
+import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
@@ -67,6 +72,8 @@ internal fun ToolMessageRow(
     modifier: Modifier = Modifier,
 ) {
     val metadata = remember(message.metadata) { parseToolMetadata(message.metadata) }
+    val liveState = LocalToolLiveSnapshots.current[toolLiveKey(message.metadata)] ?: metadata.liveState
+    val cancelLiveTool = de.heckenmann.visualagent.ui.conversation.live.LocalToolCancellation.current
     var expanded by remember { mutableStateOf(false) }
     val error = metadata.status in TOOL_FAILURE_STATUSES
     val tint =
@@ -138,6 +145,21 @@ internal fun ToolMessageRow(
                     tint = tint,
                 )
             }
+            liveState?.let { state ->
+                ToolLivePanel(
+                    state,
+                    onCancel =
+                        cancelLiveTool?.let { cancel ->
+                            {
+                                cancel(
+                                    state.executionId,
+                                    de.heckenmann.visualagent.ui.conversation.live
+                                        .toolLiveRequestId(message.metadata),
+                                )
+                            }
+                        },
+                )
+            }
             AnimatedVisibility(
                 visible = expanded,
                 enter = fadeIn(animationSpec = tween(180)),
@@ -175,6 +197,7 @@ internal data class ParsedToolMetadata(
     val inputJson: String?,
     val resultContent: String?,
     val resultError: String?,
+    val liveState: ToolLiveState? = null,
 )
 
 internal fun parseToolMetadata(metadata: String?): ParsedToolMetadata {
@@ -194,5 +217,12 @@ internal fun parseToolMetadata(metadata: String?): ParsedToolMetadata {
         inputJson = json?.get("inputJson")?.jsonPrimitive?.content,
         resultContent = json?.get("resultContent")?.jsonPrimitive?.content,
         resultError = json?.get("resultError")?.jsonPrimitive?.content,
+        liveState =
+            json?.get("liveState")?.let {
+                runCatching {
+                    kotlinx.serialization.json.Json
+                        .decodeFromJsonElement<ToolLiveState>(it)
+                }.getOrNull()
+            },
     )
 }

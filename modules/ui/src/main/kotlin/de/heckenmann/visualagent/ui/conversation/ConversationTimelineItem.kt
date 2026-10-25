@@ -115,6 +115,10 @@ internal fun buildConversationTimeline(
                 val message = uniqueHistory[index]
                 val parentId = message.id
                 when {
+                    message.role == "assistant" &&
+                        message.content.isBlank() &&
+                        message.images.isNullOrEmpty() &&
+                        !message.assistantToolTurn -> null
                     message.id != null && message.id in attachedToolIds -> null
                     message.role == "assistant" && message.assistantToolTurn && parentId != null -> {
                         val parent = ConversationTimelineItem.Persisted(message, index)

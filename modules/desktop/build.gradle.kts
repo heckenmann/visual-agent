@@ -10,6 +10,7 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 import java.security.DigestInputStream
 import java.security.MessageDigest
+import java.util.concurrent.Callable
 import java.util.jar.JarFile
 
 plugins {
@@ -68,6 +69,8 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.compose.material.icons)
     implementation(libs.compose.components.resources)
+    // Compose does not install Dispatchers.Main; its desktop event loop needs this runtime provider.
+    runtimeOnly(libs.coroutines.swing)
     implementation(libs.spring.boot.starter)
     implementation(platform(libs.spring.boot.bom))
     macOsDnsResolverClassifier?.let { classifier ->
@@ -84,6 +87,25 @@ dependencies {
     testImplementation(libs.compose.ui.test.junit4.desktop)
     testImplementation(libs.mockk)
     testImplementation(project(":application"))
+}
+
+val desktopDispatcherProbeClasspath = files(sourceSets.main.get().runtimeClasspath, sourceSets.test.get().output)
+val generateDesktopDispatcherProbeClasspath =
+    tasks.register<WriteProperties>("generateDesktopDispatcherProbeClasspath") {
+        destinationFile.set(layout.buildDirectory.file("generated/dispatcher-probe/classpath.properties"))
+        encoding = "UTF-8"
+        property("classpath", Callable { desktopDispatcherProbeClasspath.asPath })
+        dependsOn(desktopDispatcherProbeClasspath)
+    }
+
+tasks.withType<Test>().configureEach {
+    dependsOn(generateDesktopDispatcherProbeClasspath)
+    val probeClasspathFile = generateDesktopDispatcherProbeClasspath.flatMap { it.destinationFile }
+    jvmArgumentProviders.add(
+        org.gradle.process.CommandLineArgumentProvider {
+            listOf("-Dvisualagent.desktop.dispatcherProbeClasspathFile=${probeClasspathFile.get().asFile.absolutePath}")
+        },
+    )
 }
 
 if (macOsDnsResolverClassifier != null) {

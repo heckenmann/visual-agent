@@ -22,7 +22,8 @@ internal class MainAgentContextHistoryLoader(
             ).mapNotNull { row ->
                 row
                     .takeIf {
-                        it.role.isNotBlank() && (it.content.isNotBlank() || it.role == "assistant" && it.assistantToolTurn)
+                        it.role.isNotBlank() &&
+                            (it.content.isNotBlank() || it.role == "assistant" && (it.assistantToolTurn || it.providerReplay != null))
                     }?.let {
                         Message(
                             role = it.role,

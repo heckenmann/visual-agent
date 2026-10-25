@@ -18,13 +18,13 @@ class AgentResponseCoordinator
         private val repetitionGuardRetryLimit = 1
 
         /**
-         * Normalizes assistant response content: trims whitespace, replaces blank or tool-calls-only
-         * payloads with a placeholder, and detects runaway repetition.
+         * Normalizes assistant response content without fabricating an answer for empty responses.
+         * Tool results and their structural parent turns are persisted independently.
          */
         fun normalizeAssistantContent(content: String): String {
             val trimmed = stripLeadingAssistantRoleToken(removeThinkingMarkup(content)).trim()
             if (trimmed.isBlank() || isToolCallsOnlyPayload(trimmed)) {
-                return "(No text response. See tool results above.)"
+                return ""
             }
             if (ResponseRepetitionGuard.isRunawayRepetition(trimmed)) {
                 return "I generated a malformed repeated output. Please repeat your last request and I will answer it cleanly."
@@ -42,10 +42,10 @@ class AgentResponseCoordinator
          */
         fun normalizeAssistantPresentationContent(content: String): String {
             val trimmed = stripLeadingAssistantRoleToken(content).trim()
-            if (trimmed.isBlank()) return "(No text response. See tool results above.)"
+            if (trimmed.isBlank()) return ""
             val withoutThinking = removeThinkingMarkup(trimmed).trim()
             if (withoutThinking.isBlank() || isToolCallsOnlyPayload(withoutThinking)) {
-                return if (hasThinkingMarkup(trimmed)) trimmed else "(No text response. See tool results above.)"
+                return if (hasThinkingMarkup(trimmed)) trimmed else ""
             }
             if (ResponseRepetitionGuard.isRunawayRepetition(withoutThinking)) {
                 return "I generated a malformed repeated output. Please repeat your last request and I will answer it cleanly."

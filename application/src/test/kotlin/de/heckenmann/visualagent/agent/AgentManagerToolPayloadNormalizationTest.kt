@@ -8,6 +8,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
 import reactor.core.publisher.Mono
+import java.util.UUID
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -15,7 +16,38 @@ import kotlin.test.assertEquals
 @de.heckenmann.visualagent.testsupport.DatabaseTest
 class AgentManagerToolPayloadNormalizationTest {
     @Test
-    fun `sendMessage normalizes empty tool_calls payload to tool-only placeholder`() {
+    fun `textless native replay remains available after loading persisted history`() {
+        val db =
+            de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory.create(
+                createTempDirectory("visual-agent-empty-replay").resolve("history.db").toString(),
+            )
+        try {
+            val replay = ProviderReplayState("openai.responses.parts.v1", "profile", "model", "native-parts")
+            val responseId = UUID.randomUUID().toString()
+            db.saveConversationMessage(UUID.randomUUID().toString(), "main", "user", "Inspect the result", null)
+            db.saveConversationMessage(
+                responseId,
+                "main",
+                "assistant",
+                "",
+                null,
+                ConversationContextPolicy.DIALOGUE,
+                providerReplay = replay,
+            )
+            val manager =
+                AgentManager(db, mockk(relaxed = true), AgentToolConfigService(db), ToolEventBus(), TodoEventBus(), AppConfigBean(db))
+            assertEquals(replay, manager.getHistory().single { it.id == responseId }.providerReplay)
+            val history = manager.conversationOps.loadMainAgentContextFromDb()
+            assertEquals(replay, history.single { it.id == responseId }.providerReplay)
+            val request = manager.conversationOps.buildMainRequest(history)
+            assertEquals(replay, request.messages.single { it.id == responseId }.providerReplay)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun `sendMessage does not fabricate an answer for an empty tool_calls payload`() {
         val tempDb = createTempDirectory("visual-agent-tool-payload-test").resolve("history.db").toString()
         val db =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
@@ -36,9 +68,9 @@ class AgentManagerToolPayloadNormalizationTest {
                 manager.sendMessage("Bitte rufe ein Tool auf")
             }
 
-        assertEquals("(No text response. See tool results above.)", response)
-        val last = manager.getHistory().last()
-        assertEquals("(No text response. See tool results above.)", last.content)
+        assertEquals("", response)
+        assertEquals("", manager.getHistory().last().content)
+        assertEquals("", db.getConversationMessages("main", 10).single { it.role == "assistant" }.content)
         db.close()
     }
 }

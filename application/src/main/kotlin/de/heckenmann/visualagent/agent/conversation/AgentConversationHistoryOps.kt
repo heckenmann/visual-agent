@@ -8,6 +8,7 @@ import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.knowledge.ConversationRecord
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
 import java.time.Instant
 import java.util.UUID
@@ -54,6 +55,7 @@ internal class AgentConversationHistoryOps(
 
     fun recordToolCall(event: ToolCallEvent): Unit =
         synchronized(projectionLock) {
+            if (event.phase == de.heckenmann.visualagent.agent.tools.ToolCallPhase.UPDATED) return@synchronized
             val status = toolCallStatus(event)
             val firstDetailLine =
                 event.result.content
@@ -75,8 +77,10 @@ internal class AgentConversationHistoryOps(
                     put("type", "tool_call")
                     put("toolId", event.toolId)
                     put("functionName", event.functionName)
+                    event.executionId?.let { put("executionId", it) }
                     event.providerToolCallId?.let { put("providerToolCallId", it) }
                     event.requestId?.let { put("requestId", it) }
+                    event.parentAssistantTurnId?.let { put("parentAssistantTurnId", it) }
                     event.round?.let { put("round", it) }
                     event.sequence?.let { put("sequence", it) }
                     (event.context["batchId"] as? String)?.let { put("batchId", it) }
@@ -86,6 +90,13 @@ internal class AgentConversationHistoryOps(
                     put("inputJson", event.inputJson)
                     put("resultContent", event.result.content)
                     put("resultError", event.result.error ?: "")
+                    event.liveState?.let {
+                        put(
+                            "liveState",
+                            kotlinx.serialization.json.Json
+                                .encodeToJsonElement(it),
+                        )
+                    }
                 }.toString()
             val messageId = stableToolMessageId(event)
             val existing = owner.conversationStore.getConversationMessage(messageId)
@@ -280,8 +291,10 @@ internal class AgentConversationHistoryOps(
 
     private fun toMessage(row: ConversationRecord): Message? =
         row
-            .takeIf { it.role.isNotBlank() && (it.content.isNotBlank() || it.role == "assistant" && it.assistantToolTurn) }
-            ?.let {
+            .takeIf {
+                it.role.isNotBlank() &&
+                    (it.content.isNotBlank() || it.role == "assistant" && (it.assistantToolTurn || it.providerReplay != null))
+            }?.let {
                 Message(
                     role = it.role,
                     content =
@@ -304,6 +317,7 @@ internal class AgentConversationHistoryOps(
             }
 
     private fun stableToolMessageId(event: ToolCallEvent): String {
+        event.executionId?.let { return it }
         val identity =
             listOfNotNull(
                 event.requestId,

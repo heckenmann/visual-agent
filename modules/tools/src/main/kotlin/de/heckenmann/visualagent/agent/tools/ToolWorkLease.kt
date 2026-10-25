@@ -24,7 +24,7 @@ class ToolWorkLease(
 }
 
 /** Retains admission around synchronous work embedded in a reactive tool implementation. */
-internal fun <T> trackedToolWork(
+fun <T> trackedToolWork(
     context: Map<String, Any>,
     work: () -> T,
 ): T {

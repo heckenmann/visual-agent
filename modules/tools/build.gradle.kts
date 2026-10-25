@@ -15,6 +15,7 @@ repositories {
 }
 
 dependencies {
+    api(project(":model-core"))
     api(project(":task-core"))
     implementation(libs.kotlin.stdlib)
     implementation(libs.kotlin.logging)

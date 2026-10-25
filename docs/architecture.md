@@ -137,6 +137,18 @@ CPU-intensive work must run on `Dispatchers.Default`. Publish results on
 getter inside `LaunchedEffect`, does not move the work off the UI thread.
 `block()`, `runBlocking`, and blocking waits for I/O are forbidden there.
 
+The desktop host explicitly includes `kotlinx-coroutines-swing` as a runtime dependency,
+using the same version catalog entry as coroutine core. It supplies `Dispatchers.Main`
+for Compose Desktop's event thread; Compose alone does not install that dispatcher.
+This is runtime integration, not permission to add Swing/AWT widgets or toolkit imports.
+An isolated JVM regression test exercises the production runtime classpath without
+Compose test rules, which would otherwise mask a missing main dispatcher.
+Gradle's built-in `WriteProperties` task generates the probe classpath before tests run.
+Only the generated file path crosses the test-worker command line; the probe itself
+also uses a Java argument file. Neither process launch embeds the full dependency
+classpath in its command line, avoiding the Windows process-command length limit.
+See the [official dispatcher documentation](https://kotlinlang.org/api/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/-dispatchers/-main.html).
+
 Presentation snapshots are refreshed on source-change events or explicit reload,
 not on every frame, resize, or recomposition. These snapshots are display state,
 not a replacement for the database as the authoritative source. Server-side
@@ -457,6 +469,21 @@ execution contract, `VisualAgentTool.executeReactive` permits native non-blockin
 and `ToolEventBus.events` exposes lifecycle notifications as a hot `Flux`. The synchronous Spring
 AI callback uses the deliberately named `executeBlocking` adapter because Spring AI's callback SPI
 returns `String`.
+
+Tools may implement `LiveVisualAgentTool` to publish semantic execution snapshots. The runtime
+replaces status, deadline and measured progress in place; it never derives log entries from
+those refreshes. Log-producing tools provide their ordered retained log entries separately
+in each complete snapshot, so countdown and transfer updates cannot flood the log.
+The runtime
+assigns an execution UUID, revisions and terminal state; producer-supplied identities are never
+trusted. Snapshots use shared serializable model-core data, while the runtime uses Reactor and
+the ActivityPort/UI remain Reactor-free. Intermediate `UPDATED` events never write history or
+cause database refreshes. Only the final bounded snapshot is stored in the existing tool-call
+metadata, so paging and restart reuse the authoritative conversation store. The first update is
+immediate; subsequent updates are coalesced per invocation without delaying completion.
+UI cancellation resolves an active execution UUID and matching request identity on the server;
+it cannot turn arbitrary presentation data into a tool invocation. Clearing Conversation
+invalidates presentation subscriptions to already-started executions. See UC-0000154 and #495.
 
 Every connection outside the presentation process is proxied by the server: provider/network
 requests, persistence, workspace filesystem access, tool execution, and remote services are

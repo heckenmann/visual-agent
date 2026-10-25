@@ -11,6 +11,9 @@ object ConversationImageSources {
     /** Prefix for a registered workspace file managed by the application server. */
     const val WORKSPACE_PREFIX = "workspace:"
 
+    /** Prefix for a stable registered workspace-file identity, independent of later renames. */
+    const val WORKSPACE_ID_PREFIX = "workspace-id:"
+
     /** Prefix for an opaque root ID and root-relative path resolved by the application server. */
     const val GRANTED_FILE_PREFIX = "visual-agent-file:"
 

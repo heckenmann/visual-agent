@@ -116,6 +116,8 @@ class ConversationMediaResolver(
             normalized.startsWith("http://", ignoreCase = true) ||
                 normalized.startsWith("https://", ignoreCase = true) -> resolveRemote(normalized)
             normalized.startsWith("data:", ignoreCase = true) -> resolveEmbedded(normalized)
+            normalized.startsWith(ConversationImageSources.WORKSPACE_ID_PREFIX, ignoreCase = true) ->
+                resolveWorkspaceId(normalized.substring(ConversationImageSources.WORKSPACE_ID_PREFIX.length))
             normalized.startsWith(ConversationImageSources.SERVER_FILE_PREFIX, ignoreCase = true) ->
                 resolveWorkspace(normalized.substring(ConversationImageSources.SERVER_FILE_PREFIX.length))
             normalized.startsWith(ConversationImageSources.GRANTED_FILE_PREFIX, ignoreCase = true) ->
@@ -164,6 +166,11 @@ class ConversationMediaResolver(
         }
         val bytes = runCatching { file.readBytes() }.getOrNull() ?: return rejected("Workspace image could not be read")
         return validatePayload(record.mimeType.lowercase(), bytes)
+    }
+
+    private fun resolveWorkspaceId(id: String): ConversationImageResolution {
+        val record = runCatching { workspaceFiles.requireFile(id, null) }.getOrNull() ?: return rejected("Workspace image was not found")
+        return resolveWorkspace(record.relativePath)
     }
 
     private fun resolveGrantedFile(source: String): ConversationImageResolution {

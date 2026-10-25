@@ -240,7 +240,32 @@ class WorkspaceFileToolPortAdapter(
             .download(WorkspaceDownloadRequest(request.source, request.directory, request.filename))
             .let(::toToolFile)
 
+    override fun download(
+        request: ToolDownloadRequest,
+        onProgress: (Long, Long?) -> Unit,
+    ): ToolWorkspaceFile =
+        requireNotNull(downloads) { "Workspace downloads are not configured" }
+            .download(WorkspaceDownloadRequest(request.source, request.directory, request.filename), onProgress)
+            .let(::toToolFile)
+
     private fun requireRecord(file: ToolWorkspaceFile): WorkspaceFileRecord = files.requireFile(file.id, null)
+
+    override fun download(
+        request: ToolDownloadRequest,
+        onProgress: (Long, Long?) -> Unit,
+        onPhase: (de.heckenmann.visualagent.agent.tools.api.ToolDownloadPhase) -> Unit,
+    ): ToolWorkspaceFile =
+        requireNotNull(downloads) { "Workspace downloads are not configured" }
+            .download(
+                WorkspaceDownloadRequest(request.source, request.directory, request.filename),
+                onProgress,
+                onStatus = {
+                    onPhase(
+                        de.heckenmann.visualagent.agent.tools.api.ToolDownloadPhase
+                            .valueOf(it.name),
+                    )
+                },
+            ).let(::toToolFile)
 }
 
 /** Application adapter for workspace layout operations consumed by tools. */

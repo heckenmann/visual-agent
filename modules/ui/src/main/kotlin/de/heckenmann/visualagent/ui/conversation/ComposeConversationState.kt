@@ -46,6 +46,9 @@ internal class ConversationUiState(
     val streaming = MutableStateFlow("")
     val streamingTurns = MutableStateFlow<List<Message>>(emptyList())
     val contextReduced = MutableStateFlow(false)
+    val liveTools =
+        de.heckenmann.visualagent.ui.conversation.live
+            .ConversationToolLiveState()
 
     private var historyGeneration = 0L
     private var reachedOldestHistory = false
@@ -137,6 +140,7 @@ internal class ConversationUiState(
 
     /** Clears transient state and treats the replacement history as already known after a full reset. */
     fun resetHistory(messages: List<Message>) {
+        liveTools.clear()
         knownEntryIds.clear()
         replaceHistory(messages)
         pendingUserMessage = null
