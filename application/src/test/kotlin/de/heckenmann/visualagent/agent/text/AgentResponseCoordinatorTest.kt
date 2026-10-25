@@ -42,9 +42,9 @@ class AgentResponseCoordinatorTest {
 
     @Test
     fun `normalization handles blank tool-only repeated and regular text`() {
-        assertEquals("(No text response. See tool results above.)", coordinator.normalizeAssistantContent(" "))
+        assertEquals("", coordinator.normalizeAssistantContent(" "))
         assertEquals(
-            "(No text response. See tool results above.)",
+            "",
             coordinator.normalizeAssistantContent("""```json {"tool_calls": []} ```"""),
         )
         assertTrue(coordinator.normalizeAssistantContent("repeat pattern ".repeat(60)).contains("malformed"))
@@ -53,6 +53,8 @@ class AgentResponseCoordinatorTest {
         assertEquals("Deutsch", coordinator.normalizeAssistantContent("assistantDeutsch"))
         assertEquals("answer", coordinator.normalizeAssistantContent("assistant: answer"))
         assertEquals("answer", coordinator.normalizeAssistantContent("<|assistant|> answer"))
+        assertEquals("", coordinator.normalizeAssistantPresentationContent(" "))
+        assertEquals("", coordinator.normalizeAssistantPresentationContent("""{"tool_calls": []}"""))
     }
 
     @Test

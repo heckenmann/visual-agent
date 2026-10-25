@@ -211,7 +211,7 @@ class ConversationTimelineRowsTest {
                     conversationTimeline(
                         items =
                             buildConversationTimeline(
-                                history = listOf(parent, child),
+                                history = listOf(parent, child, Message("assistant", "", id = "empty-final-answer")),
                                 pendingUserMessage = null,
                                 streamingContent = "",
                                 requestActive = false,

@@ -27,7 +27,7 @@ LLM provider.
 
 ## Result
 
-Tool behavior is centralized and auditable. Each tool call is shown beneath the assistant turn that declared it, and its persisted row is updated in place when execution finishes. Tool results are fed back through the provider's native tool-call history so the assistant can answer from them instead of showing "(No text response. See tool results above.)".
+Tool behavior is centralized and auditable. Each tool call is shown beneath the assistant turn that declared it, and its persisted row is updated in place when execution finishes. Tool results are fed back through the provider's native tool-call history so the assistant can answer from them. An empty answer never generates synthetic placeholder text. Tool results and empty structural parent turns remain persisted independently; the UI shows the tool cards without an additional empty answer bubble. Textless native replay remains available for future provider requests, subject to the model's context budget. Empty assistant messages with image attachments are still displayed.
 
 ## Tool Calls
 

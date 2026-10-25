@@ -291,8 +291,10 @@ internal class AgentConversationHistoryOps(
 
     private fun toMessage(row: ConversationRecord): Message? =
         row
-            .takeIf { it.role.isNotBlank() && (it.content.isNotBlank() || it.role == "assistant" && it.assistantToolTurn) }
-            ?.let {
+            .takeIf {
+                it.role.isNotBlank() &&
+                    (it.content.isNotBlank() || it.role == "assistant" && (it.assistantToolTurn || it.providerReplay != null))
+            }?.let {
                 Message(
                     role = it.role,
                     content =

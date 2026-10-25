@@ -34,7 +34,7 @@ class AgentManagerToolHistoryPersistenceTest {
             parentId,
             "main",
             "assistant",
-            "Inspecting the configuration",
+            "",
             "{}",
             ConversationContextPolicy.DIALOGUE,
             assistantToolTurn = true,
@@ -99,8 +99,11 @@ class AgentManagerToolHistoryPersistenceTest {
             AgentManager(db2, mockk(relaxed = true), AgentToolConfigService(db2), ToolEventBus(), TodoEventBus(), AppConfigBean(db2))
         val restored = manager2.getHistory()
         assertTrue(restored.any { it.id == parentId && it.assistantToolTurn })
+        assertEquals("", restored.single { it.id == parentId }.content)
         assertTrue(restored.any { it.parentAssistantTurnId == parentId && it.turnOrder == 0 })
         assertEquals(completedRow.metadata, restored.single { it.id == completedRow.id }.metadata)
+        val request = manager2.conversationOps.buildMainRequest(manager2.conversationOps.loadMainAgentContextFromDb())
+        assertTrue(request.messages.any { it.content.contains("configuration contents") })
         db2.close()
     }
 
