@@ -9,7 +9,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -37,6 +36,7 @@ import de.heckenmann.visualagent.protocol.TodoPort
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.components.*
 import de.heckenmann.visualagent.ui.conversation.*
+import de.heckenmann.visualagent.ui.conversation.live.ConversationPanelProviders
 import de.heckenmann.visualagent.ui.modal.*
 import de.heckenmann.visualagent.ui.status.*
 import de.heckenmann.visualagent.ui.todo.*
@@ -189,9 +189,11 @@ internal fun ConversationPanel(
         suggestionController.onUserInteraction()
         if (interpolation.busy.value) interpolation.cancel() else activeToken?.cancel()
     }
-    CompositionLocalProvider(
-        LocalConversationPort provides conversationPort,
-        LocalClientImagePort provides clientImagePort,
+    ConversationPanelProviders(
+        conversationPort,
+        clientImagePort,
+        activityPort,
+        conversationState,
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             Box(modifier = Modifier.weight(1f).fillMaxWidth().onSizeChanged { viewportSize = it }) {
