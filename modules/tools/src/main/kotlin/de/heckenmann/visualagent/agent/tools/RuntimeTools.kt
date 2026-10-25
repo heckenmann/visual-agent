@@ -55,7 +55,7 @@ class TerminalTool : LiveVisualAgentTool {
         val cancellationRegistration =
             (context["toolCancellationToken"] as? ToolCancellationToken)?.onCancelled { destroyProcessTree(process) }
         val output = StringBuilder()
-        val recent = ArrayDeque<String>()
+        val recent = TerminalLiveLog()
         try {
             reporter?.report(
                 de.heckenmann.visualagent.model
@@ -66,11 +66,10 @@ class TerminalTool : LiveVisualAgentTool {
                 var count = reader.read(chunk)
                 while (count >= 0) {
                     if (output.length < 8000) output.append(chunk, 0, count.coerceAtMost(8000 - output.length))
-                    recent.addLast(String(chunk, 0, count))
-                    if (recent.size > 40) recent.removeFirst()
+                    recent.append(chunk, count)
                     reporter?.report(
                         de.heckenmann.visualagent.model
-                            .ToolLiveState("", 0, "Running command", logs = recent.toList()),
+                            .ToolLiveState("", 0, "Running command", logs = recent.snapshot()),
                     )
                     count = reader.read(chunk)
                 }

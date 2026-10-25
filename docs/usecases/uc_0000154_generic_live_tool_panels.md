@@ -51,7 +51,10 @@ message for each update or sending presentation refreshes back to the model.
 
 ## Current Producers And Limits
 - Sleep reports a deadline; remaining time is computed from that deadline, not decremented.
-- Terminal drains combined output while the process runs, retaining bounded presentation text.
+- Terminal drains combined output while the process runs, retaining up to 40 logical lines
+  with at most 500 characters each. Read-buffer boundaries never become log boundaries.
+  An unfinished line is shown immediately and extended in place; LF, CR and split CRLF
+  delimiters are handled without fabricated blank lines.
 - JavaScript forwards its existing bounded console diagnostics during sandbox execution.
 - Workspace downloads forward measured byte counts from the existing transfer control and retain
   a stable registered artifact reference. Speed and ETA are derived from measured bytes/time.
@@ -77,6 +80,13 @@ accessible, bounded numeric table rather than introducing a chart engine. Dedica
 are not implemented. Download pause/resume continues to use the existing Files controls, not
 duplicate control ownership in Conversation. Generic cancellation and explicit managed-image
 preview are supported directly in live cards.
+
+For terminal framing, Klibs/GitHub research considered kotlinx-io's delimited `readLine`
+API. The existing JDK reader remains in use: the live UI must also expose unfinished lines
+before a delimiter arrives, with application-specific retention bounds. A small invocation-owned
+line accumulator handles that presentation concern without a new I/O dependency or waiting
+for line completion. See the [kotlinx-io API](https://kotlinlang.org/api/kotlinx-io/kotlinx-io-core/kotlinx.io/read-line.html)
+and [repository](https://github.com/Kotlin/kotlinx-io).
 
 For text animation, Klibs/GitHub research also found RollingNumbers, a character/number-oriented
 GPL-3.0 library. It is not added: the required multiline word alignment, retained-log expansion
