@@ -3,6 +3,8 @@
 package de.heckenmann.visualagent.ui.conversation
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -34,7 +36,7 @@ class MessageRowsTest {
     @Test
     fun `message row copies the exact user message source`() {
         var copied = false
-        composeTestRule.setContent {
+        setMessageContent {
             MaterialTheme {
                 MessageRow(
                     message = Message(role = "user", content = "hello", id = "msg-1"),
@@ -61,7 +63,7 @@ class MessageRowsTest {
     @Test
     fun `message row shows retry button when allowed`() {
         var retried = false
-        composeTestRule.setContent {
+        setMessageContent {
             MaterialTheme {
                 MessageRow(
                     message = Message(role = "assistant", content = "hi", id = "msg-1"),
@@ -85,7 +87,7 @@ class MessageRowsTest {
     @Test
     fun `message row shows edit button when allowed`() {
         var edited = false
-        composeTestRule.setContent {
+        setMessageContent {
             MaterialTheme {
                 MessageRow(
                     message = Message(role = "user", content = "hello", id = "msg-1"),
@@ -108,7 +110,7 @@ class MessageRowsTest {
 
     @Test
     fun `message row hides content while deleting`() {
-        composeTestRule.setContent {
+        setMessageContent {
             MaterialTheme {
                 MessageRow(
                     message = Message(role = "assistant", content = "hi", id = "msg-1"),
@@ -130,7 +132,7 @@ class MessageRowsTest {
     @Test
     fun `message row delete button invokes onDelete`() {
         var deleted = false
-        composeTestRule.setContent {
+        setMessageContent {
             MaterialTheme {
                 MessageRow(
                     message = Message(role = "assistant", content = "hi", id = "msg-1"),
@@ -153,7 +155,7 @@ class MessageRowsTest {
 
     @Test
     fun `message row with retry only shows retry button`() {
-        composeTestRule.setContent {
+        setMessageContent {
             MaterialTheme {
                 MessageRow(
                     message = Message(role = "assistant", content = "hi", id = "msg-1"),
@@ -178,7 +180,7 @@ class MessageRowsTest {
 
     @Test
     fun `streaming placeholder shows thinking text`() {
-        composeTestRule.setContent {
+        setMessageContent {
             MaterialTheme {
                 MessageRow(
                     message = Message(role = "assistant", content = "", id = null),
@@ -199,7 +201,7 @@ class MessageRowsTest {
 
     @Test
     fun `thinking markup is rendered separately from the assistant answer`() {
-        composeTestRule.setContent {
+        setMessageContent {
             MaterialTheme {
                 MessageRow(
                     message = Message(role = "assistant", content = "<think>**planning**</think>answer", id = "msg-1"),
@@ -225,7 +227,7 @@ class MessageRowsTest {
 
     @Test
     fun `successful completion hides persisted thinking markup`() {
-        composeTestRule.setContent {
+        setMessageContent {
             MaterialTheme {
                 MessageRow(
                     message = Message(role = "assistant", content = "<think>first\n\nsecond</think>answer", id = "msg-2"),
@@ -248,7 +250,7 @@ class MessageRowsTest {
 
     @Test
     fun `failed request does not render persisted structured reasoning`() {
-        composeTestRule.setContent {
+        setMessageContent {
             MaterialTheme {
                 MessageRow(
                     message = Message(role = "assistant", content = "answer", reasoning = "planning", id = "msg-reasoning"),
@@ -272,7 +274,7 @@ class MessageRowsTest {
 
     @Test
     fun `cancelled request does not render persisted thinking markup`() {
-        composeTestRule.setContent {
+        setMessageContent {
             MaterialTheme {
                 MessageRow(
                     message = Message(role = "assistant", content = "<think>cancelled work</think>answer", id = "msg-cancelled"),
@@ -291,6 +293,13 @@ class MessageRowsTest {
 
         composeTestRule.onNodeWithText("Thinking").assertDoesNotExist()
         composeTestRule.onNodeWithText("answer").assertExists()
+    }
+
+    private fun setMessageContent(content: @Composable () -> Unit) {
+        composeTestRule.setContent {
+            // These assertions test rendered rows, not background parser scheduling.
+            CompositionLocalProvider(LocalMarkdownImmediateParsing provides true, content = content)
+        }
     }
 
     @Test
