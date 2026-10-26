@@ -109,8 +109,8 @@ internal object ProviderTurnResponseMapper {
         val rawFinishReason = response.doneReason() ?: response.done()?.takeIf { it }?.let { "stop" }
         return ProviderTurnResponse(
             model = response.model(),
-            content = response.message().content().orEmpty(),
-            reasoning = response.message().thinking()?.takeIf { it.isNotBlank() },
+            content = response.message()?.content().orEmpty(),
+            reasoning = response.message()?.thinking()?.takeIf { it.isNotBlank() },
             finishReason = normalizeFinishReason(rawFinishReason),
             usage =
                 ProviderTokenUsage(
