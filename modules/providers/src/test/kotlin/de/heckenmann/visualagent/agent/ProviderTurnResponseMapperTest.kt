@@ -110,6 +110,38 @@ class ProviderTurnResponseMapperTest {
     }
 
     @Test
+    fun `preserves terminal ollama metadata when the response has no message`() {
+        val response =
+            OllamaApi.ChatResponse(
+                "model-a",
+                Instant.parse("2026-08-27T10:15:30Z"),
+                null,
+                "stop",
+                true,
+                2_400_000_000L,
+                null,
+                12,
+                800_000_000L,
+                5,
+                1_600_000_000L,
+            )
+
+        val turn = ProviderTurnResponseMapper.fromOllama(response, requestId = "request-final", sequence = 3)
+
+        assertEquals("", turn.content)
+        assertNull(turn.reasoning)
+        assertEquals("model-a", turn.model)
+        assertEquals(ProviderFinishReason.STOP, turn.finishReason)
+        assertEquals(12, turn.usage?.promptTokens)
+        assertEquals(5, turn.usage?.completionTokens)
+        assertEquals(17, turn.usage?.totalTokens)
+        assertEquals(2_400L, turn.timing?.totalMillis)
+        assertEquals("request-final", turn.metadata.requestId)
+        assertEquals(3, turn.metadata.sequence)
+        assertEquals("stop", turn.metadata.rawFinishReason)
+    }
+
+    @Test
     fun `keeps unfinished spring chunks nonterminal`() {
         val response =
             SpringChatResponse(
