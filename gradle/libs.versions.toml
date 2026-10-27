@@ -8,6 +8,7 @@ spring-boot = "4.2.0-RC1"
 spring-ai = "2.1.0-RC1"
 spring-integration = "7.1.2"
 compose = "1.12.2"
+skiko = "0.150.2"
 compose-material3 = "1.9.0"
 compose-material-icons = "1.7.3"
 cmp-clipboard = "3.5.31"
@@ -37,6 +38,7 @@ dnsjava = "3.6.5"
 license-report = "3.1.4"
 
 [libraries]
+skiko = { module = "org.jetbrains.skiko:skiko", version.ref = "skiko" }
 kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
 kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "kotlin" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }

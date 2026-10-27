@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.canvas
 
+import de.heckenmann.visualagent.image.RgbaPngEncoder
 import org.junit.jupiter.api.Test
 import kotlin.test.assertTrue
 
@@ -74,7 +75,8 @@ class CanvasPngRendererTest {
             )
         val snapshot = CanvasSnapshot(figureCount = figures.size, zoomPercent = 100, gridVisible = true, figures = figures)
 
-        val bytes = CanvasPngRenderer.render(snapshot, 300, 200)
+        // The renderer now requires real authorized bytes rather than drawing a placeholder outline.
+        val bytes = CanvasPngRenderer.render(snapshot, 300, 200) { RgbaPngEncoder.encodeArgb(2, 2, IntArray(4) { -1 }) }
 
         assertTrue(isPng(bytes))
         assertTrue(bytes.size > 100)
