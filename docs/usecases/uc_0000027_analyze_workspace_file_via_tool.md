@@ -45,6 +45,8 @@ Agents can work with imported files while content access remains explicit and au
 
 - Raw file contents are not injected into every model request.
 - Hash action supports SHA-256.
+- Content, hash, image, MIME and PDF operations reject symlinked files and ancestors
+  before reading. Cached PDF text does not bypass current managed-path authorization.
 - PDF page previews are stored as immutable generated workspace files with size and SHA-256 metadata.
 - Unsupported vision/model combinations return clear failures.
 - Codex CLI vision requests use the app-server image input protocol and preserve the detected image MIME type.

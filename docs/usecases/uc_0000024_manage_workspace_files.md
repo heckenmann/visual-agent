@@ -62,3 +62,7 @@ Workspace files can be managed without leaving the application.
 - File mutations are visible in the conversation and become model context only with the next user message.
 - Context summaries coalesce repeated operations by normalized path and retain
   actionable failures without copying progress text verbatim.
+- Managed reads reject symbolic links in both the file and its ancestors, including
+  links targeting another file inside the workspace. Canonical containment is checked
+  at resolution time; this is not an OS sandbox against a separate process concurrently
+  replacing directories after validation. The workspace root itself cannot be a link.
