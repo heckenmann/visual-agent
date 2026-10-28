@@ -34,6 +34,8 @@ The conversation contains a durable visual snapshot that can be persisted and re
 - `de.heckenmann.visualagent.canvas.InMemoryCanvasService`
 - `de.heckenmann.visualagent.canvas.CanvasPngRenderer`
 - `de.heckenmann.visualagent.canvas.CanvasCaptureLimits`
+- `de.heckenmann.visualagent.canvas.CanvasImageRasterizer`
+- `de.heckenmann.visualagent.canvas.CanvasTextRasterizer`
 
 ## Acceptance Criteria
 
@@ -50,8 +52,17 @@ The conversation contains a durable visual snapshot that can be persisted and re
   limit of 4,194,304 pixels. Larger or non-finite extents fail before allocation; the
   editable document is unchanged. Move or resize figures into the capture area to retry.
 - Images are read through the registered workspace service, limited to 8 MiB encoded
-  and the same dimension/pixel budget before decoding. PNG, JPEG and GIF are supported;
+  and the same dimension/pixel budget before pixel allocation. Skia Codec's actual
+  image dimensions authorize the allocation, not a separate header parser: a GIF's
+  first frame can exceed its logical-screen header. PNG, JPEG and GIF are supported;
   animated images capture their static frame, not an animation. Scaling preserves aspect ratio.
+- Pixel decoding must complete successfully before an image is drawn. Invalid or
+  incomplete compressed data returns a capture error even when its header is valid;
+  the renderer never reports a successful blank snapshot after a deferred decode failure.
+- Text uses width-aware paragraph layout with at most two lines and overflow
+  ellipsis, including automatic word wrapping and explicit newlines. Rendering is
+  clipped to the figure rectangle. Shaping input is bounded to 32,768 UTF-16 code
+  units per figure; this does not truncate the persisted editable text.
 
 ## Rendering Decision
 
@@ -63,3 +74,10 @@ Its Apache-2.0 bindings expose Skia's CPU raster surfaces, shaping, PNG encoding
 image decoding without importing AWT/Swing or creating a window. Platform-specific
 native runtimes are now also explicit for the standalone server. Their upstream
 Skia/native notices remain part of the exact-artifact release license audit (#410).
+
+The review follow-up uses the existing binding's
+[Codec](https://github.com/JetBrains/skiko/blob/v0.150.2/skiko/src/commonMain/kotlin/org/jetbrains/skia/Codec.kt)
+metadata and checked `readPixels(bitmap)` API instead of deferred image decoding.
+The bitmap is owned by a scoped `use` block so failed decoding releases its native
+allocation. Skia Paragraph supplies shaping, fallback, line breaking and ellipsis;
+no custom image decoder, GIF parser or word-wrapping algorithm is introduced.

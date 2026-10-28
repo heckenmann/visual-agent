@@ -1,17 +1,10 @@
 package de.heckenmann.visualagent.canvas
 
-import de.heckenmann.visualagent.error.CanvasOperationException
-import de.heckenmann.visualagent.workspace.ImageHeaderReader
 import org.jetbrains.skia.Canvas
 import org.jetbrains.skia.EncodedImageFormat
-import org.jetbrains.skia.Font
-import org.jetbrains.skia.FontMgr
-import org.jetbrains.skia.FontStyle
-import org.jetbrains.skia.Image
 import org.jetbrains.skia.Paint
 import org.jetbrains.skia.Rect
 import org.jetbrains.skia.Surface
-import org.jetbrains.skia.shaper.Shaper
 
 /** Renders bounded, server-owned canvas snapshots with Skia's AWT-free CPU raster API. */
 object CanvasPngRenderer {
@@ -56,67 +49,10 @@ object CanvasPngRenderer {
                             paint,
                         )
                     }
-                "text" -> drawText(canvas, figure, bounds, paint)
-                "image" -> drawImage(canvas, figure, bounds, imageBytes)
+                "text" -> CanvasTextRasterizer.draw(canvas, figure.content, bounds, paint.color)
+                "image" -> CanvasImageRasterizer.draw(canvas, figure.content, bounds, imageBytes)
                 else -> canvas.drawRect(bounds, paint)
             }
-        }
-    }
-
-    private fun drawText(
-        canvas: Canvas,
-        figure: CanvasFigureSnapshot,
-        bounds: Rect,
-        paint: Paint,
-    ) {
-        // Skia supplies shaping and font fallback without introducing a desktop window or AWT.
-        FontMgr.default.matchFamilyStyle(null, FontStyle.NORMAL).use { typeface ->
-            Font(typeface, 16f).use { font ->
-                Shaper.make().use { shaper ->
-                    val saved = canvas.save()
-                    try {
-                        canvas.clipRect(bounds)
-                        figure.content.lineSequence().take(2).forEachIndexed { index, line ->
-                            shaper.shapeLine(line.take(16_384), font).use { text ->
-                                canvas.drawTextLine(text, bounds.left, bounds.top + 18f + index * 20f, paint)
-                            }
-                        }
-                    } finally {
-                        canvas.restoreToCount(saved)
-                    }
-                }
-            }
-        }
-    }
-
-    private fun drawImage(
-        canvas: Canvas,
-        figure: CanvasFigureSnapshot,
-        bounds: Rect,
-        imageBytes: (String) -> ByteArray,
-    ) {
-        try {
-            val bytes = imageBytes(figure.content)
-            require(bytes.size <= CanvasCaptureLimits.MAX_IMAGE_BYTES) { "Canvas image exceeds the encoded byte limit" }
-            val dimensions = ImageHeaderReader.dimensions(bytes)
-            CanvasCaptureLimits.validateSize(dimensions.width, dimensions.height)
-            Image.makeFromEncoded(bytes).use { image ->
-                val scale = minOf(bounds.width / image.width, bounds.height / image.height)
-                val width = image.width * scale
-                val height = image.height * scale
-                canvas.drawImageRect(
-                    image,
-                    Rect.makeXYWH(bounds.left + (bounds.width - width) / 2, bounds.top + (bounds.height - height) / 2, width, height),
-                )
-            }
-        } catch (failure: Exception) {
-            if (failure is CanvasOperationException) throw failure
-            throw CanvasOperationException(
-                summary = "Canvas image could not be captured",
-                detail =
-                    "Use a readable managed PNG, JPEG, or GIF image of at most 8 MiB, " +
-                        "4096 pixels per dimension and 4194304 pixels in total.",
-            )
         }
     }
 

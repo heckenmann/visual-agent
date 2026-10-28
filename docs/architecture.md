@@ -587,7 +587,11 @@ no Compose node, window or desktop toolkit is involved. Registered image referen
 are authorized by `WorkspaceFileService`, not opened as arbitrary filesystem paths.
 `CanvasCaptureLimits` rejects non-finite geometry, dimensions above 4096 and rasters
 above 4,194,304 pixels before allocation. Encoded images are limited to 8 MiB and
-their header dimensions are validated before decoding. Infinite editing coordinates
+their authoritative Skia Codec dimensions are validated before allocating the decoded
+32-bit bitmap. Codec pixel-read failures, including incomplete/corrupt compressed
+data, abort capture rather than silently drawing an empty deferred image. Glyphs
+use Skia Paragraph's width-aware two-line wrapping and ellipsis, clipped to the
+figure bounds. Infinite editing coordinates
 are not truncated to fit a capture; an oversized capture fails with an actionable error.
 
 `image/RgbaPngEncoder.kt` remains the in-house AWT-free encoder for generated test
