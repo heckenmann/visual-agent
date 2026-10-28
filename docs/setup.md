@@ -2,9 +2,9 @@
 
 ## Prerequisites
 
-- Java 21+ (the project auto-resolves the JDK 24 toolchain locally; CI uses JDK 21 so the Foojay toolchain resolver can fetch 24).
-- The Gradle wrapper version is defined centrally in `gradle/wrapper/gradle-wrapper.properties`; the package-and-smoke workflow validates release tags against the project version only for release-triggered runs. The Wrapper JAR is intentionally excluded from version control. In a fresh clone, run `gradle wrapper --gradle-version <version from gradle-wrapper.properties>` once before using `./gradlew`.
-- Ollama running locally (`ollama serve`) or a reachable remote Ollama endpoint.
+- Java 21+ (the project auto-resolves the JDK 24 toolchain locally; CI installs JDK 24 explicitly).
+- The Gradle wrapper version is defined centrally in `gradle/wrapper/gradle-wrapper.properties` and is independent of the Visual Agent application version. The Wrapper JAR is intentionally excluded from version control. In a fresh clone, run `gradle wrapper --gradle-version <version from gradle-wrapper.properties> --no-daemon` once before using `./gradlew`.
+- A configured model provider: Ollama (local or remote), OpenAI-compatible, Codex CLI, or Codex Direct. Ollama must be running (`ollama serve`) only when using that provider.
 - H2 is embedded and accessed through Spring Data R2DBC. Versioned schema migrations run automatically before the stores are created.
 
 ## Build and Run
@@ -65,6 +65,30 @@ Publishing a release through GitHub triggers the package-and-smoke workflow for 
 the separate asset workflow uploads the verified packages to the existing release. The release
 itself is already visible while packages are being tested; a failed test leaves it without these assets.
 
+### Release Versions
+
+Create and publish a GitHub release with a Semantic Version tag. An optional `v` prefix is accepted;
+`v1.2.3`, `v1.2.3-beta.1`, and `v1.2.3-beta.1+build.7` are valid examples.
+The workflow supplies the tag to every Gradle build through `ORG_GRADLE_PROJECT_releaseTag`.
+`gradle/release-version.settings.gradle.kts` validates it, removes the optional `v`, and overrides
+the shared `visual-agent` catalog entry. No source file or Git commit is changed by the release build.
+
+All application modules, executable JARs, and runtime version metadata receive the full version.
+Native installer metadata uses only `MAJOR.MINOR.PATCH`; Windows MSI limits major/minor to 255
+and patch to 65535. Same-core prereleases therefore share a native installer version, although
+their application metadata and GitHub release tags remain distinct.
+
+Local builds and manually dispatched smoke runs keep the version in `gradle/libs.versions.toml`.
+To reproduce a release build locally without publishing anything:
+
+```bash
+./gradlew printProjectVersion -PreleaseTag=v1.2.3-beta.1 --no-daemon
+./gradlew :desktop:stageReleaseJar -PreleaseTag=v1.2.3-beta.1 --no-daemon
+```
+
+Creating or pushing a tag alone does not start release packaging. See
+[UC-0000146](usecases/uc_0000146_smoke_test_packaged_release_artifacts.md) for the full pipeline and constraints.
+
 Each JAR requires Java 24 and must be used only on the platform for which it was built. It does
 not provide native launcher or package-manager integration.
 
@@ -82,6 +106,16 @@ Standard checks:
 ```bash
 ./gradlew ktlintCheck check test
 ```
+
+Executable JAR and native-launcher verification is separate from `check`, but included in `build`:
+
+```bash
+./gradlew verifyPackages --no-daemon
+python3 -m unittest discover -s scripts -p 'test_release_*.py'
+```
+
+The Python suite includes offline Gradle fixture builds, so generate the wrapper first. It checks
+release version propagation, local/manual defaults, invalid tags, and workflow publication rules.
 
 Additional enforced checks in current build:
 
@@ -103,14 +137,19 @@ List local models:
 ollama list
 ```
 
-The Session panel configures:
+**Settings > Providers** configures:
 
 - Dynamic provider profiles and runtime adapters
 - Base URL and optional bearer API key
-- Selected model and model catalog metadata
+- Model catalog metadata and profile defaults
 - Model status, context/output limits, whitelist/blacklist rules, and options
 
-The API key is stored as `ollama.api.key` in the H2 `user_preferences` table. It is not written to `app.properties` or configuration exports. When configured, requests include:
+Select the active provider/model from the searchable picker in the Conversation composer.
+Conversation settings controls context limits and message behavior, not provider credentials.
+
+Provider profiles and their API keys are persisted in H2 `user_preferences` under
+`llm.provider.catalog.v1`; the legacy `ollama.api.key` preference is retained for compatibility.
+Keys are not written to `app.properties` or configuration exports. When configured, requests include:
 
 ```http
 Authorization: Bearer <key>

@@ -1,5 +1,7 @@
 rootProject.name = "visual-agent"
 
+apply(from = "gradle/release-version.settings.gradle.kts")
+
 include(
     ":application",
     ":ui",

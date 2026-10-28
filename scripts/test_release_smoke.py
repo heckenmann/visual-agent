@@ -144,6 +144,28 @@ class ReleaseWorkflowTest(unittest.TestCase):
                 self.assertNotEqual(0, result.returncode)
                 self.assertEqual("", environment)
 
+    def test_semver_prerelease_and_build_metadata_keep_the_original_release_tag(self):
+        for tag in ("v2.3.4-beta.1+build.7", "2.3.4"):
+            with self.subTest(tag=tag):
+                result, environment = self.run_metadata(tag, "true")
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertIn(f"RELEASE_TAG={tag}\n", environment)
+
+    def test_release_version_input_applies_to_every_gradle_job_without_shell_interpolation(self):
+        workflow = (pathlib.Path(__file__).parents[1] / ".github/workflows/package-smoke.yml").read_text()
+        environment = workflow.split("\njobs:", 1)[0]
+        self.assertIn(
+            "ORG_GRADLE_PROJECT_releaseTag: ${{ github.event_name == 'release' && github.event.release.tag_name || '' }}",
+            environment,
+        )
+        self.assertNotIn('expected_tag="v${gradle_version}"', workflow)
+        self.assertNotRegex(workflow, r"run:.*\$\{\{ github.event.release.tag_name")
+        desktop = (pathlib.Path(__file__).parents[1] / "modules/desktop/build.gradle.kts").read_text()
+        self.assertRegex(
+            desktop,
+            r"packageVersion\s*=\s*project\.version\s*\.toString\(\)\s*\.substringBefore\('-'\)\s*\.substringBefore\('\+'\)",
+        )
+
     def test_workflow_dispatch_is_tag_free_and_release_creation_is_disabled(self):
         root = pathlib.Path(__file__).parents[1] / ".github/workflows"
         smoke = (root / "package-smoke.yml").read_text()

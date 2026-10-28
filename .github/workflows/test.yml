@@ -60,7 +60,7 @@ jobs:
         run: env -u DISPLAY -u WAYLAND_DISPLAY ./gradlew ktlintCheck check test --build-cache --no-daemon --parallel --max-workers=4 -PtestMaxParallelForks=4
 
       - name: Verify offscreen and native smoke workflow contracts
-        run: python3 -m unittest discover -s scripts -p test_release_smoke.py
+        run: python3 -m unittest discover -s scripts -p 'test_release_*.py'
 
   package-smoke:
     name: Package and launch

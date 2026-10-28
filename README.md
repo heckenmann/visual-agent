@@ -42,9 +42,17 @@ the selected connection.
 
 Supported native release platforms are macOS (Apple Silicon and Intel), Windows x64, and Linux x86_64. The Linux AppImage is portable; the DEB and RPM packages integrate with the system package manager and application menu. A platform-matched executable JAR is additionally available for Java 24 environments.
 
+Publishing a GitHub release builds its tag with the corresponding Gradle application version automatically
+(for example, `v1.2.3-beta.1` becomes `1.2.3-beta.1`), without changing the checked-in version catalog.
+Tags must be Semantic Versions, with or without a `v` prefix (`v` is recommended).
+Native installer versions use the numeric `1.2.3` core; application metadata and JARs retain the full version.
+Assets are attached only after package smoke tests pass. Creating a tag alone does not trigger publication.
+Local builds and manually dispatched smoke tests use the catalog's default version.
+See [Release Versions](docs/setup.md#release-versions) for examples, installer limits, and local reproduction.
+
 ## Features
 
-- Chat with local (Ollama) or remote (OpenAI-compatible) models, with streaming responses.
+- Chat with Ollama, OpenAI-compatible, Codex CLI, or CLI-independent Codex Direct providers, with streaming responses.
 - Editable canvas where the model can draw text, shapes, and images.
 - Managed workspace files the model can import, read, search, and render (including PDF page previews).
 - Todo list and sub-agents that can work on tasks autonomously.
@@ -99,6 +107,9 @@ Filesystem ownership follows the same structure:
 ```text
 application/          # :application
 modules/ui/           # :ui
+modules/desktop/      # :desktop, startup and native packaging
+modules/protocol/     # :protocol, shared client/server contracts
+modules/task-core/    # :task-core, shared task models
 modules/agent-core/   # :agent-core
 modules/model-core/   # :model-core, pure capability evidence and override resolution
 modules/provider-core/ # :provider-core
@@ -138,6 +149,8 @@ See the module READMEs for ownership and migration details: [`:application`](app
 - [SubAgents](docs/subagents.md) — autonomous/sub-agent model, tool sets, autonomous loop
 - [Compose Migration Audit](docs/compose-migration-audit.md) — per-requirement evidence for the JavaFX to Compose Multiplatform decision
 - [Development Conventions](docs/conventions.md) — use-case traceability and documentation rules
+- [Codex Direct Provider](docs/codex-direct-provider.md) — CLI-independent Responses adapter and authentication
+- [Release Package Verification](docs/usecases/uc_0000146_smoke_test_packaged_release_artifacts.md) — versioning, package matrix, smoke tests, and publication
 
 ## License
 

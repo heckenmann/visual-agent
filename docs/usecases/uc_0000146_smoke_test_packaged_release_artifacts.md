@@ -13,7 +13,7 @@ Release workflow.
 - The package-and-smoke workflow builds all platform artifacts and uploads them as workflow artifacts.
 - Linux package tests run in Ubuntu or Fedora containers with a virtual display; macOS and Windows tests run on matching hosted runners.
 - A maintainer can manually dispatch the package-and-smoke workflow for a branch (normally `master`) without an existing tag or release. Manual runs never publish assets.
-- Publishing a GitHub release triggers the same package-and-smoke workflow for the associated tag. Only this path validates the tag against the project version and uploads assets after successful tests.
+- Publishing a GitHub release triggers the same package-and-smoke workflow for the associated tag. This path derives the Gradle project version from the tag and uploads assets only after successful tests.
 - No model provider credentials or configured external endpoints are required.
 
 ## Main Flow
@@ -40,6 +40,7 @@ Every published native installer, portable Linux package, and platform-specific 
 
 - `.github/workflows/package-smoke.yml`
 - `.github/workflows/release.yml`
+- `gradle/release-version.settings.gradle.kts`
 - `scripts/smoke-release-posix.py`
 - `scripts/smoke-release-windows.ps1`
 - `de.heckenmann.visualagent.desktop.DesktopStartupSmokeSupport`
@@ -60,3 +61,20 @@ Every published native installer, portable Linux package, and platform-specific 
 - Independent OS, architecture, and artifact smoke jobs run in parallel after the package matrix completes.
 - Manual runs execute the same build and smoke jobs for the selected commit without tag/version validation or release publication.
 - Asset upload is defined in a separate workflow and starts only after the package-and-smoke workflow succeeds. It never creates a release.
+- Release tags must be Semantic Versions, with an optional `v` prefix, such as `v1.2.3` or `v1.2.3-beta.1+build.7`.
+  The prefix is removed for Gradle; prerelease/build metadata is preserved in runtime metadata and JAR versions.
+- All verification and packaging jobs receive the same `ORG_GRADLE_PROJECT_releaseTag` environment input.
+  Gradle's Provider/version-catalog API overrides the shared `visual-agent` version before any module is configured;
+  the source catalog remains unchanged. Local and manual smoke builds retain its checked-in default.
+- Native installer versions use only `MAJOR.MINOR.PATCH` because MSI/DMG and RPM cannot all accept SemVer suffixes.
+  Major/minor must be at most 255 and patch at most 65535 to fit the Windows MSI format.
+  Prereleases with the same numeric core therefore share an installer version; they are not distinct native upgrade versions.
+  The original tag, including suffixes, still identifies the release receiving the assets.
+
+## Versioning Decision
+
+Issue #503 uses Gradle's built-in [project-property Provider API](https://docs.gradle.org/current/userguide/project_properties.html)
+and [catalog version overrides](https://docs.gradle.org/current/userguide/version_catalogs.html#sec:overwriting-catalog-versions)
+rather than adding a versioning library or modifying the source checkout. Workflow-wide environment propagation
+prevents the verification and package matrix from using different application versions. Native installer versions
+follow [Compose's platform-specific restrictions](https://kotlinlang.org/docs/multiplatform/compose-native-distribution.html#package-version).

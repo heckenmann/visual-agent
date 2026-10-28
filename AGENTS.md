@@ -11,8 +11,9 @@
 - Run one test class/method: `./gradlew test --tests "de.heckenmann.visualagent.<path>.<TestClass>.<method>"`.
 - Run smoke tests against real Ollama: `./gradlew test -Dvisualagent.ollama.smoke=true` (default `false`).
 - Copy dependencies to `./lib/`: `./gradlew :application:copyAllDependencies`.
-- Java toolchain is **JDK 24** (`jvmToolchain(24)`); CI runs on **JDK 21** to let the toolchain resolver fetch 24.
+- Java toolchain is **JDK 24** (`jvmToolchain(24)`); CI installs **JDK 24** explicitly.
 - The Gradle wrapper version is defined centrally in `gradle/wrapper/gradle-wrapper.properties`; CI reads that version when bootstrapping the wrapper. You only need a local Gradle installation to regenerate it.
+- The application version defaults to `gradle/libs.versions.toml`. GitHub release builds pass `ORG_GRADLE_PROJECT_releaseTag`; `gradle/release-version.settings.gradle.kts` validates SemVer and overrides the shared application version (optional `v` removed). Runtime/JAR metadata keeps the full version; native installers use its numeric core. Never rewrite the catalog to prepare a release.
 - `gradle.properties` sets `org.gradle.daemon=false` (matches CI).
 
 ## Pre-Commit Quality Gates
