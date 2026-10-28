@@ -210,7 +210,12 @@ compose.desktop {
                 "jdk.unsupported",
             )
             packageName = "Visual Agent"
-            packageVersion = project.version.toString()
+            // Installer formats require a numeric version; runtime metadata/JARs retain the full release version.
+            packageVersion =
+                project.version
+                    .toString()
+                    .substringBefore('-')
+                    .substringBefore('+')
             macOS {
                 bundleID = "de.heckenmann.visualagent"
                 iconFile.set(generatedMacOsIcon)

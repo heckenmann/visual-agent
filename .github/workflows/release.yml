@@ -37,7 +37,7 @@ jobs:
             echo "Manual smoke workflow completed; skipping publication."
             exit 0
           fi
-          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-+][a-zA-Z0-9.-]+)?$ ]] || exit 1
+          [[ "$tag" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$ ]] || exit 1
           echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
           echo "PUBLISH_RELEASE=true" >> "$GITHUB_ENV"
 
