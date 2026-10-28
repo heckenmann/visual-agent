@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document records the incremental Gradle modularisation planned in issues #157, #165, #178, and #65. It establishes dependency directions before source files are relocated.
+This document records the current Gradle module boundaries and dependency rules, building on the modularisation introduced in issues #157, #165, #178, and #65.
 
 ## Current module graph
 
@@ -19,7 +19,8 @@ This document records the incremental Gradle modularisation planned in issues #1
 
 :providers
  ├── :provider-standard
- └── :provider-openai-codex
+ ├── :provider-openai-codex
+ └── :provider-codex-direct
 
 :provider-standard
  ├── :provider-core
@@ -28,6 +29,10 @@ This document records the incremental Gradle modularisation planned in issues #1
 :provider-openai-codex
  ├── :provider-core
  └── :agent-core
+
+:provider-codex-direct
+ ├── :provider-core
+ └── :provider-standard
 
 :tools
  ├── :tool-standard
@@ -52,12 +57,14 @@ The filesystem layout mirrors the ownership boundary without changing Gradle pro
 application/          # :application, the composition root
 modules/ui/           # :ui, a leaf module
 modules/protocol/     # :protocol, versioned gRPC contract
+modules/task-core/    # :task-core, shared task models
 modules/desktop/      # :desktop, Compose/server endpoint host
 modules/agent-core/   # :agent-core, shared cancellation primitives
 modules/model-core/   # :model-core, dependency-free model capability evidence
 modules/provider-core/ # :provider-core, shared provider contracts and catalog
 modules/providers/    # :provider-standard, built-in Ollama/OpenAI-compatible adapters
 modules/provider-openai-codex/ # :provider-openai-codex, OpenAI Codex CLI adapter
+modules/provider-codex-direct/ # :provider-codex-direct, direct Responses/OAuth adapter
 modules/providers-bundle/ # :providers, provider aggregate
 modules/tools/        # :tool-standard, built-in tools
 modules/tool-javascript/ # :tool-javascript, GraalJS tool
@@ -66,7 +73,16 @@ modules/tools-bundle/ # :tools, tool aggregate
 
 ## Version management
 
-`gradle/libs.versions.toml` is the authoritative source for the main Visual Agent build's project version, plugin versions, library versions, and BOM versions. Main-build module scripts must use its `libs` aliases and `libs.versions.visual.agent` instead of inline version literals. The root `verifyCentralizedVersions` check enforces this rule for every main-build module.
+`gradle/libs.versions.toml` is the authoritative source for the main Visual Agent build's default project version, plugin versions, library versions, and BOM versions. Main-build module scripts must use its `libs` aliases and `libs.versions.visual.agent` instead of inline version literals. The root `verifyCentralizedVersions` check enforces this rule for every main-build module.
+
+For release builds, `gradle/release-version.settings.gradle.kts` overrides only the `visual-agent`
+catalog entry from the validated `releaseTag` Gradle project property before module configuration.
+The GitHub release workflow supplies it through the workflow-wide `ORG_GRADLE_PROJECT_releaseTag`
+environment variable; local builds may use `-PreleaseTag=v1.2.3`. The optional `v` prefix is removed,
+but the complete SemVer, including prerelease/build metadata, reaches application/JAR metadata.
+Native installer metadata uses the numeric core because not all package formats support SemVer
+suffixes. The source catalog and dependency/plugin versions remain unchanged. Manual smoke runs
+without a release tag retain the checked-in default. See [release version instructions](setup.md#release-versions).
 
 The Foojay toolchain resolver is the sole settings-only plugin and remains declared once in `settings.gradle.kts`, where Gradle evaluates it before the catalog is available. It is not applied by, or shared between, main-build modules.
 
@@ -95,7 +111,11 @@ transports alike.
 
 `:provider-standard` owns the configured-provider router and the built-in Ollama and OpenAI-compatible adapters. It depends on `:provider-core` and `:agent-core`.
 
-`:provider-openai-codex` owns the OpenAI Codex CLI/app-server adapter. It depends on the provider contracts in `:provider-core`, not on the provider aggregate. The `:providers` aggregate exposes it transitively together with `:provider-standard`.
+`:provider-openai-codex` owns the OpenAI Codex CLI/app-server adapter. It depends on the provider contracts in `:provider-core`, not on the provider aggregate. The `:providers` aggregate exposes it transitively together with `:provider-standard` and `:provider-codex-direct`.
+
+`:provider-codex-direct` owns the CLI-independent Responses adapter with explicit ChatGPT OAuth or
+API-key authentication. It exposes `:provider-core` contracts and uses shared request construction
+from `:provider-standard`; it never depends on the provider aggregate or desktop UI.
 
 `:tool-standard` owns provider-neutral tool contracts, registry infrastructure, lifecycle events, parsing helpers, and the standard tool implementations. It has no Gradle project dependency on `:application`, `:ui`, or providers.
 
@@ -107,7 +127,7 @@ transports alike.
 - `:desktop` may depend on `:ui`, `:protocol`, and the server bootstrap artifact.
 - `:ui` may depend only on `:protocol`; it must not depend on Spring, `:application`, providers,
   tools, persistence, or application implementation types.
-- `:agent-core`, `:provider-core`, `:provider-standard`, `:provider-openai-codex`, `:providers`, `:tool-standard`, `:tool-javascript`, and `:tools` must not depend on `:application` or `:ui`.
+- `:agent-core`, `:provider-core`, `:provider-standard`, `:provider-openai-codex`, `:provider-codex-direct`, `:providers`, `:tool-standard`, `:tool-javascript`, and `:tools` must not depend on `:application` or `:ui`.
 - The dependency graph is strictly one-way from hosts to contracts and implementations.
 - A submodule declares any contract it needs; `:application` supplies the contract implementation and composes the modules.
 - Spring and Compose composition remains in `:application` until a later module owns a complete independent runtime boundary.

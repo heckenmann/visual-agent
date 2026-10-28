@@ -6,6 +6,10 @@ Visual Agent uses Spring Data R2DBC over embedded H2. Spring Boot Flyway applies
 
 - [Architecture](architecture.md) - System architecture, runtime flow, in-flight indicator, current constraints
 - [Setup Guide](setup.md) - Installation, prerequisites, run/test commands, troubleshooting
+- [Release Versions](setup.md#release-versions) - Semantic Version tags, Gradle propagation, and native installer limits
+- [Gradle Module Architecture](gradle-module-architecture.md) - Module graph, dependency rules, and shared version catalog
+- [Release Package Verification](usecases/uc_0000146_smoke_test_packaged_release_artifacts.md) - Parallel package/smoke jobs and separate asset publication
+- [Codex Direct Provider](codex-direct-provider.md) - CLI-independent Responses adapter and authentication
 - [API Reference](api.md) - `LLMProvider`, Spring AI integration, tool-calling contracts, activity surface
 - [Database Schema](database.md) - H2 schema, indexes, persistence behavior
 - [SubAgents](subagents.md) - Autonomous/sub-agent model, tool sets, autonomous loop
