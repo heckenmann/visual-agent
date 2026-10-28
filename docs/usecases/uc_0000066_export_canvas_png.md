@@ -34,7 +34,7 @@ The current canvas can be inspected and reused as a PNG image in the managed wor
 - `de.heckenmann.visualagent.ui.canvas.CanvasPanel`
 - `de.heckenmann.visualagent.canvas.InMemoryCanvasService`
 - `de.heckenmann.visualagent.canvas.CanvasPngRenderer`
-- `de.heckenmann.visualagent.image.RgbaPngEncoder`
+- `de.heckenmann.visualagent.canvas.CanvasCaptureLimits`
 - `de.heckenmann.visualagent.workspace.WorkspaceFileService`
 
 ## Acceptance Criteria
@@ -43,3 +43,10 @@ The current canvas can be inspected and reused as a PNG image in the managed wor
 - The written file is valid PNG bytes.
 - The capture is rendered from toolkit-neutral canvas data instead of UI chrome or selection handles.
 - The UI capture action is disabled until a non-blank PNG filename is available.
+- Capture uses the same bounded Skia renderer as immutable conversation snapshots
+  (UC-0000032): actual glyphs/images, authorized managed image bytes, aspect-preserving
+  scaling, at most 4096 pixels per dimension and 4,194,304 pixels overall. Decoder
+  dimensions are checked before bitmap allocation and decoding must succeed before
+  drawing. Text wraps to the figure width with a two-line limit and ellipsis.
+  Oversized, corrupt or incomplete input returns an actionable error and does not
+  mutate the editable document.

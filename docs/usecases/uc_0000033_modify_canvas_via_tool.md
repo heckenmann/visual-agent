@@ -2,6 +2,10 @@
 
 ## Goal
 
+Canvas capture bounds and rendering behavior are specified in UC-0000032 and UC-0000066.
+Editing coordinates remain independent of the capture budget; an oversized capture
+fails explicitly instead of allocating an unbounded raster or changing the drawing.
+
 Allow enabled sub-agents to inspect and modify the canvas through explicit tool calls.
 
 ## Primary Actor

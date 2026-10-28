@@ -62,6 +62,21 @@ dependencies {
     // Workspace document analysis
     implementation(libs.pdfbox)
     implementation(libs.tika.core)
+    implementation(libs.skiko)
+    val skikoPlatform =
+        when {
+            System.getProperty("os.name").startsWith("Mac", ignoreCase = true) -> "macos"
+            System.getProperty("os.name").startsWith("Windows", ignoreCase = true) -> "windows"
+            System.getProperty("os.name").startsWith("Linux", ignoreCase = true) -> "linux"
+            else -> error("Unsupported Skia runtime operating system")
+        }
+    val skikoArch =
+        when (System.getProperty("os.arch")) {
+            "aarch64", "arm64" -> "arm64"
+            "amd64", "x86_64" -> "x64"
+            else -> error("Unsupported Skia runtime architecture")
+        }
+    runtimeOnly("org.jetbrains.skiko:skiko-awt-runtime-$skikoPlatform-$skikoArch:${libs.versions.skiko.get()}")
     implementation(libs.apache.httpclient5)
     implementation(libs.commons.net)
     implementation(libs.mina.sshd.scp)
@@ -102,7 +117,7 @@ tasks.test {
     System.getProperties().stringPropertyNames().filter { it.startsWith("visualagent.taskEval.") }.forEach { key ->
         systemProperty(key, System.getProperty(key))
     }
-    jvmArgs("-Xshare:off", "-Xmx2g", "-Dkotlinx.coroutines.debug=off")
+    jvmArgs("-Xshare:off", "-Xmx2g", "-Dkotlinx.coroutines.debug=off", "--enable-native-access=ALL-UNNAMED")
     // The root coverage gate consumes this execution data alongside current classes.
     outputs.cacheIf { false }
 }
@@ -190,9 +205,16 @@ val verifyExecutableJar =
                 check(attributes.getValue("Start-Class") == "de.heckenmann.visualagent.VisualAgentApplicationKt") {
                     "Application boot JAR must declare the Kotlin application entry point as Start-Class"
                 }
+                check(attributes.getValue("Enable-Native-Access") == "ALL-UNNAMED") {
+                    "Application boot JAR must authorize the Skia native renderer"
+                }
             }
         }
     }
+
+tasks.named<BootJar>("bootJar") {
+    manifest.attributes["Enable-Native-Access"] = "ALL-UNNAMED"
+}
 
 tasks.register("runServer") {
     group = "application"
@@ -201,6 +223,7 @@ tasks.register("runServer") {
 }
 
 tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
     workingDir(rootProject.projectDir)
     systemProperty("spring.output.ansi.enabled", "ALWAYS")
     // Forward explicit overrides to the forked JVM; use the repository database only as the

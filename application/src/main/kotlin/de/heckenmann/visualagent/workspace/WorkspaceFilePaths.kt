@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.workspace
 
 import java.nio.file.Files
+import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path
 import java.security.MessageDigest
 import kotlin.io.path.createDirectories
@@ -24,6 +25,7 @@ internal object WorkspaceFilePaths {
             .normalize()
             .resolve("workspace")
             .normalize()
+            .also { require(!Files.isSymbolicLink(it)) { "The managed workspace root cannot be a symbolic link" } }
             .also { it.createDirectories() }
             .toRealPath()
 
@@ -56,9 +58,16 @@ internal object WorkspaceFilePaths {
         relativePath: String,
         workspaceRoot: Path,
     ): Path {
-        val resolved = resolveWorkspacePath(relativePath, workspaceRoot)
-        require(resolved.exists() && resolved.isRegularFile()) { "Workspace file does not exist" }
-        return resolved
+        val root = workspaceRoot.toRealPath()
+        val resolved = resolveWorkspacePath(relativePath, root)
+        var current = root
+        root.relativize(resolved).forEach { segment ->
+            current = current.resolve(segment)
+            require(!Files.isSymbolicLink(current)) { "Managed workspace paths cannot contain symbolic links" }
+            require(current.toRealPath().startsWith(root)) { "Path escapes workspace root" }
+        }
+        require(resolved.isRegularFile(NOFOLLOW_LINKS)) { "Workspace file does not exist" }
+        return resolved.toRealPath().also { require(it.startsWith(root)) { "Path escapes workspace root" } }
     }
 
     /** Resolves a workspace-relative path and rejects path traversal without requiring the file to exist. */

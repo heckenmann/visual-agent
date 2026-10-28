@@ -581,11 +581,23 @@ figures to PNG; `canvas/CanvasDocumentCodec.kt` encodes editable
 mutation; explicit saves use `canvas.saveDocument(name)` to write a
 named managed workspace file under `<server-data-root>/workspace/canvas/`.
 
-Image rendering is in-house: `image/RgbaPngEncoder.kt` (no AWT or
-`ImageIO`), `workspace/ImageHeaderReader.kt` for PNG/JPEG/GIF
-dimensions, and `workspace/PdfPagePreviewRenderer.kt` for text-only
-PDF page previews (PDFBox is used only for text extraction;
-`pdfbox.rendering` is forbidden by `desktopApiUsageCheck`).
+Canvas captures use Skiko's AWT-free Skia CPU raster API, with the same pinned
+version as Compose. Glyph shaping, image decoding and PNG encoding stay server-owned;
+no Compose node, window or desktop toolkit is involved. Registered image references
+are authorized by `WorkspaceFileService`, not opened as arbitrary filesystem paths.
+`CanvasCaptureLimits` rejects non-finite geometry, dimensions above 4096 and rasters
+above 4,194,304 pixels before allocation. Encoded images are limited to 8 MiB and
+their authoritative Skia Codec dimensions are validated before allocating the decoded
+32-bit bitmap. Codec pixel-read failures, including incomplete/corrupt compressed
+data, abort capture rather than silently drawing an empty deferred image. Glyphs
+use Skia Paragraph's width-aware two-line wrapping and ellipsis, clipped to the
+figure bounds. Infinite editing coordinates
+are not truncated to fit a capture; an oversized capture fails with an actionable error.
+
+`image/RgbaPngEncoder.kt` remains the in-house AWT-free encoder for generated test
+images and `workspace/PdfPagePreviewRenderer.kt` text-only PDF page previews.
+`workspace/ImageHeaderReader.kt` inspects PNG/JPEG/GIF dimensions. PDFBox is used
+only for text extraction; `pdfbox.rendering` remains forbidden by `desktopApiUsageCheck`.
 
 The Compose canvas surface uses `io.github.xingray:compose-infinite-canvas-core`
 for pan/zoom, with a top-level `Canvas` overlay for the pen drawing mode

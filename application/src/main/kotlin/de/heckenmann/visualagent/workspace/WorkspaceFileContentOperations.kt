@@ -36,9 +36,10 @@ internal class WorkspaceFileContentOperations(
 
     /** Extracts and caches text from a managed PDF. */
     fun extractPdfText(record: WorkspaceFileRecord): WorkspaceFileText {
+        val path = resolvePath(record.relativePath)
         record.extractedText?.let { return WorkspaceFileText(it.take(MAX_TEXT_CHARS), cached = true) }
         val text =
-            Loader.loadPDF(resolvePath(record.relativePath).toFile()).use { document ->
+            Loader.loadPDF(path.toFile()).use { document ->
                 PDFTextStripper().getText(document).trim().take(MAX_TEXT_CHARS)
             }
         store.saveWorkspaceFile(record.copy(extractedText = text, updatedAt = java.time.Instant.now()))

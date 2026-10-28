@@ -30,6 +30,7 @@ tasks.withType<org.gradle.api.tasks.JavaExec>().configureEach {
     dependsOn(":ui:jar")
     workingDir(rootProject.projectDir)
     jvmArgs("-Djava.awt.headless=false")
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
     if (name == "run") {
         systemProperty("spring.output.ansi.enabled", "ALWAYS")
         description = "Builds and runs Visual Agent through the native launcher for the current operating system."
@@ -181,6 +182,7 @@ compose.desktop {
         jvmArgs +=
             listOfNotNull(
                 "-Djava.awt.headless=false",
+                "--enable-native-access=ALL-UNNAMED",
                 when {
                     System.getProperty("os.name").contains("win", ignoreCase = true) -> "-Dvisual-agent.package.type=windows-msi"
                     System.getProperty("os.name").contains("mac", ignoreCase = true) -> "-Dvisual-agent.package.type=macos-dmg"
@@ -399,6 +401,7 @@ val desktopMainOutput =
 
 val desktopBootJar =
     tasks.named<BootJar>("bootJar") {
+        manifest.attributes["Enable-Native-Access"] = "ALL-UNNAMED"
         setClasspath(files(desktopMainOutput, desktopRuntimeClasspath))
     }
 
@@ -775,6 +778,9 @@ val verifyExecutableJar =
                 }
                 check(attributes.getValue("Start-Class") == "de.heckenmann.visualagent.desktop.DesktopMain") {
                     "Desktop boot JAR must declare DesktopMain as Start-Class"
+                }
+                check(attributes.getValue("Enable-Native-Access") == "ALL-UNNAMED") {
+                    "Desktop boot JAR must authorize the Skia native renderer"
                 }
                 check(archive.getJarEntry("BOOT-INF/classes/de/heckenmann/visualagent/desktop/DesktopMain.class") != null) {
                     "Desktop boot JAR must contain its configured start class"

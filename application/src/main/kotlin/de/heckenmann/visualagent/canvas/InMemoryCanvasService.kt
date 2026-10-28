@@ -5,7 +5,6 @@ import de.heckenmann.visualagent.workspace.WorkspaceFileService
 import org.springframework.stereotype.Service
 import kotlin.io.path.readText
 import kotlin.math.max
-import kotlin.math.roundToInt
 
 /**
  * Toolkit-neutral canvas service used by model tools during the Compose migration.
@@ -224,20 +223,11 @@ class InMemoryCanvasService(
         val normalizedFormat = format.lowercase().ifBlank { "png" }
         require(normalizedFormat == "png") { "Only PNG canvas capture is supported during the Compose migration" }
         val snapshot = snapshot()
-        val width =
-            max(
-                800,
-                snapshot.figures.maxOfOrNull { (it.x + it.width + 40.0).roundToInt() } ?: 800,
-            )
-        val height =
-            max(
-                600,
-                snapshot.figures.maxOfOrNull { (it.y + it.height + 40.0).roundToInt() } ?: 600,
-            )
+        val (width, height) = CanvasCaptureLimits.dimensions(snapshot)
         return CanvasImageSnapshot(
             format = "png",
             mimeType = "image/png",
-            bytes = CanvasPngRenderer.render(snapshot, width, height),
+            bytes = CanvasPngRenderer.render(snapshot, width, height, ::readCaptureImage),
             width = width,
             height = height,
         )
