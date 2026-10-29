@@ -82,6 +82,13 @@ class ReleaseSmokeTest(unittest.TestCase):
 
 
 class ReleaseWorkflowTest(unittest.TestCase):
+    def test_ci_retains_live_test_identities_without_standard_output(self):
+        build = (pathlib.Path(__file__).parents[1] / "build.gradle.kts").read_text()
+        self.assertIn('providers.environmentVariable("GITHUB_ACTIONS")', build)
+        self.assertIn('providers.gradleProperty("testLifecycleLogging")', build)
+        self.assertIn('events("started", "passed", "skipped", "failed")', build)
+        self.assertIn("showStandardStreams = false", build)
+
     def test_release_contracts_run_independently_without_reducing_test_discovery(self):
         workflow = (pathlib.Path(__file__).parents[1] / ".github/workflows/test.yml").read_text()
         jobs = dict(re.findall(r"^  ([a-z-]+):\n(.*?)(?=^  [a-z-]+:|\Z)", workflow, re.M | re.S))

@@ -259,6 +259,16 @@ subprojects {
         jvmArgs("-Djava.awt.headless=true")
         environment.remove("DISPLAY")
         environment.remove("WAYLAND_DISPLAY")
+        if (providers.environmentVariable("GITHUB_ACTIONS").getOrElse("false").toBoolean() ||
+            providers.gradleProperty("testLifecycleLogging").getOrElse("false").toBoolean()
+        ) {
+            // Preserve live test identities when a worker stalls before XML reports are finalized (#516).
+            testLogging {
+                events("started", "passed", "skipped", "failed")
+                minGranularity = 2
+                showStandardStreams = false
+            }
+        }
     }
 }
 
