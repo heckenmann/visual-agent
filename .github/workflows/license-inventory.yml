@@ -97,3 +97,4 @@ jobs:
             build/reports/dependency-license/embedded-assets.txt
             build/reports/dependency-license/embedded-notices.txt
             modules/desktop/build/reports/dependency-license/packaged-artifacts.csv
+            modules/desktop/build/reports/dependency-license/runtime-provenance.properties

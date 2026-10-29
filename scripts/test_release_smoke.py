@@ -82,6 +82,19 @@ class ReleaseSmokeTest(unittest.TestCase):
 
 
 class ReleaseWorkflowTest(unittest.TestCase):
+    def test_release_contracts_run_independently_without_reducing_test_discovery(self):
+        workflow = (pathlib.Path(__file__).parents[1] / ".github/workflows/test.yml").read_text()
+        jobs = dict(re.findall(r"^  ([a-z-]+):\n(.*?)(?=^  [a-z-]+:|\Z)", workflow, re.M | re.S))
+        contracts = jobs["release-contracts"]
+        command = "python3 -m unittest discover -s scripts -p 'test_release_*.py'"
+        self.assertIn(command, contracts)
+        self.assertNotIn(command, jobs["test"])
+        self.assertNotRegex(contracts, re.compile(r"^    needs:", re.M))
+        self.assertIn("cache-read-only: true", contracts)
+        self.assertIn("gradle/actions/wrapper-validation", contracts)
+        self.assertIn('java-version: "27"', contracts)
+        self.assertIn("timeout-minutes: 15", jobs["test"])
+
     def test_native_smoke_fixtures_include_desktop_menus_and_process_tree_checks(self):
         root = pathlib.Path(__file__).parents[1]
         smoke = (root / ".github/workflows/package-smoke.yml").read_text()

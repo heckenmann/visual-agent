@@ -37,6 +37,35 @@ AboutLibraries was assessed on klibs.io (15.3.0, Apache-2.0, Compose 1.12 suppor
 the existing maintained Gradle License Report 3.1.4 remains the metadata inventory
 tool. Neither scanner alone covers all native redistribution obligations.
 
+## Retained Runtime Inputs
+
+`./gradlew :desktop:prepareRuntimeLegalMaterials` collects original source-JDK legal
+and vendor readme/notice files through a cacheable build task. The native distribution
+includes them under the common app-resources `legal/java-runtime` directory, using
+[Compose's supported app-resources mechanism](https://kotlinlang.org/docs/multiplatform/compose-native-distribution.html).
+The project's MIT license is separate under `legal/visual-agent`.
+
+Native package verification also writes `runtime-provenance.properties` outside
+the signed application bundle, recording source and packaged runtime/tool hashes
+separately. [JDK 27 macOS jpackage removes and replaces executable signatures](https://github.com/openjdk/jdk27u/blob/master/src/jdk.jpackage/macosx/classes/jdk/jpackage/internal/AppImageSigner.java),
+and jlink transforms the modules image. These supported stages must not be confused
+with byte-identical copies. Source inputs and retained notices are still verified
+against their hashes; no signed bundle is patched after packaging. Final release
+approval continues to bind the complete actual package bytes independently.
+
+`source-jdk.properties` includes only public version/vendor/platform keys, not host
+paths or arbitrary JDK properties. `source-inputs.sha256` identifies original JDK
+tools/modules and retained files; those original executables are not copied into
+the legal-material directory. File links outside the source JDK and directory links
+are rejected. This fixes provenance retention, not corresponding-source delivery
+or application/native dependency notice completeness.
+
+The `Release workflow contracts` CI job runs the complete `test_release_*.py`
+suite independently of `Gradle tests`. The runtime legal-material fixtures execute
+real Gradle builds; serializing them after the application suite exhausted the
+existing 15-minute job budget despite successful assertions. Both suites retain
+their tests and limits, and the contract job uses the Gradle cache read-only.
+
 ## Zulu Runtime
 
 CI currently uses Zulu Community Availability JDK 27, not Subscriber Availability.
