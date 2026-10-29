@@ -7,6 +7,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "windows-smoke-processes.ps1")
 $artifactPath = (Resolve-Path $Artifact).Path
 if (-not (Test-Path $artifactPath -PathType Leaf) -or (Get-Item $artifactPath).Length -le 0) {
     throw "Release artifact must be a non-empty file"
@@ -73,8 +74,13 @@ try {
     }
     $shutdownDeadline = [DateTime]::UtcNow.AddSeconds(30)
     while (-not $app.HasExited -and [DateTime]::UtcNow -lt $shutdownDeadline) {
-        $app.Refresh()
-        if ($app.MainWindowHandle -ne 0) { $null = $app.CloseMainWindow() }
+        $snapshot = @(Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId)
+        $ownedIds = @(Get-SmokeProcessIds -RootProcessId $app.Id -Snapshot $snapshot)
+        $ownedProcesses = foreach ($processId in $ownedIds) {
+            try { [System.Diagnostics.Process]::GetProcessById($processId) }
+            catch [System.ArgumentException] { } # A descendant can exit after the snapshot.
+        }
+        Close-SmokeWindows -Processes @($ownedProcesses)
         $null = $app.WaitForExit(250)
     }
     if (-not $app.HasExited) { throw "The application did not exit cleanly after closing its windows" }

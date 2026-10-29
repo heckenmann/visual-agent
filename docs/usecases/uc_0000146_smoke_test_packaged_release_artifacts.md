@@ -96,3 +96,14 @@ exercises the jpackage path that failed in the release, including the unchanged 
 CI installs Azul Zulu JDK 27 on every platform. [Temurin no longer publishes JDK 27 for Intel macOS](https://adoptium.net/news/2026/09/jdk27-macos-x64-removal),
 whereas [Zulu provides JDK 27 for macOS x64 and ARM64, Linux x64, and Windows x64](https://www.azul.com/downloads/).
 This preserves JDK 27 throughout the matrix rather than downgrading one architecture or dropping its package.
+
+## Native Smoke Environment
+
+Ubuntu containers install the distribution's `gnome-menus` package, which supplies
+standard desktop menu directories required by jpackage's XDG installation scripts.
+Installer/uninstaller errors are never ignored or converted into success.
+Windows closes windows belonging to the exact smoke-launched process tree, including
+restarted jpackage child launchers, rather than assuming the original starter owns
+the window. Unrelated application instances are not targeted. Parent-process exit
+and exit code remain mandatory; forceful cleanup never counts as graceful shutdown.
+Deterministic PowerShell snapshot tests run before the real Windows artifact smoke.

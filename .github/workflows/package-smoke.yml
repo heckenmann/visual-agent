@@ -248,7 +248,7 @@ jobs:
         if: matrix.image == 'ubuntu:24.04'
         run: |
           apt-get update
-          apt-get install --yes python3 xvfb xauth dbus-x11 libgtk-3-0t64 libasound2t64 libx11-xcb1 libxrender1 libxtst6 libxi6 libxrandr2 libfuse2t64
+          apt-get install --yes python3 xvfb xauth dbus-x11 gnome-menus libgtk-3-0t64 libasound2t64 libx11-xcb1 libxrender1 libxtst6 libxi6 libxrandr2 libfuse2t64
 
       - name: Install Fedora desktop runtime dependencies
         if: matrix.image == 'fedora:latest'
@@ -362,4 +362,6 @@ jobs:
 
       - name: Install, launch, and verify Windows artifact
         shell: pwsh
-        run: ./scripts/smoke-release-windows.ps1 -Kind "${{ matrix.kind }}" -Artifact "artifact/visual-agent-windows${{ matrix.kind == 'jar' && '-x64-jar.jar' || '.msi' }}"
+        run: |
+          ./scripts/test-windows-smoke-processes.ps1
+          ./scripts/smoke-release-windows.ps1 -Kind "${{ matrix.kind }}" -Artifact "artifact/visual-agent-windows${{ matrix.kind == 'jar' && '-x64-jar.jar' || '.msi' }}"

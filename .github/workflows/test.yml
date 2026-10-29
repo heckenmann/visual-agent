@@ -16,6 +16,19 @@ env:
   GRADLE_OPTS: -Dorg.gradle.daemon=false
 
 jobs:
+  windows-smoke-contract:
+    name: Windows smoke process contract
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out process regression tests
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Verify isolated native-launcher window ownership
+        shell: pwsh
+        run: ./scripts/test-windows-smoke-processes.ps1
+
   test:
     name: Gradle tests
     runs-on: ubuntu-latest
