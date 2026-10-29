@@ -211,6 +211,14 @@ jobs:
           if-no-files-found: error
           path: release-assets/
 
+      - name: Preserve native runtime provenance
+        if: matrix.extension != 'jar'
+        uses: actions/upload-artifact@v7
+        with:
+          name: runtime-provenance-${{ matrix.platform }}
+          if-no-files-found: error
+          path: modules/desktop/build/reports/dependency-license/runtime-provenance.properties
+
   smoke-linux-native:
     name: Smoke ${{ matrix.platform }} in ${{ matrix.image }}
     needs: package
