@@ -82,6 +82,23 @@ class ReleaseSmokeTest(unittest.TestCase):
 
 
 class ReleaseWorkflowTest(unittest.TestCase):
+    def test_native_smoke_fixtures_include_desktop_menus_and_process_tree_checks(self):
+        root = pathlib.Path(__file__).parents[1]
+        smoke = (root / ".github/workflows/package-smoke.yml").read_text()
+        ubuntu = re.search(
+            r"- name: Install Ubuntu desktop runtime dependencies\n(.*?)(?=\n      - name:)", smoke, re.S
+        )
+        self.assertIsNotNone(ubuntu)
+        self.assertIn("gnome-menus", ubuntu.group(1))
+        self.assertIn("./scripts/test-windows-smoke-processes.ps1", smoke)
+        ci = (root / ".github/workflows/test.yml").read_text()
+        self.assertIn("name: Windows smoke process contract", ci)
+        self.assertIn("./scripts/test-windows-smoke-processes.ps1", ci)
+        windows = (root / "scripts/smoke-release-windows.ps1").read_text()
+        self.assertIn("Get-SmokeProcessIds -RootProcessId $app.Id", windows)
+        self.assertIn("Close-SmokeWindows -Processes", windows)
+        self.assertIn('throw "The application did not exit cleanly', windows)
+
     def test_gradle_quality_gates_and_package_verification_do_not_use_a_display(self):
         root = pathlib.Path(__file__).parents[1]
         for name in ("test.yml", "package-smoke.yml"):

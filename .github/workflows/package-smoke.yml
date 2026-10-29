@@ -362,4 +362,6 @@ jobs:
 
       - name: Install, launch, and verify Windows artifact
         shell: pwsh
-        run: ./scripts/smoke-release-windows.ps1 -Kind "${{ matrix.kind }}" -Artifact "artifact/visual-agent-windows${{ matrix.kind == 'jar' && '-x64-jar.jar' || '.msi' }}"
+        run: |
+          ./scripts/test-windows-smoke-processes.ps1
+          ./scripts/smoke-release-windows.ps1 -Kind "${{ matrix.kind }}" -Artifact "artifact/visual-agent-windows${{ matrix.kind == 'jar' && '-x64-jar.jar' || '.msi' }}"
