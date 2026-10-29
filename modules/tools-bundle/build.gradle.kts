@@ -16,6 +16,6 @@ dependencies {
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(24))
+        languageVersion.set(JavaLanguageVersion.of(libs.versions.java.toolchain.get().toInt()))
     }
 }

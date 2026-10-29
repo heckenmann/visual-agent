@@ -166,6 +166,59 @@ class ReleaseWorkflowTest(unittest.TestCase):
             r"packageVersion\s*=\s*project\.version\s*\.toString\(\)\s*\.substringBefore\('-'\)\s*\.substringBefore\('\+'\)",
         )
 
+    def test_all_builds_use_one_jdk_and_retain_the_supported_bytecode_target(self):
+        root = pathlib.Path(__file__).parents[1]
+        desktop = (root / "modules/desktop/build.gradle.kts").read_text()
+        catalog = (root / "gradle/libs.versions.toml").read_text()
+        self.assertIn('java-toolchain = "27"', catalog)
+        self.assertIn('java-bytecode = "24"', catalog)
+        self.assertRegex(
+            desktop,
+            r"val desktopJavaVersion\s*=\s*libs\s*\.versions\s*\.java\s*\.toolchain\s*\.get\(\)\s*\.toInt\(\)",
+        )
+        self.assertIn("languageVersion.set(JavaLanguageVersion.of(desktopJavaVersion))", desktop)
+        self.assertIn("jvmToolchain(desktopJavaVersion)", desktop)
+        self.assertIn("majorVersion == desktopJavaVersion.toString()", desktop)
+        self.assertNotIn("installerVersions", desktop)
+        for build in [root / "application/build.gradle.kts", *sorted((root / "modules").glob("*/build.gradle.kts"))]:
+            text = build.read_text()
+            with self.subTest(module=build.parent.name):
+                self.assertNotIn("jvmToolchain(24)", text)
+                self.assertNotIn("JavaLanguageVersion.of(24)", text)
+                if "jvmToolchain(" in text:
+                    self.assertRegex(
+                        text,
+                        r"JvmTarget\s*\.fromTarget\(\s*libs\.versions\.java\.bytecode\s*\.get\(\),?\s*\)",
+                    )
+                    self.assertIn('-Xjdk-release=${libs.versions.java.bytecode.get()}', text)
+        for workflow in (root / ".github/workflows").glob("*.yml"):
+            versions = re.findall(r'java-version:\s*"(\d+)"', workflow.read_text())
+            self.assertTrue(all(version == "27" for version in versions), workflow.name)
+            distributions = re.findall(r'distribution:\s*(\S+)', workflow.read_text())
+            self.assertTrue(all(distribution == "zulu" for distribution in distributions), workflow.name)
+        build = (root / "build.gradle.kts").read_text()
+        self.assertIn("options.release.set(javaBytecodeVersion)", build)
+        self.assertIn("dependsOn(verifyJavaToolchains)", build)
+
+    def test_native_package_failures_show_and_preserve_jpackage_logs(self):
+        workflow = (pathlib.Path(__file__).parents[1] / ".github/workflows/package-smoke.yml").read_text()
+        block = re.search(
+            r"      - name: Show native packaging failure logs\n(.*?)(?=\n      - name: Preserve)", workflow, re.S
+        )
+        self.assertIsNotNone(block)
+        self.assertIn("if: failure()", block.group(1))
+        script = block.group(1).split("        run: |\n", 1)[1]
+        script = "\n".join(line[10:] for line in script.splitlines())
+        with tempfile.TemporaryDirectory() as temporary:
+            logs = pathlib.Path(temporary) / "modules/desktop/build/compose/logs/createDistributable"
+            logs.mkdir(parents=True)
+            (logs / "jpackage-err.txt").write_text("A specific packaging failure\n")
+            result = subprocess.run(["bash", "-c", script], cwd=temporary, text=True, capture_output=True)
+            self.assertEqual(0, result.returncode, result.stderr)
+            self.assertIn("A specific packaging failure", result.stdout)
+        self.assertRegex(workflow, r"name: Preserve native packaging failure logs\n\s+if: failure\(\)")
+        self.assertIn("name: packaging-logs-${{ matrix.platform }}", workflow)
+
     def test_workflow_dispatch_is_tag_free_and_release_creation_is_disabled(self):
         root = pathlib.Path(__file__).parents[1] / ".github/workflows"
         smoke = (root / "package-smoke.yml").read_text()

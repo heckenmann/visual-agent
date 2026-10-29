@@ -21,7 +21,7 @@ Release workflow.
 1. The workflow downloads each package artifact produced by the release build.
 2. It installs the DEB in Ubuntu and the RPM in Fedora, and launches the AppImage in Ubuntu; each Linux package is tested in its matching operating-system container.
 3. It mounts and launches each macOS DMG on the matching architecture runner and installs and launches the Windows MSI on Windows.
-4. It launches each platform-specific executable JAR with Java 24.
+4. It launches each platform-specific executable JAR with Java 27.
 5. Each launch uses an isolated temporary user profile and server data root, requests the ordinary local startup action through an opt-in system property, and waits for the desktop readiness log marker.
    Automatic onboarding is hidden for this launch without changing its stored status, so the main workspace can be verified without provider credentials.
 6. The workflow verifies that the application created a non-empty H2 database and a workspace in the isolated data root.
@@ -41,6 +41,7 @@ Every published native installer, portable Linux package, and platform-specific 
 - `.github/workflows/package-smoke.yml`
 - `.github/workflows/release.yml`
 - `gradle/release-version.settings.gradle.kts`
+- `build.gradle.kts` (`verifyJavaToolchains`)
 - `scripts/smoke-release-posix.py`
 - `scripts/smoke-release-windows.ps1`
 - `de.heckenmann.visualagent.desktop.DesktopStartupSmokeSupport`
@@ -51,7 +52,7 @@ Every published native installer, portable Linux package, and platform-specific 
 
 - Smoke tests consume the uploaded release artifacts rather than rebuilding substitute packages.
 - DEB and AppImage run in Ubuntu; RPM runs in Fedora; DMGs run on matching macOS architectures; MSI runs on Windows.
-- Executable JARs run with Java 24 on their target OS and architecture.
+- Executable JAR smoke tests run with Java 27 on their target OS and architecture; generated application bytecode/API targets remain Java 24.
 - Native package smoke tests do not require a system Java installation.
 - The ready signal is emitted only after the server connection, initial layout, and onboarding state are loaded and the main window is composed with restored geometry.
 - Each run uses unique temporary user and server data directories and verifies the database and workspace are created there.
@@ -70,6 +71,8 @@ Every published native installer, portable Linux package, and platform-specific 
   Major/minor must be at most 255 and patch at most 65535 to fit the Windows MSI format.
   Prereleases with the same numeric core therefore share an installer version; they are not distinct native upgrade versions.
   The original tag, including suffixes, still identifies the release receiving the assets.
+- Native package failures print `jpackage` output/error logs in the job log and retain those logs
+  as platform-specific workflow artifacts. A diagnostic step never changes failure into success.
 
 ## Versioning Decision
 
@@ -78,3 +81,18 @@ and [catalog version overrides](https://docs.gradle.org/current/userguide/versio
 rather than adding a versioning library or modifying the source checkout. Workflow-wide environment propagation
 prevents the verification and package matrix from using different application versions. Native installer versions
 follow [Compose's platform-specific restrictions](https://kotlinlang.org/docs/multiplatform/compose-native-distribution.html#package-version).
+
+Issue #505 uses the official [JDK-8380634 correction](https://github.com/openjdk/jdk/commit/0c4156d599868992cce34605bc5bd1b9a072b502),
+included in [JDK 27](https://github.com/openjdk/jdk27u/blob/master/src/jdk.jpackage/macosx/classes/jdk/jpackage/internal/CFBundleVersion.java),
+instead of compensating for JDK 24's obsolete rejection of zero-major macOS versions.
+The `java-toolchain` catalog entry selects JDK 27 throughout compilation, tests, CI and native
+tooling/runtime. The separate `java-bytecode` entry keeps Kotlin JVM/API targets and Java release
+levels at 24 because the stable Kotlin compiler does not yet expose JVM-27 bytecode generation.
+`verifyJavaToolchains` verifies compiler/test-launcher JDKs and Java release levels; native runtime
+verification checks the same JDK. No artificial version offset, custom packager, or signed-bundle patch is used.
+Regression tests preserve `v0.1.0` as application version `0.1.0`; an actual macOS DMG build
+exercises the jpackage path that failed in the release, including the unchanged installer version.
+
+CI installs Azul Zulu JDK 27 on every platform. [Temurin no longer publishes JDK 27 for Intel macOS](https://adoptium.net/news/2026/09/jdk27-macos-x64-removal),
+whereas [Zulu provides JDK 27 for macOS x64 and ARM64, Linux x64, and Windows x64](https://www.azul.com/downloads/).
+This preserves JDK 27 throughout the matrix rather than downgrading one architecture or dropping its package.

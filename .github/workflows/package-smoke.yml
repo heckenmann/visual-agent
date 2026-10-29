@@ -31,8 +31,8 @@ jobs:
       - name: Set up Java
         uses: actions/setup-java@v6
         with:
-          distribution: temurin
-          java-version: "24"
+          distribution: zulu
+          java-version: "27"
 
       - name: Read Gradle wrapper version
         id: gradle_wrapper
@@ -155,8 +155,8 @@ jobs:
       - name: Set up Java
         uses: actions/setup-java@v6
         with:
-          distribution: temurin
-          java-version: "24"
+          distribution: zulu
+          java-version: "27"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6.4.0
@@ -178,6 +178,22 @@ jobs:
       - name: Build native package
         run: ./gradlew :desktop:${{ matrix.task }} --no-daemon --no-configuration-cache
         shell: bash
+
+      - name: Show native packaging failure logs
+        if: failure()
+        shell: bash
+        run: |
+          if [[ -d modules/desktop/build/compose/logs ]]; then
+            find modules/desktop/build/compose/logs -type f -name '*.txt' -print -exec cat {} \;
+          fi
+
+      - name: Preserve native packaging failure logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: packaging-logs-${{ matrix.platform }}
+          if-no-files-found: ignore
+          path: modules/desktop/build/compose/logs/
 
       - name: Stage release asset
         shell: bash
@@ -256,8 +272,8 @@ jobs:
       - name: Set up Java
         uses: actions/setup-java@v6
         with:
-          distribution: temurin
-          java-version: "24"
+          distribution: zulu
+          java-version: "27"
 
       - name: Download Linux JAR
         uses: actions/download-artifact@v8
@@ -303,8 +319,8 @@ jobs:
         if: matrix.kind == 'jar'
         uses: actions/setup-java@v6
         with:
-          distribution: temurin
-          java-version: "24"
+          distribution: zulu
+          java-version: "27"
 
       - name: Download release artifact
         uses: actions/download-artifact@v8
@@ -335,8 +351,8 @@ jobs:
         if: matrix.kind == 'jar'
         uses: actions/setup-java@v6
         with:
-          distribution: temurin
-          java-version: "24"
+          distribution: zulu
+          java-version: "27"
 
       - name: Download release artifact
         uses: actions/download-artifact@v8

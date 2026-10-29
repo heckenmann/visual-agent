@@ -168,7 +168,12 @@ compose.resources {
     )
 }
 
-val desktopJavaVersion = 24
+// JDK-8380634 fixes zero-major macOS app versions in jpackage 27; do not rewrite the release version.
+// Kotlin's stable compiler still targets JVM 24, but compilation, tests and native runtime share JDK 27.
+val desktopJavaVersion =
+    libs.versions.java.toolchain
+        .get()
+        .toInt()
 val desktopJavaHome =
     javaToolchains
         .launcherFor { languageVersion.set(JavaLanguageVersion.of(desktopJavaVersion)) }
@@ -210,7 +215,6 @@ compose.desktop {
                 "jdk.unsupported",
             )
             packageName = "Visual Agent"
-            // Installer formats require a numeric version; runtime metadata/JARs retain the full release version.
             packageVersion =
                 project.version
                     .toString()
@@ -838,8 +842,14 @@ tasks.named("check") {
 kotlin {
     jvmToolchain(desktopJavaVersion)
     compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_24)
-        freeCompilerArgs.addAll("-Xjsr305=strict", "-Werror")
+        jvmTarget.set(
+            org.jetbrains.kotlin.gradle.dsl.JvmTarget
+                .fromTarget(
+                    libs.versions.java.bytecode
+                        .get(),
+                ),
+        )
+        freeCompilerArgs.addAll("-Xjsr305=strict", "-Werror", "-Xjdk-release=${libs.versions.java.bytecode.get()}")
     }
 }
 

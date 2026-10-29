@@ -46,6 +46,8 @@ Publishing a GitHub release builds its tag with the corresponding Gradle applica
 (for example, `v1.2.3-beta.1` becomes `1.2.3-beta.1`), without changing the checked-in version catalog.
 Tags must be Semantic Versions, with or without a `v` prefix (`v` is recommended).
 Native installer versions use the numeric `1.2.3` core; application metadata and JARs retain the full version.
+Development, compilation, tests, CI, and packaging use JDK 27, including its corrected `jpackage`
+and bundled native runtime. Bytecode/API targets stay at Java 24 for standalone JAR compatibility.
 Assets are attached only after package smoke tests pass. Creating a tag alone does not trigger publication.
 Local builds and manually dispatched smoke tests use the catalog's default version.
 See [Release Versions](docs/setup.md#release-versions) for examples, installer limits, and local reproduction.

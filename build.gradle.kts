@@ -15,6 +15,46 @@ plugins {
     alias(libs.plugins.license.report)
 }
 
+// Use one JDK for build/test/runtime while keeping Java and Kotlin API/bytecode targets aligned.
+val javaBytecodeVersion = libs.versions.java.bytecode.get().toInt()
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(libs.versions.java.toolchain.get().toInt()))
+    }
+}
+allprojects {
+    tasks.withType<JavaCompile>().configureEach {
+        options.release.set(javaBytecodeVersion)
+    }
+}
+
+val verifyJavaToolchains =
+    tasks.register("verifyJavaToolchains") {
+        group = "verification"
+        description = "Verifies one configured JDK for compilation/tests and the shared Java bytecode release."
+        doLast {
+            val expectedJdk = libs.versions.java.toolchain.get().toInt()
+            allprojects.forEach { target ->
+                target.extensions.findByType<JavaPluginExtension>()?.let { java ->
+                    check(java.toolchain.languageVersion.get().asInt() == expectedJdk) {
+                        "${target.path} must use the shared JDK $expectedJdk toolchain"
+                    }
+                }
+                target.tasks.withType<JavaCompile>().forEach { compile ->
+                    check(compile.options.release.get() == javaBytecodeVersion) { "${compile.path} has a different bytecode release" }
+                    check(compile.javaCompiler.get().metadata.languageVersion.asInt() == expectedJdk) {
+                        "${compile.path} must compile with JDK $expectedJdk"
+                    }
+                }
+                target.tasks.withType<Test>().forEach { test ->
+                    check(test.javaLauncher.get().metadata.languageVersion.asInt() == expectedJdk) {
+                        "${test.path} must run with JDK $expectedJdk"
+                    }
+                }
+            }
+        }
+    }
+
 licenseReport {
     projects = (listOf(project) + subprojects).toTypedArray()
     buildScriptProjects = (listOf(project) + subprojects).toTypedArray()
@@ -370,6 +410,7 @@ gradle.projectsEvaluated {
 }
 
 tasks.named("check") {
+    dependsOn(verifyJavaToolchains)
     dependsOn(tasks.jacocoTestCoverageVerification)
 }
 
